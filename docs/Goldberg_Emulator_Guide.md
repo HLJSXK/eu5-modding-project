@@ -23,6 +23,35 @@ The Goldberg Steam Emulator allows EU5 to run in LAN mode without requiring Stea
 
 ## 🔧 Configuration Files
 
+### Account Name and Steam ID
+
+The emulator allows you to configure your account name and Steam ID that will be displayed in LAN multiplayer sessions.
+
+**Configuration Files:**
+- `steam_settings/force_account_name.txt` - Your display name in multiplayer
+- `steam_settings/force_steamid.txt` - Your unique Steam ID (17 digits)
+
+**Using the deployment tool:**
+```bash
+# Deploy with custom account name and Steam ID
+eu5-deployer.exe --account-name "YourName" --steam-id "76561198012345678"
+
+# Deploy with default values (EU5Player / 76561197960287930)
+eu5-deployer.exe
+```
+
+**Manual configuration:**
+1. Navigate to `<EU5_Installation>/binaries/steam_settings/`
+2. Edit `force_account_name.txt` - Enter your desired display name
+3. Edit `force_steamid.txt` - Enter a valid 17-digit Steam ID starting with `7656119`
+
+**Steam ID Format:**
+- Must be exactly 17 digits
+- Must start with `7656119`
+- Example: `76561197960287930`
+
+**Important:** All players in a LAN session should use **different Steam IDs** to avoid conflicts. You can generate unique IDs by incrementing the last digits (e.g., `76561197960287931`, `76561197960287932`, etc.).
+
 ### steam_api64.dll
 
 This is the Goldberg Steam Emulator DLL that replaces the original Steam API DLL in the EU5 binaries folder. It intercepts Steam API calls and provides LAN networking functionality.

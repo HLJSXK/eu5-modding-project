@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 // Deployer handles Goldberg Emulator deployment
@@ -269,6 +271,80 @@ func copyDir(src, dst string) error {
 			}
 		}
 	}
+
+	return nil
+}
+
+// ValidateSteamID validates the Steam ID format (17 digits starting with 7656119)
+func ValidateSteamID(steamID string) error {
+	// Remove any whitespace
+	steamID = strings.TrimSpace(steamID)
+
+	// Check if it's exactly 17 digits
+	if len(steamID) != 17 {
+		return fmt.Errorf("Steam ID must be exactly 17 digits, got %d", len(steamID))
+	}
+
+	// Check if it's all numeric
+	matched, err := regexp.MatchString("^[0-9]+$", steamID)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return fmt.Errorf("Steam ID must contain only digits")
+	}
+
+	// Check if it starts with valid Steam ID prefix
+	if !strings.HasPrefix(steamID, "7656119") {
+		return fmt.Errorf("Steam ID must start with 7656119")
+	}
+
+	return nil
+}
+
+// ValidateAccountName validates the account name
+func ValidateAccountName(accountName string) error {
+	// Remove leading/trailing whitespace
+	accountName = strings.TrimSpace(accountName)
+
+	if accountName == "" {
+		return fmt.Errorf("account name cannot be empty")
+	}
+
+	if len(accountName) > 32 {
+		return fmt.Errorf("account name too long (max 32 characters)")
+	}
+
+	return nil
+}
+
+// ConfigureSteamSettings configures account name and Steam ID in steam_settings folder
+func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
+	// Validate inputs
+	if err := ValidateAccountName(accountName); err != nil {
+		return fmt.Errorf("invalid account name: %w", err)
+	}
+
+	if err := ValidateSteamID(steamID); err != nil {
+		return fmt.Errorf("invalid Steam ID: %w", err)
+	}
+
+	// Get paths
+	steamSettingsSource := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_settings")
+	accountNameFile := filepath.Join(steamSettingsSource, "force_account_name.txt")
+	steamIDFile := filepath.Join(steamSettingsSource, "force_steamid.txt")
+
+	// Write account name
+	if err := os.WriteFile(accountNameFile, []byte(strings.TrimSpace(accountName)), 0644); err != nil {
+		return fmt.Errorf("failed to write account name: %w", err)
+	}
+	fmt.Printf("✓ Set account name to: %s\n", accountName)
+
+	// Write Steam ID
+	if err := os.WriteFile(steamIDFile, []byte(strings.TrimSpace(steamID)), 0644); err != nil {
+		return fmt.Errorf("failed to write Steam ID: %w", err)
+	}
+	fmt.Printf("✓ Set Steam ID to: %s\n", steamID)
 
 	return nil
 }

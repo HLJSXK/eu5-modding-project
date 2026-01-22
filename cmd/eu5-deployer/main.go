@@ -14,6 +14,8 @@ func main() {
 	// Parse command line flags
 	eu5PathFlag := flag.String("eu5-path", "", "Path to EU5 installation directory")
 	restoreFlag := flag.Bool("restore", false, "Restore original files from backup")
+	accountNameFlag := flag.String("account-name", "EU5Player", "Steam account name to use in emulator")
+	steamIDFlag := flag.String("steam-id", "76561197960287930", "Steam ID to use in emulator (17 digits)")
 	flag.Parse()
 
 	// Get project root (executable directory or parent of cmd)
@@ -72,6 +74,13 @@ func main() {
 	if *restoreFlag {
 		actionErr = d.Restore()
 	} else {
+		// Configure Steam settings before deployment
+		fmt.Println("\n[Step 0/3] Configuring Steam emulator settings...")
+		if err := d.ConfigureSteamSettings(*accountNameFlag, *steamIDFlag); err != nil {
+			fmt.Printf("\n✗ Error configuring Steam settings: %v\n", err)
+			os.Exit(1)
+		}
+		
 		actionErr = d.Deploy()
 	}
 

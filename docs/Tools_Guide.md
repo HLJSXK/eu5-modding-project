@@ -91,8 +91,11 @@ __BINARIES_PATH__=D:\Steam\steamapps\common\Europa Universalis V\binaries
 
 **使用方法：**
 ```bash
-# 自动检测并部署
+# 自动检测并部署（使用默认账户名和 Steam ID）
 eu5-deployer-windows-amd64.exe
+
+# 自定义账户名和 Steam ID
+eu5-deployer-windows-amd64.exe --account-name "玩家1" --steam-id "76561197960287931"
 
 # 指定 EU5 路径
 eu5-deployer-windows-amd64.exe --eu5-path "D:\Steam\steamapps\common\Europa Universalis V"
@@ -101,11 +104,18 @@ eu5-deployer-windows-amd64.exe --eu5-path "D:\Steam\steamapps\common\Europa Univ
 eu5-deployer-windows-amd64.exe --restore
 ```
 
+**命令行参数：**
+- `--eu5-path` - 手动指定 EU5 安装路径
+- `--account-name` - 设置 Steam 账户名（默认：EU5Player）
+- `--steam-id` - 设置 Steam ID（默认：76561197960287930）
+- `--restore` - 恢复原始文件
+
 **部署流程：**
-1. 验证 EU5 安装路径
-2. 备份原始 `steam_api64.dll`
-3. 复制 Goldberg `steam_api64.dll`
-4. 复制 `steam_settings` 文件夹（包含 DLC.txt 和 mods）
+1. 配置 Steam 模拟器设置（账户名和 Steam ID）
+2. 验证 EU5 安装路径
+3. 备份原始 `steam_api64.dll`
+4. 复制 Goldberg `steam_api64.dll`
+5. 复制 `steam_settings` 文件夹（包含 DLC.txt、账户配置和 mods）
 
 **输出示例：**
 ```
@@ -116,6 +126,10 @@ Goldberg Emulator Deployment for EU5
 Project Root: D:\eu5-modding-project
 EU5 Installation: D:\Steam\steamapps\common\Europa Universalis V
 Binaries Folder: D:\Steam\steamapps\common\Europa Universalis V\binaries
+
+[Step 0/3] Configuring Steam emulator settings...
+✓ Set account name to: EU5Player
+✓ Set Steam ID to: 76561197960287930
 
 [Step 1/3] Backing up original steam_api64.dll...
 ✓ Backed up original DLL to: ...\binaries\.goldberg_backup\steam_api64.dll.original

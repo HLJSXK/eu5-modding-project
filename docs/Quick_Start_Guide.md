@@ -29,12 +29,32 @@ build\eu5-deployer-windows-amd64.exe
 ```
 
 脚本会自动：
+- 配置 Steam 账户名和 ID（默认：EU5Player / 76561197960287930）
 - 检测 EU5 安装位置
 - 备份原始 `steam_api64.dll`
 - 部署 Goldberg Emulator
 - 复制配置文件
 
-### 3. 启动游戏
+### 3. 自定义账户名和 Steam ID（可选）
+
+如果您想使用自定义的账户名和 Steam ID：
+
+**Windows:**
+```cmd
+build\eu5-deployer-windows-amd64.exe --account-name "你的名字" --steam-id "76561197960287931"
+```
+
+**Linux/macOS:**
+```bash
+./build/eu5-deployer-linux-amd64 --account-name "你的名字" --steam-id "76561197960287931"
+```
+
+**重要：** 每个玩家应使用不同的 Steam ID！可以将最后几位数字递增：
+- 玩家1: `76561197960287930`
+- 玩家2: `76561197960287931`
+- 玩家3: `76561197960287932`
+
+### 4. 启动游戏
 
 直接从 Steam 启动 EU5，即可在局域网列表中看到朋友的房间！
 
