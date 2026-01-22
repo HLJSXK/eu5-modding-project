@@ -115,7 +115,8 @@ eu5-deployer-windows-amd64.exe --restore
 2. 验证 EU5 安装路径
 3. 备份原始 `steam_api64.dll`
 4. 复制 Goldberg `steam_api64.dll`
-5. 复制 `steam_settings` 文件夹（包含 DLC.txt、账户配置和 mods）
+5. 复制 `steam_appid.txt`（EU5 的 App ID: 3450310）
+6. 复制 `steam_settings` 文件夹（包含 DLC.txt、账户配置和 mods）
 
 **输出示例：**
 ```
@@ -127,17 +128,20 @@ Project Root: D:\eu5-modding-project
 EU5 Installation: D:\Steam\steamapps\common\Europa Universalis V
 Binaries Folder: D:\Steam\steamapps\common\Europa Universalis V\binaries
 
-[Step 0/3] Configuring Steam emulator settings...
+[Step 0/4] Configuring Steam emulator settings...
 ✓ Set account name to: EU5Player
 ✓ Set Steam ID to: 76561197960287930
 
-[Step 1/3] Backing up original steam_api64.dll...
+[Step 1/4] Backing up original steam_api64.dll...
 ✓ Backed up original DLL to: ...\binaries\.goldberg_backup\steam_api64.dll.original
 
-[Step 2/3] Deploying Goldberg steam_api64.dll...
+[Step 2/4] Deploying Goldberg steam_api64.dll...
 ✓ Deployed Goldberg DLL to: ...\binaries\steam_api64.dll
 
-[Step 3/3] Deploying steam_settings folder...
+[Step 3/4] Deploying steam_appid.txt...
+✓ Deployed steam_appid.txt to: ...\binaries\steam_appid.txt
+
+[Step 4/4] Deploying steam_settings folder...
 ✓ Removed existing steam_settings
 ✓ Deployed steam_settings to: ...\binaries\steam_settings
   - DLC.txt: ...\binaries\steam_settings\DLC.txt

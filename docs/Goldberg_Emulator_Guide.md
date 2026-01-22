@@ -7,6 +7,7 @@ This folder contains the Goldberg Steam Emulator configuration for European Univ
 ```
 goldberg_emulator/
 ├── steam_api64.dll          # Goldberg Steam Emulator DLL
+├── steam_appid.txt          # EU5 Steam App ID (3450310)
 ├── steam_settings/          # Configuration folder
 │   ├── DLC.txt             # DLC configuration file
 │   └── mods/               # Mods folder for LAN sessions
@@ -57,6 +58,17 @@ eu5-deployer.exe
 This is the Goldberg Steam Emulator DLL that replaces the original Steam API DLL in the EU5 binaries folder. It intercepts Steam API calls and provides LAN networking functionality.
 
 **Source:** [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator)
+
+### steam_appid.txt
+
+This file contains the Steam App ID for European Universalis 5, which is required by Goldberg Emulator to identify the game.
+
+**Content:**
+```
+3450310
+```
+
+**Note:** This file must be placed in the same directory as `steam_api64.dll` (the `binaries` folder).
 
 ### steam_settings/DLC.txt
 
@@ -118,12 +130,17 @@ If you prefer to deploy manually:
    cp goldberg_emulator/steam_api64.dll "<EU5_Installation>/binaries/"
    ```
 
-3. **Copy steam_settings folder:**
+3. **Copy steam_appid.txt:**
+   ```bash
+   cp goldberg_emulator/steam_appid.txt "<EU5_Installation>/binaries/"
+   ```
+
+4. **Copy steam_settings folder:**
    ```bash
    cp -r goldberg_emulator/steam_settings "<EU5_Installation>/binaries/"
    ```
 
-4. **Launch EU5** - The game will now run in LAN mode
+5. **Launch EU5** - The game will now run in LAN mode
 
 ### Restoration
 

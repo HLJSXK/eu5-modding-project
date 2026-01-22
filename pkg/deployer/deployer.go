@@ -152,19 +152,25 @@ func (d *Deployer) Deploy() error {
 	}
 
 	// Step 1: Backup original DLL
-	fmt.Println("\n[Step 1/3] Backing up original steam_api64.dll...")
+	fmt.Println("\n[Step 1/4] Backing up original steam_api64.dll...")
 	if err := d.BackupOriginalDLL(); err != nil {
 		return err
 	}
 
 	// Step 2: Deploy Goldberg DLL
-	fmt.Println("\n[Step 2/3] Deploying Goldberg steam_api64.dll...")
+	fmt.Println("\n[Step 2/4] Deploying Goldberg steam_api64.dll...")
 	if err := d.DeployDLL(); err != nil {
 		return err
 	}
 
-	// Step 3: Deploy steam_settings
-	fmt.Println("\n[Step 3/3] Deploying steam_settings folder...")
+	// Step 3: Deploy steam_appid.txt
+	fmt.Println("\n[Step 3/4] Deploying steam_appid.txt...")
+	if err := d.DeployAppID(); err != nil {
+		return err
+	}
+
+	// Step 4: Deploy steam_settings
+	fmt.Println("\n[Step 4/4] Deploying steam_settings folder...")
 	if err := d.DeploySteamSettings(); err != nil {
 		return err
 	}
@@ -206,7 +212,33 @@ func (d *Deployer) Restore() error {
 		fmt.Println("✓ Removed steam_settings folder")
 	}
 
+	// Remove steam_appid.txt
+	targetAppID := filepath.Join(d.BinariesPath, "steam_appid.txt")
+	if _, err := os.Stat(targetAppID); err == nil {
+		if err := os.Remove(targetAppID); err != nil {
+			return fmt.Errorf("failed to remove steam_appid.txt: %w", err)
+		}
+		fmt.Println("✓ Removed steam_appid.txt")
+	}
+
 	fmt.Println("\n✓ Restoration completed successfully!")
+	return nil
+}
+
+// DeployAppID deploys steam_appid.txt to binaries folder
+func (d *Deployer) DeployAppID() error {
+	sourceAppID := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_appid.txt")
+	targetAppID := filepath.Join(d.BinariesPath, "steam_appid.txt")
+
+	if _, err := os.Stat(sourceAppID); os.IsNotExist(err) {
+		return fmt.Errorf("steam_appid.txt not found: %s", sourceAppID)
+	}
+
+	if err := copyFile(sourceAppID, targetAppID); err != nil {
+		return fmt.Errorf("failed to deploy steam_appid.txt: %w", err)
+	}
+
+	fmt.Printf("✓ Deployed steam_appid.txt to: %s\n", targetAppID)
 	return nil
 }
 
