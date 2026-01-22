@@ -57,16 +57,14 @@ When a subject takes one of these actions, the player receives a notification, a
 
 ## 4. Technical Implementation
 
-The Dynamic Missions feature is modular and self-contained within the `dynamic_missions` directory. This ensures easy installation and high compatibility with other mods.
+The Dynamic Missions feature has been integrated into the main project mod (`template_mod`), ensuring a unified structure and easy management.
 
 ### 4.1. File Structure
 
 The mod is organized into the following files, adhering to EU5 modding best practices:
 
 ```
-dynamic_missions/
-├── .metadata/metadata.json
-├── README.md
+template_mod/
 ├── in_game/
 │   ├── common/
 │   │   ├── generic_actions/dynamic_missions_actions.txt
