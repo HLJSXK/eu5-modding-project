@@ -48,7 +48,7 @@ See the [Quick Start Guide](docs/Quick_Start_Guide.md) for detailed instructions
    - Install Visual Studio Code with CwTools extension
    - Enable debug mode in EU5 (`-debug_mode` launch option)
 
-4. Start creating your mods in the `src/` directory
+4. Use the template in `src/template_mod/` as a starting point for your mods
 
 ## Documentation
 
@@ -80,7 +80,11 @@ eu5-modding-project/
 │   ├── steam_api64.dll    # Goldberg DLL
 │   └── steam_settings/    # Configuration files
 ├── docs/                   # Documentation
-├── src/                    # Mod source files
+│   ├── EU5_Modding_Knowledge_Base.md
+│   ├── EU5_Mod_Framework_Guide.md
+│   └── Mod_Structure_Analysis.txt
+├── src/                    # Mod source files and templates
+│   └── template_mod/      # Ready-to-use mod template
 ├── assets/                 # Graphics and media
 ├── tools/                  # Development utilities
 ├── build.sh               # Build script (Linux/macOS)

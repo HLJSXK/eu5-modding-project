@@ -99,9 +99,11 @@ This template can be extended with:
 
 ## References
 
-- [EU5 Modding Knowledge Base](../../docs/EU5_Modding_Knowledge_Base.md)
-- [EU5 Wiki - Mod Structure](https://eu5.paradoxwikis.com/Mod_structure)
-- [Project Documentation](../../docs/)
+- [EU5 Modding Knowledge Base](../../docs/EU5_Modding_Knowledge_Base.md) - Comprehensive modding reference
+- [EU5 Mod Framework Guide](../../docs/EU5_Mod_Framework_Guide.md) - Practical development framework
+- [Mod Structure Analysis](../../docs/Mod_Structure_Analysis.txt) - Raw analysis data from community mods
+- [EU5 Wiki - Mod Structure](https://eu5.paradoxwikis.com/Mod_structure) - Official wiki documentation
+- [Project Documentation](../../docs/) - All project documentation
 
 ## Version History
 

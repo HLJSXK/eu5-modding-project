@@ -39,6 +39,12 @@ These guides are written in Chinese for ease of use by the target audience.
   - Best practices and workflows
   - Common pitfalls and solutions
 
+- **[Mod Structure Analysis](Mod_Structure_Analysis.txt)**
+  - Raw analysis data from 16 community mods
+  - Directory structure patterns
+  - File format specifications
+  - Quick reference for common patterns
+
 - **[Goldberg Emulator Guide](Goldberg_Emulator_Guide.md)**
   - Detailed Goldberg setup instructions
   - Configuration file formats

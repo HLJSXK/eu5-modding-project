@@ -317,7 +317,7 @@ Preparing for release involves:
 The EU5 MP Project includes a reference mod demonstrating these principles:
 
 ```
-mods/eu5mp_project_mod/
+src/template_mod/
 ├── .metadata/
 │   └── metadata.json
 ├── in_game/
@@ -337,6 +337,8 @@ This structure demonstrates:
 - Modifier definitions
 - Localization with UTF-8 BOM
 - Documentation practices
+
+For complete details, see the [template mod README](../src/template_mod/README.md) and the [raw analysis data](Mod_Structure_Analysis.txt).
 
 ## 12. Conclusion
 
