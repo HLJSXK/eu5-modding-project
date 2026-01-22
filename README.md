@@ -1,53 +1,40 @@
 # European Universalis 5 Modding Project
 
-A comprehensive modding project for **European Universalis 5**, featuring documentation, tools, and mod development resources.
+A comprehensive toolkit for **European Universalis 5** modding and LAN multiplayer setup.
 
-## 📋 Project Overview
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://golang.org)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/HLJSXK/eu5-modding-project)
 
-This repository serves as the central hub for EU5 mod development, containing:
+## Overview
 
-- **Documentation**: Comprehensive guides and knowledge base
-- **Source Code**: Mod scripts, events, and game logic
-- **Assets**: Graphics, flags, and other media files
-- **Tools**: Helper scripts and utilities for mod development
+This project provides tools and documentation for EU5 modding and multiplayer setup, with a focus on enabling LAN multiplayer through Goldberg Steam Emulator. All tools are compiled as standalone executables requiring no runtime dependencies.
 
-## 📂 Repository Structure
+**Key Features:**
+- 🎮 One-click LAN multiplayer setup
+- 🔧 Automatic EU5 installation detection
+- 💾 Safe backup and restoration
+- 📦 Zero dependencies - standalone executables
+- 🌐 Cross-platform support (Windows, Linux, macOS)
+- 📚 Comprehensive modding documentation
 
+## Quick Start
+
+### For LAN Multiplayer
+
+**Windows Users:**
+1. Download the [latest release](https://github.com/HLJSXK/eu5-modding-project/releases) or clone this repository
+2. Run `build\eu5-deployer-windows-amd64.exe`
+3. Launch EU5 and enjoy LAN multiplayer!
+
+**Restore to normal Steam mode:**
+```bash
+build\eu5-deployer-windows-amd64.exe --restore
 ```
-eu5-modding-project/
-├── docs/                           # Documentation and guides
-│   └── EU5_Modding_Knowledge_Base.md
-├── src/                            # Mod source files
-│   ├── common/                     # Game data definitions
-│   ├── events/                     # Event scripts
-│   ├── gui/                        # Interface files
-│   └── localization/               # Translation files
-├── assets/                         # Graphics and media
-│   ├── flags/                      # Flag designs
-│   ├── gfx/                        # Graphics files
-│   └── music/                      # Audio files
-└── tools/                          # Development utilities
-```
 
-## 📚 Documentation
+See the [Quick Start Guide](docs/Quick_Start_Guide.md) for detailed instructions.
 
-### Core Documentation
-- **[EU5 Modding Knowledge Base](./docs/EU5_Modding_Knowledge_Base.md)** - Complete guide to EU5 modding
-
-### External Resources
-- [Official EU5 Wiki](https://eu5.paradoxwikis.com/)
-- [Modding Documentation](https://eu5.paradoxwikis.com/Modding)
-- [Paradox Forums](https://forum.paradoxplaza.com/)
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-1. **European Universalis 5** (Steam version)
-2. **Text Editor**: Visual Studio Code with CwTools extension (recommended)
-3. **Git**: For version control
-
-### Development Setup
+### For Modding
 
 1. Clone this repository:
    ```bash
@@ -55,99 +42,118 @@ eu5-modding-project/
    cd eu5-modding-project
    ```
 
-2. Read the [EU5 Modding Knowledge Base](./docs/EU5_Modding_Knowledge_Base.md)
+2. Read the [EU5 Modding Knowledge Base](docs/EU5_Modding_Knowledge_Base.md)
 
 3. Set up your development environment:
-   - Install VS Code
-   - Install CwTools extension
-   - Enable debug mode in EU5 (add `-debug_mode` to launch options)
+   - Install Visual Studio Code with CwTools extension
+   - Enable debug mode in EU5 (`-debug_mode` launch option)
 
-4. Start modding!
+4. Start creating your mods in the `src/` directory
 
-## 🎮 LAN Multiplayer Setup (Goldberg Emulator)
+## Documentation
 
-This project includes tools for setting up LAN multiplayer using Goldberg Steam Emulator.
+### User Guides
+- **[Quick Start Guide](docs/Quick_Start_Guide.md)** - Fast setup for LAN multiplayer (中文)
+- **[Tools Guide](docs/Tools_Guide.md)** - Complete guide for deployment tools (中文)
+- **[Project User Guide](docs/Project_User_Guide.md)** - Project overview and features (中文)
 
-### Quick Setup (Windows)
+### Technical Documentation
+- **[EU5 Modding Knowledge Base](docs/EU5_Modding_Knowledge_Base.md)** - Comprehensive modding reference
+- **[Goldberg Emulator Guide](docs/Goldberg_Emulator_Guide.md)** - Detailed setup and configuration
 
-1. **Download or clone this repository**
-2. **Run the deployment tool:**
-   ```
-   Double-click: build\eu5-deployer-windows-amd64.exe
-   ```
-3. **Launch EU5** - You can now play via LAN!
+### Component Documentation
+- **[Tools README](tools/README.md)** - Development tools documentation
+- **[Source README](src/README.md)** - Mod source structure
+- **[Assets README](assets/README.md)** - Graphics and media files
 
-### Restore Original Files
+## Project Structure
 
-To return to normal Steam multiplayer:
 ```
-build\eu5-deployer-windows-amd64.exe --restore
+eu5-modding-project/
+├── cmd/                    # Executable source code
+│   ├── eu5-detector/      # EU5 installation detector
+│   └── eu5-deployer/      # Goldberg deployment tool
+├── pkg/                    # Shared Go packages
+│   ├── detector/          # Detection logic
+│   └── deployer/          # Deployment logic
+├── goldberg_emulator/     # Goldberg Emulator files
+│   ├── steam_api64.dll    # Goldberg DLL
+│   └── steam_settings/    # Configuration files
+├── docs/                   # Documentation
+├── src/                    # Mod source files
+├── assets/                 # Graphics and media
+├── tools/                  # Development utilities
+├── build.sh               # Build script (Linux/macOS)
+└── build.bat              # Build script (Windows)
 ```
 
-### Features
+## Available Tools
 
-- ✅ **Automatic EU5 detection** - Finds your game installation automatically
-- ✅ **Safe backup** - Original files are backed up before modification
-- ✅ **One-click deployment** - No manual file copying needed
-- ✅ **Easy restoration** - Restore original files with one command
-- ✅ **Cross-platform** - Works on Windows, Linux, and macOS
+| Tool | Description | Windows | Linux | macOS |
+|------|-------------|---------|-------|-------|
+| **eu5-deployer** | Deploy Goldberg Emulator for LAN play | `build\eu5-deployer-windows-amd64.exe` | `build/eu5-deployer-linux-amd64` | `build/eu5-deployer-darwin-amd64` |
+| **eu5-detector** | Detect EU5 installation location | `build\eu5-detector-windows-amd64.exe` | `build/eu5-detector-linux-amd64` | `build/eu5-detector-darwin-amd64` |
 
-### Documentation
+All tools are standalone executables with no dependencies.
 
-- **[Go Tools Guide](GO_TOOLS_README.md)** - Complete guide for the deployment tools
-- **[Quick Start Guide](QUICKSTART.md)** - Step-by-step setup instructions (中文)
-- **[Goldberg Setup](goldberg_emulator/README.md)** - Detailed Goldberg Emulator documentation
+## Building from Source
 
-### Tools
+### Prerequisites
+- Go 1.22 or higher
+- Git
 
-| Tool | Purpose | Windows | Linux | macOS |
-|------|---------|---------|-------|-------|
-| **eu5-deployer** | Deploy Goldberg Emulator | `build\eu5-deployer-windows-amd64.exe` | `build/eu5-deployer-linux-amd64` | `build/eu5-deployer-darwin-amd64` |
-| **eu5-detector** | Detect EU5 installation | `build\eu5-detector-windows-amd64.exe` | `build/eu5-detector-linux-amd64` | `build/eu5-detector-darwin-amd64` |
+### Build Instructions
 
-All tools are standalone executables - no installation required!
+**Windows:**
+```cmd
+build.bat
+```
 
-## 🛠️ Development Workflow
+**Linux/macOS:**
+```bash
+chmod +x build.sh
+./build.sh
+```
 
-1. **Plan**: Define your mod's features and scope
-2. **Script**: Write events, triggers, and effects
-3. **Test**: Use debug mode to test your changes
-4. **Iterate**: Refine based on testing
-5. **Document**: Update documentation as needed
-6. **Release**: Publish to Steam Workshop
+Compiled executables will be placed in the `build/` directory.
 
-## 🎮 Game Information
+## Game Information
 
-- **Game**: European Universalis 5
-- **Release Date**: November 2025
-- **Engine**: Clausewitz Engine (updated)
-- **Scripting**: Jomini scripting layer
-- **Platform**: PC (Steam)
+- **Game:** European Universalis 5
+- **Release Date:** November 2025
+- **Engine:** Clausewitz Engine (updated)
+- **Scripting:** Jomini scripting layer
+- **Platform:** PC (Steam)
 
-## 📝 Contributing
+## Contributing
 
 Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is for educational and modding purposes. European Universalis 5 is a trademark of Paradox Interactive.
 
-## 🔗 Links
+## Links
 
-- **Repository**: https://github.com/HLJSXK/eu5-modding-project
-- **Issues**: https://github.com/HLJSXK/eu5-modding-project/issues
-- **Wiki**: https://eu5.paradoxwikis.com/
+- **Repository:** https://github.com/HLJSXK/eu5-modding-project
+- **Issues:** https://github.com/HLJSXK/eu5-modding-project/issues
+- **EU5 Wiki:** https://eu5.paradoxwikis.com/
+- **Goldberg Emulator:** https://gitlab.com/Mr_Goldberg/goldberg_emulator
 
-## 📧 Contact
+## Acknowledgments
 
-For questions or collaboration, please open an issue on GitHub.
+- Paradox Interactive for European Universalis 5
+- [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator) by Mr_Goldberg
+- EU5 modding community
 
 ---
 
-**Last Updated**: January 2026  
-**Project Status**: Active Development
+**Last Updated:** January 2026  
+**Project Status:** Active Development  
+**Version:** 1.0.0

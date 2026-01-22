@@ -13,14 +13,19 @@ cd eu5-modding-project
 
 ### 2. 自动部署
 
-**Linux/macOS:**
-```bash
-python3 tools/deploy_goldberg.py
-```
-
 **Windows:**
 ```cmd
-python tools\deploy_goldberg.py
+build\eu5-deployer-windows-amd64.exe
+```
+
+**Linux:**
+```bash
+./build/eu5-deployer-linux-amd64
+```
+
+**macOS:**
+```bash
+./build/eu5-deployer-darwin-amd64
 ```
 
 脚本会自动：
@@ -37,8 +42,14 @@ python tools\deploy_goldberg.py
 
 当你想恢复正常的 Steam 联机模式时：
 
+**Windows:**
+```cmd
+build\eu5-deployer-windows-amd64.exe --restore
+```
+
+**Linux/macOS:**
 ```bash
-python3 tools/deploy_goldberg.py --restore
+./build/eu5-deployer-linux-amd64 --restore
 ```
 
 ## 📝 配置 DLC
@@ -96,7 +107,7 @@ edge -a 10.0.0.1 -c mynetwork -k mypassword -l supernode_ip:7777
 ## 🐛 常见问题
 
 ### 游戏无法启动
-- 运行 `deploy_goldberg.py --restore` 恢复原始文件
+- 运行 `eu5-deployer --restore` 恢复原始文件
 - 在 Steam 中验证游戏完整性
 - 确保使用的是 64 位版本的 Goldberg
 
@@ -117,9 +128,10 @@ edge -a 10.0.0.1 -c mynetwork -k mypassword -l supernode_ip:7777
 
 ## 📚 详细文档
 
-- [Goldberg Emulator 完整说明](goldberg_emulator/README.md)
-- [工具使用文档](tools/README.md)
-- [项目用户指南](docs/Project_User_Guide.md)
+- [Goldberg Emulator 完整说明](Goldberg_Emulator_Guide.md)
+- [工具使用文档](Tools_Guide.md)
+- [项目用户指南](Project_User_Guide.md)
+- [文档索引](README.md)
 
 ## ⚠️ 重要提示
 

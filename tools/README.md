@@ -1,113 +1,49 @@
 # Development Tools
 
-This directory contains helper scripts and utilities for EU5 mod development and LAN multiplayer setup.
+This directory contains legacy Python scripts for reference. **For production use, please use the Go-based tools in the `build/` directory.**
 
-## Available Tools
+## Current Tools (Go-based)
 
-### 1. detect_eu5_folder.py
+The project now uses Go-based tools that compile to standalone executables:
 
-**Purpose:** Automatically detect EU5 installation directory by searching common Steam library locations.
+- **eu5-deployer** - Deploy Goldberg Emulator for LAN multiplayer
+- **eu5-detector** - Detect EU5 installation location
 
-**Usage:**
-```bash
-python3 tools/detect_eu5_folder.py
-```
+See the [Tools Guide](../docs/Tools_Guide.md) for complete documentation.
 
-**Features:**
-- Cross-platform support (Windows, Linux, macOS)
-- Searches common Steam library paths
-- Parses Steam's `libraryfolders.vdf` to find all library locations
-- Validates EU5 installation by checking for key files
-- Outputs machine-readable format for scripting
+## Legacy Tools (Python)
 
-**Output:**
-```
-Detecting EU5 installation on Linux...
-Checking Steam library: /home/user/.steam/steam
+These Python scripts are kept for reference and development purposes:
 
-✓ Found EU5 installation: /home/user/.steam/steam/steamapps/common/Europa Universalis V
+### detect_eu5_folder.py
 
-EU5 Main Folder: /home/user/.steam/steam/steamapps/common/Europa Universalis V
-Binaries Folder: /home/user/.steam/steam/steamapps/common/Europa Universalis V/binaries
+**Status:** Superseded by Go implementation  
+**Purpose:** Detect EU5 installation directory
 
-__EU5_PATH__=/home/user/.steam/steam/steamapps/common/Europa Universalis V
-__BINARIES_PATH__=/home/user/.steam/steam/steamapps/common/Europa Universalis V/binaries
-```
+### deploy_goldberg.py
 
-### 2. deploy_goldberg.py
+**Status:** Superseded by Go implementation  
+**Purpose:** Deploy Goldberg Emulator to EU5
 
-**Purpose:** Deploy Goldberg Steam Emulator to EU5 installation for LAN multiplayer.
+## Migration
 
-**Usage:**
-```bash
-# Auto-detect EU5 installation
-python3 tools/deploy_goldberg.py
+The project has migrated from Python to Go for the following benefits:
 
-# Specify EU5 path manually
-python3 tools/deploy_goldberg.py --eu5-path "/path/to/Europa Universalis V"
+- **Zero dependencies** - No Python installation required
+- **Single executable** - Easy distribution
+- **Fast startup** - Native machine code
+- **Cross-platform** - Compile once, run anywhere
 
-# Restore original files
-python3 tools/deploy_goldberg.py --restore
-```
+## For Developers
 
-**Features:**
-- Automatic EU5 installation detection
-- Backs up original `steam_api64.dll` before replacement
-- Deploys Goldberg DLL and steam_settings folder
-- Safe restoration of original files
-- Detailed progress reporting
+If you want to modify the tools:
 
-**What it does:**
-1. Validates EU5 installation path
-2. Creates backup of original `steam_api64.dll`
-3. Copies Goldberg `steam_api64.dll` to binaries folder
-4. Copies `steam_settings` folder (including DLC.txt and mods)
-5. Reports deployment status
+1. Edit the Go source code in `cmd/` and `pkg/` directories
+2. Build using `build.sh` (Linux/macOS) or `build.bat` (Windows)
+3. Test the compiled executables in `build/` directory
 
-**Restoration:**
-```bash
-python3 tools/deploy_goldberg.py --restore
-```
-
-This will:
-- Restore original `steam_api64.dll` from backup
-- Remove `steam_settings` folder
-- Return EU5 to normal Steam functionality
-
-## Tool Development Guidelines
-
-When adding new tools to this directory:
-
-1. **Use Python 3.11+** for consistency with the project environment
-2. **Include shebang:** `#!/usr/bin/env python3`
-3. **Add docstrings:** Document purpose, usage, and parameters
-4. **Make executable:** `chmod +x tool_name.py`
-5. **Update this README:** Add documentation for the new tool
-6. **Handle errors gracefully:** Provide clear error messages
-7. **Support cross-platform:** Test on Windows, Linux, and macOS if applicable
-
-## Dependencies
-
-All tools use Python standard library only. No external dependencies required.
-
-## Future Tools
-
-Planned tools for future development:
-
-- **mod_validator.py** - Validate mod structure and syntax
-- **dlc_finder.py** - Automatically find EU5 DLC IDs from Steam
-- **launcher_gui.py** - Graphical launcher for easy LAN setup
-- **n2n_manager.py** - Manage n2n VPN connections for virtual LAN
-
-## Contributing
-
-When contributing new tools:
-
-1. Follow the existing code style
-2. Add comprehensive documentation
-3. Test on multiple platforms if possible
-4. Update this README with usage instructions
+See the main [README](../README.md) for build instructions.
 
 ---
 
-**Last Updated:** January 22, 2026
+**Note:** The Python scripts may be removed in a future version once the Go implementation is fully stable.
