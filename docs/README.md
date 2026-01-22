@@ -32,6 +32,13 @@ These guides are written in Chinese for ease of use by the target audience.
   - Event, country, and localization modding
   - Advanced topics (GUI, map, graphics)
 
+- **[EU5 Mod Framework Guide](EU5_Mod_Framework_Guide.md)**
+  - Practical mod development framework
+  - Analysis of 16 community mods
+  - Detailed file structure patterns
+  - Best practices and workflows
+  - Common pitfalls and solutions
+
 - **[Goldberg Emulator Guide](Goldberg_Emulator_Guide.md)**
   - Detailed Goldberg setup instructions
   - Configuration file formats
@@ -51,6 +58,9 @@ These guides are written in Chinese for ease of use by the target audience.
 
 **Learn about EU5 modding**
 → [EU5 Modding Knowledge Base](EU5_Modding_Knowledge_Base.md)
+
+**Create my own EU5 mod**
+→ [EU5 Mod Framework Guide](EU5_Mod_Framework_Guide.md)
 
 **Configure Goldberg Emulator manually**
 → [Goldberg Emulator Guide](Goldberg_Emulator_Guide.md)
@@ -91,7 +101,8 @@ To improve or add documentation:
 - Quick Start Guide: 2026-01-22
 - Tools Guide: 2026-01-22
 - Project User Guide: 2026-01-21
-- EU5 Modding Knowledge Base: 2026-01-21
+- EU5 Modding Knowledge Base: 2026-01-22
+- EU5 Mod Framework Guide: 2026-01-22
 - Goldberg Emulator Guide: 2026-01-22
 
 ---
