@@ -64,6 +64,49 @@ eu5-modding-project/
 
 4. Start modding!
 
+## 🎮 LAN Multiplayer Setup (Goldberg Emulator)
+
+This project includes tools for setting up LAN multiplayer using Goldberg Steam Emulator.
+
+### Quick Setup (Windows)
+
+1. **Download or clone this repository**
+2. **Run the deployment tool:**
+   ```
+   Double-click: build\eu5-deployer-windows-amd64.exe
+   ```
+3. **Launch EU5** - You can now play via LAN!
+
+### Restore Original Files
+
+To return to normal Steam multiplayer:
+```
+build\eu5-deployer-windows-amd64.exe --restore
+```
+
+### Features
+
+- ✅ **Automatic EU5 detection** - Finds your game installation automatically
+- ✅ **Safe backup** - Original files are backed up before modification
+- ✅ **One-click deployment** - No manual file copying needed
+- ✅ **Easy restoration** - Restore original files with one command
+- ✅ **Cross-platform** - Works on Windows, Linux, and macOS
+
+### Documentation
+
+- **[Go Tools Guide](GO_TOOLS_README.md)** - Complete guide for the deployment tools
+- **[Quick Start Guide](QUICKSTART.md)** - Step-by-step setup instructions (中文)
+- **[Goldberg Setup](goldberg_emulator/README.md)** - Detailed Goldberg Emulator documentation
+
+### Tools
+
+| Tool | Purpose | Windows | Linux | macOS |
+|------|---------|---------|-------|-------|
+| **eu5-deployer** | Deploy Goldberg Emulator | `build\eu5-deployer-windows-amd64.exe` | `build/eu5-deployer-linux-amd64` | `build/eu5-deployer-darwin-amd64` |
+| **eu5-detector** | Detect EU5 installation | `build\eu5-detector-windows-amd64.exe` | `build/eu5-detector-linux-amd64` | `build/eu5-detector-darwin-amd64` |
+
+All tools are standalone executables - no installation required!
+
 ## 🛠️ Development Workflow
 
 1. **Plan**: Define your mod's features and scope
