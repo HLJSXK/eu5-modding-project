@@ -1,0 +1,339 @@
+# Dynamic Missions: Player Actions for City Development
+
+# Action 1: Convene Builders
+# Reduces global construction speed but massively boosts target city construction
+dm_convene_builders = {
+	# Only visible when the develop_city situation is active
+	potential = {
+		has_variable = active_dynamic_mission
+		has_active_situation = develop_city_situation
+	}
+	
+	# Requirements to use this action
+	allow = {
+		# Must not be on cooldown
+		NOT = { has_country_modifier = dm_convene_builders_cooldown }
+		
+		# Must have the situation active
+		has_active_situation = develop_city_situation
+		
+		custom_tooltip = {
+			text = dm_convene_builders.allow.tooltip
+			always = yes
+		}
+	}
+	
+	# Effects when action is taken
+	effect = {
+		# Apply global construction speed penalty
+		add_country_modifier = {
+			name = dm_global_construction_penalty
+			duration = 365  # 1 year
+		}
+		
+		# Apply local construction speed bonus to target city
+		situation:develop_city_situation = {
+			var:target_location = {
+				add_location_modifier = {
+					name = dm_target_construction_bonus
+					duration = 365  # 1 year
+				}
+			}
+		}
+		
+		# Apply cooldown
+		add_country_modifier = {
+			name = dm_convene_builders_cooldown
+			duration = 365  # 1 year cooldown
+			hidden = yes
+		}
+		
+		custom_tooltip = dm_convene_builders.effect.tooltip
+	}
+	
+	# AI will not use this action (player-only feature)
+	ai_will_do = {
+		base = 0
+	}
+}
+
+# Action 2: Public Works
+# Spend money to boost prosperity growth in target city
+dm_public_works = {
+	# Only visible when the develop_city situation is active
+	potential = {
+		has_variable = active_dynamic_mission
+		has_active_situation = develop_city_situation
+	}
+	
+	# Requirements to use this action
+	allow = {
+		# Must not be on cooldown
+		NOT = { has_country_modifier = dm_public_works_cooldown }
+		
+		# Must have enough gold
+		gold >= 500
+		
+		# Must have the situation active
+		has_active_situation = develop_city_situation
+		
+		custom_tooltip = {
+			text = dm_public_works.allow.tooltip
+			always = yes
+		}
+	}
+	
+	# Effects when action is taken
+	effect = {
+		# Spend gold
+		add_treasury = -500
+		
+		# Apply prosperity growth bonus to target city
+		situation:develop_city_situation = {
+			var:target_location = {
+				add_location_modifier = {
+					name = dm_prosperity_boost
+					duration = 365  # 1 year
+				}
+			}
+		}
+		
+		# Apply cooldown
+		add_country_modifier = {
+			name = dm_public_works_cooldown
+			duration = 365  # 1 year cooldown
+			hidden = yes
+		}
+		
+		custom_tooltip = dm_public_works.effect.tooltip
+	}
+	
+	# AI will not use this action (player-only feature)
+	ai_will_do = {
+		base = 0
+	}
+}
+
+# Action 3: Demand Contributions
+# Reduce control in other cities to boost target city control cap
+dm_demand_contributions = {
+	# Only visible when the develop_city situation is active
+	potential = {
+		has_variable = active_dynamic_mission
+		has_active_situation = develop_city_situation
+	}
+	
+	# Requirements to use this action
+	allow = {
+		# Must not be on cooldown
+		NOT = { has_country_modifier = dm_demand_contributions_cooldown }
+		
+		# Must have the situation active
+		has_active_situation = develop_city_situation
+		
+		custom_tooltip = {
+			text = dm_demand_contributions.allow.tooltip
+			always = yes
+		}
+	}
+	
+	# Effects when action is taken
+	effect = {
+		# Reduce control in all other cities
+		every_owned_location = {
+			limit = {
+				OR = {
+					location_rank = town
+					location_rank = city
+				}
+				NOT = { this = situation:develop_city_situation.var:target_location }
+			}
+			
+			# Apply control penalty
+			add_location_modifier = {
+				name = dm_control_penalty
+				duration = 365  # 1 year
+			}
+		}
+		
+		# Boost max control cap in target city
+		situation:develop_city_situation = {
+			var:target_location = {
+				add_location_modifier = {
+					name = dm_control_cap_bonus
+					duration = 365  # 1 year
+				}
+			}
+		}
+		
+		# Apply cooldown
+		add_country_modifier = {
+			name = dm_demand_contributions_cooldown
+			duration = 365  # 1 year cooldown
+			hidden = yes
+		}
+		
+		custom_tooltip = dm_demand_contributions.effect.tooltip
+	}
+	
+	# AI will not use this action (player-only feature)
+	ai_will_do = {
+		base = 0
+	}
+}
+
+# Subject Action 1: Steal Progress (for disloyal subjects)
+# Reduces target city prosperity, increases subject's capital prosperity
+dm_steal_progress = {
+	# Only visible to subjects when the develop_city situation is active
+	potential = {
+		is_subject = yes
+		overlord = {
+			has_variable = active_dynamic_mission
+			has_active_situation = develop_city_situation
+		}
+	}
+	
+	# Requirements to use this action
+	allow = {
+		# Must not be on cooldown
+		NOT = { has_country_modifier = dm_steal_progress_cooldown }
+		
+		# Must be disloyal
+		is_disloyal = yes
+		
+		custom_tooltip = {
+			text = dm_steal_progress.allow.tooltip
+			always = yes
+		}
+	}
+	
+	# Effects when action is taken
+	effect = {
+		# Reduce target city prosperity
+		overlord = {
+			situation:develop_city_situation = {
+				var:target_location = {
+					add_location_modifier = {
+						name = dm_prosperity_drain
+						duration = 365  # 1 year
+					}
+				}
+			}
+		}
+		
+		# Increase subject's capital prosperity
+		capital = {
+			add_location_modifier = {
+				name = dm_prosperity_gain
+				duration = 365  # 1 year
+			}
+		}
+		
+		# Apply cooldown
+		add_country_modifier = {
+			name = dm_steal_progress_cooldown
+			duration = 365  # 1 year cooldown
+			hidden = yes
+		}
+		
+		# Notify overlord
+		overlord = {
+			trigger_event = { id = dynamic_missions.10 }  # Notification event
+		}
+		
+		custom_tooltip = dm_steal_progress.effect.tooltip
+	}
+	
+	# AI decision-making: Use if disloyal
+	ai_will_do = {
+		base = 0
+		
+		modifier = {
+			add = 100
+			is_disloyal = yes
+			opinion = {
+				who = overlord
+				value < 0
+			}
+		}
+	}
+}
+
+# Subject Action 2: Contribute to Development (for loyal subjects)
+# Increases target city prosperity, decreases subject's capital prosperity
+dm_contribute_development = {
+	# Only visible to subjects when the develop_city situation is active
+	potential = {
+		is_subject = yes
+		overlord = {
+			has_variable = active_dynamic_mission
+			has_active_situation = develop_city_situation
+		}
+	}
+	
+	# Requirements to use this action
+	allow = {
+		# Must not be on cooldown
+		NOT = { has_country_modifier = dm_contribute_development_cooldown }
+		
+		# Must be loyal
+		is_disloyal = no
+		
+		custom_tooltip = {
+			text = dm_contribute_development.allow.tooltip
+			always = yes
+		}
+	}
+	
+	# Effects when action is taken
+	effect = {
+		# Increase target city prosperity
+		overlord = {
+			situation:develop_city_situation = {
+				var:target_location = {
+					add_location_modifier = {
+						name = dm_prosperity_contribution
+						duration = 365  # 1 year
+					}
+				}
+			}
+		}
+		
+		# Decrease subject's capital prosperity
+		capital = {
+			add_location_modifier = {
+				name = dm_prosperity_sacrifice
+				duration = 365  # 1 year
+			}
+		}
+		
+		# Apply cooldown
+		add_country_modifier = {
+			name = dm_contribute_development_cooldown
+			duration = 365  # 1 year cooldown
+			hidden = yes
+		}
+		
+		# Notify overlord
+		overlord = {
+			trigger_event = { id = dynamic_missions.11 }  # Notification event
+		}
+		
+		custom_tooltip = dm_contribute_development.effect.tooltip
+	}
+	
+	# AI decision-making: Use if loyal and has good opinion
+	ai_will_do = {
+		base = 0
+		
+		modifier = {
+			add = 100
+			is_disloyal = no
+			opinion = {
+				who = overlord
+				value >= 50
+			}
+		}
+	}
+}

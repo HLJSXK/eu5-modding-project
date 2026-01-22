@@ -1,0 +1,184 @@
+namespace = dynamic_missions
+
+# Dynamic Missions: Choose Your Goal
+# This event allows the player to select a goal to focus on
+dynamic_missions.1 = {
+	type = country_event
+	title = dynamic_missions.1.title
+	desc = dynamic_missions.1.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+	
+	# Trigger conditions - only for human players with no active mission
+	trigger = {
+		is_ai = no
+		has_game_started = yes
+		# Check that no dynamic mission situation is currently active
+		NOT = { has_variable = active_dynamic_mission }
+	}
+	
+	# Option 1: Focus on Developing a City
+	option = {
+		name = dynamic_missions.1.option_a
+		
+		# Set flag to indicate a mission is active
+		set_variable = {
+			name = active_dynamic_mission
+			value = yes
+		}
+		
+		# Trigger the city selection process
+		# Player will select a city via generic action
+		trigger_event = { id = dynamic_missions.2 }
+		
+		custom_tooltip = dynamic_missions.1.option_a.tooltip
+	}
+	
+	# Option 2: (Future) Other mission types can be added here
+	# option = {
+	#	name = dynamic_missions.1.option_b
+	#	# Future mission type
+	# }
+	
+	# Option 3: Not now
+	option = {
+		name = dynamic_missions.1.option_c
+		# Do nothing, player can trigger this event again later
+		custom_tooltip = dynamic_missions.1.option_c.tooltip
+	}
+}
+
+# Dynamic Missions: Select Target City
+# This event allows the player to select which city to develop
+dynamic_missions.2 = {
+	type = country_event
+	title = dynamic_missions.2.title
+	desc = dynamic_missions.2.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = exterior
+		10 = city
+	}
+	
+	# Immediate effect: create a list of eligible cities
+	immediate = {
+		# Find all owned cities and towns
+		every_owned_location = {
+			limit = {
+				OR = {
+					location_rank = town
+					location_rank = city
+				}
+			}
+			add_to_list = eligible_cities
+		}
+	}
+	
+	# Option: Select a city (will be done via interaction in actual implementation)
+	option = {
+		name = dynamic_missions.2.option_a
+		
+		# For now, default to capital if no selection made
+		# In full implementation, this would use select_trigger
+		capital = {
+			save_scope_as = target_city
+		}
+		
+		# Start the develop city situation
+		activate_situation = develop_city_situation
+		
+		# Store the target city in the situation
+		situation:develop_city_situation = {
+			set_variable = {
+				name = target_location
+				value = scope:target_city
+			}
+			
+			# Store initial building count
+			scope:target_city = {
+				set_variable = {
+					name = initial_building_count
+					value = num_buildings
+				}
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.2.option_a.tooltip
+	}
+	
+	# Option: Cancel
+	option = {
+		name = dynamic_missions.2.option_b
+		
+		# Remove the active mission flag
+		remove_variable = active_dynamic_mission
+		
+		custom_tooltip = dynamic_missions.2.option_b.tooltip
+	}
+}
+
+# Dynamic Missions: City Development Complete
+# This event fires when the city development mission is completed successfully
+dynamic_missions.3 = {
+	type = country_event
+	title = dynamic_missions.3.title
+	desc = dynamic_missions.3.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = city
+	}
+	
+	# Option: Claim your reward
+	option = {
+		name = dynamic_missions.3.option_a
+		
+		# Grant the reward: +1 development to target city
+		situation:develop_city_situation = {
+			var:target_location = {
+				add_development = 1
+			}
+		}
+		
+		# Remove the active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger the start event again to choose a new goal
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.3.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: City Development Failed (Time Expired)
+# This event fires when the time limit is reached without completing the goal
+dynamic_missions.4 = {
+	type = country_event
+	title = dynamic_missions.4.title
+	desc = dynamic_missions.4.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = sad
+		10 = city
+	}
+	
+	# Option: Accept failure
+	option = {
+		name = dynamic_missions.4.option_a
+		
+		# Remove the active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger the start event again to choose a new goal
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.4.option_a.tooltip
+	}
+}

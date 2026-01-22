@@ -1,0 +1,205 @@
+# Dynamic Missions: Develop City Situation
+# This situation tracks the player's progress in developing a chosen city
+develop_city_situation = {
+	# This situation is manually activated, not by monthly chance
+	monthly_spawn_chance = 0
+	
+	# Visibility: Only the player and their subjects can see this situation
+	visible = {
+		OR = {
+			this = root.owner  # The player
+			is_subject_of = root.owner  # Subjects of the player
+		}
+	}
+	
+	# Start conditions: Manually activated via event
+	can_start = {
+		always = no  # Never starts automatically
+	}
+	
+	# End conditions: Either goal is met or time limit reached
+	can_end = {
+		OR = {
+			# Success condition: Target city has 100% prosperity and 10+ new buildings
+			AND = {
+				var:target_location = {
+					prosperity >= 100
+				}
+				# Check if building count increased by at least 10
+				trigger_if = {
+					limit = { has_variable = initial_building_count }
+					var:target_location = {
+						num_buildings >= {
+							add = var:initial_building_count
+							add = 10
+						}
+					}
+				}
+				# Set success flag
+				set_variable = {
+					name = mission_success
+					value = yes
+				}
+			}
+			# Failure condition: 5 years (60 months) have passed
+			AND = {
+				has_variable = situation_start_date
+				months_since_variable = {
+					variable = situation_start_date
+					months >= 60
+				}
+				# Set failure flag
+				set_variable = {
+					name = mission_failed
+					value = yes
+				}
+			}
+		}
+	}
+	
+	# On start: Initialize variables and add participants
+	on_start = {
+		# Record the start date
+		set_variable = {
+			name = situation_start_date
+			value = current_date
+		}
+		
+		# Initialize progress tracking
+		set_variable = {
+			name = completion_progress
+			value = 0
+		}
+		
+		# Add all subjects as participants
+		owner = {
+			every_subject = {
+				add_to_list = situation_participants
+			}
+		}
+	}
+	
+	# On monthly: Update progress and check conditions
+	on_monthly = {
+		# Update completion progress based on prosperity and buildings
+		if = {
+			limit = { has_variable = target_location }
+			
+			# Calculate progress: (prosperity + building_progress) / 2
+			var:target_location = {
+				set_variable = {
+					name = prosperity_progress
+					value = prosperity
+				}
+				
+				# Calculate building progress
+				set_variable = {
+					name = building_progress
+					value = {
+						value = num_buildings
+						subtract = var:initial_building_count
+						multiply = 10  # Each building is 10% progress
+						max = 100
+					}
+				}
+			}
+			
+			# Average the two progress values
+			set_variable = {
+				name = completion_progress
+				value = {
+					value = var:target_location.prosperity_progress
+					add = var:target_location.building_progress
+					divide = 2
+				}
+			}
+		}
+		
+		# Notify participants monthly (for AI decision-making)
+		every_in_list = {
+			list = situation_participants
+			trigger_event_silently = dynamic_missions.100  # AI evaluation event
+		}
+	}
+	
+	# On ending: Trigger appropriate completion event
+	on_ending = {
+		owner = {
+			if = {
+				limit = {
+					situation:develop_city_situation = {
+						has_variable = mission_success
+					}
+				}
+				# Success event
+				trigger_event = { id = dynamic_missions.3 }
+			}
+			else_if = {
+				limit = {
+					situation:develop_city_situation = {
+						has_variable = mission_failed
+					}
+				}
+				# Failure event
+				trigger_event = { id = dynamic_missions.4 }
+			}
+		}
+	}
+	
+	# On ended: Clean up variables
+	on_ended = {
+		# Remove all situation variables to reduce save file size
+		remove_variable = target_location
+		remove_variable = situation_start_date
+		remove_variable = completion_progress
+		remove_variable = mission_success
+		remove_variable = mission_failed
+		remove_variable = initial_building_count
+		
+		# Clear participant list
+		clear_list = situation_participants
+	}
+	
+	# Map colors for the situation mapmode
+	map_color = {
+		if = {
+			limit = {
+				# Highlight the target city
+				this = situation:develop_city_situation.var:target_location
+			}
+			value = rgb { 50 200 50 }  # Green for target
+		}
+		else_if = {
+			limit = {
+				# Show player's other cities in yellow
+				owner = situation:develop_city_situation.owner
+				OR = {
+					location_rank = town
+					location_rank = city
+				}
+			}
+			value = rgb { 200 200 50 }  # Yellow for other cities
+		}
+	}
+	
+	# Tooltip for map
+	tooltip = {
+		if = {
+			limit = {
+				this = situation:develop_city_situation.var:target_location
+			}
+			custom_tooltip = dynamic_missions.situation.target_city_tooltip
+		}
+	}
+	
+	# Legend entries for the mapmode
+	legend_key = {
+		color = rgb { 50 200 50 }
+		desc = dynamic_missions.situation.legend_target
+	}
+	
+	legend_key = {
+		color = rgb { 200 200 50 }
+		desc = dynamic_missions.situation.legend_other_cities
+	}
+}
