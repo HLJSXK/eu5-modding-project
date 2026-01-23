@@ -1,0 +1,150 @@
+# Dynamic Missions: Scripted Triggers
+# These triggers determine when each mission type is available to the player
+
+# =============================================================================
+# DEVELOP CITY MISSION
+# =============================================================================
+# This mission requires the player to have at least one city or town that
+# is suitable for development (not already at maximum prosperity and has
+# room for building expansion)
+# =============================================================================
+
+can_start_develop_city_mission = {
+	# Must have at least one eligible city or town
+	any_owned_location = {
+		# Must be a city or town
+		OR = {
+			location_rank = town
+			location_rank = city
+		}
+		
+		# Should not already be at maximum prosperity
+		# (No point in developing an already perfect city)
+		prosperity < 100
+		
+		# Should have room for building expansion
+		# Check that the location can support more buildings
+		OR = {
+			# Has available building slots
+			has_available_building_slot = yes
+			
+			# Or has buildings that can be upgraded
+			has_upgradeable_building = yes
+		}
+		
+		# Should be under player's direct control (not occupied or in unrest)
+		is_occupied = no
+		is_under_siege = no
+		
+		# Optional: Prefer locations with some existing development
+		# This makes the mission more meaningful
+		development >= 5
+	}
+	
+	# Player should have sufficient resources to undertake the project
+	# At least some gold to spend on Public Works
+	gold >= 500
+	
+	# Should not be in a major war that would distract from development
+	# (Optional condition - can be removed if you want the mission available during wars)
+	OR = {
+		is_at_war = no
+		
+		# Or if at war, it should be a minor conflict
+		AND = {
+			is_at_war = yes
+			num_of_wars < 2
+			war_exhaustion < 5
+		}
+	}
+	
+	# Should have at least some administrative capacity
+	# (Representing the ability to manage a focused development project)
+	administrative_power >= 50
+}
+
+# =============================================================================
+# HELPER TRIGGERS
+# =============================================================================
+# These are utility triggers used by the main mission triggers
+# =============================================================================
+
+# Check if a location has available building slots
+has_available_building_slot = {
+	# This is a placeholder - actual implementation depends on EU5's building system
+	# In EU5, you would check if num_buildings < max_buildings for the location
+	num_buildings < 20  # Adjust this number based on EU5's building cap
+}
+
+# Check if a location has buildings that can be upgraded
+has_upgradeable_building = {
+	# This is a placeholder - actual implementation would check for specific buildings
+	# that have higher tier versions available
+	
+	# Example: Check if there are any tier 1 or tier 2 buildings
+	OR = {
+		has_building = basic_workshop
+		has_building = basic_market
+		has_building = basic_temple
+		# Add more building checks as needed
+	}
+}
+
+# =============================================================================
+# MILITARY EXPANSION MISSION (Placeholder for future implementation)
+# =============================================================================
+
+can_start_military_expansion_mission = {
+	# Placeholder - will be implemented when this mission is added
+	always = no
+}
+
+# =============================================================================
+# TECHNOLOGICAL BREAKTHROUGH MISSION (Placeholder for future implementation)
+# =============================================================================
+
+can_start_tech_breakthrough_mission = {
+	# Placeholder - will be implemented when this mission is added
+	always = no
+}
+
+# =============================================================================
+# GENERAL MISSION ELIGIBILITY
+# =============================================================================
+# This trigger checks if the player is eligible to receive ANY dynamic mission
+# =============================================================================
+
+can_receive_dynamic_mission = {
+	# Must be a human player
+	is_ai = no
+	
+	# Game must have started (not in the setup phase)
+	has_game_started = yes
+	
+	# Must not have an active dynamic mission already
+	NOT = { has_variable = active_dynamic_mission }
+	
+	# Player should be in a stable enough position to undertake a mission
+	# Not bankrupt or in extreme crisis
+	is_bankrupt = no
+	
+	# Optional: Add a cooldown after completing/failing a mission
+	# This prevents missions from firing too frequently
+	trigger_if = {
+		limit = { has_variable = last_mission_end_date }
+		
+		# At least 2 years since the last mission ended
+		years_since_variable = {
+			variable = last_mission_end_date
+			years >= 2
+		}
+	}
+	
+	# Must have at least ONE mission available
+	OR = {
+		can_start_develop_city_mission = yes
+		can_start_military_expansion_mission = yes
+		can_start_tech_breakthrough_mission = yes
+		# Add more mission checks as they are implemented
+	}
+}
