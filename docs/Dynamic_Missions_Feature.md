@@ -9,14 +9,16 @@ This document provides a comprehensive guide to the **Dynamic Missions** feature
 
 ## 2. Feature Overview
 
-The core concept of Dynamic Missions is to allow the player to temporarily focus the nation's efforts on a single, ambitious goal. Instead of balancing expansion, economic development, and diplomacy simultaneously, the player can choose to prioritize one area for a set period, unlocking powerful bonuses and unique interactions related to that goal.
+The core concept of Dynamic Missions is to present the player with a curated selection of focused, ambitious goals, allowing them to temporarily prioritize one aspect of their nation's development—be it military, economic, or technological—over others. This system encourages strategic specialization by offering significant rewards for completing time-limited, challenging objectives.
 
 This system is built upon the native EU5 **Situations** and **Generic Actions** frameworks, ensuring seamless integration with the core game mechanics and UI.
 
 ### Key Characteristics
 
-*   **Player-Initiated**: Missions are started via a player-only event, giving full control over when to engage with the system.
-*   **Exclusive Focus**: Only one Dynamic Mission can be active at a time, making the choice of which goal to pursue a significant strategic decision.
+*   **Dynamic Selection**: When the player is eligible, a starting event fires, which scans a large pool of potential missions.
+*   **Conditional Availability**: Each mission in the pool has specific trigger conditions (e.g., 'Develop a City' requires the player to own at least one city). The system only considers missions whose conditions are currently met.
+*   **Randomized Player Choice**: From the pool of available missions, the system randomly selects **four** unique options and presents them to the player. This ensures variety and replayability.
+*   **Exclusive Focus**: Once a mission is chosen, no other Dynamic Missions can be started until the current one is completed or fails. This makes the choice a significant strategic commitment.
 *   **Time-Limited Objectives**: Each mission has a time limit, creating a sense of urgency and a clear endpoint.
 *   **High-Risk, High-Reward**: Successfully completing a mission yields substantial rewards, while failure means the investment of time and resources provides no final payoff.
 *   **Interactive Gameplay**: Missions involve unique player actions and reactions from other countries (such as subjects), making them an engaging, multi-faceted experience.
@@ -78,16 +80,23 @@ template_mod/
 
 ### 4.2. Key Scripting Components
 
-*   **Events (`dynamic_missions_events.txt`)**: Handle the starting, success, and failure of missions. A key trigger, `NOT = { has_variable = active_dynamic_mission }`, ensures only one mission is active at a time.
+*   **On-Action Framework**: The system will be triggered by an `on_action` event (e.g., `on_yearly_pulse`) that checks if the player is eligible to receive new mission choices.
+*   **Scripted Effects & Triggers**: A central script will manage the mission pool. It will use a series of `if` blocks with `random_list` to check the conditions for each potential mission and build a list of valid options.
+*   **Dynamic Event Generation**: The main starting event (`dynamic_missions.1`) will be dynamically populated with the four randomly selected missions. This will be achieved by setting temporary variables that the event options will use to display the correct mission name and trigger the corresponding situation.
 *   **Situations (`dynamic_missions_situations.txt`)**: The core of the feature. The `develop_city_situation` defines the participants, duration, end conditions, and progress tracking.
 *   **Generic Actions (`dynamic_missions_actions.txt`)**: Defines the unique actions available to the player and subjects during the mission, including their costs, cooldowns, and effects.
 *   **Static Modifiers (`dynamic_missions_modifiers.txt`)**: Contains the definitions for all temporary modifiers applied by the generic actions, such as `dm_global_construction_penalty` and `dm_prosperity_boost`.
 *   **GUI (`develop_city_situation.gui`)**: Creates the custom panel for the situation, including the two progress bars for completion and time remaining. It uses the `SituationView` datacontext to display dynamic information.
 *   **Localization (`dynamic_missions_l_english.yml`)**: Provides all English text for events, actions, tooltips, and modifiers, ensuring a polished user experience.
 
-## 5. Future Development
+## 5. Mission Pool Management
 
-The Dynamic Missions framework is designed for easy expansion. New missions can be added by creating new situations, events, and actions. Potential future missions could include:
+The new framework is designed for easy expansion. To add a new mission to the pool, a modder simply needs to:
+1.  **Create the Mission Logic**: Develop the situation, events, and actions for the new mission (e.g., 'Military Expansion').
+2.  **Define Trigger Conditions**: Create a `can_start_...` scripted trigger that defines when this mission is a valid choice (e.g., `can_start_military_expansion_mission` would check if the player has a rival with adjacent territory).
+3.  **Add to the Mission Pool**: Add the new mission to the central selection script, allowing it to be picked if its conditions are met.
+
+This modular approach allows for a vast and diverse set of potential missions, such as:
 
 *   **Military Campaigns**: Conquer a specific region or defeat a rival within a time limit.
 *   **Economic Dominance**: Achieve a monopoly on a key trade good or reach a certain income level.
