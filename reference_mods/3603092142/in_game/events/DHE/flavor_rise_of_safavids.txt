@@ -1,0 +1,242 @@
+﻿namespace = rise_of_safavids_flavor
+
+#check if ardabil exists and has the safavids
+
+scripted_trigger ardabil_checker = {
+    country_exists = c:ABL
+    c:ABL = { this.ruler_or_heir_if_regent.dynasty = dynasty:safavid_dynasty }
+    NOT = { country_exists = c:IRA }
+}
+
+scripted_effect create_safavids = {
+    location:ardabil = {
+        save_scope_as = target_location
+        area ?= {
+            save_scope_as = target_area
+        }
+        create_dynasty_from_location = safavid_dynasty
+    }
+
+    create_character = {
+        first_name = name_ismail
+        dynasty = dynasty:safavid_dynasty
+        estate = estate_type:clergy_estate
+        religion = religion:shia
+        culture = culture:kurdish_culture
+        birth_location = location:ardabil
+        birth_date = 1487.7.17
+        adm = 75
+        dip = 80
+        mil = 100
+        save_scope_as = target_character
+    }
+
+    ruler_or_regent ?= {
+        save_scope_as = target_character2
+    }
+
+    scope:target_area = {
+        every_location_in_area = {
+            limit = {
+                owner ?= {
+                    is_ai = yes
+                }
+            }
+            add_core = c:ABL
+            change_location_owner = root
+        }
+    }
+
+    create_country_from_cores_in_our_locations = c:ABL
+
+    c:ABL = {
+        change_government_type = government_type:monarchy
+        set_new_ruler = scope:target_character
+
+        every_owned_location = {
+            change_integration_level = core
+        }
+
+        change_culture = culture:farsi_culture
+    }
+
+    location:ardabil = {
+        while = {
+            count = 100
+            create_sub_unit_with_owner = {
+                type = a_discovery_qizilbash
+                owner = c:ABL
+            }
+        }
+    }
+}
+
+scripted_effect empower_ardabil = {
+    if = {
+        limit = {
+            c:ABL = {
+                this.ruler_or_heir_if_regent.dynasty = dynasty:safavid_dynasty
+            }
+        }
+        
+    }
+    else = {
+        create_character = {
+            first_name = name_ismail
+            dynasty = dynasty:safavid_dynasty
+            estate = estate_type:clergy_estate
+            religion = religion:shia
+            culture = culture:kurdish_culture
+            birth_location = location:ardabil
+            birth_date = 1487.7.17
+            adm = 75
+            dip = 80
+            mil = 100
+            save_scope_as = target_character
+        }
+
+        c:ABL = {
+            set_new_ruler = scope:target_character
+            add_gold = 5000
+        }
+    }
+}
+
+rise_of_safavids_flavor.1 = {
+    type = country_event
+	title = rise_of_safavids_flavor.1.title
+	desc = rise_of_safavids_flavor.1.desc
+
+	fire_only_once = yes
+
+    trigger = {
+        has_game_rule = historical_safavids
+        location:ardabil = {
+            owner ?= root
+        }
+    }
+
+    immediate = {
+        if = {
+            limit = {
+                ardabil_checker = yes
+            }
+            empower_ardabil = yes
+        }
+        else = {
+            create_safavids = yes
+        }
+
+        scope:target_character = {
+            add_character_modifier = {
+                modifier = rise_of_ismail
+                days = -1
+                mode = add_and_extend
+            }
+
+            add_trait = trait:conqueror
+		    add_trait = trait:tactical_genius
+		    add_trait = trait:strategist
+        }
+
+        declare_war_with_cb = {
+            target = c:ABL
+            type = casus_belli:cb_annex
+        }
+    }
+
+    option = {
+        name = rise_of_safavids_flavor.1.a
+    }
+
+    option = {
+        name = rise_of_safavids_flavor.1.b
+        change_player = c:ABL
+    }
+}
+
+#if persia already exists, just give an option to enthrone a safavid
+rise_of_safavids_flavor.2 = {
+    type = country_event
+	title = rise_of_safavids_flavor.2.title
+	desc = rise_of_safavids_flavor.2.desc
+
+	fire_only_once = yes
+
+    trigger = {
+        has_game_rule = historical_safavids
+        location:ardabil = {
+            owner ?= root
+        }
+        NOT = { country_exists = c:ABL }
+    }
+
+    dynamic_historical_event = {
+		tag = IRA
+		from = 1395.1.1
+		to = 1418.1.1
+		monthly_chance = 25
+	}
+
+    option = {
+        name = rise_of_safavids_flavor.2.a
+        historical_option = yes
+
+        location:ardabil = { create_dynasty_from_location = safavid_dynasty }
+
+        create_character = {
+            first_name = name_ismail
+            dynasty = dynasty:safavid_dynasty
+            estate = estate_type:clergy_estate
+            religion = religion:shia
+            culture = culture:kurdish_culture
+            birth_location = location:ardabil
+            birth_date = 1487.7.17
+            adm = 75
+            dip = 80
+            mil = 100
+            save_scope_as = target_character
+        }
+
+        set_new_ruler = scope:target_character
+    }
+
+    option = {
+        name = rise_of_safavids_flavor.2.b
+
+        add_prestige = 20
+    }
+}
+
+rise_of_safavids_flavor.500 = {
+    type = country_event
+    title = rise_of_safavids_flavor.500.title
+    hidden = yes
+
+    immediate = {
+        random_neighbor_country = {
+            limit = {
+                NOT = { tag = TUR }
+                any_owned_location = {
+                    OR = {
+                        this.region = region:persia_region
+                        this.area = area:jazira_area
+                        this.area = area:armenian_highlands_area
+                        this.area = area:eastern_khorasan_area
+                        this.area = area:western_khorasan_area
+                        this.area = area:shirvan_area
+                        this.area = area:iraq_arabi_area
+                    }
+                }
+            }
+            save_scope_as = target
+        }
+        if = {
+            limit = { exists = scope:target }
+            declare_war_with_cb = {
+                target = scope:target
+                type = casus_belli:cb_unify_persia
+            }
+        }
+    }
+}

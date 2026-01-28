@@ -1,0 +1,169 @@
+﻿REPLACE_OR_CREATE:purchase_trade_port = {
+	type = diplomacy
+	category = CATEGORY_ECONOMY_ACTIONS
+
+	ai_tick = daily
+	ai_tick_frequency = 360
+
+	potential = {
+		scope:actor = {
+			or = {
+				is_ai = no
+				has_or_had_tag = POR
+				has_or_had_tag = CAS
+				has_or_had_tag = SPA
+				has_or_had_tag = FRA
+				has_or_had_tag = ENG
+				has_or_had_tag = GBR
+				has_or_had_tag = NED
+			}
+			or = {
+				# renaissance
+				has_advance = por_pursuing_waves
+				has_advance = route_to_the_indies_advance
+				# discovery
+				has_advance = coastal_trade_routes_advance
+				# reformation
+				has_advance = global_trade_routes_advance
+			}
+		}
+	}
+
+	cooldown = { 
+		type = purchase_trade_port
+		years = 5
+	}
+
+	allow = {}
+	
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		interaction_source_list = {
+			scope:actor = {
+				every_country_in_diplomatic_range = {
+					limit = {
+						not = { is_subject_type = colonial_nation }
+						capital = {
+							or = {
+								# africa
+								sub_continent = sub_continent:west_africa
+								sub_continent = sub_continent:central_africa
+								sub_continent = sub_continent:east_africa
+								region = region:zimbabwe_region
+								region = region:southern_africa_islands_region
+								region = region:madagascar_region
+								# middle east
+								region = region:arabia_region
+								# asia
+								sub_continent = sub_continent:south_asia
+								sub_continent = sub_continent:east_asia
+								region = region:indonesia_region
+								region = region:melanesia_region
+							}
+						}
+					}
+					add_to_list = source
+				}
+			}
+		}
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		visible = {
+			is_real_country = yes
+		}
+        enabled = {
+			power_projection < scope:actor.power_projection
+			at_war = no
+		}
+		show_why_not_visible = yes
+		show_why_not_enabled = yes
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		source = recipient
+		target_flag = target
+		name = "purchase_trade_port_select_location"
+		none_available_msg_key = "purchase_trade_port_no_locations"
+		column = { data = name }
+		column = { data = market }
+		column = { data = development }
+		default_sort = development
+		visible = {
+			is_port = yes
+		}
+		enabled = {
+			within_colonial_range_of = scope:actor
+		}
+	}
+
+	ai_will_do = {
+		if = {
+			limit = {
+				scope:actor = {
+					gold > {
+						value = scope:recipient.country_tax_base
+						add = {
+							value = scope:target.development
+							multiply = 5
+						}
+						max = {
+							value = scope:recipient.country_tax_base
+							multiply = 4
+						}
+					}
+				}
+			}
+			add = {
+				value = 100
+			}
+		}
+	}
+	
+	effect = {
+        scope:recipient = {
+			add_gold = {
+				value = scope:recipient.country_tax_base
+				add = {
+					value = scope:target.development
+					multiply = 5
+				}
+				max = {
+					value = scope:recipient.country_tax_base
+					multiply = 4
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:actor
+				modifier = opinion_traders_in_x
+			}
+		}
+		scope:actor = {
+			add_gold = {
+				value = scope:recipient.country_tax_base
+				add = {
+					value = scope:target.development
+					multiply = 5
+				}
+				max = {
+					value = scope:recipient.country_tax_base
+					multiply = 4
+				}
+				multiply = -1
+			}
+			scope:target = {
+				change_location_owner = scope:actor
+				change_integration_level = colonized
+			}
+		}
+	}
+
+	diplo_chance = {
+		base = -25
+		opinion = 0.5
+		in_debt = 100
+	}
+}

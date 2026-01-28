@@ -1,0 +1,1290 @@
+﻿byzantium_mission_pack = {
+	icon = generic_capital_economy
+	chance = 3600
+	repeatable = no
+	player_playstyle = military
+
+	ai_will_do = { value = 100 }
+
+	visible = {
+		game_has_missions_enabled = yes
+		OR = {
+			tag = "BYZ"
+			tag = "ROM"
+		}
+	}
+
+	on_start = {
+		set_variable = {
+			name = mission_target_navy_size
+			value = 25
+		}
+		set_variable = {
+			name = mission_target_silk_production
+			value = 19
+		}
+	}
+
+	on_completion = {
+		add_prestige = 100
+		add_legitimacy = 50
+		remove_variable = mission_target_navy_size
+		remove_variable = mission_target_silk_production
+	}
+
+	on_abort = {
+		remove_variable = mission_target_navy_size
+		remove_variable = mission_target_silk_production
+	}
+
+	# ==================== PHASE 1: BYZANTINE SURVIVAL & CONSOLIDATION ====================
+	
+	mission_consolidate_thrace = {
+		icon = defensive_army
+		requires = { }
+		
+		enabled = {
+			area:thrace_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.9
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_manpower = {
+				value = max_manpower
+				multiply = 0.15
+			}
+			add_country_modifier = {
+				modifier = secure_hinterland
+				years = 35
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+	
+	mission_secure_constantinople = {
+		icon = defensive_army
+		requires = { mission_consolidate_thrace }
+		
+		enabled = {
+			stability >= 40
+			legitimacy >= 50
+		}
+		
+		duration = 0
+
+		on_completion = {
+			capital = {
+				add_location_modifier = {
+					modifier = theodosian_walls_restored
+					years = 45
+					mode = add
+				}
+			}
+			trigger_event_silently = byz_mission_events.1
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_curtail_nobles_power = {
+		icon = government_reforms
+		requires = { mission_secure_constantinople }
+		
+		enabled = {
+			"estate_power(estate_type:nobles_estate)" <= 0.40
+			"estate_power(estate_type:crown_estate)" >= 0.27
+			legitimacy >= 60
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = imperial_authority_restored
+				years = 35
+				mode = add
+			}
+			add_stability = 20
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 2: NAVAL REVIVAL & TRADE ====================
+	
+	mission_repair_golden_horn = {
+		icon = ship_building_advance
+		requires = { mission_secure_constantinople }
+		
+		enabled = {
+			capital = {
+				has_building_with_at_least_one_level = dock
+				development >= 37
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			capital = {
+				add_location_modifier = {
+					modifier = golden_horn_shipyards
+					years = 30
+					mode = add
+				}
+			}
+			add_navy_tradition = 5
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_rebuild_byzantine_navy = {
+		icon = maritime_advance_age_2
+		requires = { mission_repair_golden_horn }
+		
+		enabled = {
+			navy_size >= var:mission_target_navy_size
+			any_owned_location = {
+				has_building_with_at_least_one_level = wharf
+				count >= 4
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = restored_byzantine_navy
+				years = 30
+				mode = add
+			}
+			add_navy_tradition = 10
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_dominate_bosporus = {
+		icon = maritime_advance_age_2
+		requires = { mission_consolidate_thrace }
+		
+		enabled = {
+			owns = location:gallipoli
+			owns = location:izmit
+			navy_size >= 15
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = bosporus_control
+				years = -1
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_secure_aegean = {
+		icon = ship_building_advance
+		requires = { mission_rebuild_byzantine_navy }
+		
+		enabled = {
+			area:aegean_archipelago_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.8
+				}
+			}
+			navy_size >= 35
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = aegean_dominance
+				years = 45
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 3: RECONQUEST OF GREECE ====================
+	
+	mission_recover_thessaloniki = {
+		icon = offensive_army
+		requires = { mission_consolidate_thrace }
+		
+		enabled = {
+			owns = location:thessaloniki
+			area:macedonia_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.8
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			location:thessaloniki = {
+				add_location_modifier = {
+					modifier = second_city_restored
+					years = 30
+					mode = add
+				}
+			}
+			location:thessaloniki = {
+				change_development = 3
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_secure_athens = {
+		icon = cultural_acceptance_advance
+		requires = { mission_recover_thessaloniki }
+		
+		enabled = {
+			location:athens = {
+				owner ?= root
+				has_building_with_at_least_one_level = library
+			}
+			area:northern_greece_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.7
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			location:athens = {
+				add_location_modifier = {
+					modifier = athenian_academy
+					years = -1
+					mode = add
+				}
+			}
+			add_research_progress = research_progress_mild_bonus
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_reconstruct_hexamilion = {
+		icon = defensive_army
+		requires = { mission_secure_athens }
+		
+		enabled = {
+			location:corinth = {
+				owner ?= root
+				has_building_with_at_least_one_level = bastion
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = hexamilion_wall
+				years = -1
+				mode = add
+			}
+			trigger_event_silently = byz_mission_events.2
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_unite_morea = {
+		icon = defensive_army
+		requires = { mission_secure_athens }
+		
+		enabled = {
+			area:morea_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.9
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = morea_secure
+				years = 30
+				mode = add
+			}
+			add_manpower = {
+				value = max_manpower
+				multiply = 0.25
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 4: ANATOLIAN RECONQUEST ====================
+	
+	mission_liberate_nicaea = {
+		icon = religious_icon
+		requires = { }
+		
+		enabled = {
+			location:iznik = {
+				owner ?= root
+				dominant_religion ?= religion:orthodox
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_legitimacy = 15
+			add_stability = 10
+			trigger_event_silently = byz_mission_events.3
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_cross_into_anatolia = {
+		icon = offensive_army
+		requires = { mission_liberate_nicaea }
+		
+		enabled = {
+			region:anatolia_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.35
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = anatolian_bridgehead
+				years = 20
+				mode = add
+			}
+			add_stability = 10
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_recover_bithynia = {
+		icon = offensive_army
+		requires = { mission_cross_into_anatolia }
+		
+		enabled = {
+			area:marmara_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.85
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = bithynia_secure
+				years = 20
+				mode = add
+			}
+			add_manpower = {
+				value = max_manpower
+				multiply = 0.15
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_secure_aegean_coast = {
+		icon = maritime_advance_age_2
+		requires = { mission_secure_aegean }
+		
+		enabled = {
+			owns = location:smyrna
+			owns = location:ayasuluk
+			any_owned_location = {
+				has_building_with_at_least_one_level = dry_dock
+				count >= 4
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = ionian_revival
+				years = 40
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_break_ottoman_power = {
+		icon = war_exhaustion
+		requires = { mission_cross_into_anatolia }
+		
+		enabled = {
+			owns = location:bursa
+			OR = {
+				NOT = { country_exists = c:TUR }
+				c:TUR = {
+					is_subject_of = root
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_prestige = 50
+			add_country_modifier = {
+				modifier = turkish_threat_ended
+				years = 25
+				mode = add
+			}
+			trigger_event_silently = byz_mission_events.4
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_restore_anatolian_themes = {
+		icon = administrative_efficiency
+		requires = { mission_break_ottoman_power mission_recover_bithynia }
+		
+		enabled = {
+			region:anatolia_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.75
+				}
+			}
+			average_control_in_home_region >= 0.7
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = theme_system_restored
+				years = -1
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 5: BALKAN RECONQUEST ====================
+	
+	mission_subjugate_bulgaria = {
+		icon = glorious_arms
+		requires = { mission_consolidate_thrace }
+		
+		enabled = {
+			owns = location:tarnovo
+			OR = {
+				NOT = { country_exists = c:BUL }
+				c:BUL = { is_subject_of = root }
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_prestige = 15
+			add_country_modifier = {
+				modifier = bulgarian_subjugation
+				years = 35
+				mode = add
+			}
+
+		if = {
+			limit = { exists = c:WAL }
+			add_casus_belli = {
+				target = c:WAL
+				type = casus_belli:cb_conquer_province
+				years = 20
+			}
+		}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_secure_serbia = {
+		icon = diplomatic_influence
+		requires = { mission_consolidate_thrace }
+		
+		enabled = {
+			area:serbia_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.6
+				}
+			}
+			OR = {
+				NOT = { country_exists = c:SER }
+				c:SER = { is_subject_of = root }
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_gold = 300
+
+			area:serbia_area = {
+				ordered_location_in_area = {
+					limit = { owner ?= root }
+					order_by = development
+					max = 5
+					add_core = root
+					change_development = 1
+				}
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_secure_bosnia = {
+		icon = offensive_army
+		requires = { mission_secure_serbia }
+		
+		enabled = {
+			area:bosnia_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.7
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_manpower = {
+				value = max_manpower
+				multiply = 0.35
+			}
+			area:bosnia_area = {
+				ordered_location_in_area = {
+					limit = { owner ?= root }
+					order_by = development
+					max = 5
+					add_core = root
+				}
+			}
+			if = {
+				limit = { exists = c:NAP }
+				add_casus_belli = {
+					target = c:NAP
+					type = casus_belli:cb_conquer_province
+					years = 30
+				}
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 6: RELIGIOUS & CULTURAL REVIVAL ====================
+	mission_restore_hagia_sophia = {
+		icon = religious_icon
+		requires = { mission_secure_constantinople }
+		
+		enabled = {
+			capital = {
+				has_building_with_at_least_one_level = cathedral
+				development >= 38
+			}
+			religious_unity >= 0.8
+		}
+		
+		duration = 0
+
+		on_completion = {
+			capital = {
+				add_location_modifier = {
+					modifier = hagia_sophia_restored
+					years = -1
+					mode = add
+				}
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_protect_mount_athos = {
+		icon = religious_icon
+		requires = { mission_restore_hagia_sophia }
+		
+		enabled = {
+			province:chalkidiki_province = {
+				any_location_in_province = {
+					owner ?= root
+					has_building_with_at_least_one_level = orthodox_monastery
+					count >= 2
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			location:thessaloniki = {
+				add_location_modifier = {
+					modifier = mount_athos_autonomous
+					years = -1
+					mode = add
+				}
+			}
+			add_prestige = 15
+			add_legitimacy = 15
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_revive_constantinople_university = {
+		icon = technology_icon
+		requires = { mission_restore_hagia_sophia }
+		
+		enabled = {
+			capital = {
+				has_building_with_at_least_one_level = university
+				development >= 42
+			}
+			has_advance = greek_rite
+			average_country_literacy >= 25
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = constantinople_university
+				years = -1
+				mode = add
+			}
+			add_research_progress = research_progress_severe_bonus
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_restore_greek_fire = {
+		icon = artillery_icon
+		requires = { mission_revive_constantinople_university }
+		
+		enabled = {
+			capital = {
+				has_building_with_at_least_one_level = cannon_maker
+			}
+			any_owned_location = {
+				raw_material = goods:saltpeter
+				count >= 3
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = greek_fire_arsenal
+				years = 50
+				mode = add
+			}
+			add_navy_tradition = 10
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_restore_orthodox_patriarchates = {
+		icon = religious_icon
+		requires = { mission_protect_mount_athos }
+		
+		enabled = {
+			capital.market = {
+				"merchant_power_in_market(root)" >= 90
+			}
+			religion:orthodox = {
+				any_country_in_religion = {
+					count >= 2
+					is_allied_with = { target = root }
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = orthodox_leadership
+				years = 60
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 7: TRADE & ECONOMIC DEVELOPMENT ====================
+	
+	mission_develop_silk_trade = {
+		icon = merchants_and_trade
+		requires = { mission_curtail_nobles_power }
+		
+		enabled = {
+			any_owned_location = {
+				raw_material = goods:silk
+				has_building_with_at_least_one_level = fine_cloth_workshop
+				count >= 4
+			}
+			produced_in_country:silk >= 24
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = byzantine_silk_trade
+				years = 40
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_control_black_sea_trade = {
+		icon = trade_efficiency
+		requires = { mission_dominate_bosporus }
+		
+		enabled = {
+			area:crimea_area = {
+				any_location_in_area = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.7
+				}
+			}
+			location:kaffa.market = {
+				"merchant_power_in_market(root)" >= 75
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = black_sea_dominance
+				years = 35
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 8: GRAND RECONQUEST & EMPIRE BUILDING ====================
+	
+	mission_recover_antioch = {
+		icon = religious_icon
+		requires = { mission_restore_anatolian_themes }
+		
+		enabled = {
+			location:antioch = {
+				owner ?= root
+				dominant_religion ?= religion:orthodox
+				development >= 30
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = antioch_liberated
+				years = 35
+				mode = add
+			}
+			add_prestige = 20
+			trigger_event_silently = byz_mission_events.5
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_recover_alexandria = {
+		icon = cultural_acceptance_advance
+		requires = { mission_restore_anatolian_themes }
+		
+		enabled = {
+			location:alexandria = {
+				owner ?= root
+				dominant_religion ?= religion:orthodox
+				development >= 40
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = alexandria_restored
+				years = 15
+				mode = add
+			}
+			add_gold = 500
+			
+			if = {
+				limit = { location:barca = { NOT = { owner = root } } }
+				add_casus_belli = {
+					target = location:barca.owner
+					type = casus_belli:cb_conquer_province
+					months = 180
+				}
+			}
+			
+			trigger_event_silently = byz_mission_events.6
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_recover_jerusalem = {
+		icon = religious_icon
+		requires = { mission_restore_anatolian_themes }
+		
+		enabled = {
+			location:jerusalem = {
+				owner ?= root
+				dominant_religion ?= religion:orthodox
+				development >= 25
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = jerusalem_liberated
+				years = -1
+				mode = add
+			}
+			add_prestige = 50
+			add_legitimacy = 25
+			trigger_event_silently = byz_mission_events.7
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_restore_pentarchy = {
+		icon = empire_icon
+		requires = { mission_recover_jerusalem mission_recover_alexandria mission_recover_antioch }
+		
+		enabled = {
+			owns = location:constantinople
+			owns = location:antioch
+			owns = location:alexandria
+			owns = location:jerusalem
+			owns = location:rome
+			location:rome = {
+				dominant_religion ?= religion:orthodox
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = pentarchy_restored
+				years = -1
+				mode = add
+			}
+			trigger_event_silently = byz_mission_events.8
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 9: RELIGIOUS RIVALRY BRANCH ====================
+	
+	mission_establish_orthodox_hegemony = {
+		icon = religious_icon
+		requires = { }
+		
+		enabled = {
+			religion = religion:orthodox
+			religious_unity >= 0.9
+			capital = {
+				dominant_religion ?= religion:orthodox
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = orthodox_defender
+				years = 35
+				mode = add
+			}
+			add_legitimacy = 20
+		}
+		ai_will_do = { value = 100 }
+	}
+	
+	mission_counter_islamic_threat = {
+		icon = religious_icon
+		requires = { mission_establish_orthodox_hegemony }
+		
+		enabled = {
+			any_country = {
+				religion.group = religion_group:muslim
+				is_neighbor_of = root
+				count >= 1
+			}
+			army_tradition >= 15
+		}
+		
+		duration = 0
+
+		on_completion = {
+			if = {
+				limit = { country_exists = c:TUR }
+				add_casus_belli = {
+					target ?= c:TUR
+					type = casus_belli:cb_conquer_province
+					months = 120
+				}
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_purge_anatolian_heretics = {
+		icon = religious_icon
+		requires = { mission_counter_islamic_threat }
+		
+		enabled = {
+			region:anatolia_region = {
+					any_location_in_region = {
+						custom_tooltip = {
+							text = all_locations_have_dominat_religion_of_type_orthodox_tt
+							dominant_religion ?= religion:orthodox
+					}
+					percent >= 0.90
+				}
+			}
+			religious_unity >= 0.75
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = religious_zeal
+				years = 10
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 10: DIPLOMATIC INTEGRATION BRANCH ====================
+	
+	mission_consolidate_orthodox_subjects = {
+		icon = diplomatic_training
+		requires = { mission_establish_orthodox_hegemony }
+		
+		enabled = {
+			any_subject = {
+				religion = religion:orthodox
+				count >= 2
+				liberty_desire <= 30
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			every_subject = {
+				limit = {
+					religion = religion:orthodox
+				}
+				add_trust = {
+					modifier = trust_mission_trusted_ties
+					target = root
+				}
+				add_liberty_desire = liberty_desire_mild_minus
+			}
+			add_country_modifier = {
+				modifier = integrated_subjects
+				years = 30
+				mode = add
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 11: CULTURAL INTEGRATION BRANCH ====================
+	
+	mission_promote_greek_culture = {
+		icon = cultural_acceptance_advance
+		requires = { mission_establish_orthodox_hegemony }
+		
+		enabled = {
+			culture = culture:greek_culture
+			culture:greek_culture = {
+				cultural_tradition >= 250
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			culture:greek_culture = {
+				add_cultural_influence = cultural_influence_mild_bonus
+				add_cultural_tradition = cultural_tradition_mild_bonus
+			}
+			capital = {
+				add_location_modifier = {
+					modifier = center_of_hellenic_culture
+					years = 40
+					mode = add
+				}
+			}
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	# ==================== PHASE 12: FINAL ULTIMATE MISSIONS ====================
+	
+	mission_restore_roman_empire = {
+		icon = empire_icon
+		requires = { 
+			mission_restore_pentarchy
+			mission_restore_anatolian_themes
+		}
+		
+		enabled = {
+			# Italy (60%)
+			region:italy_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.6
+				}
+			}
+			# Balkans (80%)
+			region:balkan_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.8
+				}
+			}
+			# Anatolia (80%)
+			region:anatolia_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.80
+				}
+			}
+			region:egypt_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.60
+				}
+			}
+			region:crescent_region = {
+				any_location_in_region = {
+					OR = {
+						custom_tooltip = {
+							text = is_owner_generic_check
+							owner ?= root
+						}
+						custom_tooltip = {
+							text = is_owner_generic_subject_check
+							owner ?= { is_subject_of = root }
+						}
+					}
+					percent >= 0.60
+				}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = roman_empire_restored
+				years = -1
+				mode = add
+			}
+			form_country = formable_country:ROM_f
+		}
+		ai_will_do = { value = 100 }
+	}
+
+	mission_roman_empire_restored = {
+		icon = empire_icon
+		requires = { 
+			mission_restore_roman_empire
+		}
+		final = yes
+		
+		enabled = {
+			is_great_power = yes
+			tag = ROM
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_prestige = 100
+			add_legitimacy = 100
+		}
+		ai_will_do = { value = -50 }
+	} 
+}

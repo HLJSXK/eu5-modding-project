@@ -62,6 +62,8 @@ See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instr
 - **[EU5 Mod Framework Guide](docs/technical/EU5_Mod_Framework_Guide.md)** - Practical development framework
 - **[Goldberg Emulator Guide](docs/technical/Goldberg_Emulator_Guide.md)** - Detailed setup and configuration
 
+- **[Community Mod References](reference_mods/README.md)** - 12 community mods for learning and reference
+
 ### Design & Development
 - **[Dynamic Missions Design](docs/design/Dynamic_Missions_Design.md)** - Dynamic mission system design
 - **[Documentation Index](docs/README.md)** - Complete documentation structure
@@ -93,6 +95,7 @@ eu5-modding-project/
 ├── src/                    # Mod source files and templates
 │   ├── template_mod/      # Minimal mod template
 │   └── dynamic_missions/  # Dynamic missions mod
+├── reference_mods/       # Community mod examples
 ├── assets/                 # Graphics and media
 ├── tools/                  # Development utilities
 ├── build.sh               # Build script (Linux/macOS)

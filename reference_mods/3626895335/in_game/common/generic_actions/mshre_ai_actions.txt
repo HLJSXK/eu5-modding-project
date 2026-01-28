@@ -1,0 +1,620 @@
+hre_emperor_liberate_member = {
+	type = diplomacy
+
+	show_in_gui_list = no
+	show_message = no
+	allow_multiple_targets = no
+
+
+	ai_tick = monthly
+	ai_tick_frequency = 19
+
+	ai_prerequisite = {
+		is_emperor = yes
+		at_war = no
+		stability >= 0
+		government_power >= 50
+		num_loans = 0
+		monthly_balance > 0
+		war_exhaustion < 1
+		is_during_bankruptcy = no
+		has_any_active_disaster = no
+		has_any_possible_disaster = no
+	}
+
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+			is_ai = yes
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "choose_target"
+		visible = {
+			NOT = { is_member_of_international_organization = international_organization:hre }
+			NOT = { is_at_war_with = scope:actor }
+			NOT = { is_allied_with = { target = scope:actor } }
+			NOT = { is_subject_of = scope:actor }
+			any_subject = {
+				is_member_of_international_organization = international_organization:hre
+			}
+		}
+		enabled = {
+			NOT = { has_truce_with = scope:actor }
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			declare_war_with_cb = {
+				target = scope:target
+				type = casus_belli:cb_liberate_hre_member
+			}
+		}
+	}
+
+
+	ai_will_do = {
+		# Design:
+		# Emperor needs to reach 1.5x the target's defensive alliance strength
+		# He can use own military + gold via Bolster Imperial Army to cover the gap
+
+		# Base threshold
+		add = -100
+		add = {
+			scope:actor = {
+				desc = "BIAS_FROM_RULER_TRAITS"
+				value = modifier:bias_for_militarist_policies
+			}
+		}
+
+
+		# Military strength component - need at least some base strength
+		add = {
+			value = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+			subtract = 0.40
+			multiply = 150
+		}
+
+		# Gold coverage for Bolster Imperial Army
+		add = {
+			# Available gold
+			if = {
+				limit = {
+					exists = international_organization:hre
+					international_organization:hre = { has_enabled_currency = gold }
+				}
+				value = international_organization:hre.gold
+			}
+			else = {
+				value = scope:actor.gold
+			}
+
+			# Divide by cost (gap * tax_base * 6)
+			# This gives us "how many times over can we cover the gap"
+			divide = {
+				value = 1.5
+				subtract = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+				min = 0.1  # Floor to avoid division by zero when already strong
+				multiply = scope:actor.country_tax_base
+				multiply = 6
+				min = 1  # Minimum cost to avoid division issues
+			}
+
+			# We now have: gold / cost
+			# If > 1, we have enough. If < 1, we don't.
+			# Transform so 1.0 = neutral (0 contribution)
+			subtract = 1
+
+			# Scale
+			multiply = 100
+
+			# Cap to prevent extreme values
+			max = 150
+			min = -150
+		}
+
+		# Manpower check
+		add = {
+			desc = "CURRENT_MANPOWER_TOOLTIP"
+			value = scope:actor.manpower_percentage
+			subtract = 0.5
+			multiply = 100
+		}
+
+		# Extra penalty for critically low manpower
+		if = {
+			limit = { scope:actor = { manpower_percentage < 0.2 } }
+			add = {
+				desc = "critically low manpower"
+				value = -250
+			}
+		}
+
+		# Target is already at war
+		if = {
+			limit = {
+				scope:target = { at_war = yes }
+			}
+			add = {
+				desc = "target at war"
+				value = 25
+			}
+		}
+
+		# Target war exhaustion
+		add = {
+			desc = "target war exhaustion"
+			value = scope:target.war_exhaustion
+			multiply = 10
+		}
+
+		# Target is bankrupt
+		if = {
+			limit = {
+				scope:target = { is_during_bankruptcy = yes }
+			}
+			add = {
+				desc = "target is bankrupt"
+				value = 50
+			}
+		}
+
+		# Less likely to do it if we have high relations with the target
+		# Opinion above 100 decreases the willingness to do this. Up to -100 at +200 opinion.
+		subtract = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:target)"
+			subtract = 100
+			min = 0
+		}
+
+	}
+
+}
+
+hre_emperor_reconquer_hre_lands = {
+	type = diplomacy
+
+	show_in_gui_list = no
+	show_message = no
+	allow_multiple_targets = no
+
+
+	ai_tick = monthly
+	ai_tick_frequency = 29
+
+	ai_prerequisite = {
+		is_emperor = yes
+		at_war = no
+		stability >= 0
+		government_power >= 50
+		num_loans = 0
+		monthly_balance > 0
+		war_exhaustion < 1
+		is_during_bankruptcy = no
+		has_any_active_disaster = no
+		has_any_possible_disaster = no
+	}
+
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+			is_ai = yes
+		}
+		international_organization:hre = {
+			modifier:imperial_ban_allowed = yes
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "choose_target"
+		visible = {
+			NOT = { is_member_of_international_organization = international_organization:hre }
+			NOT = { is_at_war_with = scope:actor }
+			NOT = { is_allied_with = { target = scope:actor } }
+			NOT = { is_subject_of = scope:actor }
+		}
+		enabled = {
+			NOT = { has_truce_with = scope:actor }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		interaction_source_list = {
+			scope:target = {
+				every_province = {
+					limit = {
+						any_location_in_province = {
+							is_owned_by_international_organization = international_organization:hre
+						}
+					}
+					add_to_list = source
+				}
+				every_subject_or_below = {
+					every_province = {
+						limit = {
+							any_location_in_province = {
+								is_owned_by_international_organization = international_organization:hre
+							}
+
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target_province
+		name = "choose_province"
+		visible = {
+			any_location_in_province = {
+				is_owned_by_international_organization = international_organization:hre
+			}
+		}
+		enabled = {
+		}
+	}
+
+
+	effect = {
+		scope:actor = {
+			declare_war_with_cb = {
+				type = casus_belli:cb_imperial_ban
+				province = scope:target_province
+				target = scope:target
+			}
+		}
+	}
+
+
+	ai_will_do = {
+		# Design:
+		# Emperor needs to reach 1.5x the target's defensive alliance strength
+		# He can use own military + gold via Bolster Imperial Army to cover the gap
+
+		# Base threshold
+		add = -100
+		add = {
+			scope:actor = {
+				desc = "BIAS_FROM_RULER_TRAITS"
+				value = modifier:bias_for_militarist_policies
+			}
+		}
+
+		# Military strength component - need at least some base strength
+		add = {
+			value = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+			subtract = 0.40
+			multiply = 150
+		}
+
+		# Gold coverage for Bolster Imperial Army
+		add = {
+			# Available gold
+			if = {
+				limit = {
+					exists = international_organization:hre
+					international_organization:hre = { has_enabled_currency = gold }
+				}
+				value = international_organization:hre.gold
+			}
+			else = {
+				value = scope:actor.gold
+			}
+
+			# Divide by cost (gap * tax_base * 6)
+			# This gives us "how many times over can we cover the gap"
+			divide = {
+				value = 1.5
+				subtract = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+				min = 0.1  # Floor to avoid division by zero when already strong
+				multiply = scope:actor.country_tax_base
+				multiply = 6
+				min = 1  # Minimum cost to avoid division issues
+			}
+
+			# We now have: gold / cost
+			# If > 1, we have enough. If < 1, we don't.
+			# Transform so 1.0 = neutral (0 contribution)
+			subtract = 1
+
+			# Scale
+			multiply = 100
+
+			# Cap to prevent extreme values
+			max = 150
+			min = -150
+		}
+
+		# Manpower check
+		add = {
+			desc = "CURRENT_MANPOWER_TOOLTIP"
+			value = scope:actor.manpower_percentage
+			subtract = 0.5
+			multiply = 100
+		}
+
+		# Extra penalty for critically low manpower
+		if = {
+			limit = { scope:actor = { manpower_percentage < 0.2 } }
+			add = {
+				desc = "critically low manpower"
+				value = -250
+			}
+		}
+
+		# Target is already at war
+		if = {
+			limit = {
+				scope:target = { at_war = yes }
+			}
+			add = {
+				desc = "target at war"
+				value = 25
+			}
+		}
+
+		# Target war exhaustion
+		add = {
+			desc = "target war exhaustion"
+			value = scope:target.war_exhaustion
+			multiply = 10
+		}
+
+		# Target is bankrupt
+		if = {
+			limit = {
+				scope:target = { is_during_bankruptcy = yes }
+			}
+			add = {
+				desc = "target is bankrupt"
+				value = 50
+			}
+		}
+
+		# Less likely to do it if we have high relations with the target
+		# Opinion above 100 decreases the willingness to do this. Up to -100 at +200 opinion.
+		subtract = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:target)"
+			subtract = 100
+			min = 0
+		}
+	}
+
+}
+
+
+hre_demand_unlawful_territory_rejection_war = {
+	type = diplomacy
+
+	show_in_gui_list = no
+	show_message = no
+	allow_multiple_targets = no
+
+
+	ai_tick = monthly
+	ai_tick_frequency = 37
+
+	ai_prerequisite = {
+		is_emperor = yes
+		at_war = no
+		stability >= 0
+		government_power >= 50
+		num_loans = 0
+		monthly_balance > 0
+		war_exhaustion < 1
+		is_during_bankruptcy = no
+		has_any_active_disaster = no
+		has_any_possible_disaster = no
+	}
+
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+			is_ai = yes
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "choose_target"
+		visible = {
+			is_member_of_international_organization = international_organization:hre
+			NOT = { is_at_war_with = scope:actor }
+			NOT = { is_allied_with = { target = scope:actor } }
+			NOT = { is_subject_of = scope:actor }
+		}
+		enabled = {
+			NOT = { has_truce_with = scope:actor }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		interaction_source_list = {
+			scope:target = {
+				every_province = {
+					limit = {
+						any_location_in_province = {
+							has_location_modifier = hre_unlawful_territory
+						}
+					}
+					add_to_list = source
+				}
+				every_subject_or_below = {
+					every_province = {
+						limit = {
+							any_location_in_province = {
+								has_location_modifier = hre_unlawful_territory
+							}
+
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target_province
+		name = "choose_province"
+		visible = {
+			any_location_in_province = {
+				has_location_modifier = hre_unlawful_territory
+			}
+		}
+		enabled = {
+		}
+	}
+
+
+	effect = {
+		scope:actor = {
+			declare_war_with_cb = {
+				type = casus_belli:cb_following_through_on_threat
+				province = scope:target_province
+				target = scope:target
+			}
+		}
+	}
+
+
+	ai_will_do = {
+		# Design:
+		# Emperor needs to reach 1.5x the target's defensive alliance strength
+		# He can use own military + gold via Bolster Imperial Army to cover the gap
+
+		# Base threshold
+		add = -100
+		add = {
+			scope:actor = {
+				desc = "BIAS_FROM_RULER_TRAITS"
+				value = modifier:bias_for_militarist_policies
+			}
+		}
+
+
+		# Military strength component - need at least some base strength
+		add = {
+			value = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+			subtract = 0.40
+			multiply = 150
+		}
+
+		# Gold coverage for Bolster Imperial Army
+		add = {
+			# Available gold
+			if = {
+				limit = {
+					exists = international_organization:hre
+					international_organization:hre = { has_enabled_currency = gold }
+				}
+				value = international_organization:hre.gold
+			}
+			else = {
+				value = scope:actor.gold
+			}
+
+			# Divide by cost (gap * tax_base * 6)
+			# This gives us "how many times over can we cover the gap"
+			divide = {
+				value = 1.5
+				subtract = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+				min = 0.1  # Floor to avoid division by zero when already strong
+				multiply = scope:actor.country_tax_base
+				multiply = 6
+				min = 1  # Minimum cost to avoid division issues
+			}
+
+			# We now have: gold / cost
+			# If > 1, we have enough. If < 1, we don't.
+			# Transform so 1.0 = neutral (0 contribution)
+			subtract = 1
+
+			# Scale
+			multiply = 100
+
+			# Cap to prevent extreme values
+			max = 150
+			min = -150
+		}
+
+		# Manpower check
+		add = {
+			desc = "CURRENT_MANPOWER_TOOLTIP"
+			value = scope:actor.manpower_percentage
+			subtract = 0.5
+			multiply = 100
+		}
+
+		# Extra penalty for critically low manpower
+		if = {
+			limit = { scope:actor = { manpower_percentage < 0.2 } }
+			add = {
+				desc = "critically low manpower"
+				value = -250
+			}
+		}
+
+		# Target is already at war
+		if = {
+			limit = {
+				scope:target = { at_war = yes }
+			}
+			add = {
+				desc = "target at war"
+				value = 25
+			}
+		}
+
+		# Target war exhaustion
+		add = {
+			desc = "target war exhaustion"
+			value = scope:target.war_exhaustion
+			multiply = 10
+		}
+
+		# Target is bankrupt
+		if = {
+			limit = {
+				scope:target = { is_during_bankruptcy = yes }
+			}
+			add = {
+				desc = "target is bankrupt"
+				value = 50
+			}
+		}
+
+		# Less likely to do it if we have a high opinion of the target
+		subtract = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:target)"
+			multiply = 2
+		}
+	}
+
+}

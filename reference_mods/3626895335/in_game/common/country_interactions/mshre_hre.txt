@@ -1,0 +1,766 @@
+REPLACE:bestow_free_city_status = {
+	type = diplomacy
+	category = CATEGORY_HRE_ACTIONS
+
+	ai_limit_per_check = 1
+
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+		}
+	}
+
+	allow = {
+		international_organization:hre = {
+			hre_enabled_free_cities = yes
+			international_organization_has_law = law:free_city_rights_law
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		visible = {
+			is_member_of_international_organization = international_organization:hre
+			is_rebel_country = no
+			international_organization:hre = {
+				not = {
+					country_has_special_status = {
+						type = special_status:free_city
+						country = root
+					}
+				}
+			}
+		}
+		enabled = {
+			international_organization:hre = {
+				special_status_can_be_bestowed = {
+					type = special_status:free_city
+					country = root
+				}
+			}
+		}
+	}
+
+	effect = {
+		international_organization:hre = {
+			international_organization_add_special_status = {
+				type = special_status:free_city
+				country = scope:recipient
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:recipient)"
+		}
+		add = {
+			desc = "THEIR_OPINION_TOOLTIP"
+			value = "scope:recipient.opinion(scope:actor)"
+		}
+		if = {
+			limit = { scope:actor.culture.language = scope:recipient.culture.language }
+			add = {
+				desc = "UPKEEP_SAME_LANGUAGE"
+				value = 25
+			}
+		}
+		if = {
+			limit = {
+				not = {
+					scope:recipient = {
+						government_type = government_type:republic
+					}
+				}
+			}
+			divide = 2
+		}
+		# spam protection
+		if = {
+			limit = {
+				exists = scope:recipient
+				scope:recipient = { has_cooldown = ai_spam_protection_bestow_free_city_status }
+			}
+			#ai spam protection
+			subtract = {
+				desc = "INERTIA"
+				value = 10000
+			}
+		}
+	}
+
+	accept = {
+		if = {
+			limit = { exists = scope:recipient }
+			if = {
+				limit = { scope:recipient = { government_type = government_type:theocracy } }
+				subtract = 100
+			}
+			if = {
+				limit = { scope:recipient = { government_type = government_type:monarchy } }
+				subtract = 50
+			}
+			if = {
+				limit = { exists = scope:actor }
+				add = {
+					desc = "THEIR_OPINION_TOOLTIP"
+					value = "scope:recipient.opinion(scope:actor)"
+					if = {
+						limit = { scope:recipient = { "opinion(scope:actor)" > 0 } }
+						divide = 10
+					}
+					else = {
+						divide = 5
+					}
+				}
+				add = {
+					scope:actor = {
+						value = modifier:diplomatic_reputation
+						multiply = 3
+					}
+				}
+				add = {
+					scope:recipient = {
+						value = "trust(scope:actor)"
+						divide = 5
+					}
+				}
+			}
+		}
+		else = {
+			value = 0
+		}
+	}
+
+	reject_effect = {
+		hidden_effect = {
+			if = {
+				limit = { scope:actor = { is_ai = yes } }
+				scope:recipient = {
+					add_cooldown = {
+						type = ai_spam_protection_bestow_free_city_status
+						years = 5
+					}
+				}
+			}
+		}
+	}
+}
+
+REPLACE:request_free_city_status = {
+	type = diplomacy
+	category = CATEGORY_HRE_ACTIONS
+
+	ai_limit_per_check = 1
+	potential = {
+		scope:actor = {
+			is_member_of_international_organization = international_organization:hre
+		}
+
+		international_organization:hre = {
+			not = {
+				country_has_special_status = {
+					type = special_status:free_city
+					country = scope:actor
+				}
+			}
+		}
+		international_organization:hre = {
+			special_status_can_be_bestowed = {
+				type = special_status:free_city
+				country = scope:actor
+			}
+		}
+	}
+	allow = {
+		international_organization:hre = {
+			hre_enabled_free_cities = yes
+			international_organization_has_law = law:free_city_rights_law
+		}
+		scope:actor = {
+			is_rebel_country = no
+		}
+	}
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		visible = {
+			is_emperor = yes
+		}
+		enabled = {
+		}
+	}
+	effect = {
+		international_organization:hre = {
+			international_organization_add_special_status = {
+				type = special_status:free_city
+				country = scope:actor
+			}
+		}
+	}
+	ai_will_do = {
+		add = {
+			desc = "BIAS_FROM_RULER_TRAITS"
+			value = {
+				subtract = {
+					value = "scope:actor.modifier:bias_for_militarist_policies"
+					multiply = 3
+				}
+				add = "scope:actor.modifier:bias_for_capitalist_policies"
+				add = {
+					value = "scope:actor.modifier:bias_for_administrative_policies"
+					divide = 2
+				}
+			}
+		}
+		add = {
+			desc = "TARGET_ACCEPTANCE"
+			value = "scope:actor.country_interaction_acceptance(country_interaction:request_free_city_status|scope:recipient)"
+		}
+		# spam protection
+		if = {
+			limit = {
+				exists = scope:actor
+				scope:actor = { has_cooldown = ai_spam_protection_request_free_city_status }
+			}
+			#ai spam protection
+			subtract = {
+				desc = "INERTIA"
+				value = 10000
+			}
+		}
+
+	}
+	accept = {
+		add = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:recipient)"
+		}
+		add = {
+			desc = "THEIR_OPINION_TOOLTIP"
+			value = "scope:recipient.opinion(scope:actor)"
+		}
+		if = {
+			limit = { scope:actor.culture.language = scope:recipient.culture.language }
+			add = {
+				desc = "UPKEEP_SAME_LANGUAGE"
+				value = 25
+			}
+		}
+		if = {
+			limit = {
+				not = {
+					scope:recipient = {
+						government_type = government_type:republic
+					}
+				}
+			}
+			divide = {
+				desc = "HRE_NON_REPUBLIC"
+				value = 2
+			}
+		}
+	}
+	reject_effect = {
+		hidden_effect = {
+			if = {
+				limit = { scope:actor = { is_ai = yes } }
+				scope:actor = {
+					add_cooldown = {
+						type = ai_spam_protection_request_free_city_status
+						years = 5
+					}
+				}
+			}
+		}
+	}
+}
+
+REPLACE:demand_unlawful_territory = {
+	type = diplomacy
+	category = CATEGORY_HRE_ACTIONS
+	potential = {
+		exists = international_organization:hre
+		scope:actor = {
+			is_emperor = yes
+		}
+	}
+	allow = {
+		has_gold_org_country_trigger = {
+			international_organization = international_organization:hre
+			country = scope:actor
+			value = demand_unlawful_territory_cost
+		}
+	}
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		visible = {
+		}
+		enabled = {
+			is_subject = no
+			is_rebel_country = no
+		}
+	}
+	select_trigger = {
+		looking_for_a = province
+		none_available_msg_key = "demand_unlawful_territory_no_hre_province"
+		interaction_source_list = {
+			scope:recipient = {
+				every_province = {
+					limit = {
+						any_location_in_province = {
+							is_owned_by_international_organization = international_organization:hre
+							integration_level = conquered
+							any_core_in_location = {
+								exists = this
+							}
+						}
+					}
+					add_to_list = source
+				}
+				every_subject_or_below = {
+					every_province = {
+						limit = {
+							any_location_in_province = {
+								is_owned_by_international_organization = international_organization:hre
+								integration_level = conquered
+								any_core_in_location = {
+									exists = this
+								}
+							}
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_province"
+		column = {
+			data = name
+		}
+		column = {
+			data = population
+		}
+		visible = {
+			any_location_in_province = {
+				is_owned_by_international_organization = international_organization:hre
+				integration_level = conquered
+				NOT = { is_core_of = root.owner }
+			}
+		}
+		enabled = {
+		}
+	}
+	effect = {
+		pay_gold_org_country_effect = {
+			international_organization = international_organization:hre
+			country = scope:actor
+			value = demand_unlawful_territory_cost
+		}
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				every_location_in_province = {
+					limit = {
+						integration_level = conquered
+						is_owned_by_international_organization = international_organization:hre
+					}
+					if = {
+						limit = {
+							exists = previous_owner
+							is_core_of = previous_owner
+							previous_owner != scope:recipient
+							previous_owner != scope:actor
+						}
+						change_location_owner = previous_owner
+						hidden_effect = {
+							if = {
+								limit = { integration_level = conquered }
+								change_integration_level = integrated
+							}
+						}
+					}
+					else_if = {
+						limit = {
+							any_core_in_location = {
+								this != scope:target.owner
+								this != scope:actor
+							}
+						}
+						random_core_in_location = {
+							save_scope_as = new_owner
+						}
+						change_location_owner = scope:new_owner
+						hidden_effect = {
+							if = {
+								limit = { integration_level = conquered }
+								change_integration_level = integrated
+							}
+						}
+					}
+					else = {
+						change_location_owner = scope:actor
+						add_to_list = hre_locations_to_give_away
+					}
+				}
+			}
+			if = {
+				limit = { list_size = { name = hre_locations_to_give_away value > 0 } }
+				ordered_in_list = {
+					list = hre_locations_to_give_away
+					order_by = {
+						value = population
+						if = {
+							limit = { location_rank = location_rank:city }
+							multiply = 5
+						}
+						else_if = {
+							limit = { location_rank = location_rank:town }
+							multiply = 2
+						}
+					}
+					max = 1
+					check_range_bounds = no
+					save_scope_as = target_location
+					create_country_from_location = {
+						save_scope_as = target_country
+						set_capital = scope:target_location
+					}
+				}
+				if = {
+					limit = { exists = scope:target_country }
+					every_in_list = {
+						list = hre_locations_to_give_away
+						change_location_owner = scope:target_country
+					}
+					scope:target_country = {
+						add_opinion = {
+							modifier = opinion_released_from_unlawful_territory
+							target = scope:actor
+						}
+					}
+				}
+			}
+		}
+
+		# Add a 2 months cooldown to prevent spamming
+		hidden_effect = {
+			if = {
+				limit = { scope:actor = { is_ai = yes } }
+				sscope:actor = {
+					add_cooldown = {
+						type = ai_spam_protection_demand_unlawful_territory
+						months = 2
+					}
+				}
+			}
+		}
+
+
+	}
+	reject_effect = {
+		pay_gold_org_country_effect = {
+			international_organization = international_organization:hre
+			country = scope:actor
+			value = demand_unlawful_territory_cost
+		}
+		if = {
+			limit = { exists = scope:target }
+			scope:actor = {
+				add_casus_belli = {
+					type = casus_belli:cb_following_through_on_threat
+					target = scope:target.owner
+					province = scope:target
+				}
+			}
+			scope:target = {
+				every_location_in_province = {
+					limit = {
+						integration_level = conquered
+						is_owned_by_international_organization = international_organization:hre
+					}
+					add_location_modifier = {
+						modifier = hre_unlawful_territory
+						years = modifier_duration_years_long
+						mode = extend
+					}
+				}
+			}
+		}
+		hidden_effect = {
+			if = {
+				limit = { scope:actor = { is_ai = yes } }
+				scope:recipient = {
+					add_cooldown = {
+						type = ai_spam_protection_demand_unlawful_territory_rejected
+						years = 5
+					}
+				}
+			}
+		}
+	}
+	ai_will_do = {
+		# Base value for demanding unlawful territory
+		add = {
+			desc = "VOTE_BASE_VALUE"
+			value = 100
+		}
+
+		# Subtract our opinion of them. If we like them, we are less likely to demand territory.
+		subtract = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:recipient)"
+		}
+
+		# Subtract their opinion of us. If they like us, we might want to keep them happy.
+		subtract = {
+			desc = "THEIR_OPINION_TOOLTIP"
+			value = "scope:recipient.opinion(scope:actor)"
+		}
+
+		# Antagonism makes us more likely to demand territory from them
+		add = {
+			value = "scope:actor.antagonism(scope:recipient)"
+			multiply = 2
+		}
+
+		# Result should be that countries with good relations won't be demanded territory
+
+		# Don't ask again if we already have a CB for this
+		if = {
+			limit = {
+				scope:actor = {
+					has_casus_belli_of_type_on = {
+						type = casus_belli:cb_following_through_on_threat
+						target = scope:target.owner
+					}
+				}
+			}
+			subtract = {
+				value = 1000
+			}
+		}
+
+		# spam protection for rejections (In case the above doesn't work. Seems to happen with vassals sometimes)
+		if = {
+			limit = {
+				exists = scope:recipient
+				scope:recipient = { has_cooldown = ai_spam_protection_demand_unlawful_territory_rejected }
+			}
+			#ai spam protection
+			subtract = {
+				desc = "INERTIA"
+				value = 10000
+			}
+		}
+
+		# General spam protection. Make the AI a bit more chill with demanding territory
+		if = {
+			limit = {
+				scope:actor = { has_cooldown = ai_spam_protection_demand_unlawful_territory }
+			}
+			#ai spam protection
+			subtract = {
+				desc = "INERTIA"
+				value = 10000
+			}
+		}
+
+	}
+	accept = {
+		subtract = {
+			desc = "VOTE_BASE_VALUE"
+			value = 50
+		}
+		if = {
+			limit = {
+				scope:recipient = {
+					NOT = { is_member_of_international_organization = international_organization:hre }
+				}
+			}
+			subtract = {
+				desc = "IS_NON_MEMBER_OF_HRE"
+				value = 100
+			}
+		}
+		add = hre_default_diplo_action_acceptance
+	}
+}
+
+REPLACE:bolster_imperial_army = {
+	type = diplomacy
+	category = CATEGORY_HRE_ACTIONS
+	ai_limit_per_check = 5
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+		}
+	}
+	allow = {
+		scope:actor = {
+			at_war = yes
+		}
+	}
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		visible = {
+			is_member_of_international_organization = international_organization:hre
+			NOT = { is_at_war_with = scope:actor }
+			is_subject = no
+		}
+		enabled = {
+			has_gold_org_country_trigger = {
+				international_organization = international_organization:hre
+				country = scope:actor
+				value = bolster_imperial_army_cost
+			}
+		}
+	}
+	select_trigger = {
+		looking_for_a = war
+		source = actor
+		target_flag = target
+		name = "bolster_imperial_army_select_title"
+		none_available_msg_key = "bolster_imperial_army_no_wars"
+		column = {
+			data = name
+		}
+		visible = {
+			NOT = {
+				any_war_participant = {
+					this = scope:recipient
+				}
+			}
+		}
+		enabled = {
+			OR = {
+				AND = {
+					is_an_attacker = scope:actor
+					can_join_as_attacker = scope:recipient
+				}
+				AND = {
+					is_a_defender = scope:actor
+					can_join_as_defender = scope:recipient
+				}
+			}
+		}
+	}
+	effect = {
+		if = {
+			limit = {
+				exists = international_organization:hre
+				international_organization:hre = {
+					has_enabled_currency = gold
+				}
+			}
+			international_organization:hre = {
+				add_gold = {
+					value = scope:recipient.country_tax_base
+					multiply = -6
+				}
+			}
+		}
+		else = {
+			scope:actor = {
+				add_gold = {
+					value = scope:recipient.country_tax_base
+					multiply = -6
+				}
+			}
+		}
+		if = {
+			limit = { exists = scope:target }
+			scope:recipient = {
+				join_war_with = {
+					target = scope:actor
+					war = scope:target
+					call_in_subjects = yes
+				}
+			}
+		}
+		scope:recipient = {
+			add_gold = {
+				value = scope:recipient.country_tax_base
+				multiply = 6
+			}
+		}
+
+		# Refund diplomat to enable more frequent use
+		scope:actor = {
+			add_diplomats = 1
+		}
+	}
+	ai_will_do = {
+		add = {
+			desc = "TARGET_ACCEPTANCE"
+			value = "scope:actor.country_interaction_acceptance(country_interaction:bolster_imperial_army|scope:recipient)"
+		}
+
+		# Don't bother calling in countries when already winning
+		if = {
+			limit = {
+				exists = scope:target
+				scope:actor = {
+					war_score_in_war = { war = scope:target value >= 25 }
+				}
+			}
+			subtract = {
+				value = 1000
+			}
+
+		}
+
+		# Don't call in countries that are not ready for war
+		if = {
+			limit = {
+				exists = scope:recipient
+				scope:recipient = {
+					NOT = {
+						AND = {
+							at_war = no
+							stability >= 0
+							government_power >= 50
+							num_loans = 0
+							monthly_balance > 0
+							war_exhaustion < 1
+							is_during_bankruptcy = no
+							has_any_active_disaster = no
+						}
+					}
+				}
+			}
+			subtract = {
+				value = 1000
+			}
+		}
+
+	}
+	accept = {
+		subtract = {
+			desc = "VOTE_BASE_VALUE"
+			value = 25
+		}
+		add = hre_default_diplo_action_acceptance
+	}
+}

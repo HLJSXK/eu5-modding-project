@@ -1,0 +1,262 @@
+﻿holland_expansion_mission_pack = {
+	icon = generic_conquer_province
+	chance = 3600
+	repeatable = no
+	player_playstyle = military
+
+	#ai_will_do = { add = 10 }	
+
+	visible = {
+		game_has_missions_enabled = yes
+		tag = "HOL"
+	}
+
+	on_start = {
+		set_variable = {
+			name = mission_target_income
+			value = 30
+		}
+	}
+
+	on_completion = {
+		add_army_tradition = army_tradition_mild_bonus
+		add_prestige = 20
+		remove_variable = mission_target_income
+	}
+
+	on_abort = {
+		remove_variable = mission_target_income
+	}
+
+	# === SIMPLE TEST MISSION ===
+	
+	# mission_test_development = {
+	# 	icon = cultural_acceptance_advance
+	# 	requires = { }
+		
+	# 	enabled = {
+	# 		capital = {
+	# 			development >= 10
+	# 		}
+	# 	}
+		
+	# 	duration = 0
+
+	# 	on_completion = {
+	# 		add_gold = 101
+	# 		add_manpower = 2000
+	# 		trigger_event_non_silently = coup_attempt.1
+	# 		trigger_event_non_silently = holland_expansion_events.10
+	# 		trigger_event_non_silently = reform_society.1
+	# 	}
+	# }
+
+	# === CONQUEST OF UTRECHT LANDS ===
+	
+	mission_conquer_utrecht = {
+		icon = offensive_army
+		requires = { }
+		
+		enabled = {
+			location:utrecht = {
+				owner ?= root
+				controller = root
+			}
+			location:amersfoort = {
+				owner ?= root
+				controller = root
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			# Option 1: Apply to specific province definition
+			province_definition:north_holland_province = {
+				every_location_in_province_definition = {
+					limit = {
+						owner ?= root
+					}
+					change_integration_progress = 75
+				}
+			}
+			
+			# Option 2: Apply to the conquered locations directly
+			# location:utrecht = {
+			# 	change_integration_progress = integration_progress_strong_bonus
+			# }
+			# location:amersfoort = {
+			# 	change_integration_progress = integration_progress_strong_bonus
+			# }
+			
+			# Option 3: Apply to capital province (safer alternative)
+			# capital = {
+			# 	change_integration_progress = integration_progress_strong_bonus
+			# }
+			
+			add_country_modifier = {
+				modifier = holland_territorial_expansion
+				years = 5
+			}
+			add_prestige = 15
+			add_gold = 100
+		}
+
+		#ai_will_do = { add = 10 }	
+	}
+
+	mission_war_preparation = {
+		icon = medieval_military
+		requires = { mission_conquer_utrecht }
+		
+		enabled = {
+			stability >= 30
+			monthly_income_trade_and_tax >= var:mission_target_income
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_casus_belli = {
+					target = c:GEL  # Use c: prefix for country tags
+					type = casus_belli:cb_conquer_province # Use casus_belli: prefix
+					province = scope:target_location.province
+					# province = scope:target 
+					# province = location:kholm.province 
+					# type   = casus_belli:cb_subjugation
+          # target = scope:target
+					months = 120
+			}
+			add_country_modifier = {
+				modifier = holland_war_preparation
+				years = 5
+			}
+		}
+		#ai_will_do = { add = 10 }	
+	}
+
+	mission_frisian_dominance = {
+		icon = diplomatic_influence
+		requires = { mission_conquer_utrecht }
+		
+		enabled = {
+			OR = {
+					NOT = { exists = c:FRI }  # Use c: prefix
+					c:FRI = {
+							is_subject_of = root
+					}
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_gold = 100
+			add_country_modifier = {
+				modifier = holland_regional_dominance
+				years = 5
+			}
+			if = {
+				limit = {
+					exists = c:FRI
+					c:FRI = {
+							is_subject_of = root
+					}
+				}
+				c:FRI = {
+					#@@@ test province capital 
+					province_capital = { 
+						change_integration_progress = 50
+					}
+				}
+			}
+		}
+
+		#ai_will_do = { add = 10 }	
+	}
+
+	mission_dutch_unification = {
+		icon = glorious_arms
+		requires = { mission_war_preparation mission_frisian_dominance }
+		
+		enabled = {
+			capital = {
+				development >= 40
+			}
+			total_development >= 280
+			prestige >= 30
+			"estate_power(estate_type:crown_estate)" >= 0.35  # 35% crown power
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = holland_dutch_unification
+				years = 5
+			}
+				area:holland_area = {
+					every_location_in_area = {
+						limit = {
+							owner ?= root
+						}
+						#it works but does not show ingame before we control it
+						change_control = control_mild_bonus
+						change_prosperity = prosperity_very_weak_bonus
+					}
+				}
+				area:friesland_area = {
+					every_location_in_area = {
+						limit = {
+							owner ?= root
+						}
+						#it works but does not show ingame before we control it
+						change_control = control_mild_bonus
+						change_prosperity = prosperity_very_weak_bonus
+					}
+				}
+				area:brabant_area = {
+					every_location_in_area = {
+						limit = {
+							owner ?= root
+						}
+						#it works but does not show ingame before we control it
+						change_control = control_mild_bonus
+						change_prosperity = prosperity_very_weak_bonus
+					}
+				}
+			add_prestige = 30
+			add_manpower = 3000
+		}
+		#ai_will_do = { add = 10 }	
+	}
+
+	mission_form_netherlands = {
+		icon = bill_of_rights
+		requires = { mission_dutch_unification }
+		final = yes
+		
+		enabled = {
+			tag = NED
+			OR = {
+				country_rank = country_rank:rank_duchy
+				country_rank = country_rank:rank_kingdom
+				country_rank = country_rank:rank_empire
+			}
+		}
+		
+		duration = 0
+
+		on_completion = {
+			add_country_modifier = {
+				modifier = netherlands_military_traditions
+				years = -1
+			}
+			trigger_event_non_silently = holland_expansion_events.10
+			add_prestige = 75
+			custom_tooltip = netherlands_republican_reform_tt
+		}
+		#ai_will_do = { add = 10 }	
+	}
+	
+}

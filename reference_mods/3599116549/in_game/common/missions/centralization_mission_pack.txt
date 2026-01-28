@@ -1,0 +1,408 @@
+﻿generic_centralization = {
+	icon = generic_capital_economy 
+	repeatable = yes
+	player_playstyle = diplomatic
+	visible = {
+		game_has_missions_enabled = yes
+		NOR = {
+			country_type = pop
+			country_type = building
+		}
+		#societal_value:centralization_vs_decentralization <= -30
+	}
+	chance = 3600
+	select_trigger = {
+		looking_for_a = area
+		target_flag = mission_target_area
+		name = "mission_select_area"
+		none_available_msg_key = "mission_no_area"
+		column = {
+			data = name
+		}
+		visible = {
+			any_location_in_area ?= {
+				percent > 0.5
+				owner ?= scope:actor
+            }
+		}
+	}
+	on_start = {
+		set_variable = {
+			name = average_control
+			value = {
+				add = "scope:mission_target_area.area_average_control(scope:actor)"
+				multiply = 1.25
+				max = 1
+				min = 0.1
+			}
+		}
+
+		change_variable = {
+			name = area_total_buildings
+			multiply = 1.25
+		}
+
+		set_variable = {
+			name = mission_target_area
+			value = scope:mission_target_area
+		}
+
+		set_variable = {
+			name = mission_required_gold
+			value = scope:actor.gold
+		}
+
+		change_variable = {
+			name = mission_required_gold
+			multiply = 2
+			max = 1000
+		}
+
+		set_variable = {
+			name = area_total_buildings
+			value = 1
+		}
+
+		scope:mission_target_area = {
+			every_location_in_area = {
+				limit = {
+					owner ?= root
+				}
+				change_variable = {
+					name = area_total_buildings
+					add = this.num_buildings
+				}
+			}
+		}
+	}
+	on_completion = {
+		remove_variable = average_control
+		remove_variable = mission_required_gold
+		remove_variable = mission_centralization_location
+		remove_variable = mission_target_area
+	}
+
+	on_abort = {
+		remove_variable = average_control
+		remove_variable = mission_required_gold
+		remove_variable = mission_centralization_location
+		remove_variable = mission_target_area
+	}
+
+	mission_increase_centralization_efforts = {
+		icon = cultural_acceptance_advance
+		requires = {  }
+		enabled = {
+			gold >= var:mission_required_gold
+		}
+		duration = 70
+
+		select_trigger = {
+			looking_for_a = location
+			source = actor
+			target_flag = area_location
+			name = "select_mission_for_next_mission_tasks"
+			none_available_msg_key = "integrate_province_no_provinces"
+			column = {
+				data = name
+			}
+			column = {
+				data = population
+			}
+			visible = {
+				area = scope:actor.var:mission_target_area
+				owner ?= scope:actor
+			}
+		}
+
+		on_start = {
+			
+		}
+
+		on_completion = {
+			add_gold = {
+				value = var:mission_required_gold
+				multiply = -1
+			}
+			set_variable = {
+				name = mission_centralization_location
+				value = scope:area_location
+			}
+			trigger_event_silently = centralization_missions.1
+		}
+	}
+
+	mission_build_temple = {
+		icon = merchants_and_trade
+		requires = { mission_increase_centralization_efforts }
+		enabled = {
+			trigger_if = {
+				limit = {
+					has_variable = mission_centralization_location
+				}
+				var:mission_centralization_location = {
+					has_building = building_type:temple
+				}
+			}
+			trigger_else = {
+				var:mission_target_area = {
+					any_location_in_area = {
+						count >= 4
+						has_building = building_type:temple
+					}
+				}
+			}
+		}
+		on_completion = {
+
+			var:mission_target_area = {
+				ordered_location_in_area = {
+					order_by = development
+					limit = {
+						has_building = building_type:temple
+					}
+					max = 1
+					save_scope_as = target_location
+				}
+				ordered_location_in_area = {
+					order_by = development
+					limit = {
+						has_building = building_type:temple
+					}
+					max = 2
+					save_scope_as = target_location2
+				}
+				ordered_location_in_area = {
+					order_by = development
+					limit = {
+						has_building = building_type:temple
+					}
+					max = 3
+					save_scope_as = target_location3
+				}
+				ordered_location_in_area = {
+					order_by = development
+					limit = {
+						has_building = building_type:temple
+					}
+					max = 4
+					save_scope_as = target_location4
+				}
+			}
+
+			if = {
+				limit = {
+					has_variable = mission_centralization_location
+				}
+				var:mission_centralization_location = { #Make this scale with location control
+					add_location_modifier = {
+						mode = add_and_extend
+						modifier = centralization_mission_temple_construction
+						years = 5
+					}
+				}
+			}
+			else = {
+				custom_tooltip = {
+					text = mission_centralization_grant_modifier_on_4_temple_locations
+					scope:target_location = {
+						add_location_modifier = {
+							mode = add_and_extend
+							modifier = centralization_mission_temple_construction
+							years = 5
+						}
+					}
+					scope:target_location2 = {
+						add_location_modifier = {
+							mode = add_and_extend
+							modifier = centralization_mission_temple_construction
+							years = 5
+						}
+					}
+					scope:target_location3 = {
+						add_location_modifier = {
+							mode = add_and_extend
+							modifier = centralization_mission_temple_construction
+							years = 5
+						}
+					}
+					scope:target_location4 = {
+						add_location_modifier = {
+							mode = add_and_extend
+							modifier = centralization_mission_temple_construction
+							years = 5
+						}
+					}
+				}
+			}
+		}
+	}
+
+	mission_connect_area_to_capital = {
+		icon = maritime_advance_age_2
+		requires = {
+			mission_increase_centralization_efforts
+		}
+		enabled = {
+			trigger_if = {
+				limit = {
+					has_variable = mission_centralization_location
+				}
+				var:mission_centralization_location = {
+					has_road_to = root.capital
+				}
+			}
+			trigger_else = {
+				var:mission_target_area = {
+					any_location_in_area = {
+						count >= 4
+						has_road_to = root.capital
+					}
+				}
+			}
+		}
+
+		on_completion = {
+			if = {
+				limit = {
+					has_variable = mission_centralization_location
+				}
+				var:mission_centralization_location = {
+					add_location_modifier = {
+						mode = add_and_extend
+						modifier = centralization_mission_center_of_area
+						years = 5
+					}
+				}
+			}
+			else = {
+				custom_tooltip = {
+					text = mission_centralization_all_locations_in_area_gain_proximity_cost_modifier
+					var:mission_target_area = {
+						every_location_in_area = {
+							add_location_modifier = {
+								mode = add
+								modifier = centralization_mission_increased_bureaucracy
+								years = 5
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	mission_increase_area_control = {
+		icon = court_accounting
+		final = yes
+		requires = { mission_connect_area_to_capital mission_build_temple }
+		duration = 365
+		enabled = {
+			"var:mission_target_area.area_average_control(root)" >= var:average_control
+		}
+		modifier_while_progressing = {
+			monthly_towards_centralization = societal_value_tiny_monthly_move
+		}
+
+		on_start = { 
+			custom_tooltip = {
+				text = mission_centralization_all_locations_in_area_gain_monthly_control_modifier
+				var:mission_target_area = {
+					every_location_in_area = {
+						add_location_modifier = {
+							mode = add
+							modifier = centralization_mission_control_efforts
+							years = 5
+						}
+					}
+				}
+			}
+		}
+
+		on_completion = {
+			custom_tooltip = {
+				text = mission_centralization_replace_previous_modifier_with_crown_power
+				var:mission_target_area = {
+					every_location_in_area = {
+						remove_location_modifier = centralization_mission_control_efforts
+						add_location_modifier = {
+							mode = add
+							modifier = centralization_mission_crown_control
+							years = 5
+						}
+					}
+				}
+			}
+		}
+	}
+
+	mission_develop_area_center = {
+		icon = court_accounting
+		requires = { mission_connect_area_to_capital }
+		duration = 365
+		enabled = {
+			any_owned_building = {
+				count >= var:area_total_buildings
+				location.area = var:mission_target_area
+				owner ?= root
+			}
+		}
+
+		on_completion = {
+			ruler_or_heir_if_regent ?= {
+				add_adm = {
+					value = {
+						add = 5
+					}
+				}
+				add_dip = {
+					value = {
+						add = 5
+					}
+				}
+				add_mil = {
+					value = {
+						add = 5
+					}
+				}
+			}
+		}
+	}
+
+	mission_reduce_unrest = {
+		icon = court_accounting
+		requires = { mission_build_temple }
+		duration = 125
+
+		on_start = { 
+			custom_tooltip = {
+				text = mission_centralization_reduce_control_for_unrest
+				var:mission_target_area = {
+					every_location_in_area = {
+						add_location_modifier = {
+							mode = add
+							modifier = centralization_mission_reduced_control
+							years = 5
+						}
+					}
+				}
+			}
+		}
+
+		on_completion = {
+			custom_tooltip = {
+				text = mission_centralization_replace_bad_modifier_with_good_modifier
+				var:mission_target_area = {
+					every_location_in_area = {
+						remove_location_modifier = centralization_mission_reduced_control
+						add_location_modifier = {
+							mode = add
+							modifier = centralization_mission_reduced_unrest
+							years = 5
+						}
+					}
+				}
+			}
+		}
+	}
+}

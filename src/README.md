@@ -67,3 +67,15 @@ When creating a new mod:
 - [Template Mod README](template_mod/README.md) - Detailed template documentation
 - [Dynamic Missions README](dynamic_missions/README.md) - Dynamic missions mod documentation
 - [Dynamic Missions Framework](../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical architecture
+
+
+## Community Mod References
+
+For additional learning resources, see the [Community Mod References](../reference_mods/) directory, which contains 12 real community mods from Steam Workshop. These mods provide:
+
+- **Real-world examples** of mod structure and organization
+- **Vanilla game variables** and definitions used in actual mods
+- **Code patterns** from successful community mods
+- **Different mod types** - translations, gameplay, UI, mechanics
+
+Browse the [Reference Mods Index](../reference_mods/MOD_INDEX.md) for detailed information about each mod.

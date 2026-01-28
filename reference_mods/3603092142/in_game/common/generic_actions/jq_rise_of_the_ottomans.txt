@@ -1,0 +1,254 @@
+﻿REPLACE:offer_diplomatic_protection = { 
+	type = situation
+	show_message = no
+	potential = {
+		scope:actor = {
+			has_reform = government_reform:anatolian_beylik
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			at_war = no
+			has_regent = no
+			ruler ?= {
+				has_dynasty = yes
+			}
+			is_subject = no
+		}	
+	}
+
+	automation_tick = never
+	automation_tick_frequency = 12
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	
+	price = price:offer_diplomatic_protection_price
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:rise_of_the_ottomans = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:rise_of_the_ottomans = this
+			situation_is_active = yes
+			var:strongest_beylik_variable = scope:actor
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		source_global_list = eligible_beylik_list
+		cache_interaction_source_list = yes
+		target_flag = target
+		name = "choose_a_country"
+		none_available_msg_key = "no_suitable_countries"
+		column = {
+			data = name
+		}
+		visible = {
+			has_reform = government_reform:anatolian_beylik
+			this != scope:actor
+			NOT = { is_rival_of = scope:actor }
+			NOT = { is_enemy_of = scope:actor }
+			at_war = no
+			is_subject = no
+			is_neighbor_of = scope:actor
+			relative_strength = {
+				target = scope:actor
+				value <= 0.5
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		source = actor
+		interaction_source_list = {
+			scope:actor = {
+				ruler ?= {
+					dynasty = {
+						every_character_in_dynasty = {
+							limit = {
+								owner = scope:actor
+							}
+							add_to_list = source
+						}
+					}
+				}
+			}
+		}
+		target_flag = target_1
+		name = "select_character_to_marry_into_them"
+		none_available_msg_key = "no_character_to_marry_into_them"
+		column = {
+			data = character_info
+		}
+		visible = {
+			is_ruler = no
+			is_female = no
+			is_adult = yes
+			is_heir = no
+			has_available_marriage_slot = yes
+			total_abilities < 150
+		}
+	}
+
+	cooldown = { type = offer_diplomatic_protection_key years = 1 }
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+				exists = scope:target_1
+			}
+			custom_tooltip = {
+				text = exchange_marriage_for_vassal_tt
+				scope:target = {
+					trigger_event_non_silently = jq_rise_of_the_ottomans.1
+				}
+			}
+		}
+		else = { custom_tooltip = no_link_exchange_marriage_for_vassal_tt }
+	}
+	
+	ai_will_do = {
+		add = 10
+	}
+}
+
+REPLACE:invade_neighbor_beylik = {
+	type = situation
+	show_message = no
+	potential = {
+		scope:actor = {
+			has_reform = government_reform:anatolian_beylik
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			at_war = no
+			has_regent = no
+			is_subject = no
+		}	
+	}
+
+	automation_tick = never
+	automation_tick_frequency = 12
+	
+	price = price:invade_neighbor_beylik_price
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:rise_of_the_ottomans = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:rise_of_the_ottomans = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		source_global_list = eligible_beylik_list
+		target_flag = target
+		name = "choose_a_country"
+		none_available_msg_key = "no_suitable_countries_invade_neighbor_beylik"
+		column = {
+			data = name
+		}
+		visible = {
+			this != scope:actor
+			or = {
+				is_neighbor_of = scope:actor
+				any_neighbor_country = {
+					is_subject_or_below_of = scope:actor
+				}
+			}
+			OR = { 
+				stability < 0
+				legitimacy < 50
+				in_civil_war = yes
+				at_war = yes
+				has_regent = yes
+				num_loans >= 3
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			scope:actor = {
+				add_casus_belli = {
+					type = casus_belli:cb_subjugation
+					target = scope:target
+				}
+			}
+		}
+		else = {
+			custom_tooltip = jq_rott_get_cb_against_them_tt
+		}
+	}
+	cooldown = { type = invade_neighbor_beylik years = 2 }
+	ai_will_do = {
+		add = {
+			value = 50
+			desc = "base chance"
+		}
+
+		if = {
+			limit = {
+				scope:actor = {
+					has_truce_with = scope:target
+				}
+			}
+			add = {
+				value = -200
+				desc = "truce"
+			}
+		}
+
+
+		if = {
+			limit = { exists = scope:target }
+
+			if = {
+				limit = { 
+					scope:actor = { has_casus_belli_on = scope:target }
+				}
+				add = {
+					value = -1000
+					desc = "We already have a cb on them"
+				}
+			}
+			if = {
+				limit = { 
+					scope:actor = { has_cooldown = press_claims_cooldown_key }
+				}
+				add = {
+					value = scope:actor.stability
+					desc = "[stability|e]"
+				}
+			}
+		}
+	}
+}

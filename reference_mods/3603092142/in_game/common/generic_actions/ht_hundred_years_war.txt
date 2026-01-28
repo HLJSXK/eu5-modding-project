@@ -1,0 +1,155 @@
+﻿
+REPLACE:hyw_defect_action = {	#Betray our Allegiance
+	type = situation
+	show_message = no
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = 5
+
+	potential = {
+		scope:actor = {
+			OR = {
+				is_subject_of = c:FRA
+				is_subject_of = c:ENG
+			}
+
+			OR = {
+				capital.region = region:france_region
+				capital.area = area:brabant_area
+				capital.area = area:flanders_area
+				capital.area = area:holland_area
+			}
+		}
+	}
+
+	allow = {
+		scope:actor = { 
+			at_war = no
+			custom_tooltip = {
+				text = ruler_regent_heir_not_overlord_dynasty_tt
+				trigger_if = {
+					limit = { 
+						is_subject_of = c:FRA 
+						c:FRA = { 
+							ruler_or_regent = { has_dynasty = yes }
+						}
+					}
+					NOR = {
+						ruler_or_regent ?= {
+							dynasty ?= c:FRA.ruler_or_regent.dynasty
+						}
+						heir ?= { dynasty ?= c:FRA.ruler_or_regent.dynasty }
+					}
+				}
+				trigger_else_if = {
+					limit = { 
+						is_subject_of = c:ENG 
+						c:ENG = { 
+							ruler_or_regent = { has_dynasty = yes }
+						}
+					}
+					NOR = {
+						ruler_or_regent ?= {
+							dynasty ?= c:ENG.ruler_or_regent.dynasty
+						}
+						heir ?= { dynasty ?= c:ENG.ruler_or_regent.dynasty }
+					}
+				}
+				trigger_else = { always = yes }
+			}
+			is_disloyal_subject = yes
+		}
+	}
+
+	price = price:hyw_main_actions_price
+
+	cooldown = {
+		type = hyw_defect_action
+		years = 2
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:hundred_years_war = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:hundred_years_war = this
+			situation_is_active = yes
+		}
+	}
+
+	effect = { 
+
+		custom_tooltip = able_to_defect_via_event_tt
+
+		if = {
+			limit = { scope:actor.overlord ?= c:FRA }
+			c:ENG = { trigger_event_non_silently = hundred_years_war.230 }
+		}
+		else_if = {
+			limit = { scope:actor.overlord ?= c:ENG }
+			c:FRA = { trigger_event_non_silently = hundred_years_war.230 }
+		}
+	}
+
+	ai_will_do = {
+
+		add = {
+			value = 40
+			subtract = scope:actor.subject_loyalty
+			desc = "lack of loyalty"
+		}
+
+		scope:actor = {
+			overlord = {
+				subtract = {
+					value = prestige
+					desc = "overlord prestige"
+					subtract = 10
+				}
+			}
+		}
+
+		if = {
+			limit = { 
+				scope:actor = { liberty_desire > 0 }
+			}
+			add = {
+				value = scope:actor.liberty_desire
+				desc = "actor liberty desire"
+			}
+		}
+
+		if = {
+			limit = { 
+				scope:actor = { overlord = c:FRA }
+			}
+			add = {
+				desc = "Distance to England"
+				c:ENG = {
+					value = "border_distance_to(scope:actor)"
+					multiply = -0.1
+				}
+			}
+		}
+
+		if = {
+			limit = { 
+				scope:actor = { num_locations < 7 }
+			}
+			add = {
+				value = -100
+				desc = "actor size"
+			}
+		}
+	}
+}

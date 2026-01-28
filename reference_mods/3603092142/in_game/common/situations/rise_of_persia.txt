@@ -1,0 +1,448 @@
+﻿rise_of_persia = {
+	monthly_spawn_chance = monthly_spawn_chance_unique
+	hint_tag = hint_rise_of_persia
+	
+	can_start = {
+		current_date > 1420.1.1
+        NOT = { country_exists = c:ILK }
+        has_game_rule = historical_safavids
+	}
+	
+	can_end = {
+		rise_of_persia_end_trigger = yes
+	}
+	
+	visible = {
+		OR = {
+			trigger_if = {
+				limit = { country_exists = situation:rise_of_persia.var:strongest_amir_variable }
+				OR = {
+					is_neighbor_of = situation:rise_of_persia.var:strongest_amir_variable
+					is_rival_of = situation:rise_of_persia.var:strongest_amir_variable
+					is_enemy_of = situation:rise_of_persia.var:strongest_amir_variable
+					is_subject_or_below_of = situation:rise_of_persia.var:strongest_amir_variable
+				}
+			}
+			has_presence_in = region:persia_region
+			has_presence_in = region:khorasan_region
+            has_presence_in = region:caucasus_region
+            has_presence_in = region:crescent_region
+		}
+	}
+	
+
+	on_start = {
+		every_country = {
+			limit = {
+                NOT = { tag = TIM }
+                any_primary_or_accepted_culture ?= { has_culture_group = culture_group:iranian_group }
+			}
+			add_to_global_variable_list = { name = eligible_amirs_list target = this }
+
+			add_country_modifier = {
+				modifier = ai_force_annexation
+				years = -1
+				mode = add_and_extend
+			}
+		}
+		ordered_in_global_list = {  
+			variable = eligible_amirs_list
+			limit = { is_subject = no }
+			order_by = {
+				add = {
+					value = military_strength
+				}
+				add = {
+					value = monthly_income_trade_and_tax
+				}
+			} 
+			max = 1
+			check_range_bounds = no 
+			situation:rise_of_persia = {
+				set_variable = {
+					name = strongest_amir_variable
+					value = prev
+				}
+				set_variable = {
+					name = strongest_strongest_amir_total_score_variable
+					value = {
+						add = var:strongest_amir_variable.military_strength
+						add = var:strongest_amir_variable.monthly_income_trade_and_tax 
+					}
+				}
+			}
+			trigger_event_non_silently = rise_of_persia.2
+		}
+		ordered_in_global_list = {  
+			variable = eligible_amirs_list
+			limit = { 
+				this != situation:rise_of_persia.var:strongest_amir_variable 
+				is_subject = no
+			}
+			order_by = {	
+				add = {
+					value = military_strength
+				}
+				add = {
+					value = monthly_income_trade_and_tax
+				}
+			} 
+			max = 1
+			check_range_bounds = no 
+			situation:rise_of_persia = {
+				set_variable = {
+					name = second_strongest_strongest_amir_variable
+					value = prev
+				}
+				set_variable = {
+					name = second_strongest_strongest_amir_total_score_variable
+					value = {
+						add = var:second_strongest_strongest_amir_variable.military_strength
+						add = var:second_strongest_strongest_amir_variable.monthly_income_trade_and_tax
+					}
+				}
+			}
+		}
+		ordered_in_global_list = {  
+			variable = eligible_amirs_list
+			limit = {
+				this != situation:rise_of_persia.var:strongest_amir_variable 
+				this != situation:rise_of_persia.var:second_strongest_strongest_amir_variable 
+				is_subject = no
+			}
+			order_by = {	
+				add = {
+					value = military_strength
+				}
+				add = {
+					value = monthly_income_trade_and_tax
+				}
+			} 
+			max = 1
+			check_range_bounds = no 
+			situation:rise_of_persia= {
+				set_variable = {
+					name = third_strongest_strongest_amir_variable
+					value = prev
+				}
+				set_variable = {
+					name = third_strongest_strongest_amir_total_score_variable
+					value = {
+						add = var:third_strongest_strongest_amir_variable.military_strength
+						add = var:third_strongest_strongest_amir_variable.monthly_income_trade_and_tax
+					}
+				}
+			}
+		}
+		every_country = {
+			limit = {
+				NOT = { situation:rise_of_persia.var:strongest_amir_variable = this }
+				OR = {
+					any_owned_location = {
+						OR = {
+							this.region = region:persia_region
+                            this.area = area:jazira_area
+                            this.area = area:armenian_highlands_area
+                            this.area = area:eastern_khorasan_area
+                            this.area = area:western_khorasan_area
+                            this.area = area:shirvan_area
+                            this.area = area:iraq_arabi_area
+						}
+					}
+				}
+			}
+			trigger_event_non_silently = rise_of_persia.1
+		}
+
+        if = {
+            limit = { exists = international_organization:ilkhanate }
+            destroy_international_organization_no_instigator = { target = international_organization:ilkhanate }
+            every_country = {
+                limit = { is_member_of_international_organization = international_organization:ilkhanate }
+                trigger_event_non_silently = rise_of_persia.900
+            }
+        }
+	}
+
+	on_monthly = {
+		############################################################################
+		###########See in_game\common\scripted_effects\situation_effects############
+		#####This effectively recalculates the top 3 positions in the situation#####
+
+		rise_of_persia_recalculate_top_3 = yes
+
+		############################################################################
+		
+        random_list =  {
+            70 = { }
+			23 = {
+				trigger = {
+					country_exists = c:ABL
+					c:ABL = {
+						at_war = no
+					}
+					current_year < 1545
+				}
+				c:ABL = { trigger_event_non_silently = rise_of_safavids_flavor.500 }
+			}
+			4 = {
+				trigger = {
+					var:strongest_amir_variable ?= {
+						any_owned_location = {
+							is_currently_being_integrated = yes
+						}
+					}
+				}
+				var:strongest_amir_variable ?= {
+					trigger_event_non_silently = rise_of_persia.105
+				}
+			}
+			3 = {
+				trigger = {
+					var:strongest_amir_variable ?= {
+						has_ruler = yes
+						num_subjects < 2
+						any_neighbor_country = {
+							NOT = { has_variable = rise_of_persia_vassal_cooldown_variable }
+							is_subject = no
+							at_war = no
+							NOT = { is_subject_of = prev }
+							NOT = { is_rival_of = prev }
+							NOT = { is_enemy_of = prev }
+							total_population < prev.total_population
+						}
+					}
+				}
+				var:strongest_amir_variable ?= {
+					trigger_event_non_silently = rise_of_persia.101
+				}
+			}
+        }
+	}
+
+
+	on_ending = {
+		if = {
+			limit = {
+				OR = {
+					global_variable_list_size = {
+						name = eligible_amirs_list
+						value < 1
+					}
+                    AND = {
+						current_year > 1565
+						var:strongest_amir_variable ?= { 
+							num_locations < 500
+							num_of_non_rural < 50
+						}
+					}
+				}
+			}
+			if = {
+				limit = {
+					global_variable_list_size = {
+						name = eligible_amirs_list
+						value > 0
+					}
+				}
+				every_in_global_list = {
+					variable = eligible_amirs_list
+					trigger_event_non_silently = rise_of_persia.500
+				}
+			}
+			every_country = {
+				limit = {
+					any_in_global_list = {
+						variable = eligible_amirs_list
+						this != prev
+					}
+					can_see_situation = situation:rise_of_persia
+				}
+				trigger_event_non_silently = rise_of_persia.3
+			}
+		}
+		else =  {
+			every_country = {
+                limit = {
+					NOT = { situation:rise_of_persia.var:strongest_amir_variable = this }
+					can_see_situation = situation:rise_of_persia
+				}
+				remove_country_modifier = ai_force_annexation  
+				trigger_event_non_silently = rise_of_persia.4
+			}
+			var:strongest_amir_variable ?= {
+				if = {
+					limit = { has_variable = roto600_variable }
+					remove_variable = roto600_variable
+				}
+				trigger_event_non_silently = rise_of_persia.5
+			}
+			clear_global_variable_list = eligible_amirs_list
+			remove_variable = strongest_strongest_amir_total_score_variable
+			remove_variable = second_strongest_strongest_amir_total_score_variable
+			remove_variable = third_strongest_strongest_amir_total_score_variable
+		}
+	}
+
+	tooltip = {
+		if = { #Strongest Amir
+			limit = {
+				has_owner = yes
+				situation:rise_of_persia.var:strongest_amir_variable = owner
+			}
+			custom_tooltip = "STRONGEST_AMIR_TOOLTIP"
+		}
+		else_if = {
+			limit = { #Second Strongest Amir
+				has_owner = yes
+				situation:rise_of_persia.var:second_strongest_strongest_amir_variable = owner
+			}
+			custom_tooltip = "SECOND_STRONGEST_AMIR"
+		}
+		else_if = { #Third Strongest Amir
+			limit = {
+				has_owner = yes
+				situation:rise_of_persia.var:third_strongest_strongest_amir_variable ?= owner
+			}
+			custom_tooltip = "THIRD_STRONGEST_AMIR"
+		}
+
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					is_subject = yes
+					top_overlord ?= situation:rise_of_persia.var:strongest_amir_variable
+				}
+			}
+			custom_tooltip = "STRONGEST_AMIR_SUBJECT_TOOLTIP"
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					is_subject = yes
+					top_overlord ?= situation:rise_of_persia.var:second_strongest_strongest_amir_variable	
+				}
+			}
+			custom_tooltip = "SECOND_STRONGEST_AMIR_SUBJECT_TOOLTIP"
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					is_subject = yes
+					top_overlord ?= situation:rise_of_persia.var:third_strongest_strongest_amir_variable	
+				}
+			}
+			custom_tooltip = "THIRD_STRONGEST_AMIR_SUBJECT_TOOLTIP"
+		}
+	}
+
+	map_color = {
+		if = {
+			limit = {
+				situation:rise_of_persia.var:strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				country_exists = situation:rise_of_persia.var:second_strongest_strongest_amir_variable
+				situation:rise_of_persia.var:second_strongest_strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				country_exists = situation:rise_of_persia.var:third_strongest_strongest_amir_variable
+				situation:rise_of_persia.var:third_strongest_strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:third_strongest_strongest_amir_variable.country_color
+		}
+		else = {
+			value = define:NMapColors|DEFAULT_COLOR
+		}
+	}
+
+	secondary_map_color = {
+		if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:second_strongest_strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:third_strongest_strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:third_strongest_strongest_amir_variable.country_color
+		}
+	}
+	
+	legend_key = { 
+		desc = "STRONGEST_AMIR_TOOLTIP"
+		color = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		require_color_on_map = yes
+	}
+	legend_key = { 
+		desc = "SECOND_STRONGEST_AMIR"
+		color = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		require_color_on_map = yes
+	}
+	legend_key = { 
+		desc = "THIRD_STRONGEST_AMIR"
+		color = situation:rise_of_persia.var:third_strongest_strongest_amir_variable.country_color
+		require_color_on_map = yes
+	}
+
+	secondary_map_color = {
+		if = {
+			limit = {
+				situation:rise_of_persia.var:strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				country_exists = situation:rise_of_persia.var:second_strongest_strongest_amir_variable
+				situation:rise_of_persia.var:second_strongest_strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				country_exists = situation:rise_of_persia.var:third_strongest_strongest_amir_variable
+				situation:rise_of_persia.var:third_strongest_strongest_amir_variable = prev.owner
+			}
+			value = situation:rise_of_persia.var:third_strongest_strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:second_strongest_strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:second_strongest_strongest_amir_variable.country_color
+		}
+		else_if = {
+			limit = {
+				owner ?= { is_subject_of = situation:rise_of_persia.var:third_strongest_strongest_amir_variable }
+			}
+			value = situation:rise_of_persia.var:third_strongest_strongest_amir_variable.country_color
+		}
+		else = {
+			value = define:NMapColors|DEFAULT_COLOR
+		}
+	}
+}

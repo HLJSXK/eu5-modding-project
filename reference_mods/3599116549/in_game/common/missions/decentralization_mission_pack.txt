@@ -1,0 +1,191 @@
+﻿#Notes for me:
+#-Missions should revolve around straight up reducing unrest in return for control
+#-Maybe missions about granting estates the right to the province?
+#-Interaction with subjects
+#-More subject income?
+
+generic_decentralization = {
+	icon = generic_capital_economy 
+	repeatable = yes
+	player_playstyle = diplomatic
+	visible = {
+		game_has_missions_enabled = yes
+		NOR = {
+			country_type = pop
+			country_type = building
+		}
+		societal_value:centralization_vs_decentralization >= 30
+	}
+	chance = 3600
+	on_start = {
+		set_variable = mission_num_of_bailifs
+
+		scope:actor = {
+			every_owned_location = {
+				limit = {
+					has_building_with_at_least_one_level = bailiff
+				}
+				this = {
+					change_variable = {
+						name = mission_num_of_bailifs
+						add = 1
+					}
+				}
+			}
+		}
+    }
+
+    on_completion = {
+		remove_variable = mission_num_of_bailifs
+	}
+
+	on_abort = {
+		remove_variable = mission_num_of_bailifs
+	}
+
+    mission_grant_estate_rights_to_provinces = {
+		icon = cultural_acceptance_advance
+		requires = {  }
+		duration = 320
+
+		on_start = {
+			custom_tooltip = mission_decentralization_get_events_for_granting_estate_rights_to_locations
+		}
+
+        on_monthly = {
+			random_list = {
+				5 = { trigger_event_silently = decentralization_mission.1 }	#Nobles Seize Opportunity to claim land from serfs in [location]
+				5 = { trigger_event_silently = decentralization_mission.2 }	#Nobility Stronghold in [location]
+				5 = { trigger_event_silently = decentralization_mission.3 }	#Burghers turn [location] into a trade haven
+                5 = { trigger_event_silently = decentralization_mission.4 }	#Burghers turn [location] into a place to avoid taxes
+                5 = { trigger_event_silently = decentralization_mission.5 }	#Clerical influence in [location]
+                5 = { trigger_event_silently = decentralization_mission.6 }	#The devout of [location]
+                5 = { trigger_event_silently = decentralization_mission.7 }	#Peasants claim the lands of [location]
+                5 = { trigger_event_silently = decentralization_mission.8 }	#Poacher gains in [location]
+				60 = { }
+			}
+		}
+
+		on_completion = {
+			add_all_estate_satisfaction = {
+				value = estate_satisfaction_mild_bonus
+			}
+		}
+	}
+
+	mission_build_bailifs = {
+		icon = cultural_acceptance_advance
+		requires = { mission_grant_estate_rights_to_provinces }
+		enabled = {
+			any_owned_location = {
+				count > var:mission_num_of_bailifs
+				has_building_with_at_least_one_level = bailiff
+			}
+		}
+
+		on_completion = {
+			custom_tooltip = {
+				text = mission_decentralization_all_bailif_locations_gain_dev_and_prosperity
+				every_owned_location = {
+					limit = {
+						has_building_with_at_least_one_level = bailiff
+					}
+					change_development = development_very_weak_bonus
+					change_prosperity = prosperity_tiny_bonus
+				}
+			}
+		}
+	}
+
+	mission_estate_cabinet = {
+		icon = cultural_acceptance_advance
+		requires = { mission_grant_estate_rights_to_provinces }
+		enabled = {
+			any_cabinet_character = {
+				count >= root.modifier:government_size
+				NOT = { has_estate = estate_type:crown_estate }
+			}
+		}
+
+		on_completion = {
+			custom_tooltip = {
+				text = mission_decentralization_all_cabinet_members_get_cabinet_modifier
+				every_cabinet_character = {
+					add_character_modifier = {
+						mode = add_and_extend
+						modifier = mission_decentralization_estate_cabinet_member
+						years = 5
+					}
+				}
+			}
+		}
+	}
+
+	mission_decentralized_state = {
+		icon = cultural_acceptance_advance
+		requires = { mission_estate_cabinet mission_build_bailifs }
+		duration = 320
+		final = yes
+
+		on_completion = {
+			add_gold = {
+				value = monthly_income_total
+				subtract = {
+					value = "estate_power(estate_type:crown_estate)"
+					multiply = 2
+					max = 1
+				}
+			}
+
+			if = {
+				limit = {
+					num_subjects >= 1
+				}
+				custom_tooltip = {
+					text = mission_decentralization_every_subject_capital_gains_development
+					every_subject = {
+						capital ?= {
+							change_development = development_very_weak_bonus
+						}
+					}
+				}
+			}
+		}
+	}
+
+	mission_satisfaction_at_all_cost = {
+		icon = cultural_acceptance_advance
+		requires = { mission_estate_cabinet }
+		duration = 120
+
+       modifier_while_progressing = {
+			monthly_towards_decentralization = societal_value_tiny_monthly_move
+			global_crown_estate_power = -0.25
+		}
+
+		on_completion = {
+			add_country_modifier = {
+				mode = add_and_extend
+				modifier = mission_decentralization_satisfied_achieved
+				years = modifier_duration_years_normal
+			}
+		}
+	}
+
+	mission_placate_subjects = {
+		icon = cultural_acceptance_advance
+		requires = { mission_build_bailifs }
+		bypass = {
+			num_subjects = 0
+		}
+		enabled = {
+			num_subjects > 0
+		}
+		duration = 75
+
+       modifier_while_progressing = {
+			subject_income_modifier = 0.25
+			subject_loyalty = 15
+		}
+	}
+}
