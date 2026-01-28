@@ -283,3 +283,212 @@ large_research_project_situation = {
         # TODO: Add logic to remove character modifiers from the appointed scientist
     }
 }
+
+
+
+# Dynamic Missions: Establish New City Situation
+# This situation tracks the player's progress in transforming a town into a city
+establish_new_city_situation = {
+	# This situation is manually activated, not by monthly chance
+	monthly_spawn_chance = 0
+	
+	# Visibility: Only the player can see this situation
+	visible = {
+		this = root.owner
+	}
+	
+	# Start conditions: Manually activated via event
+	can_start = {
+		always = no  # Never starts automatically
+	}
+	
+	# End conditions: Either goal is met or time limit reached
+	can_end = {
+		OR = {
+			# Success condition: Target location becomes a city
+			AND = {
+				has_variable = target_location
+				var:target_location = {
+					location_rank = city
+				}
+				# Set success flag
+				set_variable = {
+					name = mission_success
+					value = yes
+				}
+			}
+			# Failure condition: 10 years (120 months) have passed
+			AND = {
+				has_variable = situation_start_date
+				months_since_variable = {
+					variable = situation_start_date
+					months >= 120
+				}
+				# Set failure flag
+				set_variable = {
+					name = mission_failed
+					value = yes
+				}
+			}
+		}
+	}
+	
+	# On start: Initialize variables
+	on_start = {
+		# Record the start date
+		set_variable = {
+			name = situation_start_date
+			value = current_date
+		}
+		
+		# Target location is set by the triggering event
+	}
+	
+	# On monthly: Update progress and handle value shifts
+	on_monthly = {
+		owner = {
+			# Handle value shifts from toggleable actions
+			if = {
+				limit = { has_country_modifier = dm_encourage_migration_modifier }
+				change_value = {
+					value = freemen
+					amount = 0.10
+				}
+			}
+			
+			if = {
+				limit = { has_country_modifier = dm_encourage_proselytization_modifier }
+				change_value = {
+					value = spiritual
+					amount = 0.10
+				}
+			}
+			
+			if = {
+				limit = { has_country_modifier = dm_encourage_folk_culture_modifier }
+				change_value = {
+					value = humanist
+					amount = 0.10
+				}
+			}
+			
+			# Handle estate satisfaction penalty from requisition
+			if = {
+				limit = { has_country_modifier = dm_requisition_materials_modifier }
+				every_estate = {
+					change_satisfaction = -0.05
+				}
+			}
+		}
+	}
+	
+	# On ending: Trigger appropriate completion event
+	on_ending = {
+		owner = {
+			if = {
+				limit = {
+					situation:establish_new_city_situation = {
+						has_variable = mission_success
+					}
+				}
+				# Success event
+				trigger_event = { id = dynamic_missions.33 }
+			}
+			else_if = {
+				limit = {
+					situation:establish_new_city_situation = {
+						has_variable = mission_failed
+					}
+				}
+				# Failure event
+				trigger_event = { id = dynamic_missions.34 }
+			}
+		}
+	}
+	
+	# On ended: Clean up variables and modifiers
+	on_ended = {
+		owner = {
+			# Remove all toggleable modifiers
+			remove_country_modifier = dm_encourage_migration_modifier
+			remove_country_modifier = dm_encourage_proselytization_modifier
+			remove_country_modifier = dm_encourage_folk_culture_modifier
+			remove_country_modifier = dm_requisition_materials_modifier
+			remove_country_modifier = dm_appoint_governor_used
+			
+			# Remove location modifiers from target
+			if = {
+				limit = { situation:establish_new_city_situation = { has_variable = target_location } }
+				situation:establish_new_city_situation = {
+					var:target_location = {
+						remove_location_modifier = dm_migration_boost
+						remove_location_modifier = dm_conversion_boost
+						remove_location_modifier = dm_assimilation_boost
+						remove_location_modifier = dm_governor_control_bonus
+					}
+				}
+			}
+			
+			# Remove character modifier from governor if appointed
+			if = {
+				limit = { 
+					situation:establish_new_city_situation = { 
+						has_variable = governor_character 
+					} 
+				}
+				situation:establish_new_city_situation = {
+					var:governor_character = {
+						remove_character_modifier = dm_regional_governor_debuff
+					}
+				}
+			}
+		}
+		
+		# Remove all situation variables
+		remove_variable = target_location
+		remove_variable = situation_start_date
+		remove_variable = mission_success
+		remove_variable = mission_failed
+		remove_variable = governor_character
+	}
+	
+	# Map colors for the situation mapmode
+	map_color = {
+		if = {
+			limit = {
+				# Highlight the target town
+				this = situation:establish_new_city_situation.var:target_location
+			}
+			value = rgb { 100 150 255 }  # Blue for target town
+		}
+		else_if = {
+			limit = {
+				# Show player's other towns in light blue
+				owner = situation:establish_new_city_situation.owner
+				location_rank = town
+			}
+			value = rgb { 150 200 255 }  # Light blue for other towns
+		}
+	}
+	
+	# Tooltip for map
+	tooltip = {
+		if = {
+			limit = {
+				this = situation:establish_new_city_situation.var:target_location
+			}
+			custom_tooltip = dynamic_missions.establish_city.target_town_tooltip
+		}
+	}
+	
+	# Legend entries for the mapmode
+	legend_key = {
+		color = rgb { 100 150 255 }
+		desc = dynamic_missions.establish_city.legend_target
+	}
+	
+	legend_key = {
+		color = rgb { 150 200 255 }
+		desc = dynamic_missions.establish_city.legend_other_towns
+	}
+}

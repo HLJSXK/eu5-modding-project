@@ -36,7 +36,16 @@ dynamic_missions.1 = {
 		custom_tooltip = "Embark on a 5-year research project to gain a significant technology boost."
 	}
 	
-	# Option 3: Not now
+	# Option 3: Establish a New City
+	option = {
+		name = dynamic_missions.1.option_d
+		trigger = { can_start_establish_new_city_mission = yes }
+		set_variable = { name = active_dynamic_mission value = yes }
+		trigger_event = { id = dynamic_missions.30 }
+		custom_tooltip = dynamic_missions.1.option_d.tooltip
+	}
+	
+	# Option 4: Not now
 	option = {
 		name = dynamic_missions.1.option_c
 		custom_tooltip = dynamic_missions.1.option_c.tooltip
@@ -217,4 +226,246 @@ country_event = {
     is_triggered_only = yes
 
     option = { name = "OK" }
+}
+
+
+# =============================================================================
+# ESTABLISH NEW CITY MISSION EVENTS
+# =============================================================================
+
+# Dynamic Missions: Select Target Town for New City
+dynamic_missions.30 = {
+	type = country_event
+	title = dynamic_missions.30.title
+	desc = dynamic_missions.30.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = exterior
+		10 = town
+	}
+	
+	immediate = {
+		# Build list of eligible towns
+		every_owned_location = {
+			limit = {
+				location_rank = town
+				is_occupied = no
+				is_under_siege = no
+			}
+			add_to_list = eligible_towns
+		}
+	}
+	
+	# Dynamic options for each eligible town
+	# Note: In actual implementation, you may need to use a fixed number of options
+	# or implement a selection mechanism via variables
+	
+	# Option 1: Select Capital (if it's a town)
+	option = {
+		name = dynamic_missions.30.option_capital
+		trigger = {
+			capital = {
+				location_rank = town
+			}
+		}
+		
+		capital = {
+			save_scope_as = target_town
+		}
+		
+		activate_situation = establish_new_city_situation
+		
+		situation:establish_new_city_situation = {
+			set_variable = { 
+				name = target_location 
+				value = scope:target_town 
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.30.option_capital.tooltip
+	}
+	
+	# Option 2: Select First Eligible Town
+	option = {
+		name = dynamic_missions.30.option_first_town
+		trigger = {
+			any_in_list = {
+				list = eligible_towns
+				count >= 1
+			}
+		}
+		
+		random_in_list = {
+			list = eligible_towns
+			save_scope_as = target_town
+		}
+		
+		activate_situation = establish_new_city_situation
+		
+		situation:establish_new_city_situation = {
+			set_variable = { 
+				name = target_location 
+				value = scope:target_town 
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.30.option_first_town.tooltip
+	}
+	
+	# Option 3: Cancel
+	option = {
+		name = dynamic_missions.30.option_cancel
+		remove_variable = active_dynamic_mission
+		custom_tooltip = dynamic_missions.30.option_cancel.tooltip
+	}
+}
+
+# Dynamic Missions: Select Character for Regional Governor
+dynamic_missions.31 = {
+	type = country_event
+	title = dynamic_missions.31.title
+	desc = dynamic_missions.31.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = character
+		10 = interior
+	}
+	
+	# Dynamic option: Select a character from court
+	dynamic_option = {
+		for_each = every_character
+		limit = {
+			is_in_court = yes
+		}
+		name = "[character.GetName]"
+		
+		effect = {
+			# Save character reference
+			set_variable = { 
+				name = temp_governor_char 
+				value = this 
+			}
+			
+			# Calculate control bonus based on character skills
+			set_variable = {
+				name = temp_control_bonus
+				value = {
+					value = this.skill_adm
+					add = this.skill_dip
+					add = this.skill_mil
+					divide = 10
+				}
+			}
+			
+			# Apply character debuff
+			this = {
+				add_character_modifier = {
+					name = dm_regional_governor_debuff
+					duration = -1  # Until mission ends
+				}
+			}
+			
+			# Apply control bonus to target location
+			situation:establish_new_city_situation = {
+				set_variable = {
+					name = governor_character
+					value = root.var:temp_governor_char
+				}
+				
+				var:target_location = {
+					# Apply dynamic control bonus
+					add_location_modifier = {
+						name = dm_governor_control_bonus
+						duration = -1  # Until mission ends
+						# Note: The actual bonus value needs to be set here
+						# This is a simplified version
+					}
+					change_control = root.var:temp_control_bonus
+					change_max_control = root.var:temp_control_bonus
+				}
+			}
+			
+			# Lose legitimacy
+			add_legitimacy = -5
+			
+			# Clean up temporary variables
+			remove_variable = temp_governor_char
+			remove_variable = temp_control_bonus
+			
+			custom_tooltip = dynamic_missions.31.effect.tooltip
+		}
+	}
+	
+	# Option: Cancel
+	option = {
+		name = dynamic_missions.31.option_cancel
+		# Remove the "used" flag so player can try again
+		remove_country_modifier = dm_appoint_governor_used
+		custom_tooltip = dynamic_missions.31.option_cancel.tooltip
+	}
+}
+
+# Dynamic Missions: New City Established - Success
+dynamic_missions.33 = {
+	type = country_event
+	title = dynamic_missions.33.title
+	desc = dynamic_missions.33.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = city
+	}
+	
+	option = {
+		name = dynamic_missions.33.option_a
+		
+		# Apply permanent reward modifier
+		situation:establish_new_city_situation = {
+			var:target_location = {
+				add_location_modifier = {
+					name = dm_country_pearl
+					duration = -1  # Permanent
+				}
+			}
+		}
+		
+		# Set completion flag to prevent re-triggering
+		set_country_flag = has_completed_establish_city_mission
+		
+		# Remove active mission variable
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.33.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: City Development Failed
+dynamic_missions.34 = {
+	type = country_event
+	title = dynamic_missions.34.title
+	desc = dynamic_missions.34.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = sad
+		10 = town
+	}
+	
+	option = {
+		name = dynamic_missions.34.option_a
+		
+		# Remove active mission variable (but don't set completion flag)
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.34.option_a.tooltip
+	}
 }

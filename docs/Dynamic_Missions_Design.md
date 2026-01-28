@@ -287,3 +287,38 @@ can_start_large_research_project = {
 - Action names, descriptions, and tooltips.
 - Modifier names and descriptions.
 - Event titles, descriptions, and option texts.
+
+
+## 6. New Dynamic Mission: Establish New City
+
+This document outlines the design for the "Establish New City" dynamic mission. This mission simulates the long-term project of elevating a town to a city, offering a unique set of challenges and rewards focused on internal development.
+
+### 6.1. Core Mechanics
+
+- **Type:** Dynamic Situation
+- **Name:** `establish_new_city_situation`
+- **Trigger:** Player choice from the main dynamic mission event. Can only be started if the player owns at least one 'town' and has not successfully completed this mission before.
+- **Participants:** Player only.
+- **Duration:** 10 years (120 months).
+- **Goal:** The target location's rank becomes 'city'.
+- **Reward:** The target location receives a permanent modifier, **"[Country Name]'s Pearl"**, granting `+0.5%` monthly prosperity, `+0.005` monthly development, and `+1` migration attraction.
+
+### 6.2. Player Actions
+
+This mission introduces several strategic options, allowing the player to guide the city's development.
+
+| Action | Type | Cost | Effects |
+| :--- | :--- | :--- | :--- |
+| **Encourage Migration** | Toggleable | +5% Court Expenses | +0.10 Freemen Value, +1 Migration Attraction, +50% Migration Speed in target location. |
+| **Encourage Proselytization** | Toggleable | +5% Court Expenses | +0.10 Spiritual Value, +20 Monthly Conversion, +50% Conversion Speed in target location. |
+| **Encourage Folk Culture** | Toggleable | +5% Court Expenses | +0.10 Humanist Value, +20 Monthly Assimilation, +50% Assimilation Speed in target location. |
+| **Requisition Materials** | Toggleable | -5% All Estates' Satisfaction | +5% Taxation Cap. |
+| **Appoint Regional Governor** | One-Time | -5 Legitimacy | Select a character to govern. Target location gains Control and Max Control equal to `(Character Skills / 10)%`. The character becomes unsuitable for other high-level positions and receives a `-10` life expectancy debuff for the mission's duration. |
+
+### 6.3. Technical Implementation
+
+- **Situation (`establish_new_city_situation`):** Manages the 10-year timeline and checks for the success condition (`location_rank = city`). It also handles the monthly application of value changes from the toggleable actions.
+- **Decisions:** The five player actions are implemented as decisions, allowing the player to toggle them on or off at will (except for the one-time governor appointment).
+- **Events:** A series of events (`dynamic_missions.30` to `dynamic_missions.34`) handle the mission start (town selection), governor appointment, and the final success/failure outcomes.
+- **Modifiers:** A comprehensive set of country, location, and character modifiers are used to apply the various effects, costs, and rewards associated with the player's choices.
+- **Trigger (`can_start_establish_new_city_mission`):** A new scripted trigger checks if the player is eligible to start the mission, ensuring they have a town and haven't completed the mission before.
