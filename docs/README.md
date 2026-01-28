@@ -60,28 +60,10 @@ These guides are written in Chinese for ease of use by the target audience.
 ### 📐 Design Documents (`design/`)
 
 - **[Dynamic Missions Design](design/Dynamic_Missions_Design.md)**
-  - Overall dynamic missions system design
-  - Core concepts and mechanics
-  - User experience flow
-
-- **[Dynamic Missions Feature](design/Dynamic_Missions_Feature.md)**
-  - Feature specifications
-  - Gameplay mechanics
-  - Balance considerations
-
-- **[New Missions Design](design/New_Missions_Design.md)**
-  - Design patterns for new missions
-  - Mission creation guidelines
-
-- **[Establish New City Mission Design](design/Establish_New_City_Mission_Design.md)**
-  - Detailed design for city development mission
-  - Stage progression and choices
-  - Rewards and consequences
-
-- **[Large Research Project Design](design/Large_Research_Project_Design.md)**
-  - Research project mission design
-  - Resource management mechanics
-  - Research outcomes and benefits
+  - Complete dynamic missions system design
+  - All three implemented missions (Develop City, Large Research Project, Establish New City)
+  - Core concepts, mechanics, and implementation details
+  - User experience flow and balance considerations
 
 ### 📋 Task Summaries (`task_summaries/`)
 
@@ -164,10 +146,6 @@ To improve or add documentation:
 
 ### Design
 - Dynamic Missions Design: 2026-01-28
-- Dynamic Missions Feature: 2026-01-28
-- New Missions Design: 2026-01-28
-- Establish New City Design: 2026-01-28
-- Large Research Project Design: 2026-01-28
 
 ### Task Summaries
 - Establish New City: 2026-01-28

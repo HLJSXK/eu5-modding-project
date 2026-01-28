@@ -65,7 +65,7 @@ See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instr
 - **[Community Mod References](reference_mods/README.md)** - 12 community mods for learning and reference
 
 ### Design & Development
-- **[Dynamic Missions Design](docs/design/Dynamic_Missions_Design.md)** - Dynamic mission system design
+- **[Dynamic Missions Design](docs/design/Dynamic_Missions_Design.md)** - Complete dynamic mission system design and implementation
 - **[Documentation Index](docs/README.md)** - Complete documentation structure
 
 ### Component Documentation

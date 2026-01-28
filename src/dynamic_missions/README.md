@@ -91,15 +91,15 @@ dynamic_missions/
 ## Documentation
 
 For detailed design documentation, see:
-- [Dynamic Missions Design](../../docs/design/Dynamic_Missions_Design.md)
-- [Dynamic Missions Feature](../../docs/design/Dynamic_Missions_Feature.md)
-- [Framework Architecture](../../docs/technical/Dynamic_Missions_Framework_Architecture.md)
-- [Establish New City Design](../../docs/design/Establish_New_City_Mission_Design.md)
-- [Large Research Project Design](../../docs/design/Large_Research_Project_Design.md)
+- [Dynamic Missions Design](../../docs/design/Dynamic_Missions_Design.md) - Complete system design for all missions
+- [Framework Architecture](../../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical implementation details
 
 ## Version History
 
-- **1.0.0** (Jan 2026): Initial release with two missions
+- **1.0.0** (Jan 2026): Initial release with three missions
+  - Develop City Mission
+  - Large Research Project Mission
+  - Establish New City Mission
 
 ## Credits
 

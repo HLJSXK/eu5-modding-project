@@ -273,6 +273,24 @@ large_research_project_situation = {
     }
 
     on_ended = {
+        # Remove character modifier from appointed scientist if exists
+        if = {
+            limit = { has_variable = lead_scientist_char }
+            var:lead_scientist_char = {
+                remove_character_modifier = dm_lead_scientist_debuff
+            }
+            remove_variable = lead_scientist_char
+        }
+        
+        # Remove location modifiers from conscripted universities
+        owner = {
+            every_owned_location = {
+                limit = { has_location_modifier = dm_conscripted_university_debuff }
+                remove_location_modifier = dm_conscripted_university_debuff
+            }
+        }
+        
+        # Clean up variables
         remove_variable = situation_start_date
         remove_variable = research_progress
         remove_variable = mission_success
@@ -280,7 +298,6 @@ large_research_project_situation = {
         remove_variable = conscripted_universities_count
         remove_variable = lead_scientist_appointed
         clear_list = situation_participants
-        # TODO: Add logic to remove character modifiers from the appointed scientist
     }
 }
 
@@ -380,6 +397,17 @@ establish_new_city_situation = {
 				}
 			}
 		}
+		
+		# Apply governor's prosperity bonus if appointed
+		if = {
+			limit = { 
+				has_variable = target_location
+				var:target_location = { has_variable = governor_prosperity_bonus }
+			}
+			var:target_location = {
+				change_prosperity = var:governor_prosperity_bonus
+			}
+		}
 	}
 	
 	# On ending: Trigger appropriate completion event
@@ -406,51 +434,53 @@ establish_new_city_situation = {
 		}
 	}
 	
-	# On ended: Clean up variables and modifiers
-	on_ended = {
-		owner = {
-			# Remove all toggleable modifiers
-			remove_country_modifier = dm_encourage_migration_modifier
-			remove_country_modifier = dm_encourage_proselytization_modifier
-			remove_country_modifier = dm_encourage_folk_culture_modifier
-			remove_country_modifier = dm_requisition_materials_modifier
-			remove_country_modifier = dm_appoint_governor_used
-			
-			# Remove location modifiers from target
-			if = {
-				limit = { situation:establish_new_city_situation = { has_variable = target_location } }
-				situation:establish_new_city_situation = {
-					var:target_location = {
-						remove_location_modifier = dm_migration_boost
-						remove_location_modifier = dm_conversion_boost
-						remove_location_modifier = dm_assimilation_boost
-						remove_location_modifier = dm_governor_control_bonus
+		# On ended: Clean up variables and modifiers
+		on_ended = {
+			owner = {
+				# Remove all toggleable modifiers
+				remove_country_modifier = dm_encourage_migration_modifier
+				remove_country_modifier = dm_encourage_proselytization_modifier
+				remove_country_modifier = dm_encourage_folk_culture_modifier
+				remove_country_modifier = dm_requisition_materials_modifier
+				remove_country_modifier = dm_appoint_governor_used
+				
+				# Remove location modifiers and variables from target
+				if = {
+					limit = { situation:establish_new_city_situation = { has_variable = target_location } }
+					situation:establish_new_city_situation = {
+						var:target_location = {
+							remove_location_modifier = dm_migration_boost
+							remove_location_modifier = dm_conversion_boost
+							remove_location_modifier = dm_assimilation_boost
+							remove_location_modifier = dm_governor_control_bonus
+							# Remove governor prosperity bonus variable
+							remove_variable = governor_prosperity_bonus
+						}
+					}
+				}
+				
+				# Remove character modifier from governor if appointed
+				if = {
+					limit = { 
+						situation:establish_new_city_situation = { 
+							has_variable = governor_character 
+						} 
+					}
+					situation:establish_new_city_situation = {
+						var:governor_character = {
+							remove_character_modifier = dm_regional_governor_debuff
+						}
 					}
 				}
 			}
 			
-			# Remove character modifier from governor if appointed
-			if = {
-				limit = { 
-					situation:establish_new_city_situation = { 
-						has_variable = governor_character 
-					} 
-				}
-				situation:establish_new_city_situation = {
-					var:governor_character = {
-						remove_character_modifier = dm_regional_governor_debuff
-					}
-				}
-			}
+			# Remove all situation variables
+			remove_variable = target_location
+			remove_variable = situation_start_date
+			remove_variable = mission_success
+			remove_variable = mission_failed
+			remove_variable = governor_character
 		}
-		
-		# Remove all situation variables
-		remove_variable = target_location
-		remove_variable = situation_start_date
-		remove_variable = mission_success
-		remove_variable = mission_failed
-		remove_variable = governor_character
-	}
 	
 	# Map colors for the situation mapmode
 	map_color = {
