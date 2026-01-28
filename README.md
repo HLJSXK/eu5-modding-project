@@ -32,7 +32,7 @@ This project provides tools and documentation for EU5 modding and multiplayer se
 build\eu5-deployer-windows-amd64.exe --restore
 ```
 
-See the [Quick Start Guide](docs/Quick_Start_Guide.md) for detailed instructions.
+See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instructions.
 
 ### For Modding
 
@@ -42,7 +42,7 @@ See the [Quick Start Guide](docs/Quick_Start_Guide.md) for detailed instructions
    cd eu5-modding-project
    ```
 
-2. Read the [EU5 Modding Knowledge Base](docs/EU5_Modding_Knowledge_Base.md)
+2. Read the [EU5 Modding Knowledge Base](docs/technical/EU5_Modding_Knowledge_Base.md)
 
 3. Set up your development environment:
    - Install Visual Studio Code with CwTools extension
@@ -53,13 +53,18 @@ See the [Quick Start Guide](docs/Quick_Start_Guide.md) for detailed instructions
 ## Documentation
 
 ### User Guides
-- **[Quick Start Guide](docs/Quick_Start_Guide.md)** - Fast setup for LAN multiplayer (中文)
-- **[Tools Guide](docs/Tools_Guide.md)** - Complete guide for deployment tools (中文)
-- **[Project User Guide](docs/Project_User_Guide.md)** - Project overview and features (中文)
+- **[Quick Start Guide](docs/guides/Quick_Start_Guide.md)** - Fast setup for LAN multiplayer (中文)
+- **[Tools Guide](docs/guides/Tools_Guide.md)** - Complete guide for deployment tools (中文)
+- **[Project User Guide](docs/guides/Project_User_Guide.md)** - Project overview and features (中文)
 
 ### Technical Documentation
-- **[EU5 Modding Knowledge Base](docs/EU5_Modding_Knowledge_Base.md)** - Comprehensive modding reference
-- **[Goldberg Emulator Guide](docs/Goldberg_Emulator_Guide.md)** - Detailed setup and configuration
+- **[EU5 Modding Knowledge Base](docs/technical/EU5_Modding_Knowledge_Base.md)** - Comprehensive modding reference
+- **[EU5 Mod Framework Guide](docs/technical/EU5_Mod_Framework_Guide.md)** - Practical development framework
+- **[Goldberg Emulator Guide](docs/technical/Goldberg_Emulator_Guide.md)** - Detailed setup and configuration
+
+### Design & Development
+- **[Dynamic Missions Design](docs/design/Dynamic_Missions_Design.md)** - Dynamic mission system design
+- **[Documentation Index](docs/README.md)** - Complete documentation structure
 
 ### Component Documentation
 - **[Tools README](tools/README.md)** - Development tools documentation
@@ -80,11 +85,14 @@ eu5-modding-project/
 │   ├── steam_api64.dll    # Goldberg DLL
 │   └── steam_settings/    # Configuration files
 ├── docs/                   # Documentation
-│   ├── EU5_Modding_Knowledge_Base.md
-│   ├── EU5_Mod_Framework_Guide.md
-│   └── Mod_Structure_Analysis.txt
+│   ├── guides/            # User guides (Chinese)
+│   ├── technical/         # Technical documentation
+│   ├── design/            # Design documents
+│   ├── task_summaries/    # Implementation summaries
+│   └── README.md          # Documentation index
 ├── src/                    # Mod source files and templates
-│   └── template_mod/      # Ready-to-use mod template
+│   ├── template_mod/      # Minimal mod template
+│   └── dynamic_missions/  # Dynamic missions mod
 ├── assets/                 # Graphics and media
 ├── tools/                  # Development utilities
 ├── build.sh               # Build script (Linux/macOS)
