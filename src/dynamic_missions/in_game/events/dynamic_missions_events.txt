@@ -45,7 +45,16 @@ dynamic_missions.1 = {
 		custom_tooltip = dynamic_missions.1.option_d.tooltip
 	}
 	
-	# Option 4: Not now
+	# Option 4: Claim a Province
+	option = {
+		name = dynamic_missions.1.option_e
+		trigger = { can_start_claim_province_mission = yes }
+		set_variable = { name = active_dynamic_mission value = yes }
+		trigger_event = { id = dynamic_missions.40 }
+		custom_tooltip = dynamic_missions.1.option_e.tooltip
+	}
+	
+	# Option 5: Not now
 	option = {
 		name = dynamic_missions.1.option_c
 		custom_tooltip = dynamic_missions.1.option_c.tooltip
@@ -605,5 +614,501 @@ dynamic_missions.100 = {
 	option = {
 		name = "OK"
 		# Silent event, no player interaction
+	}
+}
+
+
+# =============================================================================
+# CLAIM PROVINCE MISSION EVENTS (IDs 40-52)
+# =============================================================================
+
+# Dynamic Missions: Start Claim Province Mission
+dynamic_missions.40 = {
+	type = country_event
+	title = dynamic_missions.40.title
+	desc = dynamic_missions.40.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = exterior
+		10 = military
+	}
+	
+	# Option: Select a province to claim
+	option = {
+		name = dynamic_missions.40.option_a
+		trigger_event = { id = dynamic_missions.41 }
+		custom_tooltip = dynamic_missions.40.option_a.tooltip
+	}
+	
+	# Option: Cancel
+	option = {
+		name = dynamic_missions.40.option_b
+		remove_variable = active_dynamic_mission
+		custom_tooltip = dynamic_missions.40.option_b.tooltip
+	}
+}
+
+# Dynamic Missions: Select Province to Claim
+dynamic_missions.41 = {
+	type = country_event
+	title = dynamic_missions.41.title
+	desc = dynamic_missions.41.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = map
+		10 = military
+	}
+	
+	immediate = {
+		# Build list of eligible neighboring provinces
+		every_owned_location = {
+			every_neighboring_location = {
+				limit = {
+					owner = {
+						NOT = { is_subject_of = root }
+						NOT = { this = root }
+						exists = yes
+					}
+				}
+				province = {
+					limit = {
+						NOT = { is_in_list = eligible_provinces }
+					}
+					add_to_list = eligible_provinces
+				}
+			}
+		}
+	}
+	
+	# Dynamic options for each eligible province
+	# Note: In actual implementation, would need multiple option blocks
+	# For now, showing the pattern for the first province
+	option = {
+		name = dynamic_missions.41.option_province
+		trigger = {
+			any_in_list = {
+				list = eligible_provinces
+				count >= 1
+			}
+		}
+		
+		# Get first eligible province
+		random_in_list = {
+			list = eligible_provinces
+			limit = { always = yes }
+			save_scope_as = selected_province
+			owner = { save_scope_as = target_owner }
+		}
+		
+		# Activate the situation
+		activate_situation = claim_province_situation
+		
+		# Set situation variables
+		situation:claim_province_situation = {
+			set_variable = { name = target_province value = scope:selected_province }
+			set_variable = { name = target_country value = scope:target_owner }
+		}
+		
+		custom_tooltip = dynamic_missions.41.option_province.tooltip
+	}
+	
+	# Option: Cancel
+	option = {
+		name = dynamic_missions.41.option_cancel
+		remove_variable = active_dynamic_mission
+		custom_tooltip = dynamic_missions.41.option_cancel.tooltip
+	}
+}
+
+# Dynamic Missions: Rival Support Request (To Potential Supporter)
+dynamic_missions.42 = {
+	type = country_event
+	title = dynamic_missions.42.title
+	desc = dynamic_missions.42.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = diplomacy
+		10 = military
+	}
+	
+	immediate = {
+		# Calculate willingness to support
+		dm_calculate_rival_support_willingness = yes
+	}
+	
+	# Option: Accept support request
+	option = {
+		name = dynamic_missions.42.option_accept
+		trigger = {
+			# Show acceptance chance based on willingness
+			var:support_willingness >= 0
+		}
+		
+		# Add this country to player supporters list
+		situation:claim_province_situation = {
+			add_to_list = player_supporters_list
+			change_variable = { name = player_supporters_count add = 1 }
+		}
+		
+		# Notify player
+		situation:claim_province_situation.owner = {
+			trigger_event = { id = dynamic_missions.43 days = 1 }
+		}
+		
+		custom_tooltip = dynamic_missions.42.option_accept.tooltip
+		
+		# Show calculated willingness
+		custom_tooltip = {
+			text = dynamic_missions.42.willingness_tooltip
+			# Willingness: [var:support_willingness]
+		}
+	}
+	
+	# Option: Decline support request
+	option = {
+		name = dynamic_missions.42.option_decline
+		
+		custom_tooltip = dynamic_missions.42.option_decline.tooltip
+	}
+}
+
+# Dynamic Missions: Rival Accepted Support (Notification to Player)
+dynamic_missions.43 = {
+	type = country_event
+	title = dynamic_missions.43.title
+	desc = dynamic_missions.43.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = diplomacy
+	}
+	
+	option = {
+		name = dynamic_missions.43.option_a
+		custom_tooltip = dynamic_missions.43.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Target Seeks Rival Support (Notification to Player)
+dynamic_missions.44 = {
+	type = country_event
+	title = dynamic_missions.44.title
+	desc = dynamic_missions.44.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = diplomacy
+		10 = worried
+	}
+	
+	option = {
+		name = dynamic_missions.44.option_a
+		custom_tooltip = dynamic_missions.44.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Ultimatum - Player Decision
+dynamic_missions.45 = {
+	type = country_event
+	title = dynamic_missions.45.title
+	desc = dynamic_missions.45.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = military
+		10 = serious
+	}
+	
+	immediate = {
+		# Calculate coalition strengths for display
+		situation:claim_province_situation = {
+			dm_calculate_player_coalition_strength = yes
+			dm_calculate_target_coalition_strength = yes
+		}
+	}
+	
+	# Option: Declare War
+	option = {
+		name = dynamic_missions.45.option_war
+		
+		# Trigger target's decision event
+		situation:claim_province_situation = {
+			var:target_country = {
+				trigger_event = { id = dynamic_missions.46 }
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.45.option_war.tooltip
+		custom_tooltip = {
+			text = dynamic_missions.45.supporters_tooltip
+			# Your supporters: [player_supporters_count]
+			# Their coalition: [target + allies + guarantors]
+		}
+	}
+	
+	# Option: Back Down
+	option = {
+		name = dynamic_missions.45.option_backdown
+		
+		# Set flag and end situation
+		situation:claim_province_situation = {
+			set_variable = { name = player_backed_down value = yes }
+		}
+		
+		# Apply penalties
+		add_prestige = -10
+		situation:claim_province_situation = {
+			var:target_country = {
+				add_prestige = 10
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.45.option_backdown.tooltip
+	}
+}
+
+# Dynamic Missions: Ultimatum - Target Decision
+dynamic_missions.46 = {
+	type = country_event
+	title = dynamic_missions.46.title
+	desc = dynamic_missions.46.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = military
+		10 = serious
+	}
+	
+	immediate = {
+		# Check if AI should surrender
+		situation:claim_province_situation = {
+			dm_check_ai_surrender_condition = yes
+		}
+	}
+	
+	# Option: Fight (AI almost always chooses this unless 5x weaker)
+	option = {
+		name = dynamic_missions.46.option_fight
+		trigger = {
+			OR = {
+				is_ai = no
+				situation:claim_province_situation = {
+					has_variable = ai_will_fight
+				}
+			}
+		}
+		
+		# Execute war declaration
+		situation:claim_province_situation.owner = {
+			dm_execute_claim_war_declaration = yes
+		}
+		
+		custom_tooltip = dynamic_missions.46.option_fight.tooltip
+		
+		ai_chance = {
+			base = 100
+		}
+	}
+	
+	# Option: Surrender (AI only if 5x weaker)
+	option = {
+		name = dynamic_missions.46.option_surrender
+		
+		# Transfer province to player
+		situation:claim_province_situation.owner = {
+			dm_transfer_claimed_province = yes
+		}
+		
+		# Apply prestige changes
+		add_prestige = -10
+		situation:claim_province_situation.owner = {
+			add_prestige = 10
+		}
+		
+		# Set flag and end situation
+		situation:claim_province_situation = {
+			set_variable = { name = target_surrendered value = yes }
+		}
+		
+		custom_tooltip = dynamic_missions.46.option_surrender.tooltip
+		
+		ai_chance = {
+			base = 100
+			modifier = {
+				factor = 0
+				NOT = {
+					situation:claim_province_situation = {
+						has_variable = ai_will_surrender
+					}
+				}
+			}
+		}
+	}
+}
+
+# Dynamic Missions: War Declared (Notification)
+dynamic_missions.47 = {
+	type = country_event
+	title = dynamic_missions.47.title
+	desc = dynamic_missions.47.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = military
+		10 = battle
+	}
+	
+	option = {
+		name = dynamic_missions.47.option_a
+		custom_tooltip = dynamic_missions.47.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Reconciliation Achieved
+dynamic_missions.48 = {
+	type = country_event
+	title = dynamic_missions.48.title
+	desc = dynamic_missions.48.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = diplomacy
+	}
+	
+	option = {
+		name = dynamic_missions.48.option_a
+		
+		# Both countries gain opinion
+		add_opinion = {
+			target = situation:claim_province_situation.var:target_country
+			value = 20
+		}
+		
+		situation:claim_province_situation = {
+			var:target_country = {
+				add_opinion = {
+					target = situation:claim_province_situation.owner
+					value = 20
+				}
+			}
+		}
+		
+		custom_tooltip = dynamic_missions.48.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Claim Province Success
+dynamic_missions.49 = {
+	type = country_event
+	title = dynamic_missions.49.title
+	desc = dynamic_missions.49.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = military
+	}
+	
+	option = {
+		name = dynamic_missions.49.option_a
+		
+		# Apply prestige rewards
+		add_prestige = 10
+		situation:claim_province_situation = {
+			var:target_country = {
+				add_prestige = -10
+			}
+		}
+		
+		# Clear active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.49.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Player Backed Down
+dynamic_missions.50 = {
+	type = country_event
+	title = dynamic_missions.50.title
+	desc = dynamic_missions.50.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = sad
+		10 = diplomacy
+	}
+	
+	option = {
+		name = dynamic_missions.50.option_a
+		
+		# Prestige already applied in decision
+		# Clear active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.50.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Target Surrendered
+dynamic_missions.51 = {
+	type = country_event
+	title = dynamic_missions.51.title
+	desc = dynamic_missions.51.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = military
+	}
+	
+	option = {
+		name = dynamic_missions.51.option_a
+		
+		# Prestige already applied in target's decision
+		# Clear active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.51.option_a.tooltip
+	}
+}
+
+# Dynamic Missions: Reconciliation Completed
+dynamic_missions.52 = {
+	type = country_event
+	title = dynamic_missions.52.title
+	desc = dynamic_missions.52.desc
+	fire_only_once = no
+	
+	illustration_tags = {
+		10 = happy
+		10 = diplomacy
+	}
+	
+	option = {
+		name = dynamic_missions.52.option_a
+		
+		# Opinion bonuses already applied
+		# Clear active mission flag
+		remove_variable = active_dynamic_mission
+		
+		# Trigger next mission selection after 30 days
+		trigger_event = { id = dynamic_missions.1 days = 30 }
+		
+		custom_tooltip = dynamic_missions.52.option_a.tooltip
 	}
 }

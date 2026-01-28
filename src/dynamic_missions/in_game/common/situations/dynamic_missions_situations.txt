@@ -522,3 +522,246 @@ establish_new_city_situation = {
 		desc = dynamic_missions.establish_city.legend_other_towns
 	}
 }
+
+
+# Dynamic Missions: Claim Province Situation
+# This situation simulates a diplomatic crisis where the player claims a neighboring province
+claim_province_situation = {
+	# This situation is manually activated, not by monthly chance
+	monthly_spawn_chance = 0
+	
+	# Visibility: Player and target country can see this situation
+	visible = {
+		OR = {
+			this = root.owner  # The player
+			this = root.var:target_country  # The target country
+		}
+	}
+	
+	# Start conditions: Manually activated via event
+	can_start = {
+		always = no  # Never starts automatically
+	}
+	
+	# End conditions: Province acquired, capitulation, reconciliation, or time expired
+	can_end = {
+		OR = {
+			# Success: Province acquired by player
+			AND = {
+				has_variable = target_province
+				var:target_province = {
+					owner = root.owner
+				}
+				set_variable = {
+					name = mission_success
+					value = yes
+				}
+			}
+			# Player backed down
+			AND = {
+				has_variable = player_backed_down
+			}
+			# Target surrendered
+			AND = {
+				has_variable = target_surrendered
+			}
+			# Reconciliation achieved
+			AND = {
+				has_variable = reconciliation_achieved
+			}
+			# Time expired: 5 years (60 months) have passed
+			AND = {
+				has_variable = situation_start_date
+				months_since_variable = {
+					variable = situation_start_date
+					months >= 60
+				}
+				set_variable = {
+					name = time_expired
+					value = yes
+				}
+			}
+		}
+	}
+	
+	# On start: Initialize variables and set up situation
+	on_start = {
+		# Record the start date
+		set_variable = {
+			name = situation_start_date
+			value = current_date
+		}
+		
+		# Mark situation as active
+		owner = {
+			add_country_modifier = {
+				name = dm_claim_province_active
+				duration = -1  # Permanent until situation ends
+			}
+		}
+		
+		# Initialize supporter lists
+		set_variable = { name = player_supporters_count value = 0 }
+		set_variable = { name = target_supporters_count value = 0 }
+	}
+	
+	# On monthly: Check for province ownership changes
+	on_monthly = {
+		# Check if province was acquired (e.g., through separate war)
+		if = {
+			limit = {
+				has_variable = target_province
+				var:target_province = {
+					owner = root.owner
+				}
+			}
+			# Will trigger end condition next check
+		}
+	}
+	
+	# On ending: Trigger appropriate completion event
+	on_ending = {
+		owner = {
+			# Success: Province acquired
+			if = {
+				limit = {
+					situation:claim_province_situation = {
+						has_variable = mission_success
+					}
+				}
+				trigger_event = { id = dynamic_missions.49 }
+			}
+			# Time expired: Trigger ultimatum
+			else_if = {
+				limit = {
+					situation:claim_province_situation = {
+						has_variable = time_expired
+					}
+				}
+				trigger_event = { id = dynamic_missions.45 }
+			}
+			# Player backed down
+			else_if = {
+				limit = {
+					situation:claim_province_situation = {
+						has_variable = player_backed_down
+					}
+				}
+				trigger_event = { id = dynamic_missions.50 }
+			}
+			# Target surrendered
+			else_if = {
+				limit = {
+					situation:claim_province_situation = {
+						has_variable = target_surrendered
+					}
+				}
+				trigger_event = { id = dynamic_missions.51 }
+			}
+			# Reconciliation
+			else_if = {
+				limit = {
+					situation:claim_province_situation = {
+						has_variable = reconciliation_achieved
+					}
+				}
+				trigger_event = { id = dynamic_missions.52 }
+			}
+		}
+	}
+	
+	# On ended: Clean up all modifiers and variables
+	on_ended = {
+		# Remove country modifiers from player
+		owner = {
+			remove_country_modifier = dm_claim_province_active
+			remove_country_modifier = dm_fabricated_legitimacy
+			
+			# Remove action usage flags
+			remove_variable = used_seek_rival_support
+			remove_variable = used_fabricate_legitimacy
+			remove_variable = used_incite_panic
+			remove_variable = used_contact_surrender_faction
+		}
+		
+		# Remove province modifiers if province still exists
+		if = {
+			limit = { has_variable = target_province }
+			var:target_province = {
+				every_location_in_province = {
+					limit = { has_location_modifier = dm_incited_panic_province }
+					remove_location_modifier = dm_incited_panic_province
+				}
+			}
+		}
+		
+		# Clean up all situation variables
+		remove_variable = situation_start_date
+		remove_variable = target_country
+		remove_variable = target_province
+		remove_variable = mission_success
+		remove_variable = player_backed_down
+		remove_variable = target_surrendered
+		remove_variable = reconciliation_achieved
+		remove_variable = time_expired
+		remove_variable = player_supporters_count
+		remove_variable = target_supporters_count
+		remove_variable = player_coalition_strength
+		remove_variable = target_coalition_strength
+		
+		# Clear supporter lists
+		clear_list = player_supporters_list
+		clear_list = target_supporters_list
+	}
+	
+	# Map colors for the situation mapmode
+	map_color = {
+		if = {
+			limit = {
+				# Highlight the target province in red
+				province = situation:claim_province_situation.var:target_province
+			}
+			value = rgb { 200 50 50 }  # Red for target province
+		}
+		else_if = {
+			limit = {
+				# Show player's territory in green
+				owner = situation:claim_province_situation.owner
+			}
+			value = rgb { 50 200 50 }  # Green for player territory
+		}
+		else_if = {
+			limit = {
+				# Show target country's territory in orange
+				owner = situation:claim_province_situation.var:target_country
+			}
+			value = rgb { 200 150 50 }  # Orange for target territory
+		}
+	}
+	
+	# Tooltip for map
+	tooltip = {
+		if = {
+			limit = {
+				province = situation:claim_province_situation.var:target_province
+			}
+			custom_tooltip = dynamic_missions.claim_province.target_province_tooltip
+		}
+	}
+	
+	# Legend entries for the mapmode
+	legend_key = {
+		color = rgb { 200 50 50 }
+		desc = dynamic_missions.claim_province.legend_target
+	}
+	
+	legend_key = {
+		color = rgb { 50 200 50 }
+		desc = dynamic_missions.claim_province.legend_player
+	}
+	
+	legend_key = {
+		color = rgb { 200 150 50 }
+		desc = dynamic_missions.claim_province.legend_target_country
+	}
+}
