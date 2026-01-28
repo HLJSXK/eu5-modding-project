@@ -203,3 +203,83 @@ develop_city_situation = {
 		desc = dynamic_missions.situation.legend_other_cities
 	}
 }
+
+
+# Dynamic Missions: Large Research Project Situation
+large_research_project_situation = {
+    monthly_spawn_chance = 0
+
+    visible = {
+        OR = {
+            this = root.owner
+            is_subject_of = root.owner
+            is_neighbor_of = root.owner
+        }
+    }
+
+    can_start = { always = no } # Manually triggered by event
+
+    can_end = {
+        OR = {
+            # Success Condition
+            AND = {
+                has_variable = research_progress
+                var:research_progress >= 100
+                set_variable = { name = mission_success value = yes }
+            },
+            # Failure Condition
+            AND = {
+                has_variable = situation_start_date
+                months_since_variable = { variable = situation_start_date months >= 60 }
+                set_variable = { name = mission_failed value = yes }
+            }
+        }
+    }
+
+    on_start = {
+        set_variable = { name = situation_start_date value = current_date }
+        set_variable = { name = research_progress value = 0 }
+        owner = {
+            every_subject = { add_to_list = situation_participants }
+            every_neighbor_country = { add_to_list = situation_participants }
+        }
+    }
+
+    on_monthly = {
+        # Base progress (can be 0)
+        # Progress from 'Increase Research Funding'
+        if = {
+            limit = { has_country_modifier = dm_increased_funding_modifier }
+            change_variable = { name = research_progress value = 1 }
+        }
+        # Progress from 'Conscript University'
+        if = {
+            limit = { has_variable = conscripted_universities_count }
+            change_variable = { name = research_progress value = var:conscripted_universities_count }
+        }
+    }
+
+    on_ending = {
+        owner = {
+            if = {
+                limit = { situation:large_research_project_situation = { has_variable = mission_success } }
+                trigger_event = { id = dynamic_missions.23 } # Success Event
+            }
+            else_if = {
+                limit = { situation:large_research_project_situation = { has_variable = mission_failed } }
+                trigger_event = { id = dynamic_missions.24 } # Failure Event
+            }
+        }
+    }
+
+    on_ended = {
+        remove_variable = situation_start_date
+        remove_variable = research_progress
+        remove_variable = mission_success
+        remove_variable = mission_failed
+        remove_variable = conscripted_universities_count
+        remove_variable = lead_scientist_appointed
+        clear_list = situation_participants
+        # TODO: Add logic to remove character modifiers from the appointed scientist
+    }
+}

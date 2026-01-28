@@ -1,111 +1,13 @@
-# Dynamic Missions Feature Design
+# Dynamic Mission Design: Large Research Project
 
 **Author:** Manus AI
-**Date:** Jan 22, 2026
+**Date:** Jan 28, 2026
 
 ## 1. Overview
 
-This document outlines the design and architecture for the "Dynamic Missions" feature in the EU5 modding project. This feature introduces a system of player-driven goals, implemented as situations, to provide focused gameplay objectives and rewards.
-
-## 2. File Structure
-
-The feature will be implemented across several files, organized as follows:
-
-```
-/src/dynamic_missions/
-├── in_game/
-│   ├── common/
-│   │   ├── situations/`
-│   │   │   └── dynamic_missions_situations.txt
-│   │   └── generic_actions/
-│   │       └── dynamic_missions_actions.txt
-│   └── events/
-│       └── dynamic_missions_start_event.txt
-└── main_menu/
-    └── localization/
-        └── dynamic_missions_l_english.yml
-```
-
-## 3. Core Components
-
-### 3.1. Start Event (`dynamic_missions_start_event.txt`)
-
-This file will contain the initial event that allows the player to choose a goal. It will only be triggerable by a human player when no other dynamic mission is active.
-
-**`dynamic_missions_start.1` (Choose a Goal):**
--   **Type:** Country Event
--   **Trigger:**
-    -   Is human player
-    -   Does not have any active dynamic mission situation
--   **Options:**
-    -   **Option A: Develop a City:**
-        -   Triggers the `develop_city_situation`
-        -   Allows player to select a target city
-    -   *(Future options for other goals will be added here)*
-
-### 3.2. Situations (`dynamic_missions_situations.txt`)
-
-This file will define the situations for each goal. The first situation will be for city development.
-
-**`develop_city_situation`:**
--   **Participants:** Player and all subjects
--   **Duration:** 5 years (can end sooner if goal is met)
--   **End Conditions:**
-    -   Target city reaches 100% prosperity
-    -   At least 10 new buildings are constructed in the target city
-    -   5 years have passed
--   **Progress Bars:**
-    -   Left: Situation completion progress (based on prosperity and buildings)
-    -   Right: Time remaining
--   **On Start:**
-    -   Set the target city
-    -   Add all subjects to the situation
--   **On Monthly:**
-    -   Update progress bars
-    -   Check for end conditions
--   **On End:**
-    -   Grant reward: +1 development to the target city
-    -   Trigger the `dynamic_missions_start.1` event again
-
-### 3.3. Generic Actions (`dynamic_missions_actions.txt`)
-
-This file will define the actions available to the player and other participants within the situations.
-
-**Player Actions (for `develop_city_situation`):**
--   **`convene_builders`:**
-    -   **Cooldown:** 1 year
-    -   **Effect:** -50% global construction speed, +100% construction speed in target city for 1 year
--   **`public_works`:**
-    -   **Cooldown:** 1 year
-    -   **Effect:** Spend money to increase prosperity growth in target city by 1% for 1 year
--   **`demand_contributions`:**
-    -   **Cooldown:** 1 year
-    -   **Effect:** -10% control in all other cities, +100% control cap in target city for 1 year
-
-**Participant Actions (for `develop_city_situation` - Subjects):**
--   **`steal_progress`:**
-    -   **Cooldown:** 1 year
-    -   **AI Trigger:** Disloyal subjects
-    -   **Effect:** -1% prosperity in target city, +1% prosperity in subject's capital
--   **`contribute_to_development`:**
-    -   **Cooldown:** 1 year
-    -   **AI Trigger:** Loyal subjects
-    -   **Effect:** +1% prosperity in target city, -1% prosperity in subject's capital
-
-### 3.4. Localization (`dynamic_missions_l_english.yml`)
-
-This file will contain all the English text for the feature, including event titles, descriptions, option names, situation names, action names, and tooltips.
-
-## 4. GUI (Future Phase)
-
-The progress bars and other custom UI elements will be implemented in a later phase using `.gui` files. The initial implementation will focus on the core logic and functionality.
-
-
-## 5. New Dynamic Mission: Large Research Project
-
 This document outlines the design for the "Large Research Project" dynamic mission. This mission simulates a focused, long-term research endeavor, providing players with a new way to invest in and accelerate their technological progress.
 
-### 5.1. Core Mechanics
+## 2. Core Mechanics
 
 - **Type:** Dynamic Situation
 - **Name:** `large_research_project_situation`
@@ -115,7 +17,7 @@ This document outlines the design for the "Large Research Project" dynamic missi
 - **Goal:** Achieve 100% research progress.
 - **Reward:** +20 research progress in a chosen technology category.
 
-### 5.2. Situation Definition (`dynamic_missions_situations.txt`)
+## 3. Situation Definition (`dynamic_missions_situations.txt`)
 
 The `large_research_project_situation` will track the progress of the research project.
 
@@ -198,13 +100,13 @@ large_research_project_situation = {
 }
 ```
 
-### 5.3. Player Actions (`dynamic_missions_actions.txt`)
+## 4. Player Actions (`dynamic_missions_actions.txt`)
 
-#### 5.3.1. Increase Research Funding
+### 4.1. Increase Research Funding
 
 This is a toggleable action, managed by a decision.
 
-#### 5.3.2. Conscript University
+### 4.2. Conscript University
 
 ```pdx
 dm_conscript_university = {
@@ -222,7 +124,7 @@ dm_conscript_university = {
 }
 ```
 
-#### 5.3.3. Appoint Lead Scientist
+### 4.3. Appoint Lead Scientist
 
 ```pdx
 dm_appoint_lead_scientist = {
@@ -236,7 +138,7 @@ dm_appoint_lead_scientist = {
 }
 ```
 
-### 5.4. Modifiers (`dynamic_missions_modifiers.txt`)
+## 5. Modifiers (`dynamic_missions_modifiers.txt`)
 
 ```pdx
 # Increase Research Funding
@@ -261,7 +163,7 @@ dm_lead_scientist_debuff = {
 }
 ```
 
-### 5.5. Events (`dynamic_missions_events.txt`)
+## 6. Events (`dynamic_missions_events.txt`)
 
 - **`dynamic_missions.20`**: Starts the "Large Research Project" situation.
 - **`dynamic_missions.21`**: Player selects a university to conscript.
@@ -269,7 +171,7 @@ dm_lead_scientist_debuff = {
 - **`dynamic_missions.23`**: Success event, grants reward.
 - **`dynamic_missions.24`**: Failure event.
 
-### 5.6. Trigger (`dynamic_missions_triggers.txt`)
+## 7. Trigger (`dynamic_missions_triggers.txt`)
 
 ```pdx
 can_start_large_research_project = {
@@ -281,7 +183,7 @@ can_start_large_research_project = {
 }
 ```
 
-### 5.7. Localization (`dynamic_missions_l_english.yml`)
+## 8. Localization (`dynamic_missions_l_english.yml`)
 
 - Situation name and description.
 - Action names, descriptions, and tooltips.

@@ -1,7 +1,6 @@
 namespace = dynamic_missions
 
 # Dynamic Missions: Choose Your Goal
-# This event allows the player to select a goal to focus on
 dynamic_missions.1 = {
 	type = country_event
 	title = dynamic_missions.1.title
@@ -13,47 +12,38 @@ dynamic_missions.1 = {
 		10 = interior
 	}
 	
-	# Trigger conditions - only for human players with no active mission
 	trigger = {
 		is_ai = no
 		has_game_started = yes
-		# Check that no dynamic mission situation is currently active
 		NOT = { has_variable = active_dynamic_mission }
 	}
 	
 	# Option 1: Focus on Developing a City
 	option = {
 		name = dynamic_missions.1.option_a
-		
-		# Set flag to indicate a mission is active
-		set_variable = {
-			name = active_dynamic_mission
-			value = yes
-		}
-		
-		# Trigger the city selection process
-		# Player will select a city via generic action
+		trigger = { can_start_develop_city_mission = yes }
+		set_variable = { name = active_dynamic_mission value = yes }
 		trigger_event = { id = dynamic_missions.2 }
-		
 		custom_tooltip = dynamic_missions.1.option_a.tooltip
 	}
-	
-	# Option 2: (Future) Other mission types can be added here
-	# option = {
-	#	name = dynamic_missions.1.option_b
-	#	# Future mission type
-	# }
+
+	# Option 2: Large Research Project
+	option = {
+		name = "Start a Large Research Project"
+		trigger = { can_start_large_research_project = yes }
+		set_variable = { name = active_dynamic_mission value = yes }
+		activate_situation = large_research_project_situation
+		custom_tooltip = "Embark on a 5-year research project to gain a significant technology boost."
+	}
 	
 	# Option 3: Not now
 	option = {
 		name = dynamic_missions.1.option_c
-		# Do nothing, player can trigger this event again later
 		custom_tooltip = dynamic_missions.1.option_c.tooltip
 	}
 }
 
 # Dynamic Missions: Select Target City
-# This event allows the player to select which city to develop
 dynamic_missions.2 = {
 	type = country_event
 	title = dynamic_missions.2.title
@@ -65,9 +55,7 @@ dynamic_missions.2 = {
 		10 = city
 	}
 	
-	# Immediate effect: create a list of eligible cities
 	immediate = {
-		# Find all owned cities and towns
 		every_owned_location = {
 			limit = {
 				OR = {
@@ -79,51 +67,29 @@ dynamic_missions.2 = {
 		}
 	}
 	
-	# Option: Select a city (will be done via interaction in actual implementation)
 	option = {
 		name = dynamic_missions.2.option_a
-		
-		# For now, default to capital if no selection made
-		# In full implementation, this would use select_trigger
 		capital = {
 			save_scope_as = target_city
 		}
-		
-		# Start the develop city situation
 		activate_situation = develop_city_situation
-		
-		# Store the target city in the situation
 		situation:develop_city_situation = {
-			set_variable = {
-				name = target_location
-				value = scope:target_city
-			}
-			
-			# Store initial building count
+			set_variable = { name = target_location value = scope:target_city }
 			scope:target_city = {
-				set_variable = {
-					name = initial_building_count
-					value = num_buildings
-				}
+				set_variable = { name = initial_building_count value = num_buildings }
 			}
 		}
-		
 		custom_tooltip = dynamic_missions.2.option_a.tooltip
 	}
 	
-	# Option: Cancel
 	option = {
 		name = dynamic_missions.2.option_b
-		
-		# Remove the active mission flag
 		remove_variable = active_dynamic_mission
-		
 		custom_tooltip = dynamic_missions.2.option_b.tooltip
 	}
 }
 
 # Dynamic Missions: City Development Complete
-# This event fires when the city development mission is completed successfully
 dynamic_missions.3 = {
 	type = country_event
 	title = dynamic_missions.3.title
@@ -135,29 +101,18 @@ dynamic_missions.3 = {
 		10 = city
 	}
 	
-	# Option: Claim your reward
 	option = {
 		name = dynamic_missions.3.option_a
-		
-		# Grant the reward: +1 development to target city
 		situation:develop_city_situation = {
-			var:target_location = {
-				add_development = 1
-			}
+			var:target_location = { add_development = 1 }
 		}
-		
-		# Remove the active mission flag
 		remove_variable = active_dynamic_mission
-		
-		# Trigger the start event again to choose a new goal
 		trigger_event = { id = dynamic_missions.1 days = 30 }
-		
 		custom_tooltip = dynamic_missions.3.option_a.tooltip
 	}
 }
 
-# Dynamic Missions: City Development Failed (Time Expired)
-# This event fires when the time limit is reached without completing the goal
+# Dynamic Missions: City Development Failed
 dynamic_missions.4 = {
 	type = country_event
 	title = dynamic_missions.4.title
@@ -169,16 +124,97 @@ dynamic_missions.4 = {
 		10 = city
 	}
 	
-	# Option: Accept failure
 	option = {
 		name = dynamic_missions.4.option_a
-		
-		# Remove the active mission flag
 		remove_variable = active_dynamic_mission
-		
-		# Trigger the start event again to choose a new goal
 		trigger_event = { id = dynamic_missions.1 days = 30 }
-		
 		custom_tooltip = dynamic_missions.4.option_a.tooltip
 	}
+}
+
+# --- Large Research Project Events ---
+
+country_event = {
+    id = dynamic_missions.21
+    title = "dm_conscript_university.t"
+    desc = "dm_conscript_university.d"
+    picture = GFX_evt_library
+    is_triggered_only = yes
+
+    dynamic_option = {
+        for_each = every_owned_location
+        limit = {
+            has_building = university
+            NOT = { has_location_modifier = dm_conscripted_university_debuff }
+        }
+        name = "[location.GetName]"
+        effect = {
+            add_location_modifier = { name = dm_conscripted_university_debuff }
+            situation:large_research_project_situation = {
+                if = {
+                    limit = { NOT = { has_variable = conscripted_universities_count } }
+                    set_variable = { name = conscripted_universities_count value = 0 }
+                }
+                change_variable = { name = conscripted_universities_count value = 1 }
+            }
+        }
+    }
+}
+
+country_event = {
+    id = dynamic_missions.22
+    title = "dm_appoint_lead_scientist.t"
+    desc = "dm_appoint_lead_scientist.d"
+    picture = GFX_evt_character
+    is_triggered_only = yes
+
+    dynamic_option = {
+        for_each = every_character
+        limit = { is_in_court = yes }
+        name = "[character.GetName]"
+        effect = {
+            set_variable = { name = temp_scientist_char value = this }
+            this = { add_character_modifier = { name = dm_lead_scientist_debuff } }
+            situation:large_research_project_situation = {
+                set_variable = { name = lead_scientist_appointed value = yes }
+                set_variable = { name = lead_scientist_char value = root.var:temp_scientist_char }
+                set_variable = {
+                    name = temp_progress_bonus
+                    value = {
+                        value = root.var:temp_scientist_char.skill_adm
+                        add = root.var:temp_scientist_char.skill_dip
+                        add = root.var:temp_scientist_char.skill_mil
+                        divide = 10
+                    }
+                }
+                change_variable = { name = research_progress value = var:temp_progress_bonus }
+                remove_variable = temp_progress_bonus
+            }
+            root = { remove_variable = temp_scientist_char }
+        }
+    }
+}
+
+country_event = {
+    id = dynamic_missions.23
+    title = "dm_large_research_project_success.t"
+    desc = "dm_large_research_project_success.d"
+    picture = GFX_evt_triumph
+    is_triggered_only = yes
+
+    immediate = {
+        add_technology_progress = { category = adm progress = 20 }
+    }
+
+    option = { name = "OK" }
+}
+
+country_event = {
+    id = dynamic_missions.24
+    title = "dm_large_research_project_failure.t"
+    desc = "dm_large_research_project_failure.d"
+    picture = GFX_evt_throne_room_disaster
+    is_triggered_only = yes
+
+    option = { name = "OK" }
 }
