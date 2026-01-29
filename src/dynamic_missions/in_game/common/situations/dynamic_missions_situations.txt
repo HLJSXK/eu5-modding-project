@@ -12,7 +12,10 @@ develop_city_situation = {
 	
 	# Start conditions: Manually activated via event
 	can_start = {
-		always = no  # Never starts automatically
+		owner = {
+			has_variable = wants_develop_city
+		}
+		# 
 	}
 	
 	# End conditions: Either goal is met or time limit reached
@@ -27,10 +30,22 @@ develop_city_situation = {
 	
 	# On start: Initialize variables and add participants
 	on_start = {
-		# Record the start date
-		set_variable = {
-			name = situation_start_date
-			value = yes
+		# Clear the trigger variable
+		owner = {
+			remove_variable = wants_develop_city
+			
+			# Set target_location from the location marked in event
+			random_owned_location = {
+				limit = { has_variable = selected_for_development }
+				save_scope_as = target_city
+				set_variable = { name = initial_building_count value = num_buildings }
+			}
+		}
+		
+		# Save target location to situation
+		if = {
+			limit = { exists = scope:target_city }
+			set_variable = { name = target_location value = scope:target_city }
 		}
 		
 		# Initialize month counter
@@ -38,9 +53,6 @@ develop_city_situation = {
 			name = months_elapsed
 			value = 0
 		}
-		
-		# Target location is set by the triggering event
-		# initial_building_count is also set by the triggering event
 	}
 	
 	# On monthly: Update progress and check conditions
@@ -154,6 +166,11 @@ large_research_project_situation = {
 	}
 
 	on_start = {
+		# Clear the trigger variable
+		owner = {
+			remove_variable = wants_large_research_project
+		}
+		
 		set_variable = { name = situation_start_date value = yes }
 		set_variable = { name = months_elapsed value = 0 }
 		set_variable = { name = research_progress value = 0 }
@@ -268,7 +285,10 @@ establish_new_city_situation = {
 	
 	# Start conditions: Manually activated via event
 	can_start = {
-		always = no  # Never starts automatically
+		owner = {
+			has_variable = wants_large_research_project
+		}
+		# 
 	}
 	
 	# End conditions: Either goal is met or time limit reached
@@ -281,9 +301,25 @@ establish_new_city_situation = {
 	
 	# On start: Initialize variables
 	on_start = {
+		# Clear the trigger variable
+		owner = {
+			remove_variable = wants_establish_new_city
+			
+			# Set target_location from the location marked in event
+			random_owned_location = {
+				limit = { has_variable = selected_for_new_city }
+				save_scope_as = target_town
+			}
+		}
+		
+		# Save target location to situation
+		if = {
+			limit = { exists = scope:target_town }
+			set_variable = { name = target_location value = scope:target_town }
+		}
+		
 		set_variable = { name = situation_start_date value = yes }
 		set_variable = { name = months_elapsed value = 0 }
-		# Target location is set by the triggering event
 	}
 	
 	# On monthly: Update progress and handle value shifts
@@ -444,7 +480,9 @@ claim_province_situation = {
 	
 	# Start conditions: Manually activated via event
 	can_start = {
-		always = no  # Never starts automatically
+		owner = {
+			has_variable = wants_claim_province
+		}
 	}
 	
 	# End conditions: Province acquired, capitulation, reconciliation, or time expired
@@ -460,18 +498,40 @@ claim_province_situation = {
 	
 	# On start: Initialize variables and set up situation
 	on_start = {
+		# Clear the trigger variable and retrieve target info
+		owner = {
+			remove_variable = wants_claim_province
+			
+			# Retrieve target province and country from saved variables
+			if = {
+				limit = { has_variable = claim_target_province }
+				var:claim_target_province = { save_scope_as = target_province }
+			}
+			if = {
+				limit = { has_variable = claim_target_country }
+				var:claim_target_country = { save_scope_as = target_country }
+			}
+			
+			add_country_modifier = {
+				modifier = dm_claim_province_active
+				years = -1
+			}
+		}
+		
+		# Save target info to situation
+		if = {
+			limit = { exists = scope:target_province }
+			set_variable = { name = target_province value = scope:target_province }
+		}
+		if = {
+			limit = { exists = scope:target_country }
+			set_variable = { name = target_country value = scope:target_country }
+		}
+		
 		set_variable = { name = situation_start_date value = yes }
 		set_variable = { name = months_elapsed value = 0 }
 		set_variable = { name = player_supporters_count value = 0 }
 		set_variable = { name = target_supporters_count value = 0 }
-		
-		# Mark situation as active
-		owner = {
-			add_country_modifier = {
-				modifier = dm_claim_province_active
-				years = -1  # Permanent until situation ends
-			}
-		}
 	}
 	
 	# On monthly: Check for province ownership changes
