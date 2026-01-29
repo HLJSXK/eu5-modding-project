@@ -1,14 +1,14 @@
-# Dynamic Missions: Develop City Situation
+﻿# Dynamic Missions: Develop City Situation
 # This situation tracks the player's progress in developing a chosen city
 develop_city_situation = {
 	# This situation is manually activated, not by monthly chance
-	monthly_spawn_chance = 0
+	monthly_spawn_chance = monthly_spawn_chance_unique
 	
 	# Visibility: Only the player and their subjects can see this situation
 	visible = {
 		OR = {
-			this = root.owner  # The player
-			is_subject_of = root.owner  # Subjects of the player
+			owner = this
+			is_subject_of = owner
 		}
 	}
 	
@@ -21,39 +21,9 @@ develop_city_situation = {
 	can_end = {
 		OR = {
 			# Success condition: Target city has 100% prosperity and 10+ new buildings
-			AND = {
-				var:target_location = {
-					prosperity >= 100
-				}
-				# Check if building count increased by at least 10
-				trigger_if = {
-					limit = { has_variable = initial_building_count }
-					var:target_location = {
-						num_buildings >= {
-							add = var:initial_building_count
-							add = 10
-						}
-					}
-				}
-				# Set success flag
-				set_variable = {
-					name = mission_success
-					value = yes
-				}
-			}
-			# Failure condition: 5 years (60 months) have passed
-			AND = {
-				has_variable = situation_start_date
-				months_since_variable = {
-					variable = situation_start_date
-					months >= 60
-				}
-				# Set failure flag
-				set_variable = {
-					name = mission_failed
-					value = yes
-				}
-			}
+			has_variable = mission_success
+			# Failure condition: Time expired
+			has_variable = mission_failed
 		}
 	}
 	
@@ -62,256 +32,242 @@ develop_city_situation = {
 		# Record the start date
 		set_variable = {
 			name = situation_start_date
-			value = current_date
+			value = yes
 		}
 		
-		# Initialize progress tracking
+		# Initialize month counter
 		set_variable = {
-			name = completion_progress
+			name = months_elapsed
 			value = 0
 		}
 		
-		# Add all subjects as participants
-		owner = {
-			every_subject = {
-				add_to_list = situation_participants
-			}
-		}
+		# Target location is set by the triggering event
+		# initial_building_count is also set by the triggering event
 	}
 	
 	# On monthly: Update progress and check conditions
 	on_monthly = {
-		# Update completion progress based on prosperity and buildings
+		# Increment month counter
 		if = {
-			limit = { has_variable = target_location }
-			
-			# Calculate progress: (prosperity + building_progress) / 2
-			var:target_location = {
-				set_variable = {
-					name = prosperity_progress
-					value = prosperity
-				}
-				
-				# Calculate building progress
-				set_variable = {
-					name = building_progress
-					value = {
-						value = num_buildings
-						subtract = var:initial_building_count
-						multiply = 10  # Each building is 10% progress
-						max = 100
-					}
-				}
+			limit = { has_variable = months_elapsed }
+			change_variable = {
+				name = months_elapsed
+				add = 1
+			}
+		}
+		
+		# Check for success condition
+		if = {
+			limit = {
+				has_variable = target_location
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
 			}
 			
-			# Average the two progress values
-			set_variable = {
-				name = completion_progress
-				value = {
-					value = var:target_location.prosperity_progress
-					add = var:target_location.building_progress
-					divide = 2
+			# Check if target location has 100% prosperity
+			if = {
+				limit = {
+					var:target_location = {
+						prosperity >= 100
+					}
+				}
+				# Mark as success
+				set_variable = {
+					name = mission_success
+					value = yes
 				}
 			}
 		}
 		
-		# Notify participants monthly (for AI decision-making)
-		every_in_list = {
-			list = situation_participants
-			trigger_event_silently = dynamic_missions.100  # AI evaluation event
+		# Check for failure condition (60 months = 5 years)
+		if = {
+			limit = {
+				has_variable = months_elapsed
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
+				var:months_elapsed >= 60
+			}
+			set_variable = {
+				name = mission_failed
+				value = yes
+			}
 		}
 	}
 	
 	# On ending: Trigger appropriate completion event
 	on_ending = {
-		owner = {
-			if = {
-				limit = {
-					situation:develop_city_situation = {
-						has_variable = mission_success
-					}
-				}
-				# Success event
-				trigger_event = { id = dynamic_missions.3 }
+		if = {
+			limit = { has_variable = mission_success }
+			# Success event
+			owner = {
+				trigger_event_non_silently = dynamic_missions.3
 			}
-			else_if = {
-				limit = {
-					situation:develop_city_situation = {
-						has_variable = mission_failed
-					}
-				}
-				# Failure event
-				trigger_event = { id = dynamic_missions.4 }
+		}
+		else_if = {
+			limit = { has_variable = mission_failed }
+			# Failure event
+			owner = {
+				trigger_event_non_silently = dynamic_missions.4
 			}
 		}
 	}
 	
 	# On ended: Clean up variables
 	on_ended = {
-		# Remove all situation variables to reduce save file size
-		remove_variable = target_location
-		remove_variable = situation_start_date
-		remove_variable = completion_progress
-		remove_variable = mission_success
-		remove_variable = mission_failed
-		remove_variable = initial_building_count
-		
-		# Clear participant list
-		clear_list = situation_participants
-	}
-	
-	# Map colors for the situation mapmode
-	map_color = {
-		if = {
-			limit = {
-				# Highlight the target city
-				this = situation:develop_city_situation.var:target_location
-			}
-			value = rgb { 50 200 50 }  # Green for target
-		}
-		else_if = {
-			limit = {
-				# Show player's other cities in yellow
-				owner = situation:develop_city_situation.owner
-				OR = {
-					location_rank = town
-					location_rank = city
-				}
-			}
-			value = rgb { 200 200 50 }  # Yellow for other cities
-		}
+		# Remove all situation variables
+		if = { limit = { has_variable = target_location } remove_variable = target_location }
+		if = { limit = { has_variable = situation_start_date } remove_variable = situation_start_date }
+		if = { limit = { has_variable = months_elapsed } remove_variable = months_elapsed }
+		if = { limit = { has_variable = mission_success } remove_variable = mission_success }
+		if = { limit = { has_variable = mission_failed } remove_variable = mission_failed }
+		if = { limit = { has_variable = initial_building_count } remove_variable = initial_building_count }
 	}
 	
 	# Tooltip for map
 	tooltip = {
 		if = {
 			limit = {
-				this = situation:develop_city_situation.var:target_location
+				has_variable = target_location
+				this = var:target_location
 			}
 			custom_tooltip = dynamic_missions.situation.target_city_tooltip
 		}
-	}
-	
-	# Legend entries for the mapmode
-	legend_key = {
-		color = rgb { 50 200 50 }
-		desc = dynamic_missions.situation.legend_target
-	}
-	
-	legend_key = {
-		color = rgb { 200 200 50 }
-		desc = dynamic_missions.situation.legend_other_cities
 	}
 }
 
 
 # Dynamic Missions: Large Research Project Situation
 large_research_project_situation = {
-    monthly_spawn_chance = 0
+	monthly_spawn_chance = monthly_spawn_chance_unique
 
-    visible = {
-        OR = {
-            this = root.owner
-            is_subject_of = root.owner
-            is_neighbor_of = root.owner
-        }
-    }
+	visible = {
+		OR = {
+			owner = this
+			is_subject_of = owner
+			is_neighbor_of = owner
+		}
+	}
 
-    can_start = { always = no } # Manually triggered by event
+	can_start = { always = no } # Manually triggered by event
 
-    can_end = {
-        OR = {
-            # Success Condition
-            AND = {
-                has_variable = research_progress
-                var:research_progress >= 100
-                set_variable = { name = mission_success value = yes }
-            },
-            # Failure Condition
-            AND = {
-                has_variable = situation_start_date
-                months_since_variable = { variable = situation_start_date months >= 60 }
-                set_variable = { name = mission_failed value = yes }
-            }
-        }
-    }
+	can_end = {
+		OR = {
+			# Success or failure flags set in on_monthly
+			has_variable = mission_success
+			has_variable = mission_failed
+		}
+	}
 
-    on_start = {
-        set_variable = { name = situation_start_date value = current_date }
-        set_variable = { name = research_progress value = 0 }
-        owner = {
-            every_subject = { add_to_list = situation_participants }
-            every_neighbor_country = { add_to_list = situation_participants }
-        }
-    }
+	on_start = {
+		set_variable = { name = situation_start_date value = yes }
+		set_variable = { name = months_elapsed value = 0 }
+		set_variable = { name = research_progress value = 0 }
+	}
 
-    on_monthly = {
-        # Base progress (can be 0)
-        # Progress from 'Increase Research Funding'
-        if = {
-            limit = { has_country_modifier = dm_increased_funding_modifier }
-            change_variable = { name = research_progress value = 1 }
-        }
-        # Progress from 'Conscript University'
-        if = {
-            limit = { has_variable = conscripted_universities_count }
-            change_variable = { name = research_progress value = var:conscripted_universities_count }
-        }
-    }
+	on_monthly = {
+		# Increment month counter
+		if = {
+			limit = { has_variable = months_elapsed }
+			change_variable = {
+				name = months_elapsed
+				add = 1
+			}
+		}
+		
+		# Progress from 'Increase Research Funding'
+		if = {
+			limit = { 
+				owner = {
+					has_country_modifier = dm_increased_funding_modifier
+				}
+			}
+			change_variable = { name = research_progress add = 1 }
+		}
+		
+		# Progress from 'Conscript University'
+		if = {
+			limit = { has_variable = conscripted_universities_count }
+			change_variable = { 
+				name = research_progress 
+				add = var:conscripted_universities_count 
+			}
+		}
+		
+		# Check for success (100% progress)
+		if = {
+			limit = {
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
+				var:research_progress >= 100
+			}
+			set_variable = { name = mission_success value = yes }
+		}
+		
+		# Check for failure (60 months)
+		if = {
+			limit = {
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
+				var:months_elapsed >= 60
+			}
+			set_variable = { name = mission_failed value = yes }
+		}
+	}
 
-    on_ending = {
-        owner = {
-            if = {
-                limit = { situation:large_research_project_situation = { has_variable = mission_success } }
-                trigger_event = { id = dynamic_missions.23 } # Success Event
-            }
-            else_if = {
-                limit = { situation:large_research_project_situation = { has_variable = mission_failed } }
-                trigger_event = { id = dynamic_missions.24 } # Failure Event
-            }
-        }
-    }
+	on_ending = {
+		if = {
+			limit = { has_variable = mission_success }
+			owner = {
+				trigger_event_non_silently = dynamic_missions.23
+			}
+		}
+		else_if = {
+			limit = { has_variable = mission_failed }
+			owner = {
+				trigger_event_non_silently = dynamic_missions.24
+			}
+		}
+	}
 
-    on_ended = {
-        # Remove character modifier from appointed scientist if exists
-        if = {
-            limit = { has_variable = lead_scientist_char }
-            var:lead_scientist_char = {
-                remove_character_modifier = dm_lead_scientist_debuff
-            }
-            remove_variable = lead_scientist_char
-        }
-        
-        # Remove location modifiers from conscripted universities
-        owner = {
-            every_owned_location = {
-                limit = { has_location_modifier = dm_conscripted_university_debuff }
-                remove_location_modifier = dm_conscripted_university_debuff
-            }
-        }
-        
-        # Clean up variables
-        remove_variable = situation_start_date
-        remove_variable = research_progress
-        remove_variable = mission_success
-        remove_variable = mission_failed
-        remove_variable = conscripted_universities_count
-        remove_variable = lead_scientist_appointed
-        clear_list = situation_participants
-    }
+	on_ended = {
+		# Remove character modifier from appointed scientist if exists
+		if = {
+			limit = { has_variable = lead_scientist_char }
+			var:lead_scientist_char = {
+				remove_character_modifier = dm_lead_scientist_debuff
+			}
+			remove_variable = lead_scientist_char
+		}
+		
+		# Remove location modifiers from conscripted universities
+		owner = {
+			every_owned_location = {
+				limit = { has_location_modifier = dm_conscripted_university_debuff }
+				remove_location_modifier = dm_conscripted_university_debuff
+			}
+		}
+		
+		# Clean up variables
+		if = { limit = { has_variable = situation_start_date } remove_variable = situation_start_date }
+		if = { limit = { has_variable = months_elapsed } remove_variable = months_elapsed }
+		if = { limit = { has_variable = research_progress } remove_variable = research_progress }
+		if = { limit = { has_variable = mission_success } remove_variable = mission_success }
+		if = { limit = { has_variable = mission_failed } remove_variable = mission_failed }
+		if = { limit = { has_variable = conscripted_universities_count } remove_variable = conscripted_universities_count }
+		if = { limit = { has_variable = lead_scientist_appointed } remove_variable = lead_scientist_appointed }
+	}
 }
-
 
 
 # Dynamic Missions: Establish New City Situation
 # This situation tracks the player's progress in transforming a town into a city
 establish_new_city_situation = {
 	# This situation is manually activated, not by monthly chance
-	monthly_spawn_chance = 0
+	monthly_spawn_chance = monthly_spawn_chance_unique
 	
 	# Visibility: Only the player can see this situation
 	visible = {
-		this = root.owner
+		owner = this
 	}
 	
 	# Start conditions: Manually activated via event
@@ -322,204 +278,158 @@ establish_new_city_situation = {
 	# End conditions: Either goal is met or time limit reached
 	can_end = {
 		OR = {
-			# Success condition: Target location becomes a city
-			AND = {
-				has_variable = target_location
-				var:target_location = {
-					location_rank = city
-				}
-				# Set success flag
-				set_variable = {
-					name = mission_success
-					value = yes
-				}
-			}
-			# Failure condition: 10 years (120 months) have passed
-			AND = {
-				has_variable = situation_start_date
-				months_since_variable = {
-					variable = situation_start_date
-					months >= 120
-				}
-				# Set failure flag
-				set_variable = {
-					name = mission_failed
-					value = yes
-				}
-			}
+			has_variable = mission_success
+			has_variable = mission_failed
 		}
 	}
 	
 	# On start: Initialize variables
 	on_start = {
-		# Record the start date
-		set_variable = {
-			name = situation_start_date
-			value = current_date
-		}
-		
+		set_variable = { name = situation_start_date value = yes }
+		set_variable = { name = months_elapsed value = 0 }
 		# Target location is set by the triggering event
 	}
 	
 	# On monthly: Update progress and handle value shifts
 	on_monthly = {
+		# Increment month counter
+		if = {
+			limit = { has_variable = months_elapsed }
+			change_variable = {
+				name = months_elapsed
+				add = 1
+			}
+		}
+		
+		# Handle value shifts from toggleable actions
 		owner = {
-			# Handle value shifts from toggleable actions
 			if = {
 				limit = { has_country_modifier = dm_encourage_migration_modifier }
-				change_value = {
-					value = freemen
-					amount = 0.10
+				change_societal_value = {
+					type = freemen_vs_slaves
+					value = societal_value_move_to_right
 				}
 			}
 			
 			if = {
 				limit = { has_country_modifier = dm_encourage_proselytization_modifier }
-				change_value = {
-					value = spiritual
-					amount = 0.10
+				change_societal_value = {
+					type = spiritual_vs_secular
+					value = societal_value_move_to_left
 				}
 			}
 			
 			if = {
 				limit = { has_country_modifier = dm_encourage_folk_culture_modifier }
-				change_value = {
-					value = humanist
-					amount = 0.10
-				}
-			}
-			
-			# Handle estate satisfaction penalty from requisition
-			if = {
-				limit = { has_country_modifier = dm_requisition_materials_modifier }
-				every_estate = {
-					change_satisfaction = -0.05
+				change_societal_value = {
+					type = humanist_vs_chauvinist
+					value = societal_value_move_to_left
 				}
 			}
 		}
 		
-		# Apply governor's prosperity bonus if appointed
+		# Check for success condition: Target location becomes a city
 		if = {
-			limit = { 
+			limit = {
 				has_variable = target_location
-				var:target_location = { has_variable = governor_prosperity_bonus }
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
 			}
-			var:target_location = {
-				change_prosperity = var:governor_prosperity_bonus
+			
+			if = {
+				limit = {
+					var:target_location = {
+						location_rank = location_rank:city
+					}
+				}
+				set_variable = { name = mission_success value = yes }
 			}
+		}
+		
+		# Check for failure condition (120 months = 10 years)
+		if = {
+			limit = {
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = mission_failed }
+				var:months_elapsed >= 120
+			}
+			set_variable = { name = mission_failed value = yes }
 		}
 	}
 	
 	# On ending: Trigger appropriate completion event
 	on_ending = {
-		owner = {
-			if = {
-				limit = {
-					situation:establish_new_city_situation = {
-						has_variable = mission_success
-					}
-				}
-				# Success event
-				trigger_event = { id = dynamic_missions.33 }
+		if = {
+			limit = { has_variable = mission_success }
+			owner = {
+				trigger_event_non_silently = dynamic_missions.33
 			}
-			else_if = {
-				limit = {
-					situation:establish_new_city_situation = {
-						has_variable = mission_failed
-					}
-				}
-				# Failure event
-				trigger_event = { id = dynamic_missions.34 }
+		}
+		else_if = {
+			limit = { has_variable = mission_failed }
+			owner = {
+				trigger_event_non_silently = dynamic_missions.34
 			}
 		}
 	}
 	
-		# On ended: Clean up variables and modifiers
-		on_ended = {
-			owner = {
-				# Remove all toggleable modifiers
-				remove_country_modifier = dm_encourage_migration_modifier
-				remove_country_modifier = dm_encourage_proselytization_modifier
-				remove_country_modifier = dm_encourage_folk_culture_modifier
-				remove_country_modifier = dm_requisition_materials_modifier
-				remove_country_modifier = dm_appoint_governor_used
-				
-				# Remove location modifiers and variables from target
-				if = {
-					limit = { situation:establish_new_city_situation = { has_variable = target_location } }
-					situation:establish_new_city_situation = {
-						var:target_location = {
-							remove_location_modifier = dm_migration_boost
-							remove_location_modifier = dm_conversion_boost
-							remove_location_modifier = dm_assimilation_boost
-							remove_location_modifier = dm_governor_control_bonus
-							# Remove governor prosperity bonus variable
-							remove_variable = governor_prosperity_bonus
-						}
-					}
-				}
-				
-				# Remove character modifier from governor if appointed
-				if = {
-					limit = { 
-						situation:establish_new_city_situation = { 
-							has_variable = governor_character 
-						} 
-					}
-					situation:establish_new_city_situation = {
-						var:governor_character = {
-							remove_character_modifier = dm_regional_governor_debuff
-						}
-					}
-				}
-			}
-			
-			# Remove all situation variables
-			remove_variable = target_location
-			remove_variable = situation_start_date
-			remove_variable = mission_success
-			remove_variable = mission_failed
-			remove_variable = governor_character
+	# On ended: Clean up variables and modifiers
+	on_ended = {
+		owner = {
+			# Remove all toggleable modifiers
+			if = { limit = { has_country_modifier = dm_encourage_migration_modifier } 
+				remove_country_modifier = dm_encourage_migration_modifier }
+			if = { limit = { has_country_modifier = dm_encourage_proselytization_modifier } 
+				remove_country_modifier = dm_encourage_proselytization_modifier }
+			if = { limit = { has_country_modifier = dm_encourage_folk_culture_modifier } 
+				remove_country_modifier = dm_encourage_folk_culture_modifier }
+			if = { limit = { has_country_modifier = dm_requisition_materials_modifier } 
+				remove_country_modifier = dm_requisition_materials_modifier }
+			if = { limit = { has_country_modifier = dm_appoint_governor_used } 
+				remove_country_modifier = dm_appoint_governor_used }
 		}
-	
-	# Map colors for the situation mapmode
-	map_color = {
+		
+		# Remove location modifiers from target
 		if = {
-			limit = {
-				# Highlight the target town
-				this = situation:establish_new_city_situation.var:target_location
+			limit = { has_variable = target_location }
+			var:target_location = {
+				if = { limit = { has_location_modifier = dm_migration_boost } 
+					remove_location_modifier = dm_migration_boost }
+				if = { limit = { has_location_modifier = dm_conversion_boost } 
+					remove_location_modifier = dm_conversion_boost }
+				if = { limit = { has_location_modifier = dm_assimilation_boost } 
+					remove_location_modifier = dm_assimilation_boost }
+				if = { limit = { has_location_modifier = dm_governor_control_bonus } 
+					remove_location_modifier = dm_governor_control_bonus }
 			}
-			value = rgb { 100 150 255 }  # Blue for target town
 		}
-		else_if = {
-			limit = {
-				# Show player's other towns in light blue
-				owner = situation:establish_new_city_situation.owner
-				location_rank = town
+		
+		# Remove character modifier from governor if appointed
+		if = {
+			limit = { has_variable = governor_character }
+			var:governor_character = {
+				remove_character_modifier = dm_regional_governor_debuff
 			}
-			value = rgb { 150 200 255 }  # Light blue for other towns
 		}
+		
+		# Remove all situation variables
+		if = { limit = { has_variable = target_location } remove_variable = target_location }
+		if = { limit = { has_variable = situation_start_date } remove_variable = situation_start_date }
+		if = { limit = { has_variable = months_elapsed } remove_variable = months_elapsed }
+		if = { limit = { has_variable = mission_success } remove_variable = mission_success }
+		if = { limit = { has_variable = mission_failed } remove_variable = mission_failed }
+		if = { limit = { has_variable = governor_character } remove_variable = governor_character }
 	}
 	
 	# Tooltip for map
 	tooltip = {
 		if = {
 			limit = {
-				this = situation:establish_new_city_situation.var:target_location
+				has_variable = target_location
+				this = var:target_location
 			}
 			custom_tooltip = dynamic_missions.establish_city.target_town_tooltip
 		}
-	}
-	
-	# Legend entries for the mapmode
-	legend_key = {
-		color = rgb { 100 150 255 }
-		desc = dynamic_missions.establish_city.legend_target
-	}
-	
-	legend_key = {
-		color = rgb { 150 200 255 }
-		desc = dynamic_missions.establish_city.legend_other_towns
 	}
 }
 
@@ -528,13 +438,14 @@ establish_new_city_situation = {
 # This situation simulates a diplomatic crisis where the player claims a neighboring province
 claim_province_situation = {
 	# This situation is manually activated, not by monthly chance
-	monthly_spawn_chance = 0
+	monthly_spawn_chance = monthly_spawn_chance_unique
 	
 	# Visibility: Player and target country can see this situation
 	visible = {
 		OR = {
-			this = root.owner  # The player
-			this = root.var:target_country  # The target country
+			owner = this
+			has_variable = target_country
+			this = var:target_country
 		}
 	}
 	
@@ -546,76 +457,61 @@ claim_province_situation = {
 	# End conditions: Province acquired, capitulation, reconciliation, or time expired
 	can_end = {
 		OR = {
-			# Success: Province acquired by player
-			AND = {
-				has_variable = target_province
-				var:target_province = {
-					owner = root.owner
-				}
-				set_variable = {
-					name = mission_success
-					value = yes
-				}
-			}
-			# Player backed down
-			AND = {
-				has_variable = player_backed_down
-			}
-			# Target surrendered
-			AND = {
-				has_variable = target_surrendered
-			}
-			# Reconciliation achieved
-			AND = {
-				has_variable = reconciliation_achieved
-			}
-			# Time expired: 5 years (60 months) have passed
-			AND = {
-				has_variable = situation_start_date
-				months_since_variable = {
-					variable = situation_start_date
-					months >= 60
-				}
-				set_variable = {
-					name = time_expired
-					value = yes
-				}
-			}
+			has_variable = mission_success
+			has_variable = player_backed_down
+			has_variable = target_surrendered
+			has_variable = reconciliation_achieved
+			has_variable = time_expired
 		}
 	}
 	
 	# On start: Initialize variables and set up situation
 	on_start = {
-		# Record the start date
-		set_variable = {
-			name = situation_start_date
-			value = current_date
-		}
+		set_variable = { name = situation_start_date value = yes }
+		set_variable = { name = months_elapsed value = 0 }
+		set_variable = { name = player_supporters_count value = 0 }
+		set_variable = { name = target_supporters_count value = 0 }
 		
 		# Mark situation as active
 		owner = {
 			add_country_modifier = {
-				name = dm_claim_province_active
-				duration = -1  # Permanent until situation ends
+				modifier = dm_claim_province_active
+				years = -1  # Permanent until situation ends
 			}
 		}
-		
-		# Initialize supporter lists
-		set_variable = { name = player_supporters_count value = 0 }
-		set_variable = { name = target_supporters_count value = 0 }
 	}
 	
 	# On monthly: Check for province ownership changes
 	on_monthly = {
-		# Check if province was acquired (e.g., through separate war)
+		# Increment month counter
+		if = {
+			limit = { has_variable = months_elapsed }
+			change_variable = {
+				name = months_elapsed
+				add = 1
+			}
+		}
+		
+		# Check if province was acquired
 		if = {
 			limit = {
 				has_variable = target_province
+				NOT = { has_variable = mission_success }
 				var:target_province = {
 					owner = root.owner
 				}
 			}
-			# Will trigger end condition next check
+			set_variable = { name = mission_success value = yes }
+		}
+		
+		# Check for time expiration (60 months = 5 years)
+		if = {
+			limit = {
+				NOT = { has_variable = mission_success }
+				NOT = { has_variable = time_expired }
+				var:months_elapsed >= 60
+			}
+			set_variable = { name = time_expired value = yes }
 		}
 	}
 	
@@ -624,48 +520,28 @@ claim_province_situation = {
 		owner = {
 			# Success: Province acquired
 			if = {
-				limit = {
-					situation:claim_province_situation = {
-						has_variable = mission_success
-					}
-				}
-				trigger_event = { id = dynamic_missions.49 }
+				limit = { root = { has_variable = mission_success } }
+				trigger_event_non_silently = dynamic_missions.49
 			}
 			# Time expired: Trigger ultimatum
 			else_if = {
-				limit = {
-					situation:claim_province_situation = {
-						has_variable = time_expired
-					}
-				}
-				trigger_event = { id = dynamic_missions.45 }
+				limit = { root = { has_variable = time_expired } }
+				trigger_event_non_silently = dynamic_missions.45
 			}
 			# Player backed down
 			else_if = {
-				limit = {
-					situation:claim_province_situation = {
-						has_variable = player_backed_down
-					}
-				}
-				trigger_event = { id = dynamic_missions.50 }
+				limit = { root = { has_variable = player_backed_down } }
+				trigger_event_non_silently = dynamic_missions.50
 			}
 			# Target surrendered
 			else_if = {
-				limit = {
-					situation:claim_province_situation = {
-						has_variable = target_surrendered
-					}
-				}
-				trigger_event = { id = dynamic_missions.51 }
+				limit = { root = { has_variable = target_surrendered } }
+				trigger_event_non_silently = dynamic_missions.51
 			}
 			# Reconciliation
 			else_if = {
-				limit = {
-					situation:claim_province_situation = {
-						has_variable = reconciliation_achieved
-					}
-				}
-				trigger_event = { id = dynamic_missions.52 }
+				limit = { root = { has_variable = reconciliation_achieved } }
+				trigger_event_non_silently = dynamic_missions.52
 			}
 		}
 	}
@@ -674,14 +550,16 @@ claim_province_situation = {
 	on_ended = {
 		# Remove country modifiers from player
 		owner = {
-			remove_country_modifier = dm_claim_province_active
-			remove_country_modifier = dm_fabricated_legitimacy
+			if = { limit = { has_country_modifier = dm_claim_province_active } 
+				remove_country_modifier = dm_claim_province_active }
+			if = { limit = { has_country_modifier = dm_fabricated_legitimacy } 
+				remove_country_modifier = dm_fabricated_legitimacy }
 			
 			# Remove action usage flags
-			remove_variable = used_seek_rival_support
-			remove_variable = used_fabricate_legitimacy
-			remove_variable = used_incite_panic
-			remove_variable = used_contact_surrender_faction
+			if = { limit = { has_variable = used_seek_rival_support } remove_variable = used_seek_rival_support }
+			if = { limit = { has_variable = used_fabricate_legitimacy } remove_variable = used_fabricate_legitimacy }
+			if = { limit = { has_variable = used_incite_panic } remove_variable = used_incite_panic }
+			if = { limit = { has_variable = used_contact_surrender_faction } remove_variable = used_contact_surrender_faction }
 		}
 		
 		# Remove province modifiers if province still exists
@@ -696,72 +574,27 @@ claim_province_situation = {
 		}
 		
 		# Clean up all situation variables
-		remove_variable = situation_start_date
-		remove_variable = target_country
-		remove_variable = target_province
-		remove_variable = mission_success
-		remove_variable = player_backed_down
-		remove_variable = target_surrendered
-		remove_variable = reconciliation_achieved
-		remove_variable = time_expired
-		remove_variable = player_supporters_count
-		remove_variable = target_supporters_count
-		remove_variable = player_coalition_strength
-		remove_variable = target_coalition_strength
-		
-		# Clear supporter lists
-		clear_list = player_supporters_list
-		clear_list = target_supporters_list
-	}
-	
-	# Map colors for the situation mapmode
-	map_color = {
-		if = {
-			limit = {
-				# Highlight the target province in red
-				province = situation:claim_province_situation.var:target_province
-			}
-			value = rgb { 200 50 50 }  # Red for target province
-		}
-		else_if = {
-			limit = {
-				# Show player's territory in green
-				owner = situation:claim_province_situation.owner
-			}
-			value = rgb { 50 200 50 }  # Green for player territory
-		}
-		else_if = {
-			limit = {
-				# Show target country's territory in orange
-				owner = situation:claim_province_situation.var:target_country
-			}
-			value = rgb { 200 150 50 }  # Orange for target territory
-		}
+		if = { limit = { has_variable = situation_start_date } remove_variable = situation_start_date }
+		if = { limit = { has_variable = months_elapsed } remove_variable = months_elapsed }
+		if = { limit = { has_variable = target_country } remove_variable = target_country }
+		if = { limit = { has_variable = target_province } remove_variable = target_province }
+		if = { limit = { has_variable = mission_success } remove_variable = mission_success }
+		if = { limit = { has_variable = player_backed_down } remove_variable = player_backed_down }
+		if = { limit = { has_variable = target_surrendered } remove_variable = target_surrendered }
+		if = { limit = { has_variable = reconciliation_achieved } remove_variable = reconciliation_achieved }
+		if = { limit = { has_variable = time_expired } remove_variable = time_expired }
+		if = { limit = { has_variable = player_supporters_count } remove_variable = player_supporters_count }
+		if = { limit = { has_variable = target_supporters_count } remove_variable = target_supporters_count }
 	}
 	
 	# Tooltip for map
 	tooltip = {
 		if = {
 			limit = {
-				province = situation:claim_province_situation.var:target_province
+				has_variable = target_province
+				province = var:target_province
 			}
 			custom_tooltip = dynamic_missions.claim_province.target_province_tooltip
 		}
-	}
-	
-	# Legend entries for the mapmode
-	legend_key = {
-		color = rgb { 200 50 50 }
-		desc = dynamic_missions.claim_province.legend_target
-	}
-	
-	legend_key = {
-		color = rgb { 50 200 50 }
-		desc = dynamic_missions.claim_province.legend_player
-	}
-	
-	legend_key = {
-		color = rgb { 200 150 50 }
-		desc = dynamic_missions.claim_province.legend_target_country
 	}
 }
