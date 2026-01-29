@@ -1,0 +1,226 @@
+# types trade_overview_types
+# {
+# 	# TODO: Created a new type as this is used in two places, the texts and the icon for merchants, would have been nice to have an overridable block for both text and icon for the future.
+# 	type MerchantsToolTip = ContextualTooltipType {
+# 		blockoverride "title_icon" {
+# 			icon = {
+# 				using = tooltip_title_icon_size
+# 				texture = "gfx/interface/icons/flat_icons/merchant.dds"
+# 			}
+# 		}
+# 		blockoverride "title_text" {
+# 			text = "game_concept_markets"
+# 		}
+# 		blockoverride "tooltip_content" {
+# 			TooltipStringPairList = {
+# 				textcontext = "[TradeOverview.GetNonZeroMerchantsMarketsTooltip]"
+# 			}
+# 		}
+# 	}
+# }
+
+lateralview = {
+	name = "trade_overview"
+	widgetid = "trade_overview"
+
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "THE_ECONOMY_OVERVIEW_TITLE"
+			}
+			blockoverride "window_header_alt_color_texture"{
+				using = color_economy_texture
+			}
+		}
+	}
+	
+	blockoverride "panel_content" {
+		header_main_tabs = {
+			blockoverride "content" {
+				using = economy_main_tabs
+			}
+		}
+
+		vbox = {
+			widgetid = "markets_tab_content"
+			using = layoutpolicy_expanding
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+			spacing = 3
+			visible = "[TradeOverview.Vars.NotExistOrHasValue( 'subtab', 'markets' )]"
+
+			widget = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 45 }
+				hbox = {
+					subheader_unified_icon = {
+						datacontext = "[Player]"
+						tooltipwidget = {
+							using = trade_efficiency_modifier_tooltip
+						}
+						blockoverride "subheader_unified_icon_texture" {
+							texture = "gfx/interface/icons/flat_icons/trade_efficiency.dds"
+						}
+						blockoverride "subheader_unified_top_text" {
+							text = "game_concept_trade_efficiency"
+							align = nobaseline
+						}
+						blockoverride "subheader_unified_bottom_text" {
+							text = "[Player.GetModifierValueNoFormat('trade_efficiency')]"
+							align = nobaseline
+						}
+					}
+
+					expand = {}
+					
+					subheader_unified_icon = {
+						blockoverride "mirror_layout" { righttoleft = yes }
+						datacontext = "[Player]"
+						tooltipwidget = {
+							using = ProductionEfficiencyTooltip
+						}
+						blockoverride "subheader_unified_icon_texture" {
+							texture = "gfx/interface/icons/flat_icons/building_panel/production_efficiency.dds"
+						}
+						blockoverride "subheader_unified_top_text" {
+							text = "game_concept_production_efficiency"
+							align = nobaseline
+						}
+						blockoverride "subheader_unified_bottom_text" {
+							text = "[Player.GetModifierValueNoFormat('global_production_efficiency')]"
+							align = nobaseline
+						}
+					}
+				}
+				
+				AutomatedSection = {
+					datacontext = "[GetAutomatedSystemItem('trade')]"
+					
+					blockoverride "glow_anim_automation_visible" {
+						visible = "[AutomatedSystemsItem.IsEnabled]"
+					}
+				}
+			}
+
+			trade_summary = {
+				using = bg_age_event_frame
+			}
+
+			vbox = { #WINDOW DATA SPACE
+				using = layoutpolicy_expanding
+
+				vbox = {
+					using = layoutpolicy_expanding
+					using = bg_secondary_inner_alt
+
+					trade_overview_markets = {}
+				}
+			}
+		}
+
+		widget = {
+			visible = "[TradeOverview.Vars.HasValue( 'subtab', 'trades' )]"
+			using = layoutpolicy_expanding
+			widgetid = "trading_tab_content"
+
+			vbox = {
+				using = bg_main_inner_alt
+				using = bg_main_inner_image_alt
+				using = window_main_tabs_margin_alt
+				
+				blockoverride "image" {
+					texture = "gfx/interface/illustrations/bg/bg_markets.dds"
+				}
+
+				vbox = {
+					using = layoutpolicy_expanding
+					trade_overview_possible_trades = {}
+				}
+			}
+
+			AutomatedSection = {
+				datacontext = "[GetAutomatedSystemItem('trade')]"
+				
+				blockoverride "glow_anim_automation_visible" {
+					visible = "[AutomatedSystemsItem.IsEnabled]"
+				}
+			}
+		}
+	}
+}
+
+select_menu_left = {
+	datacontext = "[GetQuickVisibleMarkets(Player.Self)]"
+	blockoverride "menu_setup" {
+		name = "possible_trades_select_market"
+	}
+
+	blockoverride "close_button" {
+		onclick = "[PossibleTradesSelectMarket.OnClose]"
+	}
+
+	blockoverride "select_content" {
+		select_menu_header = {
+			blockoverride "select_menu_header_extra" {
+				button_checkbox_visibility = {
+					size = { 32 32 }
+					tooltipwidget = { 
+						LeftClickButtonTooltip = {
+							blockoverride "onclick_text" { text = "TOGGLE_INRANGE_MARKETS" }
+						}
+					}
+					checked = "[PossibleTradesSelectMarket.Parent.Vars.Exists( 'inrange_markets')]"
+					onclick = "[PossibleTradesSelectMarket.Parent.Vars.Toggle( 'inrange_markets')]"
+				}
+
+				text_single = {
+					using = Font_Type_Headers
+					using = Font_Size_Small
+					align = nobaseline
+					text = "INRANGE_MARKETS"
+				}
+			}
+		}
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 10
+
+			datamodel = "[QuickVisibleMarkets.GetVisibleMarkets]"
+			item = {
+				widget = {
+					size = { 485 70 }
+					visible = "[Or3(GreaterThan_CFixedPoint(Market.GetCountryPopulation(Player.Self),'(CFixedPoint)0'), GreaterThan_CFixedPoint(Market.GetTotalMerchantCapacity(Player.Self),'(CFixedPoint)0'), And(PossibleTradesSelectMarket.Parent.Vars.Exists( 'inrange_markets'), IsMarketInRange(Market.Self)))]"
+					
+					hbox = {
+						using = bg_market_card
+						using = bg_cabinet_card_frame
+
+						market_card = {
+							blockoverride "market_card_title_action"{
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									title = "TOGGLE_MARKET_SELECTION"
+									on_action = "[PossibleTradesSelectMarket.Parent.FilterByMarket(Market.Self)]"
+								}
+			
+								action_tooltip = {
+									click_type = right
+									click_mode = single
+			
+									cursor = "market_menu"
+									title = "CLICK_ACTION_MARKET_CONTEXT_MENU"
+									on_action = "[PdxGuiWidget.ToggleContextMenu]"
+								}
+			
+								onmousehierarchyenter = "[PdxGuiWidget.SetHighlightMarket(Market.Self)]"
+								ondoubleclick = "[PanToLocation(Market.GetCenterLocation)]"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

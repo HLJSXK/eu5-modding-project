@@ -1,0 +1,591 @@
+﻿namespace = flavor_csu
+
+#Distribution of Panaqas
+flavor_csu.100 = {
+	type = country_event
+
+	title = flavor_csu.100.title
+	desc = flavor_csu.100.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	trigger = {
+		modifier:has_panaqas = yes
+	}
+	option = {
+		name = flavor_csu.100.a
+		custom_tooltip = {
+			text = add_panaqas_to_every_location_tt
+			every_owned_location = {
+				limit = { NOT = { has_building = building_type:panaqa_building } }
+				change_building_level_in_location = {
+					building = building_type:panaqa_building
+					value = 1
+				}
+			}
+		}
+	}
+}
+
+flavor_csu.200 = { #The Best aqha in the Andes
+	type = country_event
+	title = flavor_csu.200.title
+	desc = flavor_csu.200.desc
+	
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = CSU
+		from = 1340.1.1
+		to = 1360.1.1
+		monthly_chance = 5
+	}
+	
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	trigger = { #Ayamarca exists, the poisoner is alive and married to the ruler
+		country_exists = c:AYA
+		character:csu_cusi_chimbo = { 
+			is_alive = yes 
+			first_spouse = ROOT.ruler
+		}
+		has_ruler = yes
+	}
+	
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		character:csu_cusi_chimbo ?= {
+			save_scope_as = concubine_poisoner
+		}
+		ruler ?= { save_scope_as = target_character }
+	}
+
+	after = {
+		hidden_effect = {
+			scope:target_character = {
+				if = {
+					limit = {
+						is_alive = yes
+						num_of_traits_of_category = { type = ruler value > 3 }
+					}
+					remove_traits_of_category = ruler
+					add_trait = trait:drunkard
+					add_trait = trait:bold_fighter
+					add_trait = trait:calm
+				}
+			}
+		}
+	}
+
+	option = { #Drink
+		name = flavor_csu.200.a
+		historical_option = yes
+		
+		add_prestige = prestige_weak_bonus
+		random_list = {
+			50 = { #Poison!
+				custom_tooltip = { 
+					text =  flavor_csu.201.tt.a
+					trigger_event_silently = { id = flavor_csu.201 } 
+				}
+			}
+			
+			50 = { #Delicious!
+				scope:target_character = { 
+					#Remove non compatible traits
+					if = { 
+						limit = { has_trait = craven }
+						remove_trait = trait:craven 
+					}
+					if = { 
+						limit = { has_trait = careful }
+						remove_trait = trait:careful 
+					}
+					if = { 
+						limit = { has_trait = zealot }
+						remove_trait = trait:zealot 
+					}
+					if = { 
+						limit = { has_trait = pious }
+						remove_trait = trait:pious 
+					}
+					if = { 
+						limit = { has_trait = entrepreneur }
+						remove_trait = trait:entrepreneur 
+					}
+					#Add new traits if there is space for them
+					if = {
+						limit = { num_of_traits_of_category = { type = ruler value < 3 } }
+						add_trait = trait:drunkard
+					}
+					if = {
+						limit = { num_of_traits_of_category = { type = ruler value < 3 } }
+						add_trait = trait:bold_fighter
+					}
+					if = {
+						limit = { num_of_traits_of_category = { type = ruler value < 3 } }
+						add_trait = trait:calm
+					}
+				}
+			}
+		}
+	}
+	
+	option = { #Expel the poisoner
+		name = flavor_csu.200.b
+		scope:target_character = { 
+			divorce_character = scope:concubine_poisoner
+			if = { #Improve the ruler
+				limit = {has_trait = loose_lips}
+				remove_trait = trait:loose_lips 
+			}
+			else = {
+				add_trait = trait:secretive 
+			}
+		}
+		scope:concubine_poisoner = { move_country = c:AYA }
+		c:AYA = {
+			add_opinion = { target = root modifier = opinion_backward_monarch }
+		}
+	}
+	
+	option = { #Character trait option, is a better option
+		name = flavor_csu.200.c
+		trigger = {	
+			scope:target_character ?= { 
+				OR = {
+					has_trait = intricate_web_weaver
+					has_trait = secretive
+				}
+			} 
+		}
+		add_prestige = prestige_weak_bonus
+		custom_tooltip = flavor_csu.200.tt.c
+		kill_character = scope:concubine_poisoner	
+	}
+
+}
+
+flavor_csu.201 = { #Betrayal!
+	type = country_event
+	
+	title = flavor_csu.201.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					character:csu_inka_roqa ?= { is_alive = yes }
+				}
+				desc = flavor_csu.201.desc.a
+			}
+			triggered_desc = {
+				desc = flavor_csu.201.desc.b
+			}
+		}
+	}
+
+	trigger = {
+		exists = ruler
+	}
+	
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		character:csu_cusi_chimbo ?= {
+			save_scope_as = concubine_poisoner
+		}
+		character:csu_inka_roqa ?= {
+			save_scope_as = usurper_inka
+		}
+		heir ?= {
+			save_scope_as = old_heir
+		}
+		ruler = {
+			save_scope_as = qusqu_ruler
+			kill_character = this
+		}
+		create_rebel = {
+			category = pretender
+			save_scope_as = inka_roca_coup
+			name = hanan_qusqu_rebels
+		}
+	}
+
+	option = { #Accept the coup
+		name = flavor_csu.201.a
+		historical_option = yes
+		trigger = {	
+			scope:usurper_inka ?= { is_alive = yes }
+		}
+		set_new_ruler = scope:usurper_inka
+		trigger_event_silently = { id = flavor_csu.202 } 
+	}
+
+	option = {#Side with the current Heir, if there is one. Rebellion imminent!
+		name = flavor_csu.201.b
+		trigger = {	
+			scope:usurper_inka ?= { is_alive = yes }
+			scope:old_heir ?= { is_alive = yes }
+		}
+		scope:usurper_inka = {
+			change_character_allegiance = scope:inka_roca_coup
+		}
+
+		ordered_owned_location = {
+			order_by = population
+			max = 2
+			limit = {
+				any_pop = {
+					rebel != scope:inka_roca_coup
+				}
+			}
+			every_pop = {
+				limit = {
+					owner = root
+					rebel != scope:inka_roca_coup
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:inka_roca_coup
+			}
+		}
+		scope:inka_roca_coup = {
+			add_rebel_progress = 0.90
+		}
+		add_stability = stability_mild_penalty
+		add_legitimacy = legitimacy_severe_bonus
+	}
+
+	option = { #No coup, expel the poisoner
+		name = flavor_csu.201.c
+		trigger = {	
+			scope:usurper_inka ?= { is_alive = no }
+		}
+		add_legitimacy = legitimacy_weak_penalty
+		scope:concubine_poisoner = { move_country = c:AYA }
+		c:AYA = {
+			add_opinion = { target = root modifier = opinion_backward_monarch }
+		}
+		
+	}
+
+	option = { #No coup, kill the poisoner, posible war
+		name = flavor_csu.201.d
+		trigger = {	
+			scope:usurper_inka ?= { is_alive = no }
+		}
+		add_legitimacy = legitimacy_mild_bonus
+		kill_character = scope:concubine_poisoner
+		c:AYA = {
+			add_opinion = { target = root modifier = opinion_angry }
+			add_casus_belli = { target = c:CSU type = casus_belli:cb_claim_throne}
+		}
+		
+	}
+	
+
+}
+
+flavor_csu.202 = { #The Aftermath
+	type = country_event
+	
+	title = flavor_csu.202.title
+	desc = flavor_csu.202.desc
+	
+	trigger = { #The Hurin Qusqu still exist
+		dynasty:hurin_qusqu_dynasty ?= {
+			any_character_in_dynasty = {
+				count > 0 
+			}
+		}
+		#The ruler is not Hurin Qusqu
+		ruler = {
+			not = {dynasty = dynasty:hurin_qusqu_dynasty}
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		dynasty:hurin_qusqu_dynasty ?= {
+			dynasty_head ?= { 
+				save_scope_as = dyn_head
+			}
+		}
+		random_neighbor_country = {
+			save_scope_as = neighbor_country
+		}
+	}
+
+	option = { #Religious dynasty
+		name = flavor_csu.202.a
+		historical_option = yes
+		
+		set_variable = enable_hurin_qusqu_privilege_variable
+		grant_estate_privilege = estate_privilege:hurin_qusqu_privilege
+		add_legitimacy = legitimacy_weak_bonus	
+		add_stability = stability_severe_bonus
+	}
+
+	option = { #Expel them
+		name = flavor_csu.202.b
+		trigger = {	
+			scope:usurper_inka ?= { is_alive = yes }
+			scope:old_heir ?= { is_alive = yes }
+		}
+		dynasty:hurin_qusqu_dynasty = {
+			every_character_in_dynasty = {
+				limit = {
+					owner = root
+				}
+				move_country = scope:neighbor_country
+			}
+		}
+		
+		add_legitimacy = legitimacy_weak_penalty
+		add_stability = stability_severe_penalty
+		change_gold_effect = { scale = 7 }
+	}
+	option = { #Kill Them!
+		name = flavor_csu.202.c
+
+		trigger = {	
+			ruler = { 
+				OR = {
+					has_trait = cruel
+					has_trait = malevolent
+				}
+			} 
+		}
+		dynasty:hurin_qusqu_dynasty = {
+			every_character_in_dynasty = {
+				limit = {
+					owner = root
+				}
+				kill_character = this
+			}
+		}
+		add_legitimacy = legitimacy_weak_bonus	
+		add_stability = stability_weak_penalty
+		change_gold_effect = { scale = 10 }
+	}
+}
+
+
+flavor_csu.210 = { #A Devious Plan
+	type = country_event
+	title = flavor_csu.210.title
+	desc = flavor_csu.210.desc
+	
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = AYA
+		from = 1350.1.1
+		to = 1400.1.1
+		monthly_chance = 5
+	}
+	
+	trigger = { #Qusqu exists, and hates Ayarmaca. Heir is alive and a kid
+		country_exists = c:CSU
+		c:CSU = {
+			opinion = {
+				target = root
+				value <= 25 
+			}
+			heir ?= {
+				is_alive = yes
+				is_adult = no
+				age_in_years <= 15 
+			}
+		}
+		#There is at least a cabinet member
+		any_cabinet_character = {
+			count > 0
+		}
+	}
+	
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		random_cabinet_character = {
+			save_scope_as = minister
+		}
+		c:CSU = {
+			heir ?= {
+				save_scope_as = kidnapped_heir
+			}
+		}
+	}
+
+	option = { #Kidnap
+		name = flavor_csu.210.a
+		historical_option = yes
+		c:CSU = {
+			heir ?= {
+				move_country = root
+			}
+			trigger_event_silently = { id = flavor_csu.211 days = 5 }
+			add_opinion = { target = root modifier = opinion_angry }
+		}
+		add_legitimacy = legitimacy_weak_penalty
+		
+	}
+	
+	option = { #Reject the plan
+		name = flavor_csu.210.b
+		
+		remove_from_cabinet = scope:minister
+		add_legitimacy = legitimacy_mild_bonus
+	}
+	
+}
+
+flavor_csu.211 = { #Kidnapped Heir
+	type = country_event
+	title = flavor_csu.211.title
+	desc = flavor_csu.211.desc
+	
+	fire_only_once = yes
+		
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		heir ?= {
+			save_scope_as = kidnapped_heir
+		}
+	}
+
+	option = { #Pay
+		name = flavor_csu.211.a
+		change_gold_effect = { scale = -5 }
+
+		c:AYA = {
+			trigger_event_silently = { id = flavor_csu.212 days = 5 }
+		}
+		add_prestige = prestige_severe_penalty
+		
+	}
+	
+	option = { #Ignore them
+		name = flavor_csu.211.b
+		historical_option = yes
+		
+		add_prestige = prestige_mild_penalty
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_penalty }
+		add_legitimacy = legitimacy_weak_penalty
+		c:AYA = {
+			trigger_event_silently = { id = flavor_csu.213 days = 5 }
+		}
+	}
+	
+}
+
+flavor_csu.212 = { #They Payed
+	hide_portraits = yes
+	type = country_event
+	title = flavor_csu.212.title
+	desc = flavor_csu.212.desc
+	
+	fire_only_once = yes
+		
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		c:CSU = {
+			heir ?= {
+				save_scope_as = kidnapped_heir
+			}
+		}
+	}
+
+	option = { #Accept
+		name = flavor_csu.212.a
+		c:CSU = {
+			heir ?= {
+				move_country = c:CSU
+			}
+		}
+		add_gold = { value = c:CSU.monthly_income_trade_and_tax multiply = 5 }
+		add_prestige = prestige_weak_penalty
+		
+	}	
+
+	option = { #Keep both
+		name = flavor_csu.212.b
+		add_prestige = prestige_extreme_penalty
+		add_gold = { value = c:CSU.monthly_income_trade_and_tax multiply = 5 }
+		trigger_event_silently = { id = flavor_csu.212 days = {50 300} }
+		c:CSU = {
+			add_opinion = { target = root modifier = opinion_angry }
+			add_casus_belli = { target = c:AYA type = casus_belli:cb_insulted_us}
+		}
+	}	
+}
+
+flavor_csu.213 = { #The Evil Child
+	type = country_event
+	title = flavor_csu.213.title
+	desc = flavor_csu.213.desc
+	
+	fire_only_once = yes
+		
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		c:CSU = {
+			heir ?= {
+				save_scope_as = kidnapped_heir
+			}
+		}
+	}
+
+	option = { #Accept
+		name = flavor_csu.213.a
+		c:CSU = {
+			heir ?= {
+				move_country = c:CSU
+			}
+		}
+		add_prestige = prestige_severe_penalty
+		add_stability = stability_mild_bonus
+		
+	}
+
+	option = { #reject
+		name = flavor_csu.213.b
+		add_prestige = prestige_weak_penalty
+		add_stability = stability_severe_penalty
+	}	
+}

@@ -1,0 +1,1386 @@
+﻿namespace = french_wars_religion
+
+#French Wars of Religion related Events
+
+french_wars_religion.1 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.1.title
+	desc = french_wars_religion.1.desc
+	historical_info = french_wars_religion.1.historical_info
+	image = "gfx/interface/illustrations/disaster/french_wars_of_religion.dds"
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+		if = {
+			limit = {
+				NOT = { religion = religion:lutheran }
+				religion_percentage_in_country = {
+					religion = religion:lutheran
+					value > 0
+				}
+			}
+			create_rebel = {
+				category = religious
+				name = lutheran_huguenots
+				culture = root.culture
+				religion = religion:lutheran
+				save_scope_as = target_lutheran_rebel
+				root = {
+					set_variable = {
+						name = lutheran_rebel_variable
+						value = prev
+					}
+				}
+			}
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:lutheran
+				}
+				add_pop_satisfaction = pop_satisfaction_radical_penalty
+				change_pop_allegiance = scope:target_lutheran_rebel
+			}
+		}
+		if = {
+			limit = {
+				NOT = {
+					religion = religion:calvinist
+				}
+				religion_percentage_in_country = {
+					religion = religion:calvinist
+					value > 0
+				}
+			}
+			create_rebel = {
+				category = religious
+				name = calvinist_huguenots
+				culture = root.culture
+				religion = religion:calvinist
+				save_scope_as = target_calvinist_rebel
+				root = {
+					set_variable = {
+						name = calvinist_rebel_variable
+						value = prev
+					}
+				}
+			}
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:calvinist
+				}
+				add_pop_satisfaction = pop_satisfaction_radical_penalty
+				change_pop_allegiance = scope:target_calvinist_rebel
+			}
+		}
+		if = {
+			limit = {
+				NOT = {
+					religion = religion:catholic
+				}
+				religion_percentage_in_country = {
+					religion = religion:catholic
+					value > 0
+				}
+			}
+			create_rebel = {
+				category = religious
+				name = catholic_huguenots
+				culture = root.culture
+				religion = religion:catholic
+				save_scope_as = target_catholic_rebel
+				root = {
+					set_variable = {
+						name = catholic_rebel_variable
+						value = prev
+					}
+				}
+			}
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				add_pop_satisfaction = pop_satisfaction_radical_penalty
+				change_pop_allegiance = scope:target_catholic_rebel
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.1.a
+
+		if = {
+			limit = { has_variable = lutheran_rebel_variable }
+			custom_tooltip = fra_lutheran_rebels_explanation_tt
+		}
+		if = {
+			limit = { has_variable = calvinist_rebel_variable }
+			custom_tooltip = fra_calvinist_rebels_explanation_tt
+		}
+		if = {
+			limit = { has_variable = catholic_rebel_variable }
+			custom_tooltip = fra_catholic_rebels_explanation_tt
+		}
+
+		add_stability = stability_ultimate_penalty
+	}
+}
+
+french_wars_religion.2 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.2.title
+	desc = french_wars_religion.2.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	trigger = {
+		NOT = { has_variable = recent_event_expulsion_variable }
+		any_pop = {
+			religion.group = religion_group:christian
+			NOT = { religion = root.religion }
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = recent_event_expulsion_variable
+			years = 1
+		}
+		ordered_pop = {
+			limit = {
+				religion.group = religion_group:christian
+				NOT = { religion = root.religion }
+			}
+			order_by = {
+				value = pop_size
+				if = {
+					limit = { pop_satisfaction <= 0 }
+					divide = 0.05
+				}
+				else = { divide = pop_satisfaction }
+			}
+			position = 1
+			check_range_bounds = no
+			save_scope_as = target_migrants
+			location = {
+				save_scope_as = target_location
+				province = { save_scope_as = target_province_start }
+				province_definition = { save_scope_as = target_province_definition }
+			}
+			religion = { save_scope_as = target_religion }
+		}
+		set_variable = {
+			name = migrant_pop_size_variable
+			value = scope:target_migrants.pop_size
+			years = 1
+		}
+		scope:target_religion = {
+			random_country_in_religion = {
+				limit = {
+					this != root
+					num_of_non_rural >= 5
+					capital.continent = root.capital.continent
+					any_province = {
+						NOT = { province_definition = scope:target_province_definition }
+					}
+				}
+				save_scope_as = target_country
+				ordered_province = {
+					limit = {
+						NOT = { province_definition = scope:target_province_definition }
+					}
+					order_by = province_religious_unity
+					max = 1
+					save_scope_as = target_province_finish
+					random_location_in_province = { save_scope_as = target_province_goal }
+				}
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.2.a
+
+		add_migration = {
+			owner = root
+			from = scope:target_location.province_definition
+			to = scope:target_province_finish.province_definition
+			religion = religion:lutheran
+			amount = {
+				value = {
+					value = var:migrant_pop_size_variable
+					multiply = 0.03
+				}
+			}
+			months = 10
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_extreme_bonus
+		}
+	}
+
+	option = {
+		name = french_wars_religion.2.b
+
+		custom_tooltip = {
+			text = pops_of_target_religion_in_target_province_25_sat_tt
+			scope:target_province_start = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							religion = scope:target_religion
+						}
+						add_pop_satisfaction = pop_satisfaction_extreme_bonus
+					}
+				}
+			}
+		}
+
+		add_stability = stability_weak_penalty
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_right
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+	}
+
+	option = {
+		name = french_wars_religion.2.c
+
+		scope:target_migrants = {
+			split_pop = {
+				fraction = 0.1
+				religion = root.religion
+			}
+		}
+
+		custom_tooltip = {
+			text = pops_of_target_religion_in_target_province_lose_15_sat_tt
+			scope:target_province_start = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							religion = scope:target_religion
+						}
+						add_pop_satisfaction = pop_satisfaction_severe_penalty
+					}
+				}
+			}
+		}
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_left
+		}
+
+		add_stability = stability_mild_bonus
+	}
+}
+
+french_wars_religion.3 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.3.title
+	desc = french_wars_religion.3.desc
+	fire_only_once = yes
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	trigger = {
+		any_cabinet_character = {
+			is_adult = yes
+			is_ruler = no
+			is_regent = no
+			is_heir = no
+			religion = root.religion
+			has_estate = estate_type:clergy_estate
+		}
+	}
+
+	immediate = {
+		ordered_cabinet_character = {
+			limit = {
+				is_adult = yes
+				is_ruler = no
+				is_regent = no
+				is_heir = no
+				religion = root.religion
+				has_estate = estate_type:clergy_estate
+			}
+			order_by = total_abilities
+			max = 1
+			check_range_bounds = no
+			save_scope_as = target_character
+		}
+		capital = {
+			save_scope_as = target_location
+		}
+	}
+
+	option = {
+		name = french_wars_religion.3.a
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_huge_move_to_left
+		}
+		add_country_modifier = {
+			modifier = fra_religious_league_modifier
+			years = 10
+		}
+		if = {
+			limit = {
+				NOT = {
+					any_cabinet_character = { modifier:is_head_of_cabinet = yes }
+				}
+			}
+			scope:target_character = {
+				add_character_modifier = { modifier = head_of_the_cabinet_modifier days = -1 mode = add_and_extend }
+				hidden_effect = { set_variable = head_of_the_league_variable }
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.3.b
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_left
+		}
+	}
+
+	option = {
+		name = french_wars_religion.3.c
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_large_move_to_right
+		}
+		add_stability = stability_extreme_penalty
+	}
+}
+
+french_wars_religion.4 = {	#Paris is worth a Mass
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.4.title
+	desc = french_wars_religion.4.desc
+	fire_only_once = yes
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+	historical_info = french_wars_religion.4.historical_info
+	trigger = {
+		OR = {
+			capital.province = {
+				religion_percentage = {
+					religion = root.religion
+					value <= 0.75
+				}
+			}
+			societal_value:spiritualist_vs_humanist > 33
+		}
+	}
+
+	immediate = {
+		capital = {
+			save_scope_as = target_location
+			province = { save_scope_as = target_province }
+		}
+		ruler_or_regent = { save_scope_as = target_character }
+
+	}
+
+	option = {	#[target_location.GetName] is worth a mass.
+		name = french_wars_religion.4.a
+
+		historical_option = yes
+
+		custom_tooltip = {
+			text = pops_target_province_gain_sat_based_on_religion_a_tt
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							NOT = { religion = root.religion }
+							religion.group = religion_group:christian
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+					}
+					every_pop = {
+						limit = {
+							owner = root
+							religion = root.religion
+						}
+						add_pop_satisfaction = pop_satisfaction_extreme_penalty
+					}
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				scope:target_character = {
+					NOT = { religion = root.religion }
+				}
+			}
+			scope:target_character = { change_character_religion = root.religion }
+		}
+		if = {
+			limit = {
+				scope:target_character = { has_trait = zealot }
+			}
+			scope:target_character = {
+				remove_trait = trait:zealot
+				if = {
+					limit = {
+						NOT = { has_trait = tolerant }
+					}
+					add_trait = trait:tolerant
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target_character = {
+					num_of_traits < 3
+					NOT = { has_trait = tolerant }
+				}
+			}
+			scope:target_character = { add_trait = trait:tolerant }
+		}
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_large_move_to_right
+		}
+
+		add_stability = stability_mild_penalty
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+	}
+
+	option = {	#Let us hope it is.
+		name = french_wars_religion.4.b
+
+		custom_tooltip = {
+			text = pops_target_province_gain_sat_based_on_religion_b_tt
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							NOT = { religion = root.religion }
+							religion.group = religion_group:christian
+						}
+						add_pop_satisfaction = pop_satisfaction_extreme_bonus
+					}
+					every_pop = {
+						limit = {
+							owner = root
+							religion = root.religion
+						}
+						add_pop_satisfaction = pop_satisfaction_mild_penalty
+					}
+				}
+			}
+		}
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_right
+		}
+	}
+
+	option = {	#Never! The heretics will fall by the sword!
+		name = french_wars_religion.4.c
+
+		custom_tooltip = {
+			text = pops_target_province_gain_sat_based_on_religion_c_tt
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							NOT = { religion = root.religion }
+							religion.group = religion_group:christian
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					}
+					every_pop = {
+						limit = {
+							owner = root
+							religion = root.religion
+						}
+						add_pop_satisfaction = pop_satisfaction_extreme_bonus
+					}
+				}
+			}
+		}
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_huge_move_to_left
+		}
+	}
+}
+
+french_wars_religion.5 = {	#Massacre in Province
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.5.title
+	desc = french_wars_religion.5.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+	trigger = {
+		OR = {
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				religion_percentage_in_country = {
+					religion = religion:catholic
+					value > 0
+				}
+			}
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:lutheran }
+				}
+				religion_percentage_in_country = {
+					religion = religion:lutheran
+					value > 0
+				}
+			}
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:calvinist }
+				}
+				religion_percentage_in_country = {
+					religion = religion:calvinist
+					value > 0
+				}
+			}
+		}
+	}
+
+	immediate = {
+		random_province = {
+			limit = {
+				continent = root.capital.continent
+				OR = {
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:catholic }
+						}
+						religion_percentage = {
+							religion = religion:catholic
+							value > 0
+						}
+					}
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:lutheran }
+						}
+						religion_percentage = {
+							religion = religion:lutheran
+							value > 0
+						}
+					}
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:calvinist }
+						}
+						religion_percentage = {
+							religion = religion:calvinist
+							value > 0
+						}
+					}
+				}
+			}
+			save_scope_as = target_province
+		}
+		scope:target_province = {
+			random_location_in_province = {
+				limit = {
+					any_pop = {
+						owner = root
+						NOT = { religion = root.religion }
+						OR = {
+							religion = religion:calvinist
+							religion = religion:lutheran
+							religion = religion:catholic
+						}
+					}
+				}
+				random_pop = {
+					limit = {
+						owner = root
+						NOT = { religion = root.religion }
+						OR = {
+							religion = religion:calvinist
+							religion = religion:lutheran
+							religion = religion:catholic
+						}
+					}
+					save_scope_as = target_pop
+				}
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.5.a
+
+		scope:target_pop = {
+			add_pop_size = {
+				value = pop_size
+				multiply = -0.05
+			}
+			add_pop_satisfaction = pop_satisfaction_mild_penalty
+		}
+	}
+
+	option = {
+		name = french_wars_religion.5.b
+
+		scope:target_pop = {
+			add_pop_size = {
+				value = pop_size
+				multiply = -0.05
+			}
+		}
+
+		add_government_power = government_power_weak_penalty
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_minor_move_to_right
+		}
+	}
+}
+
+french_wars_religion.6 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.6.title
+	desc = french_wars_religion.6.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+	historical_info = french_wars_religion.6.historical_info
+	trigger = {
+		has_country_modifier = fra_religious_league_modifier
+		OR = {
+			heretic_population_fraction > 0.2
+			societal_value:spiritualist_vs_humanist > -10
+			modifier:tolerance_heretic > 0
+		}
+	}
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+		capital = {
+			save_scope_as = target_location
+			province = { save_scope_as = target_province }
+		}
+		if = {
+			limit = {
+				any_cabinet_character = { has_variable = head_of_the_league_variable }
+			}
+			random_cabinet_character = {
+				limit = { has_variable = head_of_the_league_variable }
+				save_scope_as = target_character2
+			}
+		}
+		else_if = {
+			ordered_character = {
+				limit = {
+					has_estate = estate_type:clergy_estate
+					is_ruler = no
+					is_regent = no
+				}
+				order_by = total_abilities
+				max = 1
+				check_range_bounds = no
+				save_scope_as = target_character2
+			}
+		}
+		else = {
+			random_character = {
+				limit = {
+					is_ruler = no
+					is_regent = no
+				}
+				save_scope_as = target_character2
+			}
+		}
+	}
+
+	option = {	#Ban the League and move troops to Paris
+		name = french_wars_religion.6.a
+		historical_option = yes
+
+
+		custom_tooltip = {
+			text = every_pop_cap_province_true_faith_loses_25_sat_tt
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							religion = root.religion
+						}
+						add_pop_satisfaction = pop_satisfaction_extreme_penalty
+					}
+				}
+			}
+		}
+
+		custom_tooltip = {
+			text = may_lead_to_target_character_assassination_tt
+			random_list = {
+				3400 = {
+					trigger_event_non_silently = french_wars_religion.7
+				}
+				66 = { }
+			}
+		}
+
+		add_stability = stability_mild_penalty
+	}
+
+	option = {	#Flee the City
+		name = french_wars_religion.6.b
+
+		add_country_modifier = {
+			modifier = fra_religious_league_consolidated_modifier
+			mode = add_and_extend
+			years = 5
+		}
+		add_government_power = government_power_ultimate_penalty
+	}
+}
+
+french_wars_religion.7 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.7.title
+	desc = french_wars_religion.7.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	option = {
+		name = french_wars_religion.7.a
+
+		kill_character = {
+			target = ruler_or_regent
+			reason = assassination
+			killer = ruler
+		}
+		add_stability = stability_ultimate_penalty
+	}
+}
+
+scripted_trigger eligible_french_spouce = {
+	is_alive = yes
+	is_adult = yes
+	has_available_marriage_slot = yes
+	NOT = { is_same_gender = scope:target_character }
+	NOT = { is_close_relative = scope:target_character }
+	modifier:blocked_from_character_interactions = no
+	OR = {
+		trigger_if = {
+			limit = {
+				NOT = { scope:target_character.religion = religion:calvinist }
+			}
+			religion = religion:calvinist
+		}
+		trigger_if = {
+			limit = {
+				NOT = { scope:target_character.religion = religion:lutheran }
+			}
+			religion = religion:lutheran
+		}
+		trigger_if = {
+			limit = {
+				NOT = { scope:target_character.religion = religion:catholic }
+			}
+			religion = religion:catholic
+		}
+	}
+}
+
+french_wars_religion.8 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.8.title
+	desc = french_wars_religion.8.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	trigger = {
+		ruler_or_regent = {
+			is_married = no
+			is_female = no
+		}
+		societal_value:spiritualist_vs_humanist > -10
+		ruler_or_regent ?= {
+			NOT = { has_variable = head_of_the_league_variable }
+		}
+	}
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+
+		if = {
+			limit = {
+				any_character = { eligible_french_spouce = yes }
+			}
+			random_character = {
+				limit = { eligible_french_spouce = yes }
+				save_scope_as = target_character2
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:target_character.religion = religion:catholic }
+				random_list = {
+					50 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:calvinist
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+					50 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:lutheran
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+				}
+			}
+			else_if = {
+				limit = { scope:target_character.religion = religion:lutheran }
+				random_list = {
+					25 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:calvinist
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+					75 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:catholic
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+				}
+			}
+			else = {
+				random_list = {
+					25 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:lutheran
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+					75 = {
+						create_character = {
+							age = { 18 30 }
+							religion = religion:catholic
+							female = yes
+							save_scope_as = target_character2
+						}
+					}
+				}
+			}
+		}
+		scope:target_character2.religion = { save_scope_as = target_religion }
+	}
+
+	option = {
+		name = french_wars_religion.8.a
+
+
+		scope:target_character = { marry_character = scope:target_character2 }
+		custom_tooltip = {
+			text = this_may_lead_to_massacre_tt
+			random_list = {
+				90 = { trigger_event_non_silently = french_wars_religion.9 }
+				10 = { }
+			}
+		}
+		add_stability = stability_severe_penalty
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_large_move_to_right
+		}
+	}
+
+	option = {
+		name = french_wars_religion.8.b
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_left
+		}
+	}
+}
+
+french_wars_religion.9 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.9.title
+	desc = french_wars_religion.9.desc
+	historical_info = french_wars_religion.9.historical_info
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	option = {
+		name = french_wars_religion.9.a
+
+		ordered_pop = {
+			limit = {
+				NOT = { religion = root.religion }
+				OR = {
+					religion = religion:catholic
+					religion = religion:calvinist
+					religion = religion:lutheran
+				}
+			}
+			order_by = pop_size
+			max = {
+				value = root.num_provinces
+				divide = 20
+			}
+			add_pop_size = {
+				value = pop_size
+				multiply = { -0.25 -0.05 }
+			}
+		}
+
+		ordered_pop = {
+			limit = {
+				NOT = { religion = root.religion }
+				OR = {
+					religion = religion:catholic
+					religion = religion:calvinist
+					religion = religion:lutheran
+				}
+				is_upper_class = yes
+			}
+			order_by = pop_size
+			max = {
+				value = root.num_provinces
+				divide = 25
+			}
+			add_pop_size = {
+				value = pop_size
+				multiply = { -0.25 -0.05 }
+			}
+		}
+
+		add_stability = stability_severe_penalty
+	}
+}
+
+french_wars_religion.10 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.10.title
+	desc = french_wars_religion.10.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+	}
+
+	option = {
+		name = french_wars_religion.10.a
+
+		set_parliament_location = capital
+		set_parliament_active = yes
+		set_parliament_issue = parliament_issue:edict_of_nantes_issue
+	}
+}
+
+french_wars_religion.11 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.11.title
+	desc = french_wars_religion.11.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	trigger = {
+		OR = {
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				religion_percentage_in_country = {
+					religion = religion:catholic
+					value > 0
+				}
+			}
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:lutheran }
+				}
+				religion_percentage_in_country = {
+					religion = religion:lutheran
+					value > 0
+				}
+			}
+			trigger_if = {
+				limit = {
+					NOT = { religion = religion:calvinist }
+				}
+				religion_percentage_in_country = {
+					religion = religion:calvinist
+					value > 0
+				}
+			}
+		}
+	}
+
+	immediate = {
+		ordered_pop = {
+			limit = {
+				owner = root
+				NOT = {
+					location = { has_location_modifier = entrenched_heretic_location_modifier }
+				}
+				OR = {
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:calvinist }
+						}
+						religion = religion:calvinist
+					}
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:lutheran }
+						}
+						religion = religion:lutheran
+					}
+					trigger_if = {
+						limit = {
+							NOT = { root.religion = religion:catholic }
+						}
+						religion = religion:catholic
+					}
+				}
+			}
+			order_by = {
+				value = pop_size
+				if = {
+					limit = {
+						location = { has_location_modifier = entrenched_heretic_location_modifier }
+					}
+					multiply = 0.1
+				}
+			}
+			check_range_bounds = no
+			save_scope_as = target_heretic_pop
+			location = {
+				save_scope_as = target_location
+				province = { save_scope_as = target_province }
+			}
+			religion = { save_scope_as = target_religion }
+		}
+		if = {
+			limit = {
+				any_rebel = {
+					var:lutheran_rebel_variable = this
+				}
+			}
+			random_rebel = {
+				limit = { var:lutheran_rebel_variable = this }
+				save_scope_as = target_rebel_1
+			}
+		}
+		if = {
+			limit = {
+				any_rebel = {
+					var:calvinist_rebel_variable = this
+				}
+			}
+			random_rebel = {
+				limit = { var:calvinist_rebel_variable = this }
+				save_scope_as = target_rebel_2
+			}
+		}
+		if = {
+			limit = {
+				any_rebel = {
+					var:catholic_rebel_variable = this
+				}
+			}
+			random_rebel = {
+				limit = { var:catholic_rebel_variable = this }
+				save_scope_as = target_rebel_3
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.11.a
+
+		
+		custom_tooltip = {
+			text = french_wars_religion.11.a.tt
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+							religion = root.religion
+						}
+						random_list = {
+							10 = {}
+							40 = {
+								split_pop = {
+									fraction = 0.03
+									religion = scope:target_religion
+								}
+							}
+							20 = {
+								split_pop = {
+									fraction = 0.05
+									religion = scope:target_religion
+								}
+							}
+							15 = {
+								split_pop = {
+									fraction = 0.10
+									religion = scope:target_religion
+								}
+							}
+							10 = {
+								split_pop = {
+									fraction = 0.15
+									religion = scope:target_religion
+								}
+							}
+							4 = {
+								split_pop = {
+									fraction = 0.20
+									religion = scope:target_religion
+								}
+							}
+							1 = {
+								split_pop = {
+									fraction = 0.25
+									religion = scope:target_religion
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		scope:target_location = {
+			if = {
+				limit = {
+					NOT = { has_location_modifier = entrenched_heretic_location_modifier }
+				}
+				add_location_modifier = {
+					modifier = entrenched_heretic_location_modifier
+					years = 5
+					mode = add_and_extend
+				}
+			}
+			else = {
+				add_location_modifier = {
+					modifier = entrenched_heretic_location_modifier
+					years = 2
+					mode = extend
+				}
+			}
+		}
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_minor_move_to_right
+		}
+	}
+
+	option = {
+		name = french_wars_religion.11.b
+
+		if = {
+			limit = { exists = scope:target_rebel_1 }
+			scope:target_rebel_1 = {
+				add_rebel_progress = 0.05
+			}
+		}
+		if = {
+			limit = { exists = scope:target_rebel_2 }
+			scope:target_rebel_2 = {
+				add_rebel_progress = 0.05
+			}
+		}
+		if = {
+			limit = { exists = scope:target_rebel_3 }
+			scope:target_rebel_3 = {
+				add_rebel_progress = 0.05
+			}
+		}
+		scope:target_pop = {
+			add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+		}
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_minor_move_to_left
+		}
+		add_stability = stability_severe_penalty
+	}
+
+	option = {
+		name = french_wars_religion.11.c
+
+
+		scope:target_location = {
+			if = {
+				limit = {
+					NOT = { has_location_modifier = entrenched_heretic_location_modifier }
+				}
+				add_location_modifier = {
+					modifier = entrenched_heretic_location_modifier
+					years = 5
+					mode = add_and_extend
+				}
+			}
+			else = {
+				add_location_modifier = {
+					modifier = entrenched_heretic_location_modifier
+					years = 2
+					mode = extend
+				}
+			}
+		}
+		add_government_power = government_power_mild_penalty
+	}
+}
+
+french_wars_religion.12 = {	#Ending through signing the edict of Nantes
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.12.title
+	desc = french_wars_religion.12.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+	historical_info = french_wars_religion.12.historical_info
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+		set_variable = had_french_wars_religion_disaster_variable
+	}
+
+	option = {
+		name = french_wars_religion.12.a
+
+
+		custom_tooltip = {
+			text = heretic_pops_gain_33_satisfaction_tt
+
+			every_pop = {
+				limit = {
+					owner = root
+					religion.group = root.religion.group
+					NOT = { religion = root.religion }
+				}
+				add_pop_satisfaction = pop_satisfaction_extreme_bonus
+			}
+		}
+		if = {
+			limit = { has_estate_privilege = estate_privilege:clergy_strengthen_faith }
+			revoke_estate_privilege = estate_privilege:clergy_strengthen_faith
+		}
+
+		add_stability = stability_severe_bonus
+	}
+}
+
+french_wars_religion.13 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.12.title
+	desc = french_wars_religion.13.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+		set_variable = had_french_wars_religion_disaster_variable
+	}
+
+	option = {
+		name = french_wars_religion.13.a
+
+		add_religious_influence_if_valid = { VALUE = religious_influence_ultimate_bonus }
+		add_government_power = government_power_ultimate_bonus
+	}
+}
+
+french_wars_religion.14 = {
+	type = country_event
+	category = disaster_event
+	title = french_wars_religion.14.title
+	desc = french_wars_religion.14.desc
+	image = "gfx/interface/illustrations/disaster/religious_turmoil.dds"
+
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character }
+		if = {
+			limit = { has_variable = fwr_counter }
+			if = {
+				limit = { var:fwr_counter > 0 }
+				set_variable = had_french_wars_religion_disaster_variable
+				remove_variable = fwr_counter
+			}
+			else = {
+				change_variable = {
+					name = fwr_counter
+					add = 1
+				}
+				set_variable = {
+					name = had_french_wars_religion_disaster_variable
+					years = 10
+				}
+			}
+		}
+		else = {
+			set_variable = {
+				name = fwr_counter
+				value = 0
+			}
+			set_variable = {
+				name = had_french_wars_religion_disaster_variable
+				years = 10
+			}
+		}
+	}
+
+	option = {
+		name = french_wars_religion.14.a
+
+		if = {
+			limit = { has_variable = fwr_counter }
+			custom_tooltip = status_heretics_unresolved_10_years_cd_tt
+			add_government_power = government_power_mild_penalty
+			add_stability = stability_severe_penalty
+		}
+	}
+}

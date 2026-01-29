@@ -1,0 +1,493 @@
+﻿namespace = military_order_events
+
+military_order_events.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = military_order_events.1.title
+	desc = military_order_events.1.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		ROOT = {
+			save_scope_as = target_order
+		}
+		ROOT = {
+			regent ?= { save_scope_as = target_portrait_character }
+			ruler ?= { save_scope_as = target_portrait_character }
+		}
+	}
+
+	option = {
+		name = military_order_events.1.a #Ask for Infrastructure help
+		
+		set_variable = mil_order_requests_infrastructure
+		c:PAP = {
+			trigger_event_non_silently = military_order_events.2 
+		}
+		custom_tooltip = gain_a_tt
+	}
+	option = {
+		name = military_order_events.1.b #Ask for Levies or troops
+
+		set_variable = mil_order_requests_warriors_of_faith
+		c:PAP = {
+			trigger_event_non_silently = military_order_events.2 
+		}
+		custom_tooltip = gain_b_tt
+	}
+	option = {
+		name = military_order_events.1.c #Ask for monetary donations
+
+		set_variable = mil_order_requests_donations
+		c:PAP = {
+			trigger_event_non_silently = military_order_events.2 
+		}
+		custom_tooltip = gain_c_tt
+	}
+}
+ 
+military_order_events.2 = {
+	type = country_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_order }
+				desc = military_order_events.2.title
+			}
+			triggered_desc = {
+				trigger = { NOT = { exists = scope:target_order } }
+				desc = military_order_events.2.title_fallback
+			}
+		}
+	}
+	desc = military_order_events.2.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		ruler ?= {
+			save_scope_as = target_pope
+		}
+	}
+
+	option = {
+		name = military_order_events.2.a #Accept the Order's request
+
+		ai_will_select = {
+			value = 1
+			add = {
+				value = gold
+				divide = monthly_income_trade_and_tax
+			}
+		}
+
+		change_gold_effect = { scale = -1 }
+		if = {
+			limit = { exists = scope:target_order }
+			scope:target_order = {
+				trigger_event_non_silently = military_order_events.3
+			}
+		}
+	}
+
+	option = {
+		name = military_order_events.2.b #Decline the Order's request
+
+		ai_will_select = {
+			value = 1
+		}
+
+		add_government_power = government_power_mild_penalty
+		if = {
+			limit = { exists = scope:target_order }
+			scope:target_order = {
+				trigger_event_non_silently = military_order_events.4
+			}
+		}
+	}
+}
+
+military_order_events.3 = {
+	type = country_event
+	title = military_order_events.3.title
+	desc = military_order_events.3.desc
+
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		c:PAP = {
+			ruler ?= { save_scope_as = target_character_portrait }
+		}
+	}
+
+	option = {
+		name = military_order_events.3.a 
+		
+		if = {
+			limit = { has_variable = mil_order_requests_infrastructure }
+			add_country_modifier = {
+				modifier = infrastructure_funds_modifier
+				years = 10
+				mode = add_and_extend
+			}
+			remove_variable = mil_order_requests_infrastructure
+		}
+		else_if = {
+			limit = { has_variable = mil_order_requests_warriors_of_faith }
+			add_country_modifier = {
+				modifier = warrior_banners_modifier
+				years = 10
+				mode = add_and_extend
+			}
+			remove_variable = mil_order_requests_warriors_of_faith
+		}
+		else = {
+			add_gold = { value = c:PAP.monthly_income_trade_and_tax multiply = 1 }
+			add_country_modifier = {
+				modifier = foreign_donations_modifier
+				years = 10
+				mode = add_and_extend
+			}
+			remove_variable = mil_order_requests_donations
+		}
+	}
+}
+
+military_order_events.4 = {
+	type = country_event
+	title = military_order_events.4.title
+	desc = military_order_events.4.desc
+
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		c:PAP = {
+			ruler ?= { save_scope_as = target_character_portrait }
+		}
+	}
+
+	option = {
+		name = military_order_events.4.a
+
+		add_opinion_mutual_effect = {
+			target = c:PAP
+			modifier = opinion_refused_call_for_help_modifier
+		}
+	}
+}
+
+military_order_events.5 = { #Antioch
+	type = country_event
+	title = military_order_events.5.title
+	desc = military_order_events.5.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		set_variable = conquered_antioch_variable
+	}
+
+	option = {
+		name = military_order_events.5.a 
+		
+		location:antioch = {
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				split_pop = {
+					fraction = 0.05
+					religion = religion:catholic
+				}
+			}
+		}
+		ruler ?= {
+			add_mil = 10
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_large_move_to_left }
+	}
+}
+
+military_order_events.6 = { #Edessa
+	type = country_event
+	title = military_order_events.6.title
+	desc = military_order_events.6.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		set_variable = conquered_edessa_variable 
+	}
+	option = {
+		name = military_order_events.6.a 
+
+		location:urfa = {
+			change_control = control_severe_bonus
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				split_pop = {
+					fraction = 0.05
+					religion = religion:catholic
+				}
+			}
+		}
+		add_prestige = prestige_extreme_bonus
+		add_government_power = government_power_mild_bonus
+	}
+}
+
+military_order_events.7 = { #Damascus
+	type = country_event
+	title = military_order_events.7.title
+	desc = military_order_events.7.desc
+
+	trigger = {
+		owns = location:damascus
+		has_reform = government_reform:military_order_reform
+		religion = religion:catholic
+		NOT = { has_variable = conquered_damascus_variable }
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		set_variable = conquered_damascus_variable
+	}
+
+	option = {
+		name = military_order_events.7.a 
+
+		location:damascus = {
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				split_pop = {
+					fraction = 0.05
+					religion = religion:catholic
+				}
+			}
+		}
+		add_government_power = government_power_extreme_bonus
+	}
+}
+
+military_order_events.8 = { #Jerusalem
+	type = country_event
+	title = military_order_events.8.title
+	desc = military_order_events.8.desc
+
+	trigger = {
+		owns = location:jerusalem
+		has_reform = government_reform:military_order_reform
+		religion = religion:catholic
+		NOT = { has_variable = conquered_jerusalem_variable }
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		set_variable = conquered_jerusalem_variable
+	}
+
+	option = {
+		name = military_order_events.8.a 
+
+		location:jerusalem = {
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				split_pop = {
+					fraction = 0.05
+					religion = religion:catholic
+				}
+			}
+			add_core = ROOT
+			change_integration_level = core
+		}
+		set_capital = location:jerusalem
+		ruler ?= {
+			add_character_modifier = {
+				modifier = crusader_liberator_of_jerusalem_modifier
+				years = -1
+			}
+		}
+
+		add_religious_influence_if_valid = { VALUE = 50 }
+	}
+
+	option = {
+		name = military_order_events.8.b
+
+
+		location:jerusalem = {
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:catholic }
+				}
+				split_pop = {
+					fraction = 0.05
+					religion = religion:catholic
+				}
+			}
+			add_core = ROOT
+			change_integration_level = core
+		}
+		
+		ruler ?= {
+			add_character_modifier = {
+				modifier = crusader_liberator_of_jerusalem_modifier
+				years = -1
+			}
+		}
+
+		add_religious_influence_if_valid = { VALUE = 50 }
+	}
+}
+
+military_order_events.9 = { #The Banners of KOJremer
+	type = country_event
+	title = military_order_events.9.title
+	desc = military_order_events.9.desc
+
+	fire_only_once = yes
+	trigger = {
+		owns = location:antioch
+		owns = location:jerusalem
+		owns = location:urfa
+		owns = location:damascus
+		religion = religion:catholic
+		has_reform = government_reform:military_order_reform
+		NOT = { country_exists = c:KOJ }
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+	}
+	
+	option = {
+		name = military_order_events.9.a 
+
+		custom_tooltip = forming_koj_easier_tt
+		set_variable = form_koj_variable
+		custom_tooltip = catholics_upset_tt
+		hidden_effect = {
+			religion:catholic = {
+				every_country_in_religion = {
+					limit = {
+						OR = {
+							NOT = { is_allied_with = { target = c:BOH } }
+							NOT = { is_subject_of = c:BOH }
+						}
+					}
+					add_opinion = {
+						modifier = disputed_title_of_jerusalem
+						target = ROOT
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = military_order_events.9.b
+
+		add_government_power = government_power_extreme_bonus
+		custom_tooltip = catholics_upset_tt
+		hidden_effect = {
+			religion:catholic = {
+				every_country_in_religion = {
+					limit = {
+						OR = {
+							NOT = { is_allied_with = { target = c:BOH } }
+							NOT = { is_subject_of = c:BOH }
+						}
+					}
+					add_opinion = {
+						modifier = disputed_title_of_jerusalem
+						target = ROOT
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = military_order_events.9.c 
+
+		trigger = {
+			country_exists = c:NAP
+			c:NAP = {
+				at_war = no 
+				is_subject = no
+				government_type = government_type:monarchy
+				NOT = { is_rival_of = ROOT }
+				NOT = { is_enemy_of = ROOT }
+			}
+		}
+
+		every_owned_location = {
+			limit = {
+				province_definition = province_definition:filastin_province
+			}
+			change_location_owner = c:NAP
+		}
+		add_opinion = {
+			modifier = restored_title_of_jerusalem_modifier
+			target = c:NAP
+		}
+
+
+		reverse_add_opinion = {
+			modifier = restored_title_of_jerusalem_modifier
+			target = c:NAP
+		}
+
+		add_religious_influence_if_valid = { VALUE = 25 }
+		add_stability = stability_extreme_bonus
+	}
+}
+
+
+

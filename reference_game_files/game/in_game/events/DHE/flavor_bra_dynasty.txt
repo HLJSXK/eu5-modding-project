@@ -1,0 +1,1839 @@
+﻿namespace = flavor_bra_dynasty
+
+scripted_trigger bra_ruled_by_wittelsbacher_trigger = {
+	has_ruler = yes
+	ruler.dynasty ?= dynasty:wittelsbach_dynasty
+	government_type = government_type:monarchy
+	is_member_of_international_organization = international_organization:hre
+}
+
+scripted_trigger bra_has_dynastic_chaos_active_trigger = {
+	has_country_modifier = bra_wittelsbacher_neglect
+}
+
+scripted_effect bra_change_investment_score = {
+	custom_description = {
+		text = bra_change_investment_score_$math$_text
+		value = $value$
+		change_variable = {
+			name = bra_wittelsbacher_investment_var
+			$math$ = $value$
+		}
+	}
+}
+
+scripted_effect bra_set_localization_scopes = {
+	save_scope_as = root_country
+	ruler ?= { 
+		save_scope_as = root_ruler 
+		dynasty ?= { save_scope_as = root_dynasty }
+	}
+}
+
+scripted_trigger bra_hre_emperor_favors_wittelsbacher = {
+	emperor_exists = yes
+	international_organization:hre = {
+		leader_country ?= {
+			opinion = {
+				target = root
+				value >= 100
+			}
+		}
+	}
+}
+
+scripted_trigger bra_hre_emperor_favors_pretender = {
+	international_organization:hre = {
+		leader_country ?= {
+			opinion = {
+				target = root
+				value < 0
+			}
+		}
+	}
+}
+
+#The Wittelsbacher Situation
+flavor_bra_dynasty.1 = {
+	type = country_event
+	title = flavor_bra_dynasty.1.title
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { ruler = character:bra_ludwig_v_wittelsbach }
+				desc = flavor_bra_dynasty.1.desc
+			}
+			triggered_desc = {
+				desc = flavor_bra_dynasty.1.desc.fallback
+			}
+		}
+	}
+		
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = BRA
+		from = 1300.1.1
+		to = 1800.1.1
+		monthly_chance = 100
+	}
+	trigger = {
+		bra_ruled_by_wittelsbacher_trigger = yes
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		set_variable = { name = bra_wittelsbacher_investment_var value = -15 }
+		bra_set_localization_scopes = yes
+	}
+	# Brandenburg will prevail!
+	option = {
+		name = flavor_bra_dynasty.1.a
+		historical_option = yes
+		add_legitimacy = -40
+		add_country_modifier = { modifier = bra_wittelsbacher_neglect years = -1 mode = add_and_extend }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1.a.at
+			every_owned_location = {
+				change_control = control_ultimate_penalty
+			}
+		}
+		custom_tooltip = flavor_bra_dynasty.1.a.bt
+		custom_tooltip = flavor_bra_dynasty.1.a.ct
+	}
+}
+
+#End of the Wittelsbacher Neglect (due to no longer having a Wittelsbacher anymore)
+flavor_bra_dynasty.2 = {
+	type = country_event
+	title = flavor_bra_dynasty.2.title
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	desc = flavor_bra_dynasty.2.desc
+	fire_only_once = yes
+	trigger = {
+		has_country_modifier = bra_wittelsbacher_neglect
+		OR = {
+			NOT = { government_type = government_type:monarchy }
+			NOT = { is_member_of_international_organization = international_organization:hre }
+			AND = {
+				government_type = government_type:monarchy
+				is_member_of_international_organization = international_organization:hre
+				ruler_or_heir_if_regent ?= {
+					OR = {
+						has_dynasty = no
+						NOT = { dynasty = dynasty:wittelsbach_dynasty }
+					}
+				}
+			}
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+	}
+	option = {
+		name = flavor_bra_dynasty.2.a
+		remove_country_modifier = bra_wittelsbacher_neglect
+		if = {
+			limit = { has_variable = bra_wittelsbacher_investment_var }
+			remove_variable = bra_wittelsbacher_investment_var
+		}
+	}
+}
+
+#False Waldemar Revealed!
+flavor_bra_dynasty.3 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.3.title
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+	desc = flavor_bra_dynasty.3.desc
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = BRA
+		from = 1300.1.1
+		to = 1360.1.1
+		monthly_chance = 1	#Intentionally very low chance to happen
+	}
+	trigger = {
+		character:false_waldemar ?= {
+			is_alive = yes
+			owner = root
+			has_character_modifier = bra_false_waldemar
+		}
+		has_country_modifier = bra_waldemar_rallies_nobility
+		NOT = {
+			has_variable = false_waldemar_imposter_protection
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		character:false_waldemar = { save_scope_as = target_character }
+		random_rebel = {
+			limit = { rebel_name_key = false_waldemar_rebel }
+			save_scope_as = target_rebel
+		}
+		set_variable = { name = bra_false_waldemar_revealed value = yes }
+		capital = {
+			create_dynasty_from_location = random
+			last_dynasty_in_location = { save_scope_as = target_dynasty }
+		}
+	}
+	option = {
+		name = flavor_bra_dynasty.3.a
+		scope:target_character = {
+			change_dynasty = scope:target_dynasty
+			change_character_estate = estate_type:burghers_estate
+			every_descendant = {
+				change_dynasty = scope:recipient.dynasty
+				if = {
+					limit = { has_estate = estate_type:nobles_estate }
+					change_character_estate = estate_type:burghers_estate
+				}
+			}
+			remove_character_modifier = bra_false_waldemar
+		}
+		if = {
+			limit = { exists = scope:target_rebel }
+			destroy_rebel = scope:target_rebel
+		}
+		remove_country_modifier = bra_waldemar_rallies_nobility
+	}
+}
+
+#Robber Barons issues piling up
+flavor_bra_dynasty.4 = {
+	type = country_event
+	title = flavor_bra_dynasty.4.title
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.4.desc
+	trigger = {
+		bra_has_dynastic_chaos_active_trigger = yes
+		any_owned_location = {
+			local_control < 0.5
+			is_connected_to = root.capital
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:burghers_estate }
+		random_owned_location = {
+			limit = {
+				local_control < 0.5
+				is_connected_to = root.capital
+			}
+			save_scope_as = target_location
+		}
+	}
+	#Combat the robber barons
+	option = {
+		name = flavor_bra_dynasty.4.a
+		bra_change_investment_score = { math = add value = 1 }
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_penalty }
+		change_gold_effect = { scale = -2 }
+		scope:target_location.province = {
+			every_location_in_province = {
+				change_control = control_severe_bonus
+			}
+		}
+	}
+	#That is not our issue
+	option = {
+		name = flavor_bra_dynasty.4.b
+		bra_change_investment_score = { math = subtract value = 1 }
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_weak_bonus }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+	}
+}
+
+#Peasants Revolt
+flavor_bra_dynasty.5 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.5.title
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.5.desc
+	#Support the Wittelsbacher
+	trigger = {
+		bra_has_dynastic_chaos_active_trigger = yes
+		any_owned_location = {
+			location_rank = location_rank:rural_settlement
+			any_pop = {
+				pop_type = pop_type:peasants
+			}
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		if = {
+			limit = {
+				NOT = { any_rebel = { rebel_name_key = bra_peasants_revolt } }
+			}
+			create_rebel = {
+				name = bra_peasants_revolt
+				category = estate
+				estate = peasants_estate
+				save_scope_as = target_rebel
+			}
+		}
+		else = {
+			random_rebel = {
+				limit = { rebel_name_key = bra_peasants_revolt }
+				save_scope_as = target_rebel
+			}
+		}
+		random_owned_location = {
+			limit = {
+				location_rank = location_rank:rural_settlement
+				any_pop = {
+					pop_type = pop_type:peasants
+				}
+			}
+			save_scope_as = target_location
+		}
+	}
+	option = {
+		name = flavor_bra_dynasty.5.a
+		bra_change_investment_score = { math = add value = 1 }
+		change_gold_effect = { scale = -3 }
+		add_legitimacy = legitimacy_weak_bonus
+		scope:target_location = {
+			change_control = control_mild_penalty
+			every_pop = {
+				limit = {
+					owner = root
+					pop_type = pop_type:peasants
+				}
+				add_pop_satisfaction = pop_satisfaction_mild_bonus
+			}
+		}
+	}
+	#That is not our issue
+	option = {
+		name = flavor_bra_dynasty.5.b
+		bra_change_investment_score = { math = subtract value = 1 }
+		scope:target_location = {
+			every_pop = {
+				limit = {
+					owner = root
+					pop_type = pop_type:peasants
+				}
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+				change_pop_allegiance = scope:target_rebel
+			}
+		}
+	}
+}
+
+#Estates taking control over the location
+flavor_bra_dynasty.6 = {
+	type = country_event
+	title = flavor_bra_dynasty.6.title
+	illustration_tags = {
+		10 = angry
+		10 = exterior
+	}
+	desc = flavor_bra_dynasty.6.desc
+	#Support the Wittelsbacher
+	trigger = {
+		bra_has_dynastic_chaos_active_trigger = yes
+		NOT = { has_country_modifier = bra_revoked_clergy_power }
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:peasants_estate }
+	}
+	
+	option = {
+		name = flavor_bra_dynasty.6.a
+		bra_change_investment_score = { math = add value = 1 }
+		add_stability = stability_weak_penalty
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_penalty }
+		add_country_modifier = {
+			modifier = bra_revoked_clergy_power
+			years = 5
+			mode = add_and_extend
+		}
+	}
+	#That is not our issue
+	option = {
+		name = flavor_bra_dynasty.6.b
+		bra_change_investment_score = { math = subtract value = 1 }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_bonus }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+	}
+}
+
+#City refuses to pay
+flavor_bra_dynasty.7 = {
+	type = country_event
+	title = flavor_bra_dynasty.7.title
+	illustration_tags = {
+		10 = interior
+		10 = angry
+	}
+	desc = flavor_bra_dynasty.7.desc
+	#Support the Wittelsbacher
+	trigger = {
+		bra_has_dynastic_chaos_active_trigger = yes
+		any_owned_location = {
+			OR = {
+				location_rank = location_rank:town
+				location_rank = location_rank:city
+			}
+			any_pop = { pop_type = pop_type:burghers }
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		random_owned_location = {
+			limit = {
+				OR = {
+					location_rank = location_rank:town
+					location_rank = location_rank:city
+				}
+				any_pop = { pop_type = pop_type:burghers }
+			}
+			save_scope_as = target_location
+		}
+	}
+	option = {
+		name = flavor_bra_dynasty.7.a
+		bra_change_investment_score = { math = add value = 1 }
+		add_legitimacy = legitimacy_weak_bonus
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+		scope:target_location = {
+			change_control = control_weak_bonus
+		}
+	}
+	#That is not our issue
+	option = {
+		name = flavor_bra_dynasty.7.b
+		bra_change_investment_score = { math = subtract value = 1 }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_weak_bonus }
+		scope:target_location = {
+			change_control = control_mild_penalty
+		}
+	}
+}
+
+#Wittelsbacher revitalizes Brandenburg
+flavor_bra_dynasty.8 = {
+	type = country_event
+	title = flavor_bra_dynasty.8.title
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.8.desc
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = BRA
+		from = 1300.1.1
+		to = 1800.1.1
+		monthly_chance = 100
+	}
+	trigger = {
+		has_ruler = yes
+		bra_has_dynastic_chaos_active_trigger = yes
+		var:bra_wittelsbacher_investment_var >= 7
+	}
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		set_variable = { name = bra_blocked_from_hohenzoller_event value = yes }
+	}
+	#Brandenburg shall become the pride of the Wittelsbacher
+	option = {
+		name = flavor_bra_dynasty.8.a
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+		add_legitimacy = legitimacy_severe_bonus
+		add_prestige = prestige_severe_bonus
+		add_stability = stability_ultimate_bonus
+	}
+}
+
+#Premature death of the False Waldemar
+flavor_bra_dynasty.9 = { #GRAVEYARD
+	type = country_event
+	title = flavor_bra_dynasty.9.title
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+	desc = flavor_bra_dynasty.9.desc
+	fire_only_once = yes
+	trigger = {
+		has_variable = bra_fake_waldemar_on_throne
+		exists = character:false_waldemar
+		character:false_waldemar = {
+			is_alive = no
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		remove_variable = bra_fake_waldemar_on_throne
+		character:false_waldemar = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = flavor_bra_dynasty.9.a
+		add_prestige = prestige_severe_penalty
+		scope:target_character = {
+			every_descendant =  {
+				limit = { dynasty = prev.dynasty }
+				set_lowborn = yes
+			}
+			set_lowborn = yes
+		}
+	}
+}
+
+
+#EVENT CHAINS
+
+#The False Waldemar
+flavor_bra_dynasty.1000 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.1000.title
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { bra_hre_emperor_favors_wittelsbacher = yes }
+				desc = flavor_bra_dynasty.1000.desc.emperor_supports
+			}
+			triggered_desc = {
+				desc = flavor_bra_dynasty.1000.desc.emperor_rejects
+			}
+		}
+	}
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = BRA
+		from = 1300.1.1
+		to = 1360.1.1
+		monthly_chance = 5
+	}
+	trigger = {
+		emperor_exists = yes
+		is_emperor = no
+		bra_ruled_by_wittelsbacher_trigger = yes
+		NOT = {
+			ruler.dynasty = {
+				any_character_in_dynasty = {
+					is_ruler = yes
+					owner = {
+						is_emperor = yes
+					}
+				}
+			}
+		}
+	}
+	immediate = {
+		#event_illustration_estate_background_effect = { background = estate_type:crown_estate }
+		#country_room = BRA
+		location:ballenstedt = { create_dynasty_from_location = fake_askanier_dynasty }
+		create_character = {
+			first_name = name_waldemar
+			dynasty = dynasty:fake_askanier_dynasty
+			estate = estate_type:nobles_estate
+			adm = 12
+			dip = 60
+			mil = 45
+			birth_date = 1280
+			script = false_waldemar
+			save_scope_as = target_character
+		}
+		scope:target_character = {
+			add_character_modifier = { modifier = bra_false_waldemar days = -1 }
+		}
+		set_variable = {
+			name = false_waldemar_imposter_protection
+			value = yes
+			years = 2
+
+		}
+		international_organization:hre = {
+			leader_country ?= {
+				save_scope_as = emperor_country
+				ruler = { save_scope_as = emperor_ruler }
+			}
+		}
+		save_scope_as = bra_country
+		ruler = { save_scope_as = bra_ruler }
+		create_rebel = {
+			category = pretender
+			name = false_waldemar_rebel
+			save_scope_as = false_waldemar_rebel
+		}
+	}
+	# Contact the Emperor!
+	option = {
+		name = flavor_bra_dynasty.1000.a
+		historical_option = yes
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1000.a.at
+			dynasty:wittelsbach_dynasty = {
+				every_country_in_dynasty = {
+					limit = { this != root }
+					add_opinion = {
+						target = root
+						modifier = opinion_support_our_dynasty_member
+					}
+				}
+			}
+		}
+		add_stability = stability_mild_penalty
+		add_country_modifier = {
+			modifier = bra_waldemar_rallies_nobility
+			years = 20
+			mode = add_and_extend
+			size = {
+				value = 1
+				if = {
+					limit = { bra_hre_emperor_favors_wittelsbacher = yes }
+					multiply = 0.5
+				}
+				else_if = {
+					limit = { bra_hre_emperor_favors_pretender = yes }
+					multiply = 2
+				}
+				else = {
+					multiply = 1
+				}
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1000.a.tt
+			scope:emperor_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1001 years = 2 }
+			}
+		}
+		scope:target_character = {
+			change_character_allegiance = scope:false_waldemar_rebel
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.false_waldemar_rebel.tt
+			ordered_owned_location = {
+				order_by = population
+				max = 4
+				check_range_bounds = no
+				every_pop = {
+					limit = {
+						owner = root
+						pop_type = pop_type:nobles
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					change_pop_allegiance = scope:false_waldemar_rebel
+				}
+			}
+		}
+	}
+	# Execute this pretender!
+	option = {
+		name = flavor_bra_dynasty.1000.b
+		add_legitimacy = legitimacy_severe_penalty
+		hidden_effect = {
+			set_variable = { name = bra_executing_false_waldemar value = random_integer }
+			change_variable = { name = bra_executing_false_waldemar modulo = 5 }
+			destroy_rebel = scope:false_waldemar_rebel
+			trigger_event_silently = { id = flavor_bra_dynasty.1007 days = 7 }
+		}
+	}
+	# Abdicate to the true ruler.
+	option = {
+		name = flavor_bra_dynasty.1000.c
+		remove_country_modifier = bra_wittelsbacher_neglect
+		add_stability = stability_radical_penalty
+		set_new_ruler = scope:target_character
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1000.c.at
+			dynasty:wittelsbach_dynasty = {
+				every_country_in_dynasty = {
+					limit = { this != root }
+					add_opinion = {
+						target = root
+						modifier = opinion_ousted_our_dynasty_member
+					}
+				}
+			}
+		}
+		scope:target_character = {
+			add_character_modifier = { modifier = bra_waldemar_on_the_throne years = -1 mode = add_and_extend }
+		}
+		hidden_effect = {
+			set_variable = { name = bra_fake_waldemar_on_throne value = yes }
+			set_variable = { name = bra_blocked_from_hohenzoller_event value = yes }
+			remove_variable = bra_wittelsbacher_investment_var
+			trigger_event_silently = { id = flavor_bra_dynasty.1005 years = 1 }
+			scope:target_character = {
+				remove_character_modifier = bra_false_waldemar
+			}
+		}
+	}
+}
+
+#Brandenburg turns to the Emperor for help
+flavor_bra_dynasty.1001 = {
+	type = country_event
+	title = flavor_bra_dynasty.1001.title
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					scope:bra_country = { has_variable = bra_false_waldemar_revealed }
+				}
+				desc = flavor_bra_dynasty.1001.desc.imposter_revealed
+			}
+			triggered_desc = {
+				trigger = {
+					scope:bra_country = { NOT = { has_variable = bra_false_waldemar_revealed } }
+				}
+				desc = flavor_bra_dynasty.1001.desc
+			}
+		}
+	}
+	trigger = {
+		exists = character:false_waldemar
+		character:false_waldemar = { is_alive = yes }
+	}
+	immediate = {
+		character:false_waldemar = { save_scope_as = target_character }
+		set_variable = {
+			name = bra_gold_tooltip_var
+			value = {
+				value = scope:bra_country.monthly_income_trade_and_tax
+				multiply = 18
+			}
+		}
+	}
+	after = {
+		remove_variable = bra_gold_tooltip_var
+	}
+	#Support the Wittelsbacher in exchange for Gold
+	option = {
+		name = flavor_bra_dynasty.1001.a
+		trigger = {
+			scope:bra_country = { NOT = { has_variable = bra_false_waldemar_revealed } }
+			opinion = {
+				target = scope:bra_country
+				value < 100
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.help.tt
+			scope:bra_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1002 years = 1 }
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.a.tt
+			scope:bra_country = { set_variable = { name = bra_owes_gold value = root.var:bra_gold_tooltip_var } }
+		}
+	}
+	#Support the Wittelsbacher in exchange for their Loyalty
+	option = {
+		name = flavor_bra_dynasty.1001.b
+		historical_option = yes
+		trigger = {
+			scope:bra_country = {
+				NOT = { has_variable = bra_false_waldemar_revealed }
+				has_special_status_in_international_organization = {
+					type = special_status:elector
+					international_organization = international_organization:hre
+				}
+			}
+			opinion = {
+				target = scope:bra_country
+				value < 100
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.help.tt
+			scope:bra_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1002 years = 1 }
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.b.tt
+			scope:bra_country = { set_variable = { name = bra_owes_loyalty value = yes } }
+		}
+	}
+	#Support the Wittelsbacher in exchange for Dynasty opinion
+	option = {
+		name = flavor_bra_dynasty.1001.c
+		trigger = {
+			scope:bra_country = { NOT = { has_variable = bra_false_waldemar_revealed } }
+			opinion = {
+				target = scope:bra_country
+				value < 100
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.help.tt
+			scope:bra_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1002 years = 1 }
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.c.tt
+			scope:bra_country = { set_variable = { name = bra_owes_relations value = yes } }
+		}
+	}
+	#Support the Wittelsbacher for free
+	option = {
+		name = flavor_bra_dynasty.1001.d
+		trigger = {
+			scope:bra_country = { NOT = { has_variable = bra_false_waldemar_revealed } }
+		}
+		custom_tooltip = flavor_bra_dynasty.1001.d.tt
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.help.tt
+			scope:bra_country = {
+				set_variable = { name = bra_free_support value = yes }
+				trigger_event_silently = { id = flavor_bra_dynasty.1002 years = 1 }
+			}
+		}
+	}
+	#That is not our issue
+	option = {
+		name = flavor_bra_dynasty.1001.e
+		trigger = {
+			scope:bra_country = { NOT = { has_variable = bra_false_waldemar_revealed } }
+			opinion = {
+				target = scope:bra_country
+				value < 0
+			}
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.e.tt
+			scope:bra_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1003 years = 1 }
+			}
+		}
+	}
+	#They shall be allowed to do whatever they please
+	option = {
+		name = flavor_bra_dynasty.1001.zzz
+		trigger = {
+			scope:bra_country = { has_variable = bra_false_waldemar_revealed }
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1001.zzz.tt
+			scope:bra_country = {
+				trigger_event_silently = { id = flavor_bra_dynasty.1004 years = 1 }
+			}
+		}
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+#The Emperor supports us!
+flavor_bra_dynasty.1002 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.1002.title
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = bra_owes_gold }
+				desc = flavor_bra_dynasty.1002.desc.gold
+			}
+			triggered_desc = {
+				trigger = { has_variable = bra_owes_loyalty }
+				desc = flavor_bra_dynasty.1002.desc.loyalty
+			}
+			triggered_desc = {
+				trigger = { has_variable = bra_owes_relations }
+				desc = flavor_bra_dynasty.1002.desc.relations
+			}
+			triggered_desc = {
+				trigger = { has_variable = bra_free_support }
+				desc = flavor_bra_dynasty.1002.desc.free
+			}
+			triggered_desc = {
+				desc = flavor_bra_dynasty.1002.desc
+			}
+		}
+	}
+	trigger = {
+		exists = character:false_waldemar
+		character:false_waldemar = { is_alive = yes }
+	}
+	immediate = {
+		character:false_waldemar = { save_scope_as = target_character }
+		random_rebel = {
+			limit = { rebel_name_key = false_waldemar_rebel }
+			save_scope_as = target_rebel
+		}
+	}
+	#Excellent
+	option = {
+		name = flavor_bra_dynasty.1002.a
+		if = {
+			limit = { has_variable = bra_owes_gold }
+			add_gold = { value = var:bra_owes_gold multiply = -1 }
+			scope:emperor_country = { add_gold = { value = root.var:bra_owes_gold } }
+		}
+		if = {
+			limit = { has_variable = bra_owes_loyalty }
+			add_legitimacy = legitimacy_mild_penalty
+			international_organization:hre = {
+				set_vote = {
+					voter = prev
+					resolution = resolution:hre_election
+					vote = scope:emperor_country
+					lock_reason = {
+						key = VOTE_LOCK_REASON_SUPPORT
+						emperor = scope:emperor_country
+					}
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = bra_owes_relations }
+			add_prestige = prestige_severe_penalty
+			custom_tooltip = {
+				text = flavor_bra_dynasty.1002.a.tt
+				scope:emperor_country = {
+					dynasty:wittelsbach_dynasty = {
+						every_country_in_dynasty = {
+							add_opinion = {
+								target = scope:emperor_country
+								modifier = opinion_supported_the_wittelsbacher
+							}
+						}
+					}
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = bra_free_support }
+			add_opinion = {
+				target = scope:emperor_country
+				modifier = opinion_emperors_genorisity
+			}
+		}
+		scope:target_character = {
+			banish_character = yes
+		}
+		bra_change_investment_score = { math = add value = 5 }
+		if = {
+			limit = { exists = scope:target_rebel }
+			destroy_rebel = scope:target_rebel
+		}
+		remove_country_modifier = bra_waldemar_rallies_nobility
+	}
+	after = {
+		if = { limit = { has_variable = bra_owes_gold } remove_variable = bra_owes_gold }
+		if = { limit = { has_variable = bra_owes_loyalty } remove_variable = bra_owes_loyalty }
+		if = { limit = { has_variable = bra_owes_relations } remove_variable = bra_owes_relations }
+		if = { limit = { has_variable = bra_free_support } remove_variable = bra_free_support }
+	}
+}
+
+#No support from the Emperor...
+flavor_bra_dynasty.1003 = {
+	type = country_event
+	title = flavor_bra_dynasty.1003.title
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					scope:emperor_ruler = { is_alive = no }
+				}
+				desc = flavor_bra_dynasty.1003.desc.dead
+			}
+			triggered_desc = {
+				trigger = {
+					scope:emperor_ruler = { dynasty = dynasty:wittelsbach_dynasty }
+				}
+				desc = flavor_bra_dynasty.1003.desc.wittelsbach
+			}
+			triggered_desc = {
+				trigger = {
+					scope:emperor_ruler = { NOT = { dynasty = dynasty:wittelsbach_dynasty } }
+				}
+				desc = flavor_bra_dynasty.1003.desc
+			}
+		}
+	}
+	trigger = {
+		exists = character:false_waldemar
+		character:false_waldemar = { is_alive = yes }
+	}
+	immediate = {
+		character:false_waldemar = { save_scope_as = target_character }
+	}
+	#These are bad news indeed...
+	option = {
+		name = flavor_bra_dynasty.1003.a
+		add_stability = stability_severe_penalty
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1003.a.tt
+			dynasty:wittelsbach_dynasty ?= {
+				every_country_in_dynasty = {
+					add_opinion = {
+						target = scope:emperor_country
+						modifier = opinion_rejected_helping_wittelsbacher
+					}
+				}
+			}
+			dynasty:askanier_dynasty ?= {
+				every_country_in_dynasty = {
+					add_opinion = {
+						target = scope:emperor_country
+						modifier = opinion_rejected_helping_wittelsbacher_askanier
+					}
+				}
+			}
+		}
+	}
+}
+
+#Full support from the Emperor (for free!)
+flavor_bra_dynasty.1004 = { #PRISON
+	type = country_event
+	title = flavor_bra_dynasty.1004.title
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	illustration_tags = {
+		10 = exterior
+		10 = happy
+	}
+	desc = flavor_bra_dynasty.1004.desc
+	trigger = {
+		exists = character:false_waldemar
+		character:false_waldemar = { is_alive = yes }
+	}
+	immediate = {
+		character:false_waldemar = { save_scope_as = target_character }
+	}
+	#Banish [target_character.GetHimHer].
+	option = {
+		name = flavor_bra_dynasty.1004.a
+		scope:target_character = {
+			banish_character = yes
+		}
+		bra_change_investment_score = { math = add value = 5 }
+	}
+	#Execute [target_character.GetHimHer].
+	option = {
+		name = flavor_bra_dynasty.1004.a
+		kill_character = {
+			target = scope:target_character
+			reason = execution
+			killer = ruler
+		}
+		bra_change_investment_score = { math = add value = 3 }
+		add_legitimacy = legitimacy_mild_bonus
+	}
+	#[target_character.GetHisHer|U] abilities might actually come in handy to us...
+	option = {
+		name = flavor_bra_dynasty.1004.c
+		scope:target_character = {
+			remove_character_allegiance = yes
+			move_country = root
+			add_dip = 30
+			if = {
+				limit = { has_character_modifier = bra_false_waldemar }
+				remove_character_modifier = bra_false_waldemar
+			}
+		}
+		add_legitimacy = legitimacy_severe_penalty
+	}
+}
+
+#Questionable Authenticity
+flavor_bra_dynasty.1005 = {
+	type = country_event
+	title = flavor_bra_dynasty.1005.title
+	illustration_tags = {
+		10 = exterior
+		10 = regular
+	}
+	desc = flavor_bra_dynasty.1005.desc
+
+	trigger = {
+		has_variable = bra_fake_waldemar_on_throne
+		character:false_waldemar = { is_alive = yes }
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	#Research our ruler's backstory
+	option = {
+		name = flavor_bra_dynasty.1005.a
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1005.a.tt
+			trigger_event_silently = { id = flavor_bra_dynasty.1006 years = 2 }
+		}
+	}
+	#These are just unjustified rumors...
+	option = {
+		name = flavor_bra_dynasty.1005.b
+		scope:target_character = {
+			remove_character_modifier = bra_waldemar_on_the_throne
+			add_character_modifier = { modifier = bra_suspicious_waldemar_on_throne years = -1 mode = add_and_extend }
+		}
+	}
+}
+
+#Question of Authentiticity
+flavor_bra_dynasty.1006 = {
+	type = country_event
+	title = flavor_bra_dynasty.1006.title
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = bra_true_askanier }
+				desc = flavor_bra_dynasty.1006.desc.true_askanier
+			}
+			triggered_desc = {
+				desc = flavor_bra_dynasty.1006.desc.false_askanier
+			}
+		}
+	}
+	trigger = {
+		has_variable = bra_fake_waldemar_on_throne
+		character:false_waldemar = { is_alive = yes }
+	}
+	immediate = {
+		random_list = {
+			1 = { set_variable = { name = bra_true_askanier value = yes } }
+			9 = {}
+		}
+		random_owned_location = {
+			create_dynasty_from_location = random
+			last_dynasty_in_location = { save_scope_as = target_dynasty }
+		}
+		character:false_waldemar ?= {
+			save_scope_as = target_character
+		}
+		remove_variable = bra_fake_waldemar_on_throne
+	}
+	#He is the real Askanier!
+	option = {
+		name = flavor_bra_dynasty.1006.a
+		trigger = { has_variable = bra_true_askanier }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1006.a.tt
+			scope:target_character = {
+				change_dynasty = dynasty:askanier_dynasty
+				every_descendant = {
+					change_dynasty = scope:recipient.dynasty
+				}
+			}
+		}
+		scope:target_character = {
+			if = {
+				limit = { has_character_modifier = bra_false_waldemar }
+				remove_character_modifier = bra_false_waldemar
+			}
+			remove_character_modifier = bra_waldemar_on_the_throne
+			add_character_modifier = {
+				modifier = bra_true_askanier_on_the_throne
+				years = -1
+				mode = add_and_extend
+			}
+		}
+	}
+	#As long he is not a Wittelsbacher
+	option = {
+		name = flavor_bra_dynasty.1006.b
+		trigger = { NOT = { has_variable = bra_true_askanier } }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1006.b.tt
+			scope:target_character = {
+				change_dynasty = scope:target_dynasty
+				every_descendant = {
+					change_dynasty = scope:recipient.dynasty
+				}
+			}
+		}
+		scope:target_character = {
+			remove_character_modifier = bra_waldemar_on_the_throne
+			add_character_modifier = {
+				modifier = bra_imposter_dynasty_on_throne
+				years = -1
+				mode = add_and_extend
+			}
+		}
+	}
+	#Remove him and all other imposters!
+	option = {
+		name = flavor_bra_dynasty.1006.c
+		trigger = { NOT = { has_variable = bra_true_askanier } }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1006.b.tt
+			scope:target_character = {
+				banish_character = yes
+				every_descendant = {
+					limit = { owner = root }
+					banish_character = yes
+				}
+			}
+		}
+		scope:target_character = { banish_character = yes }
+		add_stability = stability_ultimate_penalty
+	}
+}
+
+#Execution of the False Waldemar
+flavor_bra_dynasty.1007 = { #PRISON #GRAVEYARD
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.1007.title
+	illustration_tags = {
+		10 = exterior
+		10 = happy
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = bra_execution_successful }
+				desc = flavor_bra_dynasty.1007.desc.successful_execution
+			}
+			triggered_desc = {
+				desc = flavor_bra_dynasty.1007.desc.failed_execution
+			}
+		}
+	}
+
+	immediate = {
+		event_illustration_government_estate_effect = yes
+		if = {
+			limit = { var:bra_executing_false_waldemar = 0 }
+			set_variable = { name = bra_execution_successful value = yes }
+		}
+		else = {
+			create_rebel = {
+				category = pretender
+				name = false_waldemar_rebel
+				save_scope_as = false_waldemar_rebel
+			}
+		}
+		set_variable = { name = bra_true_askanier_maker value = random_integer }
+		change_variable = { name = bra_true_askanier_maker modulo = 10 }
+		random_owned_location = {
+			create_dynasty_from_location = random
+			last_dynasty_in_location = { save_scope_as = target_dynasty }
+		}
+	}
+	after = {
+		remove_variable = bra_executing_false_waldemar
+		remove_variable = bra_execution_successful
+		remove_variable = bra_true_askanier_maker
+	}
+	#Our Authority is finally restored!
+	option = {
+		name = flavor_bra_dynasty.1007.a
+		trigger = { has_variable = bra_execution_successful }
+		kill_character = {
+			target = scope:target_character
+			reason = execution
+			killer = ruler
+		}
+		hidden_effect = {	#Nobody should walk with the 'Askanier' dynasty around...
+			scope:target_character = {
+				change_dynasty = scope:target_dynasty
+				change_character_estate = estate_type:burghers_estate
+				every_descendant = {
+					change_dynasty = scope:recipient.dynasty
+					if = {
+						limit = { has_estate = estate_type:nobles_estate }
+						change_character_estate = estate_type:burghers_estate
+					}
+				}
+			}
+		}
+	}
+	#To Arms!
+	option = {
+		name = flavor_bra_dynasty.1007.b
+		add_stability = stability_severe_penalty
+		trigger = { NOT = { has_variable = bra_execution_successful } }
+		hidden_effect = {
+			if = {
+				limit = { var:bra_true_askanier_maker = 0 }
+				scope:target_character = {
+					change_dynasty = dynasty:askanier_dynasty
+					every_descendant = {
+						change_dynasty = scope:recipient.dynasty
+					}
+				}
+			}
+			else = {
+				scope:target_character = {
+					change_dynasty = scope:target_dynasty
+					every_descendant = {
+						change_dynasty = scope:recipient.dynasty
+					}
+				}
+			}
+			scope:target_character = { remove_character_modifier = bra_false_waldemar }
+		}
+		scope:target_character = {
+			change_character_allegiance = scope:false_waldemar_rebel
+		}
+		custom_tooltip = {
+			text = flavor_bra_dynasty.false_waldemar_big_rebel.tt
+			ordered_owned_location = {
+				order_by = population
+				max = 12
+				check_range_bounds = no
+				every_pop = {
+					limit = {
+						owner = root
+						pop_type = pop_type:nobles
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					change_pop_allegiance = scope:false_waldemar_rebel
+				}
+			}
+		}
+		scope:false_waldemar_rebel = {
+			add_rebel_progress = 1
+		}
+		custom_tooltip = bra_true_waldemar_identity_reveal_tt
+	}
+}
+
+#Wittelsbacher neglect Brandenburg too much #DEVASTATION?
+flavor_bra_dynasty.1100 = {
+	type = country_event
+	title = flavor_bra_dynasty.1100.title
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.1100.desc
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = BRA
+		from = 1300.1.1
+		to = 1800.1.1
+		monthly_chance = 100
+	}
+	trigger = {
+		has_ruler = yes
+		bra_has_dynastic_chaos_active_trigger = yes
+		var:bra_wittelsbacher_investment_var <= -20
+		is_emperor = no
+		is_subject = no
+		exists = international_organization:hre
+		international_organization:hre = {
+			international_organization_has_leader = yes
+			leader_country ?= {
+				NOT = { in_union_with = root }
+				NOT = { has_royal_marriage_with = root }
+				ruler ?= {
+					NOT = {
+						any_spouse = {
+							is_ruler_of = root
+						}
+					}
+				}
+			}
+		}
+	}
+	immediate = {
+		bra_set_localization_scopes = yes
+		international_organization:hre = {
+			leader_country ?= {
+				save_scope_as = emperor_country
+			}
+		}
+	}
+	#The Emperor will be quite disgruntled...
+	option = {
+		name = flavor_bra_dynasty.1100.a
+		scope:emperor_country = {
+			trigger_event_non_silently = { id = flavor_bra_dynasty.1101 days = 7 }
+		}
+	}
+}
+
+#The Wittelsbacher fail the Holy Roman Empire  #DEVASTATION
+flavor_bra_dynasty.1101 = {
+	type = country_event
+	title = flavor_bra_dynasty.1101.title
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.1101.desc
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:peasants_estate }
+		ruler ?= {
+			save_scope_as = emperor_ruler
+			dynasty = {
+				random_character_in_dynasty = {
+					limit = {
+						is_alive = yes
+						is_female = no
+						is_adult = yes
+						is_ruler = no
+						owner = root
+					}
+					save_scope_as = dynasty_character
+				}
+			}
+		}
+		ordered_cabinet_character = {
+			order_by = total_abilities
+			max = 1
+			check_range_bounds = no
+			save_scope_as = cabinet_character
+		}
+	}
+	#Assume control 
+	option = {
+		name = flavor_bra_dynasty.1101.a
+		trigger = { has_ruler = yes }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1101.a.tt
+			scope:root_country = { trigger_event_silently = { id = flavor_bra_dynasty.1102 days = 5 } }
+		}
+		change_imperial_authority = { value = imperial_authority_very_weak_bonus }
+	}
+	#Place <dynasty member> on their throne
+	option = {
+		name = flavor_bra_dynasty.1101.b
+		trigger = { exists = scope:dynasty_character }
+		historical_option = yes
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1101.b.tt
+			scope:root_country = { trigger_event_silently = { id = flavor_bra_dynasty.1103 days = 5 } }
+		}
+		change_imperial_authority = { value = imperial_authority_weak_bonus }
+	}
+	#Vassalize it
+	option = {
+		name = flavor_bra_dynasty.1101.c
+		trigger = { exists = scope:cabinet_character }
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1101.c.tt
+			scope:root_country = { trigger_event_silently = { id = flavor_bra_dynasty.1104 days = 5 } }
+			international_organization:hre = {
+				every_international_organization_member = {
+					add_antagonism = { target = root modifier = subjugated_elector_antagonism }
+				}
+			}
+		}
+		change_imperial_authority = { value = imperial_authority_weak_penalty }
+	}
+	#Put Hohenzollern on the throne
+	option = {
+		name = flavor_bra_dynasty.1101.d
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1101.d.tt
+			scope:root_country = { trigger_event_silently = { id = flavor_bra_dynasty.1105 days = 5 } }
+		}
+		change_imperial_authority = { value = imperial_authority_extreme_bonus }
+		add_prestige = prestige_severe_bonus
+	}
+	#Let the Wittelsbacher keep it
+	option = {
+		name = flavor_bra_dynasty.1101.e
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1101.e.tt
+			scope:root_country = { trigger_event_silently = { id = flavor_bra_dynasty.1106 days = 5 } }
+		}
+		change_imperial_authority = { value = imperial_authority_mild_penalty }
+		add_gold = 800
+	}
+}
+
+#PU Event
+flavor_bra_dynasty.1102 = {
+	type = country_event
+	title = flavor_bra_dynasty.1102.title
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:emperor_ruler = { dynasty = dynasty:wittelsbach_dynasty } }
+				desc = flavor_bra_dynasty.1102.desc.wittelsbach
+			}
+		}
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:emperor_ruler = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+				desc = flavor_bra_dynasty.1102.desc
+			}
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+	option = {
+		name = flavor_bra_dynasty.1102.a
+		trigger = { scope:emperor_ruler = { dynasty = dynasty:wittelsbach_dynasty } }
+		set_new_ruler = scope:emperor_ruler
+		scope:emperor_ruler = { add_character_modifier = { modifier = bra_fresh_emperor_ruler_of_brandenburg years = -1 mode = add_and_extend } }
+		add_stability = stability_mild_bonus
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+	option = {
+		name = flavor_bra_dynasty.1102.b
+		trigger = { scope:emperor_ruler = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+		set_new_ruler = scope:emperor_ruler
+		scope:emperor_ruler = { add_character_modifier = { modifier = bra_fresh_emperor_ruler_of_brandenburg years = -1 mode = add_and_extend } }
+		add_stability = stability_mild_bonus
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+}
+
+#Dynasty gets the country event
+flavor_bra_dynasty.1103 = {
+	type = country_event
+	title = flavor_bra_dynasty.1103.title
+	
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+	
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:dynasty_character = { dynasty = dynasty:wittelsbach_dynasty } }
+				desc = flavor_bra_dynasty.1103.desc.wittelsbach
+			}
+		}
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:dynasty_character = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+				desc = flavor_bra_dynasty.1103.desc
+			}
+		}
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = flavor_bra_dynasty.1103.a
+		trigger = { scope:dynasty_character = { dynasty = dynasty:wittelsbach_dynasty } }
+		set_new_ruler = scope:dynasty_character
+		scope:dynasty_character = { add_character_modifier = { modifier = bra_fresh_ruler_of_brandenburg years = -1 mode = add_and_extend } }
+		add_stability = stability_mild_bonus
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+	option = {
+		name = flavor_bra_dynasty.1103.b
+		trigger = { scope:dynasty_character = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+		set_new_ruler = scope:dynasty_character
+		scope:dynasty_character = { add_character_modifier = { modifier = bra_fresh_ruler_of_brandenburg years = -1 mode = add_and_extend } }
+		add_stability = stability_mild_bonus
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+}
+
+#Vassalization event
+flavor_bra_dynasty.1104 = {
+	type = country_event
+	title = flavor_bra_dynasty.1104.title
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:cabinet_character = { dynasty = dynasty:wittelsbach_dynasty } }
+				desc = flavor_bra_dynasty.1104.desc.wittelsbach
+			}
+		}
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:cabinet_character = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+				desc = flavor_bra_dynasty.1104.desc
+			}
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = flavor_bra_dynasty.1104.a
+		trigger = { scope:cabinet_character = { dynasty = dynasty:wittelsbach_dynasty } }
+		make_subject_of = {
+			target = scope:emperor_country
+			type = subject_type:vassal
+		}
+		scope:cabinet_character = { move_country = root }
+		set_new_ruler = scope:cabinet_character
+		add_stability = stability_mild_bonus
+	}
+	option = {
+		name = flavor_bra_dynasty.1104.b
+		trigger = { scope:cabinet_character = { NOT = { dynasty = dynasty:wittelsbach_dynasty } } }
+		make_subject_of = {
+			target = scope:emperor_country
+			type = subject_type:vassal
+		}
+		scope:cabinet_character = { move_country = root }
+		set_new_ruler = scope:cabinet_character
+		add_stability = stability_mild_bonus
+	}
+	option = {
+		name = flavor_bra_dynasty.1104.c
+		scope:emperor_country = {
+			trigger_event_silently = flavor_bra_dynasty.1107
+			show_as_tooltip = {
+				add_casus_belli = {
+					type = casus_belli:cb_subjugation
+					target = scope:root_country
+				}
+				add_opinion = {
+					target = scope:root_country
+					modifier = opinion_resists_our_influence
+				}
+			}
+		}
+	}
+	after = {
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+}
+
+#Hohenzollern event
+flavor_bra_dynasty.1105 = {
+	type = country_event
+	title = flavor_bra_dynasty.1105.title
+	illustration_tags = {
+		10 = exterior
+		10 = regular
+	}
+
+	desc = flavor_bra_dynasty.1105.desc
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		create_character = {
+			first_name = name_frederick
+			dynasty = dynasty:hohenzollern_dynasty
+			estate = estate_type:nobles_estate
+			adm = { 60 80 }
+			dip = { 60 80 }
+			mil = { 60 80 }
+			age = 30
+			script = bra_friedrich_hohenzollern
+			save_scope_as = hohenzollern_character
+		}
+		set_variable = { name = bra_blocked_from_hohenzoller_event value = yes }
+	}
+	option = {
+		name = flavor_bra_dynasty.1105.a
+		set_new_ruler = scope:hohenzollern_character
+		add_stability = stability_mild_bonus
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+}
+
+#Wittelsbacher keep it for some reason...
+flavor_bra_dynasty.1106 = {
+	type = country_event
+	title = flavor_bra_dynasty.1106.title
+	illustration_tags = {
+		10 = interior
+		10 = angry
+	}
+	desc = flavor_bra_dynasty.1106.desc
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = flavor_bra_dynasty.1106.a
+		add_legitimacy = legitimacy_severe_penalty
+		remove_country_modifier = bra_wittelsbacher_neglect
+		remove_variable = bra_wittelsbacher_investment_var
+	}
+}
+
+#Brandenburg fights back!
+flavor_bra_dynasty.1107 = {
+	type = country_event
+	title = flavor_bra_dynasty.1107.title
+	illustration_tags = {
+		10 = regular
+		10 = exterior
+	}
+	desc = flavor_bra_dynasty.1107.desc
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+	}
+	option = {
+		name = flavor_bra_dynasty.1107.a
+		add_casus_belli = {
+			type = casus_belli:cb_subjugation
+			target = scope:root_country
+		}
+		add_opinion = {
+			target = scope:root_country
+			modifier = opinion_resists_our_influence
+		}
+	}
+}
+#Brandenburgian Burden
+flavor_bra_dynasty.1200 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_bra_dynasty.1200.title
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	fire_only_once = yes
+	trigger = {
+		country_exists = c:BRA
+		NOT = { tag = BRA }
+		is_emperor = yes
+		has_ruler = yes
+		c:BRA = { NOT = { has_variable = bra_blocked_from_hohenzoller_event } }
+		OR = {
+			in_union_with = c:BRA
+			c:BRA = { is_subject_of = root }
+		}
+		ruler ?= {
+			has_dynasty = yes
+			NOT = { dynasty = dynasty:wittelsbach_dynasty }
+			NOT = { dynasty = dynasty:hohenzollern_dynasty }
+			NOT = { has_character_modifier = bra_fresh_emperor_ruler_of_brandenburg }
+		}
+	}
+	desc = flavor_bra_dynasty.1200.desc
+	immediate = {
+		create_character = {
+			first_name = name_frederick
+			dynasty = dynasty:hohenzollern_dynasty
+			estate = estate_type:nobles_estate
+			adm = {60 80}
+			dip = {60 80}
+			mil = {60 80}
+			age = 30
+			script = bra_friedrich_hohenzollern
+			save_scope_as = hohenzollern_character
+		}
+		c:BRA = { save_scope_as = bra_country }
+		save_scope_as = emperor_country
+		ruler ?= {
+			save_scope_as = emperor_ruler
+			dynasty ?= {
+				save_scope_as = emperor_dynasty
+			}
+		}
+	}
+	#Place the Hohenzoller on their throne
+	option = {
+		name = flavor_bra_dynasty.1200.a
+		historical_option = yes
+		custom_tooltip = {
+			text = flavor_bra_dynasty.1200.a.tt
+			scope:bra_country = { trigger_event_silently = { id = flavor_bra_dynasty.1201 days = 3 } }
+		}
+		if = {
+			limit = { scope:bra_country = { is_subject_of = root } }
+			show_as_tooltip = {
+				cancel_subject = scope:bra_country
+			}
+		}
+	}
+	#Keep the Union
+	option = {
+		name = flavor_bra_dynasty.1200.b
+		add_stability = stability_severe_penalty
+		change_imperial_authority = { value = imperial_authority_very_strong_penalty }
+	}
+}
+
+#The Hohenzollern
+flavor_bra_dynasty.1201 = {
+	type = country_event
+	title = flavor_bra_dynasty.1201.title
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+	illustration_tags = {
+		10 = exterior
+		10 = armed
+	}
+	desc = flavor_bra_dynasty.1201.desc
+
+	option = {
+		name = flavor_bra_dynasty.1201.a
+		scope:hohenzollern_character = {
+			move_country = root
+		}
+		set_new_ruler = scope:hohenzollern_character
+		if = {
+			limit = { is_subject = yes }
+			overlord = {
+				cancel_subject = root
+			}
+		}
+		add_legitimacy = legitimacy_mild_bonus
+	}
+}

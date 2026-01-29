@@ -1,0 +1,430 @@
+﻿namespace = haudenosaunee
+
+scripted_trigger haudenosaunee_1_valid_attacker_trigger = {
+	opinion = { target = root value < 0 }
+	AND = {
+		NOT = {
+			any_international_organizations_member_of = {
+				international_organization_type = international_organization_type:tribal_confederation
+				root = { is_member_of_international_organization = prev }
+			}
+		}
+		NOT = {	is_allied_with = { target = root } }
+	}
+}
+
+scripted_trigger haudenosaunee_1_as_pop_neighbor_trigger = {
+	OR = {
+		AND = {
+			country_type = location
+			any_owned_location = {
+				OR = {
+					any_pop = { culture = root.culture }
+					any_neighbor_location = {
+						any_pop = { culture = root.culture }
+					}
+				}
+			}
+		}
+		any_owned_nomad_pop = {
+			location = {
+				OR = {
+					any_pop = { culture = root.culture }
+					any_neighbor_location = {
+						any_pop = { culture = root.culture }
+					}
+				}
+			}
+		}
+	}
+
+}
+
+haudenosaunee.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = haudenosaunee.1.title
+	desc = haudenosaunee.1.desc
+
+	trigger = {
+		culture = { has_culture_group = culture_group:haudenosaunee_group }
+		OR = {
+			AND = {
+				country_type = location
+				any_neighbor_country = { haudenosaunee_1_valid_attacker_trigger = yes }
+			}
+			any_known_country = {
+				haudenosaunee_1_as_pop_neighbor_trigger = yes
+				haudenosaunee_1_valid_attacker_trigger = yes
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
+		if = {
+			limit = {
+				country_type = location
+				any_neighbor_country = { haudenosaunee_1_valid_attacker_trigger = yes }
+			}
+			random_neighbor_country = {
+				limit = {
+					haudenosaunee_1_valid_attacker_trigger = yes
+				}
+				save_scope_as = raider
+			}
+			random_owned_location = {
+				limit = {
+					any_neighbor_location = {
+						owner ?= scope:raider
+					}
+				}
+				save_scope_as = raided_location
+			}
+		}
+		else = {
+			random_known_country = {
+				limit = {
+					haudenosaunee_1_as_pop_neighbor_trigger = yes
+					haudenosaunee_1_valid_attacker_trigger = yes
+				}
+				save_scope_as = raider
+			}
+
+			if = {
+				limit = {
+					country_type = pop
+				}
+				random_owned_nomad_pop = {
+					limit = {
+						location = {
+							OR = {
+								any_pop = { culture = root.culture }
+								any_neighbor_location = {
+									any_pop = { culture = root.culture }
+								}
+							}
+						}
+					}
+					location = {
+						save_scope_as = raided_location
+					}
+				}
+			}
+			else = {
+				random_owned_location = {
+					limit = {
+						OR = {
+							any_pop = { culture = root.culture }
+							any_neighbor_location = {
+								any_pop = { culture = root.culture }
+							}
+						}
+					}
+					save_scope_as = raided_location
+				}
+			}
+		}
+	}
+
+	option = {
+		name = haudenosaunee.1.a
+		scope:raided_location = {
+			ordered_pop = {
+				order_by = pop_size
+				max = 1
+	
+				add_pop_size = {
+					value = {
+						value = pop_size
+						multiply = 0.01
+						max = 0.5
+					}
+					multiply = -1
+				}
+			}
+		}
+		add_opinion = { target = scope:raider modifier = opinion_haudenosaunee_affront }
+	}
+}
+
+haudenosaunee.2 = {
+	type = country_event
+	title = haudenosaunee.2.title
+	desc = haudenosaunee.2.desc
+
+	trigger = {
+		culture = { has_culture_group = culture_group:haudenosaunee_group }
+		has_advance = mourning_wars
+		at_war = yes
+		any_country_at_war_with = {
+			OR = {
+				country_type = pop
+				any_owned_location = {
+					controller = root
+					population > 0
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = armed
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		if = {
+			limit = {
+				any_country_at_war_with = {
+					country_type = location
+					any_owned_location = {
+						controller = root
+						population > 0
+					}
+				}
+			}
+			random_country_at_war_with = {
+				limit = {
+					country_type = location
+					any_owned_location = {
+						controller = root
+						population > 0
+					}
+				}
+				random_owned_location = {
+					limit = {
+						controller = root
+						population > 0
+					}
+					ordered_pop = {
+						order_by = pop_size
+						max = 1
+						save_scope_as = target_pop
+					}
+					save_scope_as = target_location
+				}
+			}
+		}
+		else = {
+			random_country_at_war_with = {
+				limit = {
+					country_type = pop
+				}
+				random_owned_nomad_pop = {
+					save_scope_as = target_pop
+					location = {
+						save_scope_as = target_location
+					}
+				}
+			}
+		}
+		if = {
+			limit = { country_type = location }
+			random_owned_location = {
+				save_scope_as = our_location
+			}
+		}
+		else = {
+			random_owned_nomad_pop = {
+				location = {
+					save_scope_as = our_location
+				}
+			}
+		}
+	}
+
+	option = {
+		name = haudenosaunee.2.a
+		scope:our_location = {
+			add_pop = {
+				type = pop_type:slaves
+				culture = scope:target_pop.culture
+				religion = scope:target_pop.religion
+				literacy = scope:target_pop.pop_literacy
+				size = {
+					value = scope:target_pop.pop_size
+					multiply = 0.01
+					max = 0.5
+				}
+			}
+		}
+		scope:target_pop = {
+			add_pop_size = {
+				value = {
+					value = pop_size
+					multiply = 0.01
+					max = 0.5
+				}
+				multiply = -1
+			}
+		}
+	}
+
+	option = {
+		name = haudenosaunee.2.b
+
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+haudenosaunee.3 = {
+	type = country_event
+	title = haudenosaunee.3.title
+	desc = haudenosaunee.3.desc
+	trigger = {
+		culture = { has_culture_group = culture_group:haudenosaunee_group }
+		any_country_at_war_with = {
+			OR = {
+				country_type = pop
+				any_owned_location = {
+					controller = root
+				}
+			}
+		}
+		ruler ?= {
+			any_child = {
+				is_alive = no
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = happy
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		if = {
+			limit = {
+				any_country_at_war_with = {
+					country_type = location
+					any_owned_location = {
+						controller = root
+					}
+				}
+			}
+			random_country_at_war_with = {
+				limit = {
+					country_type = location
+					any_owned_location = {
+						controller = root
+					}
+				}
+				random_owned_location = {
+					limit = {
+						controller = root
+					}
+					save_scope_as = target_location
+				}
+			}
+		}
+		else = {
+			random_country_at_war_with = {
+				limit = {
+					country_type = pop
+				}
+				random_owned_nomad_pop = {
+					location = {
+						save_scope_as = target_location
+					}
+				}
+			}
+		}
+		ruler ?= { save_scope_as = target_character }
+		create_character = {
+			age = 3
+			culture = scope:target_location.dominant_culture
+			religion = scope:target_location.dominant_religion
+			birth_location = scope:target_location
+			estate = estate_type:nobles_estate
+			save_scope_as = target_child_character
+			create_in_limbo = yes
+		}
+	}
+
+	option = {
+		name = haudenosaunee.3.a
+		add_government_power = government_power_mild_bonus
+		kill_character_silently = scope:target_child_character
+	}
+	option = {
+		name = haudenosaunee.3.b
+		add_government_power = government_power_mild_penalty
+
+		if = {
+			limit = {
+				root.ruler = { is_female = yes }
+			}
+			scope:target_child_character = {
+				move_country = root
+				change_mother = root.ruler
+			}
+		}
+		else = {
+			scope:target_child_character = {
+				move_country = root
+				change_father = root.ruler
+			}
+		}
+
+		trigger_event_silently = { id = haudenosaunee.4 months = { 60 120 } }
+	}
+}
+
+haudenosaunee.4 = { #[target_child_character.GetNameWithNoTooltip]'s Upbringing
+	type = country_event
+	title = haudenosaunee.4.title
+	desc = haudenosaunee.4.desc
+
+	trigger = {
+		scope:target_child_character = {
+			is_alive = yes
+			OR = {
+				culture != root.culture
+				religion != root.religion
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+	
+	option = { #[target_child_character.GetSheHe|U] is one of us and can no longer call [target_child_character.GetHerselfHimself] [target_child_character.GetCulture.GetNameWithNoTooltip].
+		name = haudenosaunee.4.a
+		scope:target_child_character = {
+			if = {
+				limit = {
+					culture != root.culture
+				}
+				change_character_culture = root.culture
+			}
+			if = {
+				limit = {
+					religion != root.religion
+				}
+				change_character_religion = root.religion
+			}
+		}
+		add_prestige = prestige_weak_bonus
+	}
+
+	option = { #[target_child_character.GetSheHe|U] will be one of us or [target_child_character.GetSheHe] will die.
+		name = haudenosaunee.4.b
+		add_prestige = prestige_mild_bonus
+		kill_character = scope:target_child_character
+	}
+}

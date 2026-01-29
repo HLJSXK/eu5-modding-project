@@ -1,0 +1,223 @@
+types AiDiplomaticObjectivesViewer
+{
+	type tab_button = button {
+		size = { 185 30 }
+		texture = "gfx/interface/buttons/inner_tab_fade_vertical_low.dds"
+		spriteType = stretched
+		spriteborder = { 0 0 }
+		framesize = { 50 50 }
+		texture_density = 2
+		alpha = 1
+
+		default_format = "#high"
+
+		gfxtype = togglepushbuttongfx
+		effectname = "NoHighlight"
+
+		upframe = 1
+		uphoverframe = 3
+		uppressedframe = 3
+		downframe = 2
+		downhoverframe = 2
+		downpressedframe = 3
+		disableframe = 4
+	}
+}
+
+
+window = {
+	name = "ai_diplomatic_objectives_viewer"
+	parentanchor = top|left
+	size = { 1000 800 }
+	position = { 5 205 }
+	widgetanchor = top|left
+	movable = yes
+	using = editor_window
+
+	vbox = {
+		layoutpolicy_horizontal = expanding
+		layoutpolicy_vertical = expanding
+		text_single = {
+			size = { 300 30 }
+			align = center
+			using = Font_Type_Headers
+			raw_text = "Ai Diplomatic Objectives Viewer"
+			autoresize = no
+		}
+		hbox = {
+			layoutpolicy_horizontal = expanding
+			layoutpolicy_vertical = expanding
+			flowcontainer = {
+				direction = vertical
+				layoutpolicy_vertical = expanding
+				tab_button = {
+					raw_text = "Country Objectives"
+					down = "[AiDiplomaticObjectivesViewer.IsAiDiplomaticObjectiveTabOpen('(int32)1')]"
+					onclick = "[AiDiplomaticObjectivesViewer.OpenTab('(int32)1')]"
+					tooltip = "AI_OBJECTIVE_VIEW_COUNTRY_TAB"
+				}
+				tab_button = {
+					raw_text = "Objective Finder"
+					down = "[AiDiplomaticObjectivesViewer.IsAiDiplomaticObjectiveTabOpen('(int32)2')]"
+					onclick = "[AiDiplomaticObjectivesViewer.OpenTab('(int32)2')]"
+					tooltip = "AI_OBJECTIVE_VIEW_FINDER_TAB"
+				}
+			}
+
+			widget = {
+				layoutpolicy_horizontal = expanding
+				size = {600 770}
+				vbox = {
+					visible = "[AiDiplomaticObjectivesViewer.IsAiDiplomaticObjectiveTabOpen('(int32)2')]"
+					hbox = {
+						dropdown_menu_default = {
+							name = "objective_dropdown"
+
+							datamodel = "[AiDiplomaticObjectivesViewer.GetObjectiveTypes]"
+							onselectionchanged = "[AiDiplomaticObjectivesViewer.SelectObjectiveType]"
+							selectedindex = "[AiDiplomaticObjectivesViewer.GetSelectedObjectiveTypeIndex]"
+
+							blockoverride "dropdown_active_item_properties" {
+								raw_text = "[DiplomaticObjectiveTypeGlue.GetName]"
+							}
+
+							blockoverride "dropdown_item_properties" {
+								raw_text = "[DiplomaticObjectiveTypeGlue.GetName]"
+							}
+						}
+						text_single = {
+							raw_text = "Amount of objectives: [AiDiplomaticObjectivesViewer.GetNumberOfObjectives]"
+							layoutpolicy_horizontal = growing
+							margin_left = 20
+						}
+					}
+					scroll_list = {
+						blockoverride "scroll_list_layout" {
+							vbox = {
+								layoutpolicy_vertical = expanding
+								datamodel = "[AiDiplomaticObjectivesViewer.GetObjectivesOfType]"
+								item = {
+									vbox = {
+										layoutpolicy_horizontal = expanding
+										background = {
+											using = color_dark_blue_texture
+											alpha = 0.2
+											spriteType = stretched
+											blend_mode = alphamultiply
+										}
+										hbox = {
+											layoutpolicy_horizontal = expanding
+											text_single = {
+												raw_text = "Actor: [AiDiplomaticObjective.GetCountry]"
+												layoutpolicy_horizontal = growing
+												maximumsize = { 250 -1 }
+												margin_left = 30
+											}
+											text_single = {
+												raw_text = "Recipient: [AiDiplomaticObjective.GetTarget]"
+												layoutpolicy_horizontal = growing
+												maximumsize = { 250 -1 }
+											}
+											button_default = {
+												size = { 60 25 }
+												name = "show_dip_obj"
+												raw_text = "Show"
+												onclick = "[AiDiplomaticObjective.ShowCountry]"
+												tooltip = "AI_OBJECTIVE_VIEW_SHOW_COUNTRY"
+											}
+
+											margin = { 0 10}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				vbox = {
+					visible = "[AiDiplomaticObjectivesViewer.IsAiDiplomaticObjectiveTabOpen('(int32)1')]"
+					layoutpolicy_horizontal = expanding
+					layoutpolicy_vertical = expanding
+					hbox = {
+						dropdown_menu_default = {
+							name = "country_dropdown"
+
+							datamodel = "[AiDiplomaticObjectivesViewer.GetCountries]"
+							onselectionchanged = "[AiDiplomaticObjectivesViewer.SelectCountry]"
+							selectedindex = "[AiDiplomaticObjectivesViewer.GetSelectedCountryIndex]"
+
+							blockoverride "dropdown_active_item_properties" {
+								raw_text = "[Country.GetNameWithNoTooltip]"
+							}
+
+							blockoverride "dropdown_item_properties" {
+								raw_text = "[Country.GetNameWithNoTooltip]"
+							}
+						}
+						
+						button_default = {
+							size = { 180 22 }
+							name = "set_to_current_country"
+							raw_text = "Set to current tag"
+							onclick = "[AiDiplomaticObjectivesViewer.SelectCurrentTag]"
+							tooltip = "AI_OBJECTIVE_VIEW_CURRENT_COUNTRY"
+						}
+					}
+					scroll_list = {
+						blockoverride "scroll_list_layout" {
+							vbox = {
+								layoutpolicy_vertical = expanding
+								datamodel = "[AiDiplomaticObjectivesViewer.GetObjectiveGroups]"
+								item = {
+									vbox = {
+										background = {
+											using = color_dark_blue_texture
+											alpha = 0.2
+											spriteType = stretched
+											blend_mode = alphamultiply
+										}
+
+										margin = { 10 10 }
+										hbox = {
+											text_single = {
+												raw_text = "Objective group"
+												margin_bottom = 25
+											}
+											button_default = {
+												visible = "[AiDiplomaticObjectiveGroup.IsImportant]"
+												size = { 120 22 }
+												name = "deset_objective_as_important"
+												raw_text = "Deset as important"
+												onclick = "[AiDiplomaticObjectiveGroup.SetAsImportant]"
+												tooltip = "Deset as important"
+											}
+											button_default = {
+												visible = "[Not(AiDiplomaticObjectiveGroup.IsImportant)]"
+												size = { 120 22 }
+												name = "set_objective_as_important"
+												raw_text = "Set as important"
+												onclick = "[AiDiplomaticObjectiveGroup.SetAsImportant]"
+												tooltip = "Set as important"
+											}
+
+										}
+										vbox = {
+											name = "objectives"
+											datamodel = "[AiDiplomaticObjectiveGroup.GetAiObjectives]"
+											item = {
+												text_single = {
+													text = "[AiDiplomaticObjective.GetDebugInfo]"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+

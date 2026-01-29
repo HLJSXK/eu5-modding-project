@@ -1,0 +1,858 @@
+lateralview = {
+	name = "seazone_window"
+	
+	blockoverride "panel_header" {
+		window_header_alt = {
+			using = bg_main_inner_alt
+			blockoverride "window_header_alt_color_texture"{
+				using = color_default_brown_texture
+			}
+			
+			blockoverride "header_text_object" {
+				hbox = {
+					spacing = 5
+					expand = {}
+
+					widget = {	
+						visible = "[Not(SeaZoneView.IsCorridor)]"
+						size = { 30 30 }	
+						icon = {
+							size = { 100% 100% }
+							texture = "gfx/interface/icons/flat_icons/geopolitics/exploration_sea.dds"
+						}
+					}
+					widget = {
+						visible = "[SeaZoneView.IsCorridor]"
+						size = { 30 30 }
+						icon = {
+							size = { 100% 100% }
+							texture = "gfx/interface/mapitems/desert_connector.dds"
+						}
+					}
+
+					header_title = {
+						layoutpolicy_horizontal = fixed
+						autoresize = yes
+						maximumsize = { 450 -1 }
+						text = "[SeaZoneView.GetLocation.GetNameWithNoTooltip]"
+						using = snd_UI_window_state
+					}
+
+					button_pin = {
+						size = { 23 23 }
+						visible = "[IsPlayerValid]"
+						datacontext = "[SeaZoneView.GetLocation]"
+						onclick = "[ToggleSeazoneFav(Location.Self)]"
+						checked = "[IsSeazoneFaved(Location.Self)]"
+						tooltipwidget = { 
+							LeftClickButtonTooltip = {
+								blockoverride "onclick_text" { 
+									text = "[SelectLocalization(IsSeazoneFaved(Location.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
+								}
+							}
+						}
+					}
+
+					expand = {}
+				}
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_notabs_alt
+			using = window_main_tabs_margin_alt
+			
+			widget = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 45 }
+				hbox = {
+					vbox = {
+						using = layoutpolicy_expanding
+						layoutstretchfactor_horizontal = 1
+						margin_left = 10
+						text_single = {
+							using = layoutpolicy_expanding
+							maximumsize = { -1 21}
+							align = left|nobaseline
+							autoresize = yes
+							text = "[Select_CString(SeaZoneView.IsCorridor, corridor, Select_CString(SeaZoneView.GetLocation.GetTopography.IsDeepOcean, sea_current, seazone))|e]"
+						}
+
+						text_single = {
+							autoresize = no
+							layoutpolicy_horizontal = expanding
+							size = {-1 20}
+							fontsize = 12
+							text = "CANNOT_BE_OWNED"
+						}
+						expand = {}
+					}
+
+					hbox = {
+						using = layoutpolicy_expanding
+						layoutstretchfactor_horizontal = 1
+						datacontext = "[SeaZoneView.GetLocation]"
+						visible = "[Location.HasSoundToll]"
+						icon = { 
+							size = { 32 32 }
+							texture = "[GetConceptTexture('sound_toll')]"
+							tooltipwidget = {
+								using = SoundTollLocationTooltip
+							}
+						}
+					}
+					
+					hbox = {
+						using = layoutpolicy_expanding
+						layoutstretchfactor_horizontal = 1
+
+						expand = {}
+
+						subheader_unified_icon = {
+							blockoverride "mirror_layout" { righttoleft = yes }
+							visible = "[SeaZoneView.GetLocation.HasMarket]"
+							datacontext = "[SeaZoneView.GetLocation.GetMarket]"
+							datacontext = "[SeaZoneView.GetLocation]"
+							tooltipwidget = {
+								using = location_market_tooltip
+							}
+							blockoverride "subheader_unified_icon_texture" {
+								texture = "gfx/interface/icons/location_icons/market.dds"
+							}
+							blockoverride "subheader_unified_top_text" {
+								text = "[SeaZoneView.GetLocation.GetMarket.GetNameWithNoTooltip|w]"
+								align = nobaseline
+							}
+							
+							blockoverride "subheader_unified_bottom_text" {
+								text = "[SeaZoneView.GetLocation.GetMarketAccess|%]"
+								align = nobaseline
+							}
+						}
+					}
+				}
+				flowcontainer = {
+					parentanchor = center
+					widget = {
+						size = { 32 32 }
+						visible = "[SeaZoneView.GetLocation.IsFrozen]"
+						tooltip = "[frozen|e]"
+						tagtooltip_enabled = yes
+						icon = {
+							size = { 32 32 }
+							texture = "gfx/interface/icons/location_icons/blockade_byice.dds"
+							using = overlay_color_light_blue
+							glow = {
+								name = "drop_shadow"
+								glow_radius = 3
+								color = {0.0 0.0 0.0 1.0}
+								alpha = 0.3
+							}
+						}
+					}
+				}
+			}
+
+			# scene # TODO add battle widget for seazones and corridors
+			icon = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 220 }
+
+				using = bg_age_event_frame
+
+				hbox = {
+					ecs_scene_viewer_widget =  {
+						layoutpolicy_horizontal = expanding
+						layoutpolicy_vertical = expanding
+						name = "event_window_scene_viewer"
+						scene = "[SeaZoneView.GenerateSceneDesc]"
+					}
+					datacontext = "[SeaZoneView.GetLocation.GetTopography]"
+					tooltipwidget = {
+						using = Topography_tooltip
+					}
+				}
+
+				# BOTTOM LEFT MODIFIERS
+				hbox = {
+					parentanchor = bottom
+					layoutpolicy_horizontal = expanding
+					maximumsize = { -1 40 }
+					background = {
+						using = color_dark_blue_texture
+						alpha = 1
+
+						modify_texture = {
+							using = bg_fade_vertical_up_mask_texture
+							blend_mode = alphamultiply
+							alpha = 1
+						}
+					}
+					hbox = {
+						margin = {10 8}
+
+						using = bg_paper_card
+						using = bg_cabinet_card_frame
+
+						hbox = {
+							spacing = 5
+
+							widget = {
+								size = { 30 30 }
+								datacontext = "[SeaZoneView.GetLocation.GetTopography]"
+								tooltipwidget = {
+									using = Topography_tooltip
+								}
+								background =  {
+									texture = "[GetClimateFrame(SeaZoneView.GetLocation.GetClimate)]"
+								}
+								icon = {
+									size = { 30 30 }
+									texture = "[GetTopographyIcon(SeaZoneView.GetLocation.GetTopography)]"
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 3
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.3
+									}
+								}
+							}
+
+							widget = {
+								size = { 30 30 }
+								datacontext = "[SeaZoneView.GetLocation.GetClimate]"
+								tooltipwidget = {
+									using = Climate_tooltip
+								}
+								background =  {
+									texture = "[GetClimateFrame(SeaZoneView.GetLocation.GetClimate)]"
+								}
+								icon = {
+									size = { 30 30 }
+									texture = "[GetClimateIcon(SeaZoneView.GetLocation.GetClimate)]"
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 3
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.3
+									}
+								}
+							}
+
+							widget = {
+								visible = "[SeaZoneView.IsCorridor]"
+								size = { 30 30 }
+								datacontext = "[SeaZoneView.GetLocation.GetVegetation]"
+								tooltipwidget = {
+									using = Vegetation_tooltip
+								}
+								background =  {
+									texture = "[GetClimateFrame(SeaZoneView.GetLocation.GetClimate)]"
+								}
+								icon = {
+									size = { 30 30 }
+									texture = "[GetVegetationIcon(SeaZoneView.GetLocation.GetVegetation)]"
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 3
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.3
+									}
+								}
+							}
+
+							### IS BLOCKADED by ice
+							widget = {
+								size = { 30 30 }
+								visible = "[SeaZoneView.GetLocation.IsBlockadedByIce]"
+								tooltipwidget = {
+
+									ContextualTooltipType = {
+										blockoverride "title_text" {
+											datacontext = "[SeaZoneView.GetLocation]"
+											text = "BLOCKADED_BY_ICE"
+										}
+
+										blockoverride "title_icon_texture" {
+											texture = "gfx/interface/icons/location_icons/coastal_blockade.dds"
+										}
+
+										blockoverride "concept_link" {
+											text = [blockade|E]
+										}
+
+										blockoverride "tooltip_content" {
+											TooltipStringPairList = {
+												textcontext = "[SeaZoneView.GetLocation.GetBlockadeImpact]"
+											}
+										}
+									}
+								}
+								background =  {
+									texture = "[GetClimateFrame(SeaZoneView.GetLocation.GetClimate)]"
+								}
+								icon = {
+									size = { 30 30 }
+									texture = "gfx/interface/icons/location_icons/blockade_byice.dds"
+									using = overlay_color_light_blue
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 3
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.3
+									}
+								}
+							}
+						}
+					}
+					widget = {
+						using = layoutpolicy_expanding
+						hbox = {
+							margin = { 5 5 }
+							spacing = 7	
+
+							# Location timed modifiers
+							widget = {
+								size = { 45 26 }
+								visible = "[GreaterThan_int32(GetDataModelSize(SeaZoneView.GetLocation.GetTimedModifiers), '(int32)0')]"
+
+								# RIGHT DIVISION
+								flowcontainer = {
+									visible = "[Not(GreaterThan_int32(GetDataModelSize(SeaZoneView.GetLocation.GetTimedModifiers), '(int32)1'))]"
+
+									layoutpolicy_horizontal = expanding
+
+									datamodel = "[SeaZoneView.GetLocation.GetTimedModifiers]"
+									item = {
+										timed_modifier_icon = {
+											datacontext = "[TimedModifier]"
+											tooltipwidget = {
+												using = timed_modifier_tooltip
+												blockoverride "concept_link" {
+													text = "[location_modifier|e]"
+												}
+											}
+										}
+									}
+
+									expand = {}
+								}
+
+								flowcontainer = {
+									visible = "[GreaterThan_int32(GetDataModelSize(SeaZoneView.GetLocation.GetTimedModifiers), '(int32)1')]"
+
+									text_single = {
+										minimumsize = { -1 26 }
+										align = nobaseline|hcenter
+										text = "[GetDataModelSize(SeaZoneView.GetLocation.GetTimedModifiers)]"
+									}
+									icon = {
+										size = { 26 26 }
+										texture = "gfx/interface/icons/modifiers/locations.dds"
+										texture_density = 2
+
+										tooltipwidget = {
+											ContextualTooltipType = {
+												blockoverride "title_icon" {
+													icon = {
+														texture = "gfx/interface/icons/modifiers/locations.dds"
+														using = tooltip_title_icon_size
+													}
+												}
+												blockoverride "title_text" {
+														text = "game_concept_location_modifier"
+												}
+												blockoverride "concept_link" {
+													text = [location_modifier|e]
+												}
+
+												blockoverride "tooltip_content" {
+													TooltipScrolledRowList = {
+														blockoverride "block_title" { visible = no }
+														blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(SeaZoneView.GetLocation.GetTimedModifiers)]"}
+														blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(SeaZoneView.GetLocation.GetTimedModifiers)]"}
+														blockoverride "rowlist_datamodel" { datamodel = "[SeaZoneView.GetLocation.GetTimedModifiers]" }
+														blockoverride "rowlist_content" {
+															hbox = {
+																layoutpolicy_horizontal = expanding
+																spacing = 10
+																datacontext = "[TimedModifier]"
+																tooltipwidget = {
+																	using = timed_modifier_tooltip
+																}
+																text_single = {
+																	margin_left = 20
+																	text = "[TimedModifier.GetModifier.GetName]"
+																}
+																timed_modifier_icon = {
+																	datacontext = "[TimedModifier]"
+																	tooltipwidget = {
+																		using = timed_modifier_tooltip
+																		blockoverride "concept_link" {
+																			text = "[location_modifier|e]"
+																		}
+																	}
+																}
+
+																expand = {}
+															}
+														}
+
+														blockoverride "block_scrollarea" {
+															maximumsize = { -1 210 }
+														}
+
+														blockoverride "row_size" {
+															maximumsize = { -1 40 }
+															minimumsize = { -1 40 }
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
+							expand = {}
+						}
+					}
+
+					expand = {}
+				}
+			}
+
+			widget = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 50 }
+				icon = {
+					parentanchor = bottom
+					size = { 100% 40 }
+					using = button_main_tab_icon_texture
+					using = button_secondary_tab_alt_color
+					hbox = {
+						margin_top = 5
+		
+						text_single = {
+							align = left|nobaseline
+							text = "BREAKDOWN"
+						}
+					}
+				}
+			}
+
+			vbox = {
+				using = layoutpolicy_expanding
+				using = bg_secondary_inner_alt
+
+				# BATTLE
+				battle_goto_widget = {
+					visible = "[SeaZoneView.GetLocation.HasCombat]"
+					datacontext = "[SeaZoneView.GetLocation.GetCombat]"
+				}
+
+				scrollarea = {
+					using = layoutpolicy_expanding
+					scrollbarpolicy_horizontal = always_off
+					scrollbarpolicy_vertical = as_needed
+					scrollbar_vertical = {using = Scrollbar_Vertical}
+
+					scrollwidget = {
+						vbox = {	
+							spacing = 10
+							margin = {5 5}
+							## BATTLE
+							# vbox = {
+							# 	# TODO for seazones and corridors
+							# }
+
+							expandable_header_paper_card = {
+								visible = "[SeaZoneView.IsCorridor]"
+								blockoverride "header_paper_card_header_bg" {
+									using = bg_card_header_01_geopolitics
+								}
+								
+								blockoverride "header_content" {
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										maximumsize = { -1 40 }
+											
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											size = {-1 40}
+											autoresize = no
+											align = center|nobaseline
+											default_format = "#yellow_titles"
+											text = "[corridor|e]"
+										}
+									}
+								}
+
+								blockoverride "bottom_content" {
+									
+								}
+							}
+
+							expandable_header_paper_card = {
+								visible = "[Not(SeaZoneView.IsCorridor)]"
+								blockoverride "header_paper_card_header_bg" {
+									using = bg_card_header_01_geopolitics
+								}
+								blockoverride "header_content" {
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										maximumsize = { -1 40 }
+											
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											size = {-1 40}
+											autoresize = no
+											align = center|nobaseline
+											default_format = "#yellow_titles"
+											text = "[privateers|e]"
+										}
+									}
+								}
+
+								blockoverride "bottom_content" {
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										layoutpolicy_vertical = expanding
+										maximumsize = { -1 60 }
+
+										scrollarea = {
+											layoutpolicy_horizontal = expanding
+											size = {-1 60}
+											scrollbarpolicy_horizontal = always_off
+											autoresizescrollarea = yes
+											scrollbar_vertical = {
+												using = Scrollbar_Vertical
+											}
+											scrollwidget = {
+												flowcontainer = {
+													margin_left = 10
+													margin_top = 10
+													margin_bottom = 10
+													spacing = 10
+													ignoreinvisible = yes
+		
+													widget = {
+														size = { 40 40 }
+
+														tooltipmeta = {
+															texture = "[GetConceptTexture('privateer')]"
+															game_concept = "[privateers|E]"
+														}
+
+														navigational_action_button_alt = {
+															parentanchor = left|vcenter
+															using = bg_circle_alt_brown
+															blockoverride "bg_circle_alt_margin" {
+																margin = { 0 0 }
+															}
+															blockoverride "icon_texture" {
+																texture = "gfx/interface/icons/flat_icons/military/ship_flat.dds"
+																texture_density = 2
+																size = {70% 70%}
+
+																modify_texture = {
+																	using = color_new_gold_texture
+																}
+																modify_texture = {
+																	using = overlay_window_texture
+																	blend_mode = overlay
+																	alpha = 0.4
+																}
+																modify_texture = {
+																	using = overlay_stone_texture
+																	blend_mode = overlay
+																	alpha = 0.4
+																}
+															}
+															
+															size = { 100% 100% }
+															title = "privateers"
+															actor = "[SeaZoneView.GetPlayer]"
+															parameter = {
+																parameter_name = "target"
+																parameter_value = "[SeaZoneView.GetLocation.GetArea]"
+															}
+															left_click_and_hold_action = { action_name = "hire_privateer" }
+															right_click_and_hold_action = { action_name = "dismiss_privateer" }
+														}
+													}
+												
+													direction = horizontal
+													datamodel_wrap = 8		
+													datamodel = "[SeaZoneView.GetLocation.GetMaritime.GetPrivateers]"
+													item = {
+														widget = {
+															tooltipwidget = {
+																using = Privateer_tooltip
+															}
+															size = { 50 90 }
+															vbox = {
+																using = layoutpolicy_expanding
+																using = bg_dark_paper_card
+																spacing = 3
+																margin = {5 5}
+																margin_top = 8
+		
+																piechart = {
+																	using = bg_circle
+																	size = { 30 30 }
+																	minimumsize = { 30 30 }
+																	using = piechart_angles
+																	using = bg_circle_piechart
+		
+																	pieslice_no_highlight = {
+																		texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+																		value = "[FixedPointToFloat(Privateer.GetPower)]"
+																		color = { 1 1 1 1 }
+																	}
+		
+																	pieslice_no_highlight = {
+																		texture = "gfx/interface/pie_charts/pie_chart_alpha_80_red.dds"
+																		value = "[Subtract_float('(float)1.0', FixedPointToFloat(Privateer.GetPower))]"
+																		color = { 1 1 1 1 }
+																	}
+		
+																	icon = {
+																		size = { 20 20 }
+																		parentanchor = center
+																		texture = "gfx/interface/icons/flat_icons/geopolitics/privateer.dds"
+																		texture_density = 2
+																		alpha = 1
+																		glow = {
+																			name = "drop_shadow"
+																			glow_radius = 3
+																			color = {0.0 0.0 0.0 1.0}
+																			alpha = 0.3
+																		}
+																	}
+																}
+		
+																country_flag_small = {
+																	datacontext = "[Privateer.GetOwner]"
+																	blockoverride "tooltip" {
+																		tooltipwidget = {
+																			using = Privateer_tooltip
+																		}
+																	}
+																	blockoverride "contextmenu" {}
+																	blockoverride "click" {}
+																	blockoverride "rightclick" {}
+																}
+		
+																text_single = {
+																	size = {35 15}
+																	autoresize = no								
+																	text = "[Privateer.GetPowerChange|+=%]"
+																	align = center|nobaseline							
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
+							## MARITIME PRESENCE
+
+							expandable_header_paper_card = {
+								using = layoutpolicy_expanding
+								visible = "[Not(SeaZoneView.IsCorridor)]"
+								blockoverride "header_paper_card_header_bg" {
+									using = bg_card_header_01_geopolitics
+								}
+								blockoverride "header_content" {
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										maximumsize = { -1 40 }
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											size = {-1 40}
+											autoresize = no
+											align = center|nobaseline
+											default_format = "#yellow_titles"
+											text = "[maritime_presence|e]"
+										}
+									}
+								}
+
+								blockoverride "bottom_content" {
+									margin = { 0 10 }
+									
+									filtered_sorted_list = {
+										datacontext = "[SeaZoneView.GetMaritimePresenceItemsSortSearch]"
+		
+										blockoverride "scroll_list_is_empty" {
+											visible = "[IsDataModelEmpty(SeaZoneView.GetMaritimePresenceItems)]"
+										}
+		
+										blockoverride "scroll_list_is_empty_text" {
+											text = "NO_MARITIME_PRESENCES_AVAILABLE"
+										}
+		
+										blockoverride "scroll_list_content" {
+											addcolumn = 100%
+											addrow = 67
+											datamodel = "[SeaZoneView.GetMaritimePresenceItems]"
+
+											item = {
+												widget = {
+													datacontext = "[MaritimePresenceItem.GetMaritimePresence]"
+													size = { 100% 67 }
+													widget = {
+														size = { 96% 65 }
+														parentanchor = center
+														
+														card_list_button = {
+															tooltipwidget = {
+																using = maritime_presence_tooltip
+															}
+															layoutpolicy_horizontal = expanding
+															parentanchor = center
+															size = { 100% 60 }
+															using = bg_generic_shadow														
+															
+															action_tooltip = {
+																click_type = left
+																click_mode = single
+																title = "COUNTRY_CLICK_TOOLTIP_LEFT_CLICK"
+																on_action = "[OpenDiplomacy(MaritimePresence.GetCountry.Self)]"
+															}
+		
+															hbox = {
+																parentanchor = center
+																layoutpolicy_horizontal = expanding
+																margin = {0 3}
+																spacing = 10
+																margin_left = 10
+												
+																piechart = {
+																	using = bg_circle
+																	size = { 35 35 }
+																	minimumsize = { 35 35 }
+																	
+																	using = bg_circle_piechart
+		
+																	using = piechart_angles
+		
+																	pieslice_no_highlight = {
+																		filter_mouse = none
+																		alwaystransparent = yes
+																		texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+																		value = "[FixedPointToFloat(MaritimePresence.GetPower)]"
+																		color = { 1 1 1 1 }
+																	}
+		
+																	pieslice_no_highlight = {
+																		filter_mouse = none
+																		alwaystransparent = yes
+																		texture = "gfx/interface/pie_charts/pie_chart_alpha_80_red.dds"
+																		value = "[Subtract_float('(float)100.0', FixedPointToFloat(MaritimePresence.GetPower))]"
+																		color = { 1 1 1 1 }
+																	}
+		
+																	icon = {
+																		size = { 25 25 }
+																		parentanchor = center
+																		texture = "gfx/interface/icons/flat_icons/geopolitics/maritime_presence.dds"
+																		texture_density = 2
+																		alpha = 1
+																		glow = {
+																			name = "drop_shadow"
+																			glow_radius = 3
+																			color = {0.0 0.0 0.0 1.0}
+																			alpha = 0.3
+																		}
+																	}
+																}
+																
+																country_flag_small = {
+																	datacontext = "[MaritimePresence.GetCountry]"
+																}
+		
+																divider_flavor_01 = {
+																	size = { 15 -1 }
+																	layoutpolicy_vertical = expanding
+																}
+		
+																vbox = {
+																	using = layoutpolicy_expanding
+																	maximumsize = {-1 45}
+																	
+		
+																	text_single = {
+																		using = layoutpolicy_expanding
+																		autoresize = no
+																		text = "[MaritimePresence.GetCountry.GetLongNameWithNoTooltip]"
+																		default_format = "#yellow_titles"
+																		align = left|nobaseline
+																	}
+		
+																	text_single = {
+																		using = layoutpolicy_expanding
+																		size = { 80 20 }
+																		autoresize = no								
+																		raw_text = "[MaritimePresence.GetPower|+=]@maritime_presence!([MaritimePresence.GetChange|+=])"
+																		align = left|nobaseline							
+																	}
+																}	
+																
+																expand = {}
+		
+																hbox = {
+																	layoutpolicy_vertical = expanding
+		
+																	
+																	divider_flavor_01 = {
+																		size = { 15 -1 }
+																		layoutpolicy_vertical = expanding
+																	}
+																	
+																	hbox = {
+																		datacontext = "[MaritimePresence]"
+																		tooltipwidget = {
+																			using = maritime_merchant_power_tooltip
+																		}
+				
+																		layoutpolicy_vertical = expanding
+																		margin = {10 0}
+				
+																		text_single = {
+																			autoresize = yes
+																			align = left|nobaseline								
+																			text = "[MaritimePresence.GetMaritimeMerchantPower|2]"
+																		}
+				
+																		icon = {
+																			size = { 24 24 }
+																			texture = "gfx/interface/icons/flat_icons/trade_advantage.dds"
+																			texture_density = 2					
+																		}
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,344 @@
+﻿namespace = generic_colonial_exploration_events
+
+
+scripted_effect add_scaling_character_abilities = {
+	if = {
+		limit = {
+			NOT = {  adm = 100 }
+		}
+		add_adm = {
+			value = {
+				add = 100
+				subtract = adm
+				divide = 10
+				ceiling = yes
+			}
+		}
+	}
+	if = {
+		limit = {
+			NOT = {  dip = 100 }
+		}
+		add_dip = {
+			value = {
+				add = 100
+				subtract = dip
+				divide = 10
+				ceiling = yes
+			}
+		}
+	}
+	if = {
+		limit = {
+			NOT = {  mil = 100 }
+		}
+		add_mil = {
+			value = {
+				add = 100
+				subtract = mil
+				divide = 10
+				ceiling = yes
+			}
+		}
+	}
+}
+
+generic_colonial_exploration_events.1 = {
+	type = country_event	
+
+	title = generic_colonial_exploration_events.1.title
+	desc = generic_colonial_exploration_events.1.desc
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		ordered_character = {
+			limit = { is_explorer = yes }
+			order_by = total_abilities
+			max = 1
+			save_scope_as = target_character_1
+		}
+		ordered_character = {
+			limit = { 
+				is_explorer = yes 
+				this != scope:target_character_1
+			}
+			max = 1
+			order_by = total_abilities
+			save_scope_as = target_character_2
+		}
+		if = {
+			limit = {
+				any_character = {
+					is_explorer = yes
+					OR = {
+						adm < 100
+						dip < 100
+						mil < 100
+					}
+					NOR = {
+						this = scope:target_character_1
+						this = scope:target_character_2
+					}
+				}
+			}
+			ordered_character = {
+				limit = { 
+					is_explorer = yes 
+					this != scope:target_character_1
+					this != scope:target_character_2
+				}
+				order_by = total_abilities
+				max = 1
+				save_scope_as = target_character_3
+			}
+		}
+	}
+	
+	option = {
+		name = generic_colonial_exploration_events.1.a
+
+		trigger = {
+			exists = scope:target_character_1
+		}
+		
+		scope:target_character_1 ?= { add_scaling_character_abilities = yes }
+	}
+
+	option = {
+		name = generic_colonial_exploration_events.1.b
+
+		trigger = {
+			exists = scope:target_character_2
+		}
+		
+		scope:target_character_2 ?= { add_scaling_character_abilities = yes }
+	}
+
+	option = {
+		name = generic_colonial_exploration_events.1.c
+
+		trigger = {
+			exists = scope:target_character_3
+		}
+		
+		scope:target_character_3 ?= { add_scaling_character_abilities = yes }
+	}
+
+	option = {
+		name = generic_colonial_exploration_events.1.d
+		
+		add_country_modifier = {
+			modifier = wave_of_great_explorers_modifier
+			years = 5
+			mode = add_and_extend
+		}
+	}
+}
+
+generic_colonial_exploration_events.2 = {
+	type = country_event	
+
+	title = generic_colonial_exploration_events.2.title
+	desc = generic_colonial_exploration_events.2.desc
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+	}
+	
+	option = {
+		name = generic_colonial_exploration_events.2.a
+
+		add_research_progress = research_progress_severe_bonus
+	}
+
+	option = {
+		name = generic_colonial_exploration_events.2.b
+
+		add_navy_tradition = navy_tradition_extreme_bonus
+	}
+}
+
+generic_colonial_exploration_events.3 = {
+	type = country_event	
+
+	title = generic_colonial_exploration_events.3.title
+	desc = generic_colonial_exploration_events.3.desc
+
+	trigger = {
+		any_colonial_charter = {
+			province_definition = {
+				any_location_in_province_definition = {
+					has_owner = no
+					any_pop = {
+						culture = {
+							root = {
+								NOT = { has_primary_or_accepted_culture = prev }
+							}
+						}
+						NOT = { religion = root.religion }
+					}
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		set_variable = {
+			name = pop_size_assimilation_variable
+			value = 0
+		}
+		
+		random_colonial_charter = { 
+			province_definition = { 
+				save_scope_as = target_charter 
+				every_location_in_province_definition = {
+					every_pop = {
+						limit = {
+							culture = {
+								root = {
+									NOT = { has_primary_or_accepted_culture = prev }
+								}
+							}
+							NOT = { religion = root.religion }
+						}
+						root = {
+							change_variable = {
+								name = pop_size_assimilation_variable
+								add = prev.pop_size
+							}
+						}
+					}
+				}
+			}
+		}
+		if = {
+			limit = { var:pop_size_assimilation_variable > 0 }
+			change_variable = {
+				name = pop_size_assimilation_variable
+				multiply = -5
+			}
+		}
+	}
+	
+	option = {
+		name = generic_colonial_exploration_events.3.a
+
+		if = {
+			limit = { var:pop_size_assimilation_variable < 0 }
+			add_gold = var:pop_size_assimilation_variable
+		}
+		else = {
+			add_gold = -200
+		}
+		scope:target_charter = {
+			every_location_in_province_definition = {
+				limit = { has_owner = no is_land = yes }
+				ordered_pop = {
+					limit = {
+						culture = {
+							root = {
+								NOT = { has_primary_or_accepted_culture = prev }
+							}
+						}
+						NOT = { religion = root.religion }
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					if = {
+						limit = { pop_size > 5 }
+						split_pop = {
+							fraction = {
+								value = 0.2
+								divide = pop_size
+							}
+							religion = root.religion
+							culture = root.culture
+						}
+					}
+					else = {
+						split_pop = {
+							size = 0.25
+							religion = root.religion
+							culture = root.culture
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = generic_colonial_exploration_events.3.b
+
+		custom_tooltip = natives_left_undisturbed_tt
+	}
+
+	after = {
+		hidden_effect = {
+			if = {
+				limit = { has_variable = pop_size_assimilation_variable }
+				remove_variable = pop_size_assimilation_variable
+			}
+		}
+	}
+}
+
+generic_colonial_exploration_events.4 = {
+	type = country_event	
+
+	title = generic_colonial_exploration_events.4.title
+	desc = generic_colonial_exploration_events.4.desc
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+
+		random_colonial_charter = { 
+			province_definition = { save_scope_as = target_charter }
+		}
+	}
+	
+	option = {
+		name = generic_colonial_exploration_events.4.a
+
+		scope:target_charter = {
+			every_location_in_province_definition = {
+				limit = { owner ?= root }
+				ordered_pop = {
+					limit = {
+						culture = root.culture
+						religion = root.religion
+					}
+					order_by = pop_size
+					max = 1
+					check_range_bounds = no
+					add_pop_size = {
+						value = pop_size 
+						multiply = { 0.1 0.2 }
+					}
+				}
+			}
+		}
+	}
+}
+

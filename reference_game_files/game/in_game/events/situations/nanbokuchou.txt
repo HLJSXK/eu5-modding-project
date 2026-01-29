@@ -1,0 +1,528 @@
+﻿namespace = nanbokuchou
+
+nanbokuchou.1 = { #Nanbokuchō Jidai
+	type = country_event
+	category = situation_event	
+	image = "gfx/interface/illustrations/situation/nanbokuchou.dds"
+	title = nanbokuchou.1.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = supports_northern_court }
+				desc = nanbokuchou.1.desc.north
+			}
+			triggered_desc = {
+				trigger = { has_variable = supports_southern_court }
+				desc = nanbokuchou.1.desc.south
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = nanbokuchou.1.desc.neutral
+			}
+		}
+	}
+
+	immediate = {
+		character:jap_go_daigo_tenno = { save_scope_as = target_go_daigo }
+		character:jap_koumyou_tenno = { save_scope_as = target_koumyou }
+		character:jap_ashikaga_takauji = { save_scope_as = target_ashikaga }
+	}
+
+	option = { #Stand firm on the position
+		historical_option = yes
+		name = nanbokuchou.1.a
+		add_prestige = prestige_weak_bonus
+		trigger = {
+			hidden_trigger = {
+				OR = { #Only those that have a position can stand by it
+					has_variable = supports_northern_court
+					has_variable = supports_southern_court
+				}
+			}
+		}
+		ai_chance = {
+			factor = 90
+		}
+	}
+	option = { #Betray the position
+		name = nanbokuchou.1.b
+		trigger = {
+			hidden_trigger = {
+				OR = { #Only those that have a position can betray it
+					has_variable = supports_northern_court
+					has_variable = supports_southern_court
+				}
+				is_japanese_emperor_or_shogun = no #Emperors and the Shogun can't betray themselves
+			}
+		}
+		nanbokuchou_change_sides_effect = yes
+		add_stability = stability_severe_penalty
+		add_honor = honor_severe_penalty
+		ai_chance = {
+			factor = 5
+		}
+	}
+	option = { #Declare neutrality
+		name = nanbokuchou.1.c
+		trigger = {
+			hidden_trigger = {
+				OR = { #Only those that have a position can betray it
+					has_variable = supports_northern_court
+					has_variable = supports_southern_court
+				}
+				is_japanese_emperor_or_shogun = no #Emperors and the Shogun can't declare neutrality
+			}
+		}
+		nanbokuchou_declare_neutrality_effect = yes
+		add_stability = stability_weak_penalty
+		add_honor = honor_weak_penalty
+		ai_chance = {
+			factor = 5
+		}
+	}
+	#Options if already neutral
+	option = { #Support North Court as neutral
+		name = nanbokuchou.1.d
+		trigger = {
+			NOR = {
+				has_variable = supports_northern_court
+				has_variable = supports_southern_court
+			}
+		}
+		custom_tooltip = {
+			text = nanbokuchou.1.d
+			set_variable = { name = supports_northern_court value = yes }
+			remove_list_global_variable = { name = nanbokuchou_neutral_countries target = this }
+			add_to_global_variable_list = { name = nanbokuchou_northern_supporters target = this }
+			situation:nanbokuchou = {
+				set_vote = {
+					voter = prev
+					resolution = resolution:nanbokuchou_resolution
+					vote = c:STC
+					locked = yes
+				}
+			}
+		}
+	}
+
+	option = { #Support Southern Court as neutral
+		name = nanbokuchou.1.e
+		trigger = {
+			NOR = {
+				has_variable = supports_northern_court
+				has_variable = supports_southern_court
+			}
+		}
+		custom_tooltip = {
+			text = nanbokuchou.1.e
+			set_variable = { name = supports_southern_court value = yes }
+			remove_list_global_variable = { name = nanbokuchou_neutral_countries target = this }
+			add_to_global_variable_list = { name = nanbokuchou_southern_supporters target = this }
+			situation:nanbokuchou = {
+				set_vote = {
+					voter = prev
+					resolution = resolution:nanbokuchou_resolution
+					vote = c:NTC
+					locked = yes
+				}
+			}
+		}
+	}
+}
+
+scripted_effect nanbokuchou_end_event_emperor_effect = {
+	scope:target_emperor = {
+		if = {
+			limit = {
+				this = c:NTC
+				exists = c:STC.ruler
+				ruler ?= c:STC.ruler
+			}
+			annex_country = { country = c:STC }
+		}
+		if = {
+			limit = {
+				this = c:STC
+				exists = c:NTC.ruler
+				ruler ?= c:NTC.ruler
+			}
+			annex_country = { country = c:NTC }
+		}
+		form_country = formable_country:YMT_f
+		if = {
+			limit = { 
+				NOT = { capital = location:kyoto }
+			}
+			set_capital = location:kyoto
+			work_of_art:kusanagi_no_tsurugi = { 
+				move_art = location:kyoto
+				set_art_owner = scope:target_emperor
+			}
+			work_of_art:yata_no_kagami = { 
+				move_art = location:kyoto
+				set_art_owner = scope:target_emperor
+			}
+			work_of_art:yasakani_no_magatama = { 
+				move_art = location:kyoto
+				set_art_owner = scope:target_emperor
+			}
+		}
+	}
+	location:kyoto = {
+		if = {
+			limit = {
+				NOT = {
+					any_foreign_buildings_in_location = {
+						building_type = building_type:gosho
+						owner = scope:target_emperor
+					}
+				}
+			}
+			change_building_level_in_location = {
+				building = building_type:gosho
+				value = 1
+				owner = scope:target_emperor
+			}
+		}
+	}
+}
+
+nanbokuchou.2 = { #End of the Nanbokuchō Jidai
+	type = country_event
+	category = situation_event	
+
+	title = nanbokuchou.2.title
+	desc = nanbokuchou.2.desc
+
+	immediate = {
+		international_organization:japanese_shogunate = {
+			random_international_organization_member = {
+				limit = {
+					has_special_status_in_international_organization = {
+						type = special_status:japanese_emperor
+						international_organization = international_organization:japanese_shogunate
+					}
+				}
+				save_scope_as = target_emperor
+			}
+		}
+		if = {
+			limit = { has_variable = supports_northern_court }
+			remove_variable = supports_northern_court
+		}
+		if = {
+			limit = { has_variable = supports_southern_court }
+			remove_variable = supports_southern_court
+		}
+		if = {
+			limit = { has_variable = supports_new_imperial_line }
+			remove_variable = supports_new_imperial_line
+		}
+	}
+
+	option = {
+		name = nanbokuchou.2.a
+		if = {
+			limit = { root = scope:target_emperor }
+			nanbokuchou_end_event_emperor_effect = yes
+		}
+		else = {
+			show_as_tooltip = {
+				nanbokuchou_end_event_emperor_effect = yes
+			}
+		}
+		if = {
+			limit = { is_japanese_emperor_or_shogun = yes }
+			add_government_power = government_power_extreme_bonus
+			add_prestige = prestige_severe_bonus
+		}
+	}
+}
+
+nanbokuchou.3 = { #Window of Opportunity
+	hide_portraits = yes
+	type = country_event
+	category = situation_event	
+
+	title = nanbokuchou.3.title
+	desc = nanbokuchou.3.desc
+
+	immediate = {
+		international_organization:japanese_shogunate.leader_country = { save_scope_as = target_shogun }
+		if = {
+			limit = { has_variable = supports_northern_court }
+			c:STC = { save_scope_as = target_enemy_court }
+			c:NTC = { save_scope_as = target_supported_court }
+		}
+		if = {
+			limit = { has_variable = supports_southern_court }
+			c:STC = { save_scope_as = target_supported_court }
+			c:NTC = { save_scope_as = target_enemy_court }
+		}
+	}
+
+	option = { #Keep allegiance
+		name = nanbokuchou.3.a
+		add_honor = honor_weak_bonus
+		add_prestige = prestige_weak_bonus
+		reverse_add_opinion = {	target = scope:target_enemy_court modifier = refused_changing_court_support }
+	}
+
+	option = { #change sides
+		name = nanbokuchou.3.b
+		add_honor = honor_severe_penalty
+		add_prestige = prestige_weak_penalty
+		root = { save_scope_as = target_betrayer }
+		if = {
+			limit = { has_variable = supports_northern_court }
+			reverse_add_opinion = { target = scope:target_shogun modifier = betrayed_court_support }
+			scope:target_shogun = { trigger_event_silently = nanbokuchou.4 }
+
+		}
+		else_if = {
+			limit = { has_variable = supports_southern_court }
+		}
+		nanbokuchou_change_sides_effect = yes
+		reverse_add_opinion = { target = scope:target_supported_court modifier = betrayed_court_support }
+		scope:target_supported_court = { trigger_event_silently = nanbokuchou.4 }
+	}
+}
+
+nanbokuchou.4 = { #Betrayal (event respond from nanbokuchou.3)
+	type = country_event
+	category = situation_event	
+
+	title = nanbokuchou.4.title
+	desc = nanbokuchou.4.desc
+
+	option = {
+		name = nanbokuchou.4.a
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+nanbokuchou.5 = { #The Cost of War
+	type = country_event
+	category = situation_event	
+
+	title = nanbokuchou.5.title
+	desc = nanbokuchou.5.desc
+
+	option = { #Nonsense, we fight on!
+		name = nanbokuchou.5.a
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+		add_purity = purity_weak_penalty
+	}
+
+	option = { #Prudence is a better strategy
+		name = nanbokuchou.5.b
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_right }
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+nanbokuchou.6 = { #A Time of Conflict (event that gives cbs)
+	type = country_event
+	category = situation_event
+
+	title = nanbokuchou.6.title
+	desc = nanbokuchou.6.desc
+
+	immediate = {
+		if = { 
+			limit = { has_variable = supports_northern_court }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						NOT = { has_variable = supports_northern_court }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						NOT = { 
+							root = { has_casus_belli_on = prev }
+						}
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = supports_southern_court }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						NOT = { has_variable = supports_southern_court }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						NOT = { 
+							root = { has_casus_belli_on = prev }
+						}
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = supports_new_imperial_line }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						NOT = { has_variable = supports_new_imperial_line }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						NOT = { 
+							root = { has_casus_belli_on = prev }
+						}
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+
+	}
+
+	option = {
+		name = nanbokuchou.6.a
+		add_casus_belli = { target = scope:target_enemy type = casus_belli:cb_nanbokuchou }
+	}
+}
+
+nanbokuchou.7 = { #Time to Strike (event that declares wars)
+	type = country_event
+	category = situation_event
+
+	title = nanbokuchou.7.title
+	desc = nanbokuchou.7.desc
+
+	immediate = {
+		if = { 
+			limit = { has_variable = supports_northern_court }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						is_subject = no
+						NOT = { has_variable = supports_northern_court }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						root = { has_casus_belli_on = prev }
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = supports_southern_court }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						is_subject = no
+						NOT = { has_variable = supports_southern_court }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						root = { has_casus_belli_on = prev }
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+		if = {
+			limit = { has_variable = supports_new_imperial_line }
+			international_organization:japanese_shogunate = {
+				random_international_organization_member = {
+					limit = { 
+						is_subject = no
+						NOT = { has_variable = supports_new_imperial_line }
+						NOT = { is_at_war_with = root }
+						NOT = { has_truce_with = root }
+						root = { has_casus_belli_on = prev }
+					}
+					save_scope_as = target_enemy
+				}
+			}
+		}
+
+	}
+
+	option = { 
+		name = nanbokuchou.7.a
+		declare_war_with_cb = { target = scope:target_enemy type = casus_belli:cb_nanbokuchou }
+	}
+
+	option = {
+		name = nanbokuchou.7.b
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+nanbokuchou.8 = { #A New Imperial Line
+	type = country_event
+	category = situation_event
+
+	title = nanbokuchou.8.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					NOT = { tag = NTC }
+					NOT = { tag = STC }
+					has_regent = no
+					ruler.dynasty = dynasty:yamato_dynasty
+				}
+				desc = nanbokuchou.8.imperial.desc
+			}
+			triggered_desc = {
+				desc = nanbokuchou.8.desc
+			}
+		}
+	}
+
+	immediate = {
+		international_organization:japanese_shogunate = {
+			random_international_organization_member = {
+				limit = { 
+					NOT = { tag = NTC }
+					NOT = { tag = STC }
+					has_regent = no
+					ruler.dynasty = dynasty:yamato_dynasty
+				}
+				save_scope_as = target_new_emperor
+				ruler = { save_scope_as = target_new_emperor_ruler }
+			}
+		}
+	}
+
+	option = { #Join the new line
+		name = nanbokuchou.8.a
+		custom_tooltip = {
+			text = nanbokuchou.8.tt
+			if = {
+				limit = { has_variable = supports_northern_court }
+				remove_variable = supports_northern_court
+				remove_list_global_variable = { name = nanbokuchou_northern_supporters target = root }
+			}
+			if = {
+				limit = { has_variable = supports_southern_court }
+				remove_variable = supports_southern_court
+				remove_list_global_variable = { name = nanbokuchou_southern_supporters target = root }
+			}
+			set_variable = { name = supports_new_imperial_line value = yes }
+		}
+		if = {
+			limit = { scope:target_new_emperor = root }
+			if = {
+				limit = { 
+					NOT = { has_reform = government_reform:japanese_imperial_family }
+				}
+				add_reform = government_reform:japanese_imperial_family
+			}
+		}
+
+	}
+
+	option = { #Keep current allegiance
+		name = nanbokuchou.8.b
+		trigger = {
+			NOT = { scope:target_new_emperor = root }
+		}
+		add_honor = honor_weak_bonus
+	}
+}

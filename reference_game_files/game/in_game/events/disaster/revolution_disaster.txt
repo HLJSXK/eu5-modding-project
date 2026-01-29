@@ -1,0 +1,400 @@
+﻿namespace = revolution_disaster
+
+#The [ROOT.GetCountry.GetAdjectiveWithNoTooltip] Revolution
+revolution_disaster.1 = {
+	type = country_event
+	category = disaster_event
+	title = revolution_disaster.1.title
+	desc = revolution_disaster.1.desc
+
+	image = "gfx/interface/illustrations/disaster/revolution_disaster.dds"
+	major = yes
+	immediate = {
+		capital = {
+			province_definition = { save_scope_as = target_province_definition }
+		}
+		set_variable = {
+			name = num_infantry_variable
+			value = total_sub_unit_count:army_infantry
+			years = 1
+		}
+		set_variable = {
+			name = num_cavalry_variable
+			value = total_sub_unit_count:army_cavalry
+			years = 1
+		}
+		set_variable = {
+			name = num_artillery_variable
+			value = total_sub_unit_count:army_artillery
+			years = 1
+		}
+		set_variable = {
+			name = num_auxiliary_variable
+			value = total_sub_unit_count:army_auxiliary
+			years = 1
+		}
+		ruler_or_regent ?= {
+			save_scope_as = target_ruler
+		}
+		create_rebel = {
+			category = estate
+			estate = burghers_estate
+			name = revolutionary_rebel
+			save_scope_as = target_rebel
+		}
+		set_variable = {
+			name = revolution_rebel_var
+			value = scope:target_rebel
+		}
+		add_to_revolutionary_list = yes
+		capital = { save_scope_as = target_location }
+
+		set_variable = {
+			name = rev_rebelling_num_pops_var
+			value = 0
+			years = 1
+		}
+
+		set_variable = {
+			name = rev_rebelling_num_provinces_var
+			value = 0
+			years = 1
+		}
+		
+
+		#This variable will calculate the intensity of the rebellion based on certain factors
+		set_variable = {
+			name = rev_rebellion_intensity_var
+			value = {
+				add = 1
+				if = {
+					limit = { societal_value:absolutism_vs_liberalism < 0 }
+					add = {	#Max 5 provinces if we are fully absolutist
+						value = societal_value:absolutism_vs_liberalism
+						multiply = -0.01
+						min = 0.1
+					}
+				}
+				if = {
+					limit = { societal_value:serfdom_vs_free_subjects < 0 }
+					add = {	#Max 5 provinces if we are fully absolutist
+						value = societal_value:absolutism_vs_liberalism
+						multiply = -0.01
+						min = 0.1
+					}
+				}
+				add = {	#Max 2 provinces based on how powerful (repressive) the crown is
+					value = "estate_power(estate_type:crown_estate)"
+					multiply = 2
+					min = 0.1
+				}
+				if = {
+					limit = { government_power > 0 }
+					add = {
+						value = 25
+						divide = government_power
+					}
+				}
+				else = { add = 2 }	#If our legitimacy is 0, this will be a painful multiplier
+				if = {
+					limit = { stability < 0 }
+					add = {
+						value = -25
+						divide = stability
+						min = 0.1
+					}
+				}
+			}
+			years = 1
+		}
+
+		###Calculate rebellion pops and provinces###
+		capital = {
+			province = {
+				every_location_in_province = {
+					limit = { owner ?= root }
+					every_pop = {
+						limit = {
+							owner = root
+							OR = {
+								pop_type = pop_type:laborers
+								pop_type = pop_type:peasants
+								pop_type = pop_type:burghers
+							}
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+						change_pop_allegiance = scope:target_rebel
+					}
+				}
+			}
+		}
+		ordered_province = {
+			limit = {
+				this != root.capital.province
+				province_capital = { proximity > 0 }
+			}
+			order_by = {
+				value = "province_capital.proximity"
+			}
+			max = {
+				value = num_provinces
+				multiply = {
+					value = root.var:rev_rebellion_intensity_var
+					multiply = 0.05
+				}
+				min = 1
+			}
+			check_range_bounds = no
+			owner = { 
+				change_variable = {
+					name = rev_rebelling_num_provinces_var
+					add = 1
+				}
+			}
+			every_location_in_province = {
+				add_to_list = rev_rebelling_locations_list
+				every_pop = {
+					limit = {
+						owner = root
+						OR = {
+							pop_type = pop_type:burghers
+							pop_type = pop_type:laborers
+							pop_type = pop_type:peasants
+						}
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					change_pop_allegiance = scope:target_rebel
+					owner = {
+						change_variable = {
+							name = rev_rebelling_num_pops_var
+							add = prev.pop_size
+						}
+					}
+				}
+			}
+		}
+	}
+
+	#Dire times are ahead...
+	option = {
+		name = revolution_disaster.1.a
+		add_stability = stability_extreme_penalty		
+		scope:target_location = { change_prosperity = prosperity_mild_penalty }
+		custom_tooltip = revolution_disaster.1.a.tt
+	}
+	after = {
+		scope:target_rebel = {
+			start_civil_war = {
+				raise_all_levies = {
+					type = army
+					instant = yes
+				}
+				set_revolution = yes
+
+				save_scope_as = target_country
+				every_in_list = {
+					list = rev_rebelling_locations_list
+					limit = { owner = root }
+					change_location_owner = scope:target_country
+				}
+				root = {
+					every_owned_location = {
+						limit = {
+							is_neighbor_of = scope:target_country
+							NOT = { is_connected_to = root.capital }
+						}
+						change_location_owner = scope:target_country
+					}
+				}
+				scope:target_location = {
+					province = {
+						every_location_in_province = { change_location_owner = scope:target_country }
+					}
+				}
+			}
+
+			hidden_effect = {
+				while = {
+					limit = {
+						OR = {
+							root.var:num_infantry_variable > 0 
+							root.var:num_cavalry_variable > 0
+							root.var:num_auxiliary_variable > 0 
+							root.var:num_artillery_variable > 0 
+						}
+					}
+					scope:target_province_definition = {
+						
+						random_location_in_province_definition = {
+							limit = { 
+								has_owner = yes
+								OR = {
+									owner = scope:target_country
+									controller = scope:target_country
+								}
+							}
+							random_list = {
+								6 = {
+									trigger = { root.var:num_infantry_variable > 0 }
+									create_sub_unit_with_owner = {
+										type = a_sharpshooters
+										owner = scope:target_country
+									}
+									create_sub_unit_with_owner = {
+										type = a_fusiliers
+										owner = scope:target_country
+									}
+									root = {
+										change_variable = {
+											name = num_infantry_variable
+											subtract = 5
+										}
+									}
+									
+								}
+								1 = {
+									trigger = { root.var:num_cavalry_variable > 0 }
+									create_sub_unit_with_owner = {
+										type = a_cuirassiers
+										owner = scope:target_country
+									}
+									
+									root = {
+										change_variable = {
+											name = num_cavalry_variable
+											subtract = 3
+										}
+									}
+								}
+								1 = {
+									trigger = { root.var:num_auxiliary_variable > 0 }
+									create_sub_unit_with_owner = {
+										type = a_logistics_corps
+										owner = scope:target_country
+									}
+									
+									root = {
+										change_variable = {
+											name = num_auxiliary_variable
+											subtract = 3
+										}
+									}
+								}
+								2 = {
+									trigger = { root.var:num_artillery_variable > 0 }
+									create_sub_unit_with_owner = {
+										type = a_flying_battery
+										owner = scope:target_country
+									}
+									root = {
+										change_variable = {
+											name = num_artillery_variable
+											subtract = 3
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#The [ROOT.GetCountry.GetAdjectiveWithNoTooltip] Revolution
+revolution_disaster.2 = {
+	type = country_event
+	category = disaster_event
+	title = revolution_disaster.2.title
+	desc = revolution_disaster.2.desc
+	image = "gfx/interface/illustrations/disaster/revolution_disaster.dds"
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_ruler }
+		scope:target = { set_revolution_effect = yes }
+	}
+	#We must show these upstarts their place!
+	option = {
+		name = revolution_disaster.2.a
+		historical_option = yes
+		add_government_power = government_power_radical_penalty
+	}
+	#Perhaps they are right...
+	option = {
+		name = revolution_disaster.2.b
+		trigger = { exists = scope:target }
+		add_government_power = government_power_radical_penalty
+		change_player = scope:target
+	}
+	after = {
+		remove_variable = revolution_rebel_var
+	}
+}
+
+#Crushing of the Revolution
+revolution_disaster.3 = {
+	type = country_event
+	category = disaster_event
+	title = revolution_disaster.3.title
+	desc = revolution_disaster.3.desc
+	image = "gfx/interface/illustrations/disaster/revolution_disaster.dds"
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolution_disaster.3.a
+		add_government_power = government_power_ultimate_bonus
+		add_stability = stability_extreme_bonus
+		remove_from_revolutionary_list = yes
+		block_disaster_temporarily_effect = {
+			type = revolution_disaster
+			years = 20
+			years_in_days = 7300
+		}
+	}
+}
+
+#The Revolution has won!
+revolution_disaster.4 = {
+	type = country_event
+	category = disaster_event
+	title = revolution_disaster.4.title
+	desc = revolution_disaster.4.desc
+	image = "gfx/interface/illustrations/disaster/revolution_disaster.dds"
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+		if = {
+			limit = { has_variable = rev_former_ruler }
+			var:rev_former_ruler = {
+				move_country = root
+			}
+		}
+	}
+	option = {
+		name = revolution_disaster.4.a
+		if = {
+			limit = { is_revolutionary = yes }
+			add_stability = stability_weak_bonus
+			add_government_power = government_power_mild_bonus
+		}
+		else = {
+			set_revolution_effect = yes
+		}
+
+		#When the Revolutionaries win, they impose a Constitution and a Constitutional Parliament
+		if = {
+			limit = {
+				NOT = { has_reform = government_reform:constitutional_state }
+			}
+			hidden_effect = { unlock_government_reform_effect = { type = constitutional_state } }
+			add_reform = government_reform:constitutional_state
+		}
+
+		if = {
+			limit = { 
+				NOT = { parliament_type = parliament_type:constitutional_parliament }
+			}
+			set_parliament_type = parliament_type:constitutional_parliament
+		}
+	}
+}

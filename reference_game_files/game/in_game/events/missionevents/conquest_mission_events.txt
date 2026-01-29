@@ -1,0 +1,1022 @@
+﻿namespace = conquest_mission_events
+
+conquest_mission_events.1 = {
+	type = country_event	
+
+	title = conquest_mission_events.1.title
+	desc = conquest_mission_events.1.desc
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	trigger = {
+		OR = {
+			trigger_if = {
+				limit = { country_has_estate = estate_type:nobles_estate }
+				"estate(estate_type:nobles_estate)" = {
+					satisfaction > 0.5
+					estate_gold > 0
+				}
+			}
+			trigger_if = {
+				limit = { country_has_estate = estate_type:burghers_estate }
+				"estate(estate_type:burghers_estate)" = {
+					satisfaction > 0.5
+					estate_gold > 0
+				}
+			}
+			trigger_if = {
+				limit = { country_has_estate = estate_type:clergy_estate }
+				"estate(estate_type:clergy_estate)" = {
+					satisfaction = 0.5
+					estate_gold > 0
+				}
+			}
+			trigger_else = { always = no }
+		}
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		ruler_or_regent = { save_scope_as = target_character }
+		ordered_estate = {  
+			limit = { estate_gold > 0 }  
+			order_by = estate_gold
+			max = 1  
+			check_range_bounds = no 
+			save_scope_as = target_estate
+		} 
+	}
+	
+	option = {
+		name = conquest_mission_events.1.a
+		trigger = {
+			exists = scope:target_estate
+		}
+		add_gold = {
+			value = scope:target_estate.estate_gold
+			multiply = 0.25
+		}
+		if = {
+			limit = {
+				scope:target_estate = {
+					estate_type = estate_type:nobles_estate
+				}
+			}
+			change_societal_value = { 
+				type = aristocracy_vs_plutocracy 
+				value = societal_value_move_to_left
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target_estate = {
+					estate_type = estate_type:burghers_estate
+				}
+			}
+			change_societal_value = { 
+				type = aristocracy_vs_plutocracy 
+				value = societal_value_move_to_right
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target_estate = {
+					estate_type = estate_type:clergy_estate
+				}
+			}
+			change_societal_value = { 
+				type = spiritualist_vs_humanist 
+				value = societal_value_move_to_left
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.1.b
+
+		custom_tooltip = reject_the_advances_of_the_estate_tt
+		add_legitimacy = legitimacy_weak_bonus
+	}
+}
+
+conquest_mission_events.2 = {
+	type = country_event	
+
+	title = conquest_mission_events.2.title
+	desc = conquest_mission_events.2.desc
+
+	illustration_tags = {
+		angry = 10
+		exterior = 10
+	}
+
+	trigger = {
+		gold >= monthly_income_total
+		trigger_if = {
+			limit = { country_has_estate = estate_type:clergy_estate }
+			estate_satisfaction:peasants_estate < 0.5
+		}
+		trigger_else = { always = no }
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		ruler_or_regent = { save_scope_as = target_character }
+
+		if = {
+			limit = {
+				num_possible_estate_privileges:peasants_estate > 0
+			}
+			"estate(estate_type:peasants_estate)" = {
+				random_possible_privilege = {
+					save_scope_as = target_privilege
+				}
+			}
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.2.a
+
+		add_estate_satisfaction = { 
+			type = estate_type:peasants_estate
+			value = estate_satisfaction_mild_penalty
+		}
+		add_war_exhaustion = war_exhaustion_weak_penalty
+	}
+
+	option = {
+		name = conquest_mission_events.2.b
+
+		add_gold = {
+			value = gold
+			multiply = -0.1
+		}
+		"estate(estate_type:peasants_estate)" = {
+			estate_add_gold = {
+				value = {
+					add = root.gold
+					multiply = 0.1
+				}
+			}
+		}
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_move_to_right }
+	}
+
+	option = {
+		name = conquest_mission_events.2.c
+
+		trigger = {
+			exists = scope:target_privilege
+		}
+		grant_estate_privilege = scope:target_privilege
+		
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_move_to_right }
+	}
+}
+
+conquest_mission_events.3 = {
+	type = country_event	
+
+	title = conquest_mission_events.3.title
+	desc = conquest_mission_events.3.desc
+
+	illustration_tags = {
+		regular = 10
+		interior = 10
+	}
+
+	trigger = {
+		country_estate_loan_size <= country_loan_capacity
+		NOT = { has_variable = had_loans_event_variable }
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		ruler_or_regent = { save_scope_as = target_character }
+		set_variable = {
+			name = had_loans_event_variable
+			years = 1
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.3.a
+		trigger = {
+			ruler_or_regent ?= {
+				OR = {
+					has_trait = well_connected
+					has_trait = fierce_negotiator
+					has_trait = charismatic_negotiator
+					has_trait = greedy
+				}
+			}
+		}
+		create_estate_loan = { 
+			amount = {
+				value = {
+					add = root.monthly_income_trade_and_tax
+					multiply = 8
+					min = 25
+					max = 100000
+				}
+			}
+			interest = {
+				value = 0.01
+				add = {
+					value = modifier:bank_interest
+					divide = 5
+				}
+			}
+		}
+		custom_tooltip = extra_special_loan_with_lower_interest_tt
+	}
+	
+	option = {
+		name = conquest_mission_events.3.b
+
+		create_estate_loan = { 
+			amount = {
+				value = {
+					add = root.monthly_income_trade_and_tax
+					multiply = 6
+					min = 25
+					max = 100000
+				}
+			}
+			interest = {
+				value = 0.01
+				add = {
+					value = modifier:bank_interest
+					divide = 4
+				}
+			}
+		}
+		custom_tooltip = special_loan_with_lower_interest_tt
+	}
+
+	option = {
+		name = conquest_mission_events.3.c
+
+		custom_tooltip = turn_away_the_loan_tt
+	}
+}
+
+conquest_mission_events.4 = {
+	type = country_event	
+
+	title = conquest_mission_events.4.title
+	desc = conquest_mission_events.4.desc
+
+	illustration_tags = {
+		angry = 10
+		exterior = 10
+	}
+
+	trigger = {
+		NOT = { has_variable = recently_looted_cme4_variable }
+		any_controlled_location = {
+			population > 0
+			owner != root
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		ruler_or_regent = { save_scope_as = target_character }
+		set_variable = {
+			name = recently_looted_cme4_variable
+			months = 4
+		}
+		ordered_controlled_location = {
+			limit = {
+				NOR = { 
+					top_owner = root 
+					owner = root
+				}
+			}
+			order_by = {
+				value = population
+				if = {
+					limit = {
+						prosperity > 0
+					}
+					divide = prosperity
+				}
+				else = {
+					multiply = 10
+				}
+			}
+			max = 1
+			check_range_bounds = no
+			save_scope_as = target_loot_location
+			province = { 
+				save_scope_as = target_loot_province
+			}
+		}
+		capital = {
+			save_scope_as = target_location
+			province = { save_scope_as = target_province }
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.4.a
+
+		add_gold = {
+			value = scope:target_loot_province.province_tax_base
+			multiply = 4
+		}
+		scope:target_loot_province = {
+			every_location_in_province = {
+				change_prosperity = prosperity_mild_penalty
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.4.b
+
+		add_gold = {
+			value = scope:target_loot_province.province_tax_base
+			multiply = 2
+		}
+		scope:target_loot_province = {
+			every_location_in_province = {
+				change_prosperity = prosperity_very_weak_penalty
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.4.c
+
+		custom_tooltip = looting_will_be_lessened_in_target_province_tt
+	}
+}
+
+conquest_mission_events.5 = {
+	type = country_event	
+
+	title = conquest_mission_events.5.title
+	desc = conquest_mission_events.5.desc
+
+	illustration_tags = {
+		angry = 10
+		interior = 10
+	}
+
+	trigger = {
+		war_exhaustion_percentage > 0.1
+		NOT = { has_variable = conquest_mission_events5_variable }
+	}
+
+	immediate = {
+		set_variable = {
+			name = conquest_mission_events5_variable
+			months = 6
+		}
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		ruler_or_regent = { save_scope_as = target_character }
+	}
+	
+	option = {
+		name = conquest_mission_events.5.a
+
+		add_war_exhaustion = war_exhaustion_mild_penalty
+	}
+
+	option = {
+		name = conquest_mission_events.5.b
+
+		change_gold_effect = { scale = -2 }
+
+		add_estate_satisfaction = { 
+			type = estate_type:peasants_estate 
+			value = estate_satisfaction_weak_bonus
+		}
+	}
+}
+
+conquest_mission_events.6 = {
+	type = country_event	
+
+	title = conquest_mission_events.6.title
+	desc = conquest_mission_events.6.desc
+	image = "gfx/interface/illustrations/institutions/professional_armies.dds"
+
+	trigger = {
+		NOT = { has_variable = cme6_variable }
+	}
+
+	immediate = {
+		set_variable = {	#To space them out
+			name = cme6_variable
+			months = 2
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.6.a
+
+		if = {
+			limit = {
+				NOT = { has_embraced_institution = institution:professional_armies }
+				any_owned_location = {
+					NOT = { has_institution = institution:professional_armies }
+				}
+			}
+			ordered_owned_location = {
+				limit = {
+					NOT = { has_institution = institution:professional_armies }
+				}
+				order_by = {
+					value = {
+						add = population 
+						if = {
+							limit = { location_rank = location_rank:city }
+							multiply = 5
+						}
+						else_if = {
+							limit = { location_rank = location_rank:town }
+							multiply = 2.5
+						}
+					}
+				}
+				max = 1
+				check_range_bounds = no
+				province = {
+					every_location_in_province = {
+						change_institution_progress = { type = institution:professional_armies value = institution_progress_mild_bonus } 
+					}
+				}
+			}
+			add_army_tradition = army_tradition_mild_bonus
+		}
+		else = { 
+			add_army_tradition = army_tradition_extreme_bonus 
+			add_navy_tradition = navy_tradition_extreme_bonus 
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.6.b
+
+		add_research_progress = {
+			value = 5
+			add = {
+				value = root.modifier:monthly_towards_innovative
+				multiply = 10
+				ceiling = yes
+			}
+		}
+		custom_tooltip = research_gained_scales_with_monthly_towards_innovative_tt
+		change_societal_value = {
+			type = traditionalist_vs_innovative
+			value = societal_value_move_to_right
+		}
+	}
+}
+
+scripted_trigger great_ruler_or_regent_trigger = {
+	ruler_or_regent ?= {
+		OR = {
+			has_trait = benevolent
+			has_trait = charismatic_negotiator
+			has_trait = silver_tongue
+			has_trait = conqueror
+			total_abilities > 250
+		}
+		culture ?= root.culture
+	}
+}
+
+conquest_mission_events.7 = {	#Locals Accept Integration
+	type = country_event	
+
+	title = conquest_mission_events.7.title
+	desc = conquest_mission_events.7.desc
+
+	immediate = {
+		scope:conquest_province = {
+			save_scope_as = target_province
+			province_capital = { save_scope_as = target_location }
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.7.a
+
+		scope:target_province = {
+			every_location_in_province = {
+				limit = {
+					integration_level = conquered
+					integration_progress > 0
+				}
+				change_integration_progress = 5
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.7.b
+
+		scope:target_province = {
+			custom_tooltip = {
+				text = locations_in_target_province_receive_very_weak_bonus_integration_tt
+				every_location_in_province = {
+					limit = {
+						integration_level = conquered
+						integration_progress > 0
+					}
+					change_integration_progress = integration_progress_very_weak_bonus
+					every_pop = {
+						limit = { owner = root }
+						add_pop_satisfaction = pop_satisfaction_mild_bonus
+					}
+				}
+			}
+			custom_tooltip = locals_in_target_province_gain_mild_satisfaction_tt
+		}
+	}
+}
+
+conquest_mission_events.8 = {	#Locals Resist Integration
+	type = country_event	
+
+	title = conquest_mission_events.8.title
+	desc = conquest_mission_events.8.desc
+
+	immediate = {
+		scope:conquest_province = {
+			save_scope_as = target_province
+			province_capital = { save_scope_as = target_location }
+		}
+
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = conquest_mission_events.8.a
+
+		trigger = {
+			great_ruler_or_regent_trigger = yes
+		}
+
+		custom_tooltip = mission_ruler_or_regent_is_conqueror_tt
+	}
+	
+	option = {
+		name = conquest_mission_events.8.b
+
+		scope:target_province = {
+			every_location_in_province = {
+				limit = {
+					integration_level = conquered
+					integration_progress > 0
+				}
+				change_integration_progress = integration_progress_weak_penalty
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.8.c
+
+		scope:target_province = {
+			every_location_in_province = {
+				limit = {
+					integration_level = conquered
+					integration_progress > 0
+				}
+				change_integration_progress = integration_progress_very_weak_penalty
+			}
+		}
+
+		custom_tooltip = {
+			text = locals_in_target_province_lose_mild_satisfaction_tt
+			scope:target_province = {
+				every_location_in_province = {
+					limit = {
+						integration_level = conquered
+						integration_progress > 0
+					}
+					every_pop = {
+						limit = { 
+							owner = root
+						}
+						add_pop_satisfaction = pop_satisfaction_mild_penalty
+					}
+				}
+			}
+		}
+
+		add_legitimacy = legitimacy_weak_penalty
+	}
+}
+
+conquest_mission_events.9 = {	#Culture Spreads
+	type = country_event	
+
+	title = conquest_mission_events.9.title
+	desc = conquest_mission_events.9.desc
+
+	trigger = {
+		scope:conquest_province = {
+			culture_percentage = {
+				culture = root.culture
+				value < 0.95
+			}
+			NOT = { has_variable = conquest_mission_events_9_event_variable }
+		}
+	}
+
+	immediate = {
+		scope:conquest_province = {
+			save_scope_as = target_province
+			province_capital = { save_scope_as = target_location }
+			set_variable = {
+				name = conquest_mission_events_9_event_variable
+				months = 6
+			}
+		}
+		ruler_or_regent ?= { save_scope_as = target_character }
+		culture = { save_scope_as = target_culture }
+	}
+
+	option = {
+		name = conquest_mission_events.9.a
+
+		scope:target_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					culture != root.culture
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				split_pop = {
+					fraction = { 0.1 0.15 }
+					culture = scope:target_culture
+				}
+			}
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.9.b
+
+		change_gold_effect = { scale = -2 }
+
+		add_stability = stability_weak_penalty
+
+		scope:target_province = {
+			every_location_in_province = {
+				ordered_pop = {
+					limit = {
+						owner = root
+						culture != root.culture
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					max = 2
+					if = {
+						limit = { location = { is_province_capital = yes } }
+						split_pop = {
+							fraction = { 0.1 0.2 }
+							culture = scope:target_culture
+						}
+					}
+					else = {
+						split_pop = {
+							fraction = { 0.1 0.15 }
+							culture = scope:target_culture
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.9.c
+
+		trigger = {
+			great_ruler_or_regent_trigger = yes
+		}
+
+		change_gold_effect = { scale = -1.5	}
+
+		scope:target_province = {
+			every_location_in_province = {
+				ordered_pop = {
+					limit = {
+						owner = root
+						culture != root.culture
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					max = 4
+					if = {
+						limit = { location = { is_province_capital = yes } }
+						split_pop = {
+							fraction = { 0.1 0.2 }
+							culture = scope:target_culture
+						}
+					}
+					else = {
+						split_pop = {
+							fraction = { 0.12 0.15 }
+							culture = scope:target_culture
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.9.d
+
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_minor_move_to_right }
+
+		scope:target_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					culture != root.culture
+				}
+				order_by = pop_size
+				max = 4
+				check_range_bounds = no
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+		}
+	}
+}
+
+conquest_mission_events.10 = {	#Religion Spreads
+	type = country_event	
+
+	title = conquest_mission_events.10.title
+	desc = conquest_mission_events.10.desc
+
+	trigger = {
+		scope:conquest_province = {
+			religion_percentage = {
+				religion = root.religion
+				value < 0.95
+			}
+			NOT = { has_variable = conquest_mission_events_10_event_variable }
+		}
+	}
+
+	immediate = {
+		scope:conquest_province = {
+			save_scope_as = target_province
+			province_capital = { save_scope_as = target_location }
+			set_variable = {
+				name = conquest_mission_events_10_event_variable
+				months = 6
+			}
+		}
+		ruler_or_regent ?= { save_scope_as = target_character }
+		religion = { save_scope_as = target_religion }
+	}
+
+	option = {
+		name = conquest_mission_events.10.a
+
+		scope:target_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion != root.religion
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				split_pop = {
+					fraction = { 0.05 0.1 }
+					religion = scope:target_religion
+				}
+			}
+		}
+	}
+	
+	option = {
+		name = conquest_mission_events.9.b
+
+		change_gold_effect = { scale = -2 }
+
+		add_stability = stability_weak_penalty
+
+		scope:target_province = {
+			every_location_in_province = {
+				ordered_pop = {
+					limit = {
+						owner = root
+						religion != root.religion
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					if = {
+						limit = { location = { is_province_capital = yes } }
+						split_pop = {
+							fraction = { 0.05 0.1 }
+							religion = scope:target_religion
+						}
+					}
+					else = {
+						split_pop = {
+							fraction = { 0.02 0.05 }
+							religion = scope:target_religion
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.9.c
+
+		trigger = {
+			great_ruler_or_regent_trigger = yes
+		}
+
+		change_gold_effect = { scale = -1.5 }
+
+		scope:target_province = {
+			every_location_in_province = {
+				ordered_pop = {
+					limit = {
+						owner = root
+						religion != root.religion
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					if = {
+						limit = { location = { is_province_capital = yes } }
+						split_pop = {
+							fraction = { 0.05 0.1 }
+							religion = scope:target_religion
+						}
+					}
+					else = {
+						split_pop = {
+							fraction = { 0.02 0.05 }
+							religion = scope:target_religion
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.9.d
+
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_minor_move_to_right }
+
+		scope:target_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion != root.religion
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+		}
+	}
+}
+
+conquest_mission_events.11 = {	#Local Nobles Collaborate
+	type = country_event	
+
+	title = conquest_mission_events.11.title
+	desc = conquest_mission_events.11.desc
+
+	trigger = {
+		scope:conquest_province = {
+			any_location_in_province = {
+				integration_level = conquered
+				any_pop = { 
+					owner = root 
+					pop_type = pop_type:nobles 
+				}
+			}
+			NOT = { has_variable = conquest_mission_events_11_event_variable }
+		}
+	}
+
+	immediate = {
+		scope:conquest_province = {
+			save_scope_as = target_province
+			province_capital = { save_scope_as = target_location }
+			set_variable = {
+				name = conquest_mission_events_11_event_variable
+				months = 6
+			}
+		}
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = conquest_mission_events.11.a
+		
+		scope:target_province = {
+			add_province_modifier = {
+				modifier = local_noble_integration_modifier
+				years = modifier_duration_years_short
+				mode = replace
+			}
+			every_location_in_province = {
+				limit = { 
+					owner = root 
+					any_pop = {
+						pop_type = pop_type:nobles
+						owner = root 
+					}
+				}
+				ordered_pop = {
+					limit = {
+						pop_type = pop_type:nobles
+						owner = root 
+					}
+					order_by = pop_size
+					check_range_bounds = no
+					add_pop_satisfaction = pop_satisfaction_mild_bonus
+				}
+			}
+		}
+
+		if = {
+			limit = { societal_value:aristocracy_vs_plutocracy > -95 }
+			change_societal_value = { 
+				type = aristocracy_vs_plutocracy 
+				value = societal_value_minor_move_to_left
+			}
+		}
+		else = { add_legitimacy = legitimacy_weak_penalty }
+	}
+	
+	option = {	#Undermine the power of the nobles
+		name = conquest_mission_events.11.b
+
+		add_estate_satisfaction = { 
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_penalty
+		}
+		change_societal_value = { 
+			type = aristocracy_vs_plutocracy 
+			value = societal_value_minor_move_to_right
+		}
+	}
+
+	option = {	#Support the local peasantry instead
+		name = conquest_mission_events.11.c
+
+		trigger = {
+			societal_value:serfdom_vs_free_subjects < 90
+		}
+
+		change_societal_value = { 
+			type = serfdom_vs_free_subjects 
+			value = societal_value_move_to_right
+		}
+
+		add_stability = stability_weak_penalty
+
+		add_estate_satisfaction = { 
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_mild_penalty
+		}
+	}
+
+	option = {
+		name = conquest_mission_events.11.d
+
+		trigger = { 
+			OR = {
+				"estate_power(estate_type:crown_estate)" >= 0.5
+				great_ruler_or_regent_trigger = yes
+			}
+		}
+
+		if = {
+			limit = {
+				current_age_or_later = { age = age_5_absolutism }
+			}
+			change_societal_value = {
+				type = absolutism_vs_liberalism
+				value = societal_value_move_to_left
+			}
+		}
+		else = { custom_tooltip = ruler_or_regent_too_strong_tt }
+	}
+}

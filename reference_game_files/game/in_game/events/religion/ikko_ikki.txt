@@ -1,0 +1,949 @@
+﻿namespace = ikko_ikki
+
+scripted_trigger country_belongs_to_jodou_shinshuu = {
+	any_international_organizations_member_of = {
+		international_organization_has_policy = policy:jodou_shinshuu_policy
+		international_organization_has_policy = policy:pure_land_school_policy
+	}
+}
+
+scripted_trigger ikko_ikki_present_in_country = {
+	OR = {
+		AND = {
+			country_type = location
+			religion:shinto = {
+				var:ikko_ikki_enabled ?= {
+					any_international_organization_owned_location = { owner = root }
+				}
+			}
+		}
+		AND = {
+			country_type = building
+			religion:shinto = {
+				var:ikko_ikki_enabled ?= {
+					any_international_organization_owned_location = { 
+						any_foreign_building_countries_in_location = {
+							this = root
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+scripted_effect ikko_ikki_convert_to_mahayana = {
+	scope:target_io = {
+		if = {
+			limit = {
+				exists = var:religion
+				var:religion = religion:shinto
+			}
+			remove_variable = religion
+			set_variable = {
+				name = religion
+				value = religion:mahayana
+			}
+		}
+	}
+	change_religion = religion:mahayana
+	change_religion_for_ruler_and_family = { country = ROOT religion = religion:mahayana }
+	add_stability = stability_ultimate_penalty
+	ikko_ikki_lots_of_mahayana = yes
+	add_country_modifier = { modifier = shinto_converted_to_mahayana years  = 10 mode = add_and_extend }  
+
+}
+
+scripted_effect ikko_ikki_lots_of_mahayana = {
+	custom_tooltip = {
+		text = ikko_ikki_lots_of_mahayana.tt
+		every_owned_location = {
+			limit = { 
+				scope:target_io = { has_location = prev }
+			}
+			every_pop = {
+				limit = {
+					NOT = { religion = religion:mahayana }
+				}
+				random_list = {
+					10 = {}
+					40 = {
+						split_pop = {
+							fraction = 0.15
+							religion = religion:mahayana
+						}
+					}
+					20 = {
+						split_pop = {
+							fraction = 0.2
+							religion = religion:mahayana
+						}
+					}
+					15 = {
+						split_pop = {
+							fraction = 0.25
+							religion = religion:mahayana
+						}
+					}
+					10 = {
+						split_pop = {
+							fraction = 0.3
+							religion = religion:mahayana
+						}
+					}
+					4 = {
+						split_pop = {
+							fraction = 0.4
+							religion = religion:mahayana
+						}
+					}
+					1 = {
+						split_pop = {
+							fraction = 0.5
+							religion = religion:mahayana
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+ikko_ikki.1 = {
+	type = country_event
+	title = ikko_ikki.1.title
+	desc = ikko_ikki.1.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		"estate_power(estate_type:peasants_estate)" < 0.2
+		stability < 20
+		has_ruler = yes
+		at_war = yes
+	}
+
+	illustration_tags = {
+        10 = angry
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		ruler = { save_scope_as = target_character }
+		religion:shinto = {
+			var:ikko_ikki_enabled = { save_scope_as = target_io }
+		}
+	}
+
+	option = {
+		name = ikko_ikki.1.a
+		if = {
+			limit = { country_type = location }
+			ordered_owned_location = {
+				order_by = population
+				max = {
+					value = 1
+					add = {
+						value = root.num_provinces
+						multiply = 0.2
+					}
+				}
+				every_pop = {
+					limit = {
+						owner = root
+						culture = { has_culture_group = culture_group:japanese_group }
+						pop_type = pop_type:peasants
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				}
+			}
+		}
+		else = {
+			add_stability = stability_weak_penalty
+		}
+	}
+	
+	option = {
+		name = ikko_ikki.1.b
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_minor_move_to_right }
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+ikko_ikki.2 = {
+	type = country_event
+	title = ikko_ikki.2.title
+	desc = ikko_ikki.2.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		any_neighbor_country = {
+			religion = religion:shinto
+			any_rebel = {
+				rebel_category = estate
+				has_support_from = pop_type:peasants
+			}
+		}
+
+		stability < 20
+	}
+	
+	illustration_tags = {
+        10 = angry
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		random_neighbor_country = {
+			limit = {
+				religion = religion:shinto
+				any_rebel = {
+					rebel_category = estate
+					has_support_from = pop_type:peasants
+				}
+			}
+			save_scope_as = target_country
+		}
+	}
+
+	option = {
+		name = ikko_ikki.2.a
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_extreme_penalty }
+	}
+	option = {
+		name = ikko_ikki.2.b
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+ikko_ikki.3 = { #Creation of the sect
+	type = country_event
+	title = ikko_ikki.3.title
+	desc = ikko_ikki.3.desc
+
+	trigger = {
+		religion = religion:shinto
+		trigger_if = {
+			limit = {
+				religion:shinto = {
+					NOT = { has_variable = ikko_ikki_enabled }
+				}
+			}
+			is_situation_active = situation:sengoku
+		}
+		OR = {
+			stability <= 20
+			war_exhaustion >= 5
+			estate_satisfaction:peasants_estate <= 0.5
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		if = {
+			limit = { country_type = location }
+			random_owned_location = {
+				limit = { dominant_religion.group = religion_group:buddhist }
+				save_scope_as = target_location
+			}
+		}
+		if = {
+			limit = { country_type = building }
+			random_owned_foreign_building_location = {
+				limit = { dominant_religion.group = religion_group:buddhist }
+				save_scope_as = target_location				
+			}
+		}
+		religion:shinto = {
+			if = {
+				limit = {
+					NOT = { has_variable = ikko_ikki_enabled }
+				}
+				root = {
+					save_scope_as = target_origin_country
+					create_international_organization = {
+						type = international_organization_type:sect
+						save_scope_as = target_io
+					}
+				}
+				scope:target_io = {
+					add_policy_to_international_organization = policy:jodou_shinshuu_policy
+					add_policy_to_international_organization = policy:pure_land_school_policy
+					set_variable = { name = sect_favor value = 10 }
+					set_variable = { name = religion value = religion:shinto }
+				}
+				set_variable = { name = ikko_ikki_enabled value = scope:target_io }
+				every_country_in_religion = {
+					trigger_event_silently = ikko_ikki.10
+				}
+			}
+			else = {
+				var:ikko_ikki_enabled ?= { save_scope_as = target_io}
+			}
+			if = {
+				limit = { 
+					exists = scope:target_location
+					scope:target_io = { NOT = { has_location = scope:target_location } }
+				}
+				scope:target_io = { add_location_to_international_organization = scope:target_location }
+			}
+		}
+	}
+
+	option = { #Endorse it
+		name = ikko_ikki.3.a
+		if = {
+			limit = { 
+				exists = scope:target_location
+				scope:target_location = {
+					NOT = { has_building = building_type:temple }
+				}
+			}
+			scope:target_location = { 
+				construct_building = { building_type = building_type:temple }
+			}
+		}
+		if = {
+			limit = {
+				is_member_of_international_organization = scope:target_io
+			}
+			custom_tooltip = {
+				text = sect_gains_favor_tt
+				scope:target_io = {
+					change_variable = {
+						name = sect_favor
+						add = 10
+					}
+				}
+			}
+		}
+		else = {
+			if = {
+				limit = {
+					any_international_organizations_member_of = {
+						international_organization_type = international_organization_type:sect
+					}
+				}
+				every_international_organizations_member_of = {
+					limit = { international_organization_type = international_organization_type:sect }
+					remove_country_from_international_organization = root
+				}
+			}
+			scope:target_io = { add_country_to_international_organization = root }
+		}
+		if = {
+			limit = { has_country_modifier = favoring_kami_worship }
+			remove_country_modifier = favoring_kami_worship
+		}
+		if = {
+			limit = { NOT = { has_country_modifier = favoring_buddhism_schools} }
+			add_country_modifier = favoring_buddhism_schools
+		}
+	}
+	option = { #Let them be
+		name = ikko_ikki.3.b
+		if = {
+			limit = { 
+				exists = scope:target_location
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = { change_control = control_mild_penalty }
+		}
+		else = {
+			add_prestige = prestige_mild_penalty
+		}
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_tiny_move_to_right }
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_weak_bonus }
+	}
+	option = { #Nope
+		name = ikko_ikki.3.c
+		trigger = {
+			country_belongs_to_jodou_shinshuu = no
+		}
+		if = {
+			limit = { 
+				exists = scope:target_location
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				add_location_modifier = { modifier = enraged_ikko_ikki years  = 10 mode = add_and_extend }
+				change_control = control_weak_bonus
+			}
+		}
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_minor_move_to_left }
+		hidden_effect = {
+			if = {
+				limit = { 
+					exists = scope:target_location
+					scope:target_io = { has_location = scope:target_location }
+				}
+				scope:target_io = { remove_location_from_international_organization = scope:target_location }
+			}
+		}
+	}
+}
+
+ikko_ikki.4 = { #Jinaicho
+	type = country_event
+	title = ikko_ikki.4.title
+	desc = ikko_ikki.4.desc
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		#has_advance = jinaichou
+		OR = {
+			AND = {
+				country_type = location
+				any_owned_location = {
+					dominant_religion.group = religion_group:buddhist
+					has_building = building_type:temple
+				}
+			}
+			AND = {
+				country_type = building
+				any_owned_foreign_building_location = {
+					dominant_religion.group = religion_group:buddhist
+					has_building = building_type:temple
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = armed
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:clergy_estate }
+		if = {
+			limit = { country_type = location }
+			random_owned_location = {
+				limit = { 
+					has_building = building_type:temple
+					dominant_religion.group = religion_group:buddhist
+				}
+				save_scope_as = target_location
+			}
+		}
+		if = {
+			limit = { country_type = building }
+			random_owned_foreign_building_location = {
+				limit = { 
+					has_building = building_type:temple
+					dominant_religion.group = religion_group:buddhist
+				}
+				save_scope_as = target_location
+			}
+		}
+		religion:shinto = {
+			var:ikko_ikki_enabled ?= { save_scope_as = target_io }
+		}
+	}
+
+	option = { #Against
+		name = ikko_ikki.4.a
+		trigger = {
+			country_belongs_to_jodou_shinshuu = no
+		}
+		if = {
+			limit = { 
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				add_location_modifier = { modifier = enraged_ikko_ikki years  = 10 mode = add_and_extend }
+				change_control = control_weak_bonus
+			}
+		}
+		else = {
+			add_stability = stability_weak_penalty
+		}
+	}
+	option = { #Work together
+		name = ikko_ikki.4.b
+		if = {
+			limit = { 
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				change_control = control_weak_penalty
+				change_development  = development_weak_bonus
+			}
+		}
+		if = {
+			limit = { country_has_estate = estate_type:peasants_estate }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_weak_bonus }
+		}
+		else = {
+			add_prestige = prestige_weak_bonus
+		}
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_tiny_move_to_right }
+	}
+	option = { #Endorse
+		name = ikko_ikki.4.c
+		if = {
+			limit = { 
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				change_control = control_mild_penalty
+				change_development  = development_mild_bonus
+			}
+		}
+		if = {
+			limit = { country_has_estate = estate_type:clergy_estate }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_bonus }
+		}
+		else = {
+			add_stability = legitimacy_weak_penalty
+		}
+		hidden_effect = {
+			if = {
+				limit = {
+					scope:target_io = {
+						NOT = { has_location = scope:target_location }
+					}
+				}
+				scope:target_io = { add_location_to_international_organization = scope:target_location }
+			}
+		}
+	}
+}
+
+ikko_ikki.5 = { #Social Tensions
+	type = country_event
+	title = ikko_ikki.5.title
+	desc = ikko_ikki.5.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+			var:ikko_ikki_enabled ?= {
+				OR = {
+					AND = {
+						root = { country_type = location }
+						any_international_organization_owned_location = {
+							owner = root
+						}
+					}
+					AND = {
+						root = { country_type = building }
+						any_international_organization_owned_location = {
+							any_foreign_building_countries_in_location = {
+								this = root
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = angry
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		religion:shinto = {
+			var:ikko_ikki_enabled ?= { 
+				save_scope_as = target_io
+				if = {
+					limit = {
+						root = { country_type = location }
+					}
+					random_international_organization_owned_location = { 
+						limit = { owner = root }
+						save_scope_as = target_location
+					}
+				}
+				if = {
+					limit = {
+						root = { country_type = building }
+					}
+					random_international_organization_owned_location = { 
+						limit = { 
+							any_foreign_building_countries_in_location = {
+								this = root
+							}
+						}
+						save_scope_as = target_location
+					}
+				}
+			}
+		}
+	}
+
+	option = { #Endorse
+		name = ikko_ikki.5.a
+		if = {
+			limit = {
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				change_control = control_severe_penalty
+				change_development  = development_weak_bonus
+			}
+		}
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_penalty }
+	}
+	option = { #Status quo
+		name = ikko_ikki.5.b
+		add_legitimacy = legitimacy_severe_penalty
+	}
+	option = { #Curtail
+		name = ikko_ikki.5.c
+		trigger = {
+			country_belongs_to_jodou_shinshuu = no
+		}
+		if = {
+			limit = { 
+				scope:target_location = {
+					has_owner = yes
+					owner = root
+				}
+			}
+			scope:target_location = {
+				add_location_modifier = { modifier = enraged_ikko_ikki years  = 10 mode = add_and_extend }
+				change_control = control_weak_bonus
+			}
+		}
+		else = {
+			add_stability = stability_severe_penalty
+		}
+		if = {
+			limit = { country_has_estate = estate_type:peasants_estate }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_severe_penalty }
+		}
+	}
+}
+
+ikko_ikki.6 = { #End of the ikko ikki
+	type = country_event
+	title = ikko_ikki.6.title
+	desc = ikko_ikki.6.desc
+
+	fire_only_once = yes
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+			NOT = { is_situation_active = situation:sengoku }
+			religion:shinto = {
+				var:ikko_ikki_enabled = {
+					any_international_organization_owned_location = { count = 0 }
+					any_international_organization_member = { count = 0 }
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		religion:shinto = {
+			var:ikko_ikki_enabled = { save_scope_as = target_io }
+		}
+	}
+
+	option = { #End them
+		name = ikko_ikki.6.a
+		add_country_modifier = { modifier = ikko_ikki_crushed years = 50 mode = add_and_extend }
+		custom_tooltip = {
+			text = ikko_ikki_no_longer_available.tt
+			religion:shinto = {
+				remove_variable = ikko_ikki_enabled
+			}
+		}
+		destroy_international_organization = { target = scope:target_io }
+		save_scope_as = target_origin_country
+		religion:shinto = {
+			every_country_in_religion = {
+				limit = { this != root }
+				trigger_event_silently = ikko_ikki.11
+			}
+		}
+	}
+
+	option = { #Actually join them
+		name = ikko_ikki.6.b
+		scope:target_io = { add_country_to_international_organization = root }
+		if = {
+			limit = { exists = capital }
+			capital ?= {
+				scope:target_io = { add_location_to_international_organization = prev }
+			}
+		}
+	}
+}
+
+ikko_ikki.7 = { #Parallel Authority
+	type = country_event
+	title = ikko_ikki.7.title
+	desc = ikko_ikki.7.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		OR = {
+			ikko_ikki_present_in_country = yes
+			country_belongs_to_jodou_shinshuu = yes
+		}
+		NOT = { has_country_modifier = ikko_ikki_temple_towns }	
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		religion:shinto = {
+			var:ikko_ikki_enabled = { save_scope_as = target_io }
+		}
+	}
+
+	option = { #Use them
+		name = ikko_ikki.7.a
+		add_country_modifier = { modifier = ikko_ikki_temple_towns years = 25 mode = add_and_extend }
+		add_legitimacy = legitimacy_mild_penalty
+	}
+
+	option = { #Curtail them
+		name = ikko_ikki.7.b
+		trigger = {
+			country_belongs_to_jodou_shinshuu = no
+		}
+		add_stability = stability_weak_penalty
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_weak_bonus }
+	}
+}
+
+ikko_ikki.8 = { #Support of the ikko ikki
+	type = country_event
+	title = ikko_ikki.8.title
+	desc = ikko_ikki.8.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		country_belongs_to_jodou_shinshuu = yes
+		NOT = { has_country_modifier = support_of_ikko_ikki }	
+	}
+
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		religion:shinto = {
+			var:ikko_ikki_enabled = { save_scope_as = target_io }
+		}
+	}
+
+	option = { #Keep supporting them
+		name = ikko_ikki.8.a
+		add_country_modifier = { modifier = support_of_ikko_ikki years = 25 mode = add_and_extend }
+		add_stability = stability_mild_penalty
+		trigger_event_silently = { id = ikko_ikki.9 months = { 120 240 } }
+		if = {
+			limit = {
+				country_type = location
+				any_owned_location = {
+					scope:target_io = {
+						NOT = { has_location = prev }
+					}
+				}
+			}
+			ordered_owned_location = {
+				limit = {
+					scope:target_io = {
+						NOT = { has_location = prev }
+					}
+				}
+				order_by = population
+				max = 3
+				check_range_bounds = no
+				scope:target_io = { add_location_to_international_organization = prev }
+			}
+		}
+		if = {
+			limit = {
+				country_type = building
+				any_owned_foreign_building_location = {
+					scope:target_io = {
+						NOT = { has_location = prev }
+					}
+				}
+			}
+			ordered_owned_foreign_building_location = {
+				limit = {
+					scope:target_io = {
+						NOT = { has_location = prev }
+					}
+				}
+				order_by = population
+				max = 3
+				scope:target_io = { add_location_to_international_organization = prev }
+			}
+		}
+	}
+
+	option = { #Pull back
+		name = ikko_ikki.8.b
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
+		add_legitimacy = legitimacy_mild_penalty
+
+	}
+}
+
+ikko_ikki.9 = { #Convert to Buddhism?
+	type = country_event
+	title = ikko_ikki.9.title
+	desc = ikko_ikki.9.desc
+
+	trigger = {
+		religion = religion:shinto
+		religion:shinto = {
+			has_variable = ikko_ikki_enabled
+		}
+		country_belongs_to_jodou_shinshuu = yes
+		has_country_modifier = support_of_ikko_ikki
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		religion:shinto = {
+			var:ikko_ikki_enabled = { save_scope_as = target_io }
+		}
+	}
+
+	option = { #Stay shinto
+		name = ikko_ikki.9.a
+		add_prestige = prestige_mild_bonus
+		add_purity = purity_mild_bonus
+		add_honor = honor_mild_bonus
+	}
+
+	option = { #Convert and theocracy
+		name = ikko_ikki.9.b
+		if = {
+			limit = {
+				NOT = {
+					government_type = government_type:theocracy
+				}
+			}
+			change_government_type = government_type:theocracy
+		}
+		ikko_ikki_convert_to_mahayana = yes
+	}
+
+	option = { #Convert and republic
+		name = ikko_ikki.9.c
+		if = {
+			limit = {
+				NOT = {
+					government_type = government_type:republic
+				}
+			}
+			change_government_type = government_type:republic
+		}
+		ikko_ikki_convert_to_mahayana = yes
+	}
+	
+	option = { #Convert and that's it
+		name = ikko_ikki.9.d
+		ikko_ikki_convert_to_mahayana = yes
+	}
+}
+
+ikko_ikki.10 = { #Ikko-Ikki faction creation notification
+	type = country_event
+	title = ikko_ikki.10.title
+	desc = ikko_ikki.10.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+	
+	option = {
+		name = ikko_ikki.10.a
+		custom_tooltip = ikko_ikki_enabled.tt
+	}
+}
+
+ikko_ikki.11 = { #Ikko-Ikki faction destruction notification
+	type = country_event
+	title = ikko_ikki.11.title
+	desc = ikko_ikki.11.desc
+
+	illustration_tags = {
+        10 = happy
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+	
+	option = {
+		name = ikko_ikki.11.a
+		custom_tooltip = ikko_ikki_no_longer_available.tt
+	}
+}

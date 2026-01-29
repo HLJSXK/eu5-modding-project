@@ -1,0 +1,370 @@
+﻿namespace = flavor_chi_mon
+
+scripted_effect clear_tumu_crisis_variables = {
+	var:chi_captured_emperor_origin = {
+		remove_variable = lost_emperor
+	}
+	var:tumu_crisis_location_target_on_character = {
+		remove_variable = tumu_crisis_target
+	}
+	remove_variable = chi_captured_emperor_origin
+	remove_variable = tumu_crisis_location_target_on_character
+}
+
+# Tumu Crisis Events
+flavor_chi_mon.1 = {
+	type = country_event
+	title = flavor_chi_mon.1.title
+	desc = flavor_chi_mon.1.desc
+
+	fire_only_once = yes
+
+	immediate = {
+		save_scope_as = capturing_country
+
+		international_organization:middle_kingdom.leader_country = {
+			save_scope_as = target_country
+		}
+		scope:target = {
+			unit_location = {
+				save_scope_as = target_location
+			}
+			leader = {
+				save_scope_as = captured_emperor
+				move_country = ROOT
+				imprison_character_effect = {
+					years = -1
+				}
+				set_variable = {
+					name = chi_captured_emperor_origin
+					value = scope:target_country
+				}
+			}
+		}
+
+		scope:target_country = {
+			set_variable = {
+				name = lost_emperor
+				value = scope:captured_emperor
+			}
+		}
+		
+		"war_with_country(scope:target_country)" = {
+			save_scope_as = target_war
+		}
+
+		set_local_variable = {
+			name = ransom_value
+			value = {
+				value = scope:target_country.yearly_gold
+				multiply = { 2 3 }
+			}
+		}
+
+		location:dadu = {
+			if = {
+				limit = {
+					owner = scope:target_country
+				}
+				save_scope_as = location_for_capture
+			}
+		}
+		if = {
+			limit = {
+				NOT = { exists = scope:location_for_capture }
+			}
+			region:north_china_region = {
+				ordered_location_in_region = {
+					limit = {
+						owner ?= scope:target_country
+					}
+					order_by = population
+					max = 1
+					save_scope_as = location_for_capture
+				}
+			}
+		}
+		if = {
+			limit = {
+				NOT = { exists = scope:location_for_capture }
+			}
+			scope:target_country.capital = {
+				save_scope_as = location_for_capture
+			}
+		}
+
+		scope:location_for_capture = {
+			set_variable = tumu_crisis_target
+		}
+		scope:captured_emperor = { 
+			set_variable = {
+				name = tumu_crisis_location_target_on_character
+				value = scope:location_for_capture
+			}
+		}
+	}
+
+	option = {
+		name = flavor_chi_mon.1.a
+		
+		add_country_modifier = {
+			mode = replace
+			modifier = chi_tumu_crisis_benefit
+			years = 25
+		}
+		custom_tooltip = mon_pushing_advantage
+		show_as_tooltip = {
+			add_war_exhaustion = war_exhaustion_severe_bonus
+			add_country_modifier = {
+				mode = replace
+				modifier = chi_capture_of_beijing
+				years = 5
+			}
+		}
+	}
+
+	option = {
+		name = flavor_chi_mon.1.b
+		
+		custom_tooltip = mon_offer_ransom
+		scope:target_country = {
+			trigger_event_non_silently = {
+				id = flavor_chi_mon.5
+				days = 90
+			}
+		}
+	}
+
+	after = {
+		trigger_event_non_silently = {
+			id = flavor_chi_mon.2
+		}
+	}
+}
+
+# Information for China
+flavor_chi_mon.2 = {
+	hide_portraits = yes
+	type = country_event
+	title = flavor_chi_mon.2.title
+	desc = flavor_chi_mon.2.desc
+
+	immediate = {
+		scope:captured_emperor = {
+			random_child = {
+				limit = {
+					is_alive = yes
+				}
+				save_scope_as = child_candidate
+			}
+			father ?= {
+				random_child = {
+					limit = {
+						this != scope:captured_emperor
+						is_alive = yes
+					}
+					save_scope_as = sibling_candidate
+				}
+			}
+			dynasty ?= {
+				random_character_in_dynasty = {
+					limit = {
+						this != scope:captured_emperor
+						is_alive = yes
+						scope:sibling_candidate ?= {
+							this != prev
+						}
+						scope:child_candidate ?= {
+							this != prev
+						}
+					}
+					save_scope_as = dynasty_candidate
+				}
+			}
+		}
+	}
+
+	option = {
+		name = flavor_chi_mon.2.a
+		
+		add_prestige = prestige_extreme_penalty
+	}
+
+	option = {
+		name = flavor_chi_mon.2.b
+		
+		trigger = {
+			exists = scope:sibling_candidate
+		}
+		
+		set_new_ruler = scope:sibling_candidate
+	}
+
+	option = {
+		name = flavor_chi_mon.2.c
+		
+		trigger = {
+			exists = scope:child_candidate
+		}
+
+		set_new_ruler = scope:child_candidate
+	}
+
+	option = {
+		name = flavor_chi_mon.2.d
+		
+		trigger = {
+			exists = scope:dynasty_candidate
+		}
+		
+		set_new_ruler = scope:dynasty_candidate
+	}
+
+	after = {
+		custom_tooltip = chi_recapture_emperor_tt
+		show_as_tooltip = {
+			add_country_modifier = {
+				mode = replace
+				modifier = chi_death_of_emperor_without_capture
+				years = 30
+			}
+			add_prestige = prestige_extreme_penalty
+		}
+	}
+}
+
+# Death of the Monarch - Mongol Side
+flavor_chi_mon.3 = {
+	type = country_event
+	title = flavor_chi_mon.3.title
+	desc = flavor_chi_mon.3.desc
+
+	immediate = {
+		scope:target.var:chi_captured_emperor_origin = {
+			save_scope_as = target_country
+		}
+	}
+
+	option = {
+		name = flavor_chi_mon.3.a
+		
+		add_prestige = prestige_weak_penalty
+	}
+
+	after = {
+		scope:target_country = {
+			trigger_event_silently = flavor_chi_mon.4
+		}
+	}
+}
+
+# Death of the Monarch - Chinese Side
+flavor_chi_mon.4 = {
+	type = country_event
+	title = flavor_chi_mon.4.title
+	desc = flavor_chi_mon.4.desc
+
+	option = {
+		name = flavor_chi_mon.4.a
+		
+		add_country_modifier = {
+			mode = replace
+			modifier = chi_death_of_emperor_without_capture
+			years = 30
+		}
+		add_prestige = prestige_extreme_penalty
+	}
+	after = {
+		hidden_effect = {
+			scope:target = {
+				clear_tumu_crisis_variables = yes
+			}
+		}
+	}
+}
+
+
+# Offer of Ransom
+flavor_chi_mon.5 = {
+	type = country_event
+	title = flavor_chi_mon.5.title
+	desc = flavor_chi_mon.5.desc
+
+	option = {
+		name = flavor_chi_mon.5.a
+		
+		add_gold = {
+			value = local_var:ransom_value
+			multiply = -1
+		}
+		scope:capturing_country = {
+			add_gold = local_var:ransom_value
+		}
+
+		scope:captured_emperor = {
+			tumu_crisis_restore_emperor = yes
+		}
+	}
+}
+
+# Capture of Beijing
+flavor_chi_mon.6 = {
+	type = country_event
+	title = flavor_chi_mon.6.title
+	desc = flavor_chi_mon.6.desc
+
+	immediate = {
+		scope:target_location.var:lost_emperor = {
+			save_scope_as = target_character
+		}
+	}
+
+	option = {
+		name = flavor_chi_mon.6.a
+		
+		add_war_exhaustion = war_exhaustion_severe_bonus
+		add_country_modifier = {
+			mode = replace
+			modifier = chi_capture_of_beijing
+			years = 5
+		}
+	}
+}
+
+# Return of Emperor
+flavor_chi_mon.7 = {
+	type = country_event
+	title = flavor_chi_mon.7.title
+	desc = flavor_chi_mon.7.desc
+
+	option = {
+		name = flavor_chi_mon.7.a
+
+		set_new_ruler = scope:target_emperor
+		add_stability = stability_severe_bonus
+	}
+
+	option = {
+		name = flavor_chi_mon.7.b
+
+		trigger = {
+			OR = {
+				has_ruler = yes
+				has_heir = yes
+			}
+		}
+		
+		add_prestige = prestige_severe_penalty
+		ruler_or_heir_if_regent = {
+			add_adm = 10
+			add_dip = 10
+			add_mil = 10
+		}
+	}
+
+	after = {
+		scope:target_emperor = {
+			tumu_crisis_restore_emperor = yes
+		}
+	}
+}

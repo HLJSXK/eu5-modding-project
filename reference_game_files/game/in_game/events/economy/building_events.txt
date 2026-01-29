@@ -1,0 +1,150 @@
+﻿namespace = building
+
+# Scholars want to set up a rival university.
+
+scripted_trigger building_1_old_university_trigger = {
+	is_core_of = root
+	has_building_with_at_least_one_level = university 
+	any_pop = {
+		pop_size > 0.25
+		pop_type = pop_type:clergy
+	}
+}
+scripted_trigger building_1_new_university_trigger = {
+	is_core_of = root
+	OR = {
+		location_rank = location_rank:town
+		location_rank = location_rank:city
+	}
+	province_definition = {
+		NOT = {
+			any_location_in_province_definition = {
+				has_building = building_type:university
+			}
+		}
+	}
+}
+
+building.1 = {
+	type = country_event	
+
+	title = building.1.title
+	desc = building.1.desc
+	
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	trigger = {
+		any_owned_location = {
+			building_1_old_university_trigger = yes
+		}
+		any_owned_location = {
+			building_1_new_university_trigger = yes
+		}
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_owned_location = {
+			limit = { 
+				building_1_old_university_trigger = yes
+			}
+			save_scope_as = old_university
+		}
+		random_owned_location = {
+			limit = { 
+				building_1_new_university_trigger = yes
+			}
+			save_scope_as = new_university
+		}
+		scope:old_university = {
+			random_pop = {
+				limit = {
+					pop_size > 0.25
+					pop_type = pop_type:clergy
+				}
+				save_scope_as = scholars
+			}
+		}		
+	}
+
+	# allow the new university
+	option = {
+		name = building.1.a
+		scope:new_university = { 
+			construct_building = { 
+				building_type = building_type:university
+				cost_multiplier = 0
+				cost_multiplier_reason = "game_concept_event"
+			}
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_extreme_penalty }
+		
+		add_migration = {
+			owner = this
+			from = scope:old_university.province.province_definition
+			to = scope:new_university.province.province_definition
+			type = pop_type:clergy
+			amount = 0.04
+			months = 60
+		}
+		scope:old_university = { add_location_modifier = { modifier = student_protests years = 1 mode = add_and_extend } }
+	}
+
+	# send the scholars back
+	option = {
+		name = building.1.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+		scope:old_university = { add_location_modifier = { modifier = student_protests years = 10 mode = add_and_extend } }
+	}
+}
+
+# town vs gown
+scripted_trigger building_2_university_trigger = {
+	has_building_with_at_least_one_level = university
+}
+
+building.2 = {
+	type = country_event	
+	title = building.2.title
+	desc = building.2.desc
+	
+	trigger = {
+		any_owned_location = {
+			building_2_university_trigger = yes
+		}
+	}
+
+	illustration_tags = {
+        10 = angry
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:burghers_estate }
+		random_owned_location = {
+			limit = { 
+				building_2_university_trigger = yes
+			}
+			save_scope_as = university
+		}
+	}
+
+	# Side with the University
+	option = {
+		name = building.2.a
+		scope:university = { add_location_modifier = { modifier = student_protests years = 5 mode = add_and_extend } }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+	}
+
+	# Side with the Townsfolk
+	option = {
+		name = building.2.b
+		scope:university = { add_location_modifier = { modifier = student_protests years = 5 mode = add_and_extend } }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_bonus }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_penalty }
+	}
+}

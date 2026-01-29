@@ -1,0 +1,1328 @@
+﻿namespace = succession_crisis
+
+scripted_trigger character_valid_pretender_trigger = {
+	is_ruler = no
+	owner = ROOT
+	is_adult = yes
+	is_female = no
+	has_estate = estate_type:crown_estate
+}
+
+succession_crisis.1 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.1.title
+	desc = succession_crisis.1.desc
+
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+
+	immediate = {
+		create_rebel = {
+			category = pretender
+			name = succession_crisis_pretender
+			save_scope_as = succession_crisis_pretender_scope
+		}
+		set_variable = {
+			name = succession_crisis_pretender_variable
+			value = scope:succession_crisis_pretender_scope
+		}
+		if = {
+			limit = {
+				"estate_power(estate_type:nobles_estate)" >= 0.5
+				has_ruler = yes
+				ruler = {
+					has_dynasty = yes
+				}
+			}
+			root.ruler.dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = mil
+					limit = {
+						character_valid_pretender_trigger = yes
+					}
+					max = 1
+					save_scope_as = scope_pretender
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				"estate_power(estate_type:clergy_estate)" >= 0.5
+				has_ruler = yes
+				ruler = {
+					has_dynasty = yes
+				}
+			}
+			root.ruler.dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = adm
+					limit = {
+						character_valid_pretender_trigger = yes
+					}
+					max = 1
+					save_scope_as = scope_pretender
+				}
+			}
+
+		}
+		else_if = {
+			limit = {
+				"estate_power(estate_type:burghers_estate)" >= 0.5
+				has_ruler = yes
+				ruler = {
+					has_dynasty = yes
+				}
+			}
+			root.ruler.dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = dip
+					limit = {
+						character_valid_pretender_trigger = yes
+					}
+					max = 1
+					save_scope_as = scope_pretender
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				has_ruler = yes
+				ruler = {
+					has_dynasty = yes
+				}
+			}
+			root.ruler.dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = total_abilities
+					limit = {
+						character_valid_pretender_trigger = yes
+					}
+					max = 1
+					save_scope_as = scope_pretender
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				NOT = { exists = scope:scope_pretender }
+				"estate_power(estate_type:crown_estate)" >= 0.5
+			}
+			ordered_character = {
+				order_by = total_abilities
+				limit = {
+					character_valid_pretender_trigger = yes
+				}
+				max = 1
+				save_scope_as = scope_pretender
+			}
+		}
+
+		if = {
+			limit = {
+				NOT = { exists = scope:scope_pretender }
+			}
+			create_character = {
+				religion = root.religion
+				culture = root.culture
+				estate = estate_type:nobles_estate
+				age = 30
+				save_scope_as = scope_pretender
+			}
+		}
+
+		scope:scope_pretender = {
+			set_variable = {
+				name = scope_pretender_var
+				value = yes
+			}
+			change_character_allegiance = scope:succession_crisis_pretender_scope
+		}
+
+
+		set_variable = {
+			name = total_num_prov_variable
+			value = 0
+		}
+		every_province = {
+			limit = {
+				OR = {
+					province_average_control < 0.5
+					province_food_percentage < 0.5
+					province_satisfaction < 0.5
+				}
+				any_location_in_province = { is_capital = no }
+			}
+			add_to_list = revolt_provinces_list
+			owner = {
+				change_variable = {
+					name = total_num_prov_variable
+					add = 1
+				}
+			}
+		}
+		create_gui_variable = {
+			type = pretender_rebel_character
+			target = scope:scope_pretender
+		}
+	}
+
+	option = {
+		name = succession_crisis.1.a
+
+		custom_tooltip = succession_crisis.1.tt
+		add_stability = stability_extreme_penalty
+
+		hidden_effect = {
+			if = {
+				limit = { list_size = { name = revolt_provinces_list value > 0 } }
+				ordered_in_list = {
+					list = revolt_provinces_list
+					order_by = population
+					max = {
+						value = var:total_num_prov_variable
+						divide = 4
+						ceiling = yes
+					}
+					every_location_in_province = {
+						every_pop = {
+							limit = {
+								owner = root
+							}
+							add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+							change_pop_allegiance = scope:succession_crisis_pretender_scope
+						}
+
+					}
+				}
+			}
+		}
+		scope:scope_pretender = {
+			add_character_modifier = {
+				modifier = plotting_rebellion_modifier
+				years = -1
+				mode = extend
+			}
+		}
+
+		every_character = {
+			limit = {
+				is_adult = yes
+				is_alive = yes
+				OR = {
+					is_close_relative = scope:scope_pretender
+					is_spouse_of = scope:scope_pretender
+				}
+				NOR = {
+					is_ruler = yes
+					is_regent = yes
+				}
+			}
+			change_character_allegiance = scope:succession_crisis_pretender_scope
+			hidden_effect = {
+				add_character_modifier = {
+					modifier = plotting_rebellion_modifier
+					years = -1
+					mode = extend
+				}
+			}
+		}
+	}
+	after = {
+		remove_variable = total_num_prov_variable
+	}
+
+}
+
+succession_crisis.2 = { #Province Opposes Royal Authority
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.2.title
+	desc = succession_crisis.2.desc
+
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+
+	trigger = {
+		in_civil_war = no
+		any_province = {
+			NOT = { root.capital.province = this }
+			any_location_in_province = {
+				NOT = { has_variable = recently_demanded_aid_variable }
+				NOT = { has_variable = recently_joined_rebellion_variable }
+				is_capital = no
+			}
+		}
+		exists = var:succession_crisis_pretender_variable
+	}
+
+	immediate = {
+		var:succession_crisis_pretender_variable ?= {
+			save_scope_as = succession_crisis_pretender_scope
+		}
+		random_character = {
+			limit = {
+				has_variable = scope_pretender_var
+			}
+			save_scope_as = scope_pretender
+		}
+		ordered_province = {
+			limit = {
+				NOT = {
+					any_location_in_province = {
+						OR = {
+							has_variable = recently_joined_rebellion_variable
+							has_variable = recently_demanded_aid_variable
+						}
+					}
+				}
+				NOT = { root.capital.province = this }
+			}
+			order_by = {
+				value = province_average_control
+				multiply = -1
+
+				ordered_location_in_province = {
+					max = 1
+					order_by = {
+						if = {
+							limit = {
+								scope:scope_pretender = {
+									has_estate = estate_type:nobles_estate
+								}
+							}
+							add = {
+								value = modifier:local_nobles_estate_power
+								multiply = 2
+							}
+						}
+						else_if = {
+							limit = {
+								scope:scope_pretender = {
+									has_estate = estate_type:clergy_estate
+								}
+							}
+							add = {
+								value = modifier:local_clergy_estate_power
+								multiply = 2
+							}
+						}
+						else_if = {
+							limit = {
+								scope:scope_pretender = {
+									has_estate = estate_type:burghers_estate
+								}
+							}
+							add = {
+								value = modifier:local_burghers_estate_power
+								multiply = 2
+							}
+						}
+						else_if = {
+							limit = {
+								scope:scope_pretender = {
+									has_estate = estate_type:peasants_estate
+								}
+							}
+							add = {
+								value = modifier:local_peasants_estate_power
+								multiply = 2
+							}
+						}
+						else = {
+							value = population
+						}
+					}
+				}
+			}
+			max = 1
+			save_scope_as = target_province
+		}
+		ruler ?= {
+			save_scope_as = target_ruler
+		}
+	}
+
+	option = {
+		name = succession_crisis.2.a
+
+		custom_tooltip = every_location_loses_sat_and_joins_rebel_tt
+		hidden_effect = {
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+						}
+						add_pop_satisfaction = pop_satisfaction_mild_penalty
+						change_pop_allegiance = scope:succession_crisis_pretender_scope
+					}
+					set_variable = {
+						name = recently_joined_rebellion_variable
+						value = yes
+						days = 365
+					}
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				ruler ?= {
+					OR = {
+						has_trait = sinner
+						has_trait = greedy
+						has_trait = craven
+						has_trait = malevolent
+					}
+				}
+			}
+			var:succession_crisis_pretender_variable ?= {
+				add_rebel_progress = 0.1
+			}
+		}
+		else = {
+			var:succession_crisis_pretender_variable ?= {
+				add_rebel_progress = 0.05
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.2.b
+
+		change_gold_effect = { scale = -3 }
+		scope:target_province = {
+			change_province_food = 25
+			every_location_in_province = {
+				change_prosperity  = prosperity_very_weak_bonus
+				change_control = control_weak_bonus
+			}
+			set_variable = {
+				name = recently_demanded_aid_variable
+				value = yes
+				days = 365
+			}
+		}
+		scope:succession_crisis_pretender_scope ?= {
+			add_rebel_progress = -0.05
+		}
+		add_legitimacy = legitimacy_weak_bonus
+	}
+}
+
+succession_crisis.3 = { #A Resourceful Minister
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.3.title
+	desc = succession_crisis.3.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	trigger = {
+		in_civil_war = no
+		any_character = { in_cabinet = yes }
+		exists = var:succession_crisis_pretender_variable
+	}
+	immediate = {
+		random_character = {
+			limit = { in_cabinet = yes }
+			save_scope_as = target_character
+		}
+		ruler.dynasty ?= {
+			random_character_in_dynasty = {
+				limit = { in_cabinet = yes }
+				save_scope_as = target_character
+			}
+		}
+		var:succession_crisis_pretender_variable ?= {
+			save_scope_as = succession_crisis_pretender_scope
+		}
+	}
+
+	option = {
+		name = succession_crisis.3.a
+
+		add_legitimacy = {
+			value = 10
+			multiply = "estate_power(estate_type:crown_estate)"
+			add = 5
+		}
+		scope:succession_crisis_pretender_scope ?= {
+			add_rebel_progress = -0.03
+		}
+	}
+
+	option = {
+		name = succession_crisis.3.b
+
+		add_stability = {
+			value = 10
+			multiply = "estate_power(estate_type:crown_estate)"
+			add = 5
+		}
+		add_estate_satisfaction = {
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_bonus
+		}
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_weak_bonus
+		}
+		add_estate_satisfaction = {
+			type = estate_type:burghers_estate
+			value = estate_satisfaction_weak_bonus
+		}
+	}
+}
+
+succession_crisis.4 = { #Testing One's Mettle
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.4.title
+	desc = succession_crisis.4.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		random_list = {
+			10 = {
+				trigger = {
+					ruler ?= { has_dynasty = yes }
+				}
+				create_character = {
+					estate = estate_type:nobles_estate
+					dynasty = root.ruler.dynasty
+					culture = root.culture
+					religion = root.religion
+					save_scope_as = target_character
+					create_in_limbo = yes
+				}
+			}
+			10 = {
+				create_character = {
+					estate = estate_type:burghers_estate
+					culture = root.culture
+					religion = root.religion
+					save_scope_as = target_character
+					create_in_limbo = yes
+				}
+			}
+			10 = {
+				create_character = {
+					estate = estate_type:clergy_estate
+					culture = root.culture
+					religion = root.religion
+					save_scope_as = target_character
+					create_in_limbo = yes
+				}
+			}
+			20 = {
+				create_character = {
+					estate = estate_type:peasants_estate
+					culture = root.culture
+					religion = root.religion
+					save_scope_as = target_character
+					create_in_limbo = yes
+				}
+			}
+		}
+		scope:target_character = {
+			set_to_limited_random_stats = {
+				max_adm = 90
+				min_adm = 30
+				max_dip = 90
+				min_dip = 30
+				max_mil = 95
+				min_mil = 50
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.4.a
+
+		add_legitimacy = legitimacy_weak_bonus
+		add_stability = stability_weak_bonus
+
+		scope:target_character = {
+			move_country = root
+			add_character_modifier = {
+				modifier = recruited_in_the_government
+				years = 10
+				mode = extend
+			}
+			add_adm = 5
+		}
+	}
+
+	option = {
+		name = succession_crisis.4.b
+
+		scope:target_character = {
+			move_country = root
+			add_character_modifier = {
+				modifier = recruited_in_the_military
+				years = 10
+				mode = extend
+			}
+			add_mil = 5
+		}
+		add_army_tradition = army_tradition_mild_bonus
+	}
+}
+
+succession_crisis.5 = { #Supports Royal Authority
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.5.title
+	desc = succession_crisis.5.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	trigger = {
+		in_civil_war = no
+		any_province = {
+			NOT = {
+				any_location_in_province = { is_capital = yes }
+			}
+			OR = {
+				province_average_control > 0.5
+				province_food_percentage > 0.5
+				province_satisfaction > 0.5
+			}
+			any_location_in_province = {
+				any_pop = {
+					rebel ?= { rebel_category = pretender }
+				}
+			}
+			NOT = { has_variable = recently_demanded_aid_variable }
+		}
+	}
+	immediate = {
+		if = {
+			limit = { exists = var:succession_crisis_pretender_variable }
+			var:succession_crisis_pretender_variable ?= {
+				save_scope_as = succession_crisis_pretender_scope
+			}
+		}
+		random_province = {
+			limit = {
+				NOT = {
+					any_location_in_province = { is_capital = yes }
+				}
+				any_location_in_province = {
+					any_pop = {
+						rebel ?= { rebel_category = pretender }
+					}
+				}
+				OR = {
+					province_average_control > 0.5
+					province_food_percentage > 0.5
+					province_satisfaction > 0.5
+				}
+				NOT = { has_variable = recently_demanded_aid_variable }
+			}
+			save_scope_as = target_province
+		}
+		random_character = {
+			limit = {
+				has_variable = scope_pretender_var
+			}
+			save_scope_as = target_character
+		}
+	}
+
+	option = {
+		name = succession_crisis.5.a
+
+		add_legitimacy = legitimacy_weak_bonus
+		custom_tooltip = every_location_gains_sat_and_loses_rebel_tt
+		hidden_effect = {
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+						remove_pop_allegiance = no_arg
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.5.b
+
+		trigger = {
+			ruler ?= {
+				OR = {
+					has_trait = just
+					has_trait = kind_hearted
+					has_trait = benevolent
+				}
+			}
+		}
+		add_legitimacy = legitimacy_mild_bonus
+		custom_tooltip = every_location_gains_sat_and_loses_rebel_tt
+		hidden_effect = {
+			scope:target_province = {
+				every_location_in_province = {
+					every_pop = {
+						limit = {
+							owner = root
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+						remove_pop_allegiance = no_arg
+					}
+				}
+			}
+		}
+	}
+}
+
+succession_crisis.6 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.6.title
+	desc = succession_crisis.6.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		ruler_or_regent = { save_scope_as = target_character1 }
+		scope:target_country.ruler_or_regent = { save_scope_as = target_character2 }
+
+		set_variable = {
+			name = approximate_target_country_income_variable
+			value = {
+				add = scope:target_country.monthly_income_total
+				multiply = 4
+				min = 50
+				max = {
+					value = monthly_income_total
+					multiply = 12
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				scope:target_country = { is_neighbor_of = root }
+			}
+			ordered_province = {
+				limit = {
+					any_location_in_province = { is_neighbor_of = scope:target_country }
+					NOT = {
+						any_location_in_province = { is_capital = yes }
+					}
+				}
+				order_by = province_average_development
+				max = {
+					value = 1
+					add = {
+						value = root.num_provinces
+						divide = 10
+					}
+				}
+				check_range_bounds = no
+				add_to_list = sc_random_provinces_list
+			}
+			random_in_list = {
+				list = sc_random_provinces_list
+				save_scope_as = target_province
+			}
+		}
+		save_scope_as = target_country2
+	}
+
+	option = {
+		name = succession_crisis.6.a
+
+		ai_chance = { factor = 90 }
+
+		custom_tooltip = if_they_accept_a_tt
+		#If they accept, we approximately will gain #G 4#!
+		#months of their total income (currently [ROOT.GetVariable('approximate_target_country_income_variable').GetValue|V0])
+		show_as_tooltip = {
+			scope:target_country = {
+				give_loan = {
+					target = root
+					amount = root.var:approximate_target_country_income_variable
+					interest = 0.05
+					months = 120
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:target_country
+				modifier = opinion_assisted_during_succession_crisis_modifier
+			}
+		}
+		hidden_effect = { set_variable = money_request_variable }
+
+		scope:target_country = { trigger_event_silently = succession_crisis.7 }
+	}
+
+	option = {
+		name = succession_crisis.6.b
+
+		trigger = { exists = scope:target_province }
+
+		ai_chance = { factor = 10 }
+
+		custom_tooltip = if_they_accept_a_tt
+		show_as_tooltip = {
+			scope:target_province = { change_province_owner = scope:target_country }
+			if = {
+				limit = {
+					NOT = {
+						has_mutual_scripted_relation = {
+							type = relation_type:alliance
+							target = scope:target_country
+						}
+					}
+				}
+				create_relation = {
+					first = ROOT
+					second = scope:target_country
+					type = relation_type:alliance
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:target_country
+				modifier = opinion_assisted_during_succession_crisis_modifier
+			}
+			add_truce_with = {
+				target = scope:target_country
+				years = 15
+			}
+		}
+		hidden_effect = { set_variable = assistance_prov_request_variable }
+		scope:target_country = { trigger_event_silently = succession_crisis.7 }
+	}
+
+	option = {
+		name = succession_crisis.6.c
+
+		ai_chance = { factor = 0 }
+
+		add_prestige = prestige_weak_bonus
+
+	}
+}
+
+succession_crisis.7 = {
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.7.title
+	desc = succession_crisis.7.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+
+	major = yes
+	major_trigger = {
+		this = scope:target_country2
+	}
+
+	option = {
+		name = succession_crisis.7.a
+
+		trigger = {
+			scope:target_country2 = { has_variable = money_request_variable }
+		}
+
+		give_loan = {
+			target = scope:target_country2
+			amount = scope:target_country2.var:approximate_target_country_income_variable
+			interest = 0.05
+			months = 120
+		}
+		add_opinion_mutual_effect = {
+			target = scope:target_country2
+			modifier = opinion_assisted_during_succession_crisis_modifier
+		}
+
+		hidden_effect = {
+			scope:target_country2 = { remove_variable = money_request_variable }
+		}
+	}
+
+	option = {
+		name = succession_crisis.7.a
+
+		trigger = {
+			scope:target_country2 = { has_variable = assistance_prov_request_variable }
+		}
+
+		scope:target_province = { change_province_owner = scope:target_country }
+		if = {
+			limit = {
+				NOT = {
+					has_mutual_scripted_relation = {
+						type = relation_type:alliance
+						target = scope:target_country2
+					}
+				}
+			}
+			create_relation = {
+				first = ROOT
+				second = scope:target_country2
+				type = relation_type:alliance
+			}
+		}
+		add_truce_with = {
+			target = scope:target_country2
+			years = 15
+		}
+		add_opinion_mutual_effect = {
+			target = scope:target_country2
+			modifier = opinion_assisted_during_succession_crisis_modifier
+		}
+
+		hidden_effect = {
+			scope:target_country2 = { remove_variable = assistance_prov_request_variable }
+		}
+	}
+
+	option = {
+		name = succession_crisis.7.c
+
+		add_opinion_mutual_effect = {
+			target = scope:target_country2
+			modifier = belligerent_diplomacy
+		}
+	}
+
+	after = {
+		hidden_effect = {
+			scope:target_country2 = { remove_variable = approximate_target_country_income_variable }
+		}
+	}
+}
+
+succession_crisis.8 = {
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.8.title
+	desc = succession_crisis.8.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		ruler_or_regent ?= {
+			save_scope_as = target_character1
+			dynasty ?= { save_scope_as = target_dynasty }
+		}
+		scope:target_character = { save_scope_as = target_character2 }
+
+		capital ?= {
+			create_art = {
+				quality = {
+					value = { 5 15 }
+					add = {
+						value = scope:target_character2.artist_skill
+						multiply = 0.5
+					}
+					add = {
+						value = root.average_country_literacy
+						divide = 10
+					}
+					add = {
+						value = scope:target_character1.total_abilities
+						divide = 50
+					}
+					add = { 5 25 }
+					ceiling = yes
+				}
+				artist = scope:target_character2
+				type = work_of_art_type:chronicle
+				key = dynastic_history_of_the_dynasty
+
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.8.a
+
+		add_government_power = {
+			value = government_power_weak_bonus
+			add = {
+				value = { 5 15 }
+				add = {
+					value = scope:target_character2.artist_skill
+					multiply = 0.5
+				}
+				add = {
+					value = root.average_country_literacy
+					divide = 10
+				}
+				add = {
+					value = scope:target_character1.total_abilities
+					divide = 50
+				}
+				add = { 5 25 }
+				divide = 10
+				max = 25
+				ceiling = yes
+			}
+		}
+
+		custom_tooltip = scales_with_art_quality_tt
+	}
+}
+
+succession_crisis.9 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.9.title
+	desc = succession_crisis.9.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character1 }
+		var:succession_crisis_pretender_variable ?= {
+			save_scope_as = succession_crisis_pretender_scope
+		}
+
+		"estate(estate_type:nobles_estate)" = {
+			random_possible_privilege = {
+				save_scope_as = target_privilege_1
+			}
+		}
+
+		scope:succession_crisis_pretender_scope = {
+			every_pops_supporting_rebel = {
+				limit = { pop_type = pop_type:nobles }
+				add_to_list = nobles_pop_list
+			}
+		}
+		var:scope_pretender_var ?= { save_scope_as = target_character2 }
+	}
+
+	option = {
+		name = succession_crisis.9.a
+
+		ai_chance = {
+			base = 100
+		}
+
+		if = {
+			limit = {
+				exists = scope:target_privilege_1
+			}
+			grant_estate_privilege = scope:target_privilege_1
+		}
+
+		ordered_in_list = {
+			list = nobles_pop_list
+			order_by = pop_size
+
+			max = {
+				value = 1
+				if = {
+					limit = { government_power > 10 }
+					add = {
+						value = root.government_power
+						divide = 20
+					}
+				}
+				else = { add = 1 }
+				ceiling = yes
+			}
+			check_range_bounds = no
+			add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+			remove_pop_allegiance = no_arg
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_extreme_bonus
+		}
+	}
+
+	option = {
+		name = succession_crisis.9.b
+
+		ai_chance = {
+			base = 0
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_penalty
+		}
+	}
+}
+
+succession_crisis.10 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.10.title
+	desc = succession_crisis.10.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+
+		ruler_or_regent ?= { save_scope_as = target_character1 }
+		var:succession_crisis_pretender_variable ?= {
+			save_scope_as = succession_crisis_pretender_scope
+		}
+
+		"estate(estate_type:clergy_estate)" = {
+			random_possible_privilege = {
+			save_scope_as = target_privilege_1
+				root = { grant_estate_privilege = prev }
+			}
+		}
+
+		scope:succession_crisis_pretender_scope = {
+			every_pops_supporting_rebel = {
+				limit = { pop_type = pop_type:clergy }
+				add_to_list = clergy_pop_list
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.10.a
+
+		ai_chance = {
+			base = 100
+		}
+
+		if = {
+			limit = {
+				exists = scope:target_privilege_1
+			}
+			grant_estate_privilege = scope:target_privilege_1
+		}
+
+		ordered_in_list = {
+			list = clergy_pop_list
+			order_by = pop_size
+
+			max = {
+				value = 1
+				if = {
+					limit = { government_power > 10 }
+					add = {
+						value = root.government_power
+						divide = 10
+					}
+				}
+				else = { add = 1 }
+				ceiling = yes
+			}
+			check_range_bounds = no
+			add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+			remove_pop_allegiance = no_arg
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_extreme_bonus
+		}
+	}
+
+	option = {
+		name = succession_crisis.10.b
+
+		ai_chance = {
+			base = 0
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_weak_penalty
+		}
+	}
+}
+
+succession_crisis.11 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.11.title
+	desc = succession_crisis.11.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+
+		ruler_or_regent ?= { save_scope_as = target_character1 }
+		var:succession_crisis_pretender_variable ?= {
+			save_scope_as = succession_crisis_pretender_scope
+		}
+
+		"estate(estate_type:burghers_estate)" = {
+			random_possible_privilege = {
+				save_scope_as = target_privilege_1
+			}
+		}
+
+		scope:succession_crisis_pretender_scope = {
+			every_pops_supporting_rebel = {
+				limit = { pop_type = pop_type:burghers }
+				add_to_list = burghers_pop_list
+			}
+		}
+	}
+
+	option = {
+		name = succession_crisis.11.a
+
+		ai_chance = {
+			base = 100
+		}
+
+		if = {
+			limit = {
+				exists = scope:target_privilege_1
+			}
+			grant_estate_privilege = scope:target_privilege_1
+		}
+
+		ordered_in_list = {
+			list = burghers_pop_list
+			order_by = pop_size
+
+			max = {
+				value = 1
+				if = {
+					limit = { government_power > 10 }
+					add = {
+						value = root.government_power
+						divide = 10
+					}
+				}
+				else = { add = 1 }
+				ceiling = yes
+			}
+			check_range_bounds = no
+			add_pop_satisfaction = pop_satisfaction_ultimate_bonus
+			remove_pop_allegiance = no_arg
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:burghers_estate
+			value = estate_satisfaction_extreme_bonus
+		}
+	}
+
+	option = {
+		name = succession_crisis.11.b
+
+		ai_chance = {
+			base = 0
+		}
+
+		add_estate_satisfaction = {
+			type = estate_type:burghers_estate
+			value = estate_satisfaction_weak_penalty
+		}
+	}
+}
+
+succession_crisis.100 = {
+	type = country_event
+	category = disaster_event
+	title = succession_crisis.100.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					in_civil_war = yes
+				}
+				desc = succession_crisis.100.desc.a
+			}
+			triggered_desc = {
+				trigger = {
+					has_variable = pretender_given_throne_variable
+				}
+				desc = succession_crisis.100.desc.b
+			}
+			triggered_desc = {
+				trigger = {
+					NOT = {
+						any_character = {
+							has_variable = scope_pretender_var
+						}
+					}
+					in_civil_war = no
+				}
+				desc = succession_crisis.100.desc.c
+			}
+			triggered_desc = {
+				desc = succession_crisis.100.desc.d
+			}
+		}
+	}
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = succession_crisis.100.a
+
+		trigger = { in_civil_war = yes }
+		scope:target_character ?= {
+			add_character_modifier = {
+				modifier = reliance_on_estates_modifier
+				years = 10
+				mode = extend
+			}
+		}
+		add_stability = stability_mild_bonus
+		add_legitimacy = legitimacy_mild_bonus
+	}
+	option = {
+		name = succession_crisis.100.b
+
+		trigger = { in_civil_war = yes }
+		scope:target_character ?= {
+			add_character_modifier = {
+				modifier = disputed_succession_modifier
+				years = 10
+				mode = extend
+			}
+		}
+		add_stability = stability_mild_bonus
+		add_legitimacy = legitimacy_mild_bonus
+	}
+	option = {
+		name = succession_crisis.100.c
+
+		trigger = { in_civil_war = no }
+
+		custom_tooltip = based_on_our_crownpower_and_prestige_tt
+		add_legitimacy = {
+			value = "estate_power(estate_type:crown_estate)"
+			multiply = 10
+			add = {
+				value = prestige
+				divide = 10
+			}
+			add = { 0 5 }
+			multiply = { 1.1 1.25 }
+			ceiling = yes
+		}
+		add_stability = {
+			value = "estate_power(estate_type:crown_estate)"
+			multiply = 10
+			add = {
+				value = prestige
+				divide = 10
+			}
+			add = { 0 5 }
+			multiply = { 1.2 1.33 }
+			ceiling = yes
+		}
+	}
+
+	after = {
+		if = {
+			limit = { has_variable = pretender_given_throne_variable }
+			remove_variable = pretender_given_throne_variable
+		}
+		if = {
+			limit = { has_variable = hol_trigger_sc_instead_of_hacw }
+			remove_variable = hol_trigger_sc_instead_of_hacw
+		}
+	}
+}

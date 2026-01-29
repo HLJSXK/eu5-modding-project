@@ -1,0 +1,975 @@
+﻿namespace = succession
+
+succession.1 = {
+	type = country_event
+
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					exists = scope:old_ruler
+				}
+				desc = succession.1.title
+			}
+			triggered_desc = {
+				trigger = {
+					NOT = { exists = scope:old_ruler }
+				}
+				desc = succession.1.title_fallback
+			}
+		}
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					#If there are no more alive adult sons
+					#2 or more rival sons
+					list_size = { name = rival_sons_list value >= 2 }
+					#1 or more adults
+					list_size = { name = adult_rival_sons_list value = 0 }
+				}
+				desc = succession.1.desc.c
+			}
+			triggered_desc = {
+				trigger = {
+					#2 or more sons, continue the culling
+					#2 or more rival sons
+					list_size = { name = rival_sons_list value >= 2 }
+					#1 or more adults
+					list_size = { name = adult_rival_sons_list value >= 1 }
+				}
+				desc = succession.1.desc.a
+			}
+			#Only one son left, make him ruler
+			triggered_desc = {
+				desc = succession.1.desc.b
+			}
+		}
+	}
+
+	immediate = {
+		#How many son's does the dead ruler have?
+		previous_ruler ?= {
+			save_scope_as = old_ruler
+			every_child = {
+				limit = {
+					is_alive = yes
+					is_female = no
+				}
+				add_to_list = rival_sons_list
+			}
+			#How many are adults?
+			every_child = {
+				limit = {
+					is_alive = yes
+					is_adult = yes
+					is_female = no
+				}
+				add_to_list = adult_rival_sons_list
+			}
+		}
+
+		#If there are no adults we get a possible dynastic successor
+		if = {
+			limit = {
+				#If there are no more alive adult sons
+				#2 or more rival sons
+				list_size = { name = rival_sons_list value >= 2 }
+				#1 or more adults
+				list_size = { name = adult_rival_sons_list value = 0 }
+			}
+			#Is there a close relative of the previous ruler?
+			if = {
+				limit = {
+					previous_ruler = {
+						save_temporary_scope_as = check
+						dynasty = {
+							any_character_in_dynasty = {
+								is_alive = yes
+								is_female = no
+								is_adult = yes
+								not = { this = scope:check }
+								is_close_relative = scope:check
+							}
+						}
+					}
+				}
+				#Save him
+				previous_ruler = {
+					save_temporary_scope_as = check
+					dynasty = {
+						random_character_in_dynasty = {
+							limit = {
+								is_alive = yes
+								is_female = no
+								is_adult = yes
+								not = { this = scope:check }
+								is_close_relative = scope:check
+							}
+						}
+					}
+					save_scope_as = dynastyc_succesor_scope
+				}
+			}
+			#There is no close relative
+			#Search for any remaining member of the dynasty
+			else_if = {
+				limit = {
+					previous_ruler = {
+						save_temporary_scope_as = check
+						dynasty = {
+							any_character_in_dynasty = {
+								is_alive = yes
+								is_female = no
+								is_adult = yes
+								not = { this = scope:check }
+							}
+						}
+					}
+				}
+				#Save him
+				previous_ruler = {
+					save_temporary_scope_as = check
+					dynasty = {
+						random_character_in_dynasty = {
+							limit = {
+								is_alive = yes
+								is_female = no
+								is_adult = yes
+								not = { this = scope:check }
+							}
+						}
+					}
+					save_scope_as = dynastyc_succesor_scope
+				}
+			}
+		}
+		#If there is one or more adults we make them kill each other
+		else_if = {
+			limit = {
+				#2 or more rival sons
+				list_size = { name = rival_sons_list value >= 2 }
+				#1 or more adults
+				list_size = { name = adult_rival_sons_list value >= 1 }
+			}
+			#We get two random brothers
+			#One Adult
+			random_in_list = {
+				list = adult_rival_sons_list
+				save_scope_as = fist_son_scope
+			}
+			#And one whatever
+			random_in_list = {
+				list = rival_sons_list
+				limit = {
+					this != scope:fist_son_scope
+				}
+				save_scope_as = second_son_scope
+			}
+			#We select the most proficient in DIP and MIL as the killer
+			#and the other as the victim
+			set_variable = {
+				name = fist_son_variable
+				value = {
+					add = {
+						value = scope:fist_son_scope.mil
+						multiply = 1.5
+					}
+					add = {
+						value = scope:fist_son_scope.dip
+						multiply = 1.5
+					}
+					add = {
+						value = random_integer
+						modulo = 20
+					}
+					if = {
+						limit = {scope:fist_son_scope = {is_adult = yes}}
+						add = 100
+					}
+				}
+			}
+			set_variable = {
+				name = second_son_variable
+				value = {
+					add = {
+						value = scope:second_son_scope.mil
+						multiply = 1.5
+					}
+					add = {
+						value = scope:second_son_scope.dip
+						multiply = 1.5
+					}
+					add = {
+						value = random_integer
+						modulo = 20
+					}
+					if = {
+						limit = {scope:second_son_scope = {is_adult = yes}}
+						add = 100
+					}
+				}
+			}
+			if = {
+				limit = {
+					var:fist_son_variable > var:second_son_variable
+				}
+				scope:fist_son_scope = {
+					save_scope_as = killer_scope
+				}
+				scope:second_son_scope = {
+					save_scope_as = victim_scope
+					remove_from_list = rival_sons_list
+					remove_from_list = adult_rival_sons_list
+				}
+			}
+			else = {
+				scope:fist_son_scope = {
+					save_scope_as = victim_scope
+					remove_from_list = rival_sons_list
+					remove_from_list = adult_rival_sons_list
+				}
+				scope:second_son_scope = {
+					save_scope_as = killer_scope
+				}
+			}
+			remove_variable = fist_son_variable
+			remove_variable = second_son_variable
+
+			scope:victim_scope ?= {
+				kill_character = {
+					target = this
+					reason = strangling
+					killer = scope:killer_scope
+				}
+			}
+		}
+		#If there is only one adult, we chose that one
+		else = {
+			random_in_list = {
+				list = adult_rival_sons_list
+				save_scope_as = killer_scope
+			}
+		}
+
+	}
+
+	#2 or more sons, continue the culling
+	option = {
+		name = succession.1.a
+		trigger = {
+			#2 or more rival sons
+			list_size = { name = rival_sons_list value >= 2 }
+			#1 or more adults
+			list_size = { name = adult_rival_sons_list value >= 1 }
+		}
+
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_bonus
+
+		trigger_event_non_silently = { id = succession.1  days = { 30 60 } }
+
+		custom_tooltip = succession.1.a.tt
+	}
+
+	#Only one son left, make him ruler
+	option = {
+		name = succession.1.b
+		trigger = {
+			#1 rival sons
+			list_size = { name = rival_sons_list value = 1 }
+			#1 adult
+			list_size = { name = adult_rival_sons_list value = 1 }
+		}
+
+		set_new_ruler_with_union_fratricide = { character = scope:killer_scope }
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_bonus
+	}
+
+	#2 or more sons, speedrun the killing
+	option = {
+		name = succession.1.c
+		trigger = {
+			#2 or more rival sons
+			list_size = { name = rival_sons_list value >= 2 }
+			#1 or more adults
+			list_size = { name = adult_rival_sons_list value >= 1 }
+		}
+		custom_tooltip = {
+			text = succession.1.c.tt
+			every_in_list = {
+				list = rival_sons_list
+				limit = {
+					this != scope:victim_scope
+					this != scope:killer_scope
+				}
+				root = {
+					add_prestige = prestige_weak_penalty
+					add_legitimacy = legitimacy_weak_bonus
+				}
+				kill_character = {
+					target = this
+					reason = strangling
+					killer = scope:killer_scope
+				}
+			}
+		}
+		show_as_tooltip = {
+			add_prestige = prestige_weak_penalty
+			add_legitimacy = legitimacy_weak_bonus
+		}
+		set_new_ruler_with_union_fratricide = { character = scope:killer_scope }
+	}
+
+	#If there are no more alive adult sons
+	#(maybe something external killed them)
+	#The remaining sons are children, we wait
+	option = {
+		name = succession.1.d
+		trigger = {
+			#No alive adult sons
+			list_size = { name = adult_rival_sons_list value = 0 }
+			#2 or more sons, all children
+			list_size = { name = rival_sons_list value >= 2 }
+		}
+
+		add_prestige = prestige_mild_bonus
+
+		trigger_event_non_silently = { id = succession.1  years = { 1 5 } }
+	}
+
+	#If there are no more alive adult sons
+	#(maybe something external killed them)
+	#The remaining sons are children, we chose a dynasty member
+	option = {
+		name = succession.1.e
+		trigger = {
+			#No alive adult sons
+			list_size = { name = adult_rival_sons_list value = 0 }
+			#2 or more sons, all children
+			list_size = { name = rival_sons_list value >= 2 }
+			exists = scope:dynastyc_succesor_scope
+		}
+
+		add_legitimacy = legitimacy_extreme_penalty
+		add_prestige = prestige_mild_bonus
+
+		set_new_ruler_with_union_fratricide = { character = scope:dynastyc_succesor_scope }
+	}
+}
+
+succession.2 = { #The powerful advisor
+	type = country_event
+
+	title = succession.2.title
+	desc = succession.2.desc
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		ordered_cabinet_character = {
+			order_by = total_abilities
+			max = 1
+			limit = {
+				religion = root.religion
+				has_estate = estate_type:nobles_estate
+				modifier:blocked_from_being_ruler = no
+				is_regent = no
+				has_trait = mamluk
+				total_abilities > 200
+				total_abilities > root.ruler.total_abilities
+			}
+
+			save_scope_as = usurper_scope
+		}
+	}
+
+	option = {
+		name = succession.2.a
+
+		add_legitimacy = legitimacy_weak_bonus
+		add_stability = stability_weak_bonus
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
+		set_regent = scope:usurper_scope
+		extend_regency = 5
+	}
+}
+
+#scope:dynasty_member_scope is the chosen ruler
+succession.3 = { #Get a member of the dynasty and make him the new ruler
+	type = country_event
+
+	title = succession.3.title
+	desc = {
+		first_valid = {
+			#Some days have passed since the regency start
+			#is our candidate still available?
+			triggered_desc = {
+				trigger = {
+					exists = scope:dynasty_member_scope
+					scope:dynasty_member_scope = {
+						is_alive = yes
+					}
+				}
+				desc = succession.3.desc.a
+			}
+			triggered_desc = {
+				desc = succession.3.desc.b
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		previous_ruler ?= {
+			save_scope_as = old_ruler
+		}
+	}
+
+	option = {
+		name = succession.3.a
+		trigger = {
+			exists = scope:dynasty_member_scope
+			scope:dynasty_member_scope = {
+				is_alive = yes
+			}
+		}
+
+		add_stability = stability_weak_bonus
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+		#Make him the new ruler
+		set_new_ruler_with_union_fratricide = { character = scope:dynasty_member_scope }
+	}
+
+	option = {
+		name = succession.3.b
+		trigger = {
+			scope:dynasty_member_scope ?= {
+				is_alive = no
+			}
+		}
+
+		add_stability = stability_mild_penalty
+		reset_regency = yes
+	}
+}
+
+#scope:new_leader is the chosen new ruler
+succession.4 = { #Get a member of the dynasty and make him the new ruler
+	type = country_event
+
+	title = succession.4.title
+	desc = succession.4.desc
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		previous_ruler ?= {
+			save_scope_as = old_ruler
+		}
+
+		#If the new ruler has somehow already died recreate it now
+		if = {
+			limit = {
+				exists = scope:new_leader
+				scope:new_leader = {
+					is_alive = no
+				}
+			}
+			random_owned_location = {
+				create_dynasty_from_location = random
+				last_dynasty_in_location = { save_scope_as = target_dynasty }
+			}
+			if = {
+				limit = { exists = scope:target_dynasty }
+				create_character = {
+					dynasty = scope:target_dynasty
+					religion = root.religion
+					culture = root.culture
+					estate = estate_type:nobles_estate
+					age = { 20 60 }
+					female = no
+					save_scope_as = new_leader
+				}
+			}
+			else = {
+				create_character = {
+					religion = root.religion
+					culture = root.culture
+					estate = estate_type:nobles_estate
+					age = { 20 60 }
+					female = no
+					save_scope_as = new_leader
+				}
+				scope:new_leader = {
+					found_dynasty = random
+				}
+			}
+		}
+	}
+
+	option = {
+		name = succession.4.a
+
+		add_stability = stability_weak_bonus
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+
+		set_new_ruler_with_union_fratricide = { character = scope:new_leader }
+		if = { #Only change the dynasty if the game rule is active
+			limit = { has_game_rule = change_countries_dynastic_naming }
+			change_country_dynastic_name = {}
+		}
+	}
+}
+
+#underaged succession case
+succession.5 = {
+	type = country_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:new_ruler_son }
+				desc = succession.5.title.new_ruler_son
+			}
+			triggered_desc = {
+				trigger = { exists = scope:new_ruler_regent }
+				desc = succession.5.title.new_ruler_regent
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = succession.5.title.no_ruler
+			}
+		}
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:new_ruler_son }
+				desc = succession.5.desc.new_ruler_son
+			}
+			triggered_desc = {
+				trigger = { exists = scope:new_ruler_regent }
+				desc = succession.5.desc.new_ruler_regent
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = succession.5.desc.no_ruler
+			}
+		}
+	}
+	immediate = {
+		event_illustration_estate_effect = {
+			 foreground = estate_type:nobles_estate
+			 background = estate_type:clergy_estate
+			 }
+		remove_variable = fraticide_succession_has_child_sons
+		previous_ruler ?= {
+			save_scope_as = old_ruler
+		}
+		#pick the now adult son and designate him as the new ruler
+		if = {
+			limit = { list_size = { name = rival_male_children value >= 1 } }
+			ordered_in_list = {
+				list = rival_male_children
+				limit = {
+					is_adult = yes
+					is_alive = yes
+				}
+				order_by = age_in_days
+				max = 1
+				save_scope_as = new_ruler_son
+			}
+		}
+		#in case there is no eligible sons, define a new regent
+		if = {
+			limit = {
+				NOT = { exists = scope:new_ruler_son }
+			}
+			random_character = {
+				limit = {
+					can_become_a_regent = yes
+					has_estate = estate_type:clergy_estate
+					religion = root.religion
+				}
+				save_temporary_scope_as = new_ruler_regent
+			}
+			if = {
+				limit = { not = { exists = scope:new_ruler_regent } }
+				create_character = {
+					religion = root.religion
+					estate = estate_type:clergy_estate
+					age = {35 50}
+					female = no
+					save_temporary_scope_as = new_ruler_regent
+				}
+			}
+			set_regent = scope:new_ruler_regent
+		}
+	}
+	option = {
+		name = succession.5.a
+		trigger = { exists = scope:new_ruler_son }
+		custom_tooltip = {
+			text = succession.5.a.tt
+			every_in_list = {
+				list = rival_male_children
+				limit = {
+					this != scope:new_ruler_son
+				}
+				root = {
+					add_prestige = prestige_weak_penalty
+					add_legitimacy = legitimacy_weak_bonus
+				}
+				kill_character = {
+					target = this
+					reason = strangling
+					killer = scope:new_ruler_son
+				}
+			}
+		}
+		show_as_tooltip = {
+			add_prestige = prestige_weak_penalty
+			add_legitimacy = legitimacy_weak_bonus
+		}
+		set_new_ruler_with_union_fratricide = { character = scope:new_ruler_son }
+	}
+	#make the regent to the new dynasty of the country
+	option = {
+		name = succession.4.a
+		trigger = { NOT = { exists = scope:new_ruler_son } }
+		add_stability = stability_weak_bonus
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+
+		if = {
+			limit = { NOT = { exists = scope:new_ruler_regent } }
+			create_character = {
+				religion = root.religion
+				estate = estate_type:clergy_estate
+				age = {35 50}
+				female = no
+				save_temporary_scope_as = new_ruler_regent
+			}
+			error_log = "succession.5 didn't find a proper regent..."
+		}
+
+		set_new_ruler_with_union_fratricide = { character = scope:new_ruler_regent }
+		if = { #Only change the dynasty if the game rule is active
+			limit = { has_game_rule = change_countries_dynastic_naming }
+			change_country_dynastic_name = {}
+		}
+	}
+}
+
+#Partition Inheritance Event
+#This event launches for every country that has partition_inheritance
+#when a new ruler is appointed, granting stability and reducing control
+#depending on the amount of brothers of the ruler
+# root = country; scope:old_ruler and scope:new_ruler are supplied
+scripted_trigger succession_100_option_a_trigger = {
+	list_size = { name = other_sons value > 1 }
+	any_province = {
+		NOT = { root.capital.province = this }
+		count = {
+			min = {
+				every_in_list = {
+					list = other_sons
+					add = 1
+				}
+			}
+		}
+	}
+	scope:old_ruler ?= {
+		NOT = { this = scope:new_ruler }
+	}
+}
+scripted_trigger succession_100_option_b_trigger = {
+	list_size = { name = other_sons value > 1 }
+	culture = { has_culture_group = culture_group:german_group }
+	scope:old_ruler ?= {
+		NOT = { this = scope:new_ruler }
+	}
+}
+scripted_trigger succession_100_option_c_trigger = {
+	#There are other sons and more than one province
+	list_size = { name = other_sons value > 1 }
+	num_provinces > 1
+	scope:old_ruler ?= {
+		NOT = { this = scope:new_ruler }
+	}
+}
+scripted_trigger succession_100_option_d_trigger = {
+	OR = {
+		list_size = { name = other_sons value <= 1 }
+		num_provinces = 1
+	}
+	scope:old_ruler ?= {
+		NOT = { this = scope:new_ruler }
+	}
+}
+scripted_trigger succession_100_option_e_trigger = {
+	has_reform = government_reform:joint_ruling_monarchy
+	scope:old_ruler ?= {
+		this = scope:new_ruler
+	}
+}
+
+succession.100 = {
+	type = country_event
+
+	title = succession.100.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					list_size = { name = other_sons value > 1 }
+				}
+				desc = succession.100.desc.a
+			}
+			triggered_desc = {
+				trigger = { NOT = { scope:old_ruler = scope:new_ruler } }
+				desc = succession.100.desc.b
+			}
+			triggered_desc = {
+				desc = succession.100.desc.c
+			}
+		}
+	}
+
+	trigger = {
+		succession_law = heir_selection:partition_inheritance
+		game_is_initialized = yes #We avoid the wave of activations when the game starts
+		exists = previous_ruler
+		previous_ruler ?= {
+			is_alive = no
+		}
+	}
+
+	immediate = {
+		scope:old_ruler ?= {
+			every_child = {
+				limit = {
+					not = {this = scope:new_ruler}
+					is_alive = yes
+					is_female = no
+					NOT = { this = scope:old_ruler }	#If somehow the old ruler manages to see themselves as a child...
+				}
+				add_to_list = other_sons
+			}
+		}
+	}
+
+	option = {
+		name = succession.100.a
+		trigger = {	succession_100_option_a_trigger = yes }
+
+		#Get all the provinces of the Tag, that are not the capital province
+		ordered_province = {
+			limit = {
+				not = {root.capital.province = this}
+			}
+			order_by = { #Get the least controlled ones
+                value = province_average_control
+                multiply = -1
+            }
+			#Select one province for each living male child of the old ruler,
+			#that is not the current ruler
+			max = {
+				every_in_list = {
+					list = other_sons
+					add = 1
+				}
+				#We make sure to avoid trying to get more provinces than available
+				max = root.num_provinces
+			}
+			#For each of those provinces reduce the control of its locations
+			every_location_in_province = {
+				change_control = control_extreme_penalty
+			}
+			#For each province "partitioned" provide a small amount of stability
+			root = {
+				add_stability = stability_weak_bonus
+			}
+		}
+
+	}
+	option = {
+		name = succession.100.b
+		trigger = {	succession_100_option_b_trigger = yes }
+		#Joint Ruling reform
+		if = {
+			#If we don't have it
+			limit = {
+				not = {has_reform = government_reform:joint_ruling_monarchy}
+			}
+			add_reform = government_reform:joint_ruling_monarchy
+		}
+		else = {
+			custom_tooltip = succession.100.b.tt
+		}
+
+		add_stability = stability_mild_bonus
+		add_legitimacy = legitimacy_mild_bonus
+
+	}
+	option = { #Create a new Noble rebel supported by the brothers and populations of "their" territories
+		name = succession.100.c
+		trigger = {	succession_100_option_c_trigger = yes }
+
+		create_rebel = {
+			category = pretender
+			name = rebellious_prince_name
+			save_scope_as = brother_rebel
+		}
+		every_in_list = {
+			list = other_sons
+			change_character_allegiance = scope:brother_rebel
+		}
+		ordered_province = {
+			limit = {
+				not = {root.capital.province = this}
+			}
+			order_by = { #Get the least controlled ones
+                value = province_average_control
+                multiply = -1
+            }
+			#Select one province for each living male child of the old ruler,
+			#that is not the current ruler
+			check_range_bounds = no
+			max = {
+				every_in_list = {
+					list = other_sons
+					add = 1
+				}
+				#We make sure to avoid trying to get more provinces than available
+				max = root.num_provinces
+			}
+			#For each of those provinces add the population to the rebels
+			every_location_in_province = {
+				every_pop = {
+					limit = {
+						owner = root
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					change_pop_allegiance = scope:brother_rebel
+				}
+			}
+		}
+	}
+	option = {#No other brothers or available provinces to share
+		name = succession.100.d
+		trigger = {	succession_100_option_d_trigger = yes }
+		if = {
+			#If we have the reform
+			limit = {
+				has_reform = government_reform:joint_ruling_monarchy
+			}
+			remove_reform = government_reform:joint_ruling_monarchy
+		}
+		if = {
+			limit = {
+				has_variable = year_of_start_of_joint_rule
+			}
+			remove_variable = year_of_start_of_joint_rule
+		}
+		add_legitimacy = legitimacy_severe_bonus
+	}
+	option = {#If for some unholy reason, the new and the old ruler are one and the same person
+		name = succession.100.e
+		trigger = { succession_100_option_e_trigger = yes }
+		if = {
+			#If we have the reform
+			limit = {
+				has_reform = government_reform:joint_ruling_monarchy
+			}
+			remove_reform = government_reform:joint_ruling_monarchy
+		}
+	}
+	option = {#Absolute fallback if everything breaks
+		name = succession.100.f
+		trigger = {
+			succession_100_option_a_trigger = no
+			succession_100_option_b_trigger = no
+			succession_100_option_c_trigger = no
+			succession_100_option_d_trigger = no
+			succession_100_option_e_trigger = no
+		}
+		if = {
+			#If we have the reform
+			limit = {
+				has_reform = government_reform:joint_ruling_monarchy
+			}
+			remove_reform = government_reform:joint_ruling_monarchy
+		}
+	}
+
+}
+
+#An information event that the succession pact has been fulfilled. Fires for the country which would become the "Junior" Union Partner
+succession.101 = {
+	type = country_event
+	title = succession.101.title
+	desc = succession.101.desc
+	immediate = {
+		random_known_country = {
+			limit = {
+				has_mutual_scripted_relation = {
+					type = relation_type:union_of_crowns_pact
+					target = root
+				}
+			}
+			save_scope_as = union_partner
+			ruler = { save_scope_as = new_ruler }
+		}
+		save_scope_as = junior_partner
+		set_new_ruler = scope:new_ruler
+	}
+	trigger = {
+		succession_law = heir_selection:union_of_crowns_succession
+		has_heir = no
+	}
+	option = {
+		name = succession.101.a
+		show_as_tooltip = {
+			set_new_ruler = scope:new_ruler
+		}
+		change_heir_selection = heir_selection:cognatic_primogeniture	#The union is most often than not a one-time thing, and as such the heir succession gets set to the default one
+		hidden_effect = { scope:union_partner = { trigger_event_silently = { id = succession.102 } } }
+		remove_relation = {
+			first = root
+			second = scope:union_partner
+			type = relation_type:union_of_crowns_pact
+		}
+	}
+}
+
+#An information event that the succession pact has been fulfilled. Fires for the country which would become the "Junior" Union Partner
+succession.102 = {
+	type = country_event
+	title = succession.101.title
+	desc = succession.102.desc
+	option = {
+		name = succession.102.a
+		change_heir_selection = heir_selection:cognatic_primogeniture	#The union is most often than not a one-time thing, and as such the heir succession gets set to the default one
+	}
+	immediate = {
+		event_illustration_government_estate_effect = yes
+	}
+}

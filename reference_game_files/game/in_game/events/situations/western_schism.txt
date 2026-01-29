@@ -1,0 +1,1773 @@
+﻿namespace = western_schism
+
+scripted_effect save_cardinal_scope = { #this saves both sides of the Western Schism
+	situation:western_schism = {
+		var:schism_pope_cardinal = {
+			save_scope_as = target_schism_pope_cardinal
+		}
+		var:schism_opponent_cardinal = {
+			save_scope_as = target_schism_opponent_cardinal
+		}
+	}
+}
+
+western_schism.1 = {
+	type = country_event
+	category = situation_event
+
+	title = western_schism.1.title
+	desc = western_schism.1.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+
+	option = {
+		name = western_schism.1.a
+	}
+}
+
+western_schism.3 = {
+	type = country_event
+	category = situation_event
+
+	title = western_schism.3.title
+	desc = western_schism.3.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+	}
+
+
+	option = {
+		name = western_schism.3.a
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_penalty }
+	}
+}
+
+western_schism.4 = {
+	type = country_event
+	category = situation_event
+
+	title = western_schism.4.title
+	desc = western_schism.4.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		lots_of_hussites = yes
+
+		create_character = {
+			first_name = name_john
+			last_name = Hus
+			adm = 90
+			dip = 90
+			mil = 90
+			birth_date = 1370 #Exact date unknown
+			culture = culture:czech
+			religion = religion:hussite
+			save_scope_as = jan_hus
+			script = boh_jan_hus
+			estate = estate_type:clergy_estate
+			add_trait = trait:unsuited_for_naval_command
+			add_trait = trait:unsuited_for_army_command
+			add_character_modifier = { modifier = refuses_to_serve_in_cabinet years = -1 mode = add_and_extend }
+		}
+	}
+
+
+	option = {
+		name = western_schism.4.a
+
+		religion:hussite = {
+			enable_religion = yes
+		}
+
+		if = {
+			limit = { religion:lollardy = { is_religion_enabled = yes } }
+			religion:hussite = {
+				set_religious_view = {
+					target = religion:lollardy
+					value = positive
+				}
+			}
+			religion:lollardy = {
+				set_religious_view = {
+					target = religion:hussite
+					value = positive
+				}
+			}
+		}
+
+		c:BOH = {
+			custom_tooltip = {
+				text = lots_of_hussites_tt
+				lots_of_hussites = yes
+			}
+		}
+		trigger_event_silently = { id = flavor_boh.13 days = { 500 1000 } }
+
+	}
+
+	historical_info = western_schism.4.historical_info
+}
+
+western_schism.5 = { #Erosion of Faith
+	type = country_event
+	category = situation_event
+	title = western_schism.5.title
+	desc = western_schism.5.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	trigger = {
+		any_owned_location = {
+			integration_level = core
+			dominant_religion = religion:catholic
+		}
+	}
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		random_owned_location = {
+			limit = {
+				integration_level = core
+				dominant_religion = religion:catholic
+			}
+			save_scope_as = unrest_location_scope
+		}
+	}
+
+	option = {
+		name = western_schism.5.a
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_penalty }
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+	}
+
+	option = {
+		name = western_schism.5.b
+
+		add_stability = stability_weak_penalty
+		add_legitimacy = legitimacy_weak_penalty
+		if = {
+			limit = {
+				OR = {
+					ruler_or_regent ?= {
+						has_trait = sinner
+					}
+					societal_value:spiritualist_vs_humanist > 90
+				}
+			}
+			scope:unrest_location_scope = {
+				create_some_heretics = yes
+			}
+		}
+	}
+}
+
+western_schism.6 = { #Clash between
+	type = country_event
+	category = situation_event
+	title = western_schism.6.title
+	desc = western_schism.6.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	trigger = {
+		num_locations > 1
+		religion_percentage_in_country = {
+			religion = religion:catholic
+			value > 0.85
+		}
+		has_ruler = yes
+	}
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		ruler = {
+			save_scope_as = target_ruler
+		}
+
+		ordered_owned_location = {
+			limit = { dominant_religion = religion:catholic }
+			order_by = {
+				value = average_satisfaction
+				#If the location is a town (rank index 2) or a city (rank index 1)
+				#It will be more likely to end up on the list
+				if = {
+					limit = {
+						rank_index ?= 1
+					}
+					multiply = 0.25
+					
+				}
+				else_if = {
+					limit = {
+						rank_index ?= 2
+					}
+					multiply = 0.5
+				}
+			}
+			max = 40
+			check_range_bounds = no
+			add_to_list = ordered_owned_non_rural_location_list
+		}
+
+		random_in_list = {
+			list = ordered_owned_non_rural_location_list
+			save_scope_as = opponent_support_location
+		}
+
+		random_in_list = {
+			list = ordered_owned_non_rural_location_list
+			limit = { this != scope:opponent_support_location }
+			save_scope_as = pope_support_location
+		}
+	}
+
+
+	option = {
+		name = western_schism.6.a
+
+		custom_tooltip = {
+			text = western_schism_resolution_impact_positive.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_opponent_cardinal ?= {
+						save_temporary_scope_as = voter
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = 0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		scope:pope_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+			}
+			change_control = control_mild_penalty
+		}
+		scope:opponent_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+			change_control = control_mild_bonus
+		}
+	}
+
+	option = {
+		name = western_schism.6.b
+
+		custom_tooltip = {
+			text = western_schism_resolution_impact_positive.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_pope_cardinal ?= {
+						save_temporary_scope_as = voter
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = 0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		scope:opponent_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+			}
+			change_control = control_mild_penalty
+		}
+		scope:pope_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+			change_control = control_mild_bonus
+		}
+	}
+
+	option = {
+		name = western_schism.6.c
+
+		scope:opponent_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_mild_penalty
+			}
+			change_control = control_weak_penalty
+		}
+		scope:pope_support_location = {
+			ordered_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				order_by = pop_size
+				check_range_bounds = no
+				max = 2
+				add_pop_satisfaction = pop_satisfaction_mild_penalty
+			}
+			change_control = control_weak_penalty
+		}
+	}
+}
+
+#Events for Supporters of Papal Pope
+western_schism.7 = { #Trade with Italy is flourishing
+	type = country_event
+	category = situation_event
+	title = western_schism.7.title
+	desc = western_schism.7.desc
+
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	immediate = {
+		save_cardinal_scope = yes
+	}
+
+	option = {
+		name = western_schism.7.a
+
+		capital = {
+			market = {
+				add_merchant_power = {
+					country = root
+					power = merchant_power_mild_bonus
+					years = 5
+					key = italian_trade
+				}
+			}
+		}
+	}
+}
+
+western_schism.8 = { #People demand support for not PAP
+	type = country_event
+	category = situation_event
+	title = western_schism.8.title
+	desc = western_schism.8.desc
+
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+
+		random_owned_location = {
+			limit = {
+				any_pop = {
+					religion = religion:catholic
+				}
+			}
+			save_scope_as = target_location
+		}
+		save_cardinal_scope = yes
+	}
+
+	option = {
+		name = western_schism.8.a
+
+		scope:target_location = {
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+			}
+		}
+		if = {
+			limit = {
+				exists = scope:target_schism_pope_cardinal
+				scope:target_schism_pope_cardinal = {
+					exists = owner
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:target_schism_pope_cardinal.owner
+				modifier = western_schism_rethinking_our_approach
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.8.b
+
+		scope:target_location = {
+			change_control = control_mild_bonus
+		}
+		if = {
+			limit = {
+				exists = scope:target_schism_opponent_cardinal
+				scope:target_schism_opponent_cardinal = {
+					exists = owner
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:target_schism_opponent_cardinal.owner
+				modifier = western_schism_rethinking_our_approach
+			}
+		}
+		custom_tooltip = {
+			text = western_schism_resolution_impact_negative.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_pope_cardinal = {
+						owner = {
+							save_temporary_scope_as = voter
+						}
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = -0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#Events for Supporters of "Anti" Pope
+western_schism.9 = { #"Anti" Pope Rewards Loyalty
+	type = country_event
+	category = situation_event
+	title = western_schism.9.title
+	desc = western_schism.9.desc
+
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+	}
+
+	option = {
+		name = western_schism.9.a
+
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_bonus }
+		add_religious_influence = religious_influence_mild_bonus
+	}
+}
+
+western_schism.10 = { #People demand support for PAP
+	type = country_event
+	category = situation_event
+	title = western_schism.10.title
+	desc = western_schism.10.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+
+		random_owned_location = {
+			save_scope_as = target_location
+		}
+		save_cardinal_scope = yes
+	}
+
+	option = {
+		name = western_schism.10.a
+
+		scope:target_location = {
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:catholic
+				}
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+			}
+			change_control = control_mild_penalty
+		}
+	}
+
+	option = {
+		name = western_schism.10.b
+		add_opinion_mutual_effect = {
+			target = c:PAP
+			modifier = western_schism_rethinking_our_approach
+		}
+		custom_tooltip = {
+			text = western_schism_resolution_impact_negative.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_opponent_cardinal = {
+						owner = {
+							save_temporary_scope_as = voter
+						}
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = -0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+	}
+}
+
+#Events for Non Cardinal Countries
+western_schism.11 = { #Papal Voter praises our church
+	type = country_event
+	category = situation_event
+	title = western_schism.11.title
+	desc = western_schism.11.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		religion:catholic = {
+			random_cardinal_country = {
+				limit = {
+					save_temporary_scope_as = voter
+					international_organization:catholic_church = {
+						has_voted_for = {
+							voter = scope:voter
+							resolution = resolution:western_schism_resolution
+							vote = c:PAP
+						}
+					}
+				}
+				save_scope_as = target_country
+			}
+		}
+		set_variable = {
+			name = recently_had_western_schism_event_11_12
+			months = 6
+		}
+	}
+
+	trigger = {
+		situation:western_schism = {
+			resolution_is_active = resolution:western_schism_resolution
+		}
+		religion:catholic = {
+			any_cardinal_country = {
+				save_temporary_scope_as = voter
+				international_organization:catholic_church = {
+					has_voted_for = {
+						voter = scope:voter
+						resolution = resolution:western_schism_resolution
+						vote = c:PAP
+					}
+				}
+			}
+		}
+		NOT = {
+			has_variable = recently_had_western_schism_event_11_12
+		}
+	}
+
+	option = {
+		name = western_schism.11.a
+
+		add_legitimacy = legitimacy_mild_bonus
+		scope:target_schism_pope_cardinal = {
+			owner = {
+				add_opinion_mutual_effect = {
+					target = root
+					modifier = schism_rewarded_loyalty
+				}
+			}
+		}
+		scope:target_country = {
+			reverse_add_opinion = {
+				target = root
+				modifier = declared_oboedientia
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.11.b
+
+		add_religious_influence = religious_influence_mild_bonus
+		scope:target_schism_pope_cardinal = {
+			owner = {
+				add_opinion_mutual_effect = {
+					target = root
+					modifier = schism_scorned_loyalty
+				}
+			}
+		}
+	}
+}
+
+western_schism.12 = { #Non Papal Voter praises our church
+	type = country_event
+	category = situation_event
+	title = western_schism.11.title
+	desc = western_schism.12.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		religion:catholic = {
+			random_cardinal_country = {
+				limit = {
+					save_temporary_scope_as = voter
+					international_organization:catholic_church = {
+						has_voted_for = {
+							voter = scope:voter
+							resolution = resolution:western_schism_resolution
+							vote = situation:western_schism.var:schism_opponent_country
+						}
+					}
+				}
+				save_scope_as = target_country
+			}
+		}
+		set_variable = {
+			name = recently_had_western_schism_event_11_12
+			months = 6
+		}
+	}
+
+	trigger = {
+		religion:catholic = {
+			any_cardinal_country = {
+				save_temporary_scope_as = voter
+				international_organization:catholic_church = {
+					has_voted_for = {
+						voter = scope:voter
+						resolution = resolution:western_schism_resolution
+						vote = situation:western_schism.var:schism_opponent_country
+					}
+				}
+			}
+		}
+		NOT = {
+			has_variable = recently_had_western_schism_event_11_12
+		}
+	}
+
+	option = {
+		name = western_schism.12.a
+
+		add_legitimacy = legitimacy_mild_bonus
+		scope:target_schism_opponent_cardinal = {
+			owner = {
+				add_opinion_mutual_effect = {
+					target = root
+					modifier = schism_rewarded_loyalty
+				}
+			}
+		}
+		scope:target_country = {
+			reverse_add_opinion = {
+				target = root
+				modifier = declared_oboedientia
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.11.b
+
+		add_religious_influence = religious_influence_mild_bonus
+		scope:target_schism_opponent_cardinal = {
+			owner = {
+				add_opinion_mutual_effect = {
+					target = root
+					modifier = schism_scorned_loyalty
+				}
+			}
+		}
+	}
+}
+
+western_schism.13 = { #Estates clash against each other
+	type = country_event
+	category = situation_event
+	title = western_schism.13.title
+	desc = western_schism.13.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		random_estate = {
+			limit = {
+				NOT = {
+					estate_type = estate_type:crown_estate
+				}
+				root = {
+					estate_opinion = {
+						estate_type = scope:target_schism_pope_cardinal
+						target = prev
+						value > 0
+					}
+				}
+				root = {
+					estate_opinion = {
+						estate_type = scope:target_schism_opponent_cardinal
+						target = prev
+						value < 0
+					}
+				}
+			}
+			save_scope_as = target_estate
+		}
+	}
+
+	trigger = {
+		NOT = {
+			OR = {
+				has_variable = schism_pope_cardinal
+				has_variable = schism_opponent_cardinal
+			}
+		}
+		any_estate = {
+			NOT = {
+				estate_type = estate_type:crown_estate
+			}
+			root = {
+				estate_opinion = {
+					estate_type = scope:target_schism_pope_cardinal
+					target = prev
+					value > 0
+				}
+			}
+			root = {
+				estate_opinion = {
+					estate_type = scope:target_schism_opponent_cardinal
+					target = prev
+					value < 0
+				}
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.13.a
+
+		add_legitimacy = legitimacy_mild_bonus
+		add_estate_satisfaction = {
+			type = scope:target_estate
+			value = estate_satisfaction_severe_bonus
+		}
+		every_estate = {
+			limit = {
+				NOT = {
+					estate_type = estate_type:crown_estate
+					this = scope:target_estate
+				}
+			}
+			ROOT = {
+				add_estate_satisfaction = {
+					type = prev.estate_type
+					value = estate_satisfaction_weak_penalty
+				}
+			}
+		}
+		if = {
+			limit = {
+				parliament_issue ?= {
+					estate_type ?= scope:target_estate
+				}
+			}
+			change_parliament_issue_support = parliament_issue_support_mild_bonus
+		}
+	}
+
+	option = {
+		name = western_schism.13.b
+
+		add_religious_influence = religious_influence_mild_bonus
+		every_estate = {
+			limit = {
+				NOT = {
+					estate_type = estate_type:crown_estate
+				}
+			}
+			ROOT = {
+				add_estate_satisfaction = {
+					type = prev.estate_type
+					value = estate_satisfaction_weak_penalty
+				}
+			}
+		}
+		if = {
+			limit = {
+				parliament_issue ?= {
+					estate_type ?= scope:target_estate
+				}
+			}
+			change_parliament_issue_support = parliament_issue_support_weak_penalty
+		}
+	}
+}
+
+western_schism.14 = { #Estates clash against each other
+	type = country_event
+	category = situation_event
+	title = western_schism.13.title
+	desc = western_schism.14.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		random_estate = {
+			limit = {
+				exists = this
+				NOT = {
+					estate_type = estate_type:crown_estate
+				}
+				root = {
+					estate_opinion = {
+						estate_type = scope:target_schism_pope_cardinal
+						target = prev
+						value < 0
+					}
+				}
+				root = {
+					estate_opinion = {
+						estate_type = scope:target_schism_opponent_cardinal
+						target = prev
+						value > 0
+					}
+				}
+			}
+			save_scope_as = target_estate
+		}
+	}
+
+	trigger = {
+		NOT = {
+			OR = {
+				has_variable = schism_pope_cardinal
+				has_variable = schism_opponent_cardinal
+			}
+		}
+		any_estate = {
+			exists = this
+			NOT = {
+				estate_type = estate_type:crown_estate
+			}
+			root = {
+				estate_opinion = {
+					estate_type = scope:target_schism_pope_cardinal
+					target = prev
+					value < 0
+				}
+			}
+			root = {
+				estate_opinion = {
+					estate_type = scope:target_schism_opponent_cardinal
+					target = prev
+					value > 0
+				}
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.13.a
+
+		add_legitimacy = legitimacy_mild_bonus
+		add_estate_satisfaction = {
+			type = scope:target_estate
+			value = estate_satisfaction_severe_bonus
+		}
+		every_estate = {
+			limit = {
+				NOT = {
+					estate_type = estate_type:crown_estate
+					this = scope:target_estate
+				}
+			}
+			ROOT = {
+				add_estate_satisfaction = {
+					type = prev.estate_type
+					value = estate_satisfaction_weak_penalty
+				}
+			}
+		}
+		if = {
+			limit = {
+				parliament_issue ?= {
+					estate_type ?= scope:target_estate
+				}
+			}
+			change_parliament_issue_support = parliament_issue_support_mild_bonus
+		}
+	}
+
+	option = {
+		name = western_schism.13.b
+
+		add_religious_influence = religious_influence_mild_bonus
+		every_estate = {
+			limit = {
+				NOT = {
+					estate_type = estate_type:crown_estate
+				}
+			}
+			ROOT = {
+				add_estate_satisfaction = {
+					type = prev.estate_type
+					value = estate_satisfaction_weak_penalty
+				}
+			}
+		}
+		if = {
+			limit = {
+				parliament_issue ?= {
+					estate_type ?= scope:target_estate
+				}
+			}
+			change_parliament_issue_support = parliament_issue_support_weak_penalty
+		}
+	}
+}
+
+western_schism.15 = { #A Traveling Preacher
+	type = country_event
+	category = situation_event
+	title = western_schism.15.title
+	desc = western_schism.15.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	trigger = {
+		any_owned_location = {			
+			integration_level = core
+			dominant_religion = religion:catholic
+		}
+	}
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		create_character = {
+			estate = estate_type:clergy_estate
+			adm = { 20 80 }
+			dip = { 40 80 }
+			mil = { 20 70 }
+			create_in_limbo = yes
+			save_scope_as = target_character
+		}
+		random_owned_location = {
+			limit = {
+				integration_level = core
+				dominant_religion = religion:catholic
+			}
+			save_scope_as = unrest_location_scope
+		}
+	}
+
+	option = {
+		name = western_schism.15.a
+
+		add_stability = stability_mild_penalty
+		scope:unrest_location_scope = {
+			create_some_heretics = yes
+		}
+		scope:target_character = {
+			move_country = root
+		}
+	}
+
+	option = {
+		name = western_schism.15.b
+
+		kill_character = {
+			target = scope:target_character
+			reason = burned_alive
+		}
+		change_societal_value = {
+			type = traditionalist_vs_innovative
+			value = societal_value_tiny_move_to_left
+		}
+	}
+}
+
+
+western_schism.1001 = { #triggered by schism_demand_support_from_one_pope action positive
+	type = country_event
+	category = situation_event
+	title = western_schism.1000.title
+	desc = western_schism.1001.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+	}
+
+	option = {
+		name = western_schism.1001.a
+
+		change_gold_effect = { scale = 1 }
+		add_opinion = {
+			target = scope:target
+			modifier = schism_rewarded_loyalty
+		}
+	}
+}
+
+western_schism.1002 = { #triggered by schism_demand_support_from_one_pope action negative
+	type = country_event
+	category = situation_event
+	title = western_schism.1000.title
+	desc = western_schism.1002.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	option = {
+		name = western_schism.1002.a
+
+		add_opinion = {
+			target = scope:target
+			modifier = schism_scorned_loyalty
+		}
+		add_religious_influence = religious_influence_weak_bonus
+	}
+}
+
+western_schism.1100 = { #Insult our Rival
+	type = country_event
+	category = situation_event
+	title = western_schism.1100.title
+	desc = western_schism.1100.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		save_cardinal_scope = yes
+
+		religion:catholic = {
+			random_cardinal_country = {
+				limit = {
+					save_temporary_scope_as = voter
+					international_organization:catholic_church = {
+						OR = {
+							has_voted_for = {
+								voter = scope:voter
+								resolution = resolution:western_schism_resolution
+								vote = c:PAP
+							}
+							has_voted_for = {
+								voter = scope:voter
+								resolution = resolution:western_schism_resolution
+								vote = situation:western_schism.var:schism_opponent_country
+							}
+						}
+					}
+					is_rival_of = root
+				}
+				save_scope_as = target_country
+			}
+		}
+		save_scope_as = origin_country
+	}
+
+	trigger = {
+		religion:catholic = {
+			any_cardinal_country = {
+				save_temporary_scope_as = voter
+				international_organization:catholic_church = {
+					OR = {
+						has_voted_for = {
+							voter = scope:voter
+							resolution = resolution:western_schism_resolution
+							vote = c:PAP
+						}
+						has_voted_for = {
+							voter = scope:voter
+							resolution = resolution:western_schism_resolution
+							vote = situation:western_schism.var:schism_opponent_country
+						}
+					}
+				}
+				is_rival_of = root
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.1100.a
+
+		add_religious_influence = religious_influence_mild_bonus
+		scope:target_country = {
+			add_opinion = {
+				target = root
+				modifier = opinion_insulted
+			}
+			trigger_event_non_silently = western_schism.1101
+		}
+	}
+
+	option = {
+		name = western_schism.1100.b
+
+		add_religious_influence = religious_influence_mild_penalty
+		scope:target_country = {
+			add_opinion = {
+				target = root
+				modifier = opinion_pleased
+			}
+		}
+	}
+}
+
+western_schism.1101 = { #Information for CB
+	type = country_event
+	category = situation_event
+	title = western_schism.1101.title
+	desc = western_schism.1101.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	option = {
+		name = western_schism.1101.a
+
+		add_religious_influence = religious_influence_mild_penalty
+		add_casus_belli = {
+			target = scope:origin_country
+			type = casus_belli:cb_insulted_us
+		}
+	}
+}
+
+western_schism.1200 = { #Suspicious Country in Religion
+	type = country_event
+	category = situation_event
+	title = western_schism.1200.title
+	desc = western_schism.1200.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+		religion:catholic = {
+			random_country_in_religion = {
+				limit = {
+					has_ruler = yes
+					num_cardinals = 0
+				}
+				ruler = {
+					save_scope_as = target_ruler
+				}
+				save_scope_as = target_country
+			}
+		}
+		save_cardinal_scope = yes
+	}
+
+	trigger = {
+		religion:catholic = {
+			any_country_in_religion = {
+				has_ruler = yes
+				num_cardinals = 0
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.1200.a
+
+		add_religious_influence = religious_influence_mild_penalty
+		scope:target_country = {
+			trigger_event_non_silently = western_schism.1201
+		}
+	}
+
+	option = {
+		name = western_schism.1200.b
+
+		add_stability = stability_mild_penalty
+	}
+}
+
+western_schism.1201 = { #Suspicious Country in Religion
+	type = country_event
+	category = situation_event
+	title = western_schism.1201.title
+	desc = western_schism.1201.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+
+	immediate = {
+
+	}
+
+	option = {
+		name = western_schism.1201.a
+
+		custom_tooltip = {
+			text = western_schism_resolution_impact_positive.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_pope_cardinal = {
+						save_temporary_scope_as = voter
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = 0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.1201.b
+
+		custom_tooltip = {
+			text = western_schism_resolution_impact_negative.tt
+
+			international_organization:catholic_church = {
+				"active_resolution(resolution:western_schism_resolution)" = {
+					save_temporary_scope_as = resolution
+					scope:target_schism_pope_cardinal = {
+						save_temporary_scope_as = voter
+						scope:resolution = {
+							"vote_in_active_resolution(scope:voter)" ?= {
+								change_variable = {
+									name = western_schism_vote_weight
+									add = {
+										value = "scope:voter.num_cardinals"
+										multiply = -0.2
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+western_schism.1300 = { #First Council Event
+	type = country_event
+	category = situation_event
+	title = western_schism.1300.title
+	desc = western_schism.1300.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	immediate = {
+		save_scope_as = council_country
+
+		scope:council_country = {
+			random_cardinal_in_country = {
+				save_scope_as = target_location
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.1300.a
+
+		add_diplomats = diplomats_mild_penalty
+
+		religion:catholic = {
+			custom_tooltip = {
+				text = western_schism.1300.a.tt
+				every_country_in_religion = {
+					limit = { this != root }
+					add_opinion = {
+						target = root
+						modifier = schism_called_council
+					}
+				}
+			}
+		}
+
+		religion:catholic = {
+			every_country_with_cardinals = {
+				trigger_event_non_silently = western_schism.1301
+			}
+		}
+		situation:western_schism = {
+			start_western_schism_resolution = yes
+		}
+	}
+}
+
+western_schism.1301 = { #First Council Event - Follow Up for Cardinal Countries
+	type = country_event
+	category = situation_event
+	title = western_schism.1301.title
+	desc = western_schism.1301.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	option = { #stay on the same side
+		name = western_schism.1301.a
+
+		trigger = {
+			has_variable = western_schism_voted_for
+			var:western_schism_voted_for = scope:council_country
+		}
+
+		add_prestige = prestige_mild_bonus
+	}
+
+	option = { #swap sides to the council
+		name = western_schism.1301.b
+
+		trigger = {
+			has_variable = western_schism_voted_for
+			NOT = { var:western_schism_voted_for = scope:council_country }
+		}
+		add_prestige = prestige_mild_penalty
+		add_religious_influence = religious_influence_mild_bonus
+	}
+
+	option = { #remain on your current side
+		name = western_schism.1301.c
+
+		trigger = {
+			OR = {
+				NOT = { has_variable = western_schism_voted_for }
+				NOT = { var:western_schism_voted_for = scope:council_country }
+			}
+		}
+
+		add_prestige = prestige_mild_bonus
+		add_religious_influence = religious_influence_mild_penalty
+	}
+
+	after = {
+		remove_variable = western_schism_voted_for
+	}
+}
+
+western_schism.1400 = { #Second Council Event - Council of Pisa
+	type = country_event
+	category = situation_event
+	title = western_schism.1300.title
+	desc = western_schism.1300.desc
+
+	immediate = {
+		if = {
+			limit = {
+				location:pisa = {
+					dominant_religion = religion:catholic
+				}
+			}
+			save_scope_as = target_location
+		}
+		else = {
+			scope:council_country = {
+				random_cardinal_in_country = {
+					save_scope_as = target_location
+				}
+			}
+		}
+	}
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	option = {
+		name = western_schism.1300.a
+
+		add_diplomats = diplomats_mild_penalty
+
+		religion:catholic = {
+			custom_tooltip = {
+				text = western_schism.1300.a.tt
+				every_country_in_religion = {
+					limit = { this != root }
+					add_opinion = {
+						target = root
+						modifier = schism_called_council
+					}
+				}
+			}
+		}
+
+		situation:western_schism = {
+			if = {
+				limit = {
+					has_variable = western_schism_pope_score
+					var:western_schism_pope_score >= 2
+				}
+				c:PAP = { save_scope_as = winner_country }
+			}
+			else_if = {
+				limit = {
+					has_variable = western_schism_anti_pope_score
+					var:western_schism_anti_pope_score >= 2
+				}
+				var:schism_opponent_country = { save_scope_as = winner_country }
+			}
+			if = {
+				limit = { exists = scope:winner_country }
+				set_variable = western_schism_ended_by_event
+				scope:winner_country = {
+					trigger_event_non_silently = {
+						id = western_schism.2100
+						days = 7
+					}
+				}
+			}
+			else = {
+				religion:catholic = {
+					every_country_with_cardinals = {
+						trigger_event_non_silently = {
+							id = western_schism.1301
+							days = 6
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+western_schism.1500 = { #Third Council Event - Council of Constance
+	type = country_event
+	category = situation_event
+	title = western_schism.1300.title
+	desc = western_schism.1300.desc
+
+	immediate = {
+		if = {
+			limit = {
+				location:konstanz = {
+					dominant_religion = religion:catholic
+				}
+			}
+			save_scope_as = target_location
+		}
+		else = {
+			scope:council_country = {
+				random_cardinal_in_country = {
+					save_scope_as = target_location
+				}
+			}
+		}
+	}
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	option = {
+		name = western_schism.1300.a
+		situation:western_schism = {
+			if = {
+				limit = {
+					has_variable = western_schism_pope_score
+					var:western_schism_pope_score >= 2
+				}
+				c:PAP = { save_scope_as = winner_country }
+			}
+			else_if = {
+				limit = {
+					has_variable = western_schism_anti_pope_score
+					var:western_schism_anti_pope_score >= 2
+				}
+				var:schism_opponent_country = { save_scope_as = winner_country }
+			}
+			if = {
+				limit = { exists = scope:winner_country }
+				set_variable = western_schism_ended_by_event
+				scope:winner_country = {
+					trigger_event_non_silently = {
+						id = western_schism.2200
+						days = 7
+					}
+				}
+			}
+		}
+	}
+}
+
+western_schism.2000 = { #Schism End Everyone
+	type = country_event
+	category = situation_event
+
+	title = western_schism.2000.title
+	desc = western_schism.2000.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	immediate = {
+		save_cardinal_scope = yes
+		
+		c:PAP = {
+			ruler_or_regent = {
+				save_scope_as = target_character
+			}
+		}
+		if = {
+			limit = {
+				has_variable = western_schism_pope_score
+				var:western_schism_pope_score >= 2
+			}
+			scope:target_schism_pope_cardinal = {
+				owner = {
+					save_scope_as = winner_country
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				has_variable = western_schism_anti_pope_score
+				var:western_schism_anti_pope_score >= 2
+			}
+			scope:target_schism_pope_cardinal = {
+				owner = {
+					save_scope_as = winner_country
+				}
+			}
+		}
+	}
+
+	option = {
+		name = western_schism.2000.a
+	}
+
+	after = {
+		remove_variable = schism_pope_cardinal
+		remove_variable = schism_opponent_cardinal
+		remove_variable = western_schism_vote_counter
+		remove_variable = western_schism_pope_score
+		remove_variable = western_schism_anti_pope_score
+		remove_variable = western_schism_cardinal_weight_bonus
+	}
+}
+
+western_schism.2100 = {
+	type = country_event
+	category = situation_event
+	title = western_schism.2100.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					this = c:PAP
+				}
+				desc = western_schism.2100.desc.a
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = western_schism.2100.desc.b
+			}
+		}
+	}
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	option = {
+		name = western_schism.2100.a
+
+		c:PAP = {
+			ruler_or_regent = {
+				save_scope_as = old_papal_ruler
+			}
+		}
+
+		add_prestige = prestige_radical_bonus
+		add_religious_influence = religious_influence_radical_bonus
+		
+		hidden_effect = {
+			kill_character_silently = scope:old_papal_ruler
+		}
+		if = {
+			limit = {
+				tag = PAP
+			}
+			create_character = {
+				estate = estate_type:clergy_estate
+				religion = religion:catholic
+				culture = culture:median
+				adm = { 10 70 }
+				dip = { 10 70 }
+				mil = { 10 70 }
+				min_age = 50
+				save_scope_as = target_character
+			}
+			set_new_ruler = scope:target_character
+			if = {
+				limit = {
+					has_estate_privilege = estate_privilege:french_cardinals
+				}
+				revoke_estate_privilege = estate_privilege:french_cardinals
+			}
+			if = {
+				limit = {
+					owns = location:rome
+					location:rome = {
+						is_capital = no
+					}
+				}
+				set_capital = location:rome
+			}
+		}
+		else = {
+			c:PAP ?= {
+				create_character = {
+					estate = estate_type:clergy_estate
+					religion = religion:catholic
+					culture = culture:french
+					adm = { 10 70 }
+					dip = { 10 70 }
+					mil = { 10 70 }
+					min_age = 50
+					save_scope_as = target_character
+				}
+				set_new_ruler = scope:target_character
+				if = {
+					limit = {
+						owns = location:avignon
+						location:avignon = {
+							is_capital = no
+						}
+					}
+					set_capital = location:avignon
+				}
+			}
+		}
+	}
+}
+
+western_schism.2200 = {
+	type = country_event
+	category = situation_event
+	title = western_schism.2100.title
+	desc =  western_schism.2200.desc
+
+	image = "gfx/interface/illustrations/situation/western_schism.dds"
+
+	immediate = {
+	}
+
+	option = {
+		name = western_schism.2100.a
+
+		c:PAP = {
+			ruler_or_regent = {
+				save_scope_as = old_papal_ruler
+			}
+		}
+		
+		hidden_effect = {
+			kill_character_silently = scope:old_papal_ruler
+		}
+		c:PAP ?= {
+			create_character = {
+				estate = estate_type:clergy_estate
+				religion = religion:catholic
+				culture = culture:median
+				adm = { 50 90 }
+				dip = { 50 90 }
+				mil = { 50 90 }
+				min_age = 50
+				save_scope_as = target_character
+			}
+			set_new_ruler = scope:target_character
+		}
+	}
+}

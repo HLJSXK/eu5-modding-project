@@ -1,0 +1,508 @@
+﻿namespace = grand_embassy
+
+scripted_trigger is_valid_embassy_country = {
+	opinion = { target = root value >= 10 }
+	num_of_advances_researched > root.num_of_advances_researched
+	societal_value:capital_economy_vs_traditional_economy  < 0
+	NOR = {
+		is_enemy_of = root
+		is_rival_of = root
+	}
+	capital.sub_continent = sub_continent:western_europe
+	any_institutions_embraced = {
+		NOT = { root = { has_embraced_institution = prev } }
+	}
+	
+	NOT = { has_variable = grand_embassy_visit }
+}
+
+scripted_effect go_on_embassy_to_new_country = {
+	change_gold_effect = { scale = -3 }
+	remove_variable = grand_embassy_government
+	remove_variable = grand_embassy_navy
+	remove_variable = grand_embassy_army
+	remove_variable = embassy_gain
+	random_known_country = {
+		limit = {
+			is_valid_embassy_country = yes
+		}
+		save_scope_as = embassy_country
+		trigger_event_silently = {
+			id = grand_embassy.2
+			days = { 30 60 }
+		}
+	}
+}
+
+scripted_effect end_grand_embassy = {
+	remove_variable = grand_embassy_government
+	remove_variable = grand_embassy_navy
+	remove_variable = grand_embassy_army
+	remove_variable = embassy_gain
+	
+	every_country = {
+		remove_variable = grand_embassy_visit
+	}
+	ruler ?= { remove_character_modifier = on_grand_embassy }
+}
+
+grand_embassy.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = grand_embassy.1.title
+	desc = grand_embassy.1.desc
+
+	trigger = {
+		ruler ?= {
+			adm >= 50
+			dip >= 50
+			mil >= 50
+			has_unit = no
+		}
+		
+		OR = {
+			current_age = age_5_absolutism
+			current_age = age_6_revolutions
+		}
+		
+		country_rank = country_rank:rank_empire
+		
+		societal_value:capital_economy_vs_traditional_economy  > 0
+	
+		NOT = { has_variable = grand_embassy }
+		
+		at_war = no
+		has_regent = no
+		
+		capital.sub_continent = sub_continent:eastern_europe
+
+		any_known_country = {
+			is_valid_embassy_country = yes
+		}
+	}
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+	
+	option = {
+		name = grand_embassy.1.a
+		historical_option = yes
+		ruler ?= { add_character_modifier = { modifier = on_grand_embassy months = -1 mode = add_and_extend } } 
+		set_variable = { name = grand_embassy value = 1 }
+		save_scope_as = from
+		
+		go_on_embassy_to_new_country = yes
+		
+	}
+	option = {
+		name = grand_embassy.1.b
+		add_stability = stability_extreme_bonus
+	}
+}
+
+grand_embassy.2 = {
+	type = country_event
+	title = grand_embassy.2.title
+	desc = grand_embassy.2.desc
+
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			scope:from = {
+				event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+			}
+		}
+		set_variable = { name = grand_embassy_visit value = 1 }
+	}
+	
+	trigger = {
+		scope:from.ruler ?= {
+			has_character_modifier = on_grand_embassy
+		}
+	}
+
+	option = {
+		name = grand_embassy.2.a
+		scope:from = {
+			add_opinion = { target = root modifier = received_grand_embassy }
+		}
+		trigger_event_silently = { 
+			id = grand_embassy.3 
+			days = { 14 21 }
+		}
+	}
+	option = {
+		name = grand_embassy.2.b
+		add_prestige = prestige_extreme_penalty
+		scope:from = {
+			add_opinion = { target = root modifier = rejected_grand_embassy }
+		}
+	}
+	option = {
+		name = grand_embassy.2.c
+		scope:from = {
+			add_casus_belli = {	target = root	type = casus_belli:cb_insulted_us	}
+			add_opinion = { target = root modifier = rejected_grand_embassy }
+		}
+	}
+}
+
+grand_embassy.3 = {
+	type = country_event
+	title = grand_embassy.3.title
+	desc = grand_embassy.3.desc
+		
+	trigger = {
+		scope:from.ruler ?= {
+			has_character_modifier = on_grand_embassy
+		}
+	}
+	
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			scope:from = {
+				event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+			}
+		}
+		
+		scope:embassy_country = {
+			random_institutions_embraced = {
+				limit = {
+					NOT = { scope:from = { has_embraced_institution = prev  } }
+				}
+				save_scope_as = target_institution
+			}
+		}
+		scope:from = {
+			remove_variable = grand_embassy_government
+			remove_variable = grand_embassy_army
+			remove_variable = grand_embassy_navy
+		}
+	}
+	
+	option = {
+		name = grand_embassy.3.a
+		trigger = {
+			exists = scope:target_institution
+		}
+		custom_tooltip = grand_embassy.3.a.tt
+		scope:from = {
+			add_opinion = { target = root modifier = invited_to_study_institutions }
+			set_variable = { name = grand_embassy_government value = 1 }
+			trigger_event_silently = { id = grand_embassy.4 }
+		}
+	}
+	option = {
+		name = grand_embassy.3.b
+		custom_tooltip = grand_embassy.3.b.tt
+		scope:from = {
+			add_opinion = { target = root modifier = invited_to_study_institutions }
+			set_variable = { name = grand_embassy_army value = 1 }
+			trigger_event_silently = { id = grand_embassy.4 }
+		}
+	}
+	option = {
+		name = grand_embassy.3.c
+		custom_tooltip = grand_embassy.3.c.tt
+		trigger = {
+			num_of_ports > 0
+		}
+		scope:from = {
+			add_opinion = { target = root modifier = invited_to_study_institutions }
+			set_variable = { name = grand_embassy_navy value = 1 }
+			trigger_event_silently = { id = grand_embassy.4 }
+		}
+	}
+	option = {
+		name = grand_embassy.3.d
+		scope:from = {
+			add_opinion = { target = root modifier = rejected_grand_embassy }
+			trigger_event_silently = { id = grand_embassy.5 }
+		}
+	}
+}
+
+grand_embassy.4 = {
+	type = country_event
+	title = grand_embassy.4.title
+	desc = grand_embassy.4.desc
+
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			scope:embassy_country = {
+				event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			}
+			event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+		}
+	}
+	
+	option = {
+		name = grand_embassy.4.a
+		trigger = {
+			has_variable = grand_embassy_government
+		}
+		change_gold_effect = { scale = -2 }
+		trigger_event_silently = { 
+			id = grand_embassy.6 
+			days = { 30 45 }
+		}
+	}
+	option = {
+		name = grand_embassy.4.b
+		trigger = {
+			has_variable = grand_embassy_army
+		}
+		change_gold_effect = { scale = -2 }
+		trigger_event_silently = { 
+			id = grand_embassy.6 
+			days = { 30 45 }
+		}
+	}
+	option = {
+		name = grand_embassy.4.c
+		trigger = {
+			has_variable = grand_embassy_navy
+		}
+		change_gold_effect = { scale = -2 }
+		trigger_event_silently = { 
+			id = grand_embassy.6 
+			days = { 30 45 }
+		}
+	}
+	option = {
+		name = grand_embassy.4.d
+		trigger = {
+			any_known_country = {
+				is_valid_embassy_country = yes
+			}
+		}
+		go_on_embassy_to_new_country = yes
+	}
+	option = {
+		name = grand_embassy.4.e
+		end_grand_embassy = yes
+	}
+}
+
+grand_embassy.5 = {
+	type = country_event
+	title = grand_embassy.5.title
+	desc = grand_embassy.5.desc
+	
+	trigger = {
+		scope:from.ruler ?= {
+			has_character_modifier = on_grand_embassy
+		}
+	}
+
+	illustration_tags = {
+        10 = angry
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+			scope:embassy_country = {
+				event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			}
+		}
+	}
+		
+	option = {
+		name = grand_embassy.5.a
+		trigger = {
+			any_known_country = {
+				is_valid_embassy_country = yes
+			}
+		}
+		go_on_embassy_to_new_country = yes
+	}
+	option = {
+		name = grand_embassy.5.b
+		end_grand_embassy = yes
+	}
+}
+
+grand_embassy.6 = {
+	type = country_event
+	title = grand_embassy.6.title
+	desc = grand_embassy.6.desc
+	trigger = {
+		scope:from.ruler ?= {
+			has_character_modifier = on_grand_embassy
+		}
+	}
+
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+			scope:embassy_country = {
+				event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			}
+		}
+		hidden_effect = {
+			random_list = {
+				25 = {
+					set_variable = { name = embassy_gain value = 1 }
+				}
+				50 = {
+					set_variable = { name = embassy_gain value = 3 }
+				}
+				25 = {
+					set_variable = { name = embassy_gain value = 5 }
+				}
+			}
+		}
+	}
+
+	option = {
+		name = grand_embassy.6.a
+		trigger = {
+			has_variable = grand_embassy_government
+		}
+		
+		ordered_owned_location = {
+			limit = {
+				NOT = { has_institution = scope:target_institution }
+			}
+			order_by = population
+			max = {
+				value = 1
+				add = {
+					value = root.num_provinces
+					multiply = 0.1
+				}
+			}
+			
+			change_institution_progress = {
+				type = scope:target_institution
+				value = {	
+					value = 5
+					multiply = root.var:embassy_gain
+				}
+			}
+		}
+		
+		remove_variable = embassy_gain
+		remove_variable = grand_embassy_government
+		trigger_event_silently = { 
+			id = grand_embassy.7 
+			days = { 7 21 }
+		}
+	}
+	option = {
+		name = grand_embassy.6.b
+		trigger = {
+			has_variable = grand_embassy_army
+		}
+		add_army_tradition = {
+			value = 1
+			multiply = var:embassy_gain
+		}
+		remove_variable = embassy_gain
+		remove_variable = grand_embassy_army
+		trigger_event_silently = { 
+			id = grand_embassy.7 
+			days = { 7 21 }
+
+		}
+	}
+	option = {
+		name = grand_embassy.6.c
+		trigger = {
+			has_variable = grand_embassy_navy
+		}
+		add_navy_tradition = {
+			value = 1
+			multiply = var:embassy_gain
+		}
+		remove_variable = embassy_gain
+		remove_variable = grand_embassy_navy
+		trigger_event_silently = { 
+			id = grand_embassy.7 
+			days = { 7 21 }
+
+		}
+		trigger_event_silently = { id = grand_embassy.7 }
+	}
+}
+
+grand_embassy.7 = {
+	type = country_event
+	title = grand_embassy.7.title
+	desc = grand_embassy.7.desc
+
+	illustration_tags = {
+        10 = happy
+        10 = interior
+    }
+
+	immediate = {
+		if = {
+			limit = {
+				is_ai = no
+			}
+			event_illustration_estate_foreground_effect = { foreground = estate_type:nobles_estate }
+			scope:embassy_country = {
+				event_illustration_estate_background_effect = { background = estate_type:nobles_estate }
+			}
+		}
+	}
+	
+	option = {
+		name = grand_embassy.7.a
+		trigger = {
+			any_known_country = {
+				is_valid_embassy_country = yes
+			}
+		}
+		go_on_embassy_to_new_country =  yes
+	}
+	option = {
+		name = grand_embassy.7.b
+		end_grand_embassy = yes
+	}
+}

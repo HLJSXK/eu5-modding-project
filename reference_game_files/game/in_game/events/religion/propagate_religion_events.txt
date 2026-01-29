@@ -1,0 +1,956 @@
+﻿namespace = propagate_religion_events
+
+scripted_effect location_pops_convert_to_muslim = {
+	custom_tooltip = {
+		text = location_pops_convert_to_muslim.tt
+		every_pop = {
+			limit = {
+				religion != scope:target_country.religion
+			}
+			split_pop = {
+				religion = scope:target_country.religion
+				fraction = 0.01
+			}
+		}
+	}
+}
+
+scripted_trigger is_valid_muslim_sufi_country = {
+	religion ?= { group = religion_group:muslim }
+	OR = {
+		religious_school ?= { is_sufi_school = yes }
+		any_invited_religious_figure ?= { 
+			religious_school ?= { is_sufi_school = yes }
+		}
+	}
+}
+
+propagate_religion_events.1 = { #Muslim Traders in [target_location.GetNameWithNoTooltip]
+	type = country_event
+	title = propagate_religion_events.1.title
+	desc = propagate_religion_events.1.desc
+
+	trigger = {
+		NOT = { religion.group = religion_group:muslim }
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+			}
+			any_location_in_market = {
+				is_port = yes
+				owner ?= root
+				dominant_religion ?= { group != religion_group:muslim }
+				NOT = { has_location_modifier = trading_settlement }
+				NOT = { has_location_modifier = muslim_traders_controlled }
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = regular
+		10 = exterior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+				any_location_in_market = {
+					is_port = yes
+					owner ?= root
+					dominant_religion ?= { group != religion_group:muslim }
+					NOT = { has_location_modifier = trading_settlement }
+					NOT = { has_location_modifier = muslim_traders_controlled }
+				}
+			}
+			random_location_in_market = {
+				limit = {
+					is_port = yes
+					owner ?= root
+					dominant_religion ?= { group != religion_group:muslim }
+					NOT = { has_location_modifier = trading_settlement }
+					NOT = { has_location_modifier = muslim_traders_controlled }
+				}
+				save_scope_as = target_location
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+				random_pop = {
+					weight = {
+						base = 1
+						modifier = {
+							add = pop_character_chance
+						}
+					}
+					limit = {
+						estate_type = estate_type:burghers_estate
+						religion = scope:target_country.religion
+					}
+					save_scope_as = target_pop
+					save_scope_as = target_pop_bckg
+				}
+			}
+		}
+	}
+
+	option = { #Accept the settlement
+		name = propagate_religion_events.1.a
+		scope:target_location = {
+			add_location_modifier = { modifier = trading_settlement years = 10 mode = add_and_extend }
+		}
+		add_migration = {
+			owner = root
+			from = scope:target_country.capital.province_definition
+			to = scope:target_location.province_definition
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			amount = 0.01
+			months = 48
+		}
+	}
+
+	option = { #Refuse the settlement
+		name = propagate_religion_events.1.b
+		scope:target_location = {
+			add_location_modifier = { modifier = muslim_traders_controlled years = 10 mode = add_and_extend }  
+		}
+	}
+}
+
+propagate_religion_events.2 = { #[target_country.GetReligion.GetAdjectiveWithNoTooltip] Missionaries
+	type = country_event
+	title = propagate_religion_events.2.title
+	desc = propagate_religion_events.2.desc
+
+	trigger = {
+		NOT = { religion.group = religion_group:muslim }
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+			}
+			any_location_in_market = {
+				is_port = yes
+				owner ?= root
+				dominant_religion ?= { group != religion_group:muslim }
+				NOT = { has_location_modifier = islamic_missionaries }
+				NOT = { has_variable = had_missionaries_settle }
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+				any_location_in_market = {
+					is_port = yes
+					owner ?= root
+					dominant_religion ?= { group != religion_group:muslim }
+					NOT = { has_location_modifier = islamic_missionaries }
+					NOT = { has_variable = had_missionaries_settle }
+				}
+			}
+			random_location_in_market = {
+				limit = {
+					is_port = yes
+					owner ?= root
+					dominant_religion ?= { group != religion_group:muslim }
+					NOT = { has_location_modifier = islamic_missionaries }
+					NOT = { has_variable = had_missionaries_settle }
+				}
+				save_scope_as = target_location
+				set_variable = { name = had_missionaries_settle value = 1 years = 10 }
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+				random_pop = {
+					weight = {
+						base = 1
+						modifier = {
+							add = pop_character_chance
+						}
+					}
+					limit = {
+						estate_type = estate_type:clergy_estate
+						religion = scope:target_country.religion
+					}
+					save_scope_as = target_pop
+					save_scope_as = target_pop_bckg
+				}
+			}
+		}
+	}
+
+	option = { #Forbid missionaries
+		name = propagate_religion_events.2.a
+		add_legitimacy = legitimacy_mild_bonus
+	}
+
+	option = { #Accept missionaries
+		name = propagate_religion_events.2.b
+		scope:target_location = {
+			add_location_modifier = { modifier = islamic_missionaries years = 20 mode = add_and_extend }
+			location_pops_convert_to_muslim = yes
+			add_migration = {
+				owner = root
+				from = scope:target_country.capital.province_definition
+				to = scope:target_location.province_definition
+				culture = scope:target_country.culture
+				religion = scope:target_country.religion
+				amount = 0.01
+				months = 48
+			}
+		}
+	}
+}
+
+propagate_religion_events.3 = { #[ShowReligionGroupAdjectiveWithNoTooltip('muslim')] Sailors
+	hide_portraits = yes
+	type = country_event
+	title = propagate_religion_events.3.title
+	desc = propagate_religion_events.3.desc
+
+	trigger = {		
+		NOT = { religion.group = religion_group:muslim }
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+				has_ports = yes
+			}
+			any_location_in_market = {
+				is_port = yes
+				owner ?= root
+				NOT = { has_location_modifier = muslim_sailor_community }
+				NOT = { has_variable = muslim_sailors_present }
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = regular
+		10 = exterior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:burghers_estate background = estate_type:burghers_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+					has_ports = yes
+				}
+				any_location_in_market = {
+					is_port = yes
+					owner ?= root
+					NOT = { has_location_modifier = muslim_sailor_community }
+					NOT = { has_variable = muslim_sailors_present }
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+					has_ports = yes
+				}
+				save_scope_as = target_country
+				random_pop = {
+					weight = {
+						base = 1
+						modifier = {
+							add = pop_character_chance
+						}
+					}
+					limit = {
+						estate_type = estate_type:burghers_estate
+						religion = scope:target_country.religion
+					}
+					save_scope_as = target_pop
+					save_scope_as = target_pop_bckg
+				}
+			}
+			random_location_in_market = {
+				limit = {
+					is_port = yes
+					owner ?= root
+				}
+				save_scope_as = target_location
+				set_variable = { name = muslim_sailors_present value = yes years = 10 }
+			}
+		}
+		create_character = {
+			adm = { 60 80 }
+			dip = { 60 80 }
+			mil = { 60 80 }
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			estate = estate_type:burghers_estate
+			create_in_limbo = yes
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Attract sailors
+		name = propagate_religion_events.3.a
+		scope:target_location = {
+			add_location_modifier = { modifier = muslim_sailor_community years = 10 mode = add_and_extend }  
+		}
+		if = {
+			limit = {
+				monthly_sailors > 0
+			}
+			add_sailors = { value = monthly_sailors multiply = 2 }
+		}
+		change_gold_effect = { scale = -10 }
+		scope:target_character = { move_country = root }
+	}
+
+	option = { #We're fine
+		name = propagate_religion_events.3.b
+		add_legitimacy = legitimacy_mild_bonus
+		hidden_effect = { kill_character = scope:target_character }
+	}
+}
+
+propagate_religion_events.4 = { #Miracle
+	type = country_event
+	title = propagate_religion_events.4.title
+	desc = propagate_religion_events.4.desc
+
+	trigger = {
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+			}
+			any_location_in_market = {
+				owner ?= root
+				is_capital = no
+				dominant_religion ?= { group != religion_group:muslim }
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+				any_location_in_market = {
+					owner ?= root
+					is_capital = no
+					dominant_religion ?= { group != religion_group:muslim }
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+				if = {
+					limit = {
+						religious_school = { is_sufi_school = yes }
+					}
+					religious_school = {
+						save_scope_as = target_school
+					}
+				}
+				else = {
+					random_invited_religious_figure = {
+						limit = {
+							religious_school = { is_sufi_school = yes }
+						}
+						religious_school = {
+							save_scope_as = target_school
+						}
+					}
+				}
+			}
+			random_location_in_market = {
+				limit = {
+					owner ?= root
+					is_capital = no
+					dominant_religion ?= { group != religion_group:muslim }
+				}
+				event_illustration_peasants_foreign_religion_pop_type_effect = yes
+				save_scope_as = target_location
+			}
+		}
+		create_character = {
+			adm = { 60 80 }
+			dip = { 60 80 }
+			mil = { 60 80 }
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			religious_figure = religious_figure:muslim_scholar
+			religious_school = scope:target_school
+			estate = estate_type:clergy_estate
+			create_in_limbo = yes
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Divine sign
+		name = propagate_religion_events.4.a
+		add_stability = stability_mild_bonus
+		scope:target_location = {
+			location_pops_convert_to_muslim = yes
+		}
+		hidden_effect = { kill_character = scope:target_character }
+	}
+
+	option = { #Invite the sage to court
+		name = propagate_religion_events.4.b
+		scope:target_location = {
+			location_pops_convert_to_muslim = yes
+		}
+		scope:target_character = { move_country = root }
+	}
+}
+
+propagate_religion_events.5 = { #Mosque Established in [target_location.GetName]
+	type = country_event
+	title = propagate_religion_events.5.title
+	desc = propagate_religion_events.5.desc
+
+	trigger = {
+		religion.group != religion_group:muslim
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+				num_of_advances_researched >= tech_level_to_advances_4
+			}
+			any_location_in_market = {
+				owner ?= root
+				dominant_religion.group = religion_group:muslim
+				NOT = { has_location_modifier = religious_community_isolated }
+				NOT = { has_location_modifier = mosque_of_x }
+				any_neighbor_location = {
+					area = prev.area
+					owner ?= root
+					is_capital = no
+					dominant_religion.group != religion_group:muslim
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+					num_of_advances_researched >= tech_level_to_advances_4
+				}
+				any_location_in_market = {
+					owner ?= root
+					dominant_religion.group = religion_group:muslim
+					NOT = { has_location_modifier = religious_community_isolated }
+					NOT = { has_location_modifier = mosque_of_x }
+					any_neighbor_location = {
+						area = prev.area
+						owner ?= root
+						is_capital = no
+						dominant_religion.group != religion_group:muslim
+					}
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+					num_of_advances_researched >= tech_level_to_advances_4
+				}
+				save_scope_as = target_country
+			}
+			random_location_in_market = {
+				limit = {
+					owner ?= root
+					dominant_religion.group = religion_group:muslim
+					any_neighbor_location = {
+						area = prev.area
+						owner ?= root
+						is_capital = no
+						dominant_religion.group != religion_group:muslim
+					}
+				}
+				event_illustration_peasants_foreign_religion_pop_type_effect = yes
+				save_scope_as = target_location
+			}
+		}
+	}
+
+	option = { #We cannot allow this
+		name = propagate_religion_events.5.a
+		scope:target_location = {
+			add_location_modifier = { modifier = religious_community_isolated years = 10 mode = add_and_extend }  
+		}
+		scope:target_country = {
+			add_opinion = { target = root modifier = opinion_discriminated_our_countrymen }
+		}
+	}
+
+	option = { #Support it
+		name = propagate_religion_events.5.b
+		scope:target_location = {
+			if = {
+				limit = {
+					NOT = { location_rank = location_rank:rural_settlement }
+					NOT = { has_building = building_type:temple }
+				}
+				change_building_level_in_location = { building = building_type:temple value = 1 }
+			}
+			change_development  = development_weak_bonus
+			custom_tooltip = {
+				text = propagate_religion.5.b.tt
+				area = {
+					every_location_in_area = {
+						change_control = control_severe_penalty
+						add_location_modifier = { modifier = mosque_of_x years = 10 mode = add_and_extend }  
+					}
+				}
+			}
+		}
+		add_migration = {
+			owner = root
+			from = scope:target_country.capital.province_definition
+			to = scope:target_location.province_definition
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			amount = 0.01
+			months = 48
+		}
+	}
+}
+
+propagate_religion_events.6 = { #$rank_kingdom_muslim$ of [ROOT.GetCountry.GetName]?
+	type = country_event
+	title = propagate_religion_events.6.title
+	desc = propagate_religion_events.6.desc
+
+	trigger = {
+		religion.group != religion_group:muslim
+		NOT = { has_variable = sultan_titles_for_non_muslims }
+		has_regent = no
+		government_type = government_type:monarchy
+		country_rank = country_rank:rank_kingdom
+		NOT = { tag = ARK }
+		NOT = { has_reform = government_reform:shogunate }
+		ruler ?= {
+			NOT = { has_variable = said_no_to_islamic_titles }
+		}
+		OR = {
+			is_subject = no
+			is_subject_type = tributary
+		}
+		dominant_religion != root.religion
+		capital = {
+			dominant_religion.group = religion_group:muslim
+		}
+		NOT = { has_country_modifier = islamic_titles }
+	}
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		ruler = {
+			save_scope_as = target_ruler
+		}
+	}
+
+	option = { #Adopt muslim titles
+		name = propagate_religion_events.6.a
+		add_country_modifier = { modifier = islamic_titles years = 10 mode = add_and_extend }  
+		set_variable = sultan_titles_for_non_muslims
+		custom_tooltip = {
+			text = sultan_titles_for_non_muslims_tooltip
+			every_known_country = {
+				limit = {
+					religion.group = religion_group:muslim
+				}
+				add_opinion = { target = root modifier = opinion_adopted_islamic_titles }
+			}
+		}
+	}
+
+	option = { #Refuse
+		name = propagate_religion_events.6.b
+		add_country_modifier = { modifier = defended_traditional_kingship years = 5 mode = add_and_extend }
+		ruler = { 
+			set_variable = said_no_to_islamic_titles
+		} 
+	}
+}
+
+propagate_religion_events.7 = { #Joining the Community of the Faithful
+	type = country_event
+	title = propagate_religion_events.7.title
+	desc = propagate_religion_events.7.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = happy
+	}
+
+	immediate = {
+		remove_variable = sultan_titles_for_non_muslims
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = propagate_religion_events.7.a
+		custom_tooltip = {
+			text = sultan_conversion_tooltip
+			every_known_country = {
+				limit = {
+					religion.group = religion_group:muslim
+				}
+				if = {
+					limit = {
+						has_opinion = { target = root modifier = opinion_adopted_islamic_titles }
+					}
+					remove_opinion = { target = root modifier = opinion_adopted_islamic_titles }
+				}
+				add_opinion_mutual_effect = {
+					target = root
+					modifier = opinion_converted_to_islam
+				}
+			}
+		}
+	}
+}
+
+propagate_religion_events.8 = { #Traveling Scholar
+	type = country_event
+	title = propagate_religion_events.8.title
+	desc = propagate_religion_events.8.desc
+
+	trigger = {
+		capital ?= {
+			market ?= {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		capital.market = {
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+				if = {
+					limit = {
+						religious_school = { is_sufi_school = yes }
+					}
+					religious_school = {
+						save_scope_as = target_school
+					}
+				}
+				else = {
+					random_invited_religious_figure = {
+						limit = {
+							religious_school = { is_sufi_school = yes }
+						}
+						religious_school = {
+							save_scope_as = target_school
+						}
+					}
+				}
+			}
+		}
+		create_character = {
+			adm = { 60 80 }
+			dip = { 60 80 }
+			mil = { 60 80 }
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			religious_figure = religious_figure:muslim_scholar
+			religious_school = scope:target_school
+			estate = estate_type:clergy_estate
+			create_in_limbo = yes
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Invite him
+		name = propagate_religion_events.8.a
+		add_prestige = prestige_mild_bonus
+		scope:target_character = {
+			move_country = root
+		}
+	}
+
+	option = { #Nah
+		name = propagate_religion_events.8.b
+		add_army_tradition = army_tradition_weak_bonus
+		add_navy_tradition = navy_tradition_weak_bonus
+		add_spy_network = { target = scope:target_country value = 75 }
+		hidden_effect = {
+			kill_character_silently = scope:target_character
+		}
+	}
+}
+
+propagate_religion_events.9 = { #Muslim Chiefs
+	type = country_event
+	title = propagate_religion_events.9.title
+	desc = propagate_religion_events.9.desc
+
+	trigger = {
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+			}
+			any_location_in_market = {
+				owner ?= root
+				is_capital = no
+				dominant_religion.group != religion_group:muslim
+				NOT = { has_location_modifier = chiefs_with_pretensions }
+				local_control < 0.3
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+				any_location_in_market = {
+					owner ?= root
+					is_capital = no
+					dominant_religion.group != religion_group:muslim
+					NOT = { has_location_modifier = chiefs_with_pretensions }
+					local_control < 0.3
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+			}
+			random_location_in_market = {
+				limit = {
+					owner ?= root
+					is_capital = no
+					dominant_religion.group != religion_group:muslim
+					NOT = { has_location_modifier = chiefs_with_pretensions }
+					local_control < 0.3
+				}
+				save_scope_as = target_location
+				event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+			}
+		}
+	}
+
+	option = {
+		name = propagate_religion_events.9.a
+		scope:target_location = {
+			location_pops_convert_to_muslim = yes
+			add_location_modifier = { modifier = chiefs_with_pretensions years = 10 mode = add_and_extend }  
+		}
+	}
+}
+
+propagate_religion_events.10 = { #Islamic Syncretism
+	type = country_event
+	title = propagate_religion_events.10.title
+	desc = propagate_religion_events.10.desc
+
+	trigger = {
+		religion.group != religion_group:muslim
+		NOT = { has_country_modifier = rejection_of_syncretism }
+		any_owned_location = {
+			dominant_religion.group = religion_group:muslim
+			dominant_culture = root.culture
+		}
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+			}
+			any_location_in_market = {
+				owner ?= root
+				is_capital = no
+				dominant_religion.group != religion_group:muslim
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = exterior
+		10 = regular
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+				}
+				any_location_in_market = {
+					owner ?= root
+					is_capital = no
+					dominant_religion.group != religion_group:muslim
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+				}
+				save_scope_as = target_country
+			}
+			random_location_in_market = {
+				limit = {
+					owner ?= root
+					is_capital = no
+					dominant_religion.group != religion_group:muslim
+				}
+				event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+				save_scope_as = target_location
+			}
+		}
+	}
+
+	option = { #Reject it
+		name = propagate_religion_events.10.a
+		add_country_modifier = { modifier = rejection_of_syncretism years = 10 mode = add_and_extend }
+	}
+
+	option = { #Accept it
+		name = propagate_religion_events.10.b
+		add_stability = stability_mild_bonus
+		scope:target_location = {
+			location_pops_convert_to_muslim = yes
+		}
+	}
+}
+
+propagate_religion_events.11 = {
+	type = country_event
+	title = propagate_religion_events.11.title
+	desc = propagate_religion_events.11.desc
+
+	trigger = {
+		religion.group != religion_group:muslim
+		any_owned_location = {
+			dominant_religion.group = religion_group:muslim
+			dominant_culture = root.culture
+		}
+		any_market_with_merchants = {
+			any_merchant_in_market = {
+				is_valid_muslim_sufi_country = yes
+				NOT = { is_at_war_with = root }
+			}
+			any_location_in_market = {
+				owner ?= root
+				dominant_religion.group != religion_group:muslim
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		random_market_with_merchants = {
+			limit = {
+				any_merchant_in_market = {
+					is_valid_muslim_sufi_country = yes
+					NOT = { is_at_war_with = root }
+				}
+				any_location_in_market = {
+					owner ?= root
+					dominant_religion.group != religion_group:muslim
+				}
+			}
+			random_merchant_in_market = {
+				limit = {
+					is_valid_muslim_sufi_country = yes
+					NOT = { is_at_war_with = root }
+				}
+				save_scope_as = target_country
+				event_illustration_peasants_foreign_religion_pop_type_effect = yes
+			}
+			random_location_in_market = {
+				limit = {
+					owner ?= root
+					dominant_religion.group != religion_group:muslim
+				}
+				save_scope_as = target_location
+			}
+		}
+	}
+
+	option = {
+		name = propagate_religion_events.11.a
+		add_migration = {
+			owner = root
+			from = scope:target_country.capital.province_definition
+			to = scope:target_location.province_definition
+			culture = scope:target_country.culture
+			religion = scope:target_country.religion
+			amount = 0.01
+			months = 48
+		}
+		scope:target_location = {
+			location_pops_convert_to_muslim = yes
+		}
+	}
+	option = {
+		name = propagate_religion_events.11.b
+		add_legitimacy = legitimacy_mild_bonus
+	}
+}
+

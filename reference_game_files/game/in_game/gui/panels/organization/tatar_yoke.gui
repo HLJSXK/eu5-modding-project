@@ -1,0 +1,250 @@
+organization_geodiplomatic_theme = {
+    
+    blockoverride "organization_laws_tab_text" { # Hide laws tab
+        visible = no
+        tooltip_enabled = no
+    }
+
+    blockoverride "card_header_button_header_content" { # Remove leave/join/invite IO icon + add member icon
+        margin_left = 18
+        icon = {
+            size = { 30 30 }
+            block "card_header_button_icon_texture" {
+                texture = "gfx/interface/icons/religious_doctrines/catholic/religious_actions.dds"
+            }
+            texture_density = 2
+            glow = {
+                name = "drop_shadow"
+                glow_radius = 3
+                color = {0.0 0.0 0.0 1.0}
+                alpha = 0.3
+            }
+        }
+        block "card_header_button_text_single" {
+            text_single = {
+                margin_left = 7
+                block "card_header_button_raw_text" {
+                    raw_text = "IO or Situation"
+                }
+            }
+        }
+        expand = {}
+    }
+
+    blockoverride "organization_overview_tab_visible" {}
+    blockoverride "organization_panel_overview_visible" {
+        visible = "[InternationalOrganizationsView.Vars.NotExistOrHasValue( 'organizations', 'overview' )]"
+    }
+    blockoverride "organization_members_tab_down" {
+		down = "[InternationalOrganizationsView.Vars.HasValue( 'organizations', 'members' )]"
+	}
+	blockoverride "organization_panel_members_visible" {
+		visible = "[InternationalOrganizationsView.Vars.HasValue( 'organizations', 'members' )]"
+	}
+
+    blockoverride "scroll_overview_empty_visible" { visible = no }
+    
+    blockoverride "io_main_actions_icon" {
+        texture = "[InternationalOrganizationsView.GetInternationalOrganization.GetIcon]"
+    }
+
+    blockoverride "organization_main_actions_extra_visible" {
+        visible = yes 
+    }
+
+    blockoverride "organization_overview_filtered_list_type" {
+		datacontext = "[InternationalOrganizationsView.GetMembersSortSearch]"
+        blockoverride "scroll_list_is_empty" {
+            block "scroll_overview_empty_visible" {
+                visible = "[IsDataModelEmpty(InternationalOrganizationsView.GetMemberItems)]"
+            }
+        }
+    }
+
+    blockoverride "organization_overview_list_custom_top_extra" {
+        vbox = {
+            margin = { 10 5 }
+            layoutpolicy_horizontal = expanding
+            datamodel = "[InternationalOrganizationsView.GetSpecialMemberItems]"
+            item = {
+                vbox = {
+                    layoutpolicy_horizontal = expanding
+                    spacing = 10
+                    datamodel = "[MemberTypeItem.GetCountries]"
+                    item = {
+                        io_character_card = { # Prince of Vladimir character
+                            datacontext = "[Country.GetGovernment.GetRulerOrRegent]"
+                        }
+                    }
+                    visible = "[EqualTo_string(MemberTypeItem.GetName, ShowSpecialStatusName('tatar_tax_collector'))]"
+                }
+            }
+        }
+        #expand = {}
+        vbox = {
+            margin = { 10 5 }
+            layoutpolicy_horizontal = expanding
+            card_expandable = { # Prince of Vladimir info
+                blockoverride "header_content" {
+                    margin = { 10 0 }
+                    icon = {
+                        size = { 30 30 }
+                        block "common_header_icon_texture" {
+                            texture = "[GetSpecialStatusIconFromKey('tatar_tax_collector')]"
+                        }
+                        texture_density = 2
+                    }                                            
+                    text_single = {
+                        block "header_text" {
+                            margin = { 10 0 }
+                            text = "TATAR_YOKE_TAX_COLLECTOR_TITLE"
+                        }
+                    }
+                    expand = {}
+                }
+                blockoverride "bottom_content" {
+                    margin_top = 15
+                    hbox = {
+                        layoutpolicy_horizontal = expanding
+                        spacing = 4
+                        text_single = {
+                            margin = { 20 10 }
+                            text = "TATAR_YOKE_TAX_COLLECTOR_DESC"
+                            multiline = yes
+                            autoresize = yes
+                            layoutpolicy_horizontal = expanding
+                        }
+                    }
+                }
+                blockoverride "header_button_onclick" {
+                    onclick = "[GetVariableSystem.Toggle( 'tatar_tax_collector_info' )]"
+                }
+                blockoverride "icon_replace_visible_yes" {
+                    visible = "[GetVariableSystem.Exists( 'tatar_tax_collector_info' )]"
+                }
+                blockoverride "icon_replace_visible_not" {
+                    visible = "[Not(GetVariableSystem.Exists( 'tatar_tax_collector_info' ))]"
+                }
+                blockoverride"bottom_content_onclick" {
+                    visible = "[GetVariableSystem.Exists( 'tatar_tax_collector_info' )]"
+                }
+                margin_bottom = 10
+            }
+        }
+    }
+
+    blockoverride "members_item_content" { #Hide special members in overview panels since there is already character portraits
+        hbox = {
+            layoutpolicy_horizontal = expanding
+            margin = {0 10}
+            dynamicgridbox = {
+                flipdirection = yes
+                datamodel_wrap = 14
+                datamodel = "[MemberTypeItem.GetCountries]"
+                item = {
+                    country_flag_small = {}
+                }
+            }
+        }
+        visible = "[And(Not(EqualTo_string(MemberTypeItem.GetName, ShowSpecialStatusName('tatar_overlord'))), Not(EqualTo_string(MemberTypeItem.GetName, ShowSpecialStatusName('tatar_tax_collector'))))]"		
+    }
+
+    blockoverride "organization_main_actions_extra" {
+        #Join io
+        action_button_diamond = {
+            #parentanchor = center
+            size = { 470 30 }
+            title = "INT_ORG_MEMBERSHIP_TITLE"
+            actor = "[InternationalOrganizationsView.GetPlayer]"
+            text = "ASK_FOR_IO_MEMBERSHIP"
+            parameter = {
+                parameter_name = "recipient"
+                parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization.GetLeaderCountry]"
+            }
+            left_action = {
+                action_name = "ask_to_join_international_organization"
+                action_direction = "request"
+                parameter = {
+                    parameter_name = "international_organization"
+                    parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+                }
+            }
+            tooltipwidget = {
+                using = io_join_button_tooltip
+            }
+            visible = "[Not(Player.IsMemberOfInternationalOrganization(InternationalOrganizationsView.GetInternationalOrganization))]"
+        }
+        #leave io
+        action_button_diamond = {
+            size = { 470 30 }
+            title = "INT_ORG_MEMBERSHIP_TITLE"
+            text = "LEAVE_IO_MEMBERSHIP"
+            actor = "[InternationalOrganizationsView.GetPlayer]"
+            left_action = {
+                action_name = "leave_international_organization"
+                action_direction = "offer"
+                parameter = {
+                    parameter_name = "recipient"
+                    parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+                }
+            }
+            tooltipwidget = {
+                using = io_leave_button_tooltip
+            }
+            visible = "[Player.HasSpecialStatus(InternationalOrganizationsView.GetInternationalOrganization,'tatar_overlord')]"
+        }
+    }
+
+    blockoverride "organization_overview_list_custom_bottom" {       
+        vbox = {
+            margin = { 10 0 }
+            layoutpolicy_horizontal = expanding
+            card_expandable = { # Hints
+                blockoverride "header_content" {
+                    margin = { 10 0 }
+                    icon = {
+                        size = { 30 30 }
+                        block "header_icon" {
+                            texture = "gfx/interface/icons/flat_icons/tabicons/hints.dds"
+                        }
+                        texture_density = 2
+                    }
+                    text_single = {
+                        block "header_text" {
+                            margin = { 10 0 }
+                            raw_text = "Hints"
+                        }
+                    }
+                    expand = {}
+                }
+                blockoverride "bottom_content" {
+                    hbox = {
+                        layoutpolicy_horizontal = expanding
+                        spacing = 4
+                        text_single = {
+                            margin = { 20 10 }
+                            text = "TATAR_YOKE_HINT_1"
+                            multiline = yes
+                            autoresize = yes
+                            layoutpolicy_horizontal = expanding  
+                        }
+                    }
+                }
+                blockoverride "header_button_onclick" {
+                    onclick = "[GetVariableSystem.Toggle( 'tatar_yoke_hints' )]"
+                }
+                blockoverride "icon_replace_visible_yes" {
+                    visible = "[GetVariableSystem.Exists( 'tatar_yoke_hints' )]"
+                }
+                blockoverride "icon_replace_visible_not" {
+                    visible = "[Not(GetVariableSystem.Exists( 'tatar_yoke_hints' ))]"
+                }
+                blockoverride"bottom_content_onclick" {
+                    visible = "[GetVariableSystem.Exists( 'tatar_yoke_hints' )]"
+                }
+                
+            } 
+        }
+    }
+    
+}

@@ -1,0 +1,2537 @@
+﻿namespace = hook_and_cod_wars
+
+scripted_effect hacw_change_faction_score = {
+	custom_tooltip = {
+		text = $is_good$_$math$_$value$_points_to_$faction$_tt
+		change_variable = {
+			name = hacw_$faction$_faction_power
+			$math$ = $value$
+		}
+	}
+}
+
+scripted_effect hacw_change_faction_score_dynamic_coloring = {
+	if = {
+		limit = { OR = { has_variable = hacw_preferred_faction_$faction$ has_variable = hacw_sided_with_$faction$ } }
+		hacw_change_faction_score = { is_good = good math = $math$ value = $value$ faction = $faction$ }
+	}
+	else = {
+		hacw_change_faction_score = { is_good = bad math = $math$ value = $value$ faction = $faction$ }
+	}
+}
+
+scripted_effect hacw_change_own_faction_score = {
+	if = {
+		limit = { $source_country$ = { OR = { has_variable = hacw_preferred_faction_hook has_variable = hacw_sided_with_hook } } }
+		$target_country$ = { hacw_change_faction_score = { is_good = good math = $math$ value = $value$ faction = hook } }
+	}
+	else_if = {
+		limit = { $source_country$ = { OR = { has_variable = hacw_preferred_faction_cod has_variable = hacw_sided_with_cod } } }
+		$target_country$ = { hacw_change_faction_score = { is_good = good math = $math$ value = $value$ faction = cod } }
+	}
+}
+
+scripted_effect hacw_change_enemy_faction_score = {
+	if = {
+		limit = { $source_country$ = { OR = { has_variable = hacw_preferred_faction_hook has_variable = hacw_sided_with_hook } } }
+		$target_country$ = { hacw_change_faction_score = { is_good = bad math = $math$ value = $value$ faction = cod } }
+	}
+	else_if = {
+		limit = { $source_country$ = { OR = { has_variable = hacw_preferred_faction_cod has_variable = hacw_sided_with_cod } } }
+		$target_country$ = { hacw_change_faction_score = { is_good = bad math = $math$ value = $value$ faction = hook } }
+	}
+}
+
+scripted_effect destroy_variable = {
+	if = {
+		limit = { has_variable = $variable$ }
+		remove_variable = $variable$
+	}
+}
+
+#############################################################
+# Periodic Disaster Events									#
+#############################################################
+
+#Anarchy in the Counties
+hook_and_cod_wars.1 = {
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_location }
+				desc = hook_and_cod_wars.1.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1.title.fallback
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_sided_with_hook }
+				desc = hook_and_cod_wars.1.desc.hook
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_sided_with_cod }
+				desc = hook_and_cod_wars.1.desc.cod
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1.desc
+			}
+		}
+	}
+	trigger = {
+		any_owned_location = {
+			NOT = { location_rank = location_rank:town }
+			NOT = { location_rank = location_rank:city }
+		}
+	}
+	immediate = {
+		random_owned_location = {
+			limit = {
+				NOT = { location_rank = location_rank:town }
+				NOT = { location_rank = location_rank:city }
+			}
+			save_scope_as = target_location
+		}
+	}
+	#Grant them additional autonomy
+	option = {
+		name = hook_and_cod_wars.1.a
+		if = {
+			limit = { exists = scope:target_location }
+			scope:target_location = { change_control = control_extreme_penalty }
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+	}
+	#Assert our authority in it
+	option = {
+		name = hook_and_cod_wars.1.b
+		if = {
+			limit = { exists = scope:target_location }
+			scope:target_location = {
+				every_pop = {
+					limit = {
+						owner = root
+						pop_type = pop_type:peasants
+					}
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				}
+			}
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+	}
+}
+#Disobedience of the Cities
+hook_and_cod_wars.2 = {
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_location }
+				desc = hook_and_cod_wars.2.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.2.title.fallback
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_sided_with_hook }
+				desc = hook_and_cod_wars.2.desc.hook
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_sided_with_cod }
+				desc = hook_and_cod_wars.2.desc.cod
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.2.desc
+			}
+		}
+	}
+	trigger = {
+		any_owned_location = {
+			OR = {
+				location_rank = location_rank:town
+				location_rank = location_rank:city
+			}
+		}
+	}
+	immediate = {
+		random_owned_location = {
+			limit = {
+				OR = {
+					location_rank = location_rank:town
+					location_rank = location_rank:city
+				}
+			}
+			save_scope_as = target_location
+		}
+	}
+	#Pay Gold
+	option = {
+		name = hook_and_cod_wars.2.a
+		trigger = { exists = scope:target_location }
+		change_gold_effect = { scale = -4 }
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+	}
+	#Pay Gold - event insigtht tooltippping
+	option = {
+		name = hook_and_cod_wars.2.a.fallback
+		trigger = { NOT = { exists = scope:target_location } }
+		change_gold_effect = { scale = -4 }
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+	}
+	#More Autonomy
+	option = {
+		name = hook_and_cod_wars.2.b
+		trigger = { exists = scope:target_location }
+		if = {
+			limit = { exists = scope:target_location }
+			scope:target_location = { change_control = control_extreme_penalty }
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+	}
+	#More Autonomy - event insigtht tooltippping
+	option = {
+		name = hook_and_cod_wars.2.b.fallback
+		trigger = { NOT = { exists = scope:target_location } }
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+	}
+}
+#Nobility Rebellion
+hook_and_cod_wars.3 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.3.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.3.desc
+	immediate = {
+		create_rebel = {
+			name = hacw_nobility_rebellion
+			category = estate
+			estate = nobles_estate
+			save_scope_as = hacw_nobility_rebellion
+		}
+	}
+	#Grant them the Privileges
+	option = {
+		name = hook_and_cod_wars.3.a
+		trigger = { has_variable = hacw_sided_with_hook }
+		add_stability = stability_mild_penalty
+		"estate(estate_type:nobles_estate)" = {
+			random_possible_privilege = {
+				root = { grant_estate_privilege = prev }
+			}
+		}
+
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+		hidden_effect = {
+			destroy_rebel = scope:hacw_nobility_rebellion
+		}
+	}
+	#Give them no quarter!
+	option = {
+		name = hook_and_cod_wars.3.b
+		trigger = { has_variable = hacw_sided_with_hook }
+		ordered_owned_location = {
+			order_by = population
+			limit = { any_pop = { pop_type = pop_type:nobles } }
+			max = 4
+			check_range_bounds = no
+			every_pop = {
+				limit = {
+					owner = root
+					pop_type = pop_type:nobles
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:hacw_nobility_rebellion
+			}
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+	}
+	#Nice reinforcement
+	option = {
+		name = hook_and_cod_wars.3.c
+		trigger = { NOT = { has_variable = hacw_sided_with_hook } }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_weak_penalty }
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+		hidden_effect = {
+			destroy_rebel = scope:hacw_nobility_rebellion
+		}
+	}
+}
+#Burghers Rebellion
+hook_and_cod_wars.4 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.4.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.4.desc
+	immediate = {
+		create_rebel = {
+			name = hacw_burghers_rebellion
+			category = estate
+			estate = burghers_estate
+			save_scope_as = hacw_burghers_rebellion
+		}
+	}
+	#Grant them the Privileges
+	option = {
+		name = hook_and_cod_wars.4.a
+		trigger = { has_variable = hacw_sided_with_cod }
+		add_stability = stability_mild_penalty
+		"estate(estate_type:burghers_estate)" = {
+			random_possible_privilege = {
+				root = { grant_estate_privilege = prev }
+			}
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+		hidden_effect = {
+			destroy_rebel = scope:hacw_burghers_rebellion
+		}
+	}
+	#Give them no quarter!
+	option = {
+		name = hook_and_cod_wars.4.b
+		trigger = { has_variable = hacw_sided_with_cod }
+		ordered_owned_location = {
+			order_by = population
+			limit = { any_pop = { pop_type = pop_type:burghers } }
+			max = 4
+			check_range_bounds = no
+			every_pop = {
+				limit = {
+					owner = root
+					pop_type = pop_type:burghers
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:hacw_burghers_rebellion
+			}
+		}
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = cod
+			math = add
+			value = 1
+		}
+	}
+	#Nice reinforcement
+	option = {
+		name = hook_and_cod_wars.4.c
+		trigger = { NOT = { has_variable = hacw_sided_with_cod } }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_weak_penalty }
+		hacw_change_faction_score_dynamic_coloring = {
+			faction = hook
+			math = add
+			value = 1
+		}
+		hidden_effect = {
+			destroy_rebel = scope:hacw_burghers_rebellion
+		}
+	}
+}
+
+#############################################################
+# Setup the disaster										#
+# These are all the events which define first				#
+# who is in the # right to claim Holland in the first place #
+#############################################################
+
+scripted_effect hacw_set_claim_on_holland_throne = {
+	custom_tooltip = {
+		text = hacw_claim_holland_tt
+		if = {
+			limit = { scope:holland = { OR = { has_variable = hacw_has_foreign_claimant has_variable = hacw_has_domestic_claimant } } }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1002 }
+		}
+		else = { scope:holland = { set_variable = hacw_has_foreign_claimant } }
+	}
+}
+scripted_effect hacw_ignore_claim_on_holland_throne = {
+	custom_tooltip = {
+		text = hacw_ignore_claim_on_holland_throne_tt
+		if = {	#If Holland already has a foreign claimant -> foreign claimer gets the throne peacefully
+			limit = { scope:holland = { OR = { has_variable = hacw_has_foreign_claimant has_variable = hacw_has_domestic_claimant } } }
+			set_variable = { name = hacw_gives_up_claim days = 1825 }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1003 }
+		}
+		else_if = {
+			limit = { scope:holland = { NOT = { has_variable = hacw_one_claimant_ignores_claim } } }
+			set_variable = { name = hacw_gives_up_claim days = 1825 }
+			scope:holland = { set_variable = { name = hacw_one_claimant_ignores_claim days = 365 } }
+		}
+		else = {	#Let Holland have a normal succession crisis instead
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1004 }
+		}
+	}
+}
+scripted_effect hacw_move_character_and_claim_holland = {
+	if = {
+		limit = { scope:holland = { has_variable = hacw_one_claimant_ignores_claim } }
+		scope:holland = {
+			set_variable = hacw_has_foreign_claimant
+			trigger_event_non_silently = hook_and_cod_wars.1003
+		}
+	}
+	else = {
+		hidden_effect = {
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = root } }
+				save_scope_as = hacw_contender_1_previous_owner
+			}
+			else = {
+				save_scope_as = hacw_contender_2_previous_owner
+			}
+		}
+		scope:hacw_claimant = {
+			move_country = scope:holland
+		}
+		custom_tooltip = {
+			text = hacw_claim_holland_tt
+			if = {
+				limit = { scope:holland = { OR = { has_variable = hacw_has_foreign_claimant has_variable = hacw_has_domestic_claimant } } }
+				scope:holland = { trigger_event_silently = hook_and_cod_wars.1005 }
+			}
+			else = { scope:holland = { set_variable = hacw_has_foreign_claimant } }
+		}
+	}
+}
+scripted_effect hacw_pre_setup_disaster = {
+	set_variable = { name = hacw_contender_variable_1 value = scope:hacw_contender_1 }
+	set_variable = { name = hacw_contender_owner_variable_1 value = scope:hacw_contender_1.owner }
+	set_variable = { name = hacw_contender_variable_2 value = scope:hacw_contender_2 }
+	set_variable = { name = hacw_contender_owner_variable_2 value = scope:hacw_contender_2.owner }
+	#For Localization
+	if = {
+		limit = { has_variable = hacw_contender_prev_owner_variable_1 }
+		var:hacw_contender_prev_owner_variable_1 = { save_scope_as = hacw_contender_1_origin_country }
+	}
+	else = { scope:hacw_contender_1 = { owner = { save_scope_as = hacw_contender_1_origin_country } } }
+	if = {
+		limit = { has_variable = hacw_contender_prev_owner_variable_2 }
+		var:hacw_contender_prev_owner_variable_2 = { save_scope_as = hacw_contender_2_origin_country }
+	}
+	else = { scope:hacw_contender_2 = { owner = { save_scope_as = hacw_contender_2_origin_country } } }
+}
+scripted_effect hacw_pre_setup_disaster_internal_focus = {
+	if = {
+		limit = { exists = scope:hacw_contender_1_previous_owner }
+		scope:hacw_contender_1_previous_owner = { save_scope_as = claimant_origin_country }
+		set_variable = { name = hacw_contender_prev_owner_variable_1 value = scope:hacw_contender_1_previous_owner }
+	}
+	if = {
+		limit = { exists = scope:hacw_contender_2_previous_owner }
+		scope:hacw_contender_2_previous_owner = { save_scope_as = claimant_origin_country }
+		set_variable = { name = hacw_contender_prev_owner_variable_2 value = scope:hacw_contender_2_previous_owner }
+	}
+	hacw_pre_setup_disaster = yes
+}
+scripted_effect hacw_clear_variables = {
+	destroy_variable = { variable = hacw_has_foreign_claimant }
+	destroy_variable = { variable = hacw_has_domestic_claimant }
+}
+
+#Event for Holland to setup the claimants - Is triggered on ruler death while being eligible for the Disaster
+hook_and_cod_wars.1000 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1000.title
+	desc = hook_and_cod_wars.1000.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	trigger = {
+		tag = HOL
+		NOT = { has_enabled_disaster_trigger = { type = hook_and_cod_wars } }
+		NOT = { had_disaster_trigger = { type = hook_and_cod_wars } }
+		government_type = government_type:monarchy
+		OR = {
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
+		}
+		has_regent = yes
+		exists = previous_ruler
+		trigger_if = {
+			limit = { has_heir = yes }
+			previous_ruler ?= {
+				has_dynasty = yes
+				dynasty ?= {
+					any_character_in_dynasty = {
+						is_alive = yes
+						is_adult = yes
+						has_estate = estate_type:nobles_estate
+					}
+				}
+			}
+		}
+		trigger_else = {
+			previous_ruler ?= {
+				has_dynasty = yes
+				dynasty ?= {
+					any_character_in_dynasty = {
+						is_alive = yes
+						is_adult = yes
+						has_estate = estate_type:nobles_estate
+						count >= 2
+					}
+				}
+			}
+		}
+	}
+	immediate = {
+		save_scope_as = holland
+		previous_ruler ?= {
+			dynasty = {
+				save_scope_as = hollands_dynasty
+			}
+		}
+		if = {
+			limit = { has_heir = yes }
+			heir = { save_scope_as = hacw_contender_1 }
+		}
+		else_if = {
+			limit = {
+				is_member_of_international_organization = international_organization:hre
+				international_organization:hre = {
+					leader_country = {
+						NOT = { in_union_with = ROOT }
+						any_character = {
+							is_alive = yes
+							is_adult = yes
+							has_estate = estate_type:nobles_estate
+							has_dynasty = yes
+							dynasty = scope:hollands_dynasty
+						}
+					}
+				}
+			}
+			international_organization:hre = {
+				leader_country = {
+					ordered_character = {
+						order_by = total_abilities
+						limit = {
+							is_alive = yes
+							is_adult = yes
+							has_estate = estate_type:nobles_estate
+							has_dynasty = yes
+							dynasty = scope:hollands_dynasty
+						}
+						max = 1
+						save_scope_as = hacw_contender_1
+						set_variable = { name = hacw_contender_1 value = yes }
+					}
+				}
+			}
+			set_variable = { name = hacw_chose_emperor_character value = yes }
+		}
+		else = {
+			scope:hollands_dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = total_abilities
+					limit = {
+						is_alive = yes
+						is_adult = yes
+						has_estate = estate_type:nobles_estate
+					}
+					max = 1
+					save_scope_as = hacw_contender_1
+					set_variable = { name = hacw_contender_1 value = yes }
+				}
+			}
+		}
+		if = {
+			limit = {
+				NOT = { has_variable = hacw_chose_emperor_character }
+				is_member_of_international_organization = international_organization:hre
+				international_organization:hre = {
+					leader_country = {
+						NOT = { in_union_with = ROOT }
+						any_character = {
+							is_alive = yes
+							is_adult = yes
+							has_estate = estate_type:nobles_estate
+							dynasty = scope:hollands_dynasty
+							NOT = { has_variable = hacw_contender_1 }
+							owner = {
+								NOT = { in_union_with = ROOT }
+							}
+						}
+					}
+				}
+			}
+			international_organization:hre = {
+				leader_country = {
+					ordered_character = {
+						order_by = total_abilities
+						limit = {
+							is_alive = yes
+							is_adult = yes
+							has_estate = estate_type:nobles_estate
+							dynasty = scope:hollands_dynasty
+							NOT = { has_variable = hacw_contender_1 }
+							owner = {
+								NOT = { in_union_with = ROOT }
+							}
+						}
+						max = 1
+						save_scope_as = hacw_contender_2
+					}
+				}
+			}
+		}
+		else = {
+			scope:hollands_dynasty = {
+				ordered_character_in_dynasty = {
+					order_by = total_abilities
+					limit = {
+						is_alive = yes
+						is_adult = yes
+						has_estate = estate_type:nobles_estate
+						NOT = { has_variable = hacw_contender_1 }
+						owner = {
+							NOT = { in_union_with = ROOT }
+						}
+					}
+					max = 1
+					save_scope_as = hacw_contender_2
+				}
+			}
+		}
+		if = {
+			limit = { exists = scope:hacw_contender_1 scope:hacw_contender_1 = { has_variable = hacw_contender_1 } }
+			scope:hacw_contender_1 = { remove_variable = hacw_contender_1 }
+		}
+		remove_variable = hacw_chose_emperor_character
+		previous_ruler ?= {
+			save_scope_as = holland_previous_ruler
+		}
+	}
+	#Let us hope for the best...
+	option = {
+		name = hook_and_cod_wars.1000.a
+		hidden_effect = {
+			random_owned_location = {
+				save_scope_as = old_ruler	#this is the only way to get rid of the old_ruler portrait in the followup events.. yes, it's dumb
+			}
+		}
+		if = {
+			limit = {
+				exists = scope:hacw_contender_1
+				exists = scope:hacw_contender_2
+			}
+			#If both claimants are owned by the same country
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = { NOT = { this = root } scope:hacw_contender_2 = { owner = prev } } } }
+				scope:hacw_contender_1 = { owner = { trigger_event_silently = hook_and_cod_wars.1006 } }
+			}
+			#If hacw_contender_1 OR hacw_contender_2 is in Holland
+			if = {
+				limit = {
+					OR = {
+						scope:hacw_contender_1 = { owner = { this = root NOT = { scope:hacw_contender_2 = { owner = prev } } } }
+						scope:hacw_contender_2 = { owner = { this = root NOT = { scope:hacw_contender_1 = { owner = prev } } } }
+					}
+				}
+				if = {
+					limit = { scope:hacw_contender_1 = { owner = { this = root NOT = { scope:hacw_contender_2 = { owner = prev } } } } }
+					scope:hacw_contender_1 = { save_scope_as = hacw_domestic_claimant }
+					scope:hacw_contender_2 = { save_scope_as = hacw_foreign_claimant owner = { save_scope_as = hacw_foreign_country_origin } }
+				}
+				else = {
+					scope:hacw_contender_2 = { save_scope_as = hacw_domestic_claimant }
+					scope:hacw_contender_1 = { save_scope_as = hacw_foreign_claimant owner = { save_scope_as = hacw_foreign_country_origin } }
+				}
+				set_variable = { name = hacw_has_domestic_claimant value = yes }
+			}
+			#If hacw_contender_1 AND hacw_contender_2 are in Holland
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = { this = root scope:hacw_contender_2 = { owner = prev } } } }
+				trigger_event_silently = hook_and_cod_wars.1008
+			}
+			#If hacw_contender_1 is foreign
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = { NOT = { this = root } scope:hacw_contender_2 = { NOT = { owner = prev } } } } }
+				scope:hacw_contender_1 = { owner = { set_variable = { name = owns_hacw_contender_1 days = 1825 } trigger_event_silently = hook_and_cod_wars.1001 } }
+			}
+			#If hacw_contender_2 is foreign
+			if = {
+				limit = { scope:hacw_contender_2 = { owner = { NOT = { this = root } scope:hacw_contender_1 = { NOT = { owner = prev } } } } }
+				scope:hacw_contender_2 = { owner = { set_variable = { name = owns_hacw_contender_2 days = 1825 } trigger_event_silently = hook_and_cod_wars.1001 } }
+			}
+		}
+	}
+}
+#The Claims of hacw_contender_1/2
+hook_and_cod_wars.1001 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1001.title
+	desc = hook_and_cod_wars.1001.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		if = {
+			limit = { has_variable = owns_hacw_contender_1 }
+			scope:hacw_contender_1 = { save_scope_as = hacw_claimant }
+		}
+		else_if = {
+			limit = { has_variable = owns_hacw_contender_2 }
+			scope:hacw_contender_2 = { save_scope_as = hacw_claimant }
+		}
+	}
+
+	# If character in question is a ruler
+	#I will rule over Holland, or see it burn to ash around me
+	option = {
+		name = hook_and_cod_wars.1001.a
+		trigger = { hidden_trigger = { scope:hacw_claimant = { OR = { is_ruler = yes is_regent = yes } } } }
+		hacw_set_claim_on_holland_throne = yes
+		historical_option = yes
+	}
+	#I have no interests in these affairs
+	option = {
+		name = hook_and_cod_wars.1001.b
+		trigger = { hidden_trigger = { scope:hacw_claimant = { OR = { is_ruler = yes is_regent = yes } } } }
+		hacw_ignore_claim_on_holland_throne = yes
+	}
+
+	# If character in question is the heir
+	#We shall support the claims of our heir
+	option = {
+		name = hook_and_cod_wars.1001.c
+		trigger = { hidden_trigger = { scope:hacw_claimant = { is_heir = yes } } }
+		hacw_set_claim_on_holland_throne = yes
+		historical_option = yes
+	}
+	#This is none of our business
+	option = {
+		name = hook_and_cod_wars.1001.d
+		trigger = { hidden_trigger = { scope:hacw_claimant = { is_heir = yes } } }
+		hacw_ignore_claim_on_holland_throne = yes
+	}
+
+	# If character in question is just some guy of your court
+	#We shall support the ambitions of the contender
+	option = {
+		name = hook_and_cod_wars.1001.e
+		trigger = { hidden_trigger = { scope:hacw_claimant = { is_ruler = no is_heir = no is_regent = no } } }
+		hacw_move_character_and_claim_holland = yes
+		historical_option = yes
+	}
+	#We cannot allow them to leave the court
+	option = {
+		name = hook_and_cod_wars.1001.f
+		trigger = { hidden_trigger = { scope:hacw_claimant = { is_ruler = no is_heir = no is_regent = no } } }
+		hacw_ignore_claim_on_holland_throne = yes
+	}
+}
+#The Claimants of Holland
+hook_and_cod_wars.1002 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1002.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_has_domestic_claimant }
+				desc = hook_and_cod_wars.1002.desc.domestic
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_has_foreign_claimant }
+				desc = hook_and_cod_wars.1002.desc.foreign
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1002.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		hacw_pre_setup_disaster = yes
+		set_variable = {
+			name = hacw_completely_international
+			value = yes
+		}
+	}
+	#Brace yourself for a long conflict...
+	option = {
+		name = hook_and_cod_wars.1002.a
+		enable_disaster_effect = { type = hook_and_cod_wars }
+	}
+	after = { hacw_clear_variables = yes }
+}
+#The Claimer country ignores Holland
+hook_and_cod_wars.1003 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1003.title
+	desc = hook_and_cod_wars.1003.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	#We narrowly avoided a disaster in our history.
+	immediate = {
+		if = {
+			limit = { has_variable = hacw_has_foreign_claimant }
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = { has_variable = hacw_gives_up_claim } } }
+				scope:hacw_contender_1 = { owner = { remove_variable = hacw_gives_up_claim } }
+				scope:hacw_contender_2 = { save_scope_as = holland_new_ruler }
+			}
+			if = {
+				limit = { scope:hacw_contender_2 = { owner = { has_variable = hacw_gives_up_claim } } }
+				scope:hacw_contender_2 = { owner = { remove_variable = hacw_gives_up_claim } }
+				scope:hacw_contender_1 = { save_scope_as = holland_new_ruler }
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:hacw_contender_1 = { owner = root } }
+				scope:hacw_contender_1 = { save_scope_as = holland_new_ruler }
+			}
+			else = {
+				scope:hacw_contender_2 = { save_scope_as = holland_new_ruler }
+			}
+		}
+	}
+	option = {
+		name = hook_and_cod_wars.1003.a
+		if = {
+			limit = { scope:holland_new_ruler = { is_heir = yes } }
+			add_legitimacy = legitimacy_ultimate_bonus
+		}
+		else = {
+			set_new_ruler = scope:holland_new_ruler
+			add_legitimacy = legitimacy_mild_bonus
+		}
+	}
+	after = { hacw_clear_variables = yes }
+}
+#The succession of Holland remains uncertain...
+hook_and_cod_wars.1004 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1004.title
+	desc = hook_and_cod_wars.1004.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	
+	#These are not good news...
+	option = {
+		name = hook_and_cod_wars.1004.a
+		custom_tooltip = {
+			text = hook_and_cod_wars.1004.a.tt
+			remove_variable = hacw_one_claimant_ignores_claim
+			set_variable = {
+				name = hol_trigger_sc_instead_of_hacw
+				value = yes
+			}
+		}
+	}
+}
+#The Claimants of Holland - Claimants moved to Holland to wage chaos
+hook_and_cod_wars.1005 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1005.title
+	desc = hook_and_cod_wars.1005.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		hacw_pre_setup_disaster_internal_focus = yes
+		set_variable = {
+			name = hacw_semi_international
+			value = yes
+		}
+	}
+	#Brace yourself for a long conflict...
+	option = {
+		name = hook_and_cod_wars.1005.a
+		enable_disaster_effect = { type = hook_and_cod_wars }
+	}
+	after = { hacw_clear_variables = yes }
+}
+#The claims of hacw_contender_1 AND hacw_contender_2
+hook_and_cod_wars.1006 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1006.title
+	desc = hook_and_cod_wars.1006.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = { save_scope_as = from_country }
+	#Give up claims on Holland
+	option = {
+		name = hook_and_cod_wars.1006.a
+		scope:hacw_contender_1 = {
+			save_scope_as = holland_new_ruler
+			if = {
+				limit = {
+					is_ruler = no
+					is_heir = no
+				}
+				move_country = scope:holland
+			}
+		}
+		scope:holland = { trigger_event_silently = hook_and_cod_wars.1007 }
+		show_as_tooltip = {
+			add_opinion = { modifier = opinion_hol_our_placed_ruler target = scope:holland }
+			reverse_add_opinion = { modifier = opinion_hol_our_origin_country target = scope:holland }
+		}
+	}
+	#Give up claims on Holland
+	option = {
+		name = hook_and_cod_wars.1006.b
+		scope:hacw_contender_2 = {
+			save_scope_as = holland_new_ruler
+			if = {
+				limit = {
+					is_ruler = no
+					is_heir = no
+				}
+				move_country = scope:holland
+			}
+		}
+		scope:holland = { trigger_event_silently = hook_and_cod_wars.1007 }
+		show_as_tooltip = {
+			add_opinion = { modifier = opinion_hol_our_placed_ruler target = scope:holland }
+			reverse_add_opinion = { modifier = opinion_hol_our_origin_country target = scope:holland }
+		}
+	}
+	#Give up claims on Holland
+	option = {
+		name = hook_and_cod_wars.1006.c
+		scope:holland = { trigger_event_silently = hook_and_cod_wars.1004 }
+	}
+}
+#A New Ruler Arrives
+hook_and_cod_wars.1007 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1007.title
+	desc = hook_and_cod_wars.1007.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	#Long live our new ruler
+	option = {
+		name = hook_and_cod_wars.1007
+		set_new_ruler = scope:holland_new_ruler
+		add_legitimacy = legitimacy_mild_bonus
+		reverse_add_opinion = { modifier = opinion_hol_our_placed_ruler target = scope:from_country }
+		add_opinion = { modifier = opinion_hol_our_origin_country target = scope:from_country }
+	}
+}
+#The Succession Crisis of Holland
+hook_and_cod_wars.1008 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1008.title
+	desc = hook_and_cod_wars.1008.desc
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		hacw_pre_setup_disaster = yes
+		set_variable = {
+			name = hacw_completely_internal
+			value = yes
+		}
+	}
+	#Brace yourself for a long conflict...
+	option = {
+		name = hook_and_cod_wars.1008.a
+		enable_disaster_effect = { type = hook_and_cod_wars }
+	}
+}
+
+#############################################################################
+# Actual disaster events													#
+# Those fire at the start, during and at the end							#
+# They will constantly refer to the following variables						#
+# which are all setup in the previously defined events						#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# These are all the variables relevant for the pre-disaster stuff ONLY		#
+# hacw_contender_variable_1 = the first claimer / heir						#
+# hacw_contender_owner_variable_1 = owner of prev. var.						#
+# hacw_contender_variable_2 = the second claimer							#
+# hacw_contender_owner_variable_2 = owner of prev. var.						#
+# hacw_contender_prev_owner_variable_1 = used only when semi_international	#
+# hacw_contender_prev_owner_variable_2 = used only when semi_international	#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# hacw_completely_international -> one or both chars outside Holland		#
+# hacw_semi_international -> all chars in Holland, but foreigin originally	#
+# hacw_completely_internal -> all chars in Holland							#
+# hacw_sided_with_hook -> Holland favors the Hook							#
+# hacw_sided_with_cod -> Holland favors the Cod								#
+# hacw_hook_contender = the character representing the hooks				#
+# hacw_cod_contender = the character representing the cods					#
+# hacw_hook_contender_prev_owner = the country representing the hooks		#
+# hacw_cod_contender_prev_owner = the country representing the cods		#
+# hacw_allegience_to_hook -> the claimer is part of the hook faction		#
+# hacw_allegience_to_cod -> the claimer is part of the cod faction			#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Additional Lists:															#
+# hacw_hook_list = countries which support the hook faction					#
+# hacw_cod_list = countries which support the cod faction					#
+#############################################################################
+
+scripted_effect hacw_setup_contender_effect = {
+	if = {
+		limit = { $character$ = { owner = root } }
+		$character$ = {
+			custom_tooltip = {
+				text = hacw_allegience_to_$faction$_tt
+				set_variable = { name = hacw_allegience_to_$faction$ value = yes }
+			}
+		}
+		set_variable = {
+			name = hacw_$faction$_contender
+			value = $character$
+		}
+		hidden_effect = {
+			if = {
+				limit = { has_variable = hacw_sided_with_$faction$ }
+				$character$ = { add_character_modifier = { modifier = hacw_supported_character years = -1 mode = add_and_extend } }
+			}
+			else = {
+				$character$ = { add_character_modifier = { modifier = hacw_opposing_character years = -1 mode = add_and_extend } }
+				if = { limit = { has_variable = hacw_sided_with_hook } change_character_allegiance = scope:hacw_cod_faction }
+				else = { change_character_allegiance = scope:hacw_hook_faction }
+			}
+			if = {
+				limit = {
+					has_variable = hacw_contender_prev_owner_variable_1
+					var:hacw_contender_variable_1 = $character$
+				}
+				if = {
+					limit = { $character$ = { has_variable = hacw_allegience_to_hook } }
+					add_to_global_variable_list = { name = hacw_hook_list target = var:hacw_contender_prev_owner_variable_1 }
+				}
+				else = {
+					add_to_global_variable_list = { name = hacw_cod_list target = var:hacw_contender_prev_owner_variable_1 }
+				}
+				set_variable = {
+					name = hacw_$faction$_contender_prev_owner
+					value = root.var:hacw_contender_prev_owner_variable_1
+				}
+			}
+			if = {
+				limit = {
+					has_variable = hacw_contender_prev_owner_variable_2
+					var:hacw_contender_variable_2 = $character$
+				}
+				if = {
+					limit = { $character$ = { has_variable = hacw_allegience_to_hook } }
+					add_to_global_variable_list = { name = hacw_hook_list target = var:hacw_contender_prev_owner_variable_2 }
+				}
+				else = {
+					add_to_global_variable_list = { name = hacw_cod_list target = var:hacw_contender_prev_owner_variable_2 }
+				}
+				set_variable = {
+					name = hacw_$faction$_contender_prev_owner
+					value = root.var:hacw_contender_prev_owner_variable_2
+				}
+			}
+			if = {
+				limit = {
+					has_variable = hacw_$faction$_contender_prev_owner
+					NOT = { var:hacw_$faction$_contender_prev_owner = root }
+				}
+				var:hacw_$faction$_contender_prev_owner = {
+					set_variable = { name = hacw_preferred_faction_$faction$ value = yes days = 3650 }	#10 years because cleaning that variable afterwards might become rather problematic
+					trigger_event_silently = hook_and_cod_wars.1101
+				}
+			}
+		}
+	}
+	else = {
+		$character$ = {
+			owner = {
+				set_variable = { name = hacw_preferred_faction_$faction$ value = yes days = 3650 }	#10 years because cleaning that variable afterwards might become rather problematic
+				trigger_event_silently = hook_and_cod_wars.1101
+			}
+		}
+		add_to_global_variable_list = { name = hacw_$faction$_list target = $character$.owner}
+	}
+}
+scripted_effect hacw_side_with_faction_effect_hook = {
+	add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
+	add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_severe_penalty }
+	custom_tooltip = {
+		text = hook_and_cod_wars.1100.gain_burghers_loyalty
+		ordered_in_list = {
+			list = hacw_nobles_location_list
+			order_by = population
+			max = 4
+			every_pop = {
+				limit = {
+					owner = root
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:hacw_cod_faction
+			}
+		}
+		every_in_list = {
+			list = hacw_burghers_location_list
+			every_pop = {
+				limit = {
+					owner = root
+				}
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+		}
+		destroy_rebel = scope:hacw_hook_faction
+		set_variable = { name = hook_and_cod_wars_pretender_variable value = scope:hacw_cod_faction }
+	}
+	hacw_setup_contender_effect = { faction = hook character = $pretender_1$ }
+	hacw_setup_contender_effect = { faction = cod character = $pretender_2$ }
+}
+scripted_effect hacw_side_with_faction_effect_cod = {
+	add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_bonus }
+	add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_penalty }
+	custom_tooltip = {
+		text = hook_and_cod_wars.1100.gain_nobles_loyalty
+		ordered_in_list = {
+			list = hacw_burghers_location_list
+			order_by = population
+			max = 4
+			check_range_bounds = no
+			every_pop = {
+				limit = {
+					owner = root
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:hacw_hook_faction
+			}
+		}
+		every_in_list = {
+			list = hacw_nobles_location_list
+			every_pop = {
+				limit = {
+					owner = root
+				}
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
+			}
+		}
+		destroy_rebel = scope:hacw_cod_faction
+		set_variable = { name = hook_and_cod_wars_pretender_variable value = scope:hacw_hook_faction }
+	}
+	hacw_setup_contender_effect = { faction = cod character = $pretender_1$ }
+	hacw_setup_contender_effect = { faction = hook character = $pretender_2$ }
+}
+scripted_effect hacw_side_with_faction_effect = {
+	add_stability = stability_extreme_penalty
+	custom_tooltip = {
+		text = hook_and_cod_wars.1100.$faction$.tt
+		set_variable = { name = hacw_sided_with_$faction$ value = yes }
+		add_to_global_variable_list = { name = hacw_$faction$_list target = this }
+	}
+	hacw_change_faction_score_dynamic_coloring = {
+		faction = $faction$
+		math = add
+		value = 1
+	}
+	hacw_side_with_faction_effect_$faction$ = { pretender_1 = $faction_supporter$ pretender_2 = $faction_opponent$ }
+}
+scripted_effect hacw_end_disaster_effect = {
+	remove_variable = hacw_$faction$_faction_power
+	remove_variable = hacw_sided_with_$faction$
+	clear_global_variable_list = hacw_$faction$_list
+	remove_variable = hacw_completely_international
+	remove_variable = hacw_semi_international
+	remove_variable = hacw_completely_internal
+	remove_variable = hacw_$faction$_faction
+	remove_variable = hacw_$faction$_contender
+	remove_variable = hacw_$faction$_contender_prev_owner
+	ruler ?= {
+		if = {
+			limit = { has_variable = hacw_allegience_to_$faction$ }
+			remove_variable = hacw_allegience_to_$faction$
+		}
+	}
+}
+scripted_effect hacw_effect_based_on_supported_side = {
+	if = {
+		limit = { has_variable = hacw_sided_with_$faction$ }
+		$support_effect$
+	}
+	else = {
+		$opponent_effect$
+	}
+}
+scripted_effect hacw_set_ruler = {
+	if = {
+		limit = { exists = $ruler$ }
+		$ruler$ = {
+			if = {
+				limit = { has_character_modifier = hacw_supported_character }
+				remove_character_modifier = hacw_supported_character
+			}
+			if = {
+				limit = { has_character_modifier = hacw_opposing_character }
+				remove_character_modifier = hacw_opposing_character
+			}
+		}
+		if = {
+			limit = {
+				has_ruler = no
+				exists = regent
+				regent = $ruler$
+			}
+			make_regent_to_ruler = yes
+		}
+		else_if = {
+			limit = {
+				NOT = { ruler ?= $ruler$ }
+				$ruler$ = { is_adult = yes }
+			}
+			set_new_ruler = $ruler$
+		}
+		if = {
+			limit = { $ruler$ = { has_variable = hacw_allegience_to_cod } }
+			$ruler$ = { remove_variable = hacw_allegience_to_cod }
+			if = {
+				limit = { has_variable = hacw_sided_with_cod }
+				add_stability = stability_extreme_bonus
+				add_legitimacy = legitimacy_extreme_bonus
+				$ruler$ = { add_character_modifier = { modifier = hacw_rightful_ruler years = -1 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_bonus }
+				add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+			}
+			else = {
+				add_stability = stability_extreme_bonus
+				add_legitimacy = legitimacy_severe_penalty
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_penalty }
+				add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_bonus }
+			}
+		}
+		else_if = {
+			limit = { $ruler$ = { has_variable = hacw_allegience_to_hook } }
+			$ruler$ = { remove_variable = hacw_allegience_to_hook }
+			if = {
+				limit = { has_variable = hacw_sided_with_hook }
+				add_stability = stability_extreme_bonus
+				add_legitimacy = legitimacy_extreme_bonus
+				$ruler$ = { add_character_modifier = { modifier = hacw_rightful_ruler years = -1 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_severe_bonus }
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_penalty }
+			}
+			else = {
+				add_stability = stability_extreme_bonus
+				add_legitimacy = legitimacy_severe_penalty
+				add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_severe_penalty }
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
+			}
+		}
+	}
+}
+scripted_effect hacw_join_faction_effect = {
+	set_variable = { name = hacw_preferred_faction_$faction$ value = yes days = 3650 }	#10 years because cleaning that variable afterwards might become rather problematic
+	add_to_global_variable_list = { name = hacw_$faction$_list target = this }
+}
+
+scripted_trigger hacw_character_and_country_same_allegiance = {
+	OR = {
+		AND = {
+			$character$ = { has_variable = hacw_allegience_to_hook }
+			$country$ = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+		}
+		AND = {
+			$character$ = { has_variable = hacw_allegience_to_cod }
+			$country$ = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+		}
+	}
+}
+
+#Disaster start
+hook_and_cod_wars.1100 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1100.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_completely_international }
+				desc = hook_and_cod_wars.1100.desc.completely_international
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_semi_international }
+				desc = hook_and_cod_wars.1100.desc.semi_international
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_completely_internal }
+				desc = hook_and_cod_wars.1100.desc.completely_internal
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1100.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/hook_and_cod_wars.dds"
+	immediate = {
+		every_owned_location = {
+			limit = {
+				population_with_traits = {
+					limit = {
+						pop_type = pop_type:burghers
+					}
+					value < {
+						value = population
+						multiply = 0.2
+					}
+				}
+				NOT = { location_rank = location_rank:town }
+				NOT = { location_rank = location_rank:city }
+			}
+			add_to_list = hacw_nobles_location_list
+		}
+		every_owned_location = {
+			limit = {
+				OR = {
+					location_rank = location_rank:town
+					location_rank = location_rank:city
+				}
+				population_with_traits = {
+					limit = {
+						pop_type = pop_type:burghers
+					}
+					value >= {
+						value = population
+						multiply = 0.2
+					}
+				}
+			}
+			add_to_list = hacw_burghers_location_list
+		}
+		create_rebel = { category = pretender name = hacw_hook_faction save_scope_as = hacw_hook_faction }
+		create_rebel = { category = pretender name = hacw_cod_faction save_scope_as = hacw_cod_faction }
+		set_variable = { name = hacw_hook_faction value = scope:hacw_hook_faction }
+		set_variable = { name = hacw_cod_faction value = scope:hacw_cod_faction }
+		set_variable = { name = hacw_hook_faction_power value = 0 }
+		set_variable = { name = hacw_cod_faction_power value = 0 }
+		save_scope_as = holland
+		var:hacw_contender_variable_1 = { save_scope_as = hacw_contender_1 }
+		var:hacw_contender_variable_2 = { save_scope_as = hacw_contender_2 }
+		if = {	#Just localization stuff
+			limit = { has_variable = hacw_semi_international }
+			if = {
+				limit = { has_variable = hacw_contender_prev_owner_variable_1 }
+				var:hacw_contender_prev_owner_variable_1 = { save_scope_as = semi_foreign_country_scope }
+				scope:hacw_contender_1 = { save_scope_as = foreign_pretender }
+				scope:hacw_contender_2 = { save_scope_as = own_pretender }
+			}
+			else = {
+				var:hacw_contender_prev_owner_variable_2 = { save_scope_as = semi_foreign_country_scope }
+				scope:hacw_contender_2 = { save_scope_as = foreign_pretender }
+				scope:hacw_contender_1 = { save_scope_as = own_pretender }
+			}
+		}
+	}
+	#Side with the Hooks
+	option = {
+		name = hook_and_cod_wars.1100.a
+		hacw_side_with_faction_effect = {
+			faction = hook
+			faction_supporter = var:hacw_contender_variable_1
+			faction_opponent = var:hacw_contender_variable_2
+		}
+	}
+	#Side with the Cods
+	option = {
+		name = hook_and_cod_wars.1100.b
+		hacw_side_with_faction_effect = {
+			faction = cod
+			faction_supporter = var:hacw_contender_variable_2
+			faction_opponent = var:hacw_contender_variable_1
+		}
+	}
+}
+#The Hook and Cod conflict of Holland
+hook_and_cod_wars.1101 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1101.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_preferred_faction_hook }
+				desc = hook_and_cod_wars.1101.desc.hook
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_preferred_faction_cod }
+				desc = hook_and_cod_wars.1101.desc.cod
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1101.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	immediate = {
+		if = {
+			limit = { scope:holland = { var:hacw_contender_owner_variable_1 = root } }
+			scope:holland = { var:hacw_contender_variable_1 = { save_scope_as = our_claimant_character } }
+		}
+		else_if = {
+			limit = { scope:holland = { var:hacw_contender_owner_variable_2 = root } }
+			scope:holland = { var:hacw_contender_variable_2 = { save_scope_as = our_claimant_character } }
+		}
+		save_scope_as = supporter_country
+	}
+	#Support our Claimant
+	option = {
+		name = hook_and_cod_wars.1101.a
+		trigger = { exists = scope:our_claimant_character }
+		change_gold_effect = { scale = -12 }
+		show_as_tooltip = {
+			switch = {
+				trigger = has_variable
+				hacw_preferred_faction_hook = {
+					scope:holland = {
+						hacw_change_faction_score_dynamic_coloring = {
+							faction = hook
+							math = add
+							value = 2
+						}
+						hacw_effect_based_on_supported_side = {
+							faction = hook
+							support_effect = "change_gold_effect = { scale = 12 }"
+							opponent_effect = "root = { support_rebel = var:hook_and_cod_wars_pretender_variable }"
+						}
+					}
+				}
+				hacw_preferred_faction_cod = {
+					scope:holland = {
+						hacw_change_faction_score_dynamic_coloring = {
+							faction = cod
+							math = add
+							value = 2
+						}
+						hacw_effect_based_on_supported_side = {
+							faction = cod
+							support_effect = "change_gold_effect = { scale = 12 }"
+							opponent_effect = "root = { support_rebel = var:hook_and_cod_wars_pretender_variable }"
+						}
+					}
+				}
+			}
+		}
+		scope:holland = { trigger_event_silently = hook_and_cod_wars.1102 }
+	}
+	#Sit back and observe
+	option = {
+		name = hook_and_cod_wars.1101.b
+	}
+}
+#The Claimant Country sends its regard
+hook_and_cod_wars.1102 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1102.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					has_variable = hacw_sided_with_hook
+					scope:supporter_country = { has_variable = hacw_preferred_faction_hook }
+				}
+				desc = hook_and_cod_wars.1102.desc.hook.support
+			}
+			triggered_desc = {
+				trigger = {
+					has_variable = hacw_sided_with_hook
+					scope:supporter_country = { has_variable = hacw_preferred_faction_cod }
+				}
+				desc = hook_and_cod_wars.1102.desc.hook.sabotage
+			}
+			triggered_desc = {
+				trigger = {
+					has_variable = hacw_sided_with_cod
+					scope:supporter_country = { has_variable = hacw_preferred_faction_cod }
+				}
+				desc = hook_and_cod_wars.1102.desc.cod.support
+			}
+			triggered_desc = {
+				trigger = {
+					has_variable = hacw_sided_with_cod
+					scope:supporter_country = { has_variable = hacw_preferred_faction_hook }
+				}
+				desc = hook_and_cod_wars.1102.desc.cod.sabotage
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.1102.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+
+	option = {
+		name = hook_and_cod_wars.1102.a
+		scope:supporter_country = {
+			switch = {
+				trigger = has_variable
+				hacw_preferred_faction_hook = {
+					scope:holland = {
+						hacw_change_faction_score_dynamic_coloring = {
+							faction = hook
+							math = add
+							value = 2
+						}
+						hacw_effect_based_on_supported_side = {
+							faction = hook
+							support_effect = "add_gold = { value = scope:supporter_country.monthly_income_trade_and_tax multiply = 12 }"
+							opponent_effect = "scope:supporter_country = { support_rebel = var:hook_and_cod_wars_pretender_variable }"
+						}
+					}
+				}
+				hacw_preferred_faction_cod = {
+					scope:holland = {
+						hacw_change_faction_score_dynamic_coloring = {
+							faction = cod
+							math = add
+							value = 2
+						}
+						hacw_effect_based_on_supported_side = {
+							faction = cod
+							support_effect = "add_gold = { value = scope:supporter_country.monthly_income_trade_and_tax multiply = 12 }"
+							opponent_effect = "scope:supporter_country = { support_rebel = var:hook_and_cod_wars_pretender_variable }"
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#Hook and Cod Wars - A Claimant dies
+hook_and_cod_wars.1200 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1200.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = hacw_uncontested_ruler }
+				desc = hook_and_cod_wars.1200.desc
+			}
+			triggered_desc = {
+				trigger = { has_variable = hacw_the_impossible_has_happened }
+				desc = hook_and_cod_wars.1200.desc.hacw_the_impossible_has_happened
+			}
+			triggered_desc = {
+				trigger = {	has_variable = hook_claimant_ally_alive }
+				desc = hook_and_cod_wars.1200.desc.hook.ally
+			}
+			triggered_desc = {
+				trigger = {	has_variable = hook_claimant_enemy_alive }
+				desc = hook_and_cod_wars.1200.desc.hook.enemy
+			}
+			triggered_desc = {
+				trigger = {	has_variable = cod_claimant_enemy_alive }
+				desc = hook_and_cod_wars.1200.desc.cod.enemy
+			}
+			triggered_desc = {
+				trigger = {	has_variable = cod_claimant_ally_alive }
+				desc = hook_and_cod_wars.1200.desc.cod.ally
+			}
+			triggered_desc = {
+				trigger = {	always = yes }
+				desc = hook_and_cod_wars.1200.desc
+			}
+		}
+	}
+	trigger = {
+		any_active_disaster = { disaster_type = disaster_type:hook_and_cod_wars }
+		OR = {
+			AND = {
+				has_variable = hacw_hook_contender
+				var:hacw_hook_contender = { is_alive = no }
+			}
+			AND = {
+				has_variable = hacw_cod_contender
+				var:hacw_cod_contender = { is_alive = no }
+			}
+		}
+	}
+	immediate = {
+		if = {
+			limit = { has_ruler = yes }
+			set_variable = hacw_uncontested_ruler
+		}
+		if = {
+			limit = {
+				has_variable = hacw_hook_contender
+				var:hacw_hook_contender = { is_alive = no }
+				var:hacw_cod_contender = { is_alive = yes }
+			}
+			var:hacw_hook_contender = { save_scope_as = dead_claimant }
+			if = {
+				limit = { has_variable = hacw_semi_international has_variable = hacw_hook_contender_prev_owner }
+				var:hacw_hook_contender_prev_owner = { save_scope_as = dead_claimant_country }
+			}
+			else = {
+				var:hacw_hook_contender = { owner = { save_scope_as = dead_claimant_country } }
+			}
+			var:hacw_cod_contender = { save_scope_as = alive_claimant }
+		}
+		else_if = {
+			limit = {
+				has_variable = hacw_hook_contender
+				var:hacw_hook_contender = { is_alive = yes }
+				var:hacw_cod_contender = { is_alive = no }
+			}
+			var:hacw_cod_contender = { save_scope_as = dead_claimant }
+			if = {
+				limit = { has_variable = hacw_semi_international has_variable = hacw_cod_contender_prev_owner }
+				var:hacw_cod_contender_prev_owner = { save_scope_as = dead_claimant_country }
+			}
+			else = {
+				var:hacw_cod_contender = { owner = { save_scope_as = dead_claimant_country } }
+			}
+			var:hacw_hook_contender = { save_scope_as = alive_claimant }
+		}
+		else = {
+			set_variable = { name = hacw_the_impossible_has_happened value = yes }
+			var:hacw_hook_contender = { save_scope_as = hacw_contender_1 }
+			var:hacw_cod_contender = { save_scope_as = hacw_contender_2 }
+			ruler ?= { save_scope_as = alive_claimant }	#Fallback
+		}
+		save_scope_as = holland
+		scope:dead_claimant = {
+			dynasty = {
+				save_scope_as = claimant_dynasty
+			}
+		}
+		if = {
+			limit = { NOT = { has_variable = hacw_the_impossible_has_happened } }
+			if = {
+				limit = { scope:alive_claimant = { has_variable = hacw_allegience_to_hook } }
+				if = {
+					limit = { has_variable = hacw_sided_with_hook }
+					set_variable = { name = hook_claimant_ally_alive value = yes }
+				}
+				else = { set_variable = { name = hook_claimant_enemy_alive value = yes } }
+			}
+			else = {
+				if = {
+					limit = { has_variable = hacw_sided_with_hook }
+					set_variable = { name = cod_claimant_enemy_alive value = yes }
+				}
+				else = { set_variable = { name = cod_claimant_ally_alive value = yes } }
+			}
+		}
+		if = {	#The current ruler has the highest legitimacy as he is the de jure and de facto ruler (sorry heirs, you are irrelevant)
+			limit = { has_ruler = yes }
+			ruler ?= { save_scope_as = new_claimant_character }
+		}
+		else_if = {	#Next comes the member of the dynasty
+			limit = { scope:dead_claimant_country = { this = root } }
+			if = {
+				limit = {
+					any_character = {
+						is_adult = yes
+						is_alive = yes
+						OR = {
+							any_parent = { dynasty = scope:claimant_dynasty }
+							dynasty = scope:claimant_dynasty
+						}
+						NOT = { has_character_modifier = hacw_supported_character }
+						NOT = { has_character_modifier = hacw_opposing_character }
+					}
+				}
+				ordered_character = {
+					order_by = total_abilities
+					limit = {
+						is_adult = yes
+						is_alive = yes
+						OR = {
+							any_parent = { dynasty = scope:claimant_dynasty }
+							dynasty = scope:claimant_dynasty
+						}
+						NOT = { has_character_modifier = hacw_supported_character }
+						NOT = { has_character_modifier = hacw_opposing_character }
+					}
+					max = 1
+					save_scope_as = new_claimant_character
+				}
+			}
+			else = {
+				scope:claimant_dynasty = {
+					ordered_character_in_dynasty = {
+						order_by = total_abilities
+						limit = {
+							is_adult = yes
+							is_alive = yes
+							NOT = { has_character_modifier = hacw_supported_character }
+							NOT = { has_character_modifier = hacw_opposing_character }
+							owner = {
+								NOT = { this = scope:holland }
+								OR = {
+									AND = {
+										root = { has_variable = hook_claimant_enemy_alive }
+										NOT = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+										is_target_in_global_variable_list = { name = hacw_cod_list target = this }
+									}
+									AND = {
+										root = { has_variable = cod_claimant_enemy_alive }
+										NOT = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+										is_target_in_global_variable_list = { name = hacw_hook_list target = this }
+									}
+								}
+							}
+						}
+						max = 1
+						save_scope_as = new_claimant_character
+					}
+				}
+			}
+		}
+		else_if = {	#Then comes the current regent who is only de facto ruler
+			limit = {
+				has_regent = yes
+			}
+			regent ?= {
+				save_scope_as = new_claimant_character
+			}
+		}
+	}
+	after = {
+		destroy_variable = { variable = hacw_the_impossible_has_happened }
+		destroy_variable = { variable = hacw_uncontested_ruler }
+	}
+	#Find a new claimant for our faction!
+	option = {
+		name = hook_and_cod_wars.1200.a
+		trigger = {
+			hidden_trigger = {
+				NOT = { has_variable = hacw_the_impossible_has_happened }
+				NOT = { has_variable = hacw_uncontested_ruler }
+			}
+			scope:dead_claimant_country = { this = root } 
+			exists = scope:new_claimant_character 
+			NOT = { any_character = { has_character_modifier = hacw_supported_character } }	#we already have a good claimant
+		}
+		custom_tooltip = {
+			text = hook_and_cod_wars.1200.a.tt
+			if = {
+				limit = { var:hacw_hook_contender = { is_alive = no } }
+				set_variable = { name = hacw_contender_variable_1 value = scope:new_claimant_character }	#done for consistency in the gui
+				scope:new_claimant_character = { set_variable = { name = hacw_allegience_to_hook value = yes } }
+				set_variable = { name = hacw_hook_contender value = scope:new_claimant_character }
+			}
+			else = {
+				set_variable = { name = hacw_contender_variable_2 value = scope:new_claimant_character }	#done for consistency in the gui
+				scope:new_claimant_character = { set_variable = { name = hacw_allegience_to_cod value = yes } }
+				set_variable = { name = hacw_cod_contender value = scope:new_claimant_character }
+			}
+			destroy_variable = { variable = hook_claimant_ally_alive }
+			destroy_variable = { variable = hook_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_ally_alive }
+		}
+		if = {
+			limit = {
+				has_regent = yes
+				regent ?= scope:new_claimant_character
+			}
+			make_regent_to_ruler = yes
+		}
+		scope:new_claimant_character = { add_character_modifier = { modifier = hacw_supported_character days = -1 mode = add_and_extend } }
+	}
+	#Let us end this war for good...
+	option = {
+		name = hook_and_cod_wars.1200.b
+		trigger = { hidden_trigger = { NOT = { has_variable = hacw_the_impossible_has_happened } } scope:dead_claimant_country = { this = root } }
+		hacw_set_ruler = { ruler = scope:alive_claimant }
+		disable_disaster_effect = { type = hook_and_cod_wars }
+		hidden_effect = {
+			destroy_variable = { variable = hook_claimant_ally_alive }
+			destroy_variable = { variable = hook_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_ally_alive }
+		}
+	}
+	#An interesting twist of turns...
+	option = {
+		name = hook_and_cod_wars.1200.c
+		trigger = {
+			hidden_trigger = {
+				NOT = { has_variable = hacw_the_impossible_has_happened }
+				NOT = { has_variable = hacw_uncontested_ruler }
+			}
+			scope:dead_claimant_country = { NOT = { this = root } }
+		}
+		scope:dead_claimant_country = {
+			trigger_event_non_silently = hook_and_cod_wars.1201
+		}
+	}
+	#What now?
+	option = {
+		name = hook_and_cod_wars.1200.d
+		trigger = { hidden_trigger = { has_variable = hacw_the_impossible_has_happened } }
+		show_as_tooltip = {
+			disable_disaster_effect = { type = hook_and_cod_wars }	#Yes, the whole disaster ends when BOTH claimants are dead at the same time
+		}
+		if = {
+			limit = { any_owned_location = { any_pop = { has_rebel = var:hacw_hook_faction } } }
+			destroy_rebel = var:hacw_hook_faction
+		}
+		if = {
+			limit = { any_owned_location = { any_pop = { has_rebel = var:hacw_cod_faction } } }
+			destroy_rebel = var:hacw_cod_faction
+		}
+		disable_disaster_effect = { type = hook_and_cod_wars }
+		hidden_effect = {
+			destroy_variable = { variable = hook_claimant_ally_alive }
+			destroy_variable = { variable = hook_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_ally_alive }
+		}
+	}
+}
+#Our Claimant of Holland died!
+hook_and_cod_wars.1201 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1201.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1201.desc
+	immediate = {
+		if = {
+			limit = {
+				any_character = {
+					dynasty = scope:claimant_dynasty
+					is_adult = yes
+					is_legally_male = yes
+				}
+			}
+			random_character = {
+				limit = {
+					dynasty = scope:claimant_dynasty
+					is_adult = yes
+					is_legally_male = yes
+				}
+				save_scope_as = target_character
+			}
+		}
+		if = {
+			limit = {
+				scope:claimant_dynasty = {
+					any_character_in_dynasty = {
+						owner = {
+							NOT = { this = root }
+							NOT = { this = scope:holland }
+							OR = {
+								AND = {
+									is_target_in_global_variable_list = { name = hacw_cod_list target = this }
+									NOT = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+								}
+								AND = {
+									is_target_in_global_variable_list = { name = hacw_hook_list target = this }
+									NOT = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+								}
+							}
+						}
+						NOT = { owner = root }
+						NOT = { owner = scope:holland }
+						is_alive = yes
+						is_adult = yes
+					}
+				}
+			}
+			save_scope_as = foreign_character
+		}
+		if = {
+			limit = {
+				OR = {
+					has_regent = no
+					has_heir = yes
+				}
+			}
+			if = {
+				limit = {
+					has_regent = yes
+					has_heir = yes
+				}
+				heir = {
+					save_scope_as = ruler_character
+				}
+			}
+			else = {
+				ruler = { save_scope_as = ruler_character }
+			}
+		}
+	}
+	#Propose target_character as the new claimant
+	option = {
+		name = hook_and_cod_wars.1201.a
+		trigger = { exists = scope:target_character }
+		custom_tooltip = {
+			text = hook_and_cod_wars.1201.a.tt
+			scope:target_character = { save_scope_as = new_claimant }
+			if = {
+				limit = { scope:holland = { OR = { has_variable = hook_claimant_ally_alive has_variable = hook_claimant_enemy_alive } } }
+				scope:target_character = { set_variable = { name = hacw_allegience_to_cod value = yes } }
+			}
+			else_if = {
+				limit = { scope:holland = { OR = { has_variable = cod_claimant_ally_alive has_variable = cod_claimant_enemy_alive } } }
+				scope:target_character = { set_variable = { name = hacw_allegience_to_hook value = yes } }
+			}
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1202 }
+		}
+	}
+	#Propose foreign_character as the new claimant
+	option = {
+		name = hook_and_cod_wars.1201.b
+		trigger = { exists = scope:foreign_character }
+		custom_tooltip = {
+			text = hook_and_cod_wars.1201.b.tt
+			scope:foreign_character = { save_scope_as = new_claimant }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1202 }
+		}
+	}
+	#Propose ruler_character as the new claimant
+	option = {
+		name = hook_and_cod_wars.1201.c
+		trigger = { exists = scope:ruler_character }
+		custom_tooltip = {
+			text = hook_and_cod_wars.1201.c.tt
+			scope:ruler_character = { save_scope_as = new_claimant }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1202 }
+		}
+	}
+	#Leave the situation be
+	option = {
+		name = hook_and_cod_wars.1201.d
+		custom_tooltip = {
+			text = hook_and_cod_wars.1201.d.tt
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1203 }
+		}
+	}
+}
+#The New Claimant
+hook_and_cod_wars.1202 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1202.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1202.desc
+	option = {
+		name = hook_and_cod_wars.1202.a
+		if = {
+			limit = { hacw_character_and_country_same_allegiance = { character = scope:new_claimant country = root } }
+			custom_tooltip = hook_and_cod_wars.1202.a.bt
+		}
+		else = {
+			custom_tooltip = hook_and_cod_wars.1202.a.at
+		}
+		hidden_effect = {
+			if = {
+				limit = { var:hacw_hook_contender = { is_alive = no } }
+				set_variable = {
+					name = hacw_hook_contender
+					value = scope:new_claimant
+				}
+				set_variable = { name = hacw_contender_variable_1 value = scope:new_claimant }
+			}
+			else = {
+				set_variable = {
+					name = hacw_cod_contender
+					value = scope:new_claimant
+				}
+				set_variable = { name = hacw_contender_variable_2 value = scope:new_claimant }
+			}
+			destroy_variable = { variable = hook_claimant_ally_alive }
+			destroy_variable = { variable = hook_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_enemy_alive }
+			destroy_variable = { variable = cod_claimant_ally_alive }
+		}
+	}
+}
+#<Faction> No Longer has Claimant
+hook_and_cod_wars.1203 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1203.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1203.desc
+	option = {
+		name = hook_and_cod_wars.1203.a
+		hacw_set_ruler = { ruler = scope:alive_claimant }
+		disable_disaster_effect = { type = hook_and_cod_wars }	#Yes, the whole disaster ends when BOTH claimants are dead at the same time
+	}
+}
+
+#Neighbor Country gets approached by Faction
+hook_and_cod_wars.1300 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1300.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1300.desc
+	trigger = {
+		any_neighbor_country = {
+			NOT = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+			NOT = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+			is_rebel_country = no
+		}
+	}
+	immediate = {
+		save_scope_as = holland
+		random_neighbor_country = {
+			limit = {
+				NOT = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+				NOT = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+				is_rebel_country = no
+			}
+			save_scope_as = neighbor_country
+		}
+	}
+	#Bribe them to join our side
+	option = {
+		name = hook_and_cod_wars.1300.a
+		change_gold_effect = { scale = -6 }
+		if = {
+			limit = { exists = scope:neighbor_country }
+			custom_tooltip = {
+				text = hook_and_cod_wars.1300.a.tt
+				scope:neighbor_country = {
+					trigger_event_silently = hook_and_cod_wars.1301
+					set_variable = hacw_bribe
+				}
+			}
+		}
+	}
+	#We won't need any bribe here..
+	option = {
+		name = hook_and_cod_wars.1300.b
+		if = {
+			limit = { exists = scope:neighbor_country }
+			custom_tooltip = {
+				text = hook_and_cod_wars.1300.b.tt
+				scope:neighbor_country = { trigger_event_silently = hook_and_cod_wars.1301 }
+			}
+		}
+	}
+}
+#Country gets Approached - Recipient
+hook_and_cod_wars.1301 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1301.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				desc = hook_and_cod_wars.1301.desc.bribe
+				trigger = { has_variable = hacw_bribe }
+			}
+			triggered_desc = {
+				desc = hook_and_cod_wars.1301.desc
+				trigger = { always = yes }
+			}
+		}
+	}
+	immediate = {
+		scope:holland = {
+			var:hacw_hook_contender = { save_scope_as = hacw_contender_1 }
+			var:hacw_cod_contender = { save_scope_as = hacw_contender_2 }
+		}
+	}
+	#Join Contra-Holland country
+	option = {
+		name = hook_and_cod_wars.1301.a
+		trigger = { NOT = { has_variable = hacw_bribe } }
+		historical_option = yes
+		custom_tooltip = {
+			text = hook_and_cod_wars.1301.a.tt
+			if = {
+				limit = { scope:holland = { has_variable = hacw_sided_with_hook } }
+				hacw_join_faction_effect = { faction = cod }
+			}
+			else = { hacw_join_faction_effect = { faction = hook } }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1303 }
+		}
+	}
+	#Join Pro-Holland country
+	option = {
+		name = hook_and_cod_wars.1301.b
+		if = {
+			limit = { has_variable = hacw_bribe }
+			add_gold = { value = scope:holland.monthly_income_trade_and_tax multiply = 6 }
+		}
+		custom_tooltip = {
+			text = hook_and_cod_wars.1301.b.tt
+			if = {
+				limit = { scope:holland = { has_variable = hacw_sided_with_hook } }
+				hacw_join_faction_effect = { faction = hook }
+			}
+			else = { hacw_join_faction_effect = { faction = cod } }
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1302 }
+		}
+	}
+	#We have nothing to gain from this
+	option = {
+		name = hook_and_cod_wars.1301.c
+		custom_tooltip = {
+			text = hook_and_cod_wars.1301.c.tt
+			scope:holland = { trigger_event_silently = hook_and_cod_wars.1304 }
+		}
+	}
+	after = { destroy_variable = { variable = hacw_bribe } }
+}
+#Country joins faction
+hook_and_cod_wars.1302 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1302.title
+	hide_portraits = yes
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1302.desc
+	#nice
+	option = {
+		name = hook_and_cod_wars.1302.a
+		hacw_change_own_faction_score = {
+			target_country = scope:holland
+			source_country = scope:holland
+			math = add
+			value = 1
+		}
+	}
+}
+#Country joins opposite faction
+hook_and_cod_wars.1303 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1303.title
+	hide_portraits = yes
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1303.desc
+	#oof
+	option = {
+		name = hook_and_cod_wars.1303.a
+		hacw_change_enemy_faction_score = {
+			target_country = scope:holland
+			source_country = scope:holland
+			math = add
+			value = 1
+		}
+	}
+}
+#Country ignores the conflict
+hook_and_cod_wars.1304 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1304.title
+	hide_portraits = yes
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1304.desc
+	#Join Hooks
+	option = {
+		name = hook_and_cod_wars.1304.a
+	}
+}
+
+#Faction Requires Monetary Support
+hook_and_cod_wars.1400 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1400.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1400.desc
+	trigger = {
+		global_variable_list_size = {
+			name = hacw_hook_list
+			value > 1
+		}
+		global_variable_list_size = {
+			name = hacw_cod_list
+			value > 1
+		}
+	}
+	immediate = {
+		save_scope_as = holland
+		random_country = {
+			limit = {
+				NOT = { this = root }
+				is_target_in_global_variable_list = { name = hacw_hook_list target = this }
+			}
+			save_scope_as = random_hook_country
+		}
+		random_country = {
+			limit = {
+				NOT = { this = root }
+				is_target_in_global_variable_list = { name = hacw_cod_list target = this }
+			}
+			save_scope_as = random_cod_country
+		}
+		if = {
+			limit = { has_variable = hacw_sided_with_hook }
+			scope:random_hook_country = { save_scope_as = faction_ally_country }
+			scope:random_cod_country = { save_scope_as = faction_enemy_country }
+		}
+		else = {
+			scope:random_cod_country = { save_scope_as = faction_ally_country }
+			scope:random_hook_country = { save_scope_as = faction_enemy_country }
+		}
+	}
+	#Ask support from members
+	option = {
+		name = hook_and_cod_wars.1400.a
+		trigger = { hidden_trigger = { exists = scope:faction_ally_country } }
+		scope:faction_ally_country = {
+			trigger_event_non_silently = hook_and_cod_wars.1401
+		}
+	}
+	#We can handle it ourselves
+	option = {
+		name = hook_and_cod_wars.1400.b
+		change_gold_effect = { scale = -12 }
+		if = {
+			limit = { exists = scope:holland }
+			hacw_change_own_faction_score = {
+				target_country = scope:holland
+				source_country = scope:holland
+				math = add
+				value = 2
+			}
+		}
+		hidden_effect = {
+			if = {
+				limit = { exists = scope:faction_enemy_country }
+				scope:faction_enemy_country = {
+					trigger_event_silently = hook_and_cod_wars.1404
+				}
+			}
+		}
+	}
+	#We do not need money
+	option = {
+		name = hook_and_cod_wars.1400.c
+		if = {
+			limit = { exists = scope:holland }
+			hacw_change_enemy_faction_score = {
+				target_country = scope:holland
+				source_country = scope:holland
+				math = add
+				value = 2
+			}
+		}
+	}
+}
+#Faction Requires Monetary Support - Recipient
+hook_and_cod_wars.1401 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1401.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1401.desc
+	#Support Holland
+	option = {
+		name = hook_and_cod_wars.1401.a
+		add_gold = {
+			value = scope:holland.monthly_income_trade_and_tax
+			multiply = -12
+		}
+		custom_tooltip = {
+			text = hook_and_cod_wars.1401.a.tt
+			scope:holland = {
+				trigger_event_silently = hook_and_cod_wars.1402
+			}
+		}
+	}
+	#We literally cannot afford it
+	option = {
+		name = hook_and_cod_wars.1401.b
+		custom_tooltip = {
+			text = hook_and_cod_wars.1401.b.tt
+			scope:holland = {
+				trigger_event_silently = hook_and_cod_wars.1403
+			}
+		}
+		custom_tooltip = hook_and_cod_wars.1401.b.bt
+	}
+}
+#Faction Requires Monetary Support - Positive Reply
+hook_and_cod_wars.1402 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1402.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1402.desc
+	#Ask support from members
+	option = {
+		name = hook_and_cod_wars.1402.a
+		change_gold_effect = { scale = 12 }
+		hacw_change_own_faction_score = {
+			target_country = scope:holland
+			source_country = scope:faction_ally_country
+			math = add
+			value = 2
+		}
+		hidden_effect = {
+			scope:faction_enemy_country = {
+				trigger_event_silently = hook_and_cod_wars.1404
+			}
+		}
+	}
+}
+#Faction Requires Monetary Support - Negative Reply
+hook_and_cod_wars.1403 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1403.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1403.desc
+	#Ask support from members
+	option = {
+		name = hook_and_cod_wars.1403.a
+		hacw_change_enemy_faction_score = {
+			target_country = scope:holland
+			source_country = scope:faction_ally_country
+			math = add
+			value = 2
+		}
+		scope:faction_ally_country = {
+			if = {
+				limit = { is_target_in_global_variable_list = { name = hacw_hook_list target = this } }
+				custom_tooltip = {
+					text = hacw_remove_country_from_hook_faction_tt
+					remove_list_global_variable = { name = hacw_hook_list target = this }
+					remove_variable = hacw_preferred_faction_hook
+					remove_variable = hacw_sided_with_hook
+				}
+			}
+			if = {
+				limit = { is_target_in_global_variable_list = { name = hacw_cod_list target = this } }
+				custom_tooltip = {
+					text = hacw_remove_country_from_cod_faction_tt
+					remove_list_global_variable = { name = hacw_cod_list target = this }
+					remove_variable = hacw_preferred_faction_cod
+					remove_variable = hacw_sided_with_cod
+				}
+			}
+		}
+	}
+}
+#Enemy Faction bolsters their side
+hook_and_cod_wars.1404 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1404.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1404.desc
+	#We must counteract on it immediately!
+	option = {
+		name = hook_and_cod_wars.1404.a
+		add_gold = {
+			value = scope:holland.monthly_income_trade_and_tax
+			multiply = -12
+		}
+		custom_tooltip = {
+			text = hook_and_cod_wars.1404.a.tt
+			scope:holland = {
+				trigger_event_silently = {
+					id = hook_and_cod_wars.1405
+					days = 14
+				}
+			}
+		}
+	}
+	#They will fail eventually...
+	option = {
+		name = hook_and_cod_wars.1404.b
+		custom_tooltip = hook_and_cod_wars.1404.b.tt
+	}
+}
+#Enemy Faction bolsters their side!
+hook_and_cod_wars.1405 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.1405.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = hook_and_cod_wars.1405.desc
+	#That is not good...
+	option = {
+		name = hook_and_cod_wars.1405.a
+		add_stability = stability_mild_penalty
+		hacw_change_enemy_faction_score = {
+			target_country = scope:holland
+			source_country = scope:faction_ally_country
+			math = add
+			value = 2
+		}
+	}
+}
+
+#Hook and Cod Wars End
+hook_and_cod_wars.100 = {
+	type = country_event
+	category = disaster_event
+	title = hook_and_cod_wars.100.title
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = { #Sided with Hook, Cod wins
+				trigger = {
+					has_variable = hacw_sided_with_hook
+					var:hacw_cod_faction_power >= 20
+				}
+				desc = hook_and_cod_wars.100.desc.a
+			}
+			triggered_desc = { #Sided with Hook, Hook wins
+				trigger = {
+					has_variable = hacw_sided_with_hook
+					var:hacw_hook_faction_power >= 20
+				}
+				desc = hook_and_cod_wars.100.desc.b
+			}
+			triggered_desc = { #Sided with Cod, Cod wins
+				trigger = {
+					has_variable = hacw_sided_with_cod
+					var:hacw_cod_faction_power >= 20
+				}
+				desc = hook_and_cod_wars.100.desc.c
+			}
+			triggered_desc = { #Sided with Cod, Hook wins
+				trigger = {
+					has_variable = hacw_sided_with_cod
+					var:hacw_hook_faction_power >= 20
+				}
+				desc = hook_and_cod_wars.100.desc.d
+			}
+			triggered_desc = { #Both Hook and Cod win
+				#at this point I don't even want to know HOW this happened...
+				trigger = {
+					has_variable = hacw_hook_contender
+					has_variable = hacw_cod_contender
+					var:hacw_hook_contender = var:hacw_cod_contender
+				}
+				desc = hook_and_cod_wars.100.desc.e
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = hook_and_cod_wars.100.desc
+			}
+		}
+	}
+	immediate = {
+		if = {
+			limit = {
+				var:hacw_hook_faction_power >= 20
+				has_variable = hacw_hook_contender
+			}
+			var:hacw_hook_contender = { save_scope_as = new_ruler }
+		}
+		else_if = {
+			limit = {
+				var:hacw_cod_faction_power >= 20
+				has_variable = hacw_cod_contender
+			}
+			var:hacw_cod_contender = { save_scope_as = new_ruler }
+		}
+		else_if = {
+			limit = {
+				has_variable = hacw_hook_contender
+				has_variable = hacw_cod_contender
+				var:hacw_hook_contender = var:hacw_cod_contender
+			}
+			var:hacw_hook_contender = { save_scope_as = new_ruler }
+		}
+		else_if = {
+			limit = { has_ruler = yes }
+			ruler ?= { save_scope_as = new_ruler }
+		}
+		else_if = {
+			limit = { has_heir = yes }
+			heir ?= { save_scope_as = new_ruler }
+		}
+		else = {
+			regent ?= { save_scope_as = new_ruler }
+		}
+	}
+	after = {
+		hacw_end_disaster_effect = { faction = hook }
+		hacw_end_disaster_effect = { faction = cod }
+		remove_variable = hacw_contender_variable_1
+		remove_variable = hacw_contender_variable_2
+		remove_variable = hacw_contender_owner_variable_1
+		remove_variable = hacw_contender_owner_variable_2
+		remove_variable = hacw_contender_prev_owner_variable_1
+		remove_variable = hacw_contender_prev_owner_variable_2
+		remove_variable = hook_and_cod_wars_pretender_variable
+	}
+
+	option = {
+		name = hook_and_cod_wars.100.a
+		hacw_set_ruler = { ruler = scope:new_ruler }
+		show_as_tooltip = {
+			disable_disaster_effect = { type = hook_and_cod_wars }
+		}
+		hidden_effect = {
+			every_character = {
+				limit = {
+					OR = {
+						has_character_modifier = hacw_supported_character
+						has_character_modifier = hacw_opposing_character
+					}
+				}
+				remove_character_modifier = hacw_supported_character
+				remove_character_modifier = hacw_opposing_character
+			}
+		}
+	}
+}

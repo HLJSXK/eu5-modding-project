@@ -1,0 +1,555 @@
+﻿namespace = settle_the_frontier
+
+#The Expansion into [target.GetNameWithNoTooltip]
+settle_the_frontier.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = settle_the_frontier.1.title
+	desc = settle_the_frontier.1.desc
+	
+	illustration_tags = {
+        10 = happy
+        10 = exterior
+    }
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = settle_the_frontier.1.a
+		custom_tooltip = settle_the_frontier.1.a.tt
+	}
+}
+
+scripted_effect create_no_mans_land_scopes = {
+	save_scope_as = actor
+	random_courtier = {
+		limit = { has_variable = settling_no_mans_land_var }
+		save_scope_as = recipient
+		var:settling_no_mans_land_var = { save_scope_as = target }
+	}
+}
+
+scripted_effect change_settling_character_loyalty = {
+	if = {
+		limit = { has_variable = settler_character_truthfulness }
+		custom_description = {
+			text = change_settling_character_loyalty
+			value = $value$
+			change_variable = {
+				name = settler_character_truthfulness
+				add = $value$
+			}
+		}
+	}
+	else = {
+		set_variable = {
+			name = settler_character_truthfulness
+			value = $value$
+		}
+	}
+}
+
+#Ventures to [target.GetNameWithNoTooltip]
+settle_the_frontier.2 = {
+	type = country_event
+	title = settle_the_frontier.2.title
+	desc = settle_the_frontier.2.desc
+	
+	trigger = {
+		any_courtier = {
+			has_variable = settling_no_mans_land_var
+			var:settling_no_mans_land_var = {
+				NOT = { any_location_in_province_definition = { is_capital_of = { target = root } } }
+			}
+		}
+		NOT = { has_variable = snml_migration_cooldown }
+	}
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		set_variable = { name = snml_migration_cooldown days = 365 }
+		create_no_mans_land_scopes = yes
+		root.capital.province_definition = { save_scope_as = from_province }
+	}
+	option = {
+		name = settle_the_frontier.2.a
+		add_migration = {
+			owner = scope:actor #A migration tries to move the owner's own citizens.
+			from = scope:from_province
+			to = scope:target
+			amount = 0.5
+			months = 3
+		}
+	}
+	option = {
+		name = settle_the_frontier.2.b
+		custom_tooltip = settle_the_frontier.2.b.tt
+	}
+}
+
+#Cultural Spread
+settle_the_frontier.3 = {
+	type = country_event
+	title = settle_the_frontier.3.title
+	desc = settle_the_frontier.3.desc
+	
+	trigger = {
+		any_courtier = {
+			has_variable = settling_no_mans_land_var
+			var:settling_no_mans_land_var = {
+				any_location_in_province_definition = {
+					NOT = { dominant_culture = root.culture }
+				}
+			}
+		}
+	}
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		save_scope_as = actor
+		culture = { save_scope_as = target_culture }
+		random_courtier = {
+			limit = {
+				has_variable = settling_no_mans_land_var
+				var:settling_no_mans_land_var = {
+					any_location_in_province_definition = {
+						NOT = { dominant_culture = scope:target_culture }
+					}
+				}
+			}
+			save_scope_as = recipient
+			var:settling_no_mans_land_var = {
+				save_scope_as = target
+			}
+		}
+	}
+	option = {
+		name = settle_the_frontier.3.a
+		culture = { add_cultural_influence = cultural_influence_mild_penalty }
+		scope:target = {
+			every_location_in_province_definition = {
+				limit = {
+					has_owner = no
+					is_ownable = yes
+					NOT = { dominant_culture = scope:target_culture }
+				}
+				random_pop = {
+					limit = { NOT = { culture = scope:target_culture } }
+					split_pop = {
+						fraction = 0.2
+						culture = scope:target_culture
+					}
+				}
+			}
+		}
+		scope:recipient = {
+			change_settling_character_loyalty = { value = 2 }
+		}
+	}
+	option = {
+		name = settle_the_frontier.3.b
+		culture = { add_cultural_tradition = cultural_tradition_weak_penalty }
+		scope:recipient = {
+			change_settling_character_loyalty = { value = 1 }
+		}
+	}
+	option = {
+		name = settle_the_frontier.3.c
+		scope:recipient = {
+			change_settling_character_loyalty = { value = -2 }
+		}
+	}
+}
+
+#Character asks for money
+settle_the_frontier.4 = {
+	type = country_event
+	title = settle_the_frontier.4.title
+	desc = settle_the_frontier.4.desc
+	illustration_tags = {
+        10 = regular
+        10 = interior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		create_no_mans_land_scopes = yes
+	}
+	option = {
+		name = settle_the_frontier.4.a
+		scope:recipient = {
+			change_settling_character_loyalty = { value = 1 }
+		}
+		change_gold_effect = { scale = -3 }
+	}
+	option = {
+		name = settle_the_frontier.4.b
+		scope:recipient = {
+			change_settling_character_loyalty = { value = -2 }
+		}
+	}
+}
+
+#Conflict with neighboring province
+settle_the_frontier.5 = {
+	type = country_event
+	title = settle_the_frontier.5.title
+	desc = settle_the_frontier.5.desc
+	illustration_tags = {
+        10 = angry
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		create_no_mans_land_scopes = yes
+	}
+	option = {
+		name = settle_the_frontier.5.a
+
+		scope:recipient = {
+			change_settling_character_loyalty = { value = 2 }
+		}
+		scope:target = {
+			random_neighbor_province_definition = {
+				limit = {
+					any_location_in_province_definition = {
+						owner = root
+					}
+				}
+				every_location_in_province_definition = {
+					change_control = control_mild_penalty
+				}
+			}
+		}
+	}
+	option = {
+		name = settle_the_frontier.5.b
+
+		scope:recipient = {
+			change_settling_character_loyalty = { value = -1 }
+		}
+	}
+}
+
+#Early resource exploitation
+scripted_effect snml_exploit_resource = {
+	scope:target_market = {
+		add_goods_supply = {
+			goods = $goods$
+			amount = market_goods_severe_gain
+		}
+	}
+	scope:recipient = {
+		change_settling_character_loyalty = { value = -2 }
+	}
+}
+settle_the_frontier.6 = {
+	type = country_event
+	title = settle_the_frontier.6.title
+	desc = settle_the_frontier.6.desc
+	illustration_tags = {
+        10 = happy
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		create_no_mans_land_scopes = yes
+		capital = { market = { save_scope_as = target_market } }
+		scope:target = {
+			every_location_in_province_definition = {
+				limit = {
+					has_owner = no
+					is_ownable = yes
+					exists = raw_material
+				}
+				raw_material = {
+					scope:actor = {
+						if = {
+							limit = {
+								OR = {
+									NOT = { has_local_variable_list = snml_trade_goods }
+									NOT = { is_target_in_local_variable_list = { name = snml_trade_goods target = prev } }
+								}
+							}
+							add_to_local_variable_list = { name = snml_trade_goods target = prev }
+						}
+					}
+				}
+			}
+		}
+		ordered_in_local_list = { variable = snml_trade_goods position = 0 save_scope_as = target_goods_0 }
+		if = {
+			limit = { local_variable_list_size = { name = snml_trade_goods value >= 1 } }
+			ordered_in_local_list = { variable = snml_trade_goods position = 1 save_scope_as = target_goods_1 }
+		}
+		if = {
+			limit = { local_variable_list_size = { name = snml_trade_goods value >= 2 } }
+			ordered_in_local_list = { variable = snml_trade_goods position = 2 save_scope_as = target_goods_2 }
+		}
+		if = {
+			limit = { local_variable_list_size = { name = snml_trade_goods value >= 3 } }
+			ordered_in_local_list = { variable = snml_trade_goods position = 3 save_scope_as = target_goods_3 }
+		}
+		if = {
+			limit = { local_variable_list_size = { name = snml_trade_goods value >= 4 } }
+			ordered_in_local_list = { variable = snml_trade_goods position = 4 save_scope_as = target_goods_4 }
+		}
+	}
+	#Exploit resource 0
+	option = {
+		name = settle_the_frontier.6.a
+		trigger = { exists = scope:target_goods_0 }
+		snml_exploit_resource = { goods = scope:target_goods_0 }
+	}
+	#Exploit resource 1
+	option = {
+		name = settle_the_frontier.6.b
+		trigger = {
+			exists = scope:target_goods_1
+			NOT = { scope:target_goods_1 = scope:target_goods_0 }
+		}
+		snml_exploit_resource = { goods = scope:target_goods_1 }
+	}
+	#Exploit resource 2
+	option = {
+		name = settle_the_frontier.6.c
+		trigger = {
+			exists = scope:target_goods_2
+			NOT = { scope:target_goods_2 = scope:target_goods_0 }
+			NOT = { scope:target_goods_2 = scope:target_goods_1 }
+		}
+		snml_exploit_resource = { goods = scope:target_goods_2 }
+	}
+	#Exploit resource 3
+	option = {
+		name = settle_the_frontier.6.d
+		trigger = {
+			exists = scope:target_goods_3
+			NOT = { scope:target_goods_3 = scope:target_goods_0 }
+			NOT = { scope:target_goods_3 = scope:target_goods_1 }
+			NOT = { scope:target_goods_3 = scope:target_goods_2 }
+		}
+		snml_exploit_resource = { goods = scope:target_goods_3 }
+	}
+	#Exploit resource 4
+	option = {
+		name = settle_the_frontier.6.e
+		trigger = {
+			exists = scope:target_goods_4
+			NOT = { scope:target_goods_4 = scope:target_goods_0 }
+			NOT = { scope:target_goods_4 = scope:target_goods_1 }
+			NOT = { scope:target_goods_4 = scope:target_goods_2 }
+			NOT = { scope:target_goods_4 = scope:target_goods_3 }
+		}
+		snml_exploit_resource = { goods = scope:target_goods_4 }
+	}
+	#We let the settlers keep their resources for themselves
+	option = {
+		name = settle_the_frontier.6.zzz
+		scope:recipient = {
+			change_settling_character_loyalty = { value = 1 }
+		}
+	}
+}
+
+#End of the Expansion
+settle_the_frontier.100 = {
+	type = country_event
+	title = settle_the_frontier.100.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					NOT = { exists = scope:target_country }
+					exists = scope:recipient
+				}
+				desc = settle_the_frontier.100.desc.a
+			}
+			triggered_desc = {
+				trigger = {
+					exists = scope:target_country
+					exists = scope:recipient
+				}
+				desc = settle_the_frontier.100.desc.b
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = settle_the_frontier.100.desc
+			}
+		}
+	}
+	illustration_tags = {
+        10 = happy
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		if = {
+			limit = {
+				exists = scope:recipient
+				scope:recipient = {
+					var:settler_character_truthfulness <= 0
+				}
+			}
+			scope:target = {
+				ordered_location_in_province_definition = {
+					limit = {
+						has_owner = no
+						is_ownable = yes
+					}
+					order_by = population
+					max = 1
+					change_location_owner = scope:actor
+					save_scope_as = target_location
+					create_country_from_location = {
+						save_scope_as = target_country
+						set_capital = scope:target_location
+					}
+				}
+				every_location_in_province_definition = {
+					limit = {
+						has_owner = no
+						is_ownable = yes
+					}
+					change_location_owner = scope:target_country
+					change_location_controller = scope:target_country
+				}
+			}
+			scope:target_country = {
+				set_new_ruler = scope:recipient
+			}
+			scope:recipient = {
+				if = {
+					limit = { has_character_modifier = settling_no_mans_land }
+					remove_character_modifier = settling_no_mans_land
+				}
+				remove_variable = settling_no_mans_land_var
+				remove_variable = settler_character_truthfulness
+				move_country = scope:target_country
+				if = {
+					limit = { scope:actor.government_type = government_type:theocracy }
+					change_character_estate = estate_type:clergy_estate
+				}
+				else_if = {
+					limit = { scope:actor.government_type = government_type:republic }
+					change_character_estate = estate_type:burghers_estate
+				}
+				else = {
+					change_character_estate = estate_type:crown_estate
+					every_descendant = {
+						if = {
+							limit = { has_estate = estate_type:peasants_estate }
+							change_character_estate = estate_type:crown_estate
+						}
+					}
+				}
+				if = {
+					limit = { NOT = { exists = dynasty } }
+					scope:target_location = {
+						create_dynasty_from_location = random
+						if = {
+							limit = { exists = last_dynasty_in_location }
+							last_dynasty_in_location = {
+								save_scope_as = target_dynasty
+							}
+						}
+					}
+					if = {
+						limit = { exists = scope:target_dynasty }
+						change_dynasty = scope:target_dynasty
+						every_descendant = {
+							change_dynasty = scope:target_dynasty
+						}
+					}
+				}
+			}
+		}
+	}
+	#Default option, character settles the province and returns
+	option = {
+		name = settle_the_frontier.100.a
+		trigger = {
+			NOT = { exists = scope:target_country }
+			exists = scope:recipient
+		}
+		scope:target = {
+			every_location_in_province_definition = {
+				limit = {
+					has_owner = no
+					is_ownable = yes
+				}
+				change_location_owner = scope:actor
+				change_location_controller = scope:actor
+				change_integration_level = integrated
+			}
+		}
+		scope:recipient = {
+			if = {
+				limit = { has_character_modifier = settling_no_mans_land }
+				remove_character_modifier = settling_no_mans_land
+			}
+			remove_variable = settling_no_mans_land_var
+			remove_variable = settler_character_truthfulness
+		}
+	}
+	option = {
+		name = settle_the_frontier.100.b
+		trigger = {
+			exists = scope:target_country
+			exists = scope:recipient
+		}
+		custom_tooltip = settle_the_frontier.100.b.tt
+	}
+	#Fallback
+	option = {
+		name = settle_the_frontier.100.c
+		trigger = { NOT = { exists = scope:recipient } }
+		assert_if = {
+			limit = { always = yes }
+			text = "settle_the_frontier.100 was triggered while there was no valid settler..."
+		}
+	}
+}
+
+#Death of Character
+settle_the_frontier.101 = {
+	type = country_event
+	title = settle_the_frontier.101.title
+	desc = settle_the_frontier.101.desc
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+	}
+	option = {
+		name = settle_the_frontier.101.a
+		custom_tooltip = settle_the_frontier.101.a.tt
+	}
+}
+
+#Land has been colonized already
+settle_the_frontier.102 = {
+	type = country_event
+	title = settle_the_frontier.102.title
+	desc = settle_the_frontier.102.desc
+	illustration_tags = {
+        10 = regular
+        10 = exterior
+    }
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+	option = {
+		name = settle_the_frontier.102.a
+		custom_tooltip = settle_the_frontier.102.a.tt
+	}
+}

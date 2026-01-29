@@ -1,0 +1,1395 @@
+﻿namespace = rise_of_timur
+
+######################################
+# The start of the situation events
+######################################
+scripted_effect buff_timur_effect = {
+	$target$ = {
+		add_army_tradition = army_tradition_ultimate_bonus
+	}
+	scope:target_character = {
+		add_character_modifier = {
+			modifier = timmy_wants_to_play
+			days = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			remove_traits_of_category = ruler
+			remove_traits_of_category = general
+		}
+		add_trait = trait:conqueror
+		add_trait = trait:tactical_genius
+		add_trait = trait:cruel
+		add_trait = trait:strategist
+	}
+}
+
+scripted_effect clear_timur_variables = {
+	remove_variable = tim_founding_father
+	remove_country_modifier = rot_legacy_islam
+	remove_country_modifier = rot_legacy_borjigin
+	remove_country_modifier = rot_legacy_fallback
+	remove_variable = rise_of_timur_situation_country
+}
+
+scripted_effect remove_all_timmy_cbs = {
+	if = {
+		limit = { NOT = { has_reform = government_reform:timurid_empire } }
+		custom_tooltip = {
+			text = remove_all_timmy_cbs_tt
+			ROOT = {
+				every_casus_belli_target = {
+					limit = { ROOT = { has_casus_belli_of_type_on = { target = PREV type = casus_belli:cb_timurs_conquests } } }
+					ROOT = { remove_casus_belli = { target = PREV type = casus_belli:cb_timurs_conquests } }
+				}
+			}
+		}
+	}
+}
+scripted_effect remove_all_timmy_cbs_tim = {
+	if = {
+		limit = {
+			country_exists = c:TIM
+			c:TIM = {
+				NOT = { has_reform = government_reform:timurid_empire }
+			}
+		}
+		custom_tooltip = {
+			text = remove_all_timmy_cbs_tt
+			c:TIM = {
+				every_casus_belli_target = {
+					limit = { c:TIM = { has_casus_belli_of_type_on = { target = PREV type = casus_belli:cb_timurs_conquests } } }
+					c:TIM = { remove_casus_belli = { target = PREV type = casus_belli:cb_timurs_conquests } }
+				}
+			}
+		}
+	}
+}
+
+#Info event
+rise_of_timur.1 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1.title
+	desc = rise_of_timur.1.desc
+	image = "gfx/interface/illustrations/situation/rise_of_timur.dds"
+	immediate = {
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+		save_scope_as = target_country
+		set_variable = rise_of_timur_situation_country
+	}
+	option = {
+		name = rise_of_timur.1.a
+		buff_timur_effect = { target = scope:target_country }
+	}
+}
+
+#Info event (everyone else)
+rise_of_timur.2 = {
+	type = country_event
+	category = situation_event	
+	title = rise_of_timur.2.title
+	desc = rise_of_timur.1.desc		# same desc 
+	image = "gfx/interface/illustrations/situation/rise_of_timur.dds"
+	immediate = {
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.2.a
+		show_as_tooltip = {
+			buff_timur_effect = { target = c:TIM }
+		}
+	}
+}
+
+#End Event -> Timurids get annexed, trigger for the one who annexes the Timurids
+rise_of_timur.3 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.3.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_global_variable = timur_character global_var:timur_character = { is_alive = no } }
+				desc = rise_of_timur.3.desc.dead_timur
+			}
+			triggered_desc = {
+				trigger = { has_global_variable = timur_character global_var:timur_character = { is_alive = yes } }
+				desc = rise_of_timur.3.desc.alive_timur
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.3.desc
+			}
+		}
+	}
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		c:TIM = {
+			save_scope_as = tim_country
+			capital ?= {
+				save_scope_as = target_location
+			}
+		}
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+		save_scope_as = target_country
+	}
+	option = {
+		name = rise_of_timur.3.a
+		disable_situation_effect = { type = rise_of_timur }
+		add_stability = stability_severe_bonus
+		add_prestige = prestige_severe_bonus
+		if = {
+			limit = { has_global_variable = timur_character global_var:timur_character = { is_alive = no } }
+			set_variable = {
+				name = timmy_is_dead
+				days = 30
+			}
+		}
+		else_if = {
+			limit = { has_global_variable = timur_character global_var:timur_character = { is_alive = yes } }
+			set_variable = {
+				name = timmy_is_alive
+				days = 30
+			}
+			kill_character = {
+				target = scope:target_character
+				reason = execution
+			}
+		}
+		hidden_effect = {
+			every_country = {
+				limit = {
+					OR = {
+						is_neighbor_of = scope:target_country
+						is_subject_of = scope:target_country
+						is_enemy_of = scope:target_country
+						is_rival_of = scope:target_country
+						capital.sub_continent = sub_continent:central_asia
+						capital.sub_continent = sub_continent:middle_east
+						capital.sub_continent = sub_continent:south_asia
+					}
+				}
+				trigger_event_silently = rise_of_timur.4
+			}
+		}
+	}
+}
+#Info for everyone else
+rise_of_timur.4 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.4.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:target_country = { has_variable = timmy_is_dead } }
+				desc = rise_of_timur.4.desc.dead_timur
+			}
+			triggered_desc = {
+				trigger = { scope:target_country = { has_variable = timmy_is_alive } }
+				desc = rise_of_timur.4.desc.alive_timur
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.4.desc
+			}
+		}
+	}
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.4.a
+	}
+}
+
+#End Event -> Timurids get vassalized, triggers for the conqueror
+rise_of_timur.5 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.5.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_global_variable = timur_character global_var:timur_character = { is_alive = no } }
+				desc = rise_of_timur.5.desc.dead_timur
+			}
+			triggered_desc = {
+				trigger = { has_global_variable = timur_character global_var:timur_character = { is_alive = yes } }
+				desc = rise_of_timur.5.desc.alive_timur
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.5.desc
+			}
+		}
+	}
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.5.a
+		disable_situation_effect = { type = rise_of_timur }
+		add_stability = stability_severe_bonus
+		add_prestige = prestige_severe_bonus
+		if = {
+			limit = { has_global_variable = timur_character global_var:timur_character = { is_alive = no } }
+			set_variable = {
+				name = timmy_is_dead
+				days = 30
+			}
+		}
+		else_if = {
+			limit = { has_global_variable = timur_character global_var:timur_character = { is_alive = yes } }
+			set_variable = {
+				name = timmy_is_alive
+				days = 30
+			}
+			kill_character = {
+				target = scope:target_character
+				reason = execution
+			}
+		}
+		remove_all_timmy_cbs_tim = yes
+		hidden_effect = {
+			every_country = {
+				limit = {
+					this != root
+					can_see_situation = situation:rise_of_timur
+				}
+				trigger_event_silently = rise_of_timur.6
+			}
+		}
+	}
+	after = {
+		clear_timur_variables = yes
+	}
+}
+#Info for everyone else
+rise_of_timur.6 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.6.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { scope:target_country = { has_variable = timmy_is_dead } }
+				desc = rise_of_timur.6.desc.dead_timur
+			}
+			triggered_desc = {
+				trigger = { scope:target_country = { has_variable = timmy_is_alive } }
+				desc = rise_of_timur.6.desc.alive_timur
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.6.desc
+			}
+		}
+	}
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.6.a
+	}
+}
+
+#End Event -> The Stagnation of the Timurids
+rise_of_timur.7 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.7.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_ruler = yes }
+				desc = rise_of_timur.7.desc_ruler
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.7.desc
+			}
+		}
+	}
+	
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+		ruler ?= { save_scope_as = target_ruler }
+		save_scope_as = tim_country
+	}
+	option = {
+		name = rise_of_timur.7.a
+		disable_situation_effect = { type = rise_of_timur }
+		remove_all_timmy_cbs = yes
+	}
+	after = {
+		clear_timur_variables = yes
+	}
+}
+#Info Event
+rise_of_timur.8 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.8.title
+	desc = rise_of_timur.8.desc
+	image = "gfx/interface/illustrations/situation/rise_of_timur.dds"
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+		c:TIM = { save_scope_as = tim_country }
+	}
+	option = {
+		name = rise_of_timur.8.a
+		show_as_tooltip = { disable_situation_effect = { type = rise_of_timur } }
+	}
+}
+
+#End Event -> Has restored the Mongol Empire
+rise_of_timur.9 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.9.title
+	desc = rise_of_timur.9.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.9.a
+		disable_situation_effect = { type = rise_of_timur }
+		remove_all_timmy_cbs = yes
+		add_country_modifier = {
+			modifier = restoration_of_the_mongol_empire
+			years = 100
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			every_country = {
+				limit = {
+					NOT = { this = root }
+					OR = {
+						is_neighbor_of = root
+						is_subject_of = root
+						is_enemy_of = root
+						is_rival_of = root
+						capital.sub_continent = sub_continent:central_asia
+						capital.sub_continent = sub_continent:middle_east
+						capital.sub_continent = sub_continent:south_asia
+					}
+				}
+				trigger_event_silently = rise_of_timur.10
+			}
+		}
+	}
+	after = {
+		clear_timur_variables = yes
+	}
+}
+
+#Info
+rise_of_timur.10 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.10.title
+	desc = rise_of_timur.10.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+	}
+	option = {
+		name = rise_of_timur.10.a
+	}
+}
+
+#Monthly Unique Events
+#Fall of Delhi
+rise_of_timur.11 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.11.title
+	desc = rise_of_timur.11.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_fall_of_delhi
+		}
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.11.a
+		add_army_tradition = army_tradition_severe_bonus
+		add_war_exhaustion = war_exhaustion_mild_bonus
+		change_gold_effect = { scale = 5 }
+	}
+}
+
+#Timurid's Campaign against China
+rise_of_timur.12 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.12.title
+	desc = rise_of_timur.12.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_prepare_conquest_of_china
+		}
+		c:CHI ?= { save_scope_as = target_country }
+	}
+	option = {
+		name = rise_of_timur.12.a
+		add_casus_belli = {
+			type = casus_belli:cb_timurs_conquests
+			target = scope:target_country
+		}
+		add_manpower = {
+			value = root.monthly_manpower
+			multiply = 8
+			add = 0.25
+		}
+	}
+}
+
+#Right to Conquer
+rise_of_timur.13 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.13.title
+	desc = rise_of_timur.13.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_right_to_conquer
+		}
+		global_var:timur_character = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = rise_of_timur.13.a
+		trigger = {
+			religion.group = religion_group:muslim
+		}
+		add_country_modifier = {
+			modifier = rot_legacy_islam
+			years = -1
+			mode = add_and_extend
+		}
+		custom_tooltip = LASTS_UNTIL_END_OF_SITUATION_TT
+	}
+	option = {
+		name = rise_of_timur.13.b
+		trigger = {
+			scope:target_character = {
+				dynasty ?= dynasty:borjigin_dynasty
+			}
+		}
+		add_country_modifier = {
+			modifier = rot_legacy_borjigin
+			years = -1
+			mode = add_and_extend
+		}
+		custom_tooltip = LASTS_UNTIL_END_OF_SITUATION_TT
+	}
+	option = {
+		name = rise_of_timur.13.c
+		trigger = {
+			OR = {
+				NOT = { religion.group = religion_group:muslim }
+				NOT = { scope:target_character = { dynasty ?= dynasty:borjigin_dynasty } }
+			}
+		}
+		add_country_modifier = {
+			modifier = rot_legacy_fallback
+			years = -1
+			mode = add_and_extend
+		}
+		custom_tooltip = LASTS_UNTIL_END_OF_SITUATION_TT
+	}
+}
+
+#Conquest of Persia
+rise_of_timur.14 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.14.title
+	desc = rise_of_timur.14.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_prepare_conquest_of_persia
+		}
+	}
+	option = {
+		name = rise_of_timur.14.a
+		add_manpower = {
+			value = root.monthly_manpower
+			multiply = 3
+			add = 0.250
+		}
+		custom_tooltip = {
+			text = rise_of_timur.14.a.tt
+			region:persia_region = {
+				every_location_in_region = {
+					limit = {
+						is_capital = yes
+						owner = {
+							NOT = { tag = root }
+							NOT = { is_subject_of = root }
+						}
+					}
+					owner = {
+						root = {
+							add_casus_belli = {
+								type = casus_belli:cb_timurs_conquests
+								target = PREV
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#Conquest of Anatolia
+rise_of_timur.15 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.15.title
+	desc = rise_of_timur.15.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_prepare_conquest_of_anatolia
+		}
+		random_neighbor_country = {
+			limit = {
+				capital = {
+					region = region:anatolia_region
+				}
+			}
+			save_scope_as = target_country
+		}
+	}
+	option = {
+		name = rise_of_timur.15.a
+		if = {
+			limit = { monthly_manpower > 0 }
+			add_manpower = {
+				value = root.monthly_manpower
+				multiply = 3
+				add = 0.250
+			}
+		}
+		add_casus_belli = {
+			type = casus_belli:cb_timurs_conquests
+			target = scope:target_country
+		}
+	}
+}
+
+#Monthly "Spammy" Events
+#The Expansionism of Timur
+rise_of_timur.100 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_country }
+				desc = rise_of_timur.100.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.100.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.100.desc
+	immediate = {
+		save_scope_as = root_country
+		ruler ?= { save_scope_as = target_character }
+		ordered_neighbor_country = {
+			limit = {
+				NOT = { has_truce_with = root }
+				NOT = { has_target_casus_belli_on_us = root }
+				NOT = { is_allied_with = { target = root } }
+				NOT = { is_subject_of = root }
+				is_rebel_country = no
+				can_declare_war_on = root
+				capital = {
+					OR = {
+						sub_continent = sub_continent:middle_east
+						sub_continent = sub_continent:central_asia
+						sub_continent = sub_continent:south_asia
+					}
+				}
+			}
+			max = 1
+			order_by = {
+				value = expected_army_size
+				multiply = -1
+			}
+			save_scope_as = target_country
+		}
+		if = {
+			limit = { NOT = { exists = scope:target_country } }
+			ordered_neighbor_country = {
+				limit = {
+					NOT = { has_truce_with = root }
+					NOT = { has_target_casus_belli_on_us = root }
+					NOT = { is_allied_with = { target = root } }
+					NOT = { is_subject_of = root }
+					is_rebel_country = no
+					can_declare_war_on = root
+				}
+				max = 1
+				order_by = {
+					value = expected_army_size
+					multiply = -1
+				}
+				save_scope_as = target_country
+			}
+		}
+	}
+	option = {
+		name = rise_of_timur.100.a
+		declare_war_with_cb = {
+			target = scope:target_country
+			type = casus_belli:cb_timurs_conquests
+		}
+		historical_option = yes
+	}
+	option = {
+		name = rise_of_timur.100.b
+		add_government_power = government_power_mild_penalty
+		add_casus_belli = { target = scope:target_country type = casus_belli:cb_timurs_conquests }
+	}
+}
+
+#Developing Timurid culture
+rise_of_timur.101 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_country }
+				desc = rise_of_timur.101.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.101.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.101.desc
+	immediate = {
+		save_scope_as = target_country
+		ruler ?= { save_scope_as = target_character }
+	}
+	# They might help us improve our reputation.
+	option = {
+		name = rise_of_timur.101.a
+		trigger = {
+			has_countries_with_timed_antagonism = yes
+		}
+		drop_antagonism_bomb = {
+			target = capital
+			modifier = antagonism_cultural_development
+		}
+	}
+	# They are a sign of our war achievements.
+	option = {
+		name = rise_of_timur.101.b
+		trigger = {
+			war_exhaustion >= war_exhaustion_mild_penalty
+		}
+		add_war_exhaustion = war_exhaustion_mild_bonus
+	}
+	# May our culture prosper
+	option = {
+		name = rise_of_timur.101.c
+		culture = {
+			add_cultural_tradition = cultural_tradition_weak_bonus
+		}
+	}
+}
+
+#Soldiers flock to Timur's Armies
+rise_of_timur.102 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_character }
+				desc = rise_of_timur.102.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.102.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.102.desc
+	immediate = {
+		save_scope_as = target_country
+		ruler ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = rise_of_timur.102.a
+		add_manpower = {
+			value = root.monthly_manpower
+			multiply = 3
+			add = 0.25
+		}
+	}
+}
+
+#Event Chains
+#Timur's Relationship with the Golden Horde
+rise_of_timur.1000 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_country }
+				desc = rise_of_timur.1000.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.1000.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.1000.desc
+	immediate = {
+		save_scope_as = from_country
+		ruler ?= { save_scope_as = from_character }
+		c:GLH ?= {
+			save_scope_as = target_country
+			ruler_or_regent ?= { save_scope_as = target_character }
+		}
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_had_glh_alliance
+		}
+	}
+	#Let's cement our relations with the Golden Horde
+	option = {
+		name = rise_of_timur.1000.a
+		custom_tooltip = {
+			text = rise_of_timur.1000.a.tt
+			scope:target_country = {
+				trigger_event_non_silently = rise_of_timur.1001
+			}
+		}
+		historical_option = yes
+	}
+	#We have no interests in getting involved with the Golden Horde
+	option = {
+		name = rise_of_timur.1000.b
+		custom_tooltip = rise_of_timur.1000.b.tt
+		add_prestige = prestige_weak_bonus
+	}
+}
+#Timur's Alliance
+rise_of_timur.1001 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1001.title
+	desc = rise_of_timur.1001.desc
+	#An alliance sounds good
+	option = {
+		name = rise_of_timur.1001.a
+		historical_option = yes
+		show_as_tooltip = {
+			create_alliance = { target = scope:from_country }
+			add_opinion_mutual_effect = {
+				modifier = opinion_rot_timurid_golden_horde_alliance
+				target = scope:from_country
+			}
+		}
+		scope:from_country = {
+			trigger_event_silently = rise_of_timur.1002
+		}
+	}
+	#Pah, they are not even real children of $genghis_khan_name_no_tooltip$!
+	option = {
+		name = rise_of_timur.1001.b
+		custom_tooltip = {
+			text = rise_of_timur.1001.b.tt
+			scope:from_country = {
+				trigger_event_non_silently = rise_of_timur.1003
+			}
+		}
+		show_as_tooltip = {
+			scope:from_country = {
+				add_casus_belli = { target = scope:target_country type = casus_belli:cb_timurs_conquests }
+			}
+		}
+	}
+}
+#Timur's Alliance accepted
+rise_of_timur.1002 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1002.title
+	desc = rise_of_timur.1002.desc
+	#An alliance sounds good
+	option = {
+		name = rise_of_timur.1002.a
+		create_alliance = { target = scope:target_country }
+		add_opinion_mutual_effect = {
+			modifier = opinion_rot_timurid_golden_horde_alliance
+			target = scope:target_country
+		}
+	}
+}
+#Timur's Alliance rejected
+rise_of_timur.1003 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1003.title
+	desc = rise_of_timur.1003.desc
+	#An alliance sounds goodf
+	option = {
+		name = rise_of_timur.1003.a
+		add_casus_belli = { target = scope:target_country type = casus_belli:cb_timurs_conquests }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_had_glh_alliance_break
+		}
+	}
+}
+
+#Timur's Conflict with the GLH
+rise_of_timur.1010 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_country }
+				desc = rise_of_timur.1010.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.1010.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.1010.desc
+	immediate = {
+		save_scope_as = from_country
+		ruler ?= { save_scope_as = from_character }
+		c:GLH ?= {
+			save_scope_as = target_country
+			ruler_or_regent ?= { save_scope_as = target_character }
+		}
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_had_glh_alliance_break
+		}
+	}
+	#We have no more use of the Golden Horde
+	option = {
+		name = rise_of_timur.1010.a
+		historical_option = yes
+		show_as_tooltip = {
+			break_alliance = { target = scope:from_country }
+			remove_opinion_mutual_effect = { modifier = opinion_rot_timurid_golden_horde_alliance target = scope:target_country }
+			declare_war_with_cb = {
+				target = scope:target_country
+				type = casus_belli:cb_timurs_conquests
+			}
+		}
+		scope:target_country = {
+			trigger_event_silently = rise_of_timur.1011
+		}
+	}
+	#We should not break an alliance like this
+	option = {
+		name = rise_of_timur.1010.b
+		add_government_power = government_power_extreme_penalty
+	}
+}
+#Timur breaks the Alliance
+rise_of_timur.1011 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1011.title
+	desc = rise_of_timur.1011.desc
+	#These vile dogs...
+	option = {
+		name = rise_of_timur.1011.a
+		scope:from_country = {
+			break_alliance = { target = scope:target_country }
+			remove_opinion_mutual_effect = { modifier = opinion_rot_timurid_golden_horde_alliance target = scope:target_country }
+			declare_war_with_cb = {
+				target = scope:target_country
+				type = casus_belli:cb_timurs_conquests
+			}
+		}
+	}
+}
+
+#Claim over the Turkoman
+rise_of_timur.1020 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1020.title
+	desc = rise_of_timur.1020.desc
+	immediate = {
+		save_scope_as = from_country
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_claim_turkoman
+		}
+	}
+	#The Seljuk shall be restored!
+	option = {
+		name = rise_of_timur.1020.a
+		historical_option = yes
+		custom_tooltip = {
+			text = rise_of_timur.1020.a.tt
+			region:anatolia_region = {
+				every_location_in_region = {
+					limit = {
+						is_capital = yes
+						NOT = { owner = scope:from_country }
+						owner = {
+							NOT = { is_subject_of = scope:from_country }
+							OR = {
+								is_neighbor_of = scope:from_country
+								any_neighbor_country = { is_subject_of = scope:from_country }
+							}
+						}
+					}
+					owner = { trigger_event_non_silently = rise_of_timur.1021 }
+				}
+			}
+		}
+	}
+	#Pah! We shall prevail where the Seljuk have failed
+	option = {
+		name = rise_of_timur.1020.b
+		custom_tooltip = {
+			text = rise_of_timur.1020.b.tt
+			region:anatolia_region = {
+				every_location_in_region = {
+					limit = {
+						is_capital = yes
+						NOT = { owner = scope:from_country }
+						owner = {
+							NOT = { is_subject_of = scope:from_country }
+						}
+					}
+					owner = {
+						scope:from_country = {
+							add_casus_belli = {
+								type = casus_belli:cb_timurs_conquests
+								target = PREV
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#Vassalization under Timur
+rise_of_timur.1021 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1021.title
+	desc = rise_of_timur.1021.desc
+	immediate = {
+		save_scope_as = target_country
+	}
+	#An alliance sounds good
+	option = {
+		name = rise_of_timur.1021.a
+		show_as_tooltip = {
+			scope:target_country = {
+				make_subject_of = {
+					target = scope:from_country
+					type = subject_type:vassal
+				}
+			}
+		}
+		scope:from_country = {
+			trigger_event_silently = rise_of_timur.1022
+		}
+		ai_chance = {
+			factor = 1
+			modifier = {
+				factor = 0
+				has_variable = rise_of_the_ottomans_winner_variable
+			}
+			modifier = {
+				factor = 0
+				situation:rise_of_the_ottomans = {
+					situation_is_active = yes
+					has_variable = strongest_beylik_variable
+				}
+				root = situation:rise_of_the_ottomans.var:strongest_beylik_variable
+			}
+		}
+	}
+	#Pah, they are not even real children of $genghis_khan_name_no_tooltip$!
+	option = {
+		name = rise_of_timur.1021.b
+		scope:from_country = {
+			trigger_event_non_silently = rise_of_timur.1023
+		}
+	}
+}
+#Vassalization accepted
+rise_of_timur.1022 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1022.title
+	desc = rise_of_timur.1022.desc
+	#A wise choice
+	option = {
+		name = rise_of_timur.1022.a
+		scope:target_country = {
+			make_subject_of = {
+				target = root
+				type = subject_type:vassal
+			}
+		}
+	}
+}
+#Vassalization rejected
+rise_of_timur.1023 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1023.title
+	desc = rise_of_timur.1023.desc
+	#Then they shall pay in blood
+	option = {
+		name = rise_of_timur.1023.a
+		add_casus_belli = {
+			type = casus_belli:cb_timurs_conquests
+			target = scope:target_country
+		}
+	}
+}
+
+scripted_effect timurs_demands = {
+	if = {
+		limit = {
+			exists = scope:target_country
+			exists = scope:from_country
+		}
+		scope:target_country = {
+			custom_tooltip = {
+				text = timurs_demands_at
+				every_subject = {
+					limit = { capital = { region = region:anatolia_region } }
+					scope:from_country = {
+						make_subject_of = {
+							target = PREV
+							type = subject_type:tributary
+						}
+					}
+				}
+			}
+			transfer_yearly_gold = {
+				value = 3
+				target = scope:from_country
+			}
+			make_subject_of = {
+				target = PREV
+				type = subject_type:tributary
+			}
+		}
+	}
+}
+
+#Growing Influence of Timur in Anatolia
+rise_of_timur.1030 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_country }
+				desc = rise_of_timur.1030.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.1030.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.1030.desc
+	immediate = {
+		save_scope_as = from_country
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_tim_in_anatolia
+		}
+		random_neighbor_country = {
+			limit = {
+				OR = {
+					AND = {
+						situation:rise_of_the_ottomans = {
+							situation_is_active = yes
+							has_variable = strongest_beylik_variable
+							var:strongest_beylik_variable = PREV
+						}
+					}
+					has_variable = rise_of_the_ottomans_winner_variable
+					tag = TUR
+				}
+			}
+			save_scope_as = target_country
+		}
+	}
+	#Tell them who is in charge!
+	option = {
+		name = rise_of_timur.1030.a
+		historical_option = yes
+		custom_tooltip = {
+			text = rise_of_timur.1030.a.at
+			scope:target_country = {
+				trigger_event_non_silently = rise_of_timur.1031
+			}
+		}
+		show_as_tooltip = {
+			timurs_demands = yes
+		}
+	}
+	#[ShowRegionNameWithNoTooltip('anatolia_region')] is big enough for the both of us.
+	option = {
+		name = rise_of_timur.1030.b
+		add_government_power = government_power_mild_penalty
+	}
+}
+#Timur pushes into Anatolia
+rise_of_timur.1031 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1031.title
+	desc = rise_of_timur.1031.desc
+
+	immediate = {
+		save_scope_as = target_country
+	}
+	#It is in our best interests to comply.
+	option = {
+		name = rise_of_timur.1031.a
+		custom_tooltip = {
+			text = rise_of_timur.1031.a.tt
+			scope:from_country = {
+				trigger_event_silently = rise_of_timur.1032
+			}
+		}
+		show_as_tooltip = {
+			timurs_demands = yes
+		}
+	}
+	#Their hubris knows no limits.
+	option = {
+		name = rise_of_timur.1031.b
+		historical_option = yes
+		scope:from_country = {
+			show_as_tooltip = {
+				declare_war_with_cb = {
+					target = scope:target_country
+					type = casus_belli:cb_timurs_conquests
+				}
+			}
+			trigger_event_silently = rise_of_timur.1033
+		}
+	}
+}
+#Ottomans subjugate themselves
+rise_of_timur.1032 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1032.title
+	desc = rise_of_timur.1032.desc
+	#A wise decision.
+	option = {
+		name = rise_of_timur.1032.a
+		timurs_demands = yes
+	}
+}
+#Active war between Timur and Ottomans
+rise_of_timur.1033 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1033.title
+	desc = rise_of_timur.1033.desc
+	#War it is then.
+	option = {
+		name = rise_of_timur.1033.a
+		declare_war_with_cb = {
+			target = scope:target_country
+			type = casus_belli:cb_timurs_conquests
+		}
+	}
+}
+
+#Capture of the Ottoman Sultan
+rise_of_timur.1040 = {
+	type = country_event
+	category = situation_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_character }
+				desc = rise_of_timur.1040.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = rise_of_timur.1040.title.generic
+			}
+		}
+	}
+	desc = rise_of_timur.1040.desc
+	historical_info = rise_of_timur.1040.desc.historical_info
+	immediate = {
+		scope:previous_owner = {
+			save_scope_as = target_country
+			ruler ?= {
+				save_scope_as = target_character
+			}
+		}
+		save_scope_as = from_country
+		ruler ?= { save_scope_as = from_character }
+		flag_situation_event = {
+			situation = situation:rise_of_timur
+			event = rot_capturing_the_ottoman_sultan
+		}
+	}
+	#He will be a nice trophy!
+	option = {
+		name = rise_of_timur.1040.a
+		historical_option = yes
+		add_prestige = prestige_extreme_bonus
+		scope:target_character = {
+			imprison_character_in_country_effect = {
+				target = scope:from_country
+				years = -1
+			}
+		}
+		scope:target_country = {
+			trigger_event_silently = rise_of_timur.1041
+			show_as_tooltip = {
+				add_stability = stability_ultimate_penalty
+				add_government_power = government_power_radical_penalty
+				add_prestige = prestige_extreme_penalty
+				add_war_exhaustion = war_exhaustion_extreme_penalty
+			}
+		}
+	}
+}
+#Sultan captured!
+rise_of_timur.1041 = {
+	type = country_event
+	category = situation_event
+	title = rise_of_timur.1041.title
+	desc = rise_of_timur.1041.desc
+	historical_info = rise_of_timur.1040.desc.historical_info
+	#This is the doom!
+	option = {
+		name = rise_of_timur.1041.a
+		show_as_tooltip = {
+			scope:target_character = {
+				imprison_character_in_country_effect = {
+					target = scope:from_country
+					years = -1
+				}
+			}
+		}
+		add_stability = stability_ultimate_penalty
+		add_government_power = government_power_radical_penalty
+		add_prestige = prestige_extreme_penalty
+		add_war_exhaustion = war_exhaustion_extreme_penalty
+	}
+}

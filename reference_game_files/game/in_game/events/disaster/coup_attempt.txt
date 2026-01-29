@@ -1,0 +1,842 @@
+﻿namespace = coup_attempt
+
+#Start event
+coup_attempt.1 = {
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.1.title
+	desc = coup_attempt.1.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+		every_character = {
+			limit = {
+				is_ruler = no
+				is_regent = no
+				is_adult = yes 
+			}
+			random_list = {
+				10 = { 
+					set_variable = potential_conspirator_variable
+				}
+				90 = { }
+			}
+		}
+		random_character = {	#To ensure there is at least 1 conspirator
+			limit = {
+				is_ruler = no
+				is_regent = no
+				is_adult = yes 
+				NOT = { has_variable = potential_conspirator_variable }
+			}
+			set_variable = potential_conspirator_variable 
+		}
+	}
+	option = {
+		name = coup_attempt.1.a
+		
+		custom_tooltip = explain_coup_attempt_tt
+	}
+}
+
+coup_attempt.2 = {	#Conspiracy Gains Member
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.2.title
+	desc = coup_attempt.2.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	trigger = {
+		NOT = { has_variable = recently_had_coup_attempt2_event }
+		any_character = {
+			is_ruler = no
+			is_regent = no
+			is_adult = yes 
+			NOT = { has_variable = potential_conspirator_variable }
+		}
+	}
+
+	immediate = {
+		random_character = {
+			limit = { 
+				is_ruler = no
+				is_regent = no
+				is_adult = yes 
+				NOT = { has_variable = potential_conspirator_variable }
+			}
+			set_variable = potential_conspirator_variable
+		}
+		set_variable = {
+			name = recently_had_coup_attempt2_event
+			years = 1
+		}
+	}
+
+	option = {
+		name = coup_attempt.2.a
+		
+		custom_tooltip = conspiracy_grows_tt
+	}
+}
+
+coup_attempt.3 = {	#Conspiracy Member Exposed
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.3.title
+	desc = coup_attempt.3.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	trigger = {
+		any_character = {
+			has_variable = potential_conspirator_variable
+		}
+	}
+
+	immediate = {
+		random_character = {
+			limit = { 
+				has_variable = potential_conspirator_variable
+			}
+			save_scope_as = target_character_1
+		}
+		ruler_or_regent ?= { save_scope_as = target_character_2 }
+		random_neighbor_country = { save_scope_as = target_country }
+
+		if = {
+			limit = {
+				any_character = {
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+					count > 2
+				}
+			}
+			random_character = {
+				limit = {
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+				}
+				save_scope_as = target_character_3
+			}
+			random_character = {
+				limit = {
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+					this != scope:target_character_3
+				}
+				save_scope_as = target_character_4
+			}
+
+			random_character = {
+				limit = {
+					is_ruler = no
+					is_regent = no
+					is_adult = yes
+					this != scope:target_character_1
+					this != scope:target_character_3
+					this != scope:target_character_4
+				}
+				save_scope_as = target_character_5
+			}
+
+			random_character = {
+				limit = {
+					is_ruler = no
+					is_regent = no
+					is_adult = yes
+					this != scope:target_character_1
+					this != scope:target_character_3
+					this != scope:target_character_4
+					this != scope:target_character_5
+				}
+				save_scope_as = target_character_6
+			}
+		}
+	}
+
+	option = {	#Kill him
+		name = coup_attempt.3.a
+		
+		kill_character = {
+			target = scope:target_character_1
+			reason = execution
+			killer = scope:target_character_2
+		}
+
+		add_government_power = government_power_weak_bonus
+	}
+
+	option = {	#Spare him
+		name = coup_attempt.3.b
+
+		trigger = {
+			exists = scope:target_country
+		}
+		
+		add_stability = stability_weak_bonus
+
+		scope:target_character_1 = { remove_variable = potential_conspirator_variable }
+		random_list = {
+			75 = {
+				desc = target_character_1_flees
+				show_chance = no
+				scope:target_character_1 = { move_country = scope:target_country }
+			}
+			25 = {
+				desc = cease_activities_and_stay
+				show_chance = no 
+				add_government_power = government_power_weak_penalty 
+			}
+		}
+	}
+
+	option = {	#Use him
+		name = coup_attempt.3.c
+
+		trigger = {
+			exists = scope:target_character_3
+			exists = scope:target_character_4
+			exists = scope:target_character_5
+			exists = scope:target_character_6
+		}
+
+		custom_tooltip = {
+			text = coup_attempts_3_b_tt
+			scope:target_character_1 = { remove_variable = potential_conspirator_variable }
+			random_list = {
+				90 = {
+					show_chance = no 
+					kill_character = {
+						target = scope:target_character_3
+						reason = execution
+						killer = scope:target_character_2
+					}
+					kill_character = {
+						target = scope:target_character_4
+						reason = execution
+						killer = scope:target_character_2
+					}
+				}
+				10 = {
+					show_chance = no 
+					kill_character = {
+						target = scope:target_character_5
+						reason = execution
+						killer = scope:target_character_2
+					}
+					kill_character = {
+						target = scope:target_character_6
+						reason = execution
+						killer = scope:target_character_2
+					}
+				}
+			}
+		}
+	}
+}
+
+coup_attempt.4 = {	#Investigators Present Findings
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.4.title
+	desc = coup_attempt.4.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	immediate = {
+		random_character = {
+			limit = { has_variable = potential_conspirator_variable }
+			save_scope_as = target_character_1
+		}
+		ruler_or_regent ?= { save_scope_as = target_character_2 }
+	}
+
+	option = {	#Kill him
+		name = coup_attempt.3.a
+		
+		kill_character = {
+			target = scope:target_character_1
+			reason = execution
+			killer = scope:target_character_2
+		}
+
+		add_government_power = government_power_weak_bonus
+	}
+
+	option = {	#Spare him
+		name = coup_attempt.3.b
+		
+		add_stability = stability_weak_bonus
+		custom_tooltip = {
+			text = target_character_1_ends_support_tt
+			scope:target_character_1 = { remove_variable = potential_conspirator_variable }
+		}
+	}
+}
+
+coup_attempt.5 = {	#Heir Falls Under Suspicion
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.5.title
+	desc = coup_attempt.5.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	trigger = {
+		has_heir = yes
+		heir = { has_variable = potential_conspirator_variable }
+	}
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character_1 }
+		heir = { save_scope_as = target_character_2 }
+	}
+
+	option = {
+		name = coup_attempt.5.a
+
+		add_government_power = government_power_mild_bonus
+		scope:target_character_2 = {
+			imprison_character_effect = {
+				years = modifier_duration_years_short
+			}
+			hidden_effect = { remove_variable = potential_conspirator_variable }
+		}
+		if = {
+			limit = {
+				scope:target_character_2 = {
+					in_cabinet = yes
+				}
+			}
+			remove_from_cabinet = scope:target_character_2
+		}
+	}
+
+	option = {	#Have him killed
+		name = coup_attempt.5.b
+		
+		add_government_power = government_power_extreme_bonus
+		add_prestige = prestige_mild_penalty
+		kill_character = {
+			target = scope:target_character_2
+			reason = execution
+			killer = scope:target_character_1
+		}
+	}
+
+	option = {	#Leave him be
+		name = coup_attempt.5.c
+
+		add_stability = stability_weak_penalty
+		
+	}
+}
+
+coup_attempt.6 = {	#The Private Council
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.6.title
+	desc = coup_attempt.6.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	immediate = {
+		set_variable = relevant_event_variable
+		ruler_or_regent ?= { save_scope_as = target_character_1 }
+		random_list = {
+			33 = {
+				trigger = { country_has_estate = estate_type:nobles_estate }
+				
+				"estate(estate_type:nobles_estate)" = {
+					random_possible_privilege = {
+						save_scope_as = target_privilege_1
+					}
+				}
+			}
+			33 = {
+				trigger = { country_has_estate = estate_type:burghers_estate }
+				
+				"estate(estate_type:nobles_estate)" = {
+					random_possible_privilege = {
+						save_scope_as = target_privilege_2
+					}
+				}
+			}
+			33 = {
+				trigger = { country_has_estate = estate_type:clergy_estate }
+				
+				"estate(estate_type:clergy_estate)" = {
+					random_possible_privilege = {
+						save_scope_as = target_privilege_3
+					}
+				}
+			}
+		}
+	}
+	option = {
+		name = coup_attempt.6.a
+		
+		custom_tooltip = {
+			text = conspirator_names_exposed_tt
+			trigger_event_silently = coup_attempt.7
+		}
+		
+		change_gold_effect = { scale = -3 }
+
+		if = {
+			limit = {
+				exists = scope:target_privilege_1
+			}
+			grant_estate_privilege = scope:target_privilege_1
+		}
+		else_if = {
+			limit = { country_has_estate = estate_type:nobles_estate }
+			"estate(estate_type:nobles_estate)" = {
+				estate_add_gold = {
+					value = {
+						add = root.monthly_income_total
+						multiply = 1
+					}
+				}
+			}
+		}
+		if = {
+			limit = {
+				exists = scope:target_privilege_2
+			}
+			grant_estate_privilege = scope:target_privilege_2
+		}
+		else_if = {
+			limit = { country_has_estate = estate_type:burghers_estate }
+			"estate(estate_type:burghers_estate)" = {
+				estate_add_gold = {
+					value = {
+						add = root.monthly_income_total
+						multiply = 1
+					}
+				}
+			}
+		}
+		if = {
+			limit = {
+				exists = scope:target_privilege_3
+			}
+			grant_estate_privilege = scope:target_privilege_3
+		}
+		else_if = {
+			limit = { country_has_estate = estate_type:clergy_estate }
+			"estate(estate_type:clergy_estate)" = {
+				estate_add_gold = {
+					value = {
+						add = root.monthly_income_total
+						multiply = 1
+					}
+				}
+			}
+		}
+	}
+
+	option = {
+		name = coup_attempt.6.b
+
+		add_prestige = prestige_weak_penalty
+	}
+
+	after = {
+		hidden_effect = { remove_variable = relevant_event_variable }
+	}
+}
+
+coup_attempt.7 = {	#The Private Council
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.7.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				desc = coup_attempt.7.desc	#When there are more than 2 conspirators
+				trigger = {
+					any_character = {
+						has_variable = potential_conspirator_variable 
+						count > 2
+					}
+				}
+			}
+			triggered_desc = {
+				desc = coup_attempt.7.desc_b	#When there is only 1 conspirator
+				trigger = {
+					NOT = {
+						any_character = {
+							has_variable = potential_conspirator_variable 
+							count > 2
+						}
+					}
+				}
+			}
+		}
+	}
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character_1 }
+		if = {
+			limit = {
+				any_character = {
+					has_variable = potential_conspirator_variable 
+					count > 2
+				}
+			}
+			random_character = {
+				limit = { 
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+				}
+				save_scope_as = target_character_2
+			}
+			random_character = {
+				limit = { 
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+					this != scope:target_character_2
+				}
+				save_scope_as = target_character_3
+			}
+			random_character = {
+				limit = { 
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+					this != scope:target_character_2
+					this != scope:target_character_3
+				}
+				save_scope_as = target_character_4
+			}
+		}
+		else = {
+			random_character = {
+				limit = { 
+					has_variable = potential_conspirator_variable
+					this != scope:target_character_1
+				}
+				save_scope_as = target_character_2
+			}
+		}
+	}
+	option = {	#Execute them!
+		name = coup_attempt.7.a
+
+		trigger = {
+			any_character = {
+				has_variable = potential_conspirator_variable 
+				count > 2
+			}
+		}
+		
+		add_government_power = government_power_extreme_bonus
+		kill_character = {
+			target = scope:target_character_2
+			reason = execution
+			killer = scope:target_character_1
+		}
+		if = {
+			limit = { exists = scope:target_character_3 }
+			kill_character = {
+				target = scope:target_character_2
+				reason = execution
+				killer = scope:target_character_1
+			}
+		}
+		if = {
+			limit = { exists = scope:target_character_4 }
+			kill_character = {
+				target = scope:target_character_4
+				reason = execution
+				killer = scope:target_character_1
+			}
+		}
+	}
+
+	option = {	#Grant clemency
+		name = coup_attempt.7.b 
+
+		trigger = {
+			any_character = {
+				has_variable = potential_conspirator_variable 
+				count > 2
+			}
+		}
+		
+		add_stability = stability_mild_penalty
+		custom_tooltip = {
+			text = conspirators_will_stick_around_absolved_tt
+			scope:target_character_2 ?= { remove_variable = potential_conspirator_variable }
+			scope:target_character_3 ?= { remove_variable = potential_conspirator_variable }
+			scope:target_character_4 ?= { remove_variable = potential_conspirator_variable }
+		}
+	}
+
+	option = {
+		name = coup_attempt.7.c
+
+		trigger = {
+			NOT = {
+				any_character = {
+					has_variable = potential_conspirator_variable 
+					count > 2
+				}
+			}
+		}
+
+		add_government_power = government_power_extreme_bonus
+		kill_character = {
+			target = scope:target_character_2
+			reason = execution
+			killer = scope:target_character_1
+		}
+	}
+
+	option = {
+		name = coup_attempt.7.d
+
+		trigger = {
+			NOT = {
+				any_character = {
+					has_variable = potential_conspirator_variable 
+					count > 2
+				}
+			}
+		}
+
+		add_stability = stability_weak_penalty
+		custom_tooltip = {
+			text = conspirators_will_stick_around_absolved_2_tt
+			scope:target_character_2 ?= { remove_variable = potential_conspirator_variable }
+		}
+	}
+}
+
+coup_attempt.8 = {	#Assassination Attempt
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.8.title
+	desc = coup_attempt.8.desc
+
+	image = "gfx/interface/illustrations/disaster/placeholder.dds"
+
+	trigger = {
+		any_character = {
+			has_variable = potential_conspirator_variable
+			percent > 0.25	#Most people in the court are Conspirators
+		}
+		NOT = { has_variable = recent_assassination_variable }	#Only once a year at most
+	}
+
+	immediate = {
+		set_variable = {
+			name = recent_assassination_variable
+			years = 1
+		}
+		ruler_or_regent ?= { save_scope_as = target_character_1 }
+		random_character = {
+			limit = { has_variable = potential_conspirator_variable }
+			save_scope_as = target_character_2
+		}
+	}
+	option = {	#Execute them!
+		name = coup_attempt.8.a
+		
+		random_list = {
+			75 = {
+				kill_character = {
+					target = scope:target_character_1
+					reason = assassination
+					killer = scope:target_character_2
+				}
+
+				custom_tooltip = {
+					text = this_will_end_the_coup_disaster_tt
+					set_variable = {
+						name = recently_had_coup_attempt_inconclusive_or_negative_variable
+						years = 5
+					}
+					set_variable = {
+						name = murdered_ruler_variable
+						months = 6
+					}
+				}
+			}
+			25 = { add_government_power = government_power_extreme_bonus }
+		}
+		
+	}
+}
+
+coup_attempt.9 = {	#Executing Court Member Actioned Event
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.9.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				desc = coup_attempt.9.desc.conspirator	#When scope:recipient is a conspirator
+				trigger = {
+					scope:target_character_2 = { has_variable = potential_conspirator_variable }
+				}
+			}
+			triggered_desc = {
+				desc = coup_attempt.9.desc.innocent	#When scope:recipient is innocent
+				trigger = {
+					scope:target_character_2 = { NOT = { has_variable = potential_conspirator_variable } }
+				}
+			}
+		}
+	}
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+		scope:target_character_2 = { }
+	}
+
+	option = {	#Execute them!
+		name = coup_attempt.9.a
+
+		trigger = {
+			scope:target_character_2 = { NOT = { has_variable = potential_conspirator_variable } }
+		}
+
+		show_as_tooltip = {
+			kill_character = {
+				target = scope:target_character_2
+				reason = execution
+				killer = scope:target_character
+			}
+		}
+		
+		if = {
+			limit = {
+				scope:target_character_2 = {
+					OR = {
+						is_consort = yes
+						is_heir = yes
+					}
+				}
+			}
+			custom_tooltip = because_they_are_consort_or_heir_tt
+			add_stability = stability_severe_penalty
+		}
+		else = { add_stability = stability_weak_penalty }
+
+		hidden_effect = {
+			kill_character = {
+				target = scope:target_character_2
+				reason = execution
+				killer = scope:target_character
+			}
+		}
+	}
+
+	option = {
+		name = coup_attempt.9.b
+
+		trigger = {
+			scope:target_character_2 = { has_variable = potential_conspirator_variable }
+		}
+		
+		add_government_power = government_power_mild_bonus
+		kill_character = {
+			target = scope:target_character_2
+			reason = execution
+			killer = scope:target_character
+		}
+		
+	}
+}
+
+coup_attempt.100 = {	#Inconclusive Ending / Time ran out and conspirators are still alive and active
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.100.title
+	desc = coup_attempt.100.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+	
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+		set_variable = {
+			name = recently_had_coup_attempt_inconclusive_or_negative_variable
+			years = 5
+		}
+		if = {
+			limit = { has_variable = murdered_ruler_variable }
+			previous_ruler ?= { save_scope_as = target_character_2 }
+		}
+	}
+
+	option = {
+		name = coup_attempt.100.a
+
+		if = {
+			limit = {
+				NOT = { has_variable = murdered_ruler_variable }
+			}
+			custom_tooltip = inconclusive_end_5_years_tt
+		}
+		else = {
+			custom_tooltip = murdered_ending_tt
+			set_variable = had_successful_coup
+		}
+		
+	}
+}
+
+coup_attempt.101 = {	#Good Ending / Conspirators Eliminated or Legitimacy Restored
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.101.title
+	desc = coup_attempt.101.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+	
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = coup_attempt.101.a
+		
+		add_prestige = prestige_extreme_bonus
+	}
+}
+
+coup_attempt.200 = {	#Weird Ending / We are not a monarchy anymore
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = coup_attempt.200.title
+	desc = coup_attempt.200.desc
+
+	image = "gfx/interface/illustrations/disaster/coup_attempt.dds"
+	
+
+	immediate = {
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = coup_attempt.200.a
+
+	}
+}

@@ -1,0 +1,795 @@
+﻿namespace = culture_religion_events
+culture_religion_events.1 = {
+	type = country_event
+	title = culture_religion_events.1.title
+	desc = culture_religion_events.1.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		country_has_estate = estate_type:nobles_estate
+		has_heir = yes
+		has_regent = no
+		heir = { 
+			age_in_years >= 13 
+			age_in_years < 25
+		}
+		
+		any_cabinet_character ?= {
+			culture != root.heir.culture
+			culture != root.culture 
+		}		
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = {
+				culture != root.heir.culture
+				culture != root.culture
+			}
+			save_scope_as = teacher
+		}
+		heir = { save_scope_as = target_heir }
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = culture_religion_events.1.a
+		remove_from_cabinet = scope:teacher
+		scope:teacher = { 
+			add_character_modifier = { 
+				modifier = banned_from_cabinet 
+				years = 20 
+				mode = add_and_extend 
+			}	
+		}	
+		add_estate_satisfaction = { 
+			type = estate_type:nobles_estate 
+			value = estate_satisfaction_mild_bonus 
+		}
+	}
+	option = {
+		name = culture_religion_events.1.b
+		heir = {
+			change_character_culture = scope:teacher.culture
+		}
+		add_legitimacy = legitimacy_mild_penalty
+	}
+}
+
+culture_religion_events.2 = {
+	type = country_event
+	title = culture_religion_events.2.title
+	desc = culture_religion_events.2.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}	
+	trigger = {
+		trigger_if = {
+			limit = {
+				exists = scope:old_ruler
+				exists = scope:new_ruler
+			}
+			NOT = { scope:old_ruler = scope:new_ruler }
+		}
+		ruler ?= { 
+			culture ?= {
+				exists = this
+				NOR = {
+					this = root.culture
+					reverse_cultural_view = { target = root.culture value = kindred }
+				}
+			}
+		}
+		NOT = {
+			tag = PAP
+		}
+	}
+
+	immediate = {
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+	}
+
+	option = {
+		name = culture_religion_events.2.a
+		custom_tooltip = {
+			text = culture_religion_events.2.a.tt
+			every_known_country = {
+				limit = {
+					culture = root.ruler.culture
+				}
+				add_opinion = { target = root modifier = opinion_ruler_of_our_culture }
+			}
+		}
+		add_legitimacy = legitimacy_mild_penalty
+	}
+	option = {
+		name = culture_religion_events.2.b
+		add_stability = stability_mild_penalty
+	}
+}
+
+culture_religion_events.3 = {
+	type = country_event
+	title = culture_religion_events.3.title
+	desc = culture_religion_events.3.desc
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+	trigger = {
+		country_has_estate = estate_type:nobles_estate
+		has_ruler = yes
+		ruler.religion != root.religion
+		ruler.religion.group = religion.group
+		num_of_non_rural > 0
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		ruler = { save_scope_as = target_ruler }
+	}
+
+	option = {
+		name = culture_religion_events.3.a
+		custom_tooltip = {
+			text = culture_religion_events.3.a.tt
+			
+			ordered_owned_location = {
+				order_by = population
+				check_range_bounds = no
+				limit = {
+					local_control < 0.5
+				}
+				max = root.num_provinces
+
+				ordered_pop = {
+					limit = { 
+						NOT = { religion = root.religion } 
+					}
+					order_by = pop_size
+					max = 1
+					check_range_bounds = no
+					split_pop = {
+						fraction = 0.10
+						religion = root.ruler.religion
+					}
+				}
+			}
+		}
+
+	}
+	option = {
+		name = culture_religion_events.3.b
+		add_legitimacy = legitimacy_mild_penalty
+	}
+}
+
+
+culture_religion_events.4 = {
+	type = country_event
+	title = culture_religion_events.4.title
+	desc = culture_religion_events.4.desc
+	illustration_tags = {
+		10 = armed
+		10 = exterior
+	}
+	trigger = {
+		country_has_estate = estate_type:nobles_estate
+		country_has_estate = estate_type:clergy_estate
+		has_ruler = yes
+
+		religion.group = ruler.religion.group
+		ruler.religion != root.religion
+		
+		any_owned_non_rural_location = { dominant_religion ?= root.religion }
+	}
+
+
+	immediate = {
+		ordered_owned_non_rural_location = {
+			order_by = population
+			limit = {
+				dominant_religion ?= root.religion
+			}
+			max = 1
+			save_scope_as = rebel_province
+		}
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		ruler = { save_scope_as = target_ruler }
+	}
+
+	option = {
+		name = culture_religion_events.4.a
+		add_legitimacy = legitimacy_mild_penalty
+		scope:rebel_province = { every_pop = {	add_pop_satisfaction = pop_satisfaction_severe_penalty	} }
+	}
+}
+
+culture_religion_events.5 = {
+	type = country_event
+	title = culture_religion_events.5.title
+	desc = culture_religion_events.5.desc
+	illustration_tags = {
+		10 = angry
+		10 = exterior
+	}
+	trigger = {
+		has_ruler = yes
+		religion.group != ruler.religion.group
+		country_has_estate = estate_type:clergy_estate
+		ruler = {
+			any_ruling_countries = { #So that it's not changing cultures of rulers that are also ruling other countries
+				count = 1
+			}
+		}
+		any_owned_non_rural_location = { dominant_religion ?= root.religion }
+	}
+
+	immediate = {
+		ordered_owned_non_rural_location = {
+			order_by = population
+			limit = { dominant_religion ?= root.religion }
+			max = 1
+			save_scope_as = rebel_province
+		}
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		ruler = { save_scope_as = target_ruler }
+	}
+
+	option = {
+		name = culture_religion_events.5.a
+		scope:rebel_province = { every_pop = {	add_pop_satisfaction = pop_satisfaction_severe_penalty	} }
+	}
+	option = {
+		name = culture_religion_events.5.b
+		ruler = { change_character_religion = root.religion }
+		add_prestige = prestige_extreme_penalty
+	}
+}
+
+culture_religion_events.6 = {
+	type = country_event
+	title = culture_religion_events.6.title
+	desc = culture_religion_events.6.desc
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+	trigger = {
+		country_has_estate = estate_type:clergy_estate
+		has_ruler = yes
+		ruler.religion != root.religion 
+		any_cabinet_character ?= { religion = root.ruler.religion }
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = { religion = root.ruler.religion }
+			save_scope_as = minister
+		}
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		ruler = { save_scope_as = target_ruler }
+	}
+
+	option = {
+		name = culture_religion_events.6.a
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_penalty }
+	}
+	option = {
+		name = culture_religion_events.6.b
+		add_legitimacy = legitimacy_mild_penalty
+		remove_from_cabinet = scope:minister
+		scope:minister = { add_character_modifier = { modifier = banned_from_cabinet years = 20 mode = add_and_extend }	}
+	}
+}
+
+culture_religion_events.7 = {
+	type = country_event
+	title = culture_religion_events.7.title
+	desc = culture_religion_events.7.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		ruler.culture != root.culture
+		ruler = {
+			owner = root
+		}
+		any_cabinet_character ?= { culture = root.culture }
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = { culture = root.culture }
+			save_scope_as = minister
+		}
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = culture_religion_events.7.a
+		add_legitimacy = legitimacy_mild_penalty
+	}
+	option = {
+		name = culture_religion_events.7.b
+		remove_from_cabinet = scope:minister
+		scope:minister = { add_character_modifier = { modifier = banned_from_cabinet years = 20 mode = add_and_extend }	}
+	}
+}
+
+culture_religion_events.8 = {
+	type = country_event
+	title = culture_religion_events.8.title
+	desc = culture_religion_events.8.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		ruler.culture != root.culture
+	}
+
+	immediate = {
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = culture_religion_events.8.a
+		add_legitimacy = legitimacy_mild_penalty
+	}
+	option = {
+		name = culture_religion_events.8.b
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+culture_religion_events.9 = {
+	type = country_event
+	title = culture_religion_events.9.title
+	desc = culture_religion_events.9.desc
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		ruler.culture != root.culture
+		any_known_country = {
+			this != root
+			culture = root.ruler.culture
+			num_of_advances_researched > root.num_of_advances_researched
+		}
+	}
+
+
+	immediate = {
+		random_known_country = {
+			limit = {
+				this != root
+				culture = root.ruler.culture
+				num_of_advances_researched > root.num_of_advances_researched
+			}
+			save_scope_as = advanced_country
+		}
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+
+	}
+
+	option = {
+		name = culture_religion_events.9.a
+		every_known_country = {
+			limit = {
+				this != root
+				culture = root.ruler.culture
+			}
+			add_opinion = { target = root modifier = opinion_ruler_of_our_culture }
+		}
+	}
+	option = {
+		name = culture_religion_events.9.b
+		add_research_progress = research_progress_severe_bonus 
+	}
+}
+
+culture_religion_events.10 = {
+	type = country_event
+	title = culture_religion_events.10.title
+	desc = culture_religion_events.10.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		any_cabinet_character ?= { 
+			culture ?= {
+				NOT = {
+					this = root.culture
+				} 
+			}
+		}
+		country_has_estate = estate_type:nobles_estate
+		country_has_estate = estate_type:burghers_estate
+	}
+
+
+	immediate = {
+		ruler = { save_scope_as = target_ruler }
+		random_cabinet_character = {
+			limit = { culture != root.culture }
+			save_scope_as = minister
+		}
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:burghers_estate }
+	}
+
+	option = {
+		name = culture_religion_events.10.a
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
+		remove_from_cabinet = scope:minister
+		scope:minister = { add_character_modifier = { modifier = banned_from_cabinet years = 20 mode = add_and_extend }	}
+	}
+	option = {
+		name = culture_religion_events.10.b
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_penalty }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+	}
+}
+
+culture_religion_events.11 = {
+	type = country_event
+	title = culture_religion_events.11.title
+	desc = culture_religion_events.11.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}
+	trigger = {
+		has_ruler = yes
+		any_cabinet_character ?= {
+			culture ?= {
+				NOT = {
+ 					this = root.culture
+				}
+			}
+			root = {
+				"culture_percentage_in_country(prev.culture)" > 0
+			}
+		}
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = { culture != root.culture }
+			save_scope_as = minister
+			culture = {save_scope_as = target_culture}
+		}
+		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
+	}	
+
+	option = {
+		name = culture_religion_events.11.a
+		custom_tooltip = {
+			text = every_location_with_target_culture_receives_changes_tt
+			every_owned_location = {
+				limit = { dominant_culture ?= scope:minister.culture }
+				change_development = development_weak_bonus
+			}
+		}
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+culture_religion_events.12 = {
+	type = country_event
+	title = culture_religion_events.12.title
+	desc = culture_religion_events.12.desc
+	illustration_tags = {
+		10 = happy
+		10 = exterior
+	}	
+	trigger = {
+		has_ruler = yes
+		any_cabinet_character ?= {
+			religion != root.religion
+			religion.group = root.religion.group
+			root = { "religion_percentage_in_country(religion)" > 0.01 }
+		}
+	}
+	
+	immediate = {
+		random_cabinet_character = {
+			limit = {
+				religion != root.religion
+				religion.group = root.religion.group
+				root = { "religion_percentage_in_country(religion)" > 0.01 }
+			}
+			save_scope_as = minister
+		}
+		event_illustration_poptype_effect = { foreground = pop_type:burghers   background = pop_type:burghers }
+	}
+
+	option = {
+		name = culture_religion_events.12.a
+		add_stability = stability_mild_bonus
+		custom_tooltip = {
+			text = culture_religion_events.12.a.tt
+			every_owned_location = {
+				limit = {
+					any_pop = {
+						owner ?= root
+						religion = scope:minister.religion
+					}
+				}
+				every_pop = {
+					limit = {
+						owner ?= root
+						religion = scope:minister.religion
+					}
+					add_pop_satisfaction = pop_satisfaction_mild_bonus
+				}
+			}
+		}
+	}
+}
+
+culture_religion_events.13 = {
+	type = country_event
+	title = culture_religion_events.13.title
+	desc = culture_religion_events.13.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		any_cabinet_character ?= { religion.group != root.religion.group	}
+		country_has_estate = estate_type:clergy_estate
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = { religion.group != root.religion.group }
+			save_scope_as = minister
+		}	
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = culture_religion_events.13.a
+		remove_from_cabinet = scope:minister
+		scope:minister = { add_character_modifier = { modifier = banned_from_cabinet years = 20 mode = add_and_extend }	}
+	}
+	option = {
+		name = culture_religion_events.13.b
+		trigger = {
+			any_known_country = { religion.group = root.religion.group }
+		}
+
+		custom_tooltip = {
+			text = culture_religion_events.13.b.tt
+			ordered_known_country = {
+				limit = {
+					religion.group = root.religion.group
+					this != root
+				}
+				order_by = modifier:great_power_score
+				max = num_provinces	
+				check_range_bounds = no
+				add_opinion = { target = root modifier = entertaining_heathens }
+			}
+		}
+	}
+}
+
+culture_religion_events.14 = {
+	type = country_event
+	title = culture_religion_events.14.title
+	desc = culture_religion_events.14.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_ruler = yes
+		any_cabinet_character ?= {
+			religion != root.religion
+			religion.group = root.religion.group
+		}
+		country_has_estate = estate_type:clergy_estate
+	}
+
+	immediate = {
+		random_cabinet_character = {
+			limit = {
+				religion != root.religion
+				religion.group = root.religion.group
+			}
+			save_scope_as = minister
+		}
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_government_estate_effect = yes
+	}
+
+	option = {
+		name = culture_religion_events.14.a
+		remove_from_cabinet = scope:minister
+		scope:minister = { add_character_modifier = { modifier = banned_from_cabinet years = 20 mode = add_and_extend }	}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+	}
+	option = {
+		name = culture_religion_events.14.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_extreme_penalty }
+	}
+}
+
+
+
+culture_religion_events.18 = {
+	type = country_event
+	title = culture_religion_events.18.title
+	desc = culture_religion_events.18.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		has_heir = yes
+		has_ruler = yes
+		government_type = government_type:monarchy
+		societal_value:traditionalist_vs_innovative > 20
+		heir = { 
+			owner = root
+			age_in_years > 14
+			religion = root.religion
+		}
+		
+		religion = {
+			any_other_religion_in_same_group = {
+				is_religion_enabled = yes
+				this != root.religion
+			}
+		}
+		country_has_estate = estate_type:clergy_estate
+	}
+
+	immediate = {
+		religion = {
+			random_other_religion_in_same_group = {
+				limit = {
+					is_religion_enabled = yes
+					this != root.religion
+				}
+				save_scope_as = target_religion
+			}
+		}
+		heir = { save_scope_as = target_heir }
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+
+	}
+
+	option = {
+		name = culture_religion_events.18.a
+		heir = {
+			add_adm = -10
+			add_dip = -10
+			add_mil = -10
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+
+	}
+	option = {
+		name = culture_religion_events.18.b
+		heir = { change_character_religion = scope:target_religion }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_severe_penalty }
+	}
+}
+
+
+
+culture_religion_events.21 = {
+	type = country_event
+	title = culture_religion_events.21.title
+	desc = culture_religion_events.21.desc
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+	trigger = {
+		legitimacy > 90.00
+		stability > 20
+		has_ruler = yes
+		ruler.religion != root.religion
+		ruler.religion.group = religion.group
+		exists = capital
+		capital ?= { dominant_religion ?= root.religion }
+		country_has_estate = estate_type:nobles_estate
+		country_has_estate = estate_type:clergy_estate
+	}
+
+	immediate = {
+		ruler = { save_scope_as = target_ruler }
+		capital = { save_scope_as = target_capital }
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:nobles_estate }
+	}
+
+	option = {
+		name = culture_religion_events.21.a
+		custom_tooltip = {
+			text = culture_religion_events.21.a.tt
+			capital = {
+				every_pop = {
+					limit = { religion = root.religion }
+					split_pop = {
+						fraction = 0.25
+						religion = root.ruler.religion
+					}
+				}
+			}
+		}
+		add_stability = stability_ultimate_penalty
+		add_legitimacy = legitimacy_extreme_penalty
+	}
+	option = {
+		name = culture_religion_events.21.b
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+culture_religion_events.22 = {
+	type = country_event
+	title = culture_religion_events.22.title
+	desc = culture_religion_events.22.desc
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+	trigger = {
+		legitimacy > 90.00
+		stability > 20
+		government_type = government_type:monarchy
+		has_ruler = yes
+		ruler.culture != culture
+		capital = { dominant_culture ?= root.culture }
+		country_has_estate = estate_type:nobles_estate
+	}
+
+	immediate = {
+		ruler = { save_scope_as = target_ruler }
+		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+	}	
+
+	option = {
+		name = culture_religion_events.22.a
+		
+		custom_tooltip = {
+			text = culture_religion_events.22.a.tt
+			capital = {
+				every_pop = {
+					limit = { culture = root.culture }
+					split_pop = {
+						fraction = 0.25
+						culture = root.ruler.culture
+					}
+				}
+			}
+		}
+		add_stability = stability_extreme_penalty
+		add_legitimacy = legitimacy_extreme_penalty
+		
+	}
+	option = {
+		name = culture_religion_events.22.b
+		add_prestige = prestige_mild_bonus
+	}
+}

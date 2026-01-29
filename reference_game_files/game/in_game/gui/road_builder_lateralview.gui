@@ -1,0 +1,393 @@
+lateralview = {
+	name = "road_builder_lateralview"
+
+	widget = {
+		visible = "[TutorialIsRunning]"
+		widget = {
+			widgetid = "road_builder_player_capital"
+			visible = "[ObjectsEqual(Player.GetCapital.Self, RoadBuilder.GetLocation.Self)]"
+		}
+	}
+
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "ROAD_BUILDER_TAB"
+			}
+		}
+
+		# Road type buttons
+		header_main_tabs = {
+			blockoverride "content" {
+				datamodel = "[RoadBuilder.GetRoadTypes]"
+
+				item = {
+					margin_widget = {
+						size = { 130 50 }
+
+						button_main_tab_alt = {
+							using = layoutpolicy_expanding
+							datacontext = "[RoadTypeItem.GetRoadType]"
+
+							tooltipwidget = {
+								using = RoadType_tooltip
+							}
+							
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								title = "LOC_BUILD_ROAD_TYPE_CLICK"
+								on_action = "[RoadBuilder.SelectRoadType(RoadTypeItem.GetRoadType)]"
+								enabled = "[RoadTypeItem.IsEnabled]"
+								conditions = "LOC_BUILD_ROAD_TYPE_CONDITIONS"
+							}
+								
+							down = "[RoadTypeItem.GetIsSelected]"
+							enabled = "[RoadTypeItem.IsEnabled]"
+
+							size = { 125 40 }
+							
+							blockoverride "tab_text"{
+								text = "[RoadTypeItem.GetRoadType.GetNameWithNoTooltip]"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+
+			vbox = {
+				size = { -1 100 }
+				layoutpolicy_horizontal = expanding
+
+				# Calculation type buttons
+				hbox = {
+					datamodel = "[RoadBuilder.GetRoadCostCalculations]"
+					spacing = 5
+					margin_top = 13
+					margin_left = 10
+					item = {
+						button = {
+							size = {30 30}
+							using = header_button_template
+							blockoverride "header_button_template_push_properties"{using = button_tab_toggle_properties_template}
+							blockoverride "header_button_full_content"{}
+							blockoverride "header_button_template_texture"{using = pressed_button_texture}
+							tooltipwidget = {
+								ContextualTooltipType = {
+									blockoverride "title_text" {
+										text = "[RoadCostCalculation.GetName]"
+									}
+									blockoverride "title_icon" {
+										icon = {
+											size = { 50 50 }
+											texture = "[GetRoadCostCalculationIcon(RoadCostCalculation.Self)]"
+										}
+									}
+									blockoverride "tooltip_content" {
+										TooltipTextBlock = {
+											blockoverride "text" {
+												text = "[RoadCostCalculation.GetDescription]"
+											}
+										}
+									}
+									blockoverride "tooltip_ui_action_block" {
+										TooltipFunctionalBlock = {
+											using = tooltip_left_click_template
+
+											blockoverride "action_text_wide" {
+												using = tooltip_max_width_title_wide
+											}
+
+											blockoverride "action_left_text" {
+												text = "[RoadCostCalculation.GetActionName]"
+											}
+										}
+									}
+								}
+							}
+
+							onclick = "[RoadCostCalculation.OnClick]"
+							down = "[RoadCostCalculation.GetIsSelected]"
+
+							icon = {
+								size = {70% 70%}
+								parentanchor = center
+								texture = "[GetRoadCostCalculationIcon(RoadCostCalculation.Self)]"
+								modify_texture = {
+									using = color_gold_texture
+									alpha = 0.4
+								}
+							}
+						}
+					}
+				}
+
+				margin_widget = {
+					visible = "[RoadBuilder.GetShouldShowUpgradeButton]"
+					enabled = "[RoadBuilder.CanUpgradeCandidates]"
+					layoutpolicy_horizontal = expanding
+					size = { -1 30 }
+					margin_top = -5
+					margin_bottom = 1
+
+					button_regular = {
+						size = { 97% 50 }
+						parentanchor = center
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							enabled = "[RoadBuilder.CanUpgradeCandidates]"
+							title = "ROAD_BUILDER_UPGRADE_ROAD"
+							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)0')]"
+							cost = "[RoadBuilder.GetUpgradeCost('(int32)0')]"
+						}
+						
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							click_modifier = ctrl
+							enabled = "[RoadBuilder.CanUpgradeCandidates]"
+							title = "ROAD_BUILDER_UPGRADE_ROADS_CTRL"
+							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)1')]"
+							cost = "[RoadBuilder.GetUpgradeCost('(int32)1')]"
+						}
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							click_modifier = shift
+							enabled = "[RoadBuilder.CanUpgradeCandidates]"
+							title = "ROAD_BUILDER_UPGRADE_ROADS_SHIFT"
+							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)2')]"
+							cost = "[RoadBuilder.GetUpgradeCost('(int32)2')]"
+						}
+
+						tooltipwidget = {
+							using = upgrade_road_ranking_tt
+						}
+
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							layoutpolicy_vertical = expanding
+							spacing = 5
+
+							margin_left = 8
+							margin_right = 5
+
+							text_single = {
+								align = center|nobaseline
+								layoutpolicy_horizontal = expanding
+								autoresize = no
+								fontsize_min = 12
+								text = "ROAD_BUILDER_UPGRADE_ROADS"
+							}
+						}
+					}
+				}
+
+				expand = {}
+			}
+
+			# Searchbar and location list
+			filtered_sorted_list = {
+				datacontext = "[RoadBuilder.GetRoadDestinationsSearch]"
+
+				blockoverride "scroll_list_is_empty" {
+					visible = "[IsDataModelEmpty(RoadBuilder.GetRoadDestinationsItems)]"
+				}
+
+				blockoverride "scroll_list_is_empty_text" {
+					text = "ROADBUILDER_LIST_EMPTY"
+				}
+
+				blockoverride "scroll_list_content" {
+					addcolumn = 100%
+					addrow = 40
+
+					datamodel = "[RoadBuilder.GetRoadDestinationsItems]"
+
+					item = {
+						widget = {
+							size = { 100% 40 }
+					
+							widget = {
+								parentanchor = hcenter|vcenter
+								size = { 98% 40 }
+								using = road_destination_entry
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template road_destination_entry {
+	onmousehierarchyenter = "[RoadDestinationItem.OnMouseHierarchyEnter]"
+  	onmousehierarchyleave = "[RoadDestinationItem.OnMouseHierarchyLeave]"
+
+	background = {
+		using = paper_card_texture
+		margin = { 1 1 }
+		margin_bottom = 1
+		alpha = 0.3
+		block "card_shadow_margin" {}
+	}
+
+	card_list_button = {
+		size = {100% 40}
+		enabled = "[RoadDestinationItem.CanBuildRoad]"
+		onclick = "[RoadDestinationItem.BuildRoad]"
+		tooltipwidget = {
+			ContextualTooltipType = {
+				blockoverride "title_text" {
+					text = "ROAD_BUILDER_DESTINATION_TITLE_TT"
+				}
+				blockoverride "concept_link" {
+					text = [road|e]
+				}
+				blockoverride "title_icon" {
+					icon = {
+						using = tooltip_title_icon_size
+						texture = "[GetRoadTypeIcon(RoadDestinationItem.GetRoadType)]"
+					}
+				}
+				blockoverride "tooltip_content" {							
+					TooltipStringPairList = {
+						textcontext = "[StringToConditionListOnlyPassedAndNeutralIfNot(RoadDestinationItem.CanBuildRoad, RoadBuilder.GetTooltipForLocation(RoadDestinationItem.GetLocation)).GetOutput]"
+					}
+					
+					TooltipStringPairList = {
+						blockoverride "block_title" {
+							text = "HAS_ROAD_IN_BOTH_LOC"
+						}
+						
+						textcontext = "[ShowModifierEffect('has_road')]"
+					}
+				}				
+			}
+		}
+
+		action_tooltip = {
+			click_type = left
+			click_mode = single
+			title = "[RoadDestinationItem.GetTitle]"
+			cost = "[RoadDestinationItem.GetCostString]"
+			enabled = "[RoadDestinationItem.CanBuildRoad]"
+			visible = yes
+			on_action = "[PlayAudioEffect('UI_action_road_build')]"
+			conditions = "[RoadBuilder.GetConditionsForLocation(RoadDestinationItem.GetLocation)]"
+		}		
+		
+		modify_texture = {
+			using = color_dark_blue_texture
+			blend_mode = multiply
+			alpha = 0.1
+		}
+
+		hbox = {
+			# using = layoutpolicy_expanding
+			spacing = 5
+			margin = {5 0}
+			margin_left = 10
+
+			widget = {
+				size = {200 18}
+				hbox = {
+					spacing = 5
+
+					icon = {
+						size = { 18 18 }
+						texture = "[RoadDestinationItem.GetLocation.GetRankIcon]"
+					}
+
+					text_single = {
+						maximumsize = { 180 -1 }
+						default_format = "#yellow_titles"
+						using = Font_Type_Standard
+						text = "[RoadDestinationItem.GetLocation.GetNameWithNoTooltip]"
+						autoresize = yes
+
+						sort_by_highlight = {
+							size = { 100% 100% }
+							name = "name"
+						}
+					}
+
+					expand = {}
+				}
+			}
+
+			text_single = {
+				size = {35 18}
+				autoresize = no
+				align = left|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				text = "[RoadDestinationItem.GetDistance]"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "distance"
+				}
+			}
+
+			text_single = {
+				size = {55 18}
+				align = right|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				text = "[RoadDestinationItem.GetLocation.GetTopography.GetIcon][RoadDestinationItem.GetLocation.GetTopography.GetNameNoUnderline]"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "topography"
+				}
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				autoresize = no
+				size = {20 18}
+				margin_right = 5
+				align = right|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				raw_text = "[RoadDestinationItem.GetCost|2]@gold!"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "cost"
+				}
+			}
+		}
+	}
+}
+
+template upgrade_road_ranking_tt {
+    ContextualTooltipType = {
+        blockoverride "title_text" {
+            text = "ROAD_BUILDER_UPGRADE_TOOLTIP_TITLE"
+        }
+
+        blockoverride "title_icon" {}
+
+        blockoverride "tooltip_content" {
+            TooltipListBase = {
+                TooltipStringPairList = {
+					lowpriotextcontext = "[RoadBuilder.GetUpgradeTooltip]"
+                }
+            }
+        }
+    }
+}

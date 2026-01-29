@@ -1,0 +1,303 @@
+﻿namespace = autocephalous_patriarchates
+
+#seat of an autocephalous patriarchate captured by another country of the same religion
+#root= location, scope:loser = previous owner (if there was one), scope:winner = new owner
+autocephalous_patriarchates.1 = {
+	type = location_event
+	title = autocephalous_patriarchates.1.title
+	desc = autocephalous_patriarchates.1.desc
+	image = "gfx/interface/illustrations/international_organization_types/autocephalous_patriarchate.dds"
+
+	trigger = {
+		has_owner = yes
+		exists = scope:loser
+		owner = { 
+			religion = scope:loser.religion
+			exists = autocephalous_patriarchate
+		}
+		scope:loser = {
+			exists = autocephalous_patriarchate
+			autocephalous_patriarchate = {
+				var:seat ?= root
+			}
+		}
+	}
+
+	immediate = {
+		save_scope_as = target_location
+		scope:loser = {
+			autocephalous_patriarchate = {
+				#save this as it's possible that the loser will cease to exist within milliseconds
+				save_scope_as = target_ap
+			}
+		}
+	}
+
+	#dissolve the patriarchate
+	option = {
+		name = autocephalous_patriarchates.1.a
+
+		custom_tooltip = {
+			text = every_member_of_scopeloser_ap_loses_opinion_of_scopewinner_tt
+			scope:loser = {
+				autocephalous_patriarchate = {
+					every_international_organization_member = {
+						add_opinion = {
+							target = root.owner
+							modifier = destroyed_my_autocephalous_patriarchate
+						}
+					}
+				}
+			}
+		}
+		owner = {
+			autocephalous_patriarchate = {
+				add_international_organization_modifier = {
+					modifier = destroying_another_autocephalous_patriarchate
+					mode = replace
+					#effect doubled if it's an Ecumenical Patriarchate
+					size = {
+						if = {
+							limit = {
+								var:seat = {
+									is_location_holy_site_for = prev.var:religion
+								}
+							}
+							value = 2
+						}
+						else = {
+							value = 1
+						}
+					}
+				}
+				every_international_organization_member = {
+					limit = { NOT = { root.owner = this } }
+					add_opinion = {
+						target = root.owner
+						modifier = destroyed_another_autocephalous_patriarchate
+					}
+				}
+			}
+		}
+		scope:winner = {
+			destroy_international_organization = { target = scope:loser.autocephalous_patriarchate }
+		}
+	}
+
+	#keep the patriarchate
+	option = {
+		name = autocephalous_patriarchates.1.b
+	}
+}
+
+#seat of an autocephalous patriarchate captured by another country of different religion
+#root= location, scope:loser = previous owner, scope:winner = new owner
+autocephalous_patriarchates.2 = {
+	type = location_event
+	title = autocephalous_patriarchates.2.title
+	desc = autocephalous_patriarchates.2.desc
+	image = "gfx/interface/illustrations/international_organization_types/autocephalous_patriarchate.dds"
+
+	trigger = {
+		has_owner = yes
+		exists = scope:loser
+		owner = {
+			not = {
+				religion = scope:loser.religion
+			}
+		}
+		scope:loser = {
+			exists = autocephalous_patriarchate
+			autocephalous_patriarchate = {
+				var:seat ?= root
+			}
+		}
+	}
+
+	immediate = {
+		scope:loser = {
+			autocephalous_patriarchate = {
+				#save this as it's possible that the loser will cease to exist within milliseconds
+				save_scope_as = target_ap
+			}
+			religion = {
+				group = {
+					save_scope_as = target_religion_group
+				}
+			}
+		}
+		save_scope_as = target_location
+	}
+
+	#dissolve the patriarchate
+	option = {
+		name = autocephalous_patriarchates.2.a
+
+		custom_tooltip = {
+			text = every_member_of_scopeloser_ap_loses_opinion_of_scopewinner_tt
+			scope:target_ap = {
+				every_international_organization_member = {
+					add_opinion = {
+						target = root.owner
+						modifier = destroyed_my_autocephalous_patriarchate
+					}
+				}
+			}
+		}
+		owner = {
+			add_yearly_gold = 0.4
+			if = {
+				limit = {
+					religion.group = scope:target_religion_group
+				}
+				add_country_modifier = {
+					modifier = destroying_heretic_autocephalous_patriarchate
+					mode = set_to_largest_and_extend
+					#effect doubled if it's an Ecumenical Patriarchate
+					size = {
+						if = {
+							limit = {
+								scope:target_ap = {
+									var:seat = {
+										is_location_holy_site_for = prev.var:religion
+									}
+		
+								}
+							}
+							value = {
+								desc = is_ecumenical_patriarchate
+								value = 2
+							}
+						}
+						else = {
+							value = {
+								desc = is_autocephalous_patriarchate
+								value = 1
+							}
+						}
+					}
+				}
+			}
+			else = {
+				add_country_modifier = {
+					modifier = destroying_heathen_autocephalous_patriarchate
+					mode = set_to_largest_and_extend
+					#effect doubled if it's an Ecumenical Patriarchate
+					size = {
+						if = {
+							limit = {
+								scope:target_ap = {
+									var:seat = {
+										is_location_holy_site_for = prev.var:religion
+									}
+		
+								}
+							}
+							value = {
+								desc = is_ecumenical_patriarchate
+								value = 2
+							}
+						}
+						else = {
+							value = {
+								desc = is_autocephalous_patriarchate
+								value = 1
+							}
+						}
+					}
+				}
+			}
+		}
+		scope:winner = {
+			destroy_international_organization = { target = scope:target_ap }
+		}
+	}
+
+	#keep the patriarchate
+	option = {
+		name = autocephalous_patriarchates.2.b
+		scope:target_ap ?= {
+			add_international_organization_modifier = {
+				modifier = autocephalous_patriarchate_seat_under_heretic_or_heathen_control
+				mode = extend
+				#effect doubled if it's an Ecumenical Patriarchate
+				size = {
+					if = {
+						limit = {
+							var:seat = {
+								is_location_holy_site_for = prev.var:religion
+							}
+						}
+						value = 2
+					}
+					else = {
+						value = 1
+					}
+				}
+			}
+		}
+		owner = {
+			if = {
+				limit = {
+					religion.group = scope:target_religion_group
+				}
+				add_country_modifier = {
+					modifier = maintaining_heretic_autocephalous_patriarchate
+					mode = set_to_largest_and_extend
+					#effect doubled if it's an Ecumenical Patriarchate
+					size = {
+						if = {
+							limit = {
+								scope:target_ap ?= {
+									var:seat ?= {
+										is_location_holy_site_for = prev.var:religion
+									}
+		
+								}
+							}
+							value = {
+								desc = is_ecumenical_patriarchate
+								value = 2
+							}
+						}
+						else = {
+							value = {
+								desc = is_autocephalous_patriarchate
+								value = 1
+							}
+						}
+					}
+				}
+			}
+			else = {
+				add_country_modifier = {
+					modifier = maintaining_heathen_autocephalous_patriarchate
+					mode = set_to_largest_and_extend
+					#effect doubled if it's an Ecumenical Patriarchate
+					size = {
+						if = {
+							limit = {
+								scope:target_ap = {
+									var:seat = {
+										is_location_holy_site_for = prev.var:religion
+									}
+		
+								}
+							}
+							value = {
+								desc = is_ecumenical_patriarchate
+								value = 2
+							}
+						}
+						else = {
+							value = {
+								desc = is_autocephalous_patriarchate
+								value = 1
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

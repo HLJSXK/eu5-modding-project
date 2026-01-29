@@ -1,0 +1,1511 @@
+﻿namespace = revolutionary_chaos
+
+scripted_effect rev_chaos_side_effect = {
+	if = {
+		limit = { has_country_modifier = rev_chaos_sided_with_revolution }
+		$revolution_effect$
+		custom_tooltip = revolutionary_chaos_sided_with_revolution_tt
+	}
+	if = {
+		limit = { has_country_modifier = rev_chaos_sided_with_monarchists }
+		$monarchist_effect$
+		custom_tooltip = revolutionary_chaos_sided_with_monarchists_tt
+	}
+}
+
+scripted_effect revolutionary_chaos_clear_temporaries = {
+	#Clear all the flags / modifiers
+	if = { limit = { has_country_modifier = rev_chaos_sided_with_revolution } remove_country_modifier = rev_chaos_sided_with_revolution }
+	if = { limit = { has_country_modifier = rev_chaos_sided_with_monarchists } remove_country_modifier = rev_chaos_sided_with_monarchists }
+	if = { limit = { has_country_modifier = rev_chaos_religious_intolerance } remove_country_modifier = rev_chaos_religious_intolerance }
+	if = { limit = { has_country_modifier = rev_chaos_religious_tolerance } remove_country_modifier = rev_chaos_religious_tolerance }
+	if = { limit = { has_country_modifier = restrict_serfdom } remove_country_modifier = restrict_serfdom }
+	if = { limit = { has_country_modifier = enforce_serfdom } remove_country_modifier = enforce_serfdom }
+	if = { limit = { has_country_modifier = suppress_free_thinkers } remove_country_modifier = suppress_free_thinkers }
+	if = { limit = { has_country_modifier = bureaucratic_reduction } remove_country_modifier = bureaucratic_reduction }
+	if = { limit = { has_country_modifier = bureaucratic_expansion } remove_country_modifier = bureaucratic_expansion }
+	if = { limit = { has_country_modifier = the_reign_of_terror } remove_country_modifier = the_reign_of_terror }
+	if = { limit = { has_country_modifier = the_counter_revolution } remove_country_modifier = the_counter_revolution }
+	if = { limit = { has_variable = religious_revolution } remove_variable = religious_revolution }
+	if = { limit = { has_variable = rev_chaos_serfdom } remove_variable = rev_chaos_serfdom }
+	if = { limit = { has_variable = rev_social_reform } remove_variable = rev_social_reform }
+	if = { limit = { has_variable = royal_bureaucracy } remove_variable = royal_bureaucracy }
+	if = { limit = { has_variable = robespierre_flag } remove_variable = robespierre_flag }
+	if = { limit = { has_variable = the_directory_flag } remove_variable = the_directory_flag }
+	if = { limit = { has_variable = rev_had_reign_of_terror_event } remove_variable = rev_had_reign_of_terror_event }
+	if = { limit = { has_variable = rev_had_counter_revolution_event } remove_variable = rev_had_counter_revolution_event }
+	if = { limit = { has_variable = had_execution_of_king_louis_event_flag } remove_variable = had_execution_of_king_louis_event_flag }
+	if = { limit = { has_variable = rev_former_ruler } remove_variable = rev_former_ruler }
+	if = { limit = { has_variable = fra_monarch_executed } remove_variable = fra_monarch_executed }
+	ruler = {
+		if = { limit = { has_variable = untouchable_character } remove_variable = untouchable_character }
+	}
+}
+
+#Chaos in the [ROOT.GetCountry.GetLongNameWithNoTooltip]
+revolutionary_chaos.1 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.1.title
+	desc = revolutionary_chaos.1.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+
+	option = {
+		name = revolutionary_chaos.1.a
+		historical_option = yes
+		custom_tooltip = revolutionary_chaos.1.a.tt
+		add_country_modifier = {
+			modifier = rev_chaos_sided_with_revolution
+			years = -1
+			mode = add_and_extend
+		}
+		add_stability = stability_ultimate_penalty
+		change_societal_value = { type = aristocracy_vs_plutocracy value = societal_value_move_to_right }
+	}
+	option = {
+		name = revolutionary_chaos.1.b
+		custom_tooltip = revolutionary_chaos.1.b.tt
+		add_country_modifier = {
+			modifier = rev_chaos_sided_with_monarchists
+			years = -1
+			mode = add_and_extend
+		}
+		add_stability = stability_ultimate_penalty
+		change_societal_value = { type = aristocracy_vs_plutocracy value = societal_value_move_to_left }
+	}
+}
+
+# Events which fire only once per Disaster #
+#Religious Intolerance
+revolutionary_chaos.2 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.2.title
+	desc = revolutionary_chaos.2.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_variable = religious_revolution }
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		religious_unity < 1
+		capital.region = {
+			any_location_in_region = {
+				owner ?= root
+				NOT = { dominant_religion ?= root.religion }
+			}
+		}
+	}
+	immediate = {
+		set_variable = { name = religious_revolution value = 1 }
+		capital.region = {
+			random_location_in_region = {
+				limit = {
+					owner ?= root
+					NOT = { dominant_religion ?= root.religion }
+				}
+				save_scope_as = target_location
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.2.a
+		add_country_modifier = { modifier = rev_chaos_religious_intolerance months = -1 mode = add_and_extend }
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_move_to_left }
+	}
+	option = {
+		name = revolutionary_chaos.2.b
+		if = {
+			limit = { religion = religion:catholic }
+			reverse_add_opinion = { target = c:PAP modifier = opinion_too_tolerate }
+		}
+		add_country_modifier = { modifier = rev_chaos_religious_tolerance months = -1 mode = add_and_extend }
+		change_societal_value = { type = spiritualist_vs_humanist value = societal_value_move_to_right }
+	}
+}
+
+#Serfdom
+revolutionary_chaos.3 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.3.title
+	desc = revolutionary_chaos.3.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_variable = rev_chaos_serfdom }
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		societal_value:serfdom_vs_free_subjects <= -50
+		#If for whatever reason, your revolutionary country has this high serfdom, you kinda deserve to be punished
+	}
+	immediate = {
+		set_variable = { name = rev_chaos_serfdom value = 1 }
+		create_rebel = {
+			category = estate
+			estate = peasants_estate
+			name = rebellious_masses_name
+			save_scope_as = target_rebel
+		}
+		capital.region = {
+			random_location_in_region = {
+				limit = { owner ?= root }
+				random_pop = {
+					limit = {
+						owner = root
+						OR = {
+							pop_type = pop_type:peasants
+							pop_type = pop_type:laborers
+						}
+					}
+					save_scope_as = target_pop_for_loc
+				}
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.3.a
+		add_country_modifier = { modifier = restrict_serfdom months = -1 mode = add_and_extend }
+		destroy_rebel = scope:target_rebel
+		add_effect_scaling_with_societal_value = {
+			societal_value = serfdom_vs_free_subjects
+			effect = stability
+			operator = divide
+			value = -5
+		}
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_large_move_to_right }
+	}
+	option = {
+		name = revolutionary_chaos.3.b
+		add_country_modifier = { modifier = enforce_serfdom months = -1 mode = add_and_extend }
+		custom_tooltip = {
+			text = revolutionary_chaos.3.a.tt
+			capital.region = {
+				every_location_in_region = {
+					limit = { owner ?= root }
+					every_pop = {
+						limit = {
+							owner = root
+							OR = {
+								pop_type = pop_type:peasants
+								pop_type = pop_type:laborers
+							}
+						}
+						change_pop_allegiance = scope:target_rebel
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					}
+				}
+			}
+		}
+		add_effect_scaling_with_societal_value = {
+			societal_value = serfdom_vs_free_subjects
+			effect = prestige
+			operator = divide
+			value = -5
+		}
+		change_societal_value = { type = serfdom_vs_free_subjects value = societal_value_large_move_to_left }
+	}
+}
+
+#Social Reform
+revolutionary_chaos.4 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.4.title
+	desc = revolutionary_chaos.4.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_variable = rev_social_reform }
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+	}
+	immediate = {
+		set_variable = { name = rev_social_reform value = yes }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = revolutionary_chaos.4.a
+		add_country_modifier = { modifier = suppress_free_thinkers months = -1 mode = add_and_extend }
+		rev_chaos_side_effect = {
+			revolution_effect = "
+				add_government_power = government_power_severe_penalty
+			"
+			monarchist_effect = "
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_bonus }
+				add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_severe_bonus }
+			"
+		}
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_huge_move_to_left }
+	}
+	option = {
+		name = revolutionary_chaos.4.b
+		rev_chaos_side_effect = {
+			revolution_effect = "
+				add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_penalty }
+				add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_severe_penalty }
+			"
+			monarchist_effect = "
+				add_stability = stability_severe_penalty
+			"
+		}
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_move_to_right }
+	}
+}
+
+#The [ROOT.GetCountry.GetGovernment.GetGovernmentType.GetNameWithNoTooltip]'s Bureaucracy
+revolutionary_chaos.5 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.5.title
+	desc = revolutionary_chaos.5.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_variable = royal_bureaucracy }
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+	}
+	immediate = {
+		set_variable = { name = royal_bureaucracy value = yes }
+	}
+	option = {
+		name = revolutionary_chaos.5.a
+		add_country_modifier = { modifier = bureaucratic_reduction months = -1 mode = add_and_extend }
+		rev_chaos_side_effect = {
+			revolution_effect = "
+				add_government_power = government_power_mild_bonus
+			"
+			monarchist_effect = "
+				add_stability = stability_mild_penalty
+			"
+		}
+		change_societal_value = { type = centralization_vs_decentralization value = societal_value_move_to_right }
+	}
+	option = {
+		name = revolutionary_chaos.5.b
+		add_country_modifier = { modifier = bureaucratic_expansion months = -1 mode = add_and_extend }
+		rev_chaos_side_effect = {
+			revolution_effect = "
+				add_government_power = government_power_mild_penalty
+			"
+			monarchist_effect = "
+				add_stability = stability_mild_bonus
+			"
+		}
+		change_societal_value = { type = centralization_vs_decentralization value = societal_value_move_to_left }
+	}
+}
+
+#The Reign of Terror in [ROOT.GetCountry.GetNameWithNoTooltip] - If you side with the Revolutionaries
+revolutionary_chaos.6 = {
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	title = revolutionary_chaos.6.title
+	desc = revolutionary_chaos.6.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		has_country_modifier = rev_chaos_sided_with_revolution
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		NOT = { has_variable = rev_has_reign_of_terror_event }
+		NOT = { has_variable = rev_had_reign_of_terror_event }
+	}
+	immediate = {
+		set_variable = { name = rev_has_reign_of_terror_event value = yes }
+		if = {
+			limit = { tag = FRA }
+			create_character = {
+				first_name = name_maximilian
+				last_name = Robespierre
+				religion = root.religion
+				culture = root.culture
+				estate = estate_type:burghers_estate
+				adm = 66
+				dip = 31
+				mil = 79
+				age = 35
+				female = no
+				add_trait = trait:malevolent
+				hidden_effect = {
+					remove_trait = trait:benevolent
+					remove_trait = trait:kind_hearted
+				}
+				script = fra_robespierre
+				save_scope_as = target_character
+			}
+		}
+		else = {
+			create_character = {
+				religion = root.religion
+				culture = root.culture
+				estate = estate_type:burghers_estate
+				adm = { 40 60 }
+				dip = { 30 50 }
+				mil = { 50 70 }
+				age = { 30 40 }
+				save_scope_as = target_character
+			}
+		}
+		set_variable = {
+			name = robespierre_flag
+			value = scope:target_character
+		}
+		set_variable = {
+			name = reign_of_terror_minimum_length
+			value = current_year
+			days = 365
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.6.a
+		set_new_ruler = scope:target_character
+		add_country_modifier = { modifier = the_reign_of_terror years = 10 mode = add_and_extend }
+		add_government_power = government_power_extreme_bonus
+		custom_tooltip = reign_of_terror_tt
+	}
+	option = {
+		name = revolutionary_chaos.6.b
+		add_stability = stability_ultimate_penalty
+	}
+	after = {
+		set_variable = { name = rev_had_reign_of_terror_event value = yes }
+		remove_variable = rev_has_reign_of_terror_event
+	}
+}
+
+#End of the Reign of Terror
+revolutionary_chaos.7 = {
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	title = revolutionary_chaos.7.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					exists = scope:target_character
+					has_variable = robespierre_flag
+					var:robespierre_flag = scope:target_character
+				}
+				desc = revolutionary_chaos.7.desc.robespierre
+			}
+			triggered_desc = {
+				trigger = { always = yes}
+				desc = revolutionary_chaos.7.desc.fallback
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+
+	trigger = {
+		has_variable = rev_had_reign_of_terror_event
+		has_country_modifier = rev_chaos_sided_with_revolution
+		OR = {
+			NOT = { has_country_modifier = the_reign_of_terror }
+			NOT = { has_variable = reign_of_terror_minimum_length }
+		}
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+	}
+	immediate = {
+		set_variable = { name = the_directory_flag value = 1 }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolutionary_chaos.7.a
+		trigger = {
+			OR = {
+				NOT = { has_variable = robespierre_flag }
+				AND = {
+					has_variable = robespierre_flag
+					NOT = { var:robespierre_flag = scope:target_character }
+				}
+			}
+		}
+		kill_character = {
+			target = scope:target_character
+			reason = guillotine
+		}
+		add_stability = stability_extreme_bonus
+		remove_country_modifier = the_reign_of_terror
+	}
+	option = {
+		name = revolutionary_chaos.7.b
+		trigger = {
+			has_variable = robespierre_flag
+			var:robespierre_flag = scope:target_character
+		}
+		kill_character = {
+			target = scope:target_character
+			reason = guillotine
+		}
+		add_stability = stability_extreme_bonus
+		remove_country_modifier = the_reign_of_terror
+	}
+	option = {
+		name = revolutionary_chaos.7.c
+		trigger = {
+			has_variable = robespierre_flag
+			var:robespierre_flag = scope:target_character
+		}
+		add_stability = stability_extreme_penalty
+		add_country_modifier = { modifier = the_reign_of_terror years = -1 mode = add_and_extend }
+	}
+}
+
+#The Counter-Revolution of [ROOT.GetCountry.GetNameWithNoTooltip] - If you side with the Monarchists
+revolutionary_chaos.8 = {
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	title = revolutionary_chaos.8.title
+	desc = revolutionary_chaos.8.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		has_country_modifier = rev_chaos_sided_with_monarchists
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		NOT = { has_variable = rev_had_counter_revolution_event }
+		NOT = { has_variable = rev_currently_in_country_rev_event }
+	}
+	immediate = {
+		set_variable = { name = rev_currently_in_country_rev_event value = yes }
+		create_character = {
+			religion = root.religion
+			culture = root.culture
+			estate = estate_type:nobles_estate
+			adm = { 40 60 }
+			dip = { 30 50 }
+			mil = { 50 70 }
+			age = { 30 40 }
+			save_scope_as = target_character
+		}
+		set_variable = {
+			name = reign_of_terror_minimum_length
+			value = current_year
+			days = 365
+		}
+	}
+	option = {
+		name = revolutionary_chaos.8.a
+		add_country_modifier = { modifier = the_counter_revolution years = 10 mode = add_and_extend }
+		set_new_ruler = scope:target_character
+		custom_tooltip = counter_revolution_tt
+	}
+	option = {
+		name = revolutionary_chaos.8.b
+		add_stability = stability_extreme_penalty
+	}
+	after = {
+		remove_variable = rev_currently_in_country_rev_event
+		set_variable = { name = rev_had_counter_revolution_event value = yes }
+	}
+}
+
+#End of the Counter-Revolution
+revolutionary_chaos.9 = {
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	title = revolutionary_chaos.9.title
+	desc = revolutionary_chaos.9.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		has_country_modifier = rev_chaos_sided_with_monarchists
+		has_variable = rev_had_counter_revolution_event
+		OR = {
+			NOT = { has_country_modifier = the_counter_revolution }
+			NOT = { has_variable = reign_of_terror_minimum_length }
+		}
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		NOT = { has_variable = the_directory_flag }
+	}
+	immediate = {
+		set_variable = { name = the_directory_flag value = 1 }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolutionary_chaos.9.a
+		scope:target_character = {
+			banish_character = yes
+		}
+		add_government_power = government_power_extreme_bonus
+		remove_country_modifier = the_counter_revolution
+	}
+	option = {
+		name = revolutionary_chaos.9.b
+		add_government_power = government_power_extreme_penalty
+		add_country_modifier = { modifier = the_counter_revolution months = -1 mode = add_and_extend }
+		set_variable = picked_infinite_counter_revolution
+	}
+}
+
+# Generic Repeatable Events #
+
+
+# Events during the Reign of Terror #
+#Treachery against the Revolution
+revolutionary_chaos.101 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.101.title
+	desc = revolutionary_chaos.101.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_reign_of_terror
+		NOT = { has_variable = recent_terror_rev_event_var }
+		any_cabinet_character = { NOT = { has_variable = untouchable_character } }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 90 }
+		ordered_cabinet_character = {
+			limit = { NOT = { has_variable = untouchable_character } }
+			order_by = total_abilities
+			max = 1
+			check_range_bounds = no
+			save_scope_as = target_character
+		}
+		if = {
+			limit = { has_variable = robespierre_flag }
+			var:robespierre_flag = {
+				save_scope_as = target_robespierre
+			}
+		}
+		else = {
+			ruler_or_regent = { save_scope_as = target_robespierre }
+		}
+	}
+	option = {
+		name = revolutionary_chaos.101.a
+		kill_character = {
+			target = scope:target_character
+			reason = guillotine
+		}
+	}
+	option = {
+		name = revolutionary_chaos.101.b
+		add_government_power = government_power_mild_penalty
+	}
+}
+
+#The Enemies in [target_province.GetName] / The Enemies in the Province
+revolutionary_chaos.102 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_province }
+				desc = revolutionary_chaos.102.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.102.title.fallback
+			}
+		}
+	}
+	desc = revolutionary_chaos.102.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_reign_of_terror
+		NOT = { has_variable = recent_terror_rev_event_var }
+		capital.region = {
+			any_area_in_region = {
+				any_province_in_area = {
+					owner ?= root
+				}
+			}
+		}
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 1825 }
+		capital.region = {
+			random_area_in_region = {
+				random_province_in_area = {
+					limit = { owner ?= root }
+					save_scope_as = target_province
+				}
+			}
+		}
+		if = {
+			limit = { NOT = { any_rebel = { rebel_name_key = counter_revolutionaries } } }
+			create_rebel = {
+				category = pretender
+				name = counter_revolutionaries
+				save_scope_as = target_rebel
+			}
+		}
+		else = {
+			random_rebel = {
+				limit = { rebel_name_key = counter_revolutionaries }
+				save_scope_as = target_rebel
+			}
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.102.a
+		custom_tooltip = {
+			text = mass_pops_execution_tt
+			scope:target_province = {
+				every_location_in_province = {
+					limit = { owner ?= root }
+					every_pop = {
+						add_pop_size = {
+							value = pop_size
+							multiply = -0.1
+						}
+					}
+				}
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.102.b
+		random_list = {
+			15 = {
+				custom_tooltip = {
+					text = counter_rev_rebellion_might_start_tt
+					scope:target_province = {
+						every_location_in_province = {
+							limit = { owner ?= root }
+							every_pop = {
+								limit = {
+									owner = root
+								}
+								add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+								change_pop_allegiance = scope:target_rebel
+							}
+						}
+					}
+					create_character = {
+						estate = estate_type:nobles_estate
+						age = 35
+						female = no
+						change_character_allegiance = scope:target_rebel
+					}
+				}
+			}
+			85 = {}
+		}
+	}
+}
+
+#Terror Reigns Supreme
+revolutionary_chaos.103 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.103.title
+	desc = revolutionary_chaos.103.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_reign_of_terror
+		NOT = { has_variable = recent_terror_rev_event_var }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 1825 }
+		if = {
+			limit = { has_variable = robespierre_flag }
+			var:robespierre_flag = { save_scope_as = target_character }
+		}
+		else = {
+			ruler_or_regent = { save_scope_as = target_character }
+		}
+	}
+	option = {
+		name = revolutionary_chaos.103.a
+		add_government_power = government_power_mild_bonus
+	}
+}
+
+#Purge of the Courtiers
+revolutionary_chaos.104 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.104.title
+	desc = revolutionary_chaos.104.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_reign_of_terror
+		NOT = { has_variable = recent_terror_rev_event_var }
+		any_courtier = { count > 3 }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 90 }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolutionary_chaos.104.a
+		ordered_courtier = {
+			limit = {
+				is_adult = yes
+				NOT = { has_variable = untouchable_character }
+			}
+			max = 6
+			check_range_bounds = no
+			kill_character = {
+				target = this
+				reason = guillotine
+			}
+		}
+	}
+}
+
+# Events during the Counter Revolution #
+#Republicanism Questioned
+revolutionary_chaos.201 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.201.title
+	desc = revolutionary_chaos.201.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_counter_revolution
+		NOT = { has_variable = recent_terror_rev_event_var }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 90 }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolutionary_chaos.201.a
+		add_government_power = government_power_severe_penalty
+	}
+}
+
+#The Revolutionaries in [target_province.GetName] / The Revolutionaries in the Province
+revolutionary_chaos.202 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_province }
+				desc = revolutionary_chaos.202.title
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.202.title.fallback
+			}
+		}
+	}
+	desc = revolutionary_chaos.202.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_counter_revolution
+		NOT = { has_variable = recent_terror_rev_event_var }
+		capital.area = {
+			any_province_in_area = {
+				owner = root
+			}
+		}
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 1825 }
+		capital.area = {
+			random_province_in_area = {
+				limit = { owner = root }
+				save_scope_as = target_province
+			}
+		}
+		if = {
+			limit = { NOT = { any_rebel = { rebel_name_key = revolutionary_rebels } } }
+			create_rebel = {
+				category = estate
+				estate = burghers_estate
+				name = revolutionary_rebels
+				save_scope_as = target_rebel
+			}
+		}
+		else = {
+			random_rebel = {
+				limit = { rebel_name_key = revolutionary_rebels }
+				save_scope_as = target_rebel
+			}
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.202.a
+		random_list = {
+			1 = { trigger = { societal_value:centralization_vs_decentralization < 90 }	change_societal_value = { type = centralization_vs_decentralization		value = societal_value_move_to_right } }
+			1 = { trigger = { societal_value:aristocracy_vs_plutocracy < 90 }			change_societal_value = { type = aristocracy_vs_plutocracy				value = societal_value_move_to_right } }
+			1 = { trigger = { societal_value:serfdom_vs_free_subjects < 90 }			change_societal_value = { type = serfdom_vs_free_subjects				value = societal_value_move_to_right } }
+			1 = { trigger = { societal_value:individualism_vs_communalism > -90 }		change_societal_value = { type = individualism_vs_communalism			value = societal_value_move_to_left } }
+			1 = { change_gold_effect = { scale = -3 } }
+		}
+	}
+	option = {
+		name = revolutionary_chaos.202.b
+		custom_tooltip = {
+			text = rev_rebellion_might_start_tt
+			scope:target_province = {
+				every_location_in_province = {
+					limit = { owner ?= root }
+					every_pop = {
+						limit = {
+							owner = root
+							OR = {
+								pop_type = pop_type:burghers
+								pop_type = pop_type:peasants
+							}
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+						change_pop_allegiance = scope:target_rebel
+					}
+				}
+			}
+		}
+	}
+}
+
+#Rise of the [ROOT.GetCountry.GetGovernment.GetEstateNameWithNoTooltip('nobles_estate')]
+revolutionary_chaos.203 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.203.title
+	desc = revolutionary_chaos.203.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_counter_revolution
+		NOT = { has_variable = recent_terror_rev_event_var }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 1825 }
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = revolutionary_chaos.203.a
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_severe_bonus }
+	}
+}
+
+#Revolutionaries leave the Country
+revolutionary_chaos.204 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.204.title
+	desc = revolutionary_chaos.204.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_counter_revolution
+		NOT = { has_variable = recent_terror_rev_event_var }
+		any_courtier = { count > 3 }
+	}
+	immediate = {
+		set_variable = { name = recent_terror_rev_event_var value = yes days = 90 }
+		ordered_cabinet_character = {
+			order_by = total_abilities
+			max = 1
+			check_range_bounds = no
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = revolutionary_chaos.204.a
+		scope:target_character = { banish_character = yes }
+		ordered_courtier = {
+			limit = { is_adult = yes }
+			order_by = total_abilities
+			max = 4
+			check_range_bounds = no
+			banish_character = yes
+		}
+	}
+}
+
+#Re-institution the Monarchy
+revolutionary_chaos.205 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.205.title
+	desc = revolutionary_chaos.205.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		has_country_modifier = the_counter_revolution
+		has_variable = picked_infinite_counter_revolution
+	}
+	immediate = {
+		remove_variable = picked_infinite_counter_revolution
+		if = {
+			limit = {
+				has_variable = rev_former_ruler
+				var:rev_former_ruler ?= { is_alive = yes }
+			}
+			var:rev_former_ruler = { save_scope_as = target_character }
+		}
+		else = {
+			ruler_or_regent = { save_scope_as = target_character }
+		}
+	}
+	option = {
+		name = revolutionary_chaos.205.a
+		trigger = {
+			has_variable = rev_former_ruler
+			var:rev_former_ruler ?= { is_alive = yes }
+		}
+		set_new_ruler = scope:target_character
+		remove_revolution = yes
+		set_revolution_target = no
+	}
+	option = {
+		name = revolutionary_chaos.205.b
+		trigger = {
+			OR = {
+				NOT = { has_variable = rev_former_ruler }
+				var:rev_former_ruler ?= { is_alive = no }
+			}
+		}
+		remove_revolution = yes
+		set_revolution_target = no
+	}
+	option = {
+		name = revolutionary_chaos.205.c
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_radical_penalty }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_radical_penalty }
+		remove_country_modifier = the_counter_revolution
+		add_stability = stability_radical_penalty
+		custom_tooltip = revolutionary_chaos.1.a.tt
+		add_country_modifier = {
+			modifier = rev_chaos_sided_with_revolution
+			years = -1
+			mode = add_and_extend
+		}
+		remove_country_modifier = rev_chaos_sided_with_monarchists
+	}
+}
+
+# End Event #
+#Calmer Times
+revolutionary_chaos.300 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.300.title
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { is_revolutionary = no }
+				desc = revolutionary_chaos.300.desc.failed_rev
+			}
+			triggered_desc = {
+				trigger = {
+					OR = {
+						has_reform = government_reform:revolutionary_autocracy
+						has_reform = government_reform:revolutionary_empire
+					}
+				}
+				desc = revolutionary_chaos.300.desc.rev_autocracy
+			}
+			triggered_desc = {
+				trigger = {
+					had_disaster_for_years = {
+						disaster_type = disaster_type:revolutionary_chaos
+						years >= 10
+					}
+				}
+				desc = revolutionary_chaos.300.desc.rev_republic
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.300.desc
+			}
+		}
+	}
+
+	immediate = {
+		if = {
+			limit = {
+				OR = {
+					has_reform = government_reform:revolutionary_autocracy
+					has_reform = government_reform:revolutionary_empire
+				}
+			}
+			ruler_or_regent ?= { save_scope_as = target_character }
+		}
+		set_ended_disaster_flag_effect = { type = revolutionary_chaos }
+	}
+
+	option = {
+		name = revolutionary_chaos.300.a
+		trigger = {
+			had_disaster_for_years = {
+				disaster_type = disaster_type:revolutionary_chaos
+				years >= 10
+			}
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.300.b
+		trigger = {
+			OR = {
+				has_reform = government_reform:revolutionary_autocracy
+				has_reform = government_reform:revolutionary_empire
+			}
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.300.c
+		trigger = {
+			NOT = {
+				had_disaster_for_years = {
+					disaster_type = disaster_type:revolutionary_chaos
+					years >= 10
+				}
+			}
+			NOR = {
+				has_reform = government_reform:revolutionary_autocracy
+				has_reform = government_reform:revolutionary_empire
+			}
+		}
+	}
+	after = {
+		add_stability = stability_ultimate_bonus
+		add_government_power = government_power_extreme_bonus
+		revolutionary_chaos_clear_temporaries = yes
+	}
+}
+
+
+# Event chains #
+# Execution of the Previous Ruler
+#Execute him?
+revolutionary_chaos.1000 = {
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	title = revolutionary_chaos.1000.title
+	desc = revolutionary_chaos.1000.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	trigger = {
+		NOT = { has_variable = had_execution_of_king_louis_event_flag }
+		NOT = { has_country_modifier = the_counter_revolution }
+		has_variable = rev_former_ruler
+		var:rev_former_ruler = {
+			is_alive = yes
+		}
+		OR = {
+			has_variable = the_directory_flag
+			has_country_modifier = the_reign_of_terror
+		}
+		NOT = { has_reform = government_reform:revolutionary_autocracy }
+		num_rivals > 0
+		any_rival = {
+			is_neighbor_of = root
+			is_revolutionary = no
+		}
+	}
+
+
+	immediate = {
+		set_variable = { name = had_execution_of_king_louis_event_flag value = yes }
+		var:rev_former_ruler = { save_scope_as = target_character }
+		random_rival = {
+			limit = {
+				is_neighbor_of = root
+				is_revolutionary = no
+			}
+			save_scope_as = target_country
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.1000.a
+		rev_chaos_side_effect = {
+			revolution_effect = "
+				add_stability = stability_ultimate_bonus
+				add_government_power = government_power_extreme_bonus
+			"
+			monarchist_effect = "
+				add_stability = stability_extreme_penalty
+			"
+		}
+		set_variable = { name = fra_monarch_executed value = yes }
+		custom_tooltip = {
+			text = every_non_revolutionary_monarchy_dislikes_us_tt
+			every_known_country = {
+				limit = {
+					is_revolutionary = no
+					government_type = government_type:monarchy
+					capital = { continent = root.capital.continent }
+					"border_distance_to(root)" < 500
+				}
+				add_opinion = { target = root modifier = opinion_executed_monarch }
+			}
+		}
+		hidden_effect = {
+			random = {
+				chance = 90
+				trigger_event_silently = { id = revolutionary_chaos.1001 days = 20 }
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.1000.b
+		if = {
+			limit = { NOT = { has_country_modifier = rev_chaos_sided_with_monarchists } }
+			add_stability = stability_severe_penalty
+		}
+		else = {
+			add_government_power = government_power_mild_penalty
+		}
+		scope:target_character = {
+			if = {
+				limit = { exists = scope:target_country }
+				banish_character_to_country_effect = { target = scope:target_country }
+			}
+			else = {
+				banish_character = yes
+			}
+		}
+	}
+}
+
+#Consequences of his death!
+revolutionary_chaos.1001 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { tag = FRA }
+				desc = revolutionary_chaos.1001.title.FRA
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.1001.title
+			}
+		}
+	}
+	desc = revolutionary_chaos.1001.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+
+	immediate = {
+		create_rebel = {
+			category = pretender
+			name = counter_revolutionaries
+			save_scope_as = target_rebel
+		}
+		create_character = {
+			estate = estate_type:nobles_estate
+			age = 35
+			female = no
+			change_character_allegiance = scope:target_rebel
+		}
+		capital.region = {
+			random_area_in_region = {
+				limit = { any_province_in_area = { owner ?= root } }
+				save_scope_as = target_area
+			}
+		}
+	}
+
+	option = {
+		name = revolutionary_chaos.1001.a
+		add_government_power = government_power_severe_penalty
+		custom_tooltip = {
+			text = rev_revolting_area_tt
+			scope:target_area = {
+				every_location_in_area = {
+					limit = { owner ?= root }
+					every_pop = {
+						limit = {
+							owner = root
+							NOT = { pop_type = pop_type:burghers }
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+						change_pop_allegiance = scope:target_rebel
+					}
+				}
+			}
+		}
+	}
+}
+
+# Napoleon event chain
+#Great Military Leader arises
+revolutionary_chaos.1100 = {
+	type = country_event
+	category = disaster_event
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { exists = scope:target_character }
+				desc = revolutionary_chaos.1100.title.specific
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.1100.title
+			}
+		}
+	}
+	desc = revolutionary_chaos.1100.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+
+	fire_only_once = yes
+	trigger = {
+		is_revolution_target = yes
+		OR = {
+			has_variable = fra_monarch_executed
+			has_variable = the_directory_flag
+		}
+		at_war = yes
+	}
+	immediate = {
+		if = {
+			limit = { tag = FRA }
+			create_character = {
+				first_name = name_napoleon
+				last_name = Bonaparte
+				religion = root.religion
+				culture = culture:corsican
+				estate = estate_type:burghers_estate
+				adm = 100
+				dip = 100
+				mil = 100
+				age = 25
+				female = no
+				add_trait = trait:conqueror
+				add_trait = trait:tactical_genius
+				add_trait = trait:inspiring_leader
+				script = fra_napoleon_bonaparte
+				save_scope_as = target_character
+			}
+		}
+		else = {
+			create_character = {
+				religion = root.religion
+				culture = root.culture
+				estate = estate_type:burghers_estate
+				adm = { 80 100 }
+				dip = { 80 100 }
+				mil = { 80 100 }
+				age = { 20 30 }
+				female = no
+				add_trait = trait:conqueror
+				add_trait = trait:tactical_genius
+				add_trait = trait:inspiring_leader
+				save_scope_as = target_character
+			}
+		}
+		scope:target_character = {
+			set_variable = { name = untouchable_character value = yes }
+			add_character_modifier = {
+				modifier = insatiable_ambition
+				years = -1
+				mode = add_and_extend
+			}
+		}
+		set_variable = {
+			name = our_napoleon
+			value = scope:target_character
+		}
+		set_variable = { name = napoleon_earliest_takeover value = yes days = 1000 }
+		set_variable = { name = napoleon_latest_takeover value = yes days = 2000 }
+	}
+
+	option = {
+		name = revolutionary_chaos.1100.a
+		add_army_tradition = army_tradition_ultimate_bonus
+	}
+}
+
+#Establishment of the Revolutionary Autocracy
+revolutionary_chaos.1101 = {
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.1101.title
+	desc = revolutionary_chaos.1101.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	
+	fire_only_once = yes
+	trigger = {
+		has_variable = our_napoleon
+		var:our_napoleon = { is_alive = yes }
+		OR = {
+			NOT = { has_variable = napoleon_latest_takeover }
+			AND = {
+				NOT = { has_variable = napoleon_earliest_takeover }
+				government_power < 50
+				stability < 40
+			}
+		}
+	}
+	immediate = {
+		var:our_napoleon = {
+			save_scope_as = target_character
+		}
+		create_rebel = {
+			category = pretender
+			name = bonaparte_rebels
+			save_scope_as = target_rebel
+		}
+	}
+	option = {
+		name = revolutionary_chaos.1101.a
+		hidden_effect = { destroy_rebel = scope:target_rebel }
+		set_new_ruler = scope:target_character
+		if = {
+			limit = { has_country_modifier = the_reign_of_terror }
+			remove_country_modifier = the_reign_of_terror
+		}
+		if = {
+			limit = { has_reform = government_reform:revolutionary_republic }
+			remove_reform = government_reform:revolutionary_republic
+		}
+		if = {
+			limit = { has_reform = government_reform:constitutional_state }
+			remove_reform = government_reform:constitutional_state
+		}
+		add_reform = government_reform:revolutionary_autocracy
+		if = {
+			limit = { NOT = { succession_law = heir_selection:military_dictatorship } }
+			change_heir_selection = heir_selection:military_dictatorship
+		}
+		trigger_event_silently = {
+			id = revolutionary_chaos.1102
+			days = { 1460 2190 }
+		}
+		trigger_event_silently = {
+			id = revolutionary_chaos.1103
+			days = { 365 1000 }
+		}
+		hidden_effect = {
+			scope:target_character = {
+				set_variable = { name = bonaparte_flag value = yes }
+				if = {
+					limit = { root = { tag = FRA } }
+					set_variable = bonaparte_dynasty
+				}
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.1101.b
+		add_stability = stability_severe_bonus
+		scope:target_character = { change_character_allegiance = scope:target_rebel }
+		custom_tooltip = {
+			text = bonaparte_rebels_rise_up_tt
+			capital.area = {
+				every_location_in_area = {
+					limit = { owner ?= root }
+					every_pop = {
+						limit = {
+							owner = root
+						}
+						add_pop_satisfaction = pop_satisfaction_radical_penalty
+						change_pop_allegiance = scope:target_rebel
+					}
+				}
+			}
+		}
+	}
+}
+
+#The Infernal Machine
+revolutionary_chaos.1102 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.1102.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = napoleon_dies }
+				desc = revolutionary_chaos.1102.desc.dead_napoleon
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = revolutionary_chaos.1102.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	fire_only_once = yes
+	trigger = {
+		has_ruler = yes
+		ruler = { has_variable = bonaparte_flag }
+		has_reform = government_reform:revolutionary_autocracy
+	}
+	immediate = {
+		random_list = {
+			1 = {
+				set_variable = napoleon_dies
+				kill_character = {
+					target = scope:target_character
+					reason = assassination
+				}
+			}
+			3 = {}
+		}
+		ruler = { save_scope_as = target_character }
+	}
+
+	option = {
+		name = revolutionary_chaos.1102.a
+		trigger = { has_variable = napoleon_dies }
+		add_government_power = government_power_mild_penalty
+		remove_variable = napoleon_dies
+	}
+	option = {
+		name = revolutionary_chaos.1102.b
+		trigger = { NOT = { has_variable = napoleon_dies } }
+		add_government_power = government_power_weak_penalty
+	}
+}
+
+#Aspiration of an Empire
+revolutionary_chaos.1103 = {
+	type = country_event
+	category = disaster_event
+	title = revolutionary_chaos.1103.title
+	desc = revolutionary_chaos.1103.desc
+	image = "gfx/interface/illustrations/disaster/revolutionary_chaos.dds"
+	
+	trigger = {
+		has_ruler = yes
+		ruler = { has_variable = bonaparte_flag }
+		has_reform = government_reform:revolutionary_autocracy
+	}
+	immediate = {
+		ruler = {
+			save_scope_as = target_character
+		}
+	}
+	option = {
+		name = revolutionary_chaos.1103.a
+		add_stability = stability_severe_penalty
+		remove_reform = government_reform:revolutionary_autocracy
+		change_government_type = government_type:monarchy
+		add_reform = government_reform:revolutionary_empire
+		set_country_rank_effect = { rank = country_rank:rank_empire }
+		scope:target_character = {
+			change_character_estate = estate_type:crown_estate
+			if = {
+				limit = { scope:target_character = { has_variable = bonaparte_dynasty } }
+				scope:target_character = {
+					found_dynasty = bonaparte_dynasty
+				}
+				dynasty:bonaparte_dynasty ?= {
+					save_scope_as = target_dynasty
+				}
+			}
+			else = {
+				scope:target_character = {
+					found_dynasty = random
+				}
+			}
+		}
+	}
+	option = {
+		name = revolutionary_chaos.1103.b
+		add_government_power = government_power_radical_bonus
+	}
+}

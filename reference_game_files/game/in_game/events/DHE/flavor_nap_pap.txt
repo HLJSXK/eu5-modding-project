@@ -1,0 +1,320 @@
+﻿namespace = flavor_nap_pap
+
+scripted_effect nap_exposed_donation_of_constantine = {
+	drop_antagonism_bomb = {
+		target = c:PAP.capital
+		modifier = antagonism_revealed_sham_documents
+	}
+
+    c:PAP ?= {
+        add_opinion_mutual_effect = {
+            modifier = nap_papal_state_exposed
+            target = ROOT
+        }
+    }
+
+    add_country_modifier = {
+        modifier = nap_exposed_papacy
+        years = 30
+    }
+}
+
+flavor_nap_pap.1 = { #Lorenzo Valla
+	hide_portraits = yes
+	type = country_event
+	title = flavor_nap_pap.1.title
+	desc = flavor_nap_pap.1.desc
+	historical_info = flavor_nap_pap.1.historical_info
+
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = NAP
+		from = 1435.1.1
+		to = 1445.1.1
+		monthly_chance = 20
+	}
+
+	trigger = {
+		OR = {
+			is_rival_of = c:PAP
+			is_enemy_of = c:PAP
+			is_neighbor_of = c:PAP
+		}
+		c:PAP = {
+			has_ruler = yes
+		}
+		has_ruler = yes
+	}
+
+	immediate = {
+		create_character = { #https://en.wikipedia.org/wiki/Lorenzo_Valla
+			first_name = name_laurence
+			last_name = Valla
+			adm = { 60 70 } dip = { 50 65 } mil = { 40 45 }
+			birth_date = 1407.6.1
+			birth_location = location:rome
+			estate = estate_type:clergy_estate
+			script = nap_lorenzo_valla
+			save_scope_as = lorenzo_valla_scope
+			create_in_limbo = yes
+		}
+        save_scope_as = nap_from
+		ruler = { save_scope_as = country_ruler }
+	}
+
+	#Hire [lorenzo_valla_scope.GetHerHim] at once!
+	option = {
+		name = flavor_nap_pap.1.a
+
+		historical_option = yes
+
+		change_gold_effect = { scale = -12 }
+		scope:lorenzo_valla_scope = {
+			move_country = ROOT
+		}
+		add_research_progress = research_progress_severe_bonus
+
+		custom_tooltip = NAP_when_done
+		trigger_event_non_silently = {
+			id = flavor_nap_pap.2
+			years = { 1 2 }
+		}
+		show_as_tooltip = {
+			nap_exposed_donation_of_constantine = yes
+		}
+	}
+
+	#Let [lorenzo_valla_scope.GetHerHim] have the school at most.
+	option = {
+		name = flavor_nap_pap.1.b
+
+		change_gold_effect = { scale = -3 }
+		add_research_progress = research_progress_mild_bonus
+   		kill_character_silently = scope:lorenzo_valla_scope
+	}
+
+	#What if [lorenzo_valla_scope.GetSheHe] is a spy?
+	option = {
+		name = flavor_nap_pap.1.c
+
+		add_prestige = prestige_mild_penalty
+
+		add_stability = stability_mild_bonus
+   		kill_character_silently = scope:lorenzo_valla_scope
+	}
+}
+
+flavor_nap_pap.2 = { #Exposee on Donation of Constantine is done
+	type = country_event
+	title = flavor_nap_pap.2.title
+	desc = flavor_nap_pap.2.desc
+	historical_info = flavor_nap_pap.2.historical_info
+
+	trigger = {
+		scope:lorenzo_valla_scope = {
+			is_alive = yes
+			owner = ROOT
+		}
+	}
+
+	option = {
+		name = flavor_nap_pap.2.a #publish it
+
+		nap_exposed_donation_of_constantine = yes
+
+		c:PAP = {
+			trigger_event_non_silently = flavor_nap_pap.3
+		}
+
+        custom_tooltip = NAP_increase_reform_desire
+	}
+
+	option = {
+		name = flavor_nap_pap.2.b
+
+		add_prestige = prestige_severe_penalty
+	}
+}
+
+flavor_nap_pap.3 = { #Papal Reaction
+	hide_portraits = yes
+	type = country_event
+	title = flavor_nap_pap.3.title
+	desc = flavor_nap_pap.3.desc
+	historical_info = flavor_nap_pap.3.historical_info
+
+	immediate = {
+		set_local_variable = {
+			name = amount_of_all_catholic_locations
+			value = 0
+		}
+		religion:catholic = {
+			every_country_in_religion = {
+				every_owned_location = {
+					limit = {
+						dominant_religion = religion:catholic
+					}
+					change_local_variable = {
+						name = amount_of_all_catholic_locations
+						add = 1
+					}
+				}
+			}
+		}
+		change_local_variable = {
+			name = amount_of_all_catholic_locations
+			multiply = 100
+		}
+		ruler_or_regent = {
+			save_scope_as = the_pope
+		}
+		save_scope_as = the_papacy
+	}
+
+	option = {
+		name = flavor_nap_pap.3.a #Excommunicate those involved and suppressed
+
+        historical_option = yes
+
+        scope:nap_from = {
+            excommunicate_effect = yes
+        }
+
+        set_local_variable = {
+            name = harshness_multiplier
+            value = 1.5
+        }
+        custom_tooltip = nap_harsher_effect_on_excommunication_but_less_likely_and_excom
+	}
+
+	option = {
+		name = flavor_nap_pap.3.b #Concede to the pressure
+
+		add_country_modifier = {
+			modifier = nap_donation_of_contantine_exposed
+			years = -1
+		}
+		set_local_variable = pap_donation_of_constantine_nullified
+        set_local_variable = {
+            name = harshness_multiplier
+            value = 1
+        }
+
+        add_prestige = prestige_extreme_penalty
+        add_devotion = devotion_extreme_penalty
+	}
+
+	after = {
+        custom_tooltip = {
+            text = nap_every_catholic_country_gets_to_choose
+            hidden_effect = {
+                every_country = {
+                    limit = {
+                        religion = religion:catholic
+                        NOT = { this = ROOT }
+                        NOT = { this = scope:nap_from }
+                        within_diplomatic_range = ROOT
+                    }
+                    trigger_event_silently = flavor_nap_pap.4
+                }
+            }
+        }
+        show_as_tooltip = {
+            random_country = {
+                limit = {
+                    religion = religion:catholic
+                    NOT = { this = ROOT }
+                    NOT = { this = scope:nap_from }
+                    within_diplomatic_range = ROOT
+                }
+                trigger_event_silently = flavor_nap_pap.4
+            }
+        }
+	}
+}
+
+flavor_nap_pap.4 = { #Each Christian Nation can make up their mind on it
+	type = country_event
+	title = flavor_nap_pap.4.title
+	desc = flavor_nap_pap.4.desc
+	historical_info = flavor_nap_pap.4.historical_info
+
+	immediate = {
+		set_local_variable = {
+			name = our_amount_of_all_catholic_locations
+			value = 0
+		}
+		every_owned_location = {
+			limit = {
+				dominant_religion = religion:catholic
+			}
+			change_local_variable = {
+				name = our_amount_of_all_catholic_locations
+				add = 1
+			}
+		}
+	}
+
+	option = {
+		name = flavor_nap_pap.4.a #Condemn the Pope
+
+        ai_chance = {
+			factor = 20
+            modifier = {
+                factor = 0.5
+                has_local_variable = pap_donation_of_constantine_nullified
+            }
+		}
+
+		religion = {
+			add_reform_desire = {
+				value = local_var:our_amount_of_all_catholic_locations
+				divide = local_var:amount_of_all_catholic_locations
+				multiply = 4
+				multiply = local_var:harshness_multiplier
+			}
+		}
+		c:PAP ?= {
+			add_opinion = {
+				target = ROOT
+				modifier = nap_condemned_his_holiness
+			}
+		}
+
+        if = {
+            limit = {
+                has_local_variable = pap_donation_of_constantine_nullified
+            }
+            excommunicate_effect = yes
+        }
+
+        change_societal_value = {
+            type = traditionalist_vs_innovative
+            value = societal_value_minor_move_to_right
+        }
+	}
+
+	option = {
+		name = flavor_nap_pap.4.b #Ignore this incident
+
+        ai_chance = {
+			factor = 1
+			modifier = {
+				factor = { # 0 to 200
+					value = "root.opinion(c:PAP)"
+					add = 200
+					divide = 2
+            	}
+			}
+		}
+
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_large_move_to_left
+		}
+        add_religious_influence_if_valid = {
+            VALUE = 10
+        }
+	}
+}

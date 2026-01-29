@@ -1,0 +1,835 @@
+﻿namespace = rise_of_the_szlachta
+
+rise_of_the_szlachta.1 = { #Rise of the [ROOT.GetCountry.GetGovernment.GetEstateNameWithNoTooltip('nobles_estate')]
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.1.title
+	desc = rise_of_the_szlachta.1.desc
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		capital = {
+			save_scope_as = target_location
+		}
+		capital = {
+			area = { save_scope_as = target_area }
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.1.a
+
+		add_stability = stability_ultimate_penalty
+		add_government_power = government_power_ultimate_penalty
+	}
+}
+
+rise_of_the_szlachta.2 = {	#Nobles Demand Privilege
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.2.title
+	desc = rise_of_the_szlachta.2.desc
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	trigger = {
+		num_possible_estate_privileges:nobles_estate > 0
+		num_possible_estate_privileges:burghers_estate > 0
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		
+	}
+
+	option = {
+		name = rise_of_the_szlachta.2.a
+
+		if = {
+			limit = { has_variable = estate_priv_cooldown_timer_nobles }
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_tiny_move_to_left
+			}
+			add_stability = stability_weak_bonus
+		}
+		else = {
+			"estate(estate_type:nobles_estate)" = {
+				random_possible_privilege = {
+					root = { grant_estate_privilege = prev }
+				}
+			}
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_minor_move_to_left
+			}
+			add_stability = stability_mild_bonus
+		}
+		add_estate_satisfaction = { type = estate_type:nobles_estate 
+			value = estate_satisfaction_weak_bonus
+		}
+		add_estate_satisfaction = { type = estate_type:burghers_estate 
+			value = estate_satisfaction_severe_penalty
+		}
+		set_variable = {
+			name = estate_priv_cooldown_timer_nobles
+			years = 1
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.2.b
+		
+		if = {
+			limit = { 
+				has_variable = estate_priv_cooldown_timer_burghers
+			}
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_tiny_move_to_right
+			}
+			add_stability = stability_weak_bonus
+		}
+		else = {
+			if = {
+				limit = {
+					num_possible_estate_privileges:burghers_estate > 0
+				}
+				
+				"estate(estate_type:burghers_estate)" = {
+					random_possible_privilege = {
+						root = { grant_estate_privilege = prev }
+					}
+				}
+				change_societal_value = {
+					type = aristocracy_vs_plutocracy
+					value = societal_value_tiny_move_to_right
+				}
+			}
+			else = {
+				change_societal_value = {
+					type = aristocracy_vs_plutocracy
+					value = societal_value_minor_move_to_right
+				}
+			}
+			add_stability = stability_mild_bonus
+		}
+		add_estate_satisfaction = { type = estate_type:burghers_estate 
+			value = estate_satisfaction_weak_bonus
+		}
+		add_estate_satisfaction = { type = estate_type:nobles_estate 
+			value = estate_satisfaction_extreme_penalty
+		}
+		set_variable = {
+			name = estate_priv_cooldown_timer_burghers
+			years = 1
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.2.c
+		if = {
+			limit = {
+				OR = {
+					has_variable = estate_priv_cooldown_timer_burghers
+					has_variable = estate_priv_cooldown_timer_nobles
+				}
+			}
+			add_stability = stability_weak_penalty
+			add_government_power = government_power_severe_bonus
+			add_estate_satisfaction = { type = estate_type:burghers_estate
+				value = estate_satisfaction_extreme_penalty
+			}
+			add_estate_satisfaction = { type = estate_type:nobles_estate
+				value = estate_satisfaction_extreme_penalty
+			}
+		}
+		else = {
+			add_stability = stability_mild_penalty
+			add_government_power = government_power_mild_bonus
+			add_estate_satisfaction = { type = estate_type:burghers_estate
+				value = estate_satisfaction_radical_penalty
+			}
+			add_estate_satisfaction = { type = estate_type:nobles_estate
+				value = estate_satisfaction_radical_penalty
+			}
+		}
+		if = {
+			limit = {
+				NOT = { has_country_modifier = pol_attempts_consolidation_modifier }
+			}
+			add_country_modifier = {
+				modifier = pol_attempts_consolidation_modifier
+				years = 5
+				mode = add_and_extend
+			}
+		}
+		else = {
+			add_country_modifier = {
+				modifier = pol_attempts_consolidation_modifier
+				mode = add_and_extend
+				months = 6
+				size = {
+					value = 1
+					multiply = {
+						desc = "[crown_power|e]"
+						value = "estate_power(estate_type:crown_estate)"
+					}
+				}
+			}
+		}
+	}
+}
+
+rise_of_the_szlachta.3 = {	#Estate Disputes
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.3.title
+	desc = rise_of_the_szlachta.3.desc
+	trigger = {
+		country_has_estate = estate_type:burghers_estate
+	}
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		ordered_owned_location = {
+			limit = {
+				any_pop = { pop_type = pop_type:burghers }
+			}
+			order_by = {
+				value = num_pop_type:burghers
+				if = {	#Less likely to pick a location that already has the modifier, but not impossible
+					limit = { has_location_modifier = stronghold_of_the_burghers_modifier }
+					divide = 10
+				}
+			}
+			check_range_bounds = no
+			save_scope_as = target_location
+		}
+		random_list = {	#Pick random option for event option a
+			1 = { set_variable = eventopt1 }
+			1 = { set_variable = eventopt2 }
+			1 = { set_variable = eventopt3 }
+			1 = { set_variable = eventopt4 }
+		}
+		random_list = {	#Pick random option for event option b
+			1 = { set_variable = eventopt5 }
+			1 = { set_variable = eventopt6 }
+			1 = { set_variable = eventopt7 }
+			1 = { set_variable = eventopt8 }
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.3.a
+		if = {
+			limit = { 
+				has_variable = chose_event_3_variable
+			}
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_move_to_right
+			}
+		} 
+		else = {
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_large_move_to_right
+			}
+		}
+		set_variable = {
+			name = chose_event_3_variable
+			years = 1
+		}
+		add_stability = stability_weak_bonus
+		add_estate_satisfaction = { 
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+		switch = {
+			trigger = has_variable
+			eventopt1 = {
+				custom_tooltip = based_on_burghers_estate_satisfaction_tt
+				scope:target_location = {	#set in the immediate
+					add_location_modifier = {
+						modifier = stronghold_of_the_burghers_modifier
+						years = 10
+						size = {
+							value = 1
+							add = {
+								desc = "estate_satisfaction_burghers_tt"
+								value = owner.estate_satisfaction:burghers_estate
+							}
+						}
+						mode = add_and_extend
+					}
+				}
+			}
+			eventopt2 = {
+				custom_tooltip = based_on_burghers_estate_satisfaction_tt
+				add_gold = {
+					value = monthly_income_trade_and_tax
+					multiply = 24
+					multiply = estate_satisfaction:burghers_estate
+				}
+			}
+			eventopt3 = {
+				custom_tooltip = based_on_burghers_estate_satisfaction_tt
+				scope:target_location = {	#set in the immediate
+					province = {
+						every_location_in_province = {
+							change_prosperity = {
+								value = 0.1
+								add = {
+									desc = "estate_satisfaction_burghers_tt"
+									value = owner.estate_satisfaction:burghers_estate
+									multiply = 0.1
+								}
+							}
+						}
+					}
+				}
+			}
+			eventopt4 = {
+				custom_tooltip = based_on_burghers_estate_satisfaction_tt
+				add_prestige = {
+					value = 10
+					multiply = estate_satisfaction:burghers_estate
+					add = 5
+				}
+			}
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.3.b
+		add_estate_satisfaction = { type = estate_type:burghers_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+		if = {
+			limit = { 
+				has_variable = chose_event_3_variable
+			}
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_tiny_move_to_left
+			}
+		} 
+		else = {
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_move_to_left
+			}
+		}
+		scope:target_location = {
+			every_pop = { 
+				limit = {
+					owner = root
+					pop_type = pop_type:burghers
+				} 
+				add_pop_satisfaction = pop_satisfaction_severe_penalty
+			}
+		}
+		add_stability = stability_mild_penalty
+		custom_tooltip = based_on_nobles_estate_power_tt
+		switch = {
+			trigger = has_variable
+			eventopt5 = {
+				if = { 
+					limit = { societal_value:aristocracy_vs_plutocracy < 0 } 
+					add_stability = {
+						value = societal_value:aristocracy_vs_plutocracy
+						multiply = "estate_power(estate_type:nobles_estate)"
+						multiply = -1
+					}
+				}
+				else = {
+					add_stability = {
+						value = societal_value:aristocracy_vs_plutocracy
+						multiply = "estate_power(estate_type:nobles_estate)"
+					}
+				}
+			}
+			eventopt6 = {
+				if = {
+					limit = {
+						yearly_manpower > 0
+						NOT = { has_country_modifier = pol_levy_support_modifier }
+					}
+					add_country_modifier = {
+						modifier = pol_levy_support_modifier
+						years = 2
+						mode = add_and_extend 
+					}
+				}
+				else_if = {
+					limit = { yearly_manpower > 0 }
+					add_country_modifier = {
+						modifier = pol_levy_support_modifier
+						months = 6
+						mode = add_and_extend 
+						size = {
+							value = 1 
+							multiply = "estate_power(estate_type:nobles_estate)"
+						}
+					}
+				}
+				else = {
+					if = {
+						limit = { yearly_manpower > 0 }
+						add_manpower = { 
+							value = monthly_manpower 
+							multiply = 3
+							multiply = "estate_power(estate_type:nobles_estate)" 
+						}
+					}
+					else = {
+						add_government_power = {
+							value = government_power_severe_bonus
+							multiply = "estate_power(estate_type:nobles_estate)"
+						}
+					}
+				}
+			}
+			eventopt7 = {
+				add_army_tradition = {
+					value = army_tradition_mild_bonus
+					multiply = "estate_power(estate_type:nobles_estate)"
+				}
+			}
+			eventopt8 = {
+				add_prestige = {
+					value = 10
+					multiply = "estate_power(estate_type:nobles_estate)"
+					add = 3
+				}
+			}
+		}
+		set_variable = {
+			name = chose_event_3_variable
+			years = 1
+		}
+	}
+
+	after = {
+		if = {
+			limit = { has_variable = eventopt1 } 
+			remove_variable = eventopt1
+		}
+		if = {
+			limit = { has_variable = eventopt2 } 
+			remove_variable = eventopt2
+		}
+		if = {
+			limit = { has_variable = eventopt3 } 
+			remove_variable = eventopt3
+		}
+		if = {
+			limit = { has_variable = eventopt4 } 
+			remove_variable = eventopt4
+		}
+		if = {
+			limit = { has_variable = eventopt5 } 
+			remove_variable = eventopt5
+		}
+		if = {
+			limit = { has_variable = eventopt6 } 
+			remove_variable = eventopt6
+		}
+		if = {
+			limit = { has_variable = eventopt7 } 
+			remove_variable = eventopt7
+		}
+		if = {
+			limit = { has_variable = eventopt8 } 
+			remove_variable = eventopt8
+		}
+	}
+}
+
+rise_of_the_szlachta.4 = {	#Popular Backing
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.4.title
+	desc = rise_of_the_szlachta.4.desc
+	trigger = {
+		is_active_parliament = yes
+		parliament_issue_support < 0.5
+	}
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.4.a 
+		if = {
+			limit = { societal_value:aristocracy_vs_plutocracy <= -95 }
+			add_stability = stability_mild_bonus
+		}
+		else = {
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_minor_move_to_left
+			}
+		}
+		if = {
+			limit = {
+				NOT = { has_country_modifier = szlachta_backing_modifier }
+			}
+			add_country_modifier = {
+				modifier = szlachta_backing_modifier
+				years = 4
+				mode = add_and_extend
+			}
+		}
+		else = {
+			add_country_modifier = {
+				modifier = szlachta_backing_modifier
+				months = 6
+				mode = add_and_extend
+				size = "estate_power(estate_type:nobles_estate)"
+			}
+		}
+		if = {
+			limit = { has_country_modifier = burghers_backing_modifier }
+			remove_country_modifier = burghers_backing_modifier
+		}
+		change_parliament_issue_support = {
+			value = 0.1
+			multiply = "estate_power(estate_type:nobles_estate)"
+			multiply = 2
+			max = 0.2
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.4.b
+		if = {
+			limit = { societal_value:aristocracy_vs_plutocracy >= 95 }
+			add_stability = stability_mild_bonus
+		}
+		else = {
+			change_societal_value = {
+				type = aristocracy_vs_plutocracy
+				value = societal_value_minor_move_to_right
+			}
+		}
+		if = {
+			limit = {
+				NOT = { has_country_modifier = burghers_backing_modifier }
+			}
+			add_country_modifier = {
+				modifier = burghers_backing_modifier
+				years = 4
+				mode = add_and_extend
+			}
+		}
+		else = {
+			add_country_modifier = {
+				modifier = burghers_backing_modifier
+				months = 6
+				mode = add_and_extend
+				size = "estate_power(estate_type:burghers_estate)"
+			}
+		}
+		if = {
+			limit = { has_country_modifier = szlachta_backing_modifier }
+			remove_country_modifier = szlachta_backing_modifier
+		}
+		change_parliament_issue_support = {
+			value = 0.1
+			multiply = "estate_power(estate_type:burghers_estate)"
+			multiply = 2
+			max = 0.2
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.4.c 
+
+		add_government_power = government_power_mild_bonus
+		custom_tooltip = based_on_nobles_estate_power_tt
+		add_estate_satisfaction = { type = estate_type:nobles_estate 
+			value = {
+				add = estate_satisfaction_radical_penalty
+				multiply = "estate_power(estate_type:nobles_estate)"
+			}
+		}
+		custom_tooltip = based_on_burghers_estate_satisfaction_tt
+		add_estate_satisfaction = { 
+			type = estate_type:burghers_estate 
+			value = {
+				add = estate_satisfaction_radical_penalty
+				multiply = estate_satisfaction:burghers_estate
+			}
+		}
+	}
+}
+
+rise_of_the_szlachta.5 = {	#Estates Demand a Parliament 
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.5.title
+	desc = rise_of_the_szlachta.5.desc
+	trigger = {
+		months_since_last_parliament_called >= 62
+		has_parliament = yes
+		exists = capital
+	}
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		random_possible_parliament_issue = { save_scope_as = target_debate }
+		random_possible_parliament_issue = {
+			limit = {
+				this != scope:target_debate
+			}
+			save_scope_as = target_debate_2
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.5.a
+
+		if = {
+			limit = { is_active_parliament = no }
+			set_parliament_location = capital
+			set_parliament_active = yes
+			set_parliament_issue = scope:target_debate
+			hidden_effect = {
+				change_parliament_issue_support = parliament_issue_support_mild_bonus
+			}
+		}
+		add_estate_satisfaction = { 
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_mild_bonus
+		}
+		custom_tooltip = based_on_nobles_estate_power_tt
+		add_government_power = {
+			value = government_power_mild_penalty
+			add = {
+				value = "estate_power(estate_type:nobles_estate)"
+				multiply = 10
+				floor = yes
+			}
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.5.b
+
+		change_societal_value = {
+			type = aristocracy_vs_plutocracy
+			value = societal_value_minor_move_to_right
+		}
+
+		if = {
+			limit = { is_active_parliament = no }
+			set_parliament_location = capital
+			set_parliament_active = yes
+			set_parliament_issue = scope:target_debate_2
+			hidden_effect = {
+				change_parliament_issue_support = parliament_issue_support_mild_bonus
+			}
+		}
+
+		add_estate_satisfaction = { 
+			type = estate_type:burghers_estate
+			value = estate_satisfaction_mild_bonus
+		}
+		custom_tooltip = based_on_nobles_estate_power_tt
+		add_stability = {
+			value = stability_weak_penalty
+			subtract = {
+				value = "estate_power(estate_type:nobles_estate)"
+				multiply = 10
+				floor = yes
+			}
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.5.c
+
+		add_estate_satisfaction = { type = estate_type:nobles_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+		add_estate_satisfaction = { type = estate_type:burghers_estate
+			value = estate_satisfaction_extreme_penalty
+		}
+		custom_tooltip = based_on_nobles_estate_power_tt
+		add_stability = {
+			value = stability_weak_penalty
+			subtract = {
+				value = "estate_power(estate_type:nobles_estate)"
+				multiply = 10
+				floor = yes
+			}
+		}
+		custom_tooltip = based_on_crown_estate_power_tt
+		add_government_power = {
+			value = government_power_mild_bonus
+			add = {
+				value = "estate_power(estate_type:crown_estate)"
+				multiply = 10
+				ceiling = yes
+			}
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = {
+				add = societal_value_large_move_to_left
+				multiply = "estate_power(estate_type:crown_estate)"
+				floor = yes
+			}
+		}
+	}
+}
+
+rise_of_the_szlachta.6 = {	#Nobles Win 
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.6.title
+	desc = rise_of_the_szlachta.6.desc
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		set_variable = rise_of_szlachta_szlachta_outcome_variable
+	}
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	option = {
+		name = rise_of_the_szlachta.6.a
+
+		if = {
+			limit = {
+				NOT = { government_type = government_type:monarchy }
+			}
+			change_government_type = government_type:monarchy
+		}
+		add_reform = government_reform:rule_of_the_sejm
+		grant_estate_privilege = estate_privilege:golden_liberty
+		if = {
+			limit = {
+				NOT = { succession_law = heir_selection:elective_succession }
+			}
+			unlock_heir_selection_effect = { type = elective_succession }
+			change_heir_selection = heir_selection:elective_succession
+		}
+	}
+}
+
+rise_of_the_szlachta.7 = {	#Burghers Win
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.7.title
+	desc = rise_of_the_szlachta.7.desc
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	option = {
+		name = rise_of_the_szlachta.7.a
+		
+		if = {
+			limit = {
+				current_age_or_later = { age = age_4_reformation }
+			}
+			change_societal_value = {
+				type = mercantilism_vs_free_trade
+				value = societal_value_large_move_to_left
+			}
+		}
+		change_societal_value = {
+			type = aristocracy_vs_plutocracy
+			value = societal_value_large_move_to_right
+		}
+		if = {
+			limit = {
+				num_possible_estate_privileges:burghers_estate > 0
+			}
+			"estate(estate_type:burghers_estate)" = {
+				random_possible_privilege = {
+					root = { grant_estate_privilege = prev }
+				}
+			}
+			"estate(estate_type:burghers_estate)" = {
+				random_possible_privilege = {
+					root = { grant_estate_privilege = prev }
+				}
+			}			
+			"estate(estate_type:burghers_estate)" = {
+				random_possible_privilege = {
+					root = { grant_estate_privilege = prev }
+				}
+			}			
+		}
+	}
+}
+
+rise_of_the_szlachta.8 = {	#Crown Wins
+	type = country_event
+	category = disaster_event
+	title = rise_of_the_szlachta.8.title
+	desc = rise_of_the_szlachta.8.desc
+	image = "gfx/interface/illustrations/disaster/rise_of_the_szlachta.dds"
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+		random_estate_privilege ?= {
+			limit = { estate_type = estate_type:nobles_estate }
+			save_scope_as = target_privilege_1
+		}
+		random_estate_privilege ?= {
+			limit = { 
+				estate_type = estate_type:nobles_estate 
+				this != scope:target_privilege_1
+			}
+			save_scope_as = target_privilege_2
+		}
+		random_estate_privilege ?= {
+			limit = { 
+				estate_type = estate_type:nobles_estate
+				this != scope:target_privilege_1 
+				this != scope:target_privilege_2
+			}
+			save_scope_as = target_privilege_3
+		}
+	}
+
+	option = {
+		name = rise_of_the_szlachta.8.a
+
+		add_country_modifier = {
+			modifier = pol_supremacy_over_the_nobles_modifier
+			years = 20
+			mode = add_and_extend
+			size = "estate_power(estate_type:crown_estate)"
+		}
+		if = {
+			limit = { exists = scope:target_privilege_1 }
+			revoke_estate_privilege = scope:target_privilege_1
+		}
+		if = {
+			limit = { exists = scope:target_privilege_2 }
+			revoke_estate_privilege = scope:target_privilege_2
+		}
+		if = {
+			limit = { exists = scope:target_privilege_3 }
+			revoke_estate_privilege = scope:target_privilege_3
+		}
+		add_stability = stability_extreme_bonus
+	}
+}

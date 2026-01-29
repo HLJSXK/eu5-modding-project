@@ -1,0 +1,887 @@
+﻿namespace = treaty_of_tordesillas
+
+#First Event
+#root = country
+#scope:target_location location of new colony
+treaty_of_tordesillas.1 = {
+	type = country_event
+	category = situation_event
+	fire_only_once = yes
+
+	title = treaty_of_tordesillas.1.title
+	desc = treaty_of_tordesillas.1.desc
+	historical_info = treaty_of_tordesillas.1.historical_info
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	trigger = {
+		#At least discovery
+		current_age_or_later = { age = age_3_discovery }
+		#We are catholic
+		religion = religion:catholic
+		capital.continent = continent:europe
+		#We are not a rebel country
+		is_rebel_country = no
+		#we have colonies or locations in the new world
+		OR = {
+			any_subject_or_below = {
+				capital.continent = continent:america
+			}
+			any_owned_location = {
+				continent = continent:america
+				population > 0
+			}
+		}
+		#Another catholic country that have locations in the New World
+		#Or have colonies in the new world
+		religion:catholic = {
+			any_country_in_religion = {
+				NOT = {this = root}
+				#Is not a rebel
+				is_rebel_country = no
+				capital.continent = continent:europe
+				OR = {
+					any_subject_or_below = {
+						capital.continent = continent:america
+					}
+					any_owned_location = {
+						continent = continent:america
+						population > 0
+					}
+				}
+			}
+		}
+	}
+
+	immediate = {
+		#Get the scopes of the other country
+		religion:catholic = {
+			ordered_country_in_religion = {
+				limit = {
+					NOT = {this = root}
+					capital.continent = continent:europe
+					OR = {
+						any_subject_or_below = {
+							capital.continent = continent:america
+						}
+						any_owned_location = {
+							continent = continent:america
+							population > 0
+						}
+					}
+				}
+				max = 1
+				order_by = total_population
+				save_scope_as = other_country_scope
+				capital = {
+					save_scope_as = other_capital_scope
+				}
+				if = {
+					limit = {
+						any_subject_or_below = {
+							capital.continent = continent:america
+						}
+					}
+					random_subject_or_below = {
+						limit = {
+							capital.continent = continent:america
+						}
+						capital = {
+							save_scope_as = other_country_colony_scope
+						}
+					}
+				}
+				else = {
+					random_owned_location = {
+						limit = {
+							continent = continent:america
+							population > 0
+						}
+						save_scope_as = other_country_colony_scope
+					}
+				}
+			}
+		}
+
+		capital = {
+			save_scope_as = capital_scope
+		}
+		if = {
+			limit = {
+				owns = location:tordesillas
+			}
+			location:tordesillas = {save_scope_as = random_location_scope}
+		}
+		else = {
+			random_owned_non_rural_location = {
+				limit = {
+					root.capital != this
+				}
+				save_scope_as = random_location_scope
+			}
+		}
+		random_owned_location = {
+			limit = {
+				continent = continent:america
+				population > 0
+			}
+			save_scope_as = american_location_scope
+		}
+		#Border location
+		random_political_border_location = {
+			random_neighbor_location = {
+				limit = {
+					trigger_if = {
+						limit = {
+							has_owner = yes
+						}
+					owner = scope:other_country_scope
+					}
+					trigger_else = {
+						always = no
+					}
+				}
+				save_scope_as = border_location_scope
+			}
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.1.a
+		change_societal_value = { type = centralization_vs_decentralization value = societal_value_minor_move_to_left }
+		scope:capital_scope = {
+			change_prosperity = prosperity_very_weak_bonus
+			save_scope_as = chosen_location_scope
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.1.b
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_left }
+		scope:other_capital_scope = {
+			change_prosperity = prosperity_very_weak_bonus
+			save_scope_as = chosen_location_scope
+		}
+		reverse_add_opinion = {
+			target = scope:other_country_scope
+			modifier = successful_diplomacy
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.1.c
+		add_estate_satisfaction = { type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_bonus
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = societal_value_minor_move_to_right
+		}
+		scope:random_location_scope = {
+			change_prosperity = prosperity_very_weak_bonus
+			save_scope_as = chosen_location_scope
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.1.d
+		trigger = {
+			exists = scope:american_location_scope
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = societal_value_minor_move_to_right
+		}
+		scope:american_location_scope = {
+			change_prosperity = prosperity_very_weak_bonus
+			save_scope_as = chosen_location_scope
+		}
+		change_gold_effect = { scale = -1 }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.1.e
+		trigger = {
+			exists = scope:border_location_scope
+		}
+		add_estate_satisfaction = { type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_bonus
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = societal_value_minor_move_to_right
+		}
+		scope:border_location_scope = {
+			change_prosperity = prosperity_very_weak_bonus
+			save_scope_as = chosen_location_scope
+		}
+		reverse_add_opinion = {
+			target = scope:other_country_scope
+			modifier = opinion_diplomatic_move
+		}
+	}
+
+	after = {
+		scope:other_country_scope = {
+			trigger_event_non_silently = treaty_of_tordesillas.2
+		}
+	}
+
+}
+
+#Second Event for the Other colonial power
+#root = second country, scope:target_location
+#capital_scope = first country capital
+#target_location = first country colony location
+#other_capital_scope = root country capital
+#other_country_colony_scope = root country colony location
+#chosen_location_scope = location where the treaty is signed
+treaty_of_tordesillas.2 = {
+	type = country_event
+	category = situation_event
+	fire_only_once = yes
+
+	title = treaty_of_tordesillas.1.title
+	desc = treaty_of_tordesillas.2.desc
+	historical_info = treaty_of_tordesillas.1.historical_info
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	immediate = {
+		scope:capital_scope = {#capital_scope = first country capital
+			owner = {
+				save_scope_as = first_country_scope
+			}
+		}
+
+		situation:treaty_of_tordesillas = {
+			set_variable = {
+				name = treaty_location
+				value = scope:chosen_location_scope
+			}
+
+			#Location is east of the other colony
+			if = {
+				limit = {
+					scope:target_location = {
+						is_east_of = scope:other_country_colony_scope
+					}
+				}
+				set_variable = {
+					name = var_east_country
+					value = scope:first_country_scope
+				}
+				set_variable = {
+					name = var_west_country
+					value = scope:other_country_scope
+				}
+				set_variable = {
+					name = var_east_colony
+					value = scope:target_location
+				}
+				set_variable = {
+					name = var_west_colony
+					value = scope:other_country_colony_scope
+				}
+			}
+			#Location is west of the other colony
+			else = {
+				set_variable = {
+					name = var_west_country
+					value = scope:first_country_scope
+				}
+				set_variable = {
+					name = var_east_country
+					value = scope:other_country_scope
+				}
+				set_variable = {
+					name = var_west_colony
+					value = scope:target_location
+				}
+				set_variable = {
+					name = var_east_colony
+					value = scope:other_country_colony_scope
+				}
+			}
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.2.a
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_left }
+		reverse_add_opinion = {
+			target = scope:first_country_scope
+			modifier = opinion_diplomatic_move
+		}
+		if = {
+			limit = {
+				situation:treaty_of_tordesillas = {
+					situation_is_active = no
+					situation_has_ended = no
+				}
+			}
+			activate_situation = situation:treaty_of_tordesillas
+		}
+	}
+}
+
+#Third Event for the every catholic country
+#root = catholic country, scope:target_location
+#capital_scope = first country capital
+#first_country_scope = first country
+#other_capital_scope = second country capital
+#other_country_scope = second country
+#chosen_location_scope = location where the treaty is signed
+treaty_of_tordesillas.3 = {
+	type = country_event
+	category = situation_event
+
+	title = treaty_of_tordesillas.3.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					#There is only one signatory left
+					situation:treaty_of_tordesillas.var:var_east_country = situation:treaty_of_tordesillas.var:var_west_country
+				}
+				desc = treaty_of_tordesillas.3.desc_one_signatory
+			}
+			triggered_desc = {
+				desc = treaty_of_tordesillas.3.desc
+			}
+		}
+	}
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	immediate = {
+		situation:treaty_of_tordesillas = {
+			var:var_east_country = {
+				save_scope_as = first_country_scope
+			}
+			var:var_west_country = {
+				save_scope_as = other_country_scope
+			}
+			var:treaty_location = {
+				save_scope_as = chosen_location_scope
+			}
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.3.a
+		trigger = {
+			NOR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_left }
+		add_opinion_mutual_effect = {
+			target = scope:first_country_scope
+			modifier = opinion_irritated
+		}
+		add_opinion_mutual_effect = {
+			target = scope:other_country_scope
+			modifier = opinion_irritated
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.3.b
+		trigger = {
+			NOR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_right }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.3.c
+		trigger = {
+			OR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_left }
+	}
+}
+
+treaty_of_tordesillas.4 = {
+	type = country_event
+	category = situation_event
+
+	title = treaty_of_tordesillas.4.title
+	desc = treaty_of_tordesillas.4.desc
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	immediate = {
+		situation:treaty_of_tordesillas.var:var_east_country = {
+			save_scope_as = first_country_scope
+		}
+		situation:treaty_of_tordesillas.var:var_west_country = {
+			save_scope_as = other_country_scope
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.4.a
+		trigger = {
+			NOR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = outward_vs_inward value = societal_value_minor_move_to_left }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.4.b
+		trigger = {
+			NOR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+		add_opinion_mutual_effect = {
+			target = scope:first_country_scope
+			modifier = opinion_irritated
+		}
+		add_opinion_mutual_effect = {
+			target = scope:other_country_scope
+			modifier = opinion_irritated
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.4.c
+		trigger = {
+			OR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.4.d
+		trigger = {
+			OR = {
+				root = scope:first_country_scope
+				root = scope:other_country_scope
+			}
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_right }
+	}
+}
+
+#scoped province is selected_province
+#scoped country is selected_country
+treaty_of_tordesillas.5 = {
+	type = country_event
+	category = situation_event
+
+	title = treaty_of_tordesillas.5.title
+	desc = treaty_of_tordesillas.5.desc
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	major = yes
+	major_trigger = {
+		this = scope:actor
+	}
+
+	immediate = {
+		scope:selected_province = {
+			province_capital = {
+				save_scope_as = prov_capital_scope
+			}
+		}
+		if = {
+			limit = {					
+				is_subject = yes 
+			}
+			top_overlord ?= { 
+				save_scope_as = overlord
+			}
+		}
+	}
+
+	option = {
+		name = treaty_of_tordesillas.5.a
+
+		trigger = {
+			is_subject = no 
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_right }
+		scope:selected_province ?= {
+			change_province_owner = scope:actor
+		}
+		scope:actor ?= {
+			add_opinion = { target = ROOT modifier = accepted_demands_modifier }
+		}
+		ai_will_select = {
+			value = -70
+			#More willing if the country is a lot more powerful
+			add = {
+				desc = "RELATIVE_STRENGTH"
+				value = 100
+				multiply = "scope:actor.relative_military_strength(root)"
+			}
+			#The less control we have over it, the less we care about giving it up
+			add = {# 100 x (1-province_average_control*2)
+				value = 100
+				multiply = {
+					value = 1
+					subtract = {
+						value = scope:selected_province.province_average_control
+						multiply = 2
+					}
+				}
+			}
+			# More willing if manpower is low! risk-averse
+			if = {
+				limit = { root.manpower_percentage < 0.3 }
+				add = 10
+			}
+
+			# Less inclined to accept if manpower is high — confident in ability to fight
+			if = {
+				limit = { root.manpower_percentage > 0.7 }
+				subtract = 10
+			}
+
+			# If the proposer is a rival or enemy, we may say no
+			if = {
+				limit = {
+					OR = {
+						is_rival_of = scope:actor
+						is_enemy_of = scope:actor
+					}
+				}
+				subtract = -999
+			}
+
+			# High war exhaustion makes peace more attractive
+			add = {
+				value = war_exhaustion
+				multiply = 2
+			}
+
+			# Slight bonus if we are at war elsewhere — less appetite for additional fronts
+			if = {
+				limit = {
+					any_current_war = { count > 1 }
+				}
+				every_current_war = {
+					add = 10
+				}
+			}
+		}	
+	}
+
+	option = {
+		name = treaty_of_tordesillas.5.b
+
+		trigger = {
+			is_subject = no 
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+		scope:actor ?= {
+			add_opinion = { target = ROOT modifier = declined_demands_modifier }
+
+			add_casus_belli = {
+				target = scope:selected_country
+				type = casus_belli:cb_conquer_province
+				province = scope:selected_province
+			}
+		}
+		ai_will_select = {
+			value = 0
+		}
+	}
+	option = {
+		name = treaty_of_tordesillas.5.c
+
+		trigger = {
+			is_subject = yes 
+		}
+		top_overlord ?= { 
+			trigger_event_non_silently = { id = treaty_of_tordesillas.5 days = 2 }
+		}
+	}
+}
+
+#Triggered by tordesillas_swap_claim
+treaty_of_tordesillas.6 = {
+	type = country_event
+	category = situation_event
+
+	title = treaty_of_tordesillas.6.title
+	desc = treaty_of_tordesillas.6.desc
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	major = yes
+	major_trigger = {
+		this = scope:actor
+	}
+
+	option = {
+		name = treaty_of_tordesillas.6.a
+
+		scope:actor ?= {
+			add_opinion = { target = ROOT modifier = accepted_demands_modifier }
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_right }
+
+        #Remove the claims in both Areas
+		scope:target_actor_area ?= {
+			every_province_definition_in_area = {
+				remove_colonial_claim = this
+				root ?= {
+					add_colonial_claim = {
+						province_definition = prev
+						reason = claim_reason_treaty_of_tordesillas
+						category = same_religion
+					}
+				}
+			}
+
+		}
+		scope:target_recipient_area ?= {
+			every_province_definition_in_area = {
+				remove_colonial_claim = this
+				scope:actor ?= {
+					add_colonial_claim = {
+						province_definition = prev
+						reason = claim_reason_treaty_of_tordesillas
+						category = same_religion
+					}
+				}
+			}
+		}
+
+		ai_will_select = {
+			value = 1
+			#We lose the utility of a charter in this area
+			scope:target_recipient_area = {
+				every_province_in_area = {
+					subtract = population
+					subtract = province_capital.proximity
+				}
+			}
+			#We gain the utility of a charter in this area
+			scope:target_actor_area = {
+				every_province_in_area = {
+					add = population
+					add = province_capital.proximity
+				}
+			}
+			#bias against doing anything
+			subtract = {
+				desc = "bias against doing stuff"
+				value = 1
+			}
+       }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.6.b
+
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+		scope:actor ?= {
+			add_opinion = { target = ROOT modifier = declined_demands_modifier }
+		}
+
+		ai_will_select = {
+			value = 1
+			#We lose the utility of a charter in this area
+			scope:target_recipient_area = {
+				every_province_in_area = {
+					add = population
+					add = province_capital.proximity
+				}
+			}
+			#We gain the utility of a charter in this area
+			scope:target_actor_area = {
+				every_province_in_area = {
+					subtract = population
+					subtract = province_capital.proximity
+				}
+			}
+			#bias against doing anything
+			add = {
+				desc = "bias against doing stuff"
+				value = 1
+			}
+       }
+	}
+}
+
+#Launched from tordesillas_swap_sides action
+treaty_of_tordesillas.7 = {
+	type = country_event
+	category = situation_event
+
+	title = treaty_of_tordesillas.7.title
+	desc = treaty_of_tordesillas.7.desc
+
+	image = "gfx/interface/illustrations/situation/treaty_of_tordesillas.dds"
+
+	major = yes
+	major_trigger = {
+		this = scope:actor
+	}
+
+	option = {
+		name = treaty_of_tordesillas.7.a
+
+		scope:actor ?= {
+			add_favors = { target = root value = 10 }
+			add_opinion = { target = root modifier = accepted_demands_modifier }
+		}
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_right }
+
+		custom_tooltip = {
+			text = treaty_of_tordesillas.7.a.tt
+			#Swap the sides of the countries
+			if = {
+				#If we are the east country
+				limit ={
+					root = situation:treaty_of_tordesillas.var:var_east_country
+				}
+				situation:treaty_of_tordesillas ?= {				
+					set_variable = { name = var_east_country value = scope:actor }				
+					set_variable = { name = var_west_country value = root }
+				}
+			}
+			else = {			
+				situation:treaty_of_tordesillas ?= {				
+					set_variable = { name = var_east_country value = root }				
+					set_variable = { name = var_west_country value = scope:actor }
+				}
+			}
+		}
+
+		ai_will_select = {
+			#AI will accept this if they think that the other side is better
+			value = 1
+			#Add the value of the East side
+			add = {
+				value = {
+					every_region = {
+						limit = {					
+							continent != continent:europe
+							sub_continent != sub_continent:south_asia
+							sub_continent != sub_continent:east_asia
+							any_location_in_region = {						
+								is_east_of = situation:treaty_of_tordesillas.var:var_line_location
+							}
+						}
+						every_area_in_region = {
+							every_province_in_area = {
+								limit = {
+									any_location_in_province = {
+										is_ownable = yes
+										NAND = {
+											has_owner = yes
+											owner ?= { is_country_religion_pagan = no }
+										}
+										is_east_of = scope:target.var:var_line_location
+									}
+								}
+								add = population
+								add = province_capital.proximity
+							}
+						}
+					}
+				}
+				if = {
+					#If we are the east country now, this is the value that we are going to lose, so make it negative
+					limit ={
+						root = situation:treaty_of_tordesillas.var:var_east_country
+					}
+					multiply = -1
+				}
+			}
+			#Subtract the value of the West side
+			add = {
+				value = {
+					every_region = {
+						limit = {					
+							continent != continent:europe
+							sub_continent != sub_continent:south_asia
+							sub_continent != sub_continent:east_asia
+						}
+						every_area_in_region = {
+							every_province_in_area = {
+								limit = {
+									any_location_in_province = {
+										is_ownable = yes
+										NAND = {
+											has_owner = yes
+											owner ?= { is_country_religion_pagan = no }
+										}
+										NOT = { is_east_of = scope:target.var:var_line_location }
+									}
+								}
+								add = population
+								add = province_capital.proximity
+							}
+						}
+					}
+				}
+				
+				if = {
+					limit ={
+						root = situation:treaty_of_tordesillas.var:var_west_country
+					}
+					multiply = -1
+				}
+			}
+			#bias against doing anything
+			subtract = {
+				desc = "bias against doing stuff"
+				value = 1
+			}
+       }
+	}
+
+	option = {
+		name = treaty_of_tordesillas.7.b
+
+		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_minor_move_to_left }
+		scope:actor ?= {
+			add_opinion = { target = ROOT modifier = declined_demands_modifier }
+		}
+
+		ai_will_select = {
+			value = 1
+			#We lose the utility of a charter in this area
+			scope:target_recipient_area = {
+				every_province_in_area = {
+					add = population
+					add = province_capital.proximity
+				}
+			}
+			#We gain the utility of a charter in this area
+			scope:target_actor_area = {
+				every_province_in_area = {
+					subtract = population
+					subtract = province_capital.proximity
+				}
+			}
+			#bias against doing anything
+			add = {
+				desc = "bias against doing stuff"
+				value = 1
+			}
+       }
+	}
+}

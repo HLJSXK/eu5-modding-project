@@ -1,0 +1,346 @@
+lateralview = {
+	name = "select_loan"
+
+	# SOUND - Current Debt (Left Panel)
+	blockoverride "snd_panel_identifier" { soundeffect = "UI_panelAux_currentDebt_show" }
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "PAY_LOANS_TITLE"
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		header_main_tabs = {
+			blockoverride "content" {
+				button_main_tab_alt = {
+					layoutpolicy_horizontal = expanding
+					tooltip_enabled = no
+
+					blockoverride "tab_text"{
+						text = "LOANS_TAKEN_TITLE"
+					}
+
+					onclick = "[SelectLoanLateralView.Vars.Set('subtab','loans_taken')]"
+					down = "[SelectLoanLateralView.Vars.HasValue('subtab','loans_taken')]"
+				}
+
+				button_main_tab_alt = {
+					layoutpolicy_horizontal = expanding
+					tooltip_enabled = no
+
+					blockoverride "tab_text"{
+						text = "LOANS_GIVEN_TITLE"
+					}
+
+					onclick = "[SelectLoanLateralView.Vars.Set('subtab','loans_given')]"
+					down = "[SelectLoanLateralView.Vars.HasValue('subtab','loans_given')]"
+				}
+			}
+		}
+
+		# loans taken
+		vbox = {
+			visible = "[SelectLoanLateralView.Vars.HasValue('subtab','loans_taken')]"
+
+			using = layoutpolicy_expanding
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+
+			# repay all loans
+			vbox = {
+				layoutpolicy_vertical = fixed
+				layoutpolicy_horizontal = expanding
+				hbox = {
+					layoutpolicy_vertical = fixed
+					layoutpolicy_horizontal = expanding
+					select_card_action_button = {
+						blockoverride "card_action_bg" {}
+						blockoverride "button_setup" {
+							datacontext = "[SelectLoanLateralView.GetRepayAllLoansUIAction]"
+							using = button_action_provider
+							blockoverride "button_action_provider_tooltipwidget" {
+								tooltipwidget = { using = loan_action_tooltip }
+							}
+							# tooltipwidget = { using = action_tooltip_pop_out }
+						}
+
+						blockoverride "button_icon_obj" {}
+
+						blockoverride "button_text" {
+							text = "REPAY_ALL_LOANS"
+						}
+
+						blockoverride "effect_text_layout" {}
+					}
+
+					select_card_action_button = {
+						blockoverride "card_action_bg" {}
+						blockoverride "button_setup" {
+							datacontext = "[SelectLoanLateralView.GetDeclareBankruptcyUIAction]"
+							using = button_action_provider
+		#					blockoverride "button_action_provider_tooltipwidget" {
+		#						tooltipwidget = { using = loan_action_tooltip }
+		#					}
+							 tooltipwidget = { using = action_tooltip_pop_out }
+						}
+
+						blockoverride "button_icon_obj" {}
+
+						blockoverride "button_text" {
+							text = "DECLARE_BANKRUPTCY"
+						}
+
+						blockoverride "effect_text_layout" {}
+					}
+				}
+			}
+
+			# repay all possible loans
+			vbox = {
+				layoutpolicy_vertical = fixed
+				layoutpolicy_horizontal = expanding
+				spacing = 10
+
+				select_card_action_button = {
+					visible = [PlayerCanRepayAnyLoan]
+					blockoverride "card_action_bg" {
+						using = bg_paper_card_fancy
+						
+					}
+
+					blockoverride "button_setup" {
+						datacontext = "[SelectLoanLateralView.GetRepayAllPossibleLoansUIAction]"
+						using = button_action_provider
+						tooltipwidget = { using = action_tooltip_pop_out }
+					}
+
+					blockoverride "button_icon_obj" {}
+
+					blockoverride "button_text" {
+						text = "REPAY_ALL_POSSIBLE_LOANS"
+					}
+
+					blockoverride "effect_text_layout" {}
+				}
+			}
+
+			icon_pie = {
+				visible = "[Not(IsDataModelEmpty(SelectLoanLateralView.GetLoansTaken))]"
+
+				blockoverride "icon_pie_frame" {
+					using = bg_number_container_bckg
+				}
+				blockoverride "item_bg_color" {
+					using = color_light_paper_texture
+					alpha = 0.1
+
+				}
+
+				margin = { 10 10 }
+				blockoverride "PieSize" { size = { 120 120 } }
+	
+				###Slices and Icon
+				blockoverride "SliceTooltip" { tooltip = "[LoanEntry.GetLoan.GetShortNameAsBorrower]" }
+				blockoverride "SliceValue" { value = "[LoanEntry.GetLoan.GetAmount]" }
+				blockoverride "SliceColor" { color = "[LoanEntry.GetLoan.GetLender.GetMapColor]" }
+				blockoverride "Icon" {
+					texture = "gfx/interface/icons/character_interactions/culture.dds"
+					position = { 0 1 }
+				}
+				blockoverride "datamodel" {	datamodel = "[SelectLoanLateralView.GetLoansTaken]" }
+				blockoverride "pie_datamodel" {	datamodel = "[SelectLoanLateralView.GetLoansTaken]" }
+				blockoverride "color" { color = "[LoanEntry.GetLoan.GetLender.GetMapColor]" }
+				blockoverride "leftside_info" {text = "[LoanEntry.GetLoan.GetShortNameAsBorrower]"}
+				blockoverride "rightside_info" {text = "[LoanEntry.GetLoan.GetAmount|2][gold_i]"}
+			}
+
+			# loans taken
+			filtered_sorted_list = {
+				datacontext = "[SelectLoanLateralView.GetLoansTakenSortSearch]"
+
+				blockoverride "scroll_list_is_empty" {
+					visible = "[IsDataModelEmpty(SelectLoanLateralView.GetLoansTaken)]"
+				}
+
+				blockoverride "scroll_list_is_empty_text" {
+					text = "LOANS_SCROLL_LIST_EMPTY"
+				}
+
+				blockoverride "scroll_list_content" {
+					addcolumn = 100%
+					addrow = 125
+					datamodel = "[SelectLoanLateralView.GetLoansTaken]"
+					item = {
+						widget = {
+							size = {100% 120}
+
+							widget = {
+								size = { 100% 115 }
+																
+								select_card_action_button = {
+									datacontext = "[LoanEntry.GetLoan]"
+									blockoverride "card_action_bg" {
+										using = bg_paper_card_fancy
+									}
+				
+									blockoverride "button_setup" {
+										datacontext = "[LoanEntry.GetRepayLoanUIAction]"
+										datacontext = "[LoanEntry.GetLoan]"									
+										using = button_action_provider
+										blockoverride "button_action_provider_tooltipwidget" {
+											tooltipwidget = { using = loan_action_tooltip }
+										}
+										# tooltipwidget = { using = action_tooltip_pop_out }
+									}
+				
+									blockoverride "button_icon_obj" {}
+				
+									blockoverride "button_text" {
+										text = "LOAN_BUTTON_TEXT"
+									}
+
+									blockoverride "effect_text_layout_bg" {
+										using = bg_number_container_bckg
+										blockoverride "number_container_extra" {
+											alpha = 0.4
+											margin = {10 7}
+										}
+									}
+				
+									blockoverride "effect_text" {
+										text = "LOAN_BUTTON_EFFECT"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		# loans given
+		vbox = {
+			visible = "[SelectLoanLateralView.Vars.HasValue('subtab','loans_given')]"
+
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+			layoutpolicy_vertical = expanding
+			layoutpolicy_horizontal = expanding
+			margin_top = 15
+
+			icon_pie = {
+				visible = "[Not(IsDataModelEmpty(SelectLoanLateralView.GetLoansGiven))]"
+
+				blockoverride "icon_pie_frame" {
+					using = bg_number_container_bckg
+				}
+				blockoverride "item_bg_color" {
+					using = color_light_paper_texture
+					alpha = 0.1
+
+				}
+
+				margin = { 10 10 }
+				blockoverride "PieSize" { size = { 120 120 } }
+	
+				###Slices and Icon
+				blockoverride "SliceTooltip" { tooltip = "[LoanEntry.GetLoan.GetShortNameAsLender]" }
+				blockoverride "SliceValue" { value = "[LoanEntry.GetLoan.GetAmount]" }
+				blockoverride "SliceColor" { color = "[LoanEntry.GetLoan.GetLender.GetMapColor]" }
+				blockoverride "Icon" {
+					texture = "gfx/interface/icons/character_interactions/culture.dds"
+					position = { 0 1 }
+				}
+				blockoverride "datamodel" {	datamodel = "[SelectLoanLateralView.GetLoansGiven]" }
+				blockoverride "pie_datamodel" {	datamodel = "[SelectLoanLateralView.GetLoansGiven]" }
+				blockoverride "color" { color = "[LoanEntry.GetLoan.GetLender.GetMapColor]" }
+				blockoverride "leftside_info" {text = "[LoanEntry.GetLoan.GetShortNameAsLender]"}
+				blockoverride "rightside_info" {text = "[LoanEntry.GetLoan.GetAmount|2][gold_i]"}
+			}
+
+			filtered_sorted_list = {
+				datacontext = "[SelectLoanLateralView.GetLoansGivenSortSearch]"
+
+				blockoverride "scroll_list_is_empty" {
+					visible = "[IsDataModelEmpty(SelectLoanLateralView.GetLoansGiven)]"
+				}
+
+				blockoverride "scroll_list_is_empty_text" {
+					text = "LOANS_SCROLL_LIST_EMPTY"
+				}
+
+				blockoverride "scroll_list_content" {
+					addcolumn = 100%
+					addrow = 55
+					datamodel = "[SelectLoanLateralView.GetLoansGiven]"
+					item = {
+						widget = {
+							size = { 100% 45 }
+
+							using = bg_paper_card_fancy
+							
+							hbox = {
+								layoutpolicy_horizontal = expanding
+								margin = {15 0}
+								spacing = 10
+
+								text_single = {
+									using = bg_number_container_bckg
+									blockoverride "number_container_extra" {
+										alpha = 0.4
+										margin = {10 7}
+									}
+									text = "[LoanEntry.GetLoan.GetName]"
+									align = left|nobaseline
+								}
+
+								expand = {}
+
+								
+
+								hbox = {
+									layoutpolicy_horizontal = expanding
+									layoutpolicy_vertical = expanding
+									
+									margin = {10 0}
+									margin_right = 0
+									spacing = 20
+
+									expand = {}
+
+									divider_flavor_03 = {size = {9 -1}}
+
+									text_single = {
+										layoutpolicy_horizontal = expanding
+										text = "[LoanEntry.GetLoan.GetBorrower.GetName]"
+										align = center|nobaseline
+									}
+
+									expand = {}
+
+									divider_flavor_03 = {size = {9 -1}}
+
+									expand = {}
+				
+									text_single = {
+										using = bg_number_container_bckg
+										blockoverride "number_container_extra" {
+											alpha = 0.4
+											margin = {10 7}
+										}
+										raw_text = "[LoanEntry.GetLoan.GetMonthlyCost|2-=]@gold!"
+										align = right|nobaseline
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		expand = {}
+	}
+}

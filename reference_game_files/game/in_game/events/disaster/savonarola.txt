@@ -1,0 +1,670 @@
+﻿namespace = savonarola_disaster
+
+scripted_trigger has_savonarola = {
+	character:flo_savonarola ?= {
+		is_alive = yes
+		owner = root
+	}
+}
+
+scripted_trigger has_savonarola_ruler = {
+	character:flo_savonarola ?= {
+		is_alive = yes
+		owner = root
+	}
+	ruler ?= character:flo_savonarola
+}
+
+savonarola_disaster.1 = { #An upstart preacher
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.1.title
+	desc = savonarola.1.desc
+	fire_only_once = yes
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		any_neighbor_country = {
+			count > 0
+		}
+	}
+
+	illustration_tags = {
+		10 = angry
+		10 = exterior
+	}
+
+	immediate = {
+		create_character = {
+			first_name = name_hieronymus #Girolamo
+			last_name = savonarola
+			culture = culture:emilian
+			religion = religion:catholic
+			birth_date = 1452.9.21
+			birth_location = location:ferrara
+			estate = estate_type:clergy_estate
+			script = flo_savonarola
+			save_scope_as = target_character
+			create_in_limbo = yes
+		}
+	}
+
+	option = { #Invite him in
+		name = savonarola.1.a
+		historical_option = yes
+		scope:target_character = { move_country = root }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_bonus }
+		add_prestige = prestige_weak_bonus
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_tiny_move_to_left }
+	}
+
+	option = { #Send him away
+		name = savonarola.1.b
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_tiny_move_to_right }
+		scope:target_character = { banish_character = yes }
+		trigger_event_silently = { id = savonarola_disaster.13 days = { 30 100 } }
+		add_stability = stability_weak_bonus
+	}
+}
+
+savonarola_disaster.2 = { #Savonarola preaches
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.2.title
+	desc = savonarola.2.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		has_savonarola = yes
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Let him preach
+		name = savonarola.2.a
+		if = {
+			limit = { ruler ?= character:flo_savonarola }
+			change_societal_value = { type = traditionalist_vs_innovative value = societal_value_minor_move_to_left }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_penalty }
+		}
+		else = {
+			change_societal_value = { type = traditionalist_vs_innovative value = societal_value_tiny_move_to_left }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+		}
+	}
+
+	option = { #Curtail him
+		name = savonarola.2.b
+		trigger = {
+			NOT = { has_variable = flo_savonarola_reforms }
+			has_savonarola_ruler = no
+		}
+		add_prestige = prestige_weak_penalty
+		if = {
+			limit = { has_variable = flo_savonarola_piagnoni }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+		}
+		add_stability = stability_weak_bonus
+	}
+}
+
+savonarola_disaster.3 = { #Formation of the Piagnoni
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.3.title
+	desc = savonarola.3.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		has_savonarola = yes
+		estate_satisfaction:peasants_estate < 0.8
+		NOT = { has_variable = flo_savonarola_piagnoni }
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Let them
+		name = savonarola.3.a
+		historical_option = yes
+		set_variable = flo_savonarola_piagnoni
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_penalty }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_weak_penalty }
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_weak_penalty }
+		add_stability = stability_weak_bonus
+	}
+
+	option = { #Ban them
+		name = savonarola.3.b
+		trigger = {
+			ruler != character:flo_savonarola
+		}
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_extreme_penalty }
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_tiny_move_to_right }
+	}
+}
+
+scripted_trigger location_preaching_potential = {
+	any_pop = {
+		pop_type = pop_type:peasants
+		religion = religion:catholic
+		pop_size > 0.1
+		pop_satisfaction < 0.8
+	}
+}
+
+savonarola_disaster.4 = { #Savonarola fame grows
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.4.title
+	desc = savonarola.4.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		has_savonarola = yes
+		OR = {
+			has_ruler = no
+			ruler != character:flo_savonarola
+		}
+		any_owned_location = {
+			location_preaching_potential = yes
+		}
+	}
+
+	immediate = {
+		random_owned_location = {
+			limit = {
+				location_preaching_potential = yes
+			}
+			save_scope_as = target_location
+		}
+		character:flo_savonarola ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #He is harmless
+		name = savonarola.4.a
+		scope:target_location = {
+			every_pop = {
+				limit = {
+					owner = root
+					pop_type = pop_type:peasants
+					religion = religion:catholic
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+			}
+			change_control = control_mild_penalty
+		}
+	}
+
+	option = { #He is becoming a nuisance
+		name = savonarola.4.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_penalty }
+		if = {
+			limit = { has_variable = flo_savonarola_piagnoni }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_mild_penalty }
+		}
+		add_stability = stability_weak_penalty
+	}
+}
+
+savonarola_disaster.5 = { #Savonarola takes control
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.5.title
+	desc = savonarola.5.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		has_savonarola = yes
+		has_ruler = yes
+		ruler != character:flo_savonarola
+		OR = {
+			stability < 0
+			estate_satisfaction:peasants_estate < 0.5
+			societal_value:traditionalist_vs_innovative < -80
+			AND = {
+				at_war = yes
+				war_exhaustion > 4
+			}
+		}
+		any_neighbor_country = {
+			count > 0
+		}
+	}
+
+	immediate = {
+		random_neighbor_country ?= {
+			save_scope_as = target_country
+		}
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Allow him to take control
+		name = savonarola.5.a
+		set_new_ruler = character:flo_savonarola
+		add_stability = stability_mild_bonus
+		historical_option = yes
+		trigger_event_silently = {
+			id = savonarola_disaster.6
+			days = { 50 100 }
+		}
+	}
+
+	option = { #His ideology is fine, but he's no ruler
+		name = savonarola.5.b
+		trigger = {
+			estate_satisfaction:peasants_estate > 0.35
+		}
+		add_prestige = prestige_mild_penalty
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_weak_penalty }
+	}
+
+	option = { #We are done with him
+		name = savonarola.5.c
+		trigger = {
+			estate_satisfaction:peasants_estate > 0.35
+		}
+		character:flo_savonarola = { move_country = scope:target_country }
+		trigger_event_silently = { id = savonarola_disaster.13 days = { 30 100 } }
+		add_stability = stability_weak_bonus
+	}
+}
+
+savonarola_disaster.6 = { #Savonarola's laws
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.6.title
+	desc = savonarola.6.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	fire_only_once = yes
+
+	trigger = {
+		has_savonarola_ruler = yes
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Adopt these reforms
+		name = savonarola.6.a
+		historical_option = yes
+		set_variable = flo_savonarola_reforms
+		add_stability = stability_mild_penalty
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_large_move_to_left }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+	}
+
+	option = { #This is a bit extreme
+		name = savonarola.6.b
+		add_prestige = prestige_weak_penalty
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_minor_move_to_right }
+	}
+}
+
+savonarola_disaster.7 = { #Savonarola summoned to Rome
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.7.title
+	desc = savonarola.7.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		has_savonarola_ruler = yes
+		estate_satisfaction:clergy_estate < 0.5
+		country_exists = c:PAP
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Obey the Pope
+		name = savonarola.7.a
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_tiny_move_to_right }
+		add_prestige = prestige_mild_penalty
+	}
+
+	option = { #Ignore the Pope
+		name = savonarola.7.b
+		historical_option = yes
+		add_stability = stability_mild_penalty
+		add_religious_influence = religious_influence_mild_penalty
+		c:PAP = {
+			add_opinion = { target = root modifier = flo_refused_summons }
+		}
+	}
+
+}
+
+savonarola_disaster.8 = { #Savonarola's Bonfire of the Vanities
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.8.title
+	desc = savonarola.8.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+
+	trigger = {
+		has_savonarola = yes
+		NOT = {
+			OR = {
+				estate_satisfaction:nobles_estate < 0.5
+				estate_satisfaction:burghers_estate < 0.5
+				estate_satisfaction:peasants_estate < 0.5
+				estate_satisfaction:clergy_estate < 0.5
+			}
+		}
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Burn them all
+		name = savonarola.8.a
+		historical_option = yes
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_weak_penalty }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_mild_penalty }
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_penalty }
+		add_stability = stability_weak_bonus
+		culture = {
+			add_cultural_tradition = cultural_tradition_weak_penalty
+			add_cultural_influence = cultural_influence_weak_penalty
+		}
+	}
+
+	option = { #This has gone too far
+		name = savonarola.8.b
+		trigger = {
+			ruler != character:flo_savonarola
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_weak_penalty }
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_weak_bonus }
+		add_prestige = prestige_mild_penalty
+	}
+
+}
+
+savonarola_disaster.9 = { #Excommunication of Savonarola
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.9.title
+	desc = savonarola.9.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		OR = {
+			has_savonarola_ruler = yes
+			AND = {
+				has_savonarola = yes
+				character:flo_savonarola ?= { age_in_years > 45 }
+			}
+		}
+		country_exists = c:PAP
+		OR = {
+			estate_satisfaction:clergy_estate < 0.5
+			c:PAP = {
+				opinion = { target = root value < 0 }
+			}
+		}
+		has_ruler = yes
+		NOT = {	ruler = { has_character_modifier = excommunicated }	}
+	}
+
+	immediate = {
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #It's he who's wrong
+		name = savonarola.9.a
+		add_stability = stability_mild_penalty
+		ruler = { add_character_modifier = { modifier = excommunicated months = -1 mode = add_and_extend } }
+	}
+}
+
+savonarola_disaster.10 = { #Trial by fire
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+
+	title = savonarola.10.title
+	desc = savonarola.10.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	fire_only_once = yes
+
+	trigger = {
+		OR = {
+			has_savonarola_ruler = yes
+			AND = {
+				has_savonarola = yes
+				character:flo_savonarola ?= { age_in_years > 45 }
+			}
+		}
+		OR = {
+			AND = {
+				has_variable = flo_savonarola_reforms
+				OR = {
+					estate_satisfaction:nobles_estate < 0.5
+					estate_satisfaction:burghers_estate < 0.5
+					estate_satisfaction:peasants_estate < 0.5
+					estate_satisfaction:clergy_estate < 0.5
+				}
+			}
+			ruler ?= { has_character_modifier = excommunicated }
+			estate_satisfaction:nobles_estate < 0.4
+			estate_satisfaction:burghers_estate < 0.4
+			estate_satisfaction:peasants_estate < 0.4
+			estate_satisfaction:clergy_estate < 0.4
+		}
+	}
+
+	immediate = {
+		character:flo_savonarola ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Savonarola was wrong
+		historical_option = yes
+		name = savonarola.10.a
+		kill_character_silently = character:flo_savonarola
+		if = {
+			limit = { has_savonarola_ruler = yes }
+			create_character = {
+				first_name = name_peter #Piero
+				last_name = soderini
+				birth_date = 1451.3.17
+				birth_location = location:florence
+				culture = culture:tuscan
+				religion = religion:catholic
+				script = flo_piero_soderini
+			}
+			set_new_ruler = character:flo_piero_soderini
+		}
+		add_stability = stability_mild_penalty
+		trigger_event_silently = { id = savonarola_disaster.12 months = { 50 200 }}
+	}
+
+	option = { #God is on his side
+		name = savonarola.10.b
+		change_government_type = government_type:theocracy
+		add_stability = stability_mild_penalty
+	}
+}
+
+savonarola_disaster.11 = { #The end of Savonarola
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	fire_only_once = yes
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	title = savonarola.11.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { government_type = government_type:theocracy }
+				desc = savonarola.11.theocracy.desc
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = savonarola.11.desc
+			}
+		}
+	}
+
+	immediate = {
+		if = {
+			limit = { has_variable = flo_savonarola_reforms }
+			remove_variable = flo_savonarola_reforms
+		}
+		if = {
+			limit = { has_variable = flo_savonarola_piagnoni }
+			remove_variable = flo_savonarola_piagnoni
+		}
+		ruler ?= {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Republic outcome
+		name = savonarola.11.a
+		trigger = {
+			government_type != government_type:theocracy
+		}
+		add_government_power = government_power_extreme_bonus
+	}
+
+	option = { #Theocracy outcome
+		name = savonarola.11.b
+		trigger = {
+			government_type = government_type:theocracy
+		}
+		change_societal_value = { type = traditionalist_vs_innovative value = societal_value_minor_move_to_left }
+		add_stability = stability_weak_bonus
+	}
+}
+
+savonarola_disaster.12 = { #The Medici strike back
+	hide_portraits = yes
+	type = country_event
+	category = disaster_event
+	title = savonarola.12.title
+	desc = savonarola.12.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+	fire_only_once = yes
+
+	trigger = {
+		dynasty_exists = medici_dynasty
+		any_character = {
+			has_dynasty = yes
+			dynasty = dynasty:medici_dynasty
+			is_alive = yes
+			is_ruler = no
+		}
+	}
+
+	immediate = {
+		ordered_character = {
+			order_by = total_abilities
+			limit = {
+				dynasty = dynasty:medici_dynasty
+				is_ruler = no
+			}
+			max = {
+				value = 1
+			}
+			save_scope_as = target_medici
+		}
+	}
+
+	option = { #Bring them back
+		name = savonarola.12.a
+		historical_option = yes
+		if = {
+			limit = {
+				ruler ?= {
+					NOT = { dynasty = dynasty:medici_dynasty }
+				}
+			}
+			set_new_ruler = scope:target_medici
+		}
+		add_stability = stability_weak_penalty
+		add_prestige = prestige_weak_bonus
+		change_societal_value = { type = aristocracy_vs_plutocracy value = societal_value_minor_move_to_left }
+	}
+
+	option = { #This is fine
+		name = savonarola.12.b
+		add_stability = stability_weak_bonus
+	}
+}
+
+savonarola_disaster.13 = { #Savonarola comes back
+	hide_portraits = yes
+	title = savonarola.13.title
+	desc = savonarola.13.desc
+	image = "gfx/interface/illustrations/disaster/savonarola_disaster.dds"
+
+	trigger = {
+		character:flo_savonarola = {
+			is_alive = yes
+			owner != root
+		}
+	}
+
+	immediate = {
+		character:flo_savonarola.owner = {
+			save_scope_as = target_country
+		}
+		character:flo_savonarola = {
+			save_scope_as = target_character
+		}
+	}
+
+	option = { #Pesky individial
+		name = savonarola.13.a
+		character:flo_savonarola = { move_country = root }
+	}
+
+}

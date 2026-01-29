@@ -1,0 +1,1332 @@
+﻿namespace = subject_interaction_events
+subject_interaction_events.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.1.title
+	desc = subject_interaction_events.1.desc
+	trigger = {
+		is_subject = yes
+		
+		government_type = government_type:monarchy
+		
+		exists = previous_ruler 
+		exists = ruler
+		exists = ruler.dynasty
+		exists = previous_ruler.dynasty
+		NOT = { previous_ruler.dynasty = ruler.dynasty }
+		
+		monthly_manpower > 0
+		
+		overlord = {
+			ruler ?= { dynasty ?= root.ruler.dynasty }
+			root = {
+				NOR = { 
+					has_opinion = { target = prev modifier = opinion_sent_help }
+					has_opinion = { target = prev modifier = opinion_refused_send_help }
+				}
+			}
+		}
+	}
+
+	immediate = {
+		previous_ruler = { save_scope_as = target_previous_ruler }
+		ruler = { save_scope_as = target_ruler }
+	}
+
+	option = {
+		name = subject_interaction_events.1.a
+		random_owned_location = {
+			limit = {
+				is_capital = yes
+			}
+			every_pop = {	add_pop_satisfaction = pop_satisfaction_severe_penalty	}
+		}
+		
+		save_scope_as = subject_in_need
+		custom_tooltip = subject_interaction_events.ask_overlord_for_help
+		overlord = {
+			trigger_event_silently = { id = subject_interaction_events.2 }
+		}
+	}
+	option = {
+		name = subject_interaction_events.1.b
+		add_prestige = prestige_mild_bonus
+		random_owned_location = {
+			limit = {
+				is_capital = yes
+			}
+			every_pop = {	add_pop_satisfaction = pop_satisfaction_mild_penalty	}
+		}
+	}
+}
+
+subject_interaction_events.2 = {
+	type = country_event
+	title = subject_interaction_events.2.title
+	desc = subject_interaction_events.2.desc
+	option = {
+		name = subject_interaction_events.2.a
+		scope:subject_in_need = {
+			set_variable = { name = si_pretender_help_flag value = 1 }
+			add_opinion = { target = root modifier = opinion_sent_help }
+			trigger_event_silently = { id = subject_interaction_events.3 }
+			show_as_tooltip = {
+				add_gold = {
+					value = scope:subject_in_need.monthly_income_trade_and_tax
+					multiply = 6
+				}
+				add_manpower = {
+					value = scope:subject_in_need.monthly_manpower
+					multiply = 6
+				}
+			}
+		}
+		add_gold = {
+			value = scope:subject_in_need.monthly_income_trade_and_tax
+			multiply = -6
+		}
+		add_manpower = {
+			value = scope:subject_in_need.monthly_manpower
+			multiply = -6
+		}
+	}
+	option = {
+		name = subject_interaction_events.2.b
+		scope:subject_in_need = {
+			set_variable = { name = si_no_help_flag value = 1 }
+			trigger_event_silently = { id = subject_interaction_events.3 }
+			add_opinion = { target = root modifier = opinion_refused_send_help }
+		}
+	}
+}
+
+subject_interaction_events.3 = {
+	type = country_event
+	title = subject_interaction_events.3.title
+	desc = subject_interaction_events.3.desc
+	option = {
+		name = subject_interaction_events.3.a
+		trigger = {
+			has_variable = si_pretender_help_flag
+		}
+		change_gold_effect = { scale = 6 }
+		add_manpower = {
+			value = monthly_manpower
+			multiply = 6
+		}
+		show_as_tooltip = {
+			add_opinion = { target = root modifier = opinion_sent_help }
+		}
+		remove_variable = si_pretender_help_flag
+	}
+	option = {
+		name = subject_interaction_events.3.b
+		trigger = {
+			has_variable = si_no_help_flag
+		}
+		show_as_tooltip = {
+			add_opinion = { target = root modifier = opinion_refused_send_help }
+		}
+		remove_variable = si_no_help_flag
+	}
+}
+
+scripted_trigger is_bad_relative_ruler = {
+	has_regent = no
+		has_ruler = yes
+		government_type = government_type:monarchy
+		ruler = { 
+			dynasty ?= root.ruler.dynasty 
+			this != root.ruler
+			adm < 50
+			dip < 50
+			mil < 50
+		}
+		any_character = {
+			is_alive = yes
+			is_adult = yes
+			dynasty ?= root.ruler.dynasty
+			this != root.ruler
+			OR = {
+				adm > 50
+				dip > 50
+				mil > 50
+			}
+		}
+}
+
+subject_interaction_events.4 = {
+	type = country_event
+	title = subject_interaction_events.4.title
+	desc = subject_interaction_events.4.desc
+	trigger = {
+		
+		has_regent = no
+		has_ruler = yes
+		ruler ?= { has_dynasty = yes }
+		any_subject = {
+			is_bad_relative_ruler = yes
+		}
+	}
+
+	immediate = {
+		random_subject = {
+			limit = {
+				is_bad_relative_ruler = yes
+			}
+			save_scope_as = subject_target
+			
+			random_character = {
+				limit = {
+					is_alive = yes
+					is_adult = yes
+					dynasty ?= root.ruler.dynasty
+					this != root.ruler
+					OR = {
+						adm > 50
+						dip > 50
+						mil > 50
+					}
+				}
+				save_scope_as = better_ruler
+			}
+		}
+	}
+
+
+	option = {
+		name = subject_interaction_events.4.a
+		trigger = {
+			exists = scope:subject_target
+		}
+		scope:subject_target = {
+			set_new_ruler = scope:better_ruler
+		}
+	}
+	option = {
+		name = subject_interaction_events.4.b
+		add_legitimacy = legitimacy_weak_penalty
+	}
+}
+
+subject_interaction_events.5 = {
+	type = country_event
+	title = subject_interaction_events.5.title
+	desc = subject_interaction_events.5.desc
+	trigger = {
+		
+		has_regent = no
+		has_ruler = yes
+		government_type = government_type:monarchy
+
+		any_subject = {
+			has_regent = no
+			has_ruler = yes
+			government_type = government_type:monarchy
+			ruler = {
+				has_dynasty = yes
+				dynasty = root.ruler.dynasty
+			}
+			ruler != root.ruler
+			OR = {
+				ruler = { dip > 66 }
+				ruler = { mil > 66 }
+				ruler = { adm > 66 }
+			}
+		}
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				has_regent = no
+				has_ruler = yes
+				government_type = government_type:monarchy
+				ruler = {
+					has_dynasty = yes
+					dynasty = root.ruler.dynasty
+				}
+				ruler != root.ruler
+				OR = {
+					ruler = { dip > 66 }
+					ruler = { mil > 66 }
+					ruler = { adm > 66 }
+				}
+			}
+			save_scope_as = subject_target
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.5.a
+		add_legitimacy = legitimacy_mild_bonus
+	}
+}
+
+subject_interaction_events.7 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.7.title
+	desc = subject_interaction_events.7.desc
+	trigger = {
+		
+		any_subject = {
+			at_war = no
+			receiving_scripted_relation = {
+				type = relation_type:support_military
+				target = root
+			}
+			
+			NOT = {
+				has_opinion = { target = root modifier = opinion_reprimanded }
+				has_opinion = { target = root modifier = opinion_resourceful }
+			}
+
+		}
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				at_war = no
+				receiving_scripted_relation = {
+					type = relation_type:support_military
+					target = root
+				}
+			}
+			save_scope_as = subject_target
+		}
+		save_scope_as = our_overlord
+	}
+
+	option = {
+		name = subject_interaction_events.7.a
+		add_prestige = prestige_weak_bonus
+		scope:subject_target = {
+			set_variable = { name = si_reprimanded_flag value = 1 }
+			add_opinion = { target = root modifier = opinion_reprimanded }
+			trigger_event_silently = { id = subject_interaction_events.8 }
+		}
+	}
+	option = {
+		name = subject_interaction_events.7.b
+		scope:subject_target = {
+			set_variable = { name = si_resourceful_flag value = 1 }
+			add_opinion = { target = root modifier = opinion_resourceful }
+			trigger_event_silently = { id = subject_interaction_events.8 }
+		}
+	}
+}
+
+subject_interaction_events.8 = {
+	type = country_event
+	title = subject_interaction_events.8.title
+	desc = subject_interaction_events.8.desc
+	option = {
+		name = subject_interaction_events.8.a
+		trigger = {
+			has_variable = si_reprimanded_flag
+		}
+		show_as_tooltip = {
+			add_opinion = { target = scope:our_overlord modifier = opinion_reprimanded }
+		}
+	}
+	option = {
+		name = subject_interaction_events.8.b
+		trigger = {
+			has_variable = si_resourceful_flag
+		}
+		show_as_tooltip = {
+			add_opinion = { target = scope:our_overlord modifier = opinion_resourceful }
+		}
+		remove_variable = si_resourceful_flag
+	}
+}
+
+subject_interaction_events.9 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.9.title
+	desc = subject_interaction_events.9.desc
+	trigger = {
+		
+		at_war = no
+		is_subject = yes
+		
+		receiving_scripted_relation = {
+			type = relation_type:support_military
+			target = overlord
+		}
+		
+		manpower > 5
+
+		war_exhaustion < 1
+		overlord = {
+			NOT = {
+				religion = root.religion
+				culture.language = root.culture.language
+			}
+		}
+		NOT = {	has_country_modifier = bad_discipline }
+	}
+
+	option = {
+		name = subject_interaction_events.9.a
+		add_manpower = { value = root.monthly_manpower multiply = -2.50 }
+		save_scope_as = subject_target
+		overlord = {
+			trigger_event_silently = { id = subject_interaction_events.10 }
+			add_opinion = { target = root modifier = opinion_purged_manpower }
+		}
+	}
+	option = {
+		name = subject_interaction_events.9.b
+		add_prestige = prestige_weak_bonus
+		add_country_modifier = { modifier = bad_discipline years = 10 mode = add_and_extend }  
+	}
+}
+
+subject_interaction_events.10 = {
+	type = country_event
+	title = subject_interaction_events.10.title
+	desc = subject_interaction_events.10.desc
+	option = {
+		name = subject_interaction_events.10.a
+		add_manpower = { value = scope:subject_target.monthly_manpower multiply = 2.50 }
+		show_as_tooltip = {
+			add_opinion = { target = root modifier = opinion_purged_manpower }
+		}
+	}
+}
+
+
+subject_interaction_events.14 = {
+	type = country_event
+	title = subject_interaction_events.14.title
+	desc = subject_interaction_events.14.desc
+	trigger = {
+		
+		is_subject = yes
+		
+		overlord = {
+			any_rival = {
+				receiving_scripted_relation = {
+					type = relation_type:embargo_nation
+					target = root
+				}
+			}
+		}
+		
+		
+		NOT = {	has_country_modifier = si_state_smuggling	}
+		overlord = {
+			NOT = {
+				root = { has_opinion = { target = prev modifier = opinion_smuggling_hindered } }
+				root = { has_opinion = { target = prev modifier = opinion_small_smuggling_ok } }
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.14.a
+		custom_tooltip = subject_interaction_events.14.ct
+		add_country_modifier = { modifier = si_state_smuggling years = 10 mode = add_and_extend }  
+	}
+	option = {
+		name = subject_interaction_events.14.b
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+subject_interaction_events.15 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.15.title
+	desc = subject_interaction_events.15.desc
+	trigger = {
+		
+		any_subject = {
+			has_country_modifier = si_state_smuggling
+			NOT = {
+				has_opinion = { target = root modifier = opinion_smuggling_hindered }
+				has_opinion = { target = root modifier = opinion_small_smuggling_ok }
+			}
+		}
+	}
+
+
+	immediate = {
+		hidden_effect = {
+			random_subject = {
+				limit = {
+					has_country_modifier = si_state_smuggling
+				}
+				save_scope_as = subject_target
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.15.a
+		add_prestige = prestige_mild_bonus
+		scope:subject_target = {
+			set_variable = { name = si_stop_smuggling_flag value = 1 }
+			trigger_event_silently = { id = subject_interaction_events.16 }
+			add_opinion = { target = root modifier = opinion_smuggling_hindered }
+			show_as_tooltip = {
+				remove_country_modifier = si_state_smuggling
+			}
+		}
+	}
+	option = {
+		name = subject_interaction_events.15.b
+		add_gold = { value = scope:subject_target.monthly_income_trade_and_tax multiply = 3.00 }
+		scope:subject_target = {
+			add_liberty_desire = liberty_desire_mild_plus
+			set_variable = { name = si_small_smuggling_flag value = 1 }
+			trigger_event_silently = { id = subject_interaction_events.16 }
+			add_opinion = { target = root modifier = opinion_small_smuggling_ok }
+		}
+	}
+}
+
+subject_interaction_events.16 = {
+	type = country_event
+	title = subject_interaction_events.16.title
+	desc = subject_interaction_events.16.desc
+	option = {
+		name = subject_interaction_events.16.a
+		trigger = {
+			has_variable = si_stop_smuggling_flag
+		}
+		remove_country_modifier = si_state_smuggling
+		show_as_tooltip = {
+			add_opinion = { target = root modifier = opinion_smuggling_hindered }
+		}
+		remove_variable = si_stop_smuggling_flag
+	}
+	option = {
+		name = subject_interaction_events.16.b
+		trigger = {
+			has_variable = si_small_smuggling_flag
+		}
+		show_as_tooltip = {
+			add_opinion = { target = root modifier = opinion_small_smuggling_ok }
+		}
+		remove_variable = si_small_smuggling_flag
+	}
+}
+
+subject_interaction_events.17 = {
+	type = country_event
+	title = subject_interaction_events.17.title
+	desc = subject_interaction_events.17.desc
+	trigger = {
+		
+		at_war = yes
+		any_subject = {
+			at_war = no
+			receiving_scripted_relation = {
+				type = relation_type:scutage
+				target = overlord
+			}
+		}
+		NOT = {
+			has_country_modifier = si_scutage_unwilling_vassals
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.17.a
+		add_country_modifier = { modifier = si_scutage_unwilling_vassals months = 60 mode = add_and_extend }  
+	}
+}
+
+subject_interaction_events.18 = {
+	type = country_event
+	title = subject_interaction_events.18.title
+	desc = subject_interaction_events.18.desc
+	trigger = {
+		
+		any_subject = {
+			at_war = no
+			receiving_scripted_relation = {
+				type = relation_type:scutage
+				target = overlord
+			}
+		}
+		NOT = {
+			has_country_modifier = si_scutage_unwilling_vassals
+		}
+		OR = {
+			at_war = yes
+			months_since_war < 60
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.18.a
+		every_subject = {
+			limit = {
+				at_war = no
+				receiving_scripted_relation = {
+					type = relation_type:scutage
+					target = overlord
+				}
+			}
+			add_opinion = { target = root modifier = opinion_scutage_benefits }
+		}
+	}
+}
+
+
+subject_interaction_events.20 = {
+	type = country_event
+	title = subject_interaction_events.20.title
+	desc = subject_interaction_events.20.desc
+	trigger = {
+	
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:support_loyalists
+				target = overlord
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.20.a
+		add_government_power = government_power_mild_penalty
+	}
+	option = {
+		name = subject_interaction_events.20.b
+		change_gold_effect = { scale = -3.00 }
+	}
+}
+
+subject_interaction_events.21 = {
+	type = country_event
+	title = subject_interaction_events.21.title
+	desc = subject_interaction_events.21.desc
+	trigger = {
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:support_loyalists
+				target = overlord
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.21.a
+		add_prestige = prestige_weak_penalty
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:support_loyalists
+					target = overlord
+				}
+			}
+			add_opinion = { target = root modifier = opinion_embarrasing_loyalists }
+		}
+	}
+	option = {
+		name = subject_interaction_events.21.b
+		add_government_power = government_power_mild_penalty
+	}
+}
+
+subject_interaction_events.22 = {
+	type = country_event
+	title = subject_interaction_events.22.title
+	desc = subject_interaction_events.22.desc
+	trigger = {
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:support_loyalists
+				target = overlord
+			}
+		}
+	}
+
+
+	option = {
+		name = subject_interaction_events.22.a
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:support_loyalists
+					target = overlord
+				}
+			}
+			add_liberty_desire = liberty_desire_weak_minus
+		}
+	}
+}
+
+
+subject_interaction_events.24 = {
+	type = country_event
+	title = subject_interaction_events.24.title
+	desc = subject_interaction_events.24.desc
+	trigger = {
+		
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:send_officers
+				target = root
+			}
+
+			NOT = {
+				has_opinion = { target = root modifier = opinion_cruel_officers }
+				has_opinion = { target = root modifier = opinion_excellent_officers }
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.24.a
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:send_officers
+					target = root
+				}
+
+			}
+			add_opinion = { target = root modifier = opinion_cruel_officers }
+		}
+	}
+}
+
+subject_interaction_events.25 = {
+	type = country_event
+	title = subject_interaction_events.25.title
+	desc = subject_interaction_events.25.desc
+	trigger = {
+		
+		any_subject = {
+
+			receiving_scripted_relation = {
+				type = relation_type:send_officers
+				target = root
+			}
+
+			NOT = {
+				has_opinion = { target = root modifier = opinion_cruel_officers }
+				has_opinion = { target = root modifier = opinion_excellent_officers }
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.25.a
+		add_prestige = prestige_weak_bonus
+		add_army_tradition = army_tradition_weak_bonus
+		add_navy_tradition = navy_tradition_weak_bonus
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:send_officers
+					target = root
+				}
+			}
+			add_opinion = { target = root modifier = opinion_excellent_officers }
+		}
+	}
+}
+
+subject_interaction_events.26 = {
+	type = country_event
+	title = subject_interaction_events.26.title
+	desc = subject_interaction_events.26.desc
+	trigger = {
+		
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:divert_trade
+				target = root
+			}
+			NOT = {
+				has_country_modifier = si_enchanced_production
+				has_opinion = { target = root modifier = opinion_export_good }
+				has_opinion = { target = root modifier = opinion_export_bad }
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.26.a
+		add_country_modifier = { modifier = si_better_exports years = 10 mode = add_and_extend }  
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:divert_trade
+					target = root
+				}
+				NOT = {
+					has_opinion = { target = root modifier = opinion_export_good }
+					has_opinion = { target = root modifier = opinion_export_bad }
+				}
+			}
+			add_country_modifier = { modifier = si_enchanced_production years = 10 mode = add_and_extend }  
+			add_opinion = { target = root modifier = opinion_export_good }
+		}
+	}
+}
+
+subject_interaction_events.27 = {
+	type = country_event
+	title = subject_interaction_events.27.title
+	desc = subject_interaction_events.27.desc
+	trigger = {
+		
+		any_subject = {
+			receiving_scripted_relation = {
+				type = relation_type:divert_trade
+				target = root
+			}
+			NOT = {
+				has_country_modifier = si_enchanced_production
+				has_opinion = { target = root modifier = opinion_export_good }
+				has_opinion = { target = root modifier = opinion_export_bad }
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.27.a
+		random_subject = {
+			limit = {
+				receiving_scripted_relation = {
+					type = relation_type:divert_trade
+					target = root
+				}
+				NOT = {
+					has_opinion = { target = root modifier = opinion_export_good }
+					has_opinion = { target = root modifier = opinion_export_bad }
+				}
+			}
+			add_opinion = { target = root modifier = opinion_export_bad }
+		}
+	}
+}
+
+subject_interaction_events.29 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.29.title
+	desc = subject_interaction_events.29.desc
+	trigger = {
+		government_type = government_type:monarchy
+		legitimacy < 70
+
+		any_subject = {
+			government_type = government_type:monarchy
+			NOT = {
+				has_opinion = { target = root modifier = opinion_low_legitimacy }
+			}
+			OR = {
+				legitimacy > root.legitimacy
+				opinion = { target = root value < 0 }
+				subject_loyalty < 50
+			}
+		}
+	}
+
+
+	immediate = {
+		hidden_effect = {
+			random_subject = {
+				limit = {
+					government_type = government_type:monarchy
+					NOT = {	has_opinion = { target = root modifier = opinion_low_legitimacy }	}
+					OR = {
+						legitimacy > root.legitimacy
+						opinion = { target = root value < 0 }
+						subject_loyalty < 50
+					}
+				}
+				save_scope_as = subject_target
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.29.a
+		scope:subject_target = {
+			add_opinion = { target = root modifier = opinion_low_legitimacy }
+			add_liberty_desire = liberty_desire_mild_plus
+
+		}
+	}
+	option = {
+		name = subject_interaction_events.29.b
+		add_prestige = prestige_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+	}
+}
+
+subject_interaction_events.30 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.30.title
+	desc = subject_interaction_events.30.desc
+	trigger = {
+		any_subject = {
+			is_during_bankruptcy = yes
+		}
+	}
+
+
+	immediate = {
+		hidden_effect = {
+			random_subject = {
+				limit = {
+					is_during_bankruptcy = yes
+				}
+				save_scope_as = subject_target
+			}
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.30.a
+		add_gold = {
+			value = scope:subject_target.monthly_income_trade_and_tax
+			multiply = -12
+		}
+		scope:subject_target = {
+			add_gold = {
+				value = scope:subject_target.monthly_income_trade_and_tax
+				multiply = 12
+			}
+			add_opinion = { target = root modifier = opinion_money_sent }
+		}
+	}
+	option = {
+		name = subject_interaction_events.30.b
+		add_prestige = prestige_mild_penalty
+		scope:subject_target = {
+			add_opinion = { target = root modifier = opinion_no_money }
+			add_liberty_desire = liberty_desire_weak_plus
+		}
+	}
+}
+
+
+subject_interaction_events.32 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.32.title
+	desc = subject_interaction_events.32.desc
+	trigger = {
+		any_subject = {
+			at_war = no
+		}
+		has_countries_with_coalition_grade_antagonism = yes
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				at_war = no
+			}
+			save_scope_as = subject_target
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.32.a
+		scope:subject_target = {
+			show_as_tooltip = {
+				add_liberty_desire = 15
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+			}
+			hidden_effect = {
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+				trigger_event_silently = { id = subject_interaction_events.33 }
+			}
+		}
+	}
+	option = {
+		name = subject_interaction_events.32.b
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+subject_interaction_events.33 = {
+	type = country_event
+	title = subject_interaction_events.33.title
+	desc = subject_interaction_events.33.desc
+	option = {
+		name = subject_interaction_events.33.a
+		add_liberty_desire = 15
+	}
+}
+
+subject_interaction_events.34 = {
+	type = country_event
+	title = subject_interaction_events.34.title
+	desc = subject_interaction_events.34.desc
+	trigger = {
+		
+		any_subject = {
+			opinion = { target = root value >= 125 }
+			subject_loyalty > 50
+			count >= 3
+		}
+	}
+		
+	
+
+	option = {
+		name = subject_interaction_events.34.a
+		add_country_modifier = { modifier = loyal_subjects months = 60 mode = add_and_extend }  
+	}
+	option = {
+		name = subject_interaction_events.34.b
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+subject_interaction_events.35 = {
+	type = country_event
+	title = subject_interaction_events.35.title
+	desc = subject_interaction_events.35.desc
+	trigger = {
+	
+		any_subject = {
+			opinion = { target = root value < 0 }
+			subject_loyalty < 33
+			count >= 3
+		}
+		
+	}
+	option = {
+		name = subject_interaction_events.35.a
+		add_country_modifier = { modifier = disloyal_subjects months = 60 mode = add_and_extend }  
+	}
+	option = {
+		name = subject_interaction_events.35.b
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+subject_interaction_events.36 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.36.title
+	desc = subject_interaction_events.36.desc
+	trigger = {
+		monthly_manpower > 2
+		manpower_percentage < 0.10
+		any_subject = {
+			manpower_percentage >= 0.75
+			capital = { continent = root.capital.continent }
+		}
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				manpower_percentage >= 0.75
+				capital = { continent = root.capital.continent }
+			}
+			save_scope_as = subject_target
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.36.a
+		add_manpower = { value = scope:subject_target.monthly_manpower multiply = 6.00 }
+		scope:subject_target = {
+			show_as_tooltip = {
+				add_manpower = { value = monthly_manpower multiply = -6.00 }
+				add_liberty_desire = liberty_desire_mild_plus
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+			}
+			hidden_effect = {
+				trigger_event_silently = { id = subject_interaction_events.37 }
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+			}
+		}
+	}
+	option = {
+		name = subject_interaction_events.36.b
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+subject_interaction_events.37 = {
+	type = country_event
+	title = subject_interaction_events.37.title
+	desc = subject_interaction_events.37.desc
+	option = {
+		name = subject_interaction_events.37.a
+		add_liberty_desire = liberty_desire_mild_plus
+		add_manpower = { value = root.monthly_manpower multiply = -6.00 }
+	}
+}
+
+subject_interaction_events.38 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.38.title
+	desc = subject_interaction_events.38.desc
+	trigger = {
+		OR = {
+			num_loans >= 8
+			is_during_bankruptcy = yes
+			inflation >= 0.10
+		}
+		any_subject = {
+			num_loans < 2
+			is_during_bankruptcy = no
+			inflation < 0.10
+		}
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				num_loans < 2
+				is_during_bankruptcy = no
+				inflation < 0.10
+			}
+			save_scope_as = subject_target
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.38.a
+		add_gold = { value = scope:subject_target.monthly_income_trade_and_tax multiply = 6 }
+		scope:subject_target = {
+			show_as_tooltip = {
+				add_liberty_desire = liberty_desire_mild_plus
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+			}
+			hidden_effect = {
+				trigger_event_silently = { id = subject_interaction_events.39 }
+				add_opinion = { target = root modifier = opinion_tyrant_overlord }
+			}
+		}
+	}
+	option = {
+		name = subject_interaction_events.38.b
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+subject_interaction_events.39 = {
+	type = country_event
+	title = subject_interaction_events.39.title
+	desc = subject_interaction_events.39.desc
+	option = {
+		name = subject_interaction_events.39.a
+		add_liberty_desire = liberty_desire_mild_plus
+		change_gold_effect = { scale = -6.00 }
+	}
+}
+
+
+
+subject_interaction_events.43 = {
+	hide_portraits = yes
+	type = country_event
+	title = subject_interaction_events.43.title
+	desc = subject_interaction_events.43.desc
+	trigger = {
+		any_subject = {
+			war_exhaustion > 5.00
+		}
+	}
+
+
+	immediate = {
+		random_subject = {
+			limit = {
+				war_exhaustion > 5.00
+			}
+			save_scope_as = subject_target
+		}
+	}
+
+	option = {
+		name = subject_interaction_events.43.a
+		change_gold_effect = { scale = -3.00 }
+		scope:subject_target = {
+			show_as_tooltip = {
+				add_war_exhaustion = war_exhaustion_severe_bonus
+				add_opinion = { target = root modifier = opinion_benevolent_overlord }
+			}
+			hidden_effect = {
+				add_opinion = { target = root modifier = opinion_benevolent_overlord }
+				trigger_event_silently = { id = subject_interaction_events.44 }
+			}
+		}
+	}
+	option = {
+		name = subject_interaction_events.43.b
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+subject_interaction_events.44 = {
+	type = country_event
+	title = subject_interaction_events.44.title
+	desc = subject_interaction_events.44.desc
+	option = {
+		name = subject_interaction_events.44.a
+		add_war_exhaustion = war_exhaustion_severe_bonus
+	}
+}
+
+subject_interaction_events.45 = {
+	type = country_event
+	title = subject_interaction_events.45.title
+	desc = subject_interaction_events.45.desc
+	trigger = {
+		has_country_modifier = si_state_smuggling
+	}
+
+	option = {
+		name = subject_interaction_events.45.a
+		remove_country_modifier = si_state_smuggling
+	}
+}
+
+subject_interaction_events.46 = {
+	type = country_event	
+
+	title = subject_interaction_events.46.title
+	desc = subject_interaction_events.46.desc
+
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+	
+	
+	trigger = {
+		NOT = { has_primary_or_accepted_culture = scope:target.culture }
+		exists = scope:target
+		culture = {
+			cultural_view = { target = scope:target.culture value >= kindred }
+			reverse_cultural_view = { target = scope:target.culture value >= kindred }
+		}
+		scope:target = {
+			is_ai = yes # bad for human players to get annexed out of the blue
+			is_disloyal_subject = no
+			scope:target = { is_subject_type = vassal } 		
+		}
+	}
+
+	immediate = {
+		scope:target = {
+			event_illustration_poptype_effect = { foreground = pop_type:peasants
+  background = pop_type:peasants }
+		}
+	}
+	
+	option = {
+		name = subject_interaction_events.46.a
+		annex_country = { country = scope:target }
+		add_accepted_culture = scope:target.culture
+	}
+
+
+	option = {
+		name = subject_interaction_events.46.b
+		add_stability = stability_severe_bonus
+	}
+}
+
+subject_interaction_events.47 = {
+	type = country_event	
+
+	title = subject_interaction_events.47.title
+	desc = subject_interaction_events.47.desc
+	
+	
+	
+	trigger = {
+		exists = scope:target
+		scope:target = { is_ai = yes }
+		scope:target = { is_subject_type = vassal } 		
+		
+		gold >= {
+			value = country_tax_base
+			min = scope:target.country_tax_base
+			multiply = 20
+		}
+	}
+
+	immediate = {
+	}
+	
+	option = {
+		name = subject_interaction_events.47.a
+
+
+		add_gold = {
+			value = country_tax_base
+			min = scope:target.country_tax_base
+			multiply = -20
+		}
+		
+		annex_country = { country = scope:target }
+	}
+
+
+	option = {
+		name = subject_interaction_events.47.b
+		add_stability = stability_mild_bonus
+	}
+}
+
+subject_interaction_events.48 = {
+	type = country_event	
+
+	title = subject_interaction_events.48.title
+	desc = subject_interaction_events.48.desc
+	
+	
+	
+	trigger = {
+		government_type = government_type:monarchy
+		has_ruler = no
+		has_heir = no
+		has_regent = yes
+
+		exists = scope:target
+		scope:target = { 
+			is_ai = yes
+			government_type = government_type:monarchy
+			has_ruler = yes
+			ruler = { has_dynasty = yes }
+		}
+		scope:target = { is_subject_type = vassal } 		
+	}
+
+	immediate = {
+		scope:target = { ruler = { save_scope_as = new_king } }
+	}
+	
+	option = {
+		name = subject_interaction_events.48.a
+		set_new_ruler = scope:new_king
+		annex_country = { country = scope:target }
+		add_government_power = government_power_ultimate_penalty
+	}
+
+
+	option = {
+		name = subject_interaction_events.48.b
+	}
+}
