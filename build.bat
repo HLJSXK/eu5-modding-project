@@ -1,9 +1,9 @@
 @echo off
-REM Build script for EU5 Goldberg Emulator tools (Windows)
-REM Compiles Windows release package only
+REM Build script for EU5 Sync UI package (Windows)
+REM Builds sync-ui + goldberg_emulator only
 
 echo ============================================================
-echo Building EU5 Goldberg Emulator Tools
+echo Building EU5 Sync UI Package
 echo ============================================================
 
 REM Create build directory
@@ -12,23 +12,25 @@ mkdir build
 mkdir build\eu5-tools-windows-amd64
 
 echo.
-echo Building Windows binaries (amd64)...
-echo -----------------------------------
+echo Preparing icon resources...
+for /f %%i in ('go env GOPATH') do set GOPATH=%%i
+go install github.com/tc-hib/go-winres@latest
+go run .\tools\gen_sync_ui_icon.go -out build\sync-ui-icon.png
+"%GOPATH%\bin\go-winres.exe" simply --arch amd64 --icon build\sync-ui-icon.png --manifest gui --out cmd\eu5-sync-ui\rsrc --product-name "EU5 Sync UI" --file-description "EU5 Sync UI" --original-filename "eu5-sync-ui.exe"
+
+echo.
+echo Building Windows binary (amd64)...
+echo ---------------------------------
 set GOOS=windows
 set GOARCH=amd64
-go build -ldflags="-s -w" -o build\eu5-detector-windows-amd64.exe .\cmd\eu5-detector
-go build -ldflags="-s -w" -o build\eu5-deployer-windows-amd64.exe .\cmd\eu5-deployer
-go build -ldflags="-s -w" -o build\eu5-modsync-windows-amd64.exe .\cmd\eu5-modsync
 go build -ldflags="-H windowsgui -s -w" -o build\eu5-sync-ui-windows-amd64.exe .\cmd\eu5-sync-ui
 
 echo.
 echo Preparing package directory...
-copy /y build\eu5-deployer-windows-amd64.exe build\eu5-tools-windows-amd64\eu5-deployer.exe >nul
-copy /y build\eu5-detector-windows-amd64.exe build\eu5-tools-windows-amd64\eu5-detector.exe >nul
-copy /y build\eu5-modsync-windows-amd64.exe build\eu5-tools-windows-amd64\eu5-modsync.exe >nul
 copy /y build\eu5-sync-ui-windows-amd64.exe build\eu5-tools-windows-amd64\eu5-sync-ui.exe >nul
-copy /y cmd\eu5-sync-ui\eu5-sync-ui.exe.manifest build\eu5-tools-windows-amd64\eu5-sync-ui.exe.manifest >nul
 xcopy /e /i /y goldberg_emulator build\eu5-tools-windows-amd64\goldberg_emulator >nul
+
+del /q cmd\eu5-sync-ui\rsrc_windows_amd64.syso >nul 2>&1
 
 echo Creating zip package...
 powershell -NoProfile -Command "Compress-Archive -Path 'build/eu5-tools-windows-amd64/*' -DestinationPath 'build/eu5-tools-windows-amd64.zip' -Force"
