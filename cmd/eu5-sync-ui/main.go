@@ -73,6 +73,14 @@ type SyncStats struct {
 	NoOp      int
 }
 
+type modStatusPayload struct {
+	Action     string `json:"action"`
+	ModID      string `json:"mod_id"`
+	ModName    string `json:"mod_name"`
+	LocalState string `json:"local_state"`
+	Reason     string `json:"reason"`
+}
+
 type workflowWriter struct {
 	m       *SyncManager
 	partial string
@@ -102,25 +110,61 @@ func parseAndAppendOperationLocked(m *SyncManager, line string) {
 	}
 	m.fullLog += line + "\n"
 
+	if strings.HasPrefix(line, "[ModStatusJSON] ") {
+		content := strings.TrimSpace(line[len("[ModStatusJSON] "):])
+		var p modStatusPayload
+		if err := json.Unmarshal([]byte(content), &p); err == nil {
+			name := strings.TrimSpace(p.ModName)
+			if name == "" {
+				name = strings.TrimSpace(p.ModID)
+			}
+			if name == "" {
+				name = "(unknown mod)"
+			}
+
+			record := ModRecord{
+				Action: strings.TrimSpace(p.Action),
+				Name:   name,
+				Local:  strings.TrimSpace(p.LocalState),
+			}
+			m.ops = append(m.ops, record)
+
+			switch record.Action {
+			case "Added":
+				m.stats.Added++
+			case "Updated":
+				m.stats.Updated++
+			case "Deleted":
+				m.stats.Deleted++
+			}
+		}
+		return
+	}
+
 	// Parse [ModStatus] markers emitted by applyPlan
 	// format: [ModStatus] Action|ModName|LocalState|Reason
 	if strings.HasPrefix(line, "[ModStatus] ") {
 		content := strings.TrimSpace(line[len("[ModStatus] "):])
 		parts := strings.SplitN(content, "|", 4)
 		if len(parts) >= 3 {
+			name := strings.TrimSpace(parts[1])
+			if name == "" {
+				name = "(unknown mod)"
+			}
+
 			record := ModRecord{
 				Action: strings.TrimSpace(parts[0]),
-				Name:   strings.TrimSpace(parts[1]),
+				Name:   name,
 				Local:  strings.TrimSpace(parts[2]),
 			}
 			m.ops = append(m.ops, record)
 
 			switch record.Action {
-			case "Add":
+			case "Added":
 				m.stats.Added++
-			case "Update":
+			case "Updated":
 				m.stats.Updated++
-			case "Delete":
+			case "Deleted":
 				m.stats.Deleted++
 			}
 		}

@@ -2,6 +2,7 @@ package modsync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -32,25 +33,27 @@ func uploadPublishOutputToCOS(opts PublishOptions, manifestPath, packagesDir str
 		return fmt.Errorf("failed to upload snapshot.json: %w", err)
 	}
 
-	entries, err := os.ReadDir(packagesDir)
+	b, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("failed to read packages dir: %w", err)
+		return fmt.Errorf("failed to read snapshot manifest: %w", err)
+	}
+	var manifest SnapshotManifest
+	if err := json.Unmarshal(b, &manifest); err != nil {
+		return fmt.Errorf("failed to parse snapshot manifest: %w", err)
 	}
 
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
+	for _, mod := range manifest.Mods {
+		zipName := mod.ModID + ".zip"
+		localPath := filepath.Join(packagesDir, zipName)
+		if _, err := os.Stat(localPath); err != nil {
+			return fmt.Errorf("missing package for mod %s: %w", mod.ModID, err)
 		}
-		if !strings.HasSuffix(strings.ToLower(e.Name()), ".zip") {
-			continue
-		}
-		localPath := filepath.Join(packagesDir, e.Name())
-		objectKey := prefix + "packages/" + e.Name()
+		objectKey := prefix + "packages/" + zipName
 		if opts.Out != nil {
 			fmt.Fprintf(opts.Out, "Uploading %s -> %s\n", localPath, objectKey)
 		}
 		if err := putFileToCOS(client, objectKey, localPath); err != nil {
-			return fmt.Errorf("failed to upload package %s: %w", e.Name(), err)
+			return fmt.Errorf("failed to upload package %s: %w", zipName, err)
 		}
 	}
 

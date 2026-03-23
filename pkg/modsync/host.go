@@ -37,6 +37,9 @@ func RunPublish(opts PublishOptions) error {
 	}
 
 	packagesDir := filepath.Join(opts.OutDir, "packages")
+	if err := os.RemoveAll(packagesDir); err != nil {
+		return fmt.Errorf("failed to clean packages dir: %w", err)
+	}
 	if err := os.MkdirAll(packagesDir, 0755); err != nil {
 		return fmt.Errorf("failed to create packages dir: %w", err)
 	}
@@ -118,8 +121,18 @@ func buildSnapshot(modPath, packagesDir, baseURL string) (*SnapshotManifest, err
 		if !entry.IsDir() {
 			continue
 		}
+		if shouldIgnoreLocalModDir(entry.Name()) {
+			continue
+		}
 		modID := entry.Name()
 		modDir := filepath.Join(modPath, modID)
+		modName := modID
+		metaPath := filepath.Join(modDir, ".metadata", "metadata.json")
+		if b, err := os.ReadFile(metaPath); err == nil {
+			if name := extractModNameFromMetadataBytes(b); strings.TrimSpace(name) != "" {
+				modName = strings.TrimSpace(name)
+			}
+		}
 
 		contentHash, fileCount, err := computeDirectoryHash(modDir)
 		if err != nil {
@@ -139,7 +152,7 @@ func buildSnapshot(modPath, packagesDir, baseURL string) (*SnapshotManifest, err
 
 		manifest.Mods = append(manifest.Mods, SnapshotMod{
 			ModID:       modID,
-			DisplayName: modID,
+			DisplayName: modName,
 			PackageURL:  buildPackageURL(baseURL, packageName),
 			PackageSHA:  pkgSHA,
 			PackageSize: pkgSize,

@@ -2,6 +2,7 @@ package modsync
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,73 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 )
+
+type localMetadata struct {
+	Name string `json:"name"`
+}
+
+type modStatusPayload struct {
+	Action     ActionType `json:"action"`
+	ModID      string     `json:"mod_id"`
+	ModName    string     `json:"mod_name"`
+	LocalState string     `json:"local_state"`
+	Reason     string     `json:"reason"`
+}
+
+var metadataNameRegex = regexp.MustCompile(`(?s)"name"\s*:\s*"((?:\\.|[^"\\])*)"`)
+
+func decodeMaybeUTF16Text(b []byte) string {
+	if len(b) >= 2 {
+		// UTF-16 LE BOM
+		if b[0] == 0xFF && b[1] == 0xFE {
+			u16 := make([]uint16, 0, (len(b)-2)/2)
+			for i := 2; i+1 < len(b); i += 2 {
+				u16 = append(u16, uint16(b[i])|uint16(b[i+1])<<8)
+			}
+			return string(utf16.Decode(u16))
+		}
+		// UTF-16 BE BOM
+		if b[0] == 0xFE && b[1] == 0xFF {
+			u16 := make([]uint16, 0, (len(b)-2)/2)
+			for i := 2; i+1 < len(b); i += 2 {
+				u16 = append(u16, uint16(b[i])<<8|uint16(b[i+1]))
+			}
+			return string(utf16.Decode(u16))
+		}
+	}
+
+	return string(b)
+}
+
+func extractModNameFromMetadataBytes(b []byte) string {
+	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
+	text := decodeMaybeUTF16Text(b)
+
+	var meta localMetadata
+	if err := json.Unmarshal([]byte(text), &meta); err == nil {
+		if strings.TrimSpace(meta.Name) != "" {
+			return strings.TrimSpace(meta.Name)
+		}
+	}
+
+	// Fallback for non-strict JSON in workshop metadata files.
+	m := metadataNameRegex.FindStringSubmatch(text)
+	if len(m) != 2 {
+		return ""
+	}
+
+	unquoted, err := strconv.Unquote("\"" + m[1] + "\"")
+	if err == nil {
+		return strings.TrimSpace(unquoted)
+	}
+	return strings.TrimSpace(m[1])
+}
 
 func RunSync(opts SyncOptions) error {
 	if opts.Out == nil {
@@ -172,11 +237,39 @@ func scanLocalModHashes(modPath string) (map[string]string, error) {
 	return result, nil
 }
 
-func shouldIgnoreLocalModDir(name string) bool {
-	if name == ".modsync_tmp" {
-		return true
+func scanLocalModNames(modPath string) (map[string]string, error) {
+	entries, err := os.ReadDir(modPath)
+	if err != nil {
+		return nil, err
 	}
-	if strings.HasPrefix(name, ".modsync_") {
+
+	result := make(map[string]string)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if shouldIgnoreLocalModDir(e.Name()) {
+			continue
+		}
+
+		modID := e.Name()
+		metaPath := filepath.Join(modPath, modID, ".metadata", "metadata.json")
+		b, err := os.ReadFile(metaPath)
+		if err != nil {
+			continue
+		}
+
+		name := extractModNameFromMetadataBytes(b)
+		if name != "" {
+			result[modID] = name
+		}
+	}
+
+	return result, nil
+}
+
+func shouldIgnoreLocalModDir(name string) bool {
+	if strings.HasPrefix(name, ".") {
 		return true
 	}
 	return false
@@ -186,6 +279,11 @@ func buildPlan(modPath string, manifest *SnapshotManifest, state *SyncState, del
 	localHashes, err := scanLocalModHashes(modPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan local mods: %w", err)
+	}
+
+	localNames, err := scanLocalModNames(modPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan local mod metadata: %w", err)
 	}
 
 	remote := make(map[string]SnapshotMod)
@@ -205,8 +303,11 @@ func buildPlan(modPath string, manifest *SnapshotManifest, state *SyncState, del
 		localHash, hasLocal := localHashes[id]
 		managed, hasManaged := state.ManagedMods[id]
 
-		modName := rm.DisplayName
-		if modName == "" {
+		modName := localNames[id]
+		if strings.TrimSpace(modName) == "" {
+			modName = rm.DisplayName
+		}
+		if strings.TrimSpace(modName) == "" {
 			modName = id
 		}
 
@@ -232,10 +333,10 @@ func buildPlan(modPath string, manifest *SnapshotManifest, state *SyncState, del
 
 	for _, id := range localIDs {
 		_, managed := state.ManagedMods[id]
-
-		// For local-only mods, we might not have a clean "Name" unless we read metadata.
-		// For simplicity, just use the directory ID as the Name.
-		modName := id
+		modName := localNames[id]
+		if strings.TrimSpace(modName) == "" {
+			modName = id
+		}
 
 		if managed {
 			if deleteManagedMissing {
@@ -258,8 +359,20 @@ func applyPlan(opts SyncOptions, manifestBase string, manifest *SnapshotManifest
 	}
 
 	for _, item := range plan {
-		// Emit structured UI log for intercepting
-		fmt.Fprintf(opts.Out, "[ModStatus] %s|%s|%s|%s\n", item.Action, item.ModName, item.LocalState, item.Reason)
+		// Emit structured UI log for intercepting.
+		payload := modStatusPayload{
+			Action:     item.Action,
+			ModID:      item.ModID,
+			ModName:    item.ModName,
+			LocalState: item.LocalState,
+			Reason:     item.Reason,
+		}
+		if b, err := json.Marshal(payload); err == nil {
+			fmt.Fprintf(opts.Out, "[ModStatusJSON] %s\n", string(b))
+		} else {
+			// Backward-compatible fallback line.
+			fmt.Fprintf(opts.Out, "[ModStatus] %s|%s|%s|%s\n", item.Action, item.ModName, item.LocalState, item.Reason)
+		}
 
 		switch item.Action {
 		case ActionAdded, ActionUpdated:

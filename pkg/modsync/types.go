@@ -1,8 +1,10 @@
 package modsync
 
 import (
+	"encoding/json"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/HLJSXK/eu5-modding-project/pkg/detector"
@@ -29,6 +31,78 @@ type SnapshotMod struct {
 	PackageSize int64  `json:"package_size"`
 	ContentHash string `json:"content_hash"`
 	FileCount   int    `json:"file_count"`
+}
+
+func (m SnapshotMod) MarshalJSON() ([]byte, error) {
+	type outSnapshotMod struct {
+		ModID       string `json:"mod_id"`
+		ID          string `json:"id"`
+		DisplayName string `json:"display_name"`
+		Name        string `json:"name"`
+		ModName     string `json:"mod_name"`
+		PackageURL  string `json:"package_url"`
+		PackageSHA  string `json:"package_sha256"`
+		PackageSize int64  `json:"package_size"`
+		ContentHash string `json:"content_hash"`
+		FileCount   int    `json:"file_count"`
+	}
+
+	modID := strings.TrimSpace(m.ModID)
+	name := strings.TrimSpace(m.DisplayName)
+
+	return json.Marshal(outSnapshotMod{
+		ModID:       modID,
+		ID:          modID,
+		DisplayName: name,
+		Name:        name,
+		ModName:     name,
+		PackageURL:  m.PackageURL,
+		PackageSHA:  m.PackageSHA,
+		PackageSize: m.PackageSize,
+		ContentHash: m.ContentHash,
+		FileCount:   m.FileCount,
+	})
+}
+
+func (m *SnapshotMod) UnmarshalJSON(data []byte) error {
+	type rawSnapshotMod struct {
+		ModID       string `json:"mod_id"`
+		ID          string `json:"id"`
+		DisplayName string `json:"display_name"`
+		Name        string `json:"name"`
+		ModName     string `json:"mod_name"`
+		PackageURL  string `json:"package_url"`
+		PackageSHA  string `json:"package_sha256"`
+		PackageSize int64  `json:"package_size"`
+		ContentHash string `json:"content_hash"`
+		FileCount   int    `json:"file_count"`
+	}
+
+	var r rawSnapshotMod
+	if err := json.Unmarshal(data, &r); err != nil {
+		return err
+	}
+
+	m.ModID = strings.TrimSpace(r.ModID)
+	if m.ModID == "" {
+		m.ModID = strings.TrimSpace(r.ID)
+	}
+
+	m.DisplayName = strings.TrimSpace(r.DisplayName)
+	if m.DisplayName == "" {
+		m.DisplayName = strings.TrimSpace(r.Name)
+	}
+	if m.DisplayName == "" {
+		m.DisplayName = strings.TrimSpace(r.ModName)
+	}
+
+	m.PackageURL = r.PackageURL
+	m.PackageSHA = r.PackageSHA
+	m.PackageSize = r.PackageSize
+	m.ContentHash = r.ContentHash
+	m.FileCount = r.FileCount
+
+	return nil
 }
 
 type SyncState struct {
