@@ -8,28 +8,8 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.goos }}/${{ matrix.goarch }} )
+    name: Build Windows Package
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        include:
-          - goos: windows
-            goarch: amd64
-            suffix: .exe
-            label: windows-amd64
-          - goos: linux
-            goarch: amd64
-            suffix: ""
-            label: linux-amd64
-          - goos: darwin
-            goarch: amd64
-            suffix: ""
-            label: darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            suffix: ""
-            label: darwin-arm64
 
     steps:
       - name: Checkout repository
@@ -43,27 +23,36 @@ jobs:
 
       - name: Build eu5-detector
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          GOOS: windows
+          GOARCH: amd64
         run: |
           go build -ldflags="-s -w" \
-            -o build/eu5-detector-${{ matrix.label }}${{ matrix.suffix }} \
+            -o build/eu5-detector-windows-amd64.exe \
             ./cmd/eu5-detector
 
       - name: Build eu5-deployer
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          GOOS: windows
+          GOARCH: amd64
         run: |
           go build -ldflags="-s -w" \
-            -o build/eu5-deployer-${{ matrix.label }}${{ matrix.suffix }} \
+            -o build/eu5-deployer-windows-amd64.exe \
             ./cmd/eu5-deployer
+
+      - name: Create direct-use package
+        run: |
+          mkdir -p build/eu5-tools-windows-amd64
+          cp build/eu5-deployer-windows-amd64.exe build/eu5-tools-windows-amd64/eu5-deployer.exe
+          cp build/eu5-detector-windows-amd64.exe build/eu5-tools-windows-amd64/eu5-detector.exe
+          cp -r goldberg_emulator build/eu5-tools-windows-amd64/goldberg_emulator
+          cd build
+          zip -r eu5-tools-windows-amd64.zip eu5-tools-windows-amd64
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.label }}
-          path: build/
+          name: eu5-tools-windows-amd64
+          path: build/eu5-tools-windows-amd64.zip
           retention-days: 7
 
   release:
@@ -86,13 +75,12 @@ jobs:
           body: |
             ## EU5 Modding Project ${{ github.ref_name }}
 
-            根据你的操作系统下载对应文件：
+            下载并解压以下文件即可直接使用：
 
-            | 文件 | 系统 |
-            |------|------|
-            | `eu5-deployer-windows-amd64.exe` | Windows 64位（主要工具） |
-            | `eu5-detector-windows-amd64.exe` | Windows 64位（检测工具） |
-            | `eu5-deployer-linux-amd64` | Linux 64位 |
-            | `eu5-deployer-darwin-amd64` | macOS Intel |
-            | `eu5-deployer-darwin-arm64` | macOS Apple Silicon (M1/M2/M3) |
-          files: dist/*
+            - `eu5-tools-windows-amd64.zip`
+
+            压缩包内容：
+            - `eu5-deployer.exe`
+            - `eu5-detector.exe`
+            - `goldberg_emulator/`（完整目录）
+          files: dist/eu5-tools-windows-amd64.zip
