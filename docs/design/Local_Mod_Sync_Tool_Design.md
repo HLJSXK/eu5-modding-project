@@ -35,15 +35,15 @@ Add a new executable:
 
 Modes:
 
-1. Host mode
-- Command: `eu5-modsync host`
+1. Publish mode
+- Command: `eu5-modsync publish`
 - Scans local `game/mod`
-- Creates snapshot manifest
-- Serves metadata and mod packages over HTTP
+- Creates snapshot manifest and zip packages
+- Supports optional COS upload and custom upload command
 
-2. Client mode
+2. Sync mode
 - Command: `eu5-modsync sync`
-- Pulls manifest from host URL
+- Pulls manifest from URL (`--manifest-url`)
 - Computes plan
 - Applies sync to local `game/mod`
 - Writes state file
@@ -53,11 +53,11 @@ Optional dry run:
 
 ## 4. High-Level Architecture
 
-### Host Components
+### Publish Components
 - Scanner: inventory local mods and file hashes
-- Packager: per-mod zip package (or direct file stream in v2)
+- Packager: per-mod zip package
 - Manifest Builder: snapshot metadata + hashes
-- HTTP Server: serves manifest and package files
+- Uploader: optional COS or custom upload command
 
 ### Client Components
 - Manifest Fetcher
@@ -144,26 +144,23 @@ If apply fails, restore from backup.
 
 ## 8. Transport and Security
 
-### v1 (trusted LAN)
-- HTTP + one-time token
-- Token passed in header `X-ModSync-Token`
+### v1 (implemented)
+- Static HTTP/HTTPS manifest URL with package links
+- Optional COS upload for remote distribution
 
-### v1.1 (recommended)
-- HTTPS reverse proxy (Caddy/Nginx) in front of host tool
-- Short-lived token per sync session
-
-### Manifest integrity
-- Include manifest signature support (Ed25519)
-- Client embeds trusted public key (or prompts first-use trust)
+### Recommended
+- Host snapshot files over HTTPS (CDN/Object Storage)
+- Use short-lived credentials for publish and upload
 
 ## 9. CLI Design
 
-### Host
-- `eu5-modsync host --mod-path "C:/.../Europa Universalis V/game/mod" --bind ":17777" --token "..." --out "./.modsync_host"`
+### Publish
+- `eu5-modsync publish --mod-path "C:/.../Europa Universalis V/game/mod" --out ".modsync_publish" --base-url "https://cdn.example.com/modsync"`
+- `eu5-modsync publish --mod-path "C:/.../game/mod" --cos-bucket mybucket-1250000000 --cos-region ap-shanghai --cos-prefix modsync`
 
-### Client
-- `eu5-modsync sync --server "http://192.168.1.20:17777" --token "..." --mod-path "C:/.../Europa Universalis V/game/mod" --dry-run`
-- `eu5-modsync sync --server "http://192.168.1.20:17777" --token "..." --mod-path "C:/.../Europa Universalis V/game/mod" --delete-managed-missing=true`
+### Sync
+- `eu5-modsync sync --manifest-url "https://cdn.example.com/modsync/snapshot.json" --mod-path "C:/.../Europa Universalis V/game/mod" --dry-run`
+- `eu5-modsync sync --manifest-url "https://cdn.example.com/modsync/snapshot.json" --mod-path "C:/.../Europa Universalis V/game/mod" --delete-managed-missing=true`
 
 ### Output report
 - Snapshot ID
@@ -178,36 +175,18 @@ If apply fails, restore from backup.
 ## 10. Suggested Repository Layout
 
 - `cmd/eu5-modsync/main.go`
-- `pkg/modsync/manifest.go`
-- `pkg/modsync/scanner.go`
-- `pkg/modsync/planner.go`
-- `pkg/modsync/downloader.go`
-- `pkg/modsync/applier.go`
-- `pkg/modsync/state.go`
-- `pkg/modsync/server.go`
-- `pkg/modsync/report.go`
+- `pkg/modsync/client.go`
+- `pkg/modsync/host.go`
+- `pkg/modsync/cos_upload.go`
+- `pkg/modsync/types.go`
 
 ## 11. Implementation Plan
 
-### Phase 1 (MVP)
-- Host scan + snapshot.json generation
-- Client fetch + plan + dry-run report
-- No writes yet
-
-### Phase 2
-- Package download and apply
-- Backup/rollback
-- State file persistence
-
-### Phase 3
-- Conflict-aware sync (KeptLocal)
-- Delete managed missing
-- Full action summary
-
-### Phase 4
-- Signature verification
-- Resume/retry + parallel downloads
-- Better host auth and session tokens
+### Status
+- Publish + sync core flow implemented
+- Conflict-aware plan and state file implemented
+- COS upload path implemented
+- Optional signature/auth hardening remains future work
 
 ## 12. Why this replaces manual publish
 
@@ -218,8 +197,8 @@ If apply fails, restore from backup.
 
 ## 13. Optional Future Upgrade
 
-After local sync works, add a hybrid mode:
-- Host tool can publish same snapshot to Tencent COS as fallback source
-- Clients prefer host LAN source, then fallback to COS
+Hybrid mode is now effectively available through publish + COS upload:
+- Host machine can publish snapshot and packages to Tencent COS
+- Clients sync from the published manifest URL
 
 This gives both convenience and reliability.

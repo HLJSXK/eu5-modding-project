@@ -3,7 +3,7 @@
 A comprehensive toolkit for **European Universalis 5** modding and LAN multiplayer setup.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8.svg)](https://golang.org)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/HLJSXK/eu5-modding-project)
 
 ## Overview
@@ -24,12 +24,12 @@ This project provides tools and documentation for EU5 modding and multiplayer se
 
 **Windows Users:**
 1. Download the [latest release](https://github.com/HLJSXK/eu5-modding-project/releases) or clone this repository
-2. Run `build\eu5-deployer-windows-amd64.exe`
-3. Launch EU5 and enjoy LAN multiplayer!
+2. Run `build\eu5-tools-windows-amd64\eu5-sync-ui.exe`
+3. Complete deployment and mod sync in the UI, then launch EU5
 
-**Restore to normal Steam mode:**
+**CLI (optional):**
 ```bash
-build\eu5-deployer-windows-amd64.exe --restore
+go run ./cmd/eu5-deployer --restore
 ```
 
 See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instructions.
@@ -79,10 +79,13 @@ See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instr
 eu5-modding-project/
 ├── cmd/                    # Executable source code
 │   ├── eu5-detector/      # EU5 installation detector
-│   └── eu5-deployer/      # Goldberg deployment tool
+│   ├── eu5-deployer/      # Goldberg deployment tool
+│   ├── eu5-modsync/       # Mod publish/sync tool
+│   └── eu5-sync-ui/       # Windows sync UI
 ├── pkg/                    # Shared Go packages
 │   ├── detector/          # Detection logic
-│   └── deployer/          # Deployment logic
+│   ├── deployer/          # Deployment logic
+│   └── modsync/           # Mod sync logic
 ├── goldberg_emulator/     # Goldberg Emulator files
 │   ├── steam_api64.dll    # Goldberg DLL
 │   └── steam_settings/    # Configuration files
@@ -106,15 +109,17 @@ eu5-modding-project/
 
 | Tool | Description | Windows | Linux | macOS |
 |------|-------------|---------|-------|-------|
-| **eu5-deployer** | Deploy Goldberg Emulator for LAN play | `build\eu5-deployer-windows-amd64.exe` | `build/eu5-deployer-linux-amd64` | `build/eu5-deployer-darwin-amd64` |
-| **eu5-detector** | Detect EU5 installation location | `build\eu5-detector-windows-amd64.exe` | `build/eu5-detector-linux-amd64` | `build/eu5-detector-darwin-amd64` |
+| **eu5-sync-ui** | One-click Windows UI for Goldberg deploy + mod sync | `build\eu5-tools-windows-amd64\eu5-sync-ui.exe` | - | - |
+| **eu5-deployer** | Deploy or restore Goldberg files | `go run ./cmd/eu5-deployer` | `go run ./cmd/eu5-deployer` | `go run ./cmd/eu5-deployer` |
+| **eu5-detector** | Detect EU5 installation location | `go run ./cmd/eu5-detector` | `go run ./cmd/eu5-detector` | `go run ./cmd/eu5-detector` |
+| **eu5-modsync** | Publish/sync local mods via snapshot manifest | `go run ./cmd/eu5-modsync` | `go run ./cmd/eu5-modsync` | `go run ./cmd/eu5-modsync` |
 
-All tools are standalone executables with no dependencies.
+Release artifacts include standalone executables. In this repository, `build.bat`/`build.sh` currently package the Windows Sync UI bundle.
 
 ## Building from Source
 
 ### Prerequisites
-- Go 1.22 or higher
+- Go 1.25 or higher
 - Git
 
 ### Build Instructions
@@ -130,7 +135,7 @@ chmod +x build.sh
 ./build.sh
 ```
 
-Compiled executables will be placed in the `build/` directory.
+Build output is placed in the `build/` directory, including `eu5-tools-windows-amd64.zip` and `eu5-tools-windows-amd64/`.
 
 ## Game Information
 
@@ -169,6 +174,6 @@ This project is for educational and modding purposes. European Universalis 5 is 
 
 ---
 
-**Last Updated:** January 2026  
+**Last Updated:** March 2026  
 **Project Status:** Active Development  
 **Version:** 1.0.0

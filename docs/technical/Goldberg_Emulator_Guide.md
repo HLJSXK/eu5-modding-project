@@ -24,34 +24,25 @@ The Goldberg Steam Emulator allows EU5 to run in LAN mode without requiring Stea
 
 ## 🔧 Configuration Files
 
-### Account Name and Steam ID
+### Display Name
 
-The emulator allows you to configure your account name and Steam ID that will be displayed in LAN multiplayer sessions.
+The emulator allows you to configure a display name that will be shown in LAN multiplayer sessions.
 
 **Configuration Files:**
 - `steam_settings/force_account_name.txt` - Your display name in multiplayer
-- `steam_settings/force_steamid.txt` - Your unique Steam ID (17 digits)
 
 **Using the deployment tool:**
 ```bash
-# Deploy with custom account name and Steam ID
-eu5-deployer.exe --account-name "YourName" --steam-id "76561198012345678"
+# Deploy with custom display name
+eu5-deployer.exe --account-name "YourName"
 
-# Deploy with default values (EU5Player / 76561197960287930)
+# Deploy with default value (EU5Player)
 eu5-deployer.exe
 ```
 
 **Manual configuration:**
 1. Navigate to `<EU5_Installation>/binaries/steam_settings/`
 2. Edit `force_account_name.txt` - Enter your desired display name
-3. Edit `force_steamid.txt` - Enter a valid 17-digit Steam ID starting with `7656119`
-
-**Steam ID Format:**
-- Must be exactly 17 digits
-- Must start with `7656119`
-- Example: `76561197960287930`
-
-**Important:** All players in a LAN session should use **different Steam IDs** to avoid conflicts. You can generate unique IDs by incrementing the last digits (e.g., `76561197960287931`, `76561197960287932`, etc.).
 
 ### steam_api64.dll
 
@@ -93,7 +84,9 @@ This file lists the DLC IDs that should be enabled for all players in the LAN se
 
 ### steam_settings/mods/
 
-This folder contains mod configurations that will be available during LAN sessions. Place mod folders here that you want to use in multiplayer.
+This folder is kept only for compatibility notes. Deployer will clean it and write a README that points to the actual EU5 mod folder.
+
+Use `<EU5_Installation>/game/mod/` for real mod files.
 
 **Important:** All players must have the same mods for compatibility!
 
@@ -101,17 +94,17 @@ This folder contains mod configurations that will be available during LAN sessio
 
 ### Automatic Deployment
 
-Use the provided deployment script:
+Use the provided Go deployment tool:
 
 ```bash
 # Auto-detect EU5 installation and deploy
-python3 tools/deploy_goldberg.py
+go run ./cmd/eu5-deployer
 
 # Specify EU5 path manually
-python3 tools/deploy_goldberg.py --eu5-path "/path/to/Europa Universalis V"
+go run ./cmd/eu5-deployer --eu5-path "/path/to/Europa Universalis V"
 
 # Restore original files
-python3 tools/deploy_goldberg.py --restore
+go run ./cmd/eu5-deployer --restore
 ```
 
 ### Manual Deployment
@@ -148,7 +141,7 @@ To restore original Steam functionality:
 
 ```bash
 # Using script
-python3 tools/deploy_goldberg.py --restore
+go run ./cmd/eu5-deployer --restore
 
 # Or manually
 cd "<EU5_Installation>/binaries"
@@ -207,7 +200,7 @@ For n2n setup, refer to: https://github.com/ntop/n2n
 - Verify the file is in the correct location: `<EU5_Installation>/binaries/steam_settings/DLC.txt`
 
 ### Mods not loading
-- Ensure mods are in `steam_settings/mods/` folder
+- Ensure mods are in `<EU5_Installation>/game/mod/`
 - Verify all players have the same mods
 - Check mod compatibility with current EU5 version
 

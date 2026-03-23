@@ -7,16 +7,13 @@
 如果您不想自己编译，可以直接使用预编译的可执行文件：
 
 ### Windows 用户
-- `build/eu5-deployer-windows-amd64.exe` - 部署工具
-- `build/eu5-detector-windows-amd64.exe` - 检测工具
+- `build/eu5-tools-windows-amd64/eu5-sync-ui.exe` - 一键同步 UI（部署 + Mod 同步）
 
 ### Linux 用户
-- `build/eu5-deployer-linux-amd64` - 部署工具
-- `build/eu5-detector-linux-amd64` - 检测工具
+- 使用 `go run ./cmd/eu5-deployer` 和 `go run ./cmd/eu5-detector` 运行 CLI
 
 ### macOS 用户
-- Intel Mac: `build/eu5-deployer-darwin-amd64`
-- Apple Silicon (M1/M2): `build/eu5-deployer-darwin-arm64`
+- 使用 `go run ./cmd/eu5-deployer` 和 `go run ./cmd/eu5-detector` 运行 CLI
 
 ## 🚀 快速使用
 
@@ -24,36 +21,36 @@
 
 1. **双击运行部署工具：**
    ```
-   build\eu5-deployer-windows-amd64.exe
+   build\eu5-tools-windows-amd64\eu5-sync-ui.exe
    ```
    
    工具会自动检测 EU5 安装位置并完成部署。
 
 2. **恢复原始文件：**
    ```cmd
-   build\eu5-deployer-windows-amd64.exe --restore
+   go run ./cmd/eu5-deployer --restore
    ```
 
 3. **手动指定 EU5 路径：**
    ```cmd
-   build\eu5-deployer-windows-amd64.exe --eu5-path "D:\Steam\steamapps\common\Europa Universalis V"
+   go run ./cmd/eu5-deployer --eu5-path "D:\Steam\steamapps\common\Europa Universalis V"
    ```
 
 ### Linux/macOS 用户
 
 1. **赋予执行权限（首次使用）：**
    ```bash
-   chmod +x build/eu5-deployer-linux-amd64
+   # go run 无需赋予执行权限
    ```
 
 2. **运行部署工具：**
    ```bash
-   ./build/eu5-deployer-linux-amd64
+   go run ./cmd/eu5-deployer
    ```
 
 3. **恢复原始文件：**
    ```bash
-   ./build/eu5-deployer-linux-amd64 --restore
+   go run ./cmd/eu5-deployer --restore
    ```
 
 ## 🔧 工具说明
@@ -65,10 +62,10 @@
 **使用方法：**
 ```bash
 # Windows
-build\eu5-detector-windows-amd64.exe
+go run ./cmd/eu5-detector
 
 # Linux/macOS
-./build/eu5-detector-linux-amd64
+go run ./cmd/eu5-detector
 ```
 
 **输出示例：**
@@ -91,27 +88,26 @@ __BINARIES_PATH__=D:\Steam\steamapps\common\Europa Universalis V\binaries
 
 **使用方法：**
 ```bash
-# 自动检测并部署（使用默认账户名和 Steam ID）
-eu5-deployer-windows-amd64.exe
+# 自动检测并部署（使用默认显示名称）
+go run ./cmd/eu5-deployer
 
-# 自定义账户名和 Steam ID
-eu5-deployer-windows-amd64.exe --account-name "玩家1" --steam-id "76561197960287931"
+# 自定义显示名称
+go run ./cmd/eu5-deployer --account-name "玩家1"
 
 # 指定 EU5 路径
-eu5-deployer-windows-amd64.exe --eu5-path "D:\Steam\steamapps\common\Europa Universalis V"
+go run ./cmd/eu5-deployer --eu5-path "D:\Steam\steamapps\common\Europa Universalis V"
 
 # 恢复原始文件
-eu5-deployer-windows-amd64.exe --restore
+go run ./cmd/eu5-deployer --restore
 ```
 
 **命令行参数：**
 - `--eu5-path` - 手动指定 EU5 安装路径
-- `--account-name` - 设置 Steam 账户名（默认：EU5Player）
-- `--steam-id` - 设置 Steam ID（默认：76561197960287930）
+- `--account-name` - 设置显示名称（默认：EU5Player）
 - `--restore` - 恢复原始文件
 
 **部署流程：**
-1. 配置 Steam 模拟器设置（账户名和 Steam ID）
+1. 配置 Steam 模拟器设置（显示名称）
 2. 验证 EU5 安装路径
 3. 备份原始 `steam_api64.dll`
 4. 复制 Goldberg `steam_api64.dll`
@@ -129,8 +125,7 @@ EU5 Installation: D:\Steam\steamapps\common\Europa Universalis V
 Binaries Folder: D:\Steam\steamapps\common\Europa Universalis V\binaries
 
 [Step 0/4] Configuring Steam emulator settings...
-✓ Set account name to: EU5Player
-✓ Set Steam ID to: 76561197960287930
+✓ Prepared display name: EU5Player
 
 [Step 1/4] Backing up original steam_api64.dll...
 ✓ Backed up original DLL to: ...\binaries\.goldberg_backup\steam_api64.dll.original
@@ -145,7 +140,7 @@ Binaries Folder: D:\Steam\steamapps\common\Europa Universalis V\binaries
 ✓ Removed existing steam_settings
 ✓ Deployed steam_settings to: ...\binaries\steam_settings
   - DLC.txt: ...\binaries\steam_settings\DLC.txt
-  - mods folder: 0 items
+   - mods folder cleaned; note written: ...\binaries\steam_settings\mods\README.txt
 
 ============================================================
 ✓ Deployment completed successfully!
@@ -160,7 +155,7 @@ To restore original files, run with --restore flag.
 如果您想自己编译工具：
 
 ### 前置要求
-- Go 1.22 或更高版本
+- Go 1.25 或更高版本
 - Git
 
 ### 编译步骤
@@ -182,13 +177,13 @@ chmod +x build.sh
 
 编译完成后，可执行文件会生成在 `build/` 目录中。
 
-### 交叉编译
+### 当前构建脚本说明
 
-构建脚本会自动为所有平台编译：
-- Windows (amd64)
-- Linux (amd64)
-- macOS (amd64 - Intel)
-- macOS (arm64 - Apple Silicon)
+当前 `build.bat` / `build.sh` 主要用于打包 Windows Sync UI 工具包：
+- `build/eu5-tools-windows-amd64/`
+- `build/eu5-tools-windows-amd64.zip`
+
+如需单独构建 CLI，请使用 `go build ./cmd/...`。
 
 ## 📁 项目结构
 
@@ -196,25 +191,24 @@ chmod +x build.sh
 eu5-modding-project/
 ├── cmd/                        # 可执行文件源码
 │   ├── eu5-detector/          # 检测工具
-│   │   └── main.go
-│   └── eu5-deployer/          # 部署工具
-│       └── main.go
+│   ├── eu5-deployer/          # 部署工具
+│   ├── eu5-modsync/           # 发布/同步工具
+│   └── eu5-sync-ui/           # Windows UI
 ├── pkg/                        # 共享包
 │   ├── detector/              # 检测逻辑
-│   │   └── detector.go
-│   └── deployer/              # 部署逻辑
-│       └── deployer.go
+│   ├── deployer/              # 部署逻辑
+│   └── modsync/               # 同步逻辑
 ├── goldberg_emulator/         # Goldberg 文件
 │   ├── steam_api64.dll
 │   └── steam_settings/
 ├── build/                      # 编译输出（.gitignore）
-│   ├── eu5-deployer-windows-amd64.exe
-│   ├── eu5-detector-windows-amd64.exe
+│   ├── eu5-sync-ui-windows-amd64.exe
+│   ├── eu5-tools-windows-amd64/
 │   └── ...
 ├── build.sh                    # Linux/macOS 构建脚本
 ├── build.bat                   # Windows 构建脚本
 ├── go.mod                      # Go 模块定义
-└── GO_TOOLS_README.md         # 本文件
+└── docs/guides/Tools_Guide.md # 本文件
 ```
 
 ## ⚠️ 重要提示
@@ -272,6 +266,6 @@ eu5-modding-project/
 
 ---
 
-**最后更新：** 2026年1月22日  
-**Go 版本：** 1.22.0  
+**最后更新：** 2026年3月24日  
+**Go 版本：** 1.25.0  
 **工具版本：** 1.0.0

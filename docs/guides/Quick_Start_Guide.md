@@ -15,44 +15,39 @@ cd eu5-modding-project
 
 **Windows:**
 ```cmd
-build\eu5-deployer-windows-amd64.exe
+build\eu5-tools-windows-amd64\eu5-sync-ui.exe
 ```
 
 **Linux:**
 ```bash
-./build/eu5-deployer-linux-amd64
+go run ./cmd/eu5-deployer
 ```
 
 **macOS:**
 ```bash
-./build/eu5-deployer-darwin-amd64
+go run ./cmd/eu5-deployer
 ```
 
 脚本会自动：
-- 配置 Steam 账户名和 ID（默认：EU5Player / 76561197960287930）
+- 配置显示名称（默认：EU5Player）
 - 检测 EU5 安装位置
 - 备份原始 `steam_api64.dll`
 - 部署 Goldberg Emulator
 - 复制配置文件
 
-### 3. 自定义账户名和 Steam ID（可选）
+### 3. 自定义显示名称（可选）
 
-如果您想使用自定义的账户名和 Steam ID：
+如果您想使用自定义显示名称：
 
 **Windows:**
 ```cmd
-build\eu5-deployer-windows-amd64.exe --account-name "你的名字" --steam-id "76561197960287931"
+go run ./cmd/eu5-deployer --account-name "你的名字"
 ```
 
 **Linux/macOS:**
 ```bash
-./build/eu5-deployer-linux-amd64 --account-name "你的名字" --steam-id "76561197960287931"
+go run ./cmd/eu5-deployer --account-name "你的名字"
 ```
-
-**重要：** 每个玩家应使用不同的 Steam ID！可以将最后几位数字递增：
-- 玩家1: `76561197960287930`
-- 玩家2: `76561197960287931`
-- 玩家3: `76561197960287932`
 
 ### 4. 启动游戏
 
@@ -64,12 +59,12 @@ build\eu5-deployer-windows-amd64.exe --account-name "你的名字" --steam-id "7
 
 **Windows:**
 ```cmd
-build\eu5-deployer-windows-amd64.exe --restore
+go run ./cmd/eu5-deployer --restore
 ```
 
 **Linux/macOS:**
 ```bash
-./build/eu5-deployer-linux-amd64 --restore
+go run ./cmd/eu5-deployer --restore
 ```
 
 ## 📝 配置 DLC
@@ -89,7 +84,9 @@ build\eu5-deployer-windows-amd64.exe --restore
 
 ## 🎮 添加 Mods
 
-将 mod 文件夹放入 `goldberg_emulator/steam_settings/mods/` 目录，然后重新运行部署脚本。
+将 mod 文件夹放入 `Europa Universalis V/game/mod/` 目录。
+
+`steam_settings/mods/` 已被弃用，部署时会清理并写入提示文件。
 
 **注意：** 所有玩家必须使用相同的 mods！
 
@@ -142,7 +139,7 @@ edge -a 10.0.0.1 -c mynetwork -k mypassword -l supernode_ip:7777
 - 所有玩家的 DLC 配置应该一致
 
 ### Mods 未加载
-- 确保 mods 在 `steam_settings/mods/` 文件夹中
+- 确保 mods 在 `<EU5安装目录>/game/mod/` 文件夹中
 - 验证所有玩家有相同的 mods
 - 检查 mod 与当前 EU5 版本的兼容性
 
