@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 
 	"github.com/HLJSXK/eu5-modding-project/pkg/detector"
 )
@@ -18,6 +20,7 @@ func main() {
 			fmt.Printf("  - %s\n", path)
 		}
 		fmt.Println("\nPlease ensure European Universalis V is installed via Steam.")
+		pause()
 		os.Exit(1)
 	}
 
@@ -28,4 +31,18 @@ func main() {
 	// Output machine-readable format for scripting
 	fmt.Printf("\n__EU5_PATH__=%s\n", eu5Path)
 	fmt.Printf("__BINARIES_PATH__=%s\n", binariesPath)
+	pause()
+}
+
+func pause() {
+	fmt.Print("\nPress Enter to exit...")
+	buf := make([]byte, 1)
+	if _, err := os.Stdin.Read(buf); err == nil {
+		return
+	}
+
+	if runtime.GOOS == "windows" {
+		fmt.Println()
+		exec.Command("cmd", "/c", "pause").Run() //nolint:errcheck,gosec
+	}
 }

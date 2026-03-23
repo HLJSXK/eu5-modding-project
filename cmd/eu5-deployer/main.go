@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -16,13 +17,19 @@ import (
 // setupLogger creates a log file next to the executable and returns a writer
 // that mirrors all output to both stdout and the log file.
 // It returns the log file handle (caller must close it) and the tee writer.
-func setupLogger(exeDir string) (*os.File, io.Writer) {
-	logPath := filepath.Join(exeDir, "eu5-deployer.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+func setupLogger(exeDir string) (*os.File, io.Writer, string) {
+	primaryLogPath := filepath.Join(exeDir, "eu5-deployer.log")
+	logFile, err := os.OpenFile(primaryLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logPath := primaryLogPath
 	if err != nil {
-		// If we can't create the log file, just use stdout
-		fmt.Printf("Warning: Could not create log file at %s: %v\n", logPath, err)
-		return nil, os.Stdout
+		fallbackLogPath := filepath.Join(os.TempDir(), "eu5-deployer.log")
+		logFile, err = os.OpenFile(fallbackLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		logPath = fallbackLogPath
+		if err != nil {
+			fmt.Printf("Warning: Could not create log file at %s or %s: %v\n", primaryLogPath, fallbackLogPath, err)
+			return nil, os.Stdout, ""
+		}
+		fmt.Printf("Warning: Could not create log file at %s, using %s\n", primaryLogPath, fallbackLogPath)
 	}
 	// Write a session header so multiple runs are easy to distinguish
 	fmt.Fprintf(logFile, "\n========================================\n")
@@ -30,7 +37,7 @@ func setupLogger(exeDir string) (*os.File, io.Writer) {
 	fmt.Fprintf(logFile, "========================================\n")
 
 	tee := io.MultiWriter(os.Stdout, logFile)
-	return logFile, tee
+	return logFile, tee, logPath
 }
 
 // logf writes a formatted message to the tee writer (stdout + log file).
@@ -56,7 +63,7 @@ func main() {
 	exeDir := filepath.Dir(exePath)
 
 	// Set up logging – all subsequent output goes through `out`
-	logFile, out := setupLogger(exeDir)
+	logFile, out, logPath := setupLogger(exeDir)
 	if logFile != nil {
 		defer logFile.Close()
 	}
@@ -73,7 +80,9 @@ func main() {
 		logf(out, "\nTips:\n")
 		logf(out, "  - If running via go run, set --project-root to your repository root\n")
 		logf(out, "  - Example: %s --project-root \"%s\"\n", filepath.Base(exePath), func() string { d, _ := os.Getwd(); return d }())
-		logf(out, "Log saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+		if logPath != "" {
+			logf(out, "Log saved to: %s\n", logPath)
+		}
 		pause()
 		os.Exit(1)
 	}
@@ -95,7 +104,9 @@ func main() {
 			logf(out, "Error detail: %v\n", err)
 			logf(out, "\nPlease specify path with --eu5-path flag:\n")
 			logf(out, "  %s --eu5-path \"C:\\Path\\To\\Europa Universalis V\"\n", filepath.Base(exePath))
-			logf(out, "\nLog saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+			if logPath != "" {
+				logf(out, "\nLog saved to: %s\n", logPath)
+			}
 			pause()
 			os.Exit(1)
 		}
@@ -114,7 +125,9 @@ func main() {
 		logf(out, "\n[Step 0/4] Configuring Steam emulator settings...\n")
 		if err := d.ConfigureSteamSettings(*accountNameFlag, *steamIDFlag); err != nil {
 			logf(out, "\n✗ Error configuring Steam settings: %v\n", err)
-			logf(out, "Log saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+			if logPath != "" {
+				logf(out, "Log saved to: %s\n", logPath)
+			}
 			pause()
 			os.Exit(1)
 		}
@@ -123,12 +136,16 @@ func main() {
 
 	if actionErr != nil {
 		logf(out, "\n✗ Error: %v\n", actionErr)
-		logf(out, "Log saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+		if logPath != "" {
+			logf(out, "Log saved to: %s\n", logPath)
+		}
 		pause()
 		os.Exit(1)
 	}
 
-	logf(out, "\nLog saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+	if logPath != "" {
+		logf(out, "\nLog saved to: %s\n", logPath)
+	}
 	pause()
 }
 
@@ -202,5 +219,14 @@ func hasGoldbergDir(root string) bool {
 func pause() {
 	fmt.Print("\nPress Enter to exit...")
 	buf := make([]byte, 1)
-	os.Stdin.Read(buf) //nolint:errcheck
+	if _, err := os.Stdin.Read(buf); err == nil {
+		return
+	}
+
+	// In some Windows double-click launches stdin is unavailable (EOF).
+	// Fall back to cmd pause to keep the console open.
+	if runtime.GOOS == "windows" {
+		fmt.Println()
+		exec.Command("cmd", "/c", "pause").Run() //nolint:errcheck,gosec
+	}
 }
