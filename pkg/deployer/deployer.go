@@ -15,10 +15,16 @@ type Deployer struct {
 	EU5Path      string
 	BinariesPath string
 	BackupDir    string
+	out          io.Writer // all output goes here (stdout, or stdout+logfile)
 }
 
-// NewDeployer creates a new Deployer
+// NewDeployer creates a new Deployer that writes to stdout
 func NewDeployer(projectRoot, eu5Path string) *Deployer {
+	return NewDeployerWithWriter(projectRoot, eu5Path, os.Stdout)
+}
+
+// NewDeployerWithWriter creates a new Deployer that writes to w
+func NewDeployerWithWriter(projectRoot, eu5Path string, w io.Writer) *Deployer {
 	binariesPath := filepath.Join(eu5Path, "binaries")
 	backupDir := filepath.Join(binariesPath, ".goldberg_backup")
 
@@ -27,7 +33,13 @@ func NewDeployer(projectRoot, eu5Path string) *Deployer {
 		EU5Path:      eu5Path,
 		BinariesPath: binariesPath,
 		BackupDir:    backupDir,
+		out:          w,
 	}
+}
+
+// logf is a convenience helper that writes to the deployer's output writer
+func (d *Deployer) logf(format string, args ...interface{}) {
+	fmt.Fprintf(d.out, format, args...)
 }
 
 // ValidatePaths validates that all required paths exist
@@ -53,7 +65,7 @@ func (d *Deployer) BackupOriginalDLL() error {
 	originalDLL := filepath.Join(d.BinariesPath, "steam_api64.dll")
 
 	if _, err := os.Stat(originalDLL); os.IsNotExist(err) {
-		fmt.Println("⚠ Warning: Original steam_api64.dll not found")
+		d.logf("⚠ Warning: Original steam_api64.dll not found\n")
 		return nil
 	}
 
@@ -66,7 +78,7 @@ func (d *Deployer) BackupOriginalDLL() error {
 
 	// Skip if backup already exists
 	if _, err := os.Stat(backupDLL); err == nil {
-		fmt.Printf("✓ Backup already exists: %s\n", backupDLL)
+		d.logf("✓ Backup already exists: %s\n", backupDLL)
 		return nil
 	}
 
@@ -75,7 +87,7 @@ func (d *Deployer) BackupOriginalDLL() error {
 		return fmt.Errorf("failed to backup original DLL: %w", err)
 	}
 
-	fmt.Printf("✓ Backed up original DLL to: %s\n", backupDLL)
+	d.logf("✓ Backed up original DLL to: %s\n", backupDLL)
 	return nil
 }
 
@@ -92,7 +104,24 @@ func (d *Deployer) DeployDLL() error {
 		return fmt.Errorf("failed to deploy DLL: %w", err)
 	}
 
-	fmt.Printf("✓ Deployed Goldberg DLL to: %s\n", targetDLL)
+	d.logf("✓ Deployed Goldberg DLL to: %s\n", targetDLL)
+	return nil
+}
+
+// DeployAppID deploys steam_appid.txt to binaries folder
+func (d *Deployer) DeployAppID() error {
+	sourceAppID := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_appid.txt")
+	targetAppID := filepath.Join(d.BinariesPath, "steam_appid.txt")
+
+	if _, err := os.Stat(sourceAppID); os.IsNotExist(err) {
+		return fmt.Errorf("steam_appid.txt not found: %s", sourceAppID)
+	}
+
+	if err := copyFile(sourceAppID, targetAppID); err != nil {
+		return fmt.Errorf("failed to deploy steam_appid.txt: %w", err)
+	}
+
+	d.logf("✓ Deployed steam_appid.txt to: %s\n", targetAppID)
 	return nil
 }
 
@@ -110,7 +139,7 @@ func (d *Deployer) DeploySteamSettings() error {
 		if err := os.RemoveAll(targetSettings); err != nil {
 			return fmt.Errorf("failed to remove existing steam_settings: %w", err)
 		}
-		fmt.Println("✓ Removed existing steam_settings")
+		d.logf("✓ Removed existing steam_settings\n")
 	}
 
 	// Copy steam_settings folder
@@ -118,19 +147,19 @@ func (d *Deployer) DeploySteamSettings() error {
 		return fmt.Errorf("failed to deploy steam_settings: %w", err)
 	}
 
-	fmt.Printf("✓ Deployed steam_settings to: %s\n", targetSettings)
+	d.logf("✓ Deployed steam_settings to: %s\n", targetSettings)
 
 	// List deployed contents
 	dlcFile := filepath.Join(targetSettings, "DLC.txt")
 	modsDir := filepath.Join(targetSettings, "mods")
 
 	if _, err := os.Stat(dlcFile); err == nil {
-		fmt.Printf("  - DLC.txt: %s\n", dlcFile)
+		d.logf("  - DLC.txt: %s\n", dlcFile)
 	}
 
 	if stat, err := os.Stat(modsDir); err == nil && stat.IsDir() {
 		entries, _ := os.ReadDir(modsDir)
-		fmt.Printf("  - mods folder: %d items\n", len(entries))
+		d.logf("  - mods folder: %d items\n", len(entries))
 	}
 
 	return nil
@@ -138,13 +167,13 @@ func (d *Deployer) DeploySteamSettings() error {
 
 // Deploy executes full deployment process
 func (d *Deployer) Deploy() error {
-	fmt.Println("============================================================")
-	fmt.Println("Goldberg Emulator Deployment for EU5")
-	fmt.Println("============================================================")
-	fmt.Printf("\nProject Root: %s\n", d.ProjectRoot)
-	fmt.Printf("EU5 Installation: %s\n", d.EU5Path)
-	fmt.Printf("Binaries Folder: %s\n", d.BinariesPath)
-	fmt.Println()
+	d.logf("============================================================\n")
+	d.logf("Goldberg Emulator Deployment for EU5\n")
+	d.logf("============================================================\n")
+	d.logf("\nProject Root: %s\n", d.ProjectRoot)
+	d.logf("EU5 Installation: %s\n", d.EU5Path)
+	d.logf("Binaries Folder: %s\n", d.BinariesPath)
+	d.logf("\n")
 
 	// Validate paths
 	if err := d.ValidatePaths(); err != nil {
@@ -152,43 +181,43 @@ func (d *Deployer) Deploy() error {
 	}
 
 	// Step 1: Backup original DLL
-	fmt.Println("\n[Step 1/4] Backing up original steam_api64.dll...")
+	d.logf("\n[Step 1/4] Backing up original steam_api64.dll...\n")
 	if err := d.BackupOriginalDLL(); err != nil {
 		return err
 	}
 
 	// Step 2: Deploy Goldberg DLL
-	fmt.Println("\n[Step 2/4] Deploying Goldberg steam_api64.dll...")
+	d.logf("\n[Step 2/4] Deploying Goldberg steam_api64.dll...\n")
 	if err := d.DeployDLL(); err != nil {
 		return err
 	}
 
 	// Step 3: Deploy steam_appid.txt
-	fmt.Println("\n[Step 3/4] Deploying steam_appid.txt...")
+	d.logf("\n[Step 3/4] Deploying steam_appid.txt...\n")
 	if err := d.DeployAppID(); err != nil {
 		return err
 	}
 
 	// Step 4: Deploy steam_settings
-	fmt.Println("\n[Step 4/4] Deploying steam_settings folder...")
+	d.logf("\n[Step 4/4] Deploying steam_settings folder...\n")
 	if err := d.DeploySteamSettings(); err != nil {
 		return err
 	}
 
-	fmt.Println("\n============================================================")
-	fmt.Println("✓ Deployment completed successfully!")
-	fmt.Println("============================================================")
-	fmt.Println("\nYou can now launch EU5 for LAN multiplayer.")
-	fmt.Println("To restore original files, run with --restore flag.")
+	d.logf("\n============================================================\n")
+	d.logf("✓ Deployment completed successfully!\n")
+	d.logf("============================================================\n")
+	d.logf("\nYou can now launch EU5 for LAN multiplayer.\n")
+	d.logf("To restore original files, run with --restore flag.\n")
 
 	return nil
 }
 
 // Restore restores original steam_api64.dll from backup
 func (d *Deployer) Restore() error {
-	fmt.Println("============================================================")
-	fmt.Println("Restoring Original Files")
-	fmt.Println("============================================================")
+	d.logf("============================================================\n")
+	d.logf("Restoring Original Files\n")
+	d.logf("============================================================\n")
 
 	backupDLL := filepath.Join(d.BackupDir, "steam_api64.dll.original")
 	targetDLL := filepath.Join(d.BinariesPath, "steam_api64.dll")
@@ -202,14 +231,14 @@ func (d *Deployer) Restore() error {
 	if err := copyFile(backupDLL, targetDLL); err != nil {
 		return fmt.Errorf("failed to restore DLL: %w", err)
 	}
-	fmt.Println("✓ Restored original steam_api64.dll")
+	d.logf("✓ Restored original steam_api64.dll\n")
 
 	// Remove steam_settings
 	if _, err := os.Stat(targetSettings); err == nil {
 		if err := os.RemoveAll(targetSettings); err != nil {
 			return fmt.Errorf("failed to remove steam_settings: %w", err)
 		}
-		fmt.Println("✓ Removed steam_settings folder")
+		d.logf("✓ Removed steam_settings folder\n")
 	}
 
 	// Remove steam_appid.txt
@@ -218,27 +247,79 @@ func (d *Deployer) Restore() error {
 		if err := os.Remove(targetAppID); err != nil {
 			return fmt.Errorf("failed to remove steam_appid.txt: %w", err)
 		}
-		fmt.Println("✓ Removed steam_appid.txt")
+		d.logf("✓ Removed steam_appid.txt\n")
 	}
 
-	fmt.Println("\n✓ Restoration completed successfully!")
+	d.logf("\n✓ Restoration completed successfully!\n")
 	return nil
 }
 
-// DeployAppID deploys steam_appid.txt to binaries folder
-func (d *Deployer) DeployAppID() error {
-	sourceAppID := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_appid.txt")
-	targetAppID := filepath.Join(d.BinariesPath, "steam_appid.txt")
-
-	if _, err := os.Stat(sourceAppID); os.IsNotExist(err) {
-		return fmt.Errorf("steam_appid.txt not found: %s", sourceAppID)
+// ConfigureSteamSettings configures account name and Steam ID in steam_settings folder
+func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
+	// Validate inputs
+	if err := ValidateAccountName(accountName); err != nil {
+		return fmt.Errorf("invalid account name: %w", err)
 	}
 
-	if err := copyFile(sourceAppID, targetAppID); err != nil {
-		return fmt.Errorf("failed to deploy steam_appid.txt: %w", err)
+	if err := ValidateSteamID(steamID); err != nil {
+		return fmt.Errorf("invalid Steam ID: %w", err)
 	}
 
-	fmt.Printf("✓ Deployed steam_appid.txt to: %s\n", targetAppID)
+	// Get paths
+	steamSettingsSource := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_settings")
+	accountNameFile := filepath.Join(steamSettingsSource, "force_account_name.txt")
+	steamIDFile := filepath.Join(steamSettingsSource, "force_steamid.txt")
+
+	// Write account name
+	if err := os.WriteFile(accountNameFile, []byte(strings.TrimSpace(accountName)), 0644); err != nil {
+		return fmt.Errorf("failed to write account name: %w", err)
+	}
+	d.logf("✓ Set account name to: %s\n", accountName)
+
+	// Write Steam ID
+	if err := os.WriteFile(steamIDFile, []byte(strings.TrimSpace(steamID)), 0644); err != nil {
+		return fmt.Errorf("failed to write Steam ID: %w", err)
+	}
+	d.logf("✓ Set Steam ID to: %s\n", steamID)
+
+	return nil
+}
+
+// ValidateSteamID validates the Steam ID format (17 digits starting with 7656119)
+func ValidateSteamID(steamID string) error {
+	steamID = strings.TrimSpace(steamID)
+
+	if len(steamID) != 17 {
+		return fmt.Errorf("Steam ID must be exactly 17 digits, got %d", len(steamID))
+	}
+
+	matched, err := regexp.MatchString("^[0-9]+$", steamID)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return fmt.Errorf("Steam ID must contain only digits")
+	}
+
+	if !strings.HasPrefix(steamID, "7656119") {
+		return fmt.Errorf("Steam ID must start with 7656119")
+	}
+
+	return nil
+}
+
+// ValidateAccountName validates the account name
+func ValidateAccountName(accountName string) error {
+	accountName = strings.TrimSpace(accountName)
+
+	if accountName == "" {
+		return fmt.Errorf("account name cannot be empty")
+	}
+
+	if len(accountName) > 32 {
+		return fmt.Errorf("account name too long (max 32 characters)")
+	}
+
 	return nil
 }
 
@@ -270,18 +351,15 @@ func copyFile(src, dst string) error {
 
 // copyDir recursively copies a directory
 func copyDir(src, dst string) error {
-	// Get source directory info
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
 
-	// Create destination directory
 	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
 		return err
 	}
 
-	// Read source directory
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
@@ -292,91 +370,15 @@ func copyDir(src, dst string) error {
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
-			// Recursively copy subdirectory
 			if err := copyDir(srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {
-			// Copy file
 			if err := copyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
 	}
-
-	return nil
-}
-
-// ValidateSteamID validates the Steam ID format (17 digits starting with 7656119)
-func ValidateSteamID(steamID string) error {
-	// Remove any whitespace
-	steamID = strings.TrimSpace(steamID)
-
-	// Check if it's exactly 17 digits
-	if len(steamID) != 17 {
-		return fmt.Errorf("Steam ID must be exactly 17 digits, got %d", len(steamID))
-	}
-
-	// Check if it's all numeric
-	matched, err := regexp.MatchString("^[0-9]+$", steamID)
-	if err != nil {
-		return err
-	}
-	if !matched {
-		return fmt.Errorf("Steam ID must contain only digits")
-	}
-
-	// Check if it starts with valid Steam ID prefix
-	if !strings.HasPrefix(steamID, "7656119") {
-		return fmt.Errorf("Steam ID must start with 7656119")
-	}
-
-	return nil
-}
-
-// ValidateAccountName validates the account name
-func ValidateAccountName(accountName string) error {
-	// Remove leading/trailing whitespace
-	accountName = strings.TrimSpace(accountName)
-
-	if accountName == "" {
-		return fmt.Errorf("account name cannot be empty")
-	}
-
-	if len(accountName) > 32 {
-		return fmt.Errorf("account name too long (max 32 characters)")
-	}
-
-	return nil
-}
-
-// ConfigureSteamSettings configures account name and Steam ID in steam_settings folder
-func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
-	// Validate inputs
-	if err := ValidateAccountName(accountName); err != nil {
-		return fmt.Errorf("invalid account name: %w", err)
-	}
-
-	if err := ValidateSteamID(steamID); err != nil {
-		return fmt.Errorf("invalid Steam ID: %w", err)
-	}
-
-	// Get paths
-	steamSettingsSource := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_settings")
-	accountNameFile := filepath.Join(steamSettingsSource, "force_account_name.txt")
-	steamIDFile := filepath.Join(steamSettingsSource, "force_steamid.txt")
-
-	// Write account name
-	if err := os.WriteFile(accountNameFile, []byte(strings.TrimSpace(accountName)), 0644); err != nil {
-		return fmt.Errorf("failed to write account name: %w", err)
-	}
-	fmt.Printf("✓ Set account name to: %s\n", accountName)
-
-	// Write Steam ID
-	if err := os.WriteFile(steamIDFile, []byte(strings.TrimSpace(steamID)), 0644); err != nil {
-		return fmt.Errorf("failed to write Steam ID: %w", err)
-	}
-	fmt.Printf("✓ Set Steam ID to: %s\n", steamID)
 
 	return nil
 }

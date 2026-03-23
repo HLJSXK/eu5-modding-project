@@ -3,6 +3,7 @@ package detector
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -104,7 +105,7 @@ func (d *EU5Detector) FindEU5InLibrary(libraryPath string) (string, error) {
 				if _, err := os.Stat(dllPath); err == nil {
 					return path, nil
 				}
-				
+
 				// Check for any eu5*.exe files (Windows)
 				if d.System == "windows" {
 					matches, _ := filepath.Glob(filepath.Join(binariesPath, "eu5*.exe"))
@@ -119,33 +120,42 @@ func (d *EU5Detector) FindEU5InLibrary(libraryPath string) (string, error) {
 	return "", fmt.Errorf("EU5 not found in library: %s", libraryPath)
 }
 
-// Detect attempts to find EU5 installation
+// Detect attempts to find EU5 installation (writes to stdout)
 func (d *EU5Detector) Detect() (string, error) {
-	fmt.Printf("Detecting EU5 installation on %s...\n", d.System)
+	return d.DetectWithWriter(os.Stdout)
+}
+
+// DetectWithWriter attempts to find EU5 installation, writing progress to w
+func (d *EU5Detector) DetectWithWriter(w io.Writer) (string, error) {
+	fmt.Fprintf(w, "Detecting EU5 installation on %s...\n", d.System)
 
 	steamPaths := d.GetCommonSteamPaths()
+	fmt.Fprintf(w, "Scanning %d candidate Steam paths...\n", len(steamPaths))
 
 	for _, steamPath := range steamPaths {
 		if _, err := os.Stat(steamPath); os.IsNotExist(err) {
+			fmt.Fprintf(w, "  [skip] %s (not found)\n", steamPath)
 			continue
 		}
 
-		fmt.Printf("Checking Steam library: %s\n", steamPath)
+		fmt.Fprintf(w, "  [found] Checking Steam library: %s\n", steamPath)
 
 		// Get all library folders from this Steam installation
 		libraries := d.ParseLibraryFolders(steamPath)
+		fmt.Fprintf(w, "    Library folders: %d\n", len(libraries))
 
 		// Search each library for EU5
 		for _, library := range libraries {
 			eu5Path, err := d.FindEU5InLibrary(library)
 			if err == nil {
-				fmt.Printf("\n✓ Found EU5 installation: %s\n", eu5Path)
+				fmt.Fprintf(w, "\n✓ Found EU5 installation: %s\n", eu5Path)
 				return eu5Path, nil
 			}
+			fmt.Fprintf(w, "    [miss] %s\n", library)
 		}
 	}
 
-	return "", fmt.Errorf("EU5 installation not found")
+	return "", fmt.Errorf("EU5 installation not found in any of the %d scanned paths", len(steamPaths))
 }
 
 // GetBinariesPath returns the binaries folder path
