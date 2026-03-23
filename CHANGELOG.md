@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-03-24
+
+### Changed
+- Repository scope is now mod development only.
+- Online multiplayer tooling moved to a separate repository:
+  - https://github.com/HLJSXK/eu5-online-tools
+
+### Removed
+- Local online deployment and sync code from this repository.
+- Go toolchain and online tool build artifacts from this repository.
+
 ## [1.1.0] - 2026-01-22
 
 ### Added
