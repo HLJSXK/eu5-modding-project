@@ -138,6 +138,7 @@ To improve or add documentation:
 - Project User Guide: 2026-01-21
 
 ### Technical
+- Stable Mod Analysis Report: 2026-03-23
 - EU5 Modding Knowledge Base: 2026-01-22
 - EU5 Mod Framework Guide: 2026-01-22
 - Mod Structure Analysis: 2026-01-22
