@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const modsFolderNotice = "This folder is no longer used for EU5 mods.\nPlease place your mods in: Europa Universalis V\\game\\mod\n"
+
 // Deployer handles Goldberg Emulator deployment
 type Deployer struct {
 	ProjectRoot  string
@@ -165,19 +167,54 @@ func (d *Deployer) DeploySteamSettings() error {
 		d.logf("  - Applied custom account/Steam ID settings to deployed steam_settings\n")
 	}
 
+	modsDir := filepath.Join(targetSettings, "mods")
+	if err := d.ensureDeprecatedModsFolder(modsDir); err != nil {
+		return err
+	}
+
 	d.logf("✓ Deployed steam_settings to: %s\n", targetSettings)
 
 	// List deployed contents
 	dlcFile := filepath.Join(targetSettings, "DLC.txt")
-	modsDir := filepath.Join(targetSettings, "mods")
+	modsNote := filepath.Join(modsDir, "README.txt")
 
 	if _, err := os.Stat(dlcFile); err == nil {
 		d.logf("  - DLC.txt: %s\n", dlcFile)
 	}
 
-	if stat, err := os.Stat(modsDir); err == nil && stat.IsDir() {
-		entries, _ := os.ReadDir(modsDir)
-		d.logf("  - mods folder: %d items\n", len(entries))
+	if _, err := os.Stat(modsNote); err == nil {
+		d.logf("  - mods folder cleaned; note written: %s\n", modsNote)
+	}
+
+	return nil
+}
+
+func (d *Deployer) ensureDeprecatedModsFolder(modsDir string) error {
+	if err := os.MkdirAll(modsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create mods folder: %w", err)
+	}
+
+	entries, err := os.ReadDir(modsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read mods folder: %w", err)
+	}
+
+	removed := 0
+	for _, entry := range entries {
+		entryPath := filepath.Join(modsDir, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return fmt.Errorf("failed to clean mods folder entry %s: %w", entryPath, err)
+		}
+		removed++
+	}
+
+	if removed > 0 {
+		d.logf("  - Cleaned deprecated steam_settings/mods folder (%d items removed)\n", removed)
+	}
+
+	notePath := filepath.Join(modsDir, "README.txt")
+	if err := os.WriteFile(notePath, []byte(modsFolderNotice), 0644); err != nil {
+		return fmt.Errorf("failed to write mods folder note: %w", err)
 	}
 
 	return nil

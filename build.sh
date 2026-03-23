@@ -22,6 +22,7 @@ echo "Building Windows binaries (amd64)..."
 echo "-----------------------------------"
 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$BUILD_DIR/eu5-detector-windows-amd64.exe" ./cmd/eu5-detector
 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$BUILD_DIR/eu5-deployer-windows-amd64.exe" ./cmd/eu5-deployer
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$BUILD_DIR/eu5-modsync-windows-amd64.exe" ./cmd/eu5-modsync
 
 echo ""
 echo "Preparing package directory..."
@@ -29,6 +30,7 @@ PACKAGE_DIR="$BUILD_DIR/eu5-tools-windows-amd64"
 mkdir -p "$PACKAGE_DIR"
 cp "$BUILD_DIR/eu5-deployer-windows-amd64.exe" "$PACKAGE_DIR/eu5-deployer.exe"
 cp "$BUILD_DIR/eu5-detector-windows-amd64.exe" "$PACKAGE_DIR/eu5-detector.exe"
+cp "$BUILD_DIR/eu5-modsync-windows-amd64.exe" "$PACKAGE_DIR/eu5-modsync.exe"
 cp -R goldberg_emulator "$PACKAGE_DIR/goldberg_emulator"
 
 echo "Creating zip package..."

@@ -1,17 +1,15 @@
-# Mods Folder
+# Deprecated Mods Folder
 
-This folder contains mod configurations for Goldberg Emulator.
+This folder is no longer used for EU5 mod loading.
 
-## Usage
+## New Mod Location
 
-Place mod folders here that you want to be available for LAN multiplayer sessions.
+Use the EU5 native mod path instead:
 
-## Structure
+`Europa Universalis V\game\mod`
 
-Each mod should be in its own subfolder with the appropriate configuration files.
+## Deployment Behavior
 
-## Notes
-
-- This folder will be copied to `<EU5_Installation>/binaries/steam_settings/mods/` during setup
-- Mods placed here will be available to all players in the LAN session
-- Make sure all players have the same mods for compatibility
+- During deployment, `steam_settings/mods` is cleaned automatically
+- A note file is left in that folder to remind users of the new location
+- Do not place mods in this folder

@@ -64,11 +64,18 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 
 	sourceAccountFile := filepath.Join(sourceSettings, "force_account_name.txt")
 	sourceSteamIDFile := filepath.Join(sourceSettings, "force_steamid.txt")
+	sourceModsDir := filepath.Join(sourceSettings, "mods")
 	if err := os.WriteFile(sourceAccountFile, []byte("DEFAULT_ACCOUNT"), 0644); err != nil {
 		t.Fatalf("failed to write source account file: %v", err)
 	}
 	if err := os.WriteFile(sourceSteamIDFile, []byte("76561197960287930"), 0644); err != nil {
 		t.Fatalf("failed to write source steamid file: %v", err)
+	}
+	if err := os.MkdirAll(sourceModsDir, 0755); err != nil {
+		t.Fatalf("failed to create source mods dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceModsDir, "old_mod.marker"), []byte("legacy"), 0644); err != nil {
+		t.Fatalf("failed to write source legacy mod marker: %v", err)
 	}
 
 	binariesPath := filepath.Join(eu5Path, "binaries")
@@ -104,6 +111,7 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 	targetSettings := filepath.Join(binariesPath, "steam_settings")
 	targetAccountFile := filepath.Join(targetSettings, "force_account_name.txt")
 	targetSteamIDFile := filepath.Join(targetSettings, "force_steamid.txt")
+	targetModsDir := filepath.Join(targetSettings, "mods")
 
 	targetAccountBytes, err := os.ReadFile(targetAccountFile)
 	if err != nil {
@@ -119,5 +127,22 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 	}
 	if got := string(targetSteamIDBytes); got != "76561197960287931" {
 		t.Fatalf("target steamid file not updated: got %q", got)
+	}
+
+	modEntries, err := os.ReadDir(targetModsDir)
+	if err != nil {
+		t.Fatalf("failed to read target mods dir: %v", err)
+	}
+	if len(modEntries) != 1 || modEntries[0].Name() != "README.txt" {
+		t.Fatalf("target mods dir should contain only README.txt, got %v entries", len(modEntries))
+	}
+
+	noteBytes, err := os.ReadFile(filepath.Join(targetModsDir, "README.txt"))
+	if err != nil {
+		t.Fatalf("failed to read target mods README.txt: %v", err)
+	}
+	noteText := string(noteBytes)
+	if !strings.Contains(noteText, "Europa Universalis V\\game\\mod") {
+		t.Fatalf("target mods note does not point to game/mod: %q", noteText)
 	}
 }

@@ -65,6 +65,11 @@ These guides are written in Chinese for ease of use by the target audience.
   - Core concepts, mechanics, and implementation details
   - User experience flow and balance considerations
 
+- **[Local Mod Sync Tool Design](design/Local_Mod_Sync_Tool_Design.md)**
+  - Host-to-client local mod synchronization architecture
+  - Conflict-safe three-way sync semantics
+  - CLI, data model, and phased implementation plan
+
 ### 📋 Task Summaries (`task_summaries/`)
 
 - **[Task Summary: Establish New City](task_summaries/Task_Summary_Establish_New_City.md)**
@@ -95,6 +100,9 @@ These guides are written in Chinese for ease of use by the target audience.
 
 **Understand dynamic missions system**
 → [Dynamic Missions Design](design/Dynamic_Missions_Design.md)
+
+**Build host-to-client local mod synchronization**
+→ [Local Mod Sync Tool Design](design/Local_Mod_Sync_Tool_Design.md)
 
 **Configure Goldberg Emulator manually**
 → [Goldberg Emulator Guide](technical/Goldberg_Emulator_Guide.md)
@@ -147,6 +155,7 @@ To improve or add documentation:
 
 ### Design
 - Dynamic Missions Design: 2026-01-28
+- Local Mod Sync Tool Design: 2026-03-24
 
 ### Task Summaries
 - Dual Mod Structure: 2026-03-23
