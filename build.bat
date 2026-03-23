@@ -13,10 +13,30 @@ mkdir build\eu5-tools-windows-amd64
 
 echo.
 echo Preparing icon resources...
+set WINRES_VERSION=v0.3.1
+set WINRES_BIN=
+
 for /f %%i in ('go env GOPATH') do set GOPATH=%%i
-go install github.com/tc-hib/go-winres@latest
-go run .\tools\gen_sync_ui_icon.go -out build\sync-ui-icon.png
-"%GOPATH%\bin\go-winres.exe" simply --arch amd64 --icon build\sync-ui-icon.png --manifest gui --out cmd\eu5-sync-ui\rsrc --product-name "EU5 Sync UI" --file-description "EU5 Sync UI" --original-filename "eu5-sync-ui.exe"
+
+if exist "%GOPATH%\bin\go-winres.exe" (
+	set WINRES_BIN=%GOPATH%\bin\go-winres.exe
+) else (
+	echo go-winres not found locally, attempting install...
+	go install github.com/tc-hib/go-winres@%WINRES_VERSION%
+	if not errorlevel 1 if exist "%GOPATH%\bin\go-winres.exe" (
+		set WINRES_BIN=%GOPATH%\bin\go-winres.exe
+	)
+)
+
+if defined WINRES_BIN (
+	go run .\tools\gen_sync_ui_icon.go -out build\sync-ui-icon.png
+	"%WINRES_BIN%" simply --arch amd64 --icon build\sync-ui-icon.png --manifest gui --out cmd\eu5-sync-ui\rsrc --product-name "EU5 Sync UI" --file-description "EU5 Sync UI" --original-filename "eu5-sync-ui.exe"
+	if errorlevel 1 (
+		echo WARNING: icon embedding failed, continuing without icon resource.
+	)
+) else (
+	echo WARNING: go-winres unavailable, install failed or offline, continuing without icon resource.
+)
 
 echo.
 echo Building Windows binary (amd64)...
