@@ -148,6 +148,7 @@ To improve or add documentation:
 - Dynamic Missions Design: 2026-01-28
 
 ### Task Summaries
+- Dual Mod Structure: 2026-03-23
 - Establish New City: 2026-01-28
 - Large Research Project: 2026-01-28
 

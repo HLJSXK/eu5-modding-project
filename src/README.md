@@ -4,6 +4,43 @@ This directory contains mod source files and templates for the EU5 Modding Proje
 
 ## Structure
 
+### `stable/`
+
+The **stable branch** of the EU5 MP mod, based on reference mod **3644897537** (Amalgamation Synergy). This is the primary mod used in MP sessions, providing a well-tested set of gameplay balance tweaks.
+
+**Features:**
+- **War Mechanics** - Harsher war exhaustion, more impactful occupation
+- **Anti-Snowballing** - Progressive build cost increases, halved base RGO size
+- **Tax Efficiency** - Rebalanced tax efficiency system
+- **Colonial Restrictions** - AI colonization limits, historical colonizer exceptions
+- **Price Rebalancing** - Scaled gold transfers, adjusted diplomatic costs
+- **Little Ice Age** - More forgiving ice age event penalties
+
+**Status:** Active, stable — primary mod for MP sessions.
+
+**Usage:**
+1. Copy the `stable/` directory to your EU5 mod folder:
+   ```
+   Documents/Paradox Interactive/Europa Universalis V/mod/
+   ```
+2. Enable in the launcher
+
+For detailed documentation, see [stable/README.md](stable/README.md).
+
+### `develop/`
+
+The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system and is currently under development pause.
+
+**Features:**
+- **Establish New City Mission** - Multi-stage city development system
+- **Large Research Project Mission** - Research and innovation mechanics
+- **Custom GUI** - Situation panels and interfaces
+- **Full localization** - English and Simplified Chinese
+
+**Status:** Development paused — kept for future reference and resumption.
+
+For detailed documentation, see the [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md) documents.
+
 ### `template_mod/`
 
 A minimal, ready-to-use mod template demonstrating EU5 modding best practices. This template includes only essential sample files to serve as a starting point for new mods.
@@ -24,29 +61,23 @@ A minimal, ready-to-use mod template demonstrating EU5 modding best practices. T
 3. Modify the files to create your custom mod
 4. Update `metadata.json` with your mod's information
 
-### `dynamic_missions/`
+## Dual-Mod Strategy
 
-A complete, functional mod implementing a dynamic mission system for EU5. This serves as both a playable mod and a reference implementation for complex modding patterns.
+As of 2026-03-23, the project maintains two parallel mods:
 
-**Features:**
-- **Establish New City Mission** - Multi-stage city development system
-- **Large Research Project Mission** - Research and innovation mechanics
-- **Custom GUI** - Situation panels and interfaces
-- **Full localization** - English and Simplified Chinese
+| Mod | Directory | Status | Focus |
+|-----|-----------|--------|-------|
+| Stable | `src/stable/` | Active | Game balance (based on ref mod 3644897537) |
+| Develop | `src/develop/` | Paused | Dynamic mission system |
 
-**Usage:**
-1. Copy the `dynamic_missions/` directory to your EU5 mod folder
-2. Enable in the launcher to play with dynamic missions
-3. Reference the code for advanced modding techniques
-
-For detailed documentation, see the [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md) documents.
+This is a temporary measure while dynamic mission development is deferred. The `stable` mod provides the core MP balance experience, while `develop` is preserved for future resumption.
 
 ## Creating New Mods
 
 When creating a new mod:
 
 1. **Start with the template**: Copy `template_mod/` as your base for simple mods
-2. **Reference dynamic_missions**: Study `dynamic_missions/` for complex features
+2. **Reference develop**: Study `develop/` for complex features
 3. **Follow naming conventions**: Use a consistent prefix for all your files (e.g., `mymod_`)
 4. **Use UTF-8-BOM encoding**: All `.yml` localization files must use UTF-8 with BOM
 5. **Test frequently**: Enable debug mode in EU5 and test after each change
@@ -65,13 +96,14 @@ When creating a new mod:
 - [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding reference
 - [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical development framework
 - [Template Mod README](template_mod/README.md) - Detailed template documentation
-- [Dynamic Missions README](dynamic_missions/README.md) - Dynamic missions mod documentation
+- [Stable Mod README](stable/README.md) - Stable mod documentation
+- [Develop Mod README](develop/README.md) - Dynamic missions mod documentation
 - [Dynamic Missions Framework](../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical architecture
 
 
 ## Community Mod References
 
-For additional learning resources, see the [Community Mod References](../reference_mods/) directory, which contains 12 real community mods from Steam Workshop. These mods provide:
+For additional learning resources, see the [Community Mod References](../reference_mods/) directory, which contains community mods from Steam Workshop. These mods provide:
 
 - **Real-world examples** of mod structure and organization
 - **Vanilla game variables** and definitions used in actual mods
