@@ -205,15 +205,20 @@ func buildPlan(modPath string, manifest *SnapshotManifest, state *SyncState, del
 		localHash, hasLocal := localHashes[id]
 		managed, hasManaged := state.ManagedMods[id]
 
+		modName := rm.DisplayName
+		if modName == "" {
+			modName = id
+		}
+
 		switch {
 		case !hasLocal:
-			plan = append(plan, PlanItem{Action: ActionAdded, ModID: id, Reason: "missing locally"})
+			plan = append(plan, PlanItem{Action: ActionAdded, ModID: id, ModName: modName, LocalState: "Missing", Reason: "missing locally"})
 		case localHash == rm.ContentHash:
-			plan = append(plan, PlanItem{Action: ActionNoOp, ModID: id, Reason: "already up to date"})
+			plan = append(plan, PlanItem{Action: ActionNoOp, ModID: id, ModName: modName, LocalState: "Exist", Reason: "already up to date"})
 		case hasManaged && managed.LastAppliedContentHash == localHash:
-			plan = append(plan, PlanItem{Action: ActionUpdated, ModID: id, Reason: "remote changed since last applied"})
+			plan = append(plan, PlanItem{Action: ActionUpdated, ModID: id, ModName: modName, LocalState: "Out of date", Reason: "remote changed since last applied"})
 		default:
-			plan = append(plan, PlanItem{Action: ActionKeptLocal, ModID: id, Reason: "local mod diverged from managed state"})
+			plan = append(plan, PlanItem{Action: ActionKeptLocal, ModID: id, ModName: modName, LocalState: "Modified", Reason: "local mod diverged from managed state"})
 		}
 	}
 
@@ -227,15 +232,20 @@ func buildPlan(modPath string, manifest *SnapshotManifest, state *SyncState, del
 
 	for _, id := range localIDs {
 		_, managed := state.ManagedMods[id]
+
+		// For local-only mods, we might not have a clean "Name" unless we read metadata.
+		// For simplicity, just use the directory ID as the Name.
+		modName := id
+
 		if managed {
 			if deleteManagedMissing {
-				plan = append(plan, PlanItem{Action: ActionDeleted, ModID: id, Reason: "removed from remote snapshot"})
+				plan = append(plan, PlanItem{Action: ActionDeleted, ModID: id, ModName: modName, LocalState: "Deprecated", Reason: "removed from remote snapshot"})
 			} else {
-				plan = append(plan, PlanItem{Action: ActionKeptLocal, ModID: id, Reason: "managed mod missing remotely; delete disabled"})
+				plan = append(plan, PlanItem{Action: ActionKeptLocal, ModID: id, ModName: modName, LocalState: "Deprecated", Reason: "managed mod missing remotely; delete disabled"})
 			}
 			continue
 		}
-		plan = append(plan, PlanItem{Action: ActionUnmanaged, ModID: id, Reason: "local unmanaged mod"})
+		plan = append(plan, PlanItem{Action: ActionUnmanaged, ModID: id, ModName: modName, LocalState: "Unmanaged", Reason: "local unmanaged mod"})
 	}
 
 	return plan, nil
@@ -248,28 +258,29 @@ func applyPlan(opts SyncOptions, manifestBase string, manifest *SnapshotManifest
 	}
 
 	for _, item := range plan {
+		// Emit structured UI log for intercepting
+		fmt.Fprintf(opts.Out, "[ModStatus] %s|%s|%s|%s\n", item.Action, item.ModName, item.LocalState, item.Reason)
+
 		switch item.Action {
 		case ActionAdded, ActionUpdated:
-			fmt.Fprintf(opts.Out, "[%s] %s - %s\n", item.Action, item.ModID, item.Reason)
+			fmt.Fprintf(opts.Out, "[System_%s] %s - %s\n", item.Action, item.ModID, item.Reason)
 			rm := remote[item.ModID]
 			if err := applyRemoteMod(opts.Out, opts.ModPath, manifestBase, rm); err != nil {
 				return fmt.Errorf("failed to apply mod %s: %w", item.ModID, err)
 			}
-			fmt.Fprintf(opts.Out, "[Applied] %s\n", item.ModID)
 			state.ManagedMods[item.ModID] = ManagedModInfo{
 				LastAppliedSnapshotID:  manifest.SnapshotID,
 				LastAppliedContentHash: rm.ContentHash,
 				LastAppliedPackageSHA:  rm.PackageSHA,
 			}
 		case ActionDeleted:
-			fmt.Fprintf(opts.Out, "[%s] %s - %s\n", item.Action, item.ModID, item.Reason)
+			fmt.Fprintf(opts.Out, "[System_%s] %s - %s\n", item.Action, item.ModID, item.Reason)
 			if err := os.RemoveAll(filepath.Join(opts.ModPath, item.ModID)); err != nil {
 				return fmt.Errorf("failed to delete mod %s: %w", item.ModID, err)
 			}
-			fmt.Fprintf(opts.Out, "[Deleted] %s\n", item.ModID)
 			delete(state.ManagedMods, item.ModID)
 		case ActionNoOp:
-			fmt.Fprintf(opts.Out, "[%s] %s - %s\n", item.Action, item.ModID, item.Reason)
+			fmt.Fprintf(opts.Out, "[System_%s] %s - %s\n", item.Action, item.ModID, item.Reason)
 			rm, ok := remote[item.ModID]
 			if ok {
 				state.ManagedMods[item.ModID] = ManagedModInfo{
@@ -279,7 +290,7 @@ func applyPlan(opts SyncOptions, manifestBase string, manifest *SnapshotManifest
 				}
 			}
 		case ActionKeptLocal, ActionUnmanaged:
-			fmt.Fprintf(opts.Out, "[%s] %s - %s\n", item.Action, item.ModID, item.Reason)
+			fmt.Fprintf(opts.Out, "[System_%s] %s - %s\n", item.Action, item.ModID, item.Reason)
 		}
 	}
 

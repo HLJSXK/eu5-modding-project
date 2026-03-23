@@ -57,9 +57,11 @@ const (
 )
 
 type PlanItem struct {
-	Action ActionType
-	ModID  string
-	Reason string
+	Action     ActionType
+	ModID      string
+	ModName    string // e.g. "European Expanded", otherwise ModID
+	LocalState string // e.g. "Missing", "Exist", "Out of date", "Modified", "Unmanaged"
+	Reason     string
 }
 
 type SyncReport struct {
