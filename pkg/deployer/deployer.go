@@ -16,6 +16,10 @@ type Deployer struct {
 	BinariesPath string
 	BackupDir    string
 	out          io.Writer // all output goes here (stdout, or stdout+logfile)
+
+	configuredAccountName string
+	configuredSteamID     string
+	hasCustomSettings     bool
 }
 
 // NewDeployer creates a new Deployer that writes to stdout
@@ -147,6 +151,20 @@ func (d *Deployer) DeploySteamSettings() error {
 		return fmt.Errorf("failed to deploy steam_settings: %w", err)
 	}
 
+	if d.hasCustomSettings {
+		accountNameFile := filepath.Join(targetSettings, "force_account_name.txt")
+		if err := os.WriteFile(accountNameFile, []byte(d.configuredAccountName), 0644); err != nil {
+			return fmt.Errorf("failed to write deployed account name: %w", err)
+		}
+
+		steamIDFile := filepath.Join(targetSettings, "force_steamid.txt")
+		if err := os.WriteFile(steamIDFile, []byte(d.configuredSteamID), 0644); err != nil {
+			return fmt.Errorf("failed to write deployed Steam ID: %w", err)
+		}
+
+		d.logf("  - Applied custom account/Steam ID settings to deployed steam_settings\n")
+	}
+
 	d.logf("✓ Deployed steam_settings to: %s\n", targetSettings)
 
 	// List deployed contents
@@ -256,6 +274,9 @@ func (d *Deployer) Restore() error {
 
 // ConfigureSteamSettings configures account name and Steam ID in steam_settings folder
 func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
+	accountName = strings.TrimSpace(accountName)
+	steamID = strings.TrimSpace(steamID)
+
 	// Validate inputs
 	if err := ValidateAccountName(accountName); err != nil {
 		return fmt.Errorf("invalid account name: %w", err)
@@ -265,22 +286,12 @@ func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
 		return fmt.Errorf("invalid Steam ID: %w", err)
 	}
 
-	// Get paths
-	steamSettingsSource := filepath.Join(d.ProjectRoot, "goldberg_emulator", "steam_settings")
-	accountNameFile := filepath.Join(steamSettingsSource, "force_account_name.txt")
-	steamIDFile := filepath.Join(steamSettingsSource, "force_steamid.txt")
+	d.configuredAccountName = accountName
+	d.configuredSteamID = steamID
+	d.hasCustomSettings = true
 
-	// Write account name
-	if err := os.WriteFile(accountNameFile, []byte(strings.TrimSpace(accountName)), 0644); err != nil {
-		return fmt.Errorf("failed to write account name: %w", err)
-	}
-	d.logf("✓ Set account name to: %s\n", accountName)
-
-	// Write Steam ID
-	if err := os.WriteFile(steamIDFile, []byte(strings.TrimSpace(steamID)), 0644); err != nil {
-		return fmt.Errorf("failed to write Steam ID: %w", err)
-	}
-	d.logf("✓ Set Steam ID to: %s\n", steamID)
+	d.logf("✓ Prepared account name: %s\n", accountName)
+	d.logf("✓ Prepared Steam ID: %s\n", steamID)
 
 	return nil
 }

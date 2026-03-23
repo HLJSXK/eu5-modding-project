@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/HLJSXK/eu5-modding-project/pkg/deployer"
@@ -39,6 +40,7 @@ func logf(w io.Writer, format string, args ...interface{}) {
 
 func main() {
 	// Parse command line flags
+	projectRootFlag := flag.String("project-root", "", "Path to project root (directory containing goldberg_emulator)")
 	eu5PathFlag := flag.String("eu5-path", "", "Path to EU5 installation directory")
 	restoreFlag := flag.Bool("restore", false, "Restore original files from backup")
 	accountNameFlag := flag.String("account-name", "EU5Player", "Steam account name to use in emulator")
@@ -65,29 +67,15 @@ func main() {
 	// ----------------------------------------------------------------
 	// Locate project root (where goldberg_emulator/ lives)
 	// ----------------------------------------------------------------
-	projectRoot := exeDir
-
-	// If we are inside a build output directory, step up one level
-	base := filepath.Base(projectRoot)
-	if base == "bin" || base == "build" {
-		projectRoot = filepath.Dir(projectRoot)
-		logf(out, "Detected build output dir, stepping up to: %s\n", projectRoot)
-	}
-
-	goldbergPath := filepath.Join(projectRoot, "goldberg_emulator")
-	if _, err := os.Stat(goldbergPath); os.IsNotExist(err) {
-		// Try parent directory
-		parent := filepath.Dir(projectRoot)
-		goldbergPath = filepath.Join(parent, "goldberg_emulator")
-		if _, err := os.Stat(goldbergPath); os.IsNotExist(err) {
-			logf(out, "\nError: Cannot find goldberg_emulator folder.\n")
-			logf(out, "Searched in:\n  %s\n  %s\n", projectRoot, parent)
-			logf(out, "\nPlease ensure goldberg_emulator folder is in the same directory as the executable.\n")
-			logf(out, "Log saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
-			pause()
-			os.Exit(1)
-		}
-		projectRoot = parent
+	projectRoot, err := resolveProjectRoot(*projectRootFlag, exeDir, out)
+	if err != nil {
+		logf(out, "\nError: %v\n", err)
+		logf(out, "\nTips:\n")
+		logf(out, "  - If running via go run, set --project-root to your repository root\n")
+		logf(out, "  - Example: %s --project-root \"%s\"\n", filepath.Base(exePath), func() string { d, _ := os.Getwd(); return d }())
+		logf(out, "Log saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
+		pause()
+		os.Exit(1)
 	}
 	logf(out, "Project root    : %s\n", projectRoot)
 
@@ -142,6 +130,71 @@ func main() {
 
 	logf(out, "\nLog saved to: %s\n", filepath.Join(exeDir, "eu5-deployer.log"))
 	pause()
+}
+
+// resolveProjectRoot finds the directory containing goldberg_emulator.
+// It supports explicit --project-root and several fallbacks for go run and built binaries.
+func resolveProjectRoot(projectRootFlag, exeDir string, out io.Writer) (string, error) {
+	if projectRootFlag != "" {
+		absPath, err := filepath.Abs(projectRootFlag)
+		if err != nil {
+			return "", fmt.Errorf("invalid --project-root path: %w", err)
+		}
+		if hasGoldbergDir(absPath) {
+			logf(out, "Using project root from flag: %s\n", absPath)
+			return absPath, nil
+		}
+		return "", fmt.Errorf("--project-root does not contain goldberg_emulator: %s", absPath)
+	}
+
+	if root, ok := findRootUpward(exeDir, 4); ok {
+		logf(out, "Resolved project root from executable location: %s\n", root)
+		return root, nil
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if root, ok := findRootUpward(cwd, 8); ok {
+			logf(out, "Resolved project root from working directory: %s\n", root)
+			return root, nil
+		}
+	}
+
+	if _, currentFile, _, ok := runtime.Caller(0); ok {
+		sourceDir := filepath.Dir(currentFile)
+		if root, ok := findRootUpward(sourceDir, 8); ok {
+			logf(out, "Resolved project root from source file location: %s\n", root)
+			return root, nil
+		}
+	}
+
+	return "", fmt.Errorf("cannot find goldberg_emulator folder")
+}
+
+func findRootUpward(start string, maxDepth int) (string, bool) {
+	cur := start
+	for i := 0; i <= maxDepth; i++ {
+		if hasGoldbergDir(cur) {
+			return cur, true
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			break
+		}
+		cur = parent
+	}
+	return "", false
+}
+
+func hasGoldbergDir(root string) bool {
+	if root == "" {
+		return false
+	}
+	path := filepath.Join(root, "goldberg_emulator")
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
 }
 
 // pause keeps the console window open when the program is double-clicked on Windows.

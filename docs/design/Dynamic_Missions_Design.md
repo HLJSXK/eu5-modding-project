@@ -12,7 +12,7 @@ This document outlines the design and architecture for the "Dynamic Missions" fe
 The feature will be implemented across several files, organized as follows:
 
 ```
-/src/dynamic_missions/
+/src/develop/
 ├── in_game/
 │   ├── common/
 │   │   ├── situations/`

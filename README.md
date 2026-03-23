@@ -48,7 +48,7 @@ See the [Quick Start Guide](docs/guides/Quick_Start_Guide.md) for detailed instr
    - Install Visual Studio Code with CwTools extension
    - Enable debug mode in EU5 (`-debug_mode` launch option)
 
-4. Use the template in `src/template_mod/` as a starting point for your mods
+4. Use `src/stable/` as a practical baseline, and `src/develop/` for advanced dynamic mission patterns
 
 ## Documentation
 
@@ -92,9 +92,9 @@ eu5-modding-project/
 │   ├── design/            # Design documents
 │   ├── task_summaries/    # Implementation summaries
 │   └── README.md          # Documentation index
-├── src/                    # Mod source files and templates
-│   ├── template_mod/      # Minimal mod template
-│   └── dynamic_missions/  # Dynamic missions mod
+├── src/                    # Mod source files
+│   ├── stable/            # Active multiplayer balance mod
+│   └── develop/           # Dynamic missions development branch
 ├── reference_mods/       # Community mod examples
 ├── assets/                 # Graphics and media
 ├── tools/                  # Development utilities

@@ -21,7 +21,7 @@ This mod implements a dynamic mission system for Europa Universalis V, allowing 
 ## Structure
 
 ```
-dynamic_missions/
+develop/
 ├── .metadata/
 │   └── metadata.json              # Mod metadata
 ├── in_game/
@@ -43,7 +43,7 @@ dynamic_missions/
 
 ## Installation
 
-1. Copy the entire `dynamic_missions` folder to:
+1. Copy the entire `develop` folder to:
    ```
    Documents/Paradox Interactive/Europa Universalis V/mod/
    ```

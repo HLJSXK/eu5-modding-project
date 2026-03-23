@@ -100,22 +100,22 @@ Disabled problematic GUI file:
 ## Files Modified
 
 ### Modified Files
-1. `/src/dynamic_missions/in_game/common/static_modifiers/dynamic_missions_modifiers.txt`
+1. `/src/develop/in_game/common/static_modifiers/dynamic_missions_modifiers.txt`
    - Fixed all invalid modifiers
    - Added UTF-8 BOM
    - Added TODO comments for pending items
 
-2. `/src/dynamic_missions/main_menu/localization/*.yml`
+2. `/src/develop/main_menu/localization/*.yml`
    - Added UTF-8 BOM to all localization files
 
-3. `/src/dynamic_missions/in_game/common/scripted_triggers/*.txt`
+3. `/src/develop/in_game/common/scripted_triggers/*.txt`
    - Added UTF-8 BOM
 
-4. `/src/dynamic_missions/in_game/common/scripted_effects/*.txt`
+4. `/src/develop/in_game/common/scripted_effects/*.txt`
    - Added UTF-8 BOM
 
 ### Disabled Files
-1. `/src/dynamic_missions/in_game/gui/panels/situation/develop_city_situation.gui`
+1. `/src/develop/in_game/gui/panels/situation/develop_city_situation.gui`
    - Renamed to `.gui.disabled`
 
 ## New Resources Added

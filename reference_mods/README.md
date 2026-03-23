@@ -209,8 +209,8 @@ These mods are created by community members and are included here for **educatio
 - [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding guide
 - [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical framework
 - [Mod Structure Analysis](../docs/technical/Mod_Structure_Analysis.txt) - Analysis of these mods
-- [Template Mod](../src/template_mod/) - Minimal starting template
-- [Dynamic Missions Mod](../src/dynamic_missions/) - Complete example mod
+- [Stable Mod Base](../src/stable/) - Active multiplayer balance baseline
+- [Develop Mod Branch](../src/develop/) - Dynamic missions and advanced scripting examples
 
 ## 🛠️ Recommended Workflow
 
@@ -224,8 +224,9 @@ These mods are created by community members and are included here for **educatio
    - Browse `3601937478` (Dense Tech Tree)
    - Study `3626895335` (More stable HRE)
 
-3. **Use the template**
-   - Copy `../src/template_mod/`
+3. **Choose a local base mod**
+   - Copy `../src/stable/` for production-oriented changes
+   - Or copy `../src/develop/` for dynamic mission features
    - Modify for your needs
 
 4. **Reference these mods**

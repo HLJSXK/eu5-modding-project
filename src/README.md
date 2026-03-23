@@ -41,25 +41,21 @@ The **development branch** of the EU5 MP mod, formerly known as `dynamic_mission
 
 For detailed documentation, see the [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md) documents.
 
-### `template_mod/`
+### Mod Base Choice
 
-A minimal, ready-to-use mod template demonstrating EU5 modding best practices. This template includes only essential sample files to serve as a starting point for new mods.
+For new work, choose one of the maintained bases:
 
-**Contents:**
-- **Proper metadata configuration** for multiplayer synchronization
-- **Sample events** with detailed comments explaining EU5 event structure
-- **Sample modifiers** demonstrating country and province patterns
-- **Localization file** with correct UTF-8 BOM encoding
-- **Comprehensive documentation** in the mod's README
+- **`stable/`** for production-ready multiplayer balance changes
+- **`develop/`** for dynamic mission systems and advanced scripted workflows
 
 **Usage:**
-1. Copy the `template_mod/` directory to your EU5 mod folder:
+1. Copy either `stable/` or `develop/` to your EU5 mod folder:
    ```
    Documents/Paradox Interactive/Europa Universalis V/mod/
    ```
-2. Rename it to your mod's name
+2. Rename the copied directory to your mod's name
 3. Modify the files to create your custom mod
-4. Update `metadata.json` with your mod's information
+4. Update `.metadata/metadata.json` with your mod's information
 
 ## Dual-Mod Strategy
 
@@ -76,7 +72,7 @@ This is a temporary measure while dynamic mission development is deferred. The `
 
 When creating a new mod:
 
-1. **Start with the template**: Copy `template_mod/` as your base for simple mods
+1. **Start with stable**: Copy `stable/` as your base for reliable gameplay mods
 2. **Reference develop**: Study `develop/` for complex features
 3. **Follow naming conventions**: Use a consistent prefix for all your files (e.g., `mymod_`)
 4. **Use UTF-8-BOM encoding**: All `.yml` localization files must use UTF-8 with BOM
@@ -87,7 +83,7 @@ When creating a new mod:
 
 - Follow EU5 scripting conventions as documented in `/docs/technical/EU5_Mod_Framework_Guide.md`
 - Reference the analysis in `/docs/technical/Mod_Structure_Analysis.txt` for common patterns
-- Use the template as a starting point to ensure proper structure
+- Use `stable/` as a clean, maintained starting point
 - Keep your mod files organized by feature or system
 - Test all changes in debug mode before releasing
 
@@ -95,7 +91,6 @@ When creating a new mod:
 
 - [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding reference
 - [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical development framework
-- [Template Mod README](template_mod/README.md) - Detailed template documentation
 - [Stable Mod README](stable/README.md) - Stable mod documentation
 - [Develop Mod README](develop/README.md) - Dynamic missions mod documentation
 - [Dynamic Missions Framework](../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical architecture

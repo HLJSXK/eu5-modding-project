@@ -314,31 +314,29 @@ Preparing for release involves:
 
 ## 11. Reference: Sample Mod Structure
 
-The EU5 MP Project includes a reference mod demonstrating these principles:
+The EU5 MP Project includes maintained source mods demonstrating these principles:
 
 ```
-src/template_mod/
+src/stable/
 ├── .metadata/
-│   └── metadata.json
 ├── in_game/
-│   ├── common/
-│   │   └── eu5mp_sample_modifiers.txt
-│   └── events/
-│       └── eu5mp_sample_events.txt
-├── main_menu/
-│   └── localization/
-│       └── eu5mp_sample_l_english.yml
-└── README.md
+├── loading_screen/
+└── main_menu/
+
+src/develop/
+├── .metadata/
+├── in_game/
+└── main_menu/
 ```
 
-This structure demonstrates:
+These structures demonstrate:
 - Proper metadata configuration
-- Event file organization
-- Modifier definitions
+- Organization of large mod feature sets
+- Event and scripted system layering
 - Localization with UTF-8 BOM
 - Documentation practices
 
-For complete details, see the [template mod README](../src/template_mod/README.md) and the [raw analysis data](Mod_Structure_Analysis.txt).
+For complete details, see the [stable mod README](../../src/stable/README.md), the [develop mod README](../../src/develop/README.md), and the [raw analysis data](Mod_Structure_Analysis.txt).
 
 ## 12. Conclusion
 

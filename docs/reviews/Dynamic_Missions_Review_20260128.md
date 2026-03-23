@@ -15,7 +15,7 @@ The purpose of this review was to assess the current state of the Dynamic Missio
 
 ## 3. Analysis and Findings
 
-The review process involved a thorough examination of the `docs` and `src/dynamic_missions` directories. The findings are categorized below.
+The review process involved a thorough examination of the `docs` and `src/develop` directories. The findings are categorized below.
 
 ### 3.1. Documentation Discrepancies
 
