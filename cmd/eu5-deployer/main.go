@@ -50,8 +50,7 @@ func main() {
 	projectRootFlag := flag.String("project-root", "", "Path to project root (directory containing goldberg_emulator)")
 	eu5PathFlag := flag.String("eu5-path", "", "Path to EU5 installation directory")
 	restoreFlag := flag.Bool("restore", false, "Restore original files from backup")
-	accountNameFlag := flag.String("account-name", "EU5Player", "Steam account name to use in emulator")
-	steamIDFlag := flag.String("steam-id", "76561197960287930", "Steam ID to use in emulator (17 digits)")
+	accountNameFlag := flag.String("account-name", "EU5Player", "Display name to use in steam_settings")
 	flag.Parse()
 
 	// Resolve executable path (use os.Executable for the real path, not a symlink)
@@ -123,7 +122,7 @@ func main() {
 		actionErr = d.Restore()
 	} else {
 		logf(out, "\n[Step 0/4] Configuring Steam emulator settings...\n")
-		if err := d.ConfigureSteamSettings(*accountNameFlag, *steamIDFlag); err != nil {
+		if err := d.ConfigureSteamSettings(*accountNameFlag); err != nil {
 			logf(out, "\n✗ Error configuring Steam settings: %v\n", err)
 			if logPath != "" {
 				logf(out, "Log saved to: %s\n", logPath)

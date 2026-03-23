@@ -7,28 +7,6 @@ import (
 	"testing"
 )
 
-func TestValidateSteamID(t *testing.T) {
-	tests := []struct {
-		name    string
-		steamID string
-		wantErr bool
-	}{
-		{name: "valid", steamID: "76561197960287930", wantErr: false},
-		{name: "wrong length", steamID: "7656119796028793", wantErr: true},
-		{name: "non digit", steamID: "7656119796028793A", wantErr: true},
-		{name: "wrong prefix", steamID: "12345678901234567", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateSteamID(tt.steamID)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("ValidateSteamID() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestValidateAccountName(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -63,13 +41,9 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 	}
 
 	sourceAccountFile := filepath.Join(sourceSettings, "force_account_name.txt")
-	sourceSteamIDFile := filepath.Join(sourceSettings, "force_steamid.txt")
 	sourceModsDir := filepath.Join(sourceSettings, "mods")
 	if err := os.WriteFile(sourceAccountFile, []byte("DEFAULT_ACCOUNT"), 0644); err != nil {
 		t.Fatalf("failed to write source account file: %v", err)
-	}
-	if err := os.WriteFile(sourceSteamIDFile, []byte("76561197960287930"), 0644); err != nil {
-		t.Fatalf("failed to write source steamid file: %v", err)
 	}
 	if err := os.MkdirAll(sourceModsDir, 0755); err != nil {
 		t.Fatalf("failed to create source mods dir: %v", err)
@@ -84,7 +58,7 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 	}
 
 	d := NewDeployer(projectRoot, eu5Path)
-	if err := d.ConfigureSteamSettings("  CustomName  ", "76561197960287931"); err != nil {
+	if err := d.ConfigureSteamSettings("  CustomName  "); err != nil {
 		t.Fatalf("ConfigureSteamSettings() returned error: %v", err)
 	}
 
@@ -96,21 +70,12 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 		t.Fatalf("source account file changed unexpectedly: got %q", got)
 	}
 
-	steamIDSourceBytes, err := os.ReadFile(sourceSteamIDFile)
-	if err != nil {
-		t.Fatalf("failed to read source steamid file: %v", err)
-	}
-	if got := string(steamIDSourceBytes); got != "76561197960287930" {
-		t.Fatalf("source steamid file changed unexpectedly: got %q", got)
-	}
-
 	if err := d.DeploySteamSettings(); err != nil {
 		t.Fatalf("DeploySteamSettings() returned error: %v", err)
 	}
 
 	targetSettings := filepath.Join(binariesPath, "steam_settings")
 	targetAccountFile := filepath.Join(targetSettings, "force_account_name.txt")
-	targetSteamIDFile := filepath.Join(targetSettings, "force_steamid.txt")
 	targetModsDir := filepath.Join(targetSettings, "mods")
 
 	targetAccountBytes, err := os.ReadFile(targetAccountFile)
@@ -119,14 +84,6 @@ func TestConfigureSteamSettings_DoesNotMutateSourceTemplate(t *testing.T) {
 	}
 	if got := string(targetAccountBytes); got != "CustomName" {
 		t.Fatalf("target account file not updated: got %q", got)
-	}
-
-	targetSteamIDBytes, err := os.ReadFile(targetSteamIDFile)
-	if err != nil {
-		t.Fatalf("failed to read target steamid file: %v", err)
-	}
-	if got := string(targetSteamIDBytes); got != "76561197960287931" {
-		t.Fatalf("target steamid file not updated: got %q", got)
 	}
 
 	modEntries, err := os.ReadDir(targetModsDir)

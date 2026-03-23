@@ -28,8 +28,7 @@ type AppConfig struct {
 	ProjectRoot          string `json:"project_root"`
 	EU5Path              string `json:"eu5_path"`
 	ModPath              string `json:"mod_path"`
-	AccountName          string `json:"account_name"`
-	SteamID              string `json:"steam_id"`
+	DisplayName          string `json:"display_name"`
 	DeleteManagedMissing bool   `json:"delete_managed_missing"`
 }
 
@@ -276,8 +275,7 @@ func main() {
 func defaultConfig() AppConfig {
 	return AppConfig{
 		ManifestURL:          "https://eu5-1300742092.cos.ap-guangzhou.myqcloud.com/modsync/snapshot.json",
-		AccountName:          "EU5Player",
-		SteamID:              "76561197960287930",
+		DisplayName:          "EU5Player",
 		DeleteManagedMissing: true,
 	}
 }
@@ -288,6 +286,16 @@ func loadConfig(path string, cfg *AppConfig) {
 		return
 	}
 	_ = json.Unmarshal(b, cfg)
+
+	// Backward compatibility for old config files.
+	if strings.TrimSpace(cfg.DisplayName) == "" {
+		var legacy struct {
+			AccountName string `json:"account_name"`
+		}
+		if err := json.Unmarshal(b, &legacy); err == nil {
+			cfg.DisplayName = strings.TrimSpace(legacy.AccountName)
+		}
+	}
 }
 
 func saveConfig(path string, cfg AppConfig) error {
@@ -351,8 +359,8 @@ func runSyncWorkflow(m *SyncManager) error {
 	if err := dep.Deploy(); err != nil {
 		return fmt.Errorf("部署 Goldberg 失败: %w", err)
 	}
-	if cfg.AccountName != "" || cfg.SteamID != "" {
-		if err := dep.ConfigureSteamSettings(cfg.AccountName, cfg.SteamID); err != nil {
+	if strings.TrimSpace(cfg.DisplayName) != "" {
+		if err := dep.ConfigureSteamSettings(cfg.DisplayName); err != nil {
 			return fmt.Errorf("配置联机账户信息失败: %w", err)
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -20,7 +19,6 @@ type Deployer struct {
 	out          io.Writer // all output goes here (stdout, or stdout+logfile)
 
 	configuredAccountName string
-	configuredSteamID     string
 	hasCustomSettings     bool
 }
 
@@ -159,12 +157,7 @@ func (d *Deployer) DeploySteamSettings() error {
 			return fmt.Errorf("failed to write deployed account name: %w", err)
 		}
 
-		steamIDFile := filepath.Join(targetSettings, "force_steamid.txt")
-		if err := os.WriteFile(steamIDFile, []byte(d.configuredSteamID), 0644); err != nil {
-			return fmt.Errorf("failed to write deployed Steam ID: %w", err)
-		}
-
-		d.logf("  - Applied custom account/Steam ID settings to deployed steam_settings\n")
+		d.logf("  - Applied custom display name to deployed steam_settings\n")
 	}
 
 	modsDir := filepath.Join(targetSettings, "mods")
@@ -309,49 +302,18 @@ func (d *Deployer) Restore() error {
 	return nil
 }
 
-// ConfigureSteamSettings configures account name and Steam ID in steam_settings folder
-func (d *Deployer) ConfigureSteamSettings(accountName, steamID string) error {
+// ConfigureSteamSettings configures display name in steam_settings folder.
+func (d *Deployer) ConfigureSteamSettings(accountName string) error {
 	accountName = strings.TrimSpace(accountName)
-	steamID = strings.TrimSpace(steamID)
 
-	// Validate inputs
 	if err := ValidateAccountName(accountName); err != nil {
 		return fmt.Errorf("invalid account name: %w", err)
 	}
 
-	if err := ValidateSteamID(steamID); err != nil {
-		return fmt.Errorf("invalid Steam ID: %w", err)
-	}
-
 	d.configuredAccountName = accountName
-	d.configuredSteamID = steamID
 	d.hasCustomSettings = true
 
-	d.logf("✓ Prepared account name: %s\n", accountName)
-	d.logf("✓ Prepared Steam ID: %s\n", steamID)
-
-	return nil
-}
-
-// ValidateSteamID validates the Steam ID format (17 digits starting with 7656119)
-func ValidateSteamID(steamID string) error {
-	steamID = strings.TrimSpace(steamID)
-
-	if len(steamID) != 17 {
-		return fmt.Errorf("Steam ID must be exactly 17 digits, got %d", len(steamID))
-	}
-
-	matched, err := regexp.MatchString("^[0-9]+$", steamID)
-	if err != nil {
-		return err
-	}
-	if !matched {
-		return fmt.Errorf("Steam ID must contain only digits")
-	}
-
-	if !strings.HasPrefix(steamID, "7656119") {
-		return fmt.Errorf("Steam ID must start with 7656119")
-	}
+	d.logf("✓ Prepared display name: %s\n", accountName)
 
 	return nil
 }
