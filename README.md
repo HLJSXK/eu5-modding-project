@@ -23,6 +23,20 @@ This repository keeps only mod-related content and documentation.
 3. Use `src/develop/` for dynamic mission patterns and experiments
 4. Read technical docs in `docs/technical/`
 
+## Build / Deploy (Stable)
+
+For a simple local deployment, run:
+
+```cmd
+build.bat
+```
+
+This copies `src/stable/` to:
+
+`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\stable`
+
+If write permission is denied, run terminal as Administrator.
+
 ## Main Directories
 
 - `src/` - Active mod source files
