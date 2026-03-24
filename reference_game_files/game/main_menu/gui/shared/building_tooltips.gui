@@ -133,6 +133,48 @@ template BuildingType_tooltip {
 						}
 					}
 
+					TooltipStatBarItem = { # SPECIAL BUILDING
+						visible = "[BuildingType.IsSpecialBuilding]"
+						blockoverride "item_content" {
+							icon = {
+								size = { 30 30 }
+								texture = "gfx/interface/icons/buildings/_default.dds"
+								icon = {
+									position = { -2 0 }
+									size = { 35 35 }
+									texture = "gfx/interface/component_tiles/specialbuildings_frame_gold.dds"
+								}
+								
+								tooltipwidget = {
+									ContextualTooltipType = {
+										blockoverride "title_icon" {
+											icon = {
+												size = { 37 37 }
+												texture = "gfx/interface/icons/buildings/_default.dds"
+												icon = {
+													using = tooltip_title_icon_size
+													position = { -2 0 }
+													texture = "gfx/interface/component_tiles/specialbuildings_frame_gold.dds"
+												}
+											}
+										}
+									
+										blockoverride "title_text" {
+											text = "SPECIAL_BUILDING"
+										}
+										blockoverride "tooltip_content" {
+											TooltipTextBlock = {
+												blockoverride "text" {
+													text = "SPECIAL_BUILDING_DESC"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+
 					TooltipStatBarItem = { # LEVEL
 						visible = "[BuildingType.IsMultipleLevels]"
 
@@ -905,12 +947,12 @@ template building_tooltip_detail {
                         expand = {}
                         text_single = {
 							visible = "[Not(Building.GetType.IsFort)]"
-                            raw_text = "#R [Building.GetUpkeep|2]#!@gold!"
+                            raw_text = "#R [Building.GetUpkeep|2]#!@expense!"
 							default_format = "#bold"
                         }
 						text_single = {
 							visible = "[Building.GetType.IsFort]"
-                            raw_text = "#R [Building.GetFortMaintenanceValue|2]#!@gold!"
+                            raw_text = "#R [Building.GetFortMaintenanceValue|2]#!@expense!"
 							default_format = "#bold"
                         }
 						tooltipwidget = {
@@ -1005,7 +1047,7 @@ template building_tooltip_detail {
 		}
 	}
 
-	TooltipListBase = { ### SIDE TABLE
+	TooltipListBase = {
 		TooltipStringPairList = {
 			textcontext = "[Building.GetMarketInfo]"
 		}
@@ -1024,6 +1066,11 @@ template building_tooltip_detail {
 				}
 			}
 		}
+	}
+
+	TooltipStringPairList = {
+		visible = "[GreaterThan_CFixedPoint(Building.GetProfit, '(CFixedPoint)0')]"
+		textcontext = "BUILDING_TT_PROFIT_PER_LEVEL"
 	}
 
 	TooltipTextBlock = {
@@ -1215,6 +1262,7 @@ template deuque_last_constructions_tt {
 template construct_building_ranking_tt {
 	ContextualTooltipType = {
 		datacontext = "[ConstructScoreRanking.GetBuildingType]"
+		datacontext = "[ConstructScoreRanking.GetBuildingType.GetPopType]"
 		datacontext = "[Location.GetMarket]"
 
 		blockoverride "title_icon_texture" {
@@ -1255,6 +1303,171 @@ template construct_building_ranking_tt {
 
 				blockoverride "block_title" {
 					text = "BUILD_IN_BEST_LOCATION_TITLE"
+				}
+				
+				TooltipListColumnContent = {
+					TooltipTableColumn = {
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "[location|e]" }
+						blockoverride "field_left" {
+                            icon = {
+                                size = { 22 22 }
+                                texture = "[ConstructScoreItem.GetLocation.GetRankIcon]"
+                            }
+                        }
+						blockoverride "field_text" { text = "[ConstructScoreItem.GetLocation.GetName]" }
+						blockoverride "field_right" { expand = {} }
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "[control|e]" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { 
+							text = "[ConstructScoreItem.GetLocation.GetControl|%1]"
+							tooltipwidget = { using = location_control_tooltip }
+						}
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "[market_access|e]" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { 
+							text = "[ConstructScoreItem.GetLocation.GetMarketAccess|%1]" 
+							tooltipwidget = { using = location_market_tooltip }
+						}
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						visible = "[ConstructScoreRanking.HasProfit]"
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "EXPAND_RGO_IN_BEST_LOCATION_PROFIT_LABEL" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { raw_text = "[ConstructScoreItem.GetNetProfitValue|+=<2]@gold!" }
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "left_click_cost" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { text = "[ConstructScoreRanking.GetCost(ConstructScoreItem.Self)]" }
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { text = "[employment|e]" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { 
+							raw_text = "[ConstructScoreItem.GetLocation.GetExpectedUnEmployed(BuildingType.GetPopType)]" 
+							tooltipwidget = { using = locationview_employed_tt }
+						}
+						blockoverride "field_right" {
+							icon = {
+                                size = { 20 20 }
+                                texture = "[GetGraphicalCultureTextureForCountryPopType(BuildingType.GetPopType, ConstructScoreItem.GetLocation.GetOwner.Self)]"
+                            }
+							widget = {
+								visible = "[LessThan_CFixedPoint(ConstructScoreItem.GetEmployability,'(CFixedPoint)0')]"
+								size = { 18 18 }
+								tooltipwidget = {
+									SimpleContextualTooltipType = {
+										blockoverride "title_icon" {
+											icon = {
+												using = tooltip_title_icon_size
+												texture = "[GetConceptTexture('employment')]"
+											}
+										}
+
+										blockoverride "concept_link" {
+											raw_text = "[employment|e]"
+										}
+										
+										textcontext = "NOT_ENOUGH_PROMOTION"
+									}
+								}
+								icon = {
+									size = { 18 18 }
+									parentanchor = center
+									using = warning_icon_texture
+									texture_density = 2
+									using = bg_circle
+								}
+							}
+                        }
+					}
+
+					TooltipTableColumn = {
+						layoutpolicy_horizontal = fixed
+						visible = "[IsBuildDebug]"
+						background = { using = bg_tooltip_debug }
+						blockoverride "column_title" {}
+						blockoverride "column_title_text" { raw_text = "[employment] score" }
+						blockoverride "field_left" { expand = {} }
+						blockoverride "field_text" { raw_text = "[ConstructScoreItem.GetEmployabilityStr]" }
+					}
+
+					blockoverride "column_datamodel" { datamodel = "[ConstructScoreRanking.GetConstructScoreItems]" }
+				}
+			}
+
+			# blockoverride "extra_build_content" {
+			# 	TooltipContentSection = {
+			# 		using = construct_building_in_location_content_tt
+			# 	}
+			# }
+		}
+	}
+}
+
+template upgrade_building_ranking_tt {
+	ContextualTooltipType = {
+		datacontext = "[ConstructScoreRanking.GetBuildingType]"
+		datacontext = "[Location.GetMarket]"
+
+		blockoverride "title_icon_texture" {
+			texture = "[GetBuildingIcon(BuildingType.Self)]"
+			tooltipwidget = { using = BuildingType_tooltip }
+		}
+
+		blockoverride "title_text" {
+			text = "UPGRADING_IN_MARKET_TITLE"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipContentSection = {
+				visible = "[And(ConstructScoreRanking.HasInvalidItems, Not(ConstructScoreRanking.HasScoreItems))]"
+
+				TooltipRowList = {
+					datacontext = "[ConstructScoreRanking.GetInvalidFirstItem]"
+					visible = "[Not(CanBuildOrExpandBuilding(ConstructScoreRanking.GetBuildingType, ConstructScoreItem.GetLocation))]"
+					textcontext = "[CanBuildOrExpandBuildingInfo(ConstructScoreRanking.GetBuildingType, ConstructScoreItem.GetLocation)]"
+			
+					blockoverride "field_background" {
+						background = {
+							using = color_mid_red_texture
+							alpha = 0.5
+			
+							modify_texture = {
+								visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+								using = color_white_texture
+								alpha = 0.1
+							}
+						}
+					}
+				}
+			}
+			
+			TooltipListBase = {
+				visible = "[ConstructScoreRanking.HasScoreItems]"
+
+				blockoverride "block_title" {
+					text = "UPGRADING_IN_MARKET_TITLE"
 				}
 				
 				TooltipListColumnContent = {
@@ -1486,11 +1699,6 @@ template construct_building_in_location_tt {
 
 				TooltipStringPairList = {
 					datacontext = "[Location]"
-
-					modify_texture = {
-						using = color_red_texture
-					}
-
 					textcontext = "[Location.GetTooManyBuildingInfo]"
 				}
             }
@@ -1555,8 +1763,8 @@ template destroy_building_in_location_tt {
 						using = color_red_texture
 					}
 				}
-				visible = "[And(CanDestroyBuilding(Building.Self), Not(StringIsEmpty(GetDestroyBuildingInfoOnlyWithCosts(Building.Self))))]"
-				textcontext = "[GetDestroyBuildingInfoOnlyWithCosts(Building.Self)]"
+				visible = "[And(CanDestroyBuilding(Building.Self), Not(StringIsEmpty(GetDestroyBuildingInfo(Building.Self))))]"
+				textcontext = "[GetDestroyBuildingInfo(Building.Self)]"
 			}
 		}
 	}
@@ -1839,13 +2047,13 @@ template BuildingTypeProfit_Tooltip {
 					}
 	
 					TooltipManualTableField = {
-						visible = "[And(GreaterThan_CFixedPoint(GetBuildingTypeProfitInLocation(BuildingType.Self, Location.Self), '(CFixedPoint)0'), LessThan_CFixedPoint(Location.GetControl, '(CFixedPoint)1'))]"
+						visible = "[And(GreaterThan_CFixedPoint(GetBuildingTypeTaxBaseInLocation(BuildingType.Self, Location.Self), '(CFixedPoint)0'), LessThan_CFixedPoint(Location.GetControl, '(CFixedPoint)1'))]"
 						blockoverride "field_content" {
 							tooltipwidget = {
 								using = location_control_tooltip
 							}
 							text_single = {
-								text = "TAX_BASE_TT_LIST"
+								text = "BUILDING_PROFIT_TT_CONTROL"
 							}
 							expand = {}									
 							text_single = {
@@ -1875,7 +2083,7 @@ template BuildingTypeProfit_Tooltip {
 			}
 
 			TooltipTextBlock = {
-				visible = "[LessThan_CFixedPoint(GetBuildingTypeProfitInLocation(BuildingType.Self, Location.Self), '(CFixedPoint)0')]"
+				visible = "[LessThan_CFixedPoint(GetBuildingTypeTaxBaseInLocation(BuildingType.Self, Location.Self), '(CFixedPoint)0')]"
 				blockoverride "text" {
 					text = "BUILDING_PROFIT_TT_TEXT_UNPROFITABLE_AND_UNBUILT"
 				}

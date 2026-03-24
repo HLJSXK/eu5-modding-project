@@ -22,8 +22,47 @@ lateralview = {
 					visible = "[IsDataModelEmpty(SetupMercenaryRequirementsView.GetPossibleLeaders)]"
 				}
 
+				blockoverride "sort_buttons_filtered_list" {
+					sort_by_key_button = {
+						name = "adm"
+						using = layoutpolicy_expanding
+					}
+					sort_by_key_button = {
+						name = "dip"
+						using = layoutpolicy_expanding
+					}
+					sort_by_key_button = {
+						name = "mil"
+						using = layoutpolicy_expanding
+					}
+					sort_by_key_button = {
+						visible = "[SetupMercenaryRequirementsView.IsArmy]"
+						name = "amount"
+						using = layoutpolicy_expanding
+						blockoverride "sort_by_key_button_texture" {
+							texture = "gfx/interface/icons/sort/manpower.dds"
+						}
+					}
+					sort_by_key_button = {
+						visible = "[Not(SetupMercenaryRequirementsView.IsArmy)]"
+						name = "ships_amount"
+						using = layoutpolicy_expanding
+						blockoverride "sort_by_key_button_texture" {
+							texture = "gfx/interface/icons/sort/ships.dds"
+						}
+					}
+					sort_by_key_button = {
+						name = "cost"
+						using = layoutpolicy_expanding
+					}
+					sort_by_key_button = {
+						name = "strength"
+						using = layoutpolicy_expanding
+					}
+				}
+
 				blockoverride "scroll_list_is_empty_text" {
-					visible = no
+					text = "NO_GATHER_MERCENARIES_AVAILABLE"
 				}
 
 				blockoverride "scroll_list_layout" {
@@ -60,6 +99,8 @@ lateralview = {
 								}
 							}
 						}
+
+						expand = {}
 					}
 				}
 			}
@@ -78,91 +119,203 @@ types SetupMercenaryTypes
 		datacontext = "[PossibleLeaderItem.GetCharacter]"
 		enabled = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
 
+		blockoverride "header_size" {
+			size = { -1 40 }
+		}
+
 		blockoverride "header_content" {
-			tooltipwidget = {
-				BasicFunctionalTooltip = {}
-			}
-				
 			action_tooltip = {
-				click_type = left
-				click_mode = single
-				title = "SELECT_COMMANDER_ARMY_TT"
-				on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
-				visible = "[IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes)]"
-				description = "NO_MERCENARY_HIRING_UNITS"
-				enabled = no
+				title = "SELECT_MERCENARY_LOCATION"
+				on_action = "[PossibleLeaderItem.OnAccept]"
+				enabled = "[PossibleLeaderItem.CanAccept]"
+				conditions = "[PossibleLeaderItem.GetCanAcceptTooltip]"
 			}
+			enabled = "[PossibleLeaderItem.CanAccept]"
 			
-			action_tooltip = {
-				click_type = left
-				click_mode = single
-				title = "SELECT_COMMANDER_ARMY_TT"
-				on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
-				visible = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
+			tooltipwidget = {
+				ContextualTooltipType = {
+					blockoverride "title_text" {
+						text = "CURRENT_MERCENARY_SELECTION"
+					}
+					blockoverride "concept_link" {
+						text = [mercenary|E]
+					}
+					
+					blockoverride "title_icon" {
+						icon = {
+							using = tooltip_title_icon_size
+							texture = "gfx/interface/icons/unit_category/mercenary.dds"
+						}
+					}
+					
+					blockoverride "tooltip_content" {
+						TooltipStringPairList = {
+							blockoverride "block_title" {
+								text = "MERCENARY_HIRING_FEE_TT_TEXT"
+							}										
+							textcontext = "[PossibleLeaderItem.GetHirePriceTooltip]"
+						}
+
+					}
+				}
 			}
-			enabled = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
 
 			hbox = {
 				using = layoutpolicy_expanding
 				margin = { 10 0 }
-				margin_left = 90
+				margin_left = 62
+				spacing = 3
 
-				text_single = {
-					using = layoutpolicy_expanding
-					#using = Font_Size_Medium
-					default_format = "#yellow_titles"
-					autoresize = no
-					align = nobaseline
-					raw_text = "[Character.GetNameToFitWithNoTooltip('(int32)45', '(bool)yes')], [Character.GetAgeInYears]"
-
-					sort_by_left_fade_highlight = {
-						name = "name"
+				hbox = {
+					spacing = 8
+					character_abilities = {
+						alwaystransparent = yes
+						visible = "[Not(PossibleLeaderItem.IsArmy)]"
+						blockoverride "abilities_bg" {}
+						blockoverride "abilities_tooltip" {
+							tagtooltip_enabled = yes
+							tooltip = "[Character.GetAbilityTooltipAsAdmiral]"
+						}
 					}
-
-					sort_by_right_fade_highlight = {
-						name = "age"
+	
+					character_abilities = {
+						alwaystransparent = yes
+						visible = "[PossibleLeaderItem.IsArmy]"
+						blockoverride "abilities_bg" {}
+						blockoverride "abilities_tooltip" {
+							tagtooltip_enabled = yes
+							tooltip = "[Character.GetAbilityTooltipAsGeneral]"
+						}
+					}
+	
+					text_single = {
+						layoutpolicy_vertical = expanding
+						size = { 120 -1 }
+						autoresize = no
+						align = nobaseline
+						raw_text = "@area! [Character.GetBirthLocation.GetArea.GetNameWithNoTooltip|L]"
+						datacontext = "[Character.GetBirthLocation.GetArea]"
+						tooltipwidget = {
+							blockoverride "area_tooltip_extra_content" {
+								TooltipTextBlock = {
+									blockoverride "text" {
+										text = "MERCENARY_ORIGIN_TT_TEXT"
+									}
+								}
+							}
+	
+							using = Area_tooltip
+						}
 					}
 				}
 
 
+				expand = {}
+
+				hbox = {
+					text_single = {
+						size = { 40 25 }
+						autoresize = no
+						align = right|nobaseline
+						using = Font_Size_Small
+						raw_text = "#L [PossibleLeaderItem.GetRequestingAmount] #! /"							
+					}
+
+					#Get min between leader's GetMaxHiringSubunitsForLeader and GetMercenaryAvailableTotalSubunitsCount
+					text_single = {
+						visible = "[PossibleLeaderItem.IsArmy]"
+						size = { 45 25 }
+						autoresize = no
+						align = left|nobaseline
+						raw_text = " [Character.GetMaxHiringSubunitsForLeaderAndPopulation]@regiment!"
+
+						sort_by_small_highlight = {
+							name = "amount"
+							size = { 110% 100% }
+						}
+					}
+
+					text_single = {
+						visible = "[Not(PossibleLeaderItem.IsArmy)]"
+						size = { 45 25 }
+						autoresize = no
+						align = left|nobaseline
+						raw_text = " [Character.GetMaxHiringSubunitsForLeaderAndPopulation]@ship!"
+
+						sort_by_small_highlight = {
+							name = "ships_amount"
+							size = { 110% 100% }
+						}
+					}
+					tooltipwidget = {
+						ContextualTooltipType = {
+							blockoverride "title_text" {
+								text = "MERCENARY_SIZE_TT_TITLE"
+							}
+							blockoverride "concept_link" {
+								text = [mercenary|E]
+							}
+							
+							blockoverride "title_icon" {
+								icon = {
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/unit_category/mercenary.dds"
+								}
+							}
+							
+							blockoverride "tooltip_content" {
+								TooltipTextBlock = {
+									visible = "[PossibleLeaderItem.IsArmy]"
+									blockoverride "text" {
+										text = "MERCENARY_SIZE_TT_TEXT_ARMY"
+									}
+								}
+								TooltipTextBlock = {
+									visible = "[Not(PossibleLeaderItem.IsArmy)]"
+									blockoverride "text" {
+										text = "MERCENARY_SIZE_TT_TEXT_NAVY"
+									}
+								}
+								TooltipStringPairList = {									
+									textcontext = "MERCENARY_SIZE_TT_TEXT"
+								}
+							}
+						}
+					}
+				}
 
 				text_single = {
 					layoutpolicy_vertical = expanding
 					size = { 60 -1 }
 					autoresize = no
 					align = nobaseline
-					text = "[Character.CalcMercenaryLeaderHireCost]"
-
+					raw_text = "[PossibleLeaderItem.GetHirePrice|2]@gold!"
 					sort_by_small_highlight = {
 						name = "cost"
-						position = { -2 0 }
-						size = { 101% 100% }
+						size = { 110% 100% }
 					}
-				}
-
-				icon = {
-					size = { 18 18 }
-					visible = "[Not(SetupMercenaryRequirementsView.IsSelectedLeader(Character.Self))]"
-					texture = "gfx/interface/buttons/flats/button_simple_right.dds"
-					using = button_regular_icon_color
-				}
-
-				icon = {
-					size = { 18 18 }
-					visible = "[SetupMercenaryRequirementsView.IsSelectedLeader(Character.Self)]"
-					texture = "gfx/interface/buttons/flats/button_simple_down.dds"
-					using = button_regular_icon_color
 				}
 			}
 		}
 
 		blockoverride "bottom_content" {
 			hbox = {
-				margin = { 10 0 }
+				margin = { 5 0 }
 				margin_left = 70
 
-				character_abilities = {
-					blockoverride "abilities_bg" {}
+				widget = {
+					size = { 60 -1 }
+
+					text_single = {
+						visible = "[PossibleLeaderItem.IsArmy]"
+						layoutpolicy_vertical = expanding
+						size = { 60 -1 }
+						autoresize = no
+						align = center|nobaseline
+						raw_text = "[PossibleLeaderItem.GetVisualStrength]@army_strength!"
+						tooltip = "[total_strength|e]"
+						tagtooltip_enabled = yes
+					}
 				}
 
 				divider_flavor_01 = {
@@ -170,31 +323,35 @@ types SetupMercenaryTypes
 					size = { 15 -1 }
 				}
 
-				expand = {}
-
 				overlappingitembox = {
-					maximumsize = { 200 32 }
+					maximumsize = { 210 22 }
 					direction = horizontal
 					autoresize = yes
-					spacing = 3
+					spacing = 2
 					datamodel = "[PossibleLeaderItem.GetMercenaryTypes]"
 					item = {
 						widget = {
-							size = { 60 30 }
+							size = { 50 20 }
 							tooltipwidget = {
 								using = MercenaryUnitType_Tooltip
 							}
 							hbox = {
 								icon = {
-									size = { 25 25 }
+									size = { 20 20 }
 									texture = "[GetSubUnitCategoryIcon(AvailableMercenaryTypes.GetCategory)]"
 								}
 		
+								# text_single = {
+								# 	size = { 35 20 }
+								# 	autoresize = no
+								# 	align = left|nobaseline
+								# 	text = "[AvailableMercenaryTypes.GetUnitsAmount]"
+								# }
 								text_single = {
-									size = { 35 20 }
+									size = { 30 20 }
 									autoresize = no
 									align = left|nobaseline
-									text = "[AvailableMercenaryTypes.GetUnitsAmount]"
+									text = "[PossibleLeaderItem.GetCategoryAmount(AvailableMercenaryTypes.GetCategory)]"
 								}
 							}
 						}
@@ -203,6 +360,82 @@ types SetupMercenaryTypes
 					sort_by_small_highlight = {
 						name = "strength"
 						size = { 110% 100% }
+					}
+				}
+
+				expand = {}
+
+				divider_flavor_01 = {
+					layoutpolicy_vertical = expanding
+					size = { 15 -1 }
+				}
+
+				# contract expiring
+				text_single = {
+					size = { 50 20 }
+					autoresize = no
+					align = center
+					using = Font_Size_Small
+					raw_text = "#L [PossibleLeaderItem.GetDuration|0] #!@mercenary_contract_expiring!"
+					tooltipwidget = {
+						SimpleContextualTooltipType = {
+							lowpriotextcontext = "MERC_HIRE_TIME_TT"
+							blockoverride "concept_link" {
+								text = [mercenary|E]
+							}
+							blockoverride "title_icon" {
+								icon = {
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 2
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.5
+									}
+								}
+							}
+						}
+					}												
+				}
+
+				divider_flavor_01 = {
+					layoutpolicy_vertical = expanding
+					size = { 15 -1 }
+				}
+
+				# Monthly Fee
+				text_single = {
+					size = { 60 20 }
+					autoresize = no
+					raw_text = "#R -[PossibleLeaderItem.GetMonthlyCost|2]#!@expense!"
+					align = right|nobaseline
+
+					tooltipwidget = {
+						ContextualTooltipType = {
+							blockoverride "title_text" {
+								text = "MODIFIER_TYPE_NAME_mercenary_maintenance_cost"
+							}
+							blockoverride "concept_link" {
+								text = [mercenary|E]
+							}
+							
+							blockoverride "title_icon" {
+								icon = {
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/unit_category/mercenary.dds"
+								}
+							}
+							
+							blockoverride "tooltip_content" {
+								TooltipStringPairList = {
+									blockoverride "block_title" {
+										text = "MERCENARY_MONTHLY_FEE_TT_TEXT"										
+									}
+									textcontext = "[PossibleLeaderItem.GetMonthlyCostTooltip]"
+								}
+							}
+						}
 					}
 				}
 
@@ -223,15 +456,110 @@ types SetupMercenaryTypes
 				# 		name = "strength"
 				# 	}
 				# }
+
+				widget = {
+					size = { 20 20 }
+
+					button = {
+						size = { 100% 100% }
+						visible = "[Not(SetupMercenaryRequirementsView.IsSelectedLeader(Character.Self))]"
+						texture = "gfx/interface/buttons/flats/button_simple_right.dds"
+						using = button_regular_icon_color
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "SELECT_COMMANDER_ARMY_TT"
+							on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
+							visible = "[IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes)]"
+							description = "NO_MERCENARY_HIRING_UNITS"
+							enabled = no
+						}
+						
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "SELECT_COMMANDER_ARMY_TT"
+							on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
+							visible = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
+						}
+						enabled = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
+
+						tooltipwidget = {
+							BasicFunctionalTooltip = {}
+						}
+
+						glow = {
+							name = "drop_shadow"
+							glow_radius = 3
+							color = {0.0 0.0 0.0 1.0}
+							alpha = 0.3
+						}
+					}
+
+					button = {
+						size = { 100% 100% }
+						visible = "[SetupMercenaryRequirementsView.IsSelectedLeader(Character.Self)]"
+						texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+						using = button_regular_icon_color
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "SELECT_COMMANDER_ARMY_TT"
+							on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
+							visible = "[IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes)]"
+							description = "NO_MERCENARY_HIRING_UNITS"
+							enabled = no
+						}
+						
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "SELECT_COMMANDER_ARMY_TT"
+							on_action = "[SetupMercenaryRequirementsView.ToggleLeader(Character.Self)]"
+							visible = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
+						}
+						enabled = "[Not(IsDataModelEmpty(PossibleLeaderItem.GetMercenaryTypes))]"
+
+						tooltipwidget = {
+							BasicFunctionalTooltip = {}
+						}
+
+						glow = {
+							name = "drop_shadow"
+							glow_radius = 3
+							color = {0.0 0.0 0.0 1.0}
+							alpha = 0.3
+						}
+					}
+				}
 			}
 		}
-		
-		select_portrait = {
-			blockoverride "portrait_datacontext"
-			{
-				datacontext = "[PossibleLeaderItem.GetCharacter]"
+
+		# Commander
+		widget = {
+			size = { 67 72 }
+			character_frame_small = {
+				blockoverride "portrait_datacontext" {
+					datacontext = "[PossibleLeaderItem.GetCharacter]"
+				}
+				blockoverride "character_frame_size" {
+					size = { 67 72 }
+				}
+				blockoverride "character_frame_texture" {
+					texture = "gfx/interface/component_decoration/character_frames/character_non_stretchable_frame_2.dds"
+				}
+				blockoverride "character_portrait_visible" {
+					visible = yes
+				}
+				blockoverride "character_portrait_ani_visible" {
+					visible = no
+				}
+				blockoverride "character_frame_estate_visible" {
+					visible = no
+				}
 			}
-			parentanchor = bottom
 		}
 	}
 
@@ -261,12 +589,206 @@ types SetupMercenaryTypes
 
 			using = bg_paper_card
 
+			# duration selection
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = fixed
+				maximumsize = { -1 25 }
+				margin = { 5 5}
+				spacing = 6
+
+				using = bg_number_container_bckg
+				margin_left = 15
+
+
+				icon = {
+					size = { 25 25 }
+					texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+					glow = {
+						name = "drop_shadow"
+						glow_radius = 2
+						color = {0.0 0.0 0.0 1.0}
+						alpha = 0.5
+					}
+				}
+
+				text_single = {
+					layoutpolicy_vertical = expanding
+					layoutpolicy_horizontal = fixed
+					size = { 190 25 }
+					fontsize = 13
+					autoresize = no
+					align = left|nobaseline
+					using = Font_Type_Standard
+					text = "MERCENARY_LENGTH"
+					default_format = "#L"
+
+					tooltipwidget = {
+						SimpleContextualTooltipType = {
+							lowpriotextcontext = "MIN_MERC_HIRE_TIME"
+							blockoverride "title_text" {
+								text = "MERCENARY_LENGTH"
+							}
+							blockoverride "concept_link" {
+								text = [mercenary|E]
+							}
+							blockoverride "title_icon" {
+								icon = {
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+									glow = {
+										name = "drop_shadow"
+										glow_radius = 2
+										color = {0.0 0.0 0.0 1.0}
+										alpha = 0.5
+									}
+								}
+							}
+						}
+					}			
+				}
+
+				ranged_slider = {
+					size = { -1 10 }
+					layoutpolicy_horizontal = expanding
+					direction = horizontal
+
+					min = 1
+					max = "[SetupMercenaryRequirementsView.GetMaxDuration]"
+					mincap = 1
+					maxcap = "[SetupMercenaryRequirementsView.GetMaxDuration]"
+					step = "[SetupMercenaryRequirementsView.GetDurationStep]"
+					wheelstep = "[SetupMercenaryRequirementsView.GetDurationStep]"
+					value = "[SetupMercenaryRequirementsView.GetDuration]"
+					onvaluechanged = "[SetupMercenaryRequirementsView.OnDurationChanged]"
+
+					track = {
+						button = {
+							texture = "gfx/interface/progressbars/slider_default_bg.dds"
+							alpha = 0.5
+							enabled = no
+							texture_density = 2
+							spriteType = Corneredstretched
+							spriteborder = { 0 0 }
+						}
+					}
+
+					track_range = { # Avalible progress
+						button = {
+							texture = "gfx/interface/progressbars/slider_default_bg.dds"
+							texture_density = 2
+							using = color_progress_blue
+							alpha = 0.3
+							spriteType = Corneredstretched
+							spriteborder = { 10 0 }
+
+							effectname = "NoHighlight"
+						}
+					}
+
+					track_highlight = { # Active Progress
+						button = {
+							texture = "gfx/interface/progressbars/progress_bar_blue_alt.dds"
+							texture_density = 2
+							spriteType = Corneredstretched
+							spriteborder = { 0 0 }
+							effectname = "NoHighlight"
+						}
+					}
+
+					slider = {
+						ui_direction_button = {
+
+							size = { 12 12 }
+							blockoverride "button_texture" {
+								texture = "gfx/interface/buttons/flats/slider.dds"
+							}
+
+							glow = {
+								name = "drop_shadow"
+								glow_radius = 3
+								color = {0.0 0.0 0.0 1.0}
+								alpha = 0.5
+							}
+						}
+					}
+
+					dec_button = { using = economy_slider_dec_button }
+					inc_button = { using = economy_slider_inc_button }
+				}
+
+				hbox = {
+					layoutpolicy_vertical = fixed
+					maximumsize = { -1 25 }
+				
+					text_single = {
+						layoutpolicy_vertical = expanding
+						layoutpolicy_horizontal = fixed
+						size = { 40 25 }
+						autoresize = no
+						align = right|nobaseline
+						using = Font_Size_Small
+						raw_text = "#L [PossibleLeaderItem.GetDuration|0] #! /"
+						tooltipwidget = {
+							SimpleContextualTooltipType = {
+								lowpriotextcontext = "MERC_HIRE_TIME_TT"
+								blockoverride "concept_link" {
+									text = [mercenary|E]
+								}
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 2
+											color = {0.0 0.0 0.0 1.0}
+											alpha = 0.5
+										}
+									}
+								}
+							}
+						}												
+					}
+					
+					text_single = {
+						layoutpolicy_vertical = expanding
+						layoutpolicy_horizontal = fixed
+						size = { 35 25 }
+						autoresize = no
+						align = left|nobaseline
+						using = Font_Size_Small
+						raw_text = " [SetupMercenaryRequirementsView.GetMaxDuration]"
+						tooltipwidget = {
+							SimpleContextualTooltipType = {
+								lowpriotextcontext = "MAX_MERC_HIRE_TIME"
+								blockoverride "concept_link" {
+									text = [mercenary_contract_length|E]
+								}
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 2
+											color = {0.0 0.0 0.0 1.0}
+											alpha = 0.5
+										}
+									}
+								}
+							}
+						}												
+					}
+				}
+			}
+
 			# list of sub units available and what's selected
 			vbox = {
 				layoutpolicy_horizontal = expanding
 				layoutpolicy_vertical = fixed
 				spacing = 10
-				datamodel = "[SetupMercenaryRequirementsView.GetPossibleSubUnitDefinitions]"
+				datamodel = "[PossibleLeaderItem.GetPossibleSubUnitDefinitions]"
 
 				item = {
 					hbox = {
@@ -326,39 +848,37 @@ types SetupMercenaryTypes
 									title = "SHOW_UNIT_TYPE"
 									on_action = "[ShowUnitType(PossibleSubUnitDefinition.GetSubUnitDefinition)]"
 								}
-							}	
+							}
 						}
 
-						# widget = {
-						# 	size = {30 30}
-						# 	using = bg_circle_piechart
-
-						# 	button = {
-						# 		parentanchor = center
-						# 		size = { 20 20 }
-						# 		position = {1 0}
-						# 		texture = "[GetSubUnitCategoryIcon(PossibleSubUnitDefinition.GetSubUnitDefinition.GetCategory)]"
-								
-
-						# 		action_tooltip = {
-						# 			title = "UNIT_CLICK_TOOLTIP_LEFT_CLICK"
-						# 			on_action = "[ShowUnitType(PossibleSubUnitDefinition.GetSubUnitDefinition)]"
-						# 		}
-
-						# 		TooltipWidget = { BasicFunctionalTooltip = {} }
-						# 	}
-						# }
-
 						text_single = {
-							layoutpolicy_vertical = expanding
-							layoutpolicy_horizontal = fixed
-							size = { 190 25 }
+							layoutpolicy_horizontal = expanding
+							size = { -1 25 }
 							fontsize = 13
 							autoresize = no
 							align = left|nobaseline
 							using = Font_Type_Standard
-		
 							text = "[PossibleSubUnitDefinition.GetSubUnitName]"
+						}
+
+						text_single = {
+							size = { 40 25 }
+							visible = "[PossibleSubUnitDefinition.GetSubUnitDefinition.IsRegiment]"
+							autoresize = no
+							align = right|nobaseline
+							using = Font_Size_Small
+							raw_text = "[PossibleSubUnitDefinition.GetSubUnitDefinition.GetMaxStrength(Player.Self)|0]@army_strength!"
+							tagtooltip_enabled = yes
+							tooltip = "[max_strength|e]"
+						}
+
+						icon = {
+							size = { 35 35 }
+							texture = "[GetAgeIcon(PossibleSubUnitDefinition.GetSubUnitDefinition.GetAge)]"
+							datacontext = "[PossibleSubUnitDefinition.GetSubUnitDefinition.GetAge]"
+							tooltipwidget = {
+								using = Age_tooltip
+							}
 						}
 
 						ranged_slider = {
@@ -506,377 +1026,6 @@ types SetupMercenaryTypes
 								}														
 							}
 						}					
-					}
-				}
-			}
-
-			# duration selection
-			hbox = {
-				layoutpolicy_horizontal = expanding
-				layoutpolicy_vertical = fixed
-				maximumsize = { -1 25 }
-				margin = { 5 5}
-				spacing = 6
-
-				using = bg_number_container_bckg
-				margin_left = 15
-
-
-				icon = {
-					size = { 25 25 }
-					texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-					glow = {
-						name = "drop_shadow"
-						glow_radius = 2
-						color = {0.0 0.0 0.0 1.0}
-						alpha = 0.5
-					}
-				}
-
-				text_single = {
-					layoutpolicy_vertical = expanding
-					layoutpolicy_horizontal = fixed
-					size = { 190 25 }
-					fontsize = 13
-					autoresize = no
-					align = left|nobaseline
-					using = Font_Type_Standard
-					text = "MERCENARY_LENGTH"
-					default_format = "#L"
-
-					tooltipwidget = {
-						SimpleContextualTooltipType = {
-							lowpriotextcontext = "MIN_MERC_HIRE_TIME"
-							blockoverride "title_text" {
-								text = "MERCENARY_LENGTH"
-							}
-							blockoverride "concept_link" {
-								text = [mercenary|E]
-							}
-							blockoverride "title_icon" {
-								icon = {
-									using = tooltip_title_icon_size
-									texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-									glow = {
-										name = "drop_shadow"
-										glow_radius = 2
-										color = {0.0 0.0 0.0 1.0}
-										alpha = 0.5
-									}
-								}
-							}
-						}
-					}			
-				}
-				# ##MIN MERCENARY HIRING TIME
-				# text_single = {
-				# 	layoutpolicy_vertical = expanding
-				# 	layoutpolicy_horizontal = fixed
-				# 	size = { 40 25 }
-				# 	autoresize = no
-				# 	align = center|nobaseline
-				# 	using = Font_Size_Small
-				# 	raw_text = "1"
-				# 	tooltipwidget = {
-				# 		SimpleContextualTooltipType = {
-				# 			lowpriotextcontext = "MIN_MERC_HIRE_TIME"
-				# 			blockoverride "concept_link" {
-				# 				text = [mercenary|E]
-				# 			}
-				# 			blockoverride "title_icon" {
-				# 				icon = {
-				# 					using = tooltip_title_icon_size
-				# 					texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-				# 					glow = {
-				# 						name = "drop_shadow"
-				# 						glow_radius = 2
-				# 						color = {0.0 0.0 0.0 1.0}
-				# 						alpha = 0.5
-				# 					}
-				# 				}
-				# 			}
-				# 		}
-				# 	}												
-				# }
-
-				ranged_slider = {
-					size = { -1 10 }
-					layoutpolicy_horizontal = expanding
-					direction = horizontal
-
-					min = 1
-					max = "[SetupMercenaryRequirementsView.GetMaxDuration]"
-					mincap = 1
-					maxcap = "[SetupMercenaryRequirementsView.GetMaxDuration]"
-					step = "[SetupMercenaryRequirementsView.GetDurationStep]"
-					wheelstep = "[SetupMercenaryRequirementsView.GetDurationStep]"
-					value = "[SetupMercenaryRequirementsView.GetDuration]"
-					onvaluechanged = "[SetupMercenaryRequirementsView.OnDurationChanged]"
-
-					track = {
-						button = {
-							texture = "gfx/interface/progressbars/slider_default_bg.dds"
-							alpha = 0.5
-							enabled = no
-							texture_density = 2
-							spriteType = Corneredstretched
-							spriteborder = { 0 0 }
-						}
-					}
-
-					track_range = { # Avalible progress
-						button = {
-							texture = "gfx/interface/progressbars/slider_default_bg.dds"
-							texture_density = 2
-							using = color_progress_blue
-							alpha = 0.3
-							spriteType = Corneredstretched
-							spriteborder = { 10 0 }
-
-							effectname = "NoHighlight"
-						}
-					}
-
-					track_highlight = { # Active Progress
-						button = {
-							texture = "gfx/interface/progressbars/progress_bar_blue_alt.dds"
-							texture_density = 2
-							spriteType = Corneredstretched
-							spriteborder = { 0 0 }
-							effectname = "NoHighlight"
-						}
-					}
-
-					slider = {
-						ui_direction_button = {
-
-							size = { 12 12 }
-							blockoverride "button_texture" {
-								texture = "gfx/interface/buttons/flats/slider.dds"
-							}
-
-							glow = {
-								name = "drop_shadow"
-								glow_radius = 3
-								color = {0.0 0.0 0.0 1.0}
-								alpha = 0.5
-							}
-						}
-					}
-
-					dec_button = { using = economy_slider_dec_button }
-					inc_button = { using = economy_slider_inc_button }
-				}
-
-				hbox = {
-					layoutpolicy_vertical = fixed
-					maximumsize = { -1 25 }
-				
-					text_single = {
-						layoutpolicy_vertical = expanding
-						layoutpolicy_horizontal = fixed
-						size = { 40 25 }
-						autoresize = no
-						align = right|nobaseline
-						using = Font_Size_Small
-						raw_text = "#L [SetupMercenaryRequirementsView.GetDuration|0] #! /"
-						tooltipwidget = {
-							SimpleContextualTooltipType = {
-								lowpriotextcontext = "MERC_HIRE_TIME_TT"
-								blockoverride "concept_link" {
-									text = [mercenary|E]
-								}
-								blockoverride "title_icon" {
-									icon = {
-										using = tooltip_title_icon_size
-										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-										glow = {
-											name = "drop_shadow"
-											glow_radius = 2
-											color = {0.0 0.0 0.0 1.0}
-											alpha = 0.5
-										}
-									}
-								}
-							}
-						}												
-					}
-					
-					text_single = {
-						layoutpolicy_vertical = expanding
-						layoutpolicy_horizontal = fixed
-						size = { 35 25 }
-						autoresize = no
-						align = left|nobaseline
-						using = Font_Size_Small
-						raw_text = " [SetupMercenaryRequirementsView.GetMaxDuration]"
-						tooltipwidget = {
-							SimpleContextualTooltipType = {
-								lowpriotextcontext = "MAX_MERC_HIRE_TIME"
-								blockoverride "concept_link" {
-									text = [mercenary_contract_length|E]
-								}
-								blockoverride "title_icon" {
-									icon = {
-										using = tooltip_title_icon_size
-										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-										glow = {
-											name = "drop_shadow"
-											glow_radius = 2
-											color = {0.0 0.0 0.0 1.0}
-											alpha = 0.5
-										}
-									}
-								}
-							}
-						}												
-					}
-				}
-			}
-
-			button_regular = {
-				layoutpolicy_horizontal = expanding
-				size = {-1 40}
-
-
-				action_tooltip = {
-					title = "SELECT_MERCENARY_LOCATION"
-					on_action = "[SetupMercenaryRequirementsView.OnAccept]"
-					enabled = "[SetupMercenaryRequirementsView.CanAccept]"
-					conditions = "[SetupMercenaryRequirementsView.GetCanAcceptTooltip]"
-				}
-				enabled = "[SetupMercenaryRequirementsView.CanAccept]"
-				
-				tooltipwidget = {
-					ContextualTooltipType = {
-						blockoverride "title_text" {
-							text = "CURRENT_MERCENARY_SELECTION"
-						}
-						blockoverride "concept_link" {
-							text = [mercenary|E]
-						}
-						
-						blockoverride "title_icon" {
-							icon = {
-								using = tooltip_title_icon_size
-								texture = "gfx/interface/icons/unit_category/mercenary.dds"
-							}
-						}
-						
-						blockoverride "tooltip_content" {
-							TooltipStringPairList = {
-								blockoverride "block_title" {
-									text = "MERCENARY_MONTHLY_FEE_TT_TEXT"
-									default_format = "#W"											
-								}
-								textcontext = "[SetupMercenaryRequirementsView.GetMonthlyCostTooltip]"
-							}
-
-							# TooltipConditionList = {
-							# 	datacontext = "[StringToConditionListOnlyPassedAndNeutralIfNot(SetupMercenaryRequirementsView.CanAccept, SetupMercenaryRequirementsView.GetCanAcceptTooltip)]"
-							# 	visible = "[ConditionList.HasItems]"
-							# }
-
-							TooltipStringPairList = {
-								blockoverride "block_title" {
-									text = "MERCENARY_HIRING_FEE_TT_TEXT"
-									default_format = "#W"
-								}										
-								textcontext = "[SetupMercenaryRequirementsView.GetHirePriceTooltip]"
-							}
-
-						}
-					}
-				}
-
-				hbox = {
-					layoutpolicy_horizontal = expanding
-					spacing = 5
-					margin = { 10 0 }
-					
-					blockoverride "margins" {
-						margin = {-2 0}
-					}
-
-					icon = {
-						size = { 22 22 }
-						texture = "gfx/interface/icons/unit_category/mercenary.dds"
-					
-						modify_texture = {
-							using = color_black_texture
-							blend_mode = overlay
-							alpha = 0.1
-						}
-					
-						glow = {
-							name = "drop_shadow"
-							glow_radius = 2
-							color = {0.0 0.0 0.0 1.0}
-							alpha = 0.7
-						}
-					}
-
-					text_single = {
-						layoutpolicy_vertical = expanding
-						layoutpolicy_horizontal = fixed
-						size = { 190 25 }
-						fontsize = 13
-						autoresize = no
-						align = left|nobaseline
-						using = Font_Type_Standard
-						
-						text = "SELECT_MERCENARIES"
-						default_format = "#L"
-
-						
-					}
-
-					expand = {}
-						
-
-					hbox = {
-						size = { 188 25 }
-						layoutpolicy_horizontal = expanding
-						# Hiring Fee
-						hbox = {
-							text_single = {
-								raw_text = "[SetupMercenaryRequirementsView.GetHirePrice|2]@gold!"
-								align = nobaseline
-							}
-						}
-
-						# Monthly Fee
-						hbox = {
-							text_single = {
-								raw_text = "(#R -[SetupMercenaryRequirementsView.GetMonthlyCost|2]#!@gold!)"
-								align = nobaseline	
-							}
-						}
-					}
-					
-
-					
-					hbox = {
-						layoutpolicy_vertical = fixed
-						maximumsize = { -1 25 }
-						text_single = {
-							layoutpolicy_vertical = expanding
-							layoutpolicy_horizontal = fixed
-							size = { 40 25 }
-							autoresize = no
-							align = right|nobaseline
-							using = Font_Size_Small
-							raw_text = "#L [SetupMercenaryRequirementsView.GetRequestingAmount] #! /"							
-						}
-
-						text_single = {
-							layoutpolicy_vertical = expanding
-							layoutpolicy_horizontal = fixed
-							size = { 30 25 }
-							autoresize = no
-							align = left|nobaseline
-							raw_text = " [Character.GetMaxHiringSubunitsForLeader]"
-						}
 					}
 				}
 			}

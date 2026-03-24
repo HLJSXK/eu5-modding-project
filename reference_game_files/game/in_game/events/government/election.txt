@@ -1,10 +1,95 @@
-﻿namespace = election
+﻿scripted_trigger is_no_junior_monarchy = {
+	OR = {
+		NOT = { government_type = government_type:monarchy }
+		NOT = { exists = union }
+		union ?= {
+			OR = {
+				country_has_special_status = {
+					type = special_status:senior_partner
+					country = prev
+				}
+				any_country_with_special_status_of_type = {
+					type = senior_partner
+					this != root
+					succession_law != root.succession_law
+				}
+			}
+		}
+	}
+}
+
+scripted_trigger is_junior_monarchy = {
+	government_type = government_type:monarchy
+	exists = union
+	union ?= {
+		NOT = {
+			country_has_special_status = {
+				type = special_status:senior_partner
+				country = prev
+			}
+		}
+		any_country_with_special_status_of_type = {
+			type = senior_partner
+			this != root
+			succession_law = root.succession_law
+		}
+	}
+}
+
+scripted_effect elect_new_ruler_with_union = {
+	if = {
+		limit = { exists = union }
+		custom_description = {
+			text = set_new_ruler_with_union
+			object = $character$
+			save_temporary_scope_as = union_country_event_scope
+			every_subject = {
+				limit = { subject_type = { has_overlords_ruler = yes } }
+				set_new_foreign_ruler_no_update = $character$
+			}
+			union ?= {
+				every_international_organization_member = {
+					limit = {
+						this != scope:union_country_event_scope
+						succession_law = scope:union_country_event_scope.succession_law
+					}
+					#don't update the unions....yet
+					set_new_foreign_ruler_no_update = $character$
+					every_subject = {
+						limit = { subject_type = { has_overlords_ruler = yes } }
+						set_new_foreign_ruler_no_update = $character$
+					}
+				}
+			}
+			#now we can update the unions
+			set_new_ruler = $character$
+			union ?= {
+				update_leadership = this
+			}
+		}
+	}
+	else = {
+		set_new_ruler = $character$
+	}
+}
+
+namespace = election
 #Normal Elections
 election.1 = {
 	type = country_event
 
 	title = election.1.title
-	desc = election.1.desc
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { is_junior_monarchy = yes }
+				desc = election.1.desc
+			}
+			triggered_desc = {
+				desc = election.1.desc
+			}
+		}
+	}
 
 
 
@@ -12,6 +97,7 @@ election.1 = {
 		NOT = { succession_law = heir_selection:lottery_election }
 		NOT = { succession_law = heir_selection:diarchic_election }
 		NOT = { succession_law = heir_selection:dynastic_elective_succession }
+		is_no_junior_monarchy = yes
 	}
 	illustration_tags = {
 		10 = happy
@@ -101,20 +187,26 @@ election.1 = {
 
 	option = {
 		name = election.1.a
-		trigger = { exists = scope:candidate_a }
+		trigger = {
+			is_no_junior_monarchy = yes
+			exists = scope:candidate_a
+		}
 		if = {
 			limit = {
 				scope:candidate_a = { is_ruler = yes }
 			}
 			add_government_power = government_power_extreme_penalty
 		}
-		set_new_ruler = scope:candidate_a
+		elect_new_ruler_with_union = { character = scope:candidate_a }
 	}
 
 
 	option = {
 		name = election.1.b
-		trigger = { exists = scope:candidate_b }
+		trigger = {
+			is_no_junior_monarchy = yes
+			exists = scope:candidate_b
+		}
 		if = {
 			limit = {
 				scope:candidate_b = { is_ruler = yes }
@@ -122,13 +214,16 @@ election.1 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_b
+		elect_new_ruler_with_union = { character = scope:candidate_b }
 	}
 
 
 	option = {
 		name = election.1.c
-		trigger = { exists = scope:candidate_c }
+		trigger = {
+			is_no_junior_monarchy = yes
+			exists = scope:candidate_c
+		}
 		if = {
 			limit = {
 				scope:candidate_c = { is_ruler = yes }
@@ -136,12 +231,15 @@ election.1 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_c
+		elect_new_ruler_with_union = { character = scope:candidate_c }
 	}
 
 	option = {
 		name = election.1.d
-		trigger = { exists = scope:candidate_d }
+		trigger = {
+			is_no_junior_monarchy = yes
+			exists = scope:candidate_d
+		}
 		if = {
 			limit = {
 				scope:candidate_d = { is_ruler = yes }
@@ -149,12 +247,15 @@ election.1 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_d
+		elect_new_ruler_with_union = { character = scope:candidate_d }
 	}
 
 	option = {
 		name = election.1.e
-		trigger = { exists = scope:candidate_e }
+		trigger = {
+			is_no_junior_monarchy = yes
+			exists = scope:candidate_e
+		}
 		if = {
 			limit = {
 				scope:candidate_e = { is_ruler = yes }
@@ -162,9 +263,15 @@ election.1 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_e
+		elect_new_ruler_with_union = { character = scope:candidate_e }
 	}
 
+	option = {
+		name = election.1.f
+		trigger = {
+			is_junior_monarchy = yes
+		}
+	}
 }
 
 #Lottery Election
@@ -181,6 +288,7 @@ election.2 = {
 		any_election_candidates = {
 			count > 0
 		}
+		is_no_junior_monarchy = yes
 	}
 	
 	illustration_tags = {
@@ -204,7 +312,7 @@ election.2 = {
 			}
 			add_government_power = government_power_extreme_penalty
 		}
-		set_new_ruler = scope:candidate_a
+		elect_new_ruler_with_union = { character = scope:candidate_a }
 	}
 }
 
@@ -222,6 +330,7 @@ election.3 = {
 	trigger = {
 		succession_law = heir_selection:diarchic_election
 		any_election_candidates = { count > 0 }
+		is_no_junior_monarchy = yes
 	}
 	immediate = {
 		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
@@ -267,33 +376,33 @@ election.3 = {
 
 	option = {
 		name = election.1.a
-		set_new_ruler = scope:candidate_a
+		elect_new_ruler_with_union = { character = scope:candidate_a }
 	}
 
 
 	option = {
 		name = election.1.b
 		trigger = { exists = scope:candidate_b }
-		set_new_ruler = scope:candidate_b
+		elect_new_ruler_with_union = { character = scope:candidate_b }
 	}
 
 
 	option = {
 		name = election.1.c
 		trigger = { exists = scope:candidate_c }
-		set_new_ruler = scope:candidate_c
+		elect_new_ruler_with_union = { character = scope:candidate_c }
 	}
 
 	option = {
 		name = election.1.d
 		trigger = { exists = scope:candidate_d }
-		set_new_ruler = scope:candidate_d
+		elect_new_ruler_with_union = { character = scope:candidate_d }
 	}
 
 	option = {
 		name = election.1.e
 		trigger = { exists = scope:candidate_e }
-		set_new_ruler = scope:candidate_e
+		elect_new_ruler_with_union = { character = scope:candidate_e }
 	}
 }
 
@@ -349,6 +458,7 @@ election.5 = {
 	trigger = {
 		succession_law = heir_selection:diarchic_election
 		any_election_candidates = { count > 0 }
+		is_no_junior_monarchy = yes
 	}
 	illustration_tags = {
 		10 = happy
@@ -361,7 +471,7 @@ election.5 = {
 
 	option = {
 		name = election.5.a
-		set_new_ruler = scope:candidate_a
+		elect_new_ruler_with_union = { character = scope:candidate_a }
 		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_mild_bonus }
 	}
 }
@@ -394,6 +504,7 @@ election.6 = {
 
 	trigger = {
 		succession_law = heir_selection:dynastic_elective_succession
+		is_no_junior_monarchy = yes
 	}
 	illustration_tags = {
 		10 = regular
@@ -496,7 +607,7 @@ election.6 = {
 			}
 			add_government_power = government_power_extreme_penalty
 		}
-		set_new_ruler = scope:candidate_a
+		elect_new_ruler_with_union = { character = scope:candidate_a }
 	}
 
 
@@ -510,7 +621,7 @@ election.6 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_b
+		elect_new_ruler_with_union = { character = scope:candidate_b }
 	}
 
 
@@ -524,7 +635,7 @@ election.6 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_c
+		elect_new_ruler_with_union = { character = scope:candidate_c }
 	}
 
 	option = {
@@ -537,7 +648,7 @@ election.6 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_d
+		elect_new_ruler_with_union = { character = scope:candidate_d }
 	}
 
 	option = {
@@ -550,7 +661,7 @@ election.6 = {
 			add_government_power = government_power_extreme_penalty
 		}
 
-		set_new_ruler = scope:candidate_e
+		elect_new_ruler_with_union = { character = scope:candidate_e }
 	}
 
 }

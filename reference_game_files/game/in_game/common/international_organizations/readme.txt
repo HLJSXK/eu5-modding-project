@@ -76,13 +76,15 @@
 #		    hidden = <yes/no> if we want to display this var to the world
 #		    monthly_change_hidden = <yes/no> if we want to display any monthly change of this var to the world
 #       }
-# - special_statuses_implemented: list of <special status tags>s of special statuses implemented initailly when setting up the international organization. Special statuses are from the international_organization_special_statuses folder. Tehy can also be added or repealed using laws and policies.
+# - special_statuses_implemented: list of <special status tags>s of special statuses implemented initailly when setting up the international organization. Special statuses are from the international_organization_special_statuses folder. They can also be added or repealed using laws and policies.
 # - payments_implemented: list of <payment tag>s of payments implemented initially when setting up the international organization. Payments are from the international_organization_payments folder. They can also be added or repealed using laws and policies.
 # - ai_desire_to_join: how much the AI wants to join the org (root = potential joiner, actor = potential leader, recipient = existing organization if it already exists, target = target if available)
 # - ai_desire_to_allow_new_member: how much the AI wants to accept a new member (root = international organization, actor = potential new member, target = target if available)
+# - ai_desire_to_attack_other_members: how much the AI wants to attack other members (root = attacking member, defender = attacked member, recipient = international organization, target = target if available)
 # - modifier: modifiers we apply to members (scale - root = country, scope:recipient = organization)
 # - leader_modifier: modifiers we apply to the leader (scale - root = country, scope:recipient = organization)
 # - non_leader_modifier: modifiers we apply to every member who is not the leader (scale - root = country, scope:recipient = organization)
+# - target_modifier: modifiers we apply to the target of the io (scale - root = country, scope:recipient = organization)
 # - international_organization_modifier: modifiers which are applied on the international organization as a base (root = organization)
 # - can_join_trigger: can we join this organization type (root = potential joiner, actor = potential leader, recipient = existing organization if it already exists, target = target if available)
 # - can_leave_trigger: can we leave this organization type (root = potential leaver, recipient = existing organization)
@@ -105,6 +107,8 @@
 # - can_build_roads_in_members = yes/no: whether members can build roads in locations owned by other members
 # - can_build_buildings_in_members = yes/no: whether members can build buildings in locations owned by other members
 # - can_build_rgos_in_members = yes/no: whether members can build rgos in locations owned by other members
+# - annulled_by_peace_treaty = yes/no: if yes, an annull treaties peace treaty will force a country out of this IO if the other country is also in it
+# - annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically
 # - opinion_bonus = float: additional opinion bonus applied to all members
 # - opinion_trust = float: additional trust bonus applied to all members
 # - can_initiate_policy_votes: trigger to determine if a country can initiate votes on policies in the IO. (root = country, recipient = IO)

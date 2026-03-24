@@ -4,8 +4,11 @@
 # allow = trigger, scope:winner = taker, scope:loser = giver, scope:war = war they're in, scope:target = location/country/province specified
 # effect = effect when the treaty is executed, scope:winner = taker, scope:loser = giver, scope:war = war they're in, scope:target = location/country/province specified
 # blocks_full_annexation = yes, prevents the target to be fully annexed when this peace treaty is used
+# collate_targets = yes/no, can the targets be combined from all givers (i.e. is the treaty giver agnostic)
 # are_targets_exclusive = yes, makes location and province targets exclusive so the treaty can't be combined with cede treaties
 # category = country/location/province/area, allows you to put the scripted peace treaty in one of the other categories
+# custom_tags = { <strings> }	#A list of custom strings to use to identify that peace treaty
+# show_tags_in_ui = yes/no #expose the tags in the tooltips and UI
 # select_trigger = can add one of these to allow selection of targets/parameters for the treaty. They get stored in scope:target
 #				   format: 
 #						looking_for_a = character/location/province/area/region/country/value/boolean etc
@@ -26,6 +29,7 @@
 #						name = localisation name of the title for the selection stage
 #						allow_null = yes/no to allow the selection of a null object, can be a trigger to check under what circumstances should null be included / excluded instead
 #                       allow_self = yes/no to allow the actor to be added to the list (only works for countries)
+#                       move_to_next_section_on_click yes/no should the UI move to the next stage when you click on an item. Usually left to the default yes, but set to no if you have some other UI that will perform that action somewhere else
 #						top_widget = links to a widget type in the gui files to show at the top of the list. 
 #						bottom_widget = links to a widget type in the gui files to show at the bottom of the list. 
 #						column = { data = <column_id> width = <int> icon = <path> show_icon_in_cells = yes/no } adds a column to the UI to search with

@@ -5,7 +5,22 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 	category = situation_event
 
 	title = hussite_wars.1.title
-	desc = hussite_wars.1.desc
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					OR = {
+						religion = religion:catholic
+						religion = religion:hussite
+					}
+				}
+				desc = hussite_wars.1.desc
+			}
+			triggered_desc = { 
+				desc = hussite_wars.1.desc.other_heresy
+			}
+		}
+	}
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	dynamic_historical_event = {
 		tag = BOH
@@ -15,6 +30,7 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 	}
 
 	trigger = {
+		religion.group = religion_group:christian
 		OR = {
 			"religion_percentage_in_country(religion:hussite)" > 0.2
 			religion = religion:hussite
@@ -81,27 +97,25 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 		}
 		else = { add_religious_influence = religious_influence_mild_bonus }
 
-		custom_tooltip = {
-			text = lots_of_hussites_tt
-			lots_of_hussites = yes
+		if = {
+			limit = {
+				has_ruler = yes
+				ruler = { has_character_modifier = enacted_placitum_regium }
+			}
+
+			ruler = { remove_character_modifier = enacted_placitum_regium }
 		}
 
-		custom_tooltip = catholics_upset_tt
+		lots_of_religion = {
+			religion = religion:hussite
+			other_religion = religion:catholic
+		}
+		upset_countries_of_religion = {
+			religion = religion:catholic
+			modifier = religious_disagreements_modifier
+		}
+
 		hidden_effect = {
-			religion:catholic = {
-				every_country_in_religion = {
-					limit = {
-						OR = {
-							NOT = { is_allied_with = { target = c:BOH } }
-							NOT = { is_subject_of = c:BOH }
-						}
-					}
-					add_opinion = {
-						modifier = religious_disagreements_modifier
-						target = c:BOH
-					}
-				}
-			}
 			destroy_rebel = scope:hussite_rebel_scope
 		}
 
@@ -130,9 +144,9 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 			change_religion_for_ruler_and_family = { country = ROOT religion = religion:catholic }
 		}
 
-		custom_tooltip = {
-			text = lots_of_hussites_tt
-			lots_of_hussites = yes
+		lots_of_religion = {
+			religion = religion:hussite
+			other_religion = religion:catholic
 		}
 
 		custom_tooltip = {
@@ -159,6 +173,52 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 			modifier = civil_war_looming
 			years = 10
 			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = hussite_wars.1.c
+		trigger = {
+			NOT = { religion = religion:catholic }
+			NOT = { religion = religion:hussite }
+		}
+		add_religious_influence = religious_influence_mild_bonus
+		lots_of_religion = {
+			religion = religion:hussite
+			other_religion = religion:catholic
+		}
+		upset_countries_of_religion = {
+			religion = religion:catholic
+			modifier = religious_disagreements_modifier
+		}
+		hidden_effect = {
+			destroy_rebel = scope:hussite_rebel_scope
+		}
+		religion = {
+			set_mutual_religious_view = {
+				target = religion:catholic
+				value = enemy
+			}
+			set_mutual_religious_view = {
+				target = religion:hussite
+				value = kindred
+			}
+		}
+		religion:hussite = {
+			set_mutual_religious_view = {
+				target = religion:catholic
+				value = enemy
+			}
+		}
+		custom_tooltip = pap_gets_hussite_wars.2_tt
+		hidden_effect = {
+			c:PAP = { trigger_event_non_silently = hussite_wars.2 }
+		}
+		add_religious_influence = religious_influence_ultimate_bonus
+		add_country_modifier = {
+			modifier = heretical_bohemian_defense_modifier
+			years = 3
+			mode = replace
 		}
 	}
 }
@@ -241,6 +301,7 @@ hussite_wars.2 = { #Hussite Protests Turn Violent in [BOH.GetCountry.GetCapital.
 							is_rival_of = c:PAP
 							is_enemy_of = c:PAP
 						}
+						NOT = { tag = POL }		#Theirs comes later if they decline hussite_wars.7!
 					}
 					trigger_event_silently = hussite_wars.3
 					set_variable = had_hussite_wars3_event_variable
@@ -306,19 +367,9 @@ hussite_wars.2 = { #Hussite Protests Turn Violent in [BOH.GetCountry.GetCapital.
 			type = estate_type:clergy_estate
 			value = estate_satisfaction_radical_penalty
 		}
-		custom_tooltip = catholics_upset_tt
-		hidden_effect = {
-			religion:catholic = {
-				every_country_in_religion = {
-					limit = {
-						NOT = { tag = PAP }
-					}
-					add_opinion = {
-						modifier = folded_to_hussites_modifier
-						target = c:PAP
-					}
-				}
-			}
+		upset_countries_of_religion = {
+			religion = religion:catholic
+			modifier = folded_to_hussites_modifier
 		}
 		c:BOH = {
 			add_prestige = prestige_extreme_bonus
@@ -567,14 +618,13 @@ hussite_wars.6 = { #Heretics at the Gates
 	option = { #Hussites must be suppressed
 		name = hussite_wars.3.a
 
-		ai_chance = {
-			factor = 10
-			modifier = {
-				factor = 0.75
-				opinion = {
-					target = c:BOH
-					value >50
-				}
+		ai_will_select = {
+			add = "opinion(c:PAP)"
+			subtract = "opinion(c:BOH)"
+
+			if = {
+				limit = { at_war = yes }
+				subtract = 25
 			}
 		}
 
@@ -598,15 +648,9 @@ hussite_wars.6 = { #Heretics at the Gates
 	option = { #We don't care.
 		name = hussite_wars.3.b
 
-		ai_chance = {
-			factor = 10
-			modifier = {
-				factor = 0.75
-				opinion = {
-					target = c:BOH
-					value < 10
-				}
-			}
+		ai_will_select = {
+			add = "opinion(c:BOH)"
+			subtract = "opinion(c:PAP)"
 		}
 
 		add_religious_influence_if_valid = {
@@ -637,7 +681,10 @@ hussite_wars.7 = { #The Plight of the Hussites
 			}
 		}
 
-		set_variable = pending_relevant_event_variable
+		set_variable = {
+			name = pending_relevant_event_variable
+			months = 5
+		}
 	}
 
 
@@ -645,15 +692,10 @@ hussite_wars.7 = { #The Plight of the Hussites
 		name = hussite_wars.7.a
 
 		historical_option = yes
-		ai_chance = {
-			factor = 10
-			modifier = {
-				factor = -1
-				opinion = {
-					target = c:BOH
-					value >50
-				}
-			}
+		ai_will_select = {
+			add = 25
+			add = "opinion(c:BOH)"
+			subtract = "opinion(c:PAP)"
 		}
 
 		c:BOH = {
@@ -687,19 +729,19 @@ hussite_wars.7 = { #The Plight of the Hussites
 	option = { #We don't care.
 		name = hussite_wars.7.b
 
-		ai_chance = {
-			factor = 10
-			modifier = {
-				factor = 0.25
-				opinion = {
-					target = c:BOH
-					value <50
-				}
-			}
+		ai_will_select = {
+			subtract = 25
+			add = "opinion(c:PAP)"
+			subtract = "opinion(c:BOH)"
 		}
 
 		add_stability = stability_mild_penalty
 		add_government_power = government_power_extreme_penalty
+
+		trigger_event_silently = {
+			id = hussite_wars.3
+			days = { 45 100 }
+		}
 	}
 
 	after = { remove_variable = pending_relevant_event_variable }

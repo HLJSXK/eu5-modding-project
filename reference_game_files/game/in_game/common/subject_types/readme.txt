@@ -2,8 +2,8 @@
 #
 # visible_through_diplomacy = <trigger> is this subject type visible through diplomacy in general. root = overlord, target = subject
 # enabled_through_diplomacy = <trigger> is this subject type enabled through diplomacy. root = overlord, target = potential subject
-# visible_through_treaty = (optional) <trigger> is this subject type visible to be offered in a peace treaty. root = overlord, target = subject, war = current war
-# enabled_through_treaty = (optional) <trigger> is this subject type enabled in a peace treaty. root = overlord, target = potential subject, war = current war
+# visible_through_treaty = (optional) <trigger> is this subject type visible to be offered in a peace treaty. root = overlord, target = subject, recipient = peace offer recipient, war = current war
+# enabled_through_treaty = (optional) <trigger> is this subject type enabled in a peace treaty. root = overlord, target = potential subject, recipient = peace offer recipient, war = current war
 # creation_visible = <trigger> can this subject type be created in general. root = overlord
 # subject_creation_enabled = <trigger> can a new province or building subject be released with this subject type. root = overlord, target_province = potential geography for location- or region- based subject types
 # release_country_enabled = <trigger> can the potential overlord create released countries as this subject type. root = overlord, target = potential subject
@@ -33,7 +33,8 @@
 # join_defensive_wars_auto_call = <trigger> does one country automatically get a call to arms from a other in defensive wars (root = subject type, scope:actor = caller, scope:recipient = callee, scope:target (optional) = against who)
 # join_defensive_wars_can_call = <trigger> does one country allow a call to arms from a other in defensive wars (root = subject type, scope:actor = caller, scope:recipient = callee, scope:target (optional) = against who)
 # can_attack = <trigger> can one of the countries in the relation attack a particular country (root = subject type, scope:overlord = overlord in the relation, scope:subject = subject in the relation, scope:attacker = country that wants to attack (will be either overlord or subject), scope:defender = country they want to attack)
-# has_overlords_ruler = <yes/no> whether or not the subject has the overlord's ruler as their ruler
+# has_overlords_ruler = <yes/no> whether or not the subject has the overlord's ruler as their ruler. This will make the subject leave its union and put in a regency if the overlord has not a ruler at the moment the subject gets created
+# has_overlords_religion = <yes/no> whether or not the subject has the overlord's religion as their religion.
 # has_limited_diplomacy = <yes/no> whether or not the subject's diplomacy options are limited by the overlord
 # can_change_rank = <yes/no> whether or not the subject can change their country rank
 # can_change_heir_selection = <yes/no> whether or not the subject can change their heir selection method
@@ -45,6 +46,7 @@
 # food_access = <yes/no> whether or not the subject gives food access to the overlord
 # use_overlord_laws = <yes/no> whether or not the subject gives uses the same set of laws and policies as the overlord
 # annulled_by_peace_treaty = <yes/no> whether this subject type gets broken / becomes unavailable when treaties get annulled, default: yes
+# annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically
 # allow_declaring_wars = <trigger> whether or not the subject can declare their own wars. (root = subject type, scope:attacker = subject trying to declare war, scope:defender = country they are trying to declare war on)
 # use_overlord_map_color = <yes/no> whether the subject shows in the same color as the overlord on the map
 # use_overlord_map_name = <yes/no> whether the subject shows in the same name as the overlord on the map

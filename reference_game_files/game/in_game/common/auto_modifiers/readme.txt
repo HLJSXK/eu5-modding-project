@@ -13,4 +13,5 @@
 # - scales_with: evaluates a value to multiply the auto modifier effects by
 # - limit: trigger checks to see when the auto modifier can be applied
 # - hide_effects: (yes/no) is this a hidden modifier
+# - alert: (yes/no) should this modifier show in the alerts when it is active?
 # Everything else is the modifiers to be applied

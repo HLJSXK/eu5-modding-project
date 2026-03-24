@@ -19,7 +19,7 @@
 # - destroy_price: <price> price to destroy the building
 # - estate: <estate type> what estate can build the building
 # - max_levels: <scripted integer> maximum levels the building can be upgraded to (root = location, scope:owner = building owner, scope:builder = who's paying)
-# - allow: <trigger> can the building be built in the location (root = location) (think of this as an "enabled" check)
+# - allow: <trigger> can the building be built in the location (root = location, scope:actor = country building it) (think of this as an "enabled" check)
 # - location_potential: <trigger> can the building be built in the location (root = location) (think of this as a "visible" check)
 # - country_potential: <trigger> can the building be built by the country (root = country) (think of this as a "visible" check)
 # - can_destroy: <trigger> can the building be destroyed in the location (root = location, actor = destroyer, building = building)
@@ -39,3 +39,4 @@
 # - custom_tags = { <strings> } #A list of custom strings to use to identify that building type
 # - AI_ignore_available_worker_flag = <yes/no> AI will build this building even if it is lacking the required pop type
 # - important_for_AI = <yes/no> When set it makes the AI use more performance trying to find a suitable place to build this
+# - important_for_UI = <yes/no> When set the building type can appear in important UI elements (e.g. high-priority alerts)

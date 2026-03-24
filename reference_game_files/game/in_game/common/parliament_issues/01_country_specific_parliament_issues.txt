@@ -11,8 +11,8 @@ baronial_burghs_rights = {
 			culture = culture:scottish
 		}
 		NOR = {
-				current_age = age_1_traditions
-				current_age = age_2_renaissance
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
 		}
 	}
 
@@ -234,10 +234,16 @@ appease_english_population = {
 		}
 		OR = {
 			c:GBR = {
-				in_union_with = ROOT
+				OR = {
+					in_union_with = ROOT
+					is_subject_of = ROOT
+				}
 			}
 			c:ENG = {
-				in_union_with = ROOT
+				OR = {
+					in_union_with = ROOT
+					is_subject_of = ROOT
+				}
 			}
 		}
 	}
@@ -245,7 +251,10 @@ appease_english_population = {
 		if = {
 			limit = {
 				c:GBR = {
-					is_subject_of = ROOT
+					OR = {
+						in_union_with = ROOT
+						is_subject_of = ROOT
+					}
 				}
 			}
 			c:GBR = {
@@ -263,7 +272,10 @@ appease_english_population = {
 		if = {
 			limit = {
 				c:ENG = {
-					is_subject_of = ROOT
+					OR = {
+						in_union_with = ROOT
+						is_subject_of = ROOT
+					}
 				}
 			}
 			c:ENG = {
@@ -289,7 +301,7 @@ increase_control_in_britain = {
 	estate = crown_estate
 
 	modifier_when_in_debate = {
-		global_monthly_control = 0.001
+		global_monthly_control = 0.01
 	}
 	allow = {
 		has_or_had_tag = NED
@@ -297,32 +309,38 @@ increase_control_in_britain = {
 			type = increase_control_in_britain
 		}
 		has_presence_in = region:great_britain_region
-		any_owned_location = {
-			percent >= 0.1
-			region = region:great_britain_region
-			OR = {
-				location_rank = location_rank:town
-				location_rank = location_rank:city
-			}
+		culture_group_percentage_in_country = {
+			culture_group = culture_group:british_group
+			value > 0.1
 		}
 	}
 	on_debate_passed = {
-		ordered_owned_location = {
-			order_by = population
+		ordered_owned_non_rural_location = {
+			limit = {
+				OR = {
+					region = region:great_britain_region 
+					culture_group_percentage = {
+						culture_group = culture_group:british_group
+						value > 0
+					}
+				} 
+				is_province_capital = yes
+			}
+			order_by = {
+				add = population
+				multiply = local_control
+			}
 			max = {
 				value = num_provinces
-				multiply = 0.1
-				add = 1
+				multiply = "root.estate_power(estate_type:crown_estate)"
 			}
-			limit = {
-				region = region:great_britain_region
-				OR = {
-					location_rank = location_rank:town
-					location_rank = location_rank:city
+			province = {
+				add_province_modifier = {
+					modifier = increasing_local_authority
+					years = modifier_duration_years_long
+					mode = replace
 				}
-				local_control <= 0.8
 			}
-			change_control = control_mild_bonus
 		}
 	}
 	on_debate_failed = {
@@ -343,29 +361,17 @@ tolerance_of_non_hindus = {
 		}
 		religion = religion:hindu
 		
-		any_owned_location = {
-			any_pop = {
-				percent >= 0.05
-				NOT = { religion = root.religion }
-			}
-		}
+		religious_unity < 0.95
 	}
 	on_debate_passed = {
 		custom_tooltip = {
 			text = VIJ_ALL_NON_HINDU_POPS_GAIN_SATISFACTION
-			every_owned_location = {
+			every_pop = {
 				limit = {
-					any_pop = {
-						NOT = { religion = root.religion }
-					}
+					owner = root
+					NOT = { religion = root.religion }
 				}
-				every_pop = {
-					limit = {
-						owner = root
-						NOT = { religion = root.religion }
-					}
-					add_pop_satisfaction = pop_satisfaction_severe_bonus
-				}
+				add_pop_satisfaction = pop_satisfaction_severe_bonus
 			}
 		}
 	}
@@ -387,23 +393,13 @@ increase_non_hindu_control = {
 		}
 		religion = religion:hindu
 		
-		any_owned_location = {
-			any_pop = {
-				percent >= 0.05
-				NOT = { religion = root.religion }
-			}
-		}
+		religious_unity < 0.95
 	}
 	on_debate_passed = {
 		custom_tooltip = {
 			text = VIJ_ALL_NON_HINDU_POPS_LOCATIONS_GAIN_CONTROL
 			every_owned_location = {
-				limit = {
-					any_pop = {
-						percent >= 0.05
-						NOT = { religion = root.religion }
-					}
-				}
+				limit = { local_religious_unity < 0.95 }
 				change_control = control_mild_bonus
 			}
 		}
@@ -429,32 +425,43 @@ dlh_famine_reductions = {
 				has_variable = dlh_famine_reduction_flag
 			}
 		}
-		any_owned_location = {
-			raw_material = {
-				goods_method = farming
-			}
-			is_full_expanded_rgo = no
-		}
+		any_market_center_in_country = { market_food_percentage < 0.9 }
 	}
 	on_debate_passed = {
 		add_estate_satisfaction = {
 			type = estate_type:peasants_estate
 			value = estate_satisfaction_mild_bonus
 		}
-		ordered_owned_location = {
-			limit = {
-				raw_material = {
-					goods_method = farming
+		ordered_market_center_in_country = {
+			limit = { market_food_percentage < 0.9 }
+
+			order_by = {
+				value = market_food_percentage
+				multiply = -1
+			}
+
+			max = 2
+
+			ordered_location_in_market = {
+				limit = { 
+					is_province_capital = yes
+					owner ?= root 
 				}
-				is_full_expanded_rgo = no
+				order_by = {
+					value = province.province_food_percentage
+					multiply = -1
+				}
+
+				max = 2
+
+				province = {
+					add_province_modifier = {
+						modifier = expanded_food_production_modifier
+						years = modifier_duration_years_long
+						mode = replace
+					}
+				}
 			}
-			order_by = population
-			max = {
-				value = num_provinces
-				multiply = 0.05
-				add = 1
-			}
-			change_max_raw_material_workers = 1
 		}
 	}
 	on_debate_failed = {
@@ -466,7 +473,7 @@ dlh_famine_reductions = {
 new_model_army_pi = {
 	estate = crown_estate
 
-	allow = { has_variable = allow_new_model_army_pi_variable }
+	potential = { has_variable = allow_new_model_army_pi_variable }
 
 	modifier_when_in_debate = {
 		land_morale_modifier = 0.1
@@ -495,7 +502,7 @@ edict_of_nantes_issue = {
 	allow = { always = no }
 	on_debate_passed = {
 		custom_tooltip = {
-			text = end_the_french_wars_of_religion_tt
+			text = end_the_french_wars_religion_tt
 			if = {
 				limit = { 
 					NOT = { has_variable = enable_fra_tolerance_edicts }
@@ -536,18 +543,9 @@ mug_promote_rajput_officials = {
 				estate = estate_type:dhimmi_estate
 				culture = scope:target_culture
 				religion = religion:hindu
-				adm = {
-					30
-					60
-				}
-				dip = {
-					20
-					50
-				}
-				mil = {
-					50
-					80
-				}
+				adm = { 30 60 }
+				dip = { 20 50 }
+				mil = { 50 80 }
 			}
 		}
 	}

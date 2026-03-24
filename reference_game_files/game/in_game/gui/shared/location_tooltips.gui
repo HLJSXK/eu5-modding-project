@@ -752,39 +752,71 @@ types LocationDetailsTypes {
                 text_single = {
                     autoresize = yes
                     align = right
-                    raw_text = "[Location.GetTotalTaxBase|2]"
+                    raw_text = "[Location.GetTotalPossibleTaxBase|2]"
                     default_format = "#yellow_titles"
                 }
+                # icon_pie_left = {
+                #     visible = "[GreaterThan_CFixedPoint(Location.GetTotalTaxBase, '(CFixedPoint)0')]"
+                #     tooltipwidget = {
+                #         using = location_tax_base_tooltip
+                #     }
+                #     blockoverride "PieSize" { size = { 24 24 } }
+                #     blockoverride "pie_datamodel" {
+                #         datacontext = "[Location.GetPopulationChart]"
+                #         datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
+                #         datamodel = "[PopsPiechartWidget.GetTax]"
+                #     }
+
+                #     blockoverride "pieslice_item" {
+                #         pieslice_no_highlight = {
+                #             texture = "gfx/interface/pie_charts/piechart_alpha.dds"
+                #             texture_density = 2
+                #             tooltip_enabled = no
+                #             value = "[PopTaxItem.GetPercentage]"
+                #             color = "[PopTaxItem.GetColor]"
+                #             alpha = 0.99
+                #             alwaystransparent = yes
+                #         }
+                #     }
+                #     blockoverride "Icon_Size" { size = { 60% 60% } }
+                #     blockoverride "Icon" {
+                #         texture = "gfx/interface/icons/location_icons/tax_base.dds"
+                #         texture_density = 2
+                #         alwaystransparent = yes
+                #     }
+
+                #     background = {
+                #         texture = "gfx/interface/component_tiles/hud_corners/circle_frame.dds"
+                #         texture_density = 2
+
+                #         modify_texture = {
+                #             using = color_gold_texture
+                #         }
+
+                #         using = overlay_gold
+                #     }
+                # }
                 icon_pie_left = {
-                    visible = "[GreaterThan_CFixedPoint(Location.GetTotalTaxBase, '(CFixedPoint)0')]"
+                    visible = "[GreaterThan_CFixedPoint(Location.GetTotalPossibleTaxBase, '(CFixedPoint)0')]"
                     tooltipwidget = {
                         using = location_tax_base_tooltip
                     }
                     blockoverride "PieSize" { size = { 24 24 } }
-                    blockoverride "pie_datamodel" {
-                        datacontext = "[Location.GetPopulationChart]"
-                        datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
-                        datamodel = "[PopsPiechartWidget.GetTax]"
-                    }
+                    blockoverride "pie_datamodel" { datamodel = "[DataModelSkipFirst(Location.GetOwner.GetGovernment.GetEstates, '(int32)1')]" }
 
                     blockoverride "pieslice_item" {
                         pieslice_no_highlight = {
                             texture = "gfx/interface/pie_charts/piechart_alpha.dds"
                             texture_density = 2
                             tooltip_enabled = no
-                            value = "[PopTaxItem.GetPercentage]"
-                            color = "[PopTaxItem.GetColor]"
+                            value = "[Location.GetEstateTaxBasePercent(Estate.Self)]"
+                            color = "[Estate.GetType.GetMapColor]"
                             alpha = 0.99
                             alwaystransparent = yes
                         }
                     }
+                    blockoverride "Icon" { texture = "[GetConceptTexture('wealth')]" }
                     blockoverride "Icon_Size" { size = { 60% 60% } }
-                    blockoverride "Icon" {
-                        texture = "gfx/interface/icons/location_icons/tax_base.dds"
-                        texture_density = 2
-                        alwaystransparent = yes
-                    }
-
                     background = {
                         texture = "gfx/interface/component_tiles/hud_corners/circle_frame.dds"
                         texture_density = 2
@@ -798,7 +830,7 @@ types LocationDetailsTypes {
                 }
                 widget = {
                     # visible = "[Location.HasOwner]"
-                    visible = "[Not(GreaterThan_CFixedPoint(Location.GetTotalTaxBase, '(CFixedPoint)0'))]"
+                    visible = "[Not(GreaterThan_CFixedPoint(Location.GetTotalPossibleTaxBase, '(CFixedPoint)0'))]"
                     size = { 24 24 }
                     icon = {
                         size = { 100% 100% }
@@ -1336,7 +1368,7 @@ template LocationProximity_tooltip {
                 }
             }
             TooltipTextBlock = { #PROXIMITY = 0
-                visible = "[And(Not(Location.IsCapital), EqualTo_CFixedPoint(Location.GetProximityToOwnerCapital, '(CFixedPoint)0'))]"
+                visible = "[And(Not(Location.IsCapital), LessThanOrEqualTo_CFixedPoint(Location.GetProximityToOwnerCapital, '(CFixedPoint)0'))]"
                 blockoverride "text" {
                     text = "NO_PROXIMITY_TT_TEXT"
                 }
@@ -1347,7 +1379,7 @@ template LocationProximity_tooltip {
                 }
             }
             TooltipScrolledStringPairList = { #PROXIMITY PATH
-                visible = "[And(Not(Location.IsCapital), Not(EqualTo_CFixedPoint(Location.GetProximityToOwnerCapital, '(CFixedPoint)0')))]"
+                visible = "[Not(Location.IsCapital)]"
                 blockoverride "block_title" {
                     text = "PROXIMITY_LIST_TITLE"
                 }
@@ -1417,6 +1449,12 @@ template location_food_tooltip {
                 }
                 textcontext = "[Location.GetFoodsOutputModifiersTooltip]"
             }
+			
+			
+			TooltipStringPairList = {
+				visible = "[Location.IsProvinceCapital]"
+				textcontext = "[Location.GetFoodDecayInfo]"
+			}
 
             TooltipListBase = {
                 blockoverride "block_title" {
@@ -2343,7 +2381,7 @@ template location_control_tooltip {
                                 }
                                 expand = {}
                                 text_single = {
-                                    raw_text = "[Location.GetControl|%0W]"
+                                    raw_text = "[Location.GetControl|%2W]"
                                 }
                             }
                         }
@@ -2407,11 +2445,11 @@ template location_control_tooltip {
                     TooltipManualTableField = {
                         blockoverride "field_content" {
                             text_single = {
-                                raw_text = "[max_tax_base|e]:"
+                                raw_text = "[wealth|e]"
                             }
                             expand = {}
                             text_single = {
-                                raw_text = "[Location.GetTotalPossibleTaxBase|2] [max_tax_base_icon]"
+                                raw_text = "[Location.GetTotalPossibleTaxBase|2] [wealth_icon]"
                             }
                         }
                     }
@@ -2419,7 +2457,7 @@ template location_control_tooltip {
                     TooltipManualTableField = {
                         blockoverride "field_content" {
                             text_single = {
-                                text = "LOCATION_CONTROL_TAX_BASE"
+                                raw_text = "[tax_base|e]"
                             }
                             expand = {}
                             text_single = {
@@ -2452,17 +2490,38 @@ template location_tax_base_details {
                 parentanchor = center
                 blockoverride "PieSize" { size = { 90% 90% } }
                 blockoverride "pie_datamodel" {
-                    datacontext = "[Location.GetPopulationChart]"
-                    datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
-                    datamodel = "[PopsPiechartWidget.GetTax]"
+                    # datacontext = "[Location.GetPopulationChart]"
+                    # datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
+                    # datamodel = "[PopsPiechartWidget.GetTax]"
+                    datamodel = "[DataModelSkipFirst(Location.GetOwner.GetGovernment.GetEstates, '(int32)1')]"
                 }
 
                 ###Slices and Icon
-                blockoverride "SliceTooltip" {}
-                blockoverride "SliceValue" { value = "[PopTaxItem.GetPercentage]" }
-                blockoverride "SliceColor" { color = "[PopTaxItem.GetColor]" }
+                blockoverride "SliceTooltip" {
+                    tooltipwidget = {
+                        SimpleContextualTooltipType = {
+                            blockoverride "title_icon" {
+                                icon = {
+                                    using = tooltip_title_icon_size
+                                    texture = "gfx/interface/icons/location_icons/tax_base.dds"
+                                }
+                            }
+                            blockoverride "title_text" {
+                                text = "TAX_BASE_TT_ESTATES_LIST_SHARE_TITLE"
+                            }
+
+                            blockoverride "concept_link" {
+                                text = "[wealth_share|e]"
+                            }
+
+                            textcontext =  "TAX_BASE_TT_ESTATES_LIST_SHARE"
+                        }
+                    }
+                }
+                blockoverride "SliceValue" { value = "[Location.GetEstateTaxBasePercent(Estate.Self)]" }
+                blockoverride "SliceColor" { color = "[Estate.GetType.GetMapColor]" }
                 blockoverride "Icon" {
-                    texture = "gfx/interface/icons/location_icons/tax_base.dds"
+                    texture = "[GetConceptTexture('wealth')]"
                 }
                 blockoverride "Icon_Size" { size = { 55% 55% } }
                 blockoverride "datamodel" { visible = no }
@@ -2470,50 +2529,92 @@ template location_tax_base_details {
                 # using = bg_circle_piechart
             }
 
-            tooltip = "[tax_base_share]"
+            tooltip = "[wealth_share]"
             tagtooltip_enabled = yes
 
         }
+        
+        vbox = {
+            spacing = 10
 
-        TooltipListBase = { ### SIDE TABLE
-            blockoverride "block_title" {
-                text = "TAX_BASE_TT_LIST_TITLE"
-            }
-            TooltipListRowContent = {
-                TooltipManualTableField = {
-                    blockoverride "field_content" {
-                        text_single = {
-                            text = "[max_tax_base|e]"
-                        }
-                        expand = {}
-                        text_single = {
-                            raw_text = "[Location.GetTotalPossibleTaxBase|W2] [max_tax_base_icon]"
-                            tagtooltip_enabled = yes
-                            tooltip = "[max_tax_base|e]"
+            TooltipListBase = { ### SIDE TABLE
+                # blockoverride "block_title" {
+                #     text = "TAX_BASE_TT_LIST_TITLE"
+                # }
+                TooltipListRowContent = {
+                    TooltipManualTableField = {
+                        blockoverride "field_content" {
+                            text_single = {
+                                text = "[wealth|e]"
+                            }
+                            expand = {}
+                            text_single = {
+                                raw_text = "[Location.GetTotalPossibleTaxBase|W2] [wealth_icon]"
+                                tagtooltip_enabled = yes
+                                tooltip = "[wealth|e]"
+                            }
                         }
                     }
+    
+                    TooltipManualTableField = {
+                        blockoverride "field_content" {
+                            text_single = {
+                                text = "TAX_BASE_TT_LIST"
+                                tooltipwidget = {
+                                    using = location_control_tooltip
+                                }
+                            }
+                            expand = {}
+                            text_single = {
+                                raw_text = "[Location.GetTotalTaxBase|W2] [tax_base_icon]"
+                                
+                                tagtooltip_enabled = yes
+                                tooltip = "[tax_base|e]"
+                            }
+                        }
+                    }
+    
+                    # TooltipManualTableField = {
+                    #     blockoverride "field_content" {
+                    #         text_single = {
+                    #             text = "TAX_BASE_TT_INCOME_TEXT"
+                    #         }
+                    #         expand = {}
+                    #         text_single = {
+                    #             raw_text = "[Location.GetTotalIncome|+=2]@income!"
+                    #             tagtooltip_enabled = yes
+                    #             tooltip = "[taxes|e]"
+                    #         }
+                    #     }
+                    # }
                 }
-
-                TooltipManualTableField = {
-                    blockoverride "field_content" {
-                        tooltipwidget = {
-                            using = location_control_tooltip
+            }
+    
+            TooltipStringPairList = {
+                visible = "[Location.HasOwner]"
+                textcontext = "TAX_BASE_PEASANT_ENFRANCH"
+                tooltipwidget = {
+                    SimpleContextualStringPairTooltipType = {
+                        blockoverride "title_icon" {
+                            icon = {
+                                using = tooltip_title_icon_size
+                                texture = "[GetConceptTexture('peasant_enfranchisement')]"
+                            }
                         }
-                        text_single = {
-                            text = "TAX_BASE_TT_LIST"
+                        
+                        blockoverride "concept_link" {
+                            text = "[peasant_enfranchisement|e]"
                         }
-                        expand = {}
-                        text_single = {
-                            raw_text = "[Subtract_CFixedPoint(Location.GetControl, '(CFixedPoint)1.0')|%2+]"
-                        }
+                        lowpriotextcontext =  "[Location.GetPeasantEnfranchismentInfo]"
                     }
                 }
             }
         }
+
     }
 
     TooltipListBase = { ### ESTATES TAXES
-        visible = "[GreaterThan_CFixedPoint(Location.GetTotalTaxBase, '(CFixedPoint)0')]"
+        visible = "[GreaterThan_CFixedPoint(Location.GetTotalPossibleTaxBase, '(CFixedPoint)0')]"
         blockoverride "block_title" {
             text = "TAX_BASE_TT_ESTATES_LIST_TITLE"
         }
@@ -2555,7 +2656,45 @@ template location_tax_base_details {
                     expand = {}
                 }
                 blockoverride "column_title_text" {
-                    text = "[tax_base_share|e]"
+                    text = "[wealth_share|e]"
+                }
+
+                blockoverride "field_left" {
+                    expand = {}
+                    visible = "[Estate.ExistsForCountry]"
+                    tooltipwidget = {
+                        SimpleContextualTooltipType = {
+                            blockoverride "title_icon" {
+                                icon = {
+                                    using = tooltip_title_icon_size
+                                    texture = "[GetConceptTexture('wealth')]"
+                                }
+                            }
+                            blockoverride "title_text" {
+                                text = "TAX_BASE_TT_ESTATES_LIST_SHARE_TITLE"
+                            }
+
+                            blockoverride "concept_link" {
+                                text = "[wealth_share|e]"
+                            }
+
+                            textcontext =  "TAX_BASE_TT_ESTATES_LIST_SHARE"
+                        }
+                    }
+                }
+                blockoverride "field_text" {
+                    visible = "[Estate.ExistsForCountry]"
+                    raw_text = "[Multiply_CFixedPoint(Location.GetTotalPossibleTaxBase, Location.GetEstateTaxBasePercent(Estate.Self))|2]@gold! ([Location.GetEstateTaxBasePercent(Estate.Self)|0%])"
+                }
+            }
+
+            TooltipTableColumn = {
+                blockoverride "column_title" {}
+                blockoverride "column_title_left" {
+                    expand = {}
+                }
+                blockoverride "column_title_text" {
+                    text = "[tax_base|e]"
                 }
 
                 blockoverride "field_left" {
@@ -2574,7 +2713,7 @@ template location_tax_base_details {
                             }
 
                             blockoverride "concept_link" {
-                                text = "[tax_base_share|e]"
+                                text = "[wealth_share|e]"
                             }
 
                             textcontext =  "TAX_BASE_TT_ESTATES_LIST_SHARE"
@@ -2583,7 +2722,7 @@ template location_tax_base_details {
                 }
                 blockoverride "field_text" {
                     visible = "[Estate.ExistsForCountry]"
-                    raw_text = "[Location.GetEstateTaxBase(Estate.Self)|2L]@gold! ([Location.GetEstateTaxBasePercent(Estate.Self)|0%]@tax_base!)"
+                    raw_text = "[Location.GetEstateTaxBase(Estate.Self)|2L]@tax_base!"
                 }
             }
 
@@ -2593,7 +2732,46 @@ template location_tax_base_details {
                     expand = {}
                 }
                 blockoverride "column_title_text" {
-                    raw_text = "Taxed amount"
+                    text = "[tax_rate|e]"
+                }
+
+                blockoverride "field_left" {
+                    expand = {}
+                    visible = "[Estate.ExistsForCountry]"
+                    tooltipwidget = {
+                        SimpleContextualTooltipType = {
+                            blockoverride "title_icon" {
+                                icon = {
+                                    using = tooltip_title_icon_size
+                                    texture = "gfx/interface/icons/resources/gold.dds"
+                                }
+                            }
+                            blockoverride "title_text" {
+                                text = "TAX_BASE_TT_ESTATES_LIST_TAXED_TITLE"
+                            }
+
+                            blockoverride "concept_link" {
+                                text = "[taxes|e]"
+                            }
+
+                            textcontext =  "TAX_BASE_TT_ESTATES_LIST_TAXED"
+                        }
+                    }
+                }
+
+                blockoverride "field_text" {
+                    visible = "[Estate.ExistsForCountry]"
+                    text = "[Location.GetOwner.GetEconomy.GetTaxRate(Estate.GetType)|2%]"
+                }
+            }
+
+            TooltipTableColumn = {
+                blockoverride "column_title" {}
+                blockoverride "column_title_left" {
+                    expand = {}
+                }
+                blockoverride "column_title_text" {
+                    text = "TAX_BASE_TT_ESTATES_LIST_INCOME_TITLE"
                     default_format = "#explanation_link"
                     tooltip = "[tax|e]"
                     tagtooltip_enabled = yes
@@ -2625,14 +2803,14 @@ template location_tax_base_details {
 
                 blockoverride "field_text" {
                     visible = "[Estate.ExistsForCountry]"
-                    raw_text = "[Multiply_CFixedPoint(Location.GetOwner.GetEconomy.GetTaxRate(Estate.GetType), Location.GetEstateTaxBase(Estate.Self))|+=2]@gold! ([Location.GetOwner.GetEconomy.GetTaxRate(Estate.GetType)|2%])"
+                    raw_text = "[Multiply_CFixedPoint(Location.GetOwner.GetEconomy.GetTaxRate(Estate.GetType), Location.GetEstateTaxBase(Estate.Self))|+=2]@income!"
                 }
             }
 
             blockoverride "column_datamodel"  {  datamodel = "[DataModelSkipFirst(Location.GetOwner.GetGovernment.GetEstates, '(int32)1')]" }
         }
     }
-
+	
     TooltipStringPairList = {
         visible = "[Location.HasOwner]"
         textcontext = "TAX_BASE_TT_TEXT"
@@ -2646,7 +2824,7 @@ template location_tax_base_tooltip {
         blockoverride "title_icon" {
             icon = {
                 using = tooltip_title_icon_size
-                texture = "gfx/interface/icons/location_icons/tax_base.dds"
+                texture = "[GetConceptTexture('wealth')]"
             }
         }
 
@@ -2656,12 +2834,21 @@ template location_tax_base_tooltip {
 
         blockoverride "title_button" {
             mapmode_tooltip_button = {
+                datacontext = "[GetMapMode('potential_tax_base')]"
+            }
+            mapmode_tooltip_button = {
                 datacontext = "[GetMapMode('tax_base')]"
+            }
+            mapmode_tooltip_button = {
+                datacontext = "[GetMapMode('net_building_profit')]"
+            }
+            mapmode_tooltip_button = {
+                datacontext = "[GetMapMode('peasant_enfranchisement')]"
             }
         }
 
         blockoverride "concept_link" {
-            text = [tax_base|e]
+            text = [wealth|e]
         }
 
         blockoverride "tooltip_content" {
@@ -2817,7 +3004,7 @@ template supply_limit_tooltip {
                     text = "[Location.GetUsedSupplyAndMax]"
                 }
                 visible = "[And(Not(Location.IsHiddenByFoW), NotEqualTo_CFixedPoint(Location.GetUsedSupply, '(CFixedPoint)0'))]"
-                textcontext = "[Location.GetAttritionTooltip]"
+                textcontext = "[Location.GetAttritionAndFoodConsumptionPenaltyTooltip]"
             }
         }
     }
@@ -3285,7 +3472,26 @@ template location_rgo_tooltip_location_content {
                             maximumsize = {55 -1}
                             align = nobaseline
                             fontsize = 14
-                            raw_text = "[Location.GetRGOProfitPerLevel|+2] @tax_base!"
+                            raw_text = "[Location.GetRGOProfitPerLevel|+2] [tax_base_icon]"
+                        }
+                    }
+                }
+
+                TooltipManualTableField = {                    
+                    blockoverride "field_content" {
+                        text_single = {
+                            text = "RAW_MATERIAL_LOCATION_TABLE_PRICE"
+                        }
+                        expand = {}
+                        text_single = {
+                            maximumsize = {55 -1}
+                            align = nobaseline
+                            fontsize = 14
+                            raw_text = "[Location.GetMarket.GetPrice(Location.GetRawMaterial)|2]@[Goods.GetPriceDifferenceIconName(Location.GetMarket.GetPrice(Location.GetRawMaterial))]!"
+                            datacontext = "[Location.GetMarket.GetMarketEntry(Location.GetRawMaterial)]"
+                            tooltipwidget = {
+                                using = goods_market_price_tooltip
+                            }
                         }
                     }
                 }
@@ -4575,6 +4781,129 @@ template HarborCapacity_tooltip {
     }
 }
 
+template RiverModifier_tooltip {
+    ContextualTooltipType = {
+        blockoverride "title_text" {
+            datacontext = "[Location]"
+            text = "RIVER_TT_TITLE"
+        }
+
+        blockoverride "concept_link" {
+            text = "[river|e]"
+        }
+
+        blockoverride "title_icon" {
+            icon = {
+                using = tooltip_title_icon_size
+                texture = "[GetConceptTexture('river')]"
+            }
+        }
+
+        blockoverride "title_button" {
+            mapmode_tooltip_button = {
+                datacontext = "[GetMapMode('rivers')]"
+            }
+        }
+
+        blockoverride "tooltip_content" {
+            TooltipStringPairList = {
+                visible = "[Location.HasRiver]"
+                textcontext = "[ShowModifierEffect('river_flowing_through')]"
+            }
+            TooltipTextBlock = {
+                visible = "[And3(Not(Location.HasRiver), IsDataModelEmpty(Location.GetRiverProximityLocations), IsDataModelEmpty(Location.GetRiverCrossingLocations))]"
+                blockoverride "text" {
+                    text = "NO_RIVER_FLOWING"
+                }
+            }
+
+            TooltipListBase = {
+                visible = "[Not(IsDataModelEmpty(Location.GetRiverProximityLocations))]"
+                blockoverride "block_title" {
+                    text = "RIVER_CONNECTED_LOCATIONS_TEXT"
+                }
+
+                TooltipListColumnContent = {
+                    TooltipTableColumn = {
+                        blockoverride "column_title" { visible = no }
+
+                        blockoverride "field_left" {
+                            icon = {
+                                visible = "[Location.HasOwner]"
+                                size = { 20 20 }
+                                texture = "[Location.GetRankIcon]"
+
+                                tooltipwidget = {
+                                    using = location_rank_tooltip
+                                }
+                            }
+
+                            icon = {
+                                visible = "[Not(Location.HasOwner)]"
+                                size = { 20 20 }
+                                texture = "[GetTopographyIcon(Location.GetTopography)]"
+
+                                background =  {
+                                    texture = "[GetClimateFrame(Location.GetClimate)]"
+                                }
+                            }
+                            
+                        }
+
+                        blockoverride "field_text" {
+                            default_format = "#subtle_name"
+                            align = left|nobaseline
+                            raw_text = "[Location.GetName]"
+                        }
+
+                        blockoverride "field_right" { expand = {} }
+                    }
+
+                    blockoverride "column_datamodel"  {  datamodel = "[Location.GetRiverProximityLocations]" }
+                }
+            }
+
+            TooltipListBase = {
+                visible = "[Not(IsDataModelEmpty(Location.GetRiverCrossingLocations))]"
+                blockoverride "block_title" {
+                    text = "RIVER_CROSSING_LOCATIONS_TEXT"
+                }
+
+                TooltipListColumnContent = {
+                    TooltipTableColumn = {
+                        blockoverride "column_title" { visible = no }
+
+                        blockoverride "field_left" {
+                            visible = "[Location.IsPossibleToOwn]"
+                            icon = {
+                                size = { 20 20 }
+                                texture = "[Location.GetRankIcon]"
+                            }
+                            tooltipwidget = {
+                                using = location_rank_tooltip
+                            }
+                        }
+
+                        blockoverride "field_text" {
+                            visible = "[Location.IsPossibleToOwn]"
+                            default_format = "#subtle_name"
+                            align = left|nobaseline
+                            raw_text = "[Location.GetName]"
+                        }
+
+                        blockoverride "field_right" { 
+                            visible = "[Location.IsPossibleToOwn]"
+                            expand = {} 
+                        }
+                    }
+
+                    blockoverride "column_datamodel"  {  datamodel = "[Location.GetRiverCrossingLocations]" }
+                }
+            }
+        }
+    }
+}
+
 template WeatherSystem_tooltip {
     ContextualTooltipType = {
         blockoverride "title_text" {
@@ -4940,7 +5269,7 @@ template locationview_employed_tt {
                                     text_multi = {
 						                align = right
 										layoutpolicy_horizontal = expanding
-                                        raw_text = "[Multiply_CFixedPoint('(CFixedPoint)1000.0', Multiply_CFixedPoint(Location.GetTotalPopTypeSizeValue(PopType.Self), Subtract_CFixedPoint('(CFixedPoint)1.0', Location.GetUnEmployedPercentage(PopType.Self))))|0L]"
+                                        raw_text = "[Location.GetEmploymentValue(PopType.Self)]"
                                         tooltipwidget = {
                                             using = employment_breakdown_tooltip
                                         }

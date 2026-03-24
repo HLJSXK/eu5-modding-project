@@ -31,6 +31,24 @@ For a simple local deployment, run:
 build.bat
 ```
 
+This also creates `build\stable.zip`.
+
+For optional upload to Tencent COS (`modsync/packages/stable.zip`), run:
+
+```cmd
+build.bat --upload-cos --cos-bucket <bucket-name> --cos-region <region>
+```
+
+Credentials can come from either arguments or environment variables:
+
+- `--cos-secret-id` / `--cos-secret-key`
+- `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`
+
+Bucket and region can also come from environment variables:
+
+- `TENCENT_COS_BUCKET`
+- `TENCENT_COS_REGION`
+
 This copies `src/stable/` to:
 
 `C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\stable`

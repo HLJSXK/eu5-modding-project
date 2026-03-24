@@ -12,6 +12,9 @@ move_nw_good_to_new_location = {
 	automation_tick = never
 	automation_tick_frequency = 12
 
+	maximum_targets_in_one_tick = 20
+	disallowed_duplicates_of_targets_for_ai = { target_location }
+
 	potential = {
 	}
 
@@ -91,18 +94,12 @@ move_nw_good_to_new_location = {
 		none_available_msg_key = "no_regions_available"
 		column = { data = name }
 		visible = {
-			any_area_in_region = {
-				scope:actor = { has_discovered_area = prev }
-				any_location_in_area = {
-					OR = {
-						owner ?= scope:actor
-						top_owner ?= scope:actor
-					}
-				}
+			scope:actor = {
+				owns_or_has_subject_in = prev
 			}
 		}
 	}
-
+	
 	#Select the owned location where to spread the new resource
 	select_trigger = {
 		looking_for_a = location
@@ -110,20 +107,28 @@ move_nw_good_to_new_location = {
 		source_flags = only_actual_locations
 		target_flag = target_location
 		ai_interaction_source_list = {
-			scope:actor ?= {
-				every_subject_or_below = {
-					every_owned_location = {
-						limit = {
-							is_candidate_for_NW_good = yes
-						}
-						add_to_list = source
-					}
-				}
-				every_owned_location = {
+			scope:target_region = {
+				every_area_in_region = {
 					limit = {
-						is_candidate_for_NW_good = yes
+						scope:actor = { owns_or_has_subject_in = prev }
 					}
-					add_to_list = source
+					every_province_definition_in_area = {						
+						limit = {
+							scope:actor = { owns_or_has_subject_in = prev }
+							#Maximum of 2 of the same resource per Province
+							"raw_material_amount(scope:target_good)" < 2
+						}
+						every_ownable_location_in_province_definition = {
+							limit = {
+								owner ?= {
+									is_subject_or_below_of = scope:actor
+								}
+								is_candidate_for_NW_good = yes
+								NOT = {raw_material ?= scope:target_good}								
+							}
+							add_to_list = source
+						}
+					}
 				}
 			}
 		}
@@ -354,7 +359,7 @@ move_nw_good_to_new_location = {
 				#If there is surplus is less valuable
 				if = {
 					limit = {
-						is_in_surplus_in_market = { market = scope:mission_target_market country = root value > 0 }
+						is_in_surplus_in_market = { market = scope:target_location.market country = root value > 0 }
 					}
 					subtract = 	100
 				}
@@ -389,6 +394,9 @@ move_ow_good_to_new_location = {
 	ai_tick_frequency = 60
 	automation_tick = never
 	automation_tick_frequency = 12
+
+	maximum_targets_in_one_tick = 20
+	disallowed_duplicates_of_targets_for_ai = { target_location }
 
 	potential = {
 	}
@@ -490,20 +498,28 @@ move_ow_good_to_new_location = {
 		source_flags = only_actual_locations
 		target_flag = target_location
 		ai_interaction_source_list = {
-			scope:actor ?= {
-				every_subject_or_below = {
-					every_owned_location = {
-						limit = {
-							is_candidate_for_OW_good = yes
-						}
-						add_to_list = source
-					}
-				}
-				every_owned_location = {
+			scope:target_region = {
+				every_area_in_region = {
 					limit = {
-						is_candidate_for_OW_good = yes
+						scope:actor = { owns_or_has_subject_in = prev }
 					}
-					add_to_list = source
+					every_province_definition_in_area = {						
+						limit = {
+							scope:actor = { owns_or_has_subject_in = prev }
+							#Maximum of 2 of the same resource per Province
+							"raw_material_amount(scope:target_good)" < 2
+						}					
+						every_ownable_location_in_province_definition = {
+							limit = {
+								owner ?= {
+									is_subject_or_below_of = scope:actor
+								}
+								is_candidate_for_OW_good = yes
+								NOT = {raw_material ?= scope:target_good}								
+							}
+							add_to_list = source
+						}
+					}
 				}
 			}
 		}

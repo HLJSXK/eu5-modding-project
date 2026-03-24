@@ -67,7 +67,19 @@ input_context={
 		text="SETTING_INPUT_ACTION_SPEED_FIVE"
 		scancode=93
 	}
-	
+
+	input_action={
+		name="speed_6"
+		text="SETTING_INPUT_ACTION_SPEED_SIX"
+		scancode=94
+	}
+
+	input_action={
+		name="speed_7"
+		text="SETTING_INPUT_ACTION_SPEED_SEVEN"
+		scancode=95
+	}
+
 	input_action={
 		name="console"
 		text="SETTING_INPUT_ACTION_CONSOLE"
@@ -137,6 +149,11 @@ input_context={
 	input_action={
 		name="previous_window_right"
 		text="SETTING_INPUT_ACTION_PREVIOUS_WINDOW_RIGHT"
+	}
+
+	input_action={
+		name="toggle_window_collapse"
+		text="SETTING_INPUT_ACTION_TOGGLE_WINDOW_COLLAPSE"
 	}
 
 	input_action={
@@ -611,6 +628,12 @@ input_context={
 			scancode=64
 			modifier=ctrl
 		}
+	}
+
+	input_action={
+		name="toggle_alert_stash"
+		text="SETTING_INPUT_ACTION_TOGGLE_ALERT_STASH"
+		scancode=8
 	}
 
 	input_action={
