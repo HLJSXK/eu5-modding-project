@@ -1,70 +1,46 @@
 @echo off
-REM Build script for EU5 Sync UI package (Windows)
-REM Builds sync-ui + goldberg_emulator only
+setlocal
 
-echo ============================================================
-echo Building EU5 Sync UI Package
-echo ============================================================
+REM Simple build/deploy script for stable mod.
+REM Default target: C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod
 
-REM Create build directory
-if exist build rmdir /s /q build
-mkdir build
-mkdir build\eu5-tools-windows-amd64
+set "REPO_ROOT=%~dp0"
+set "SOURCE_DIR=%REPO_ROOT%src\stable"
+set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
+set "TARGET_DIR=%TARGET_ROOT%\stable"
 
-echo.
-echo Preparing icon resources...
-set WINRES_VERSION=v0.3.1
-set WINRES_BIN=
-
-for /f %%i in ('go env GOPATH') do set GOPATH=%%i
-
-if exist "%GOPATH%\bin\go-winres.exe" (
-	set WINRES_BIN=%GOPATH%\bin\go-winres.exe
-) else (
-	echo go-winres not found locally, attempting install...
-	go install github.com/tc-hib/go-winres@%WINRES_VERSION%
-	if not errorlevel 1 if exist "%GOPATH%\bin\go-winres.exe" (
-		set WINRES_BIN=%GOPATH%\bin\go-winres.exe
-	)
+if not exist "%SOURCE_DIR%" (
+    echo [ERROR] Source directory not found: "%SOURCE_DIR%"
+    exit /b 1
 )
 
-if defined WINRES_BIN (
-	go run .\tools\gen_sync_ui_icon.go -out build\sync-ui-icon.png
-	"%WINRES_BIN%" simply --arch amd64 --icon build\sync-ui-icon.png --manifest gui --out cmd\eu5-sync-ui\rsrc --product-name "EU5 Sync UI" --file-description "EU5 Sync UI" --original-filename "eu5-sync-ui.exe"
-	if errorlevel 1 (
-		echo WARNING: icon embedding failed, continuing without icon resource.
-	)
-) else (
-	echo WARNING: go-winres unavailable, install failed or offline, continuing without icon resource.
+if not exist "%TARGET_ROOT%" (
+    echo [INFO] Target root not found. Creating: "%TARGET_ROOT%"
+    mkdir "%TARGET_ROOT%"
+    if errorlevel 1 (
+        echo [ERROR] Failed to create target root. Try running as Administrator.
+        exit /b 1
+    )
 )
 
-echo.
-echo Building Windows binary (amd64)...
-echo ---------------------------------
-set GOOS=windows
-set GOARCH=amd64
-go build -ldflags="-H windowsgui -s -w" -o build\eu5-sync-ui-windows-amd64.exe .\cmd\eu5-sync-ui
+if exist "%TARGET_DIR%" (
+    echo [INFO] Removing previous deployment: "%TARGET_DIR%"
+    rmdir /s /q "%TARGET_DIR%"
+    if errorlevel 1 (
+        echo [ERROR] Failed to remove old target directory. Close EU5/Steam and retry.
+        exit /b 1
+    )
+)
 
-echo.
-echo Preparing package directory...
-copy /y build\eu5-sync-ui-windows-amd64.exe build\eu5-tools-windows-amd64\eu5-sync-ui.exe >nul
-xcopy /e /i /y goldberg_emulator build\eu5-tools-windows-amd64\goldberg_emulator >nul
+echo [INFO] Copying "%SOURCE_DIR%" to "%TARGET_DIR%" ...
+robocopy "%SOURCE_DIR%" "%TARGET_DIR%" /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >nul
 
-del /q cmd\eu5-sync-ui\rsrc_windows_amd64.syso >nul 2>&1
+REM Robocopy exit code: 0-7 success, 8+ failure
+if errorlevel 8 (
+    echo [ERROR] Copy failed. Robocopy exit code: %errorlevel%
+    exit /b 1
+)
 
-echo Creating zip package...
-powershell -NoProfile -Command "Compress-Archive -Path 'build/eu5-tools-windows-amd64/*' -DestinationPath 'build/eu5-tools-windows-amd64.zip' -Force"
-
-echo.
-echo ============================================================
-echo Build completed successfully!
-echo ============================================================
-echo.
-echo Output files:
-dir /b build
-
-echo.
-echo Direct-use package:
-echo   build\eu5-tools-windows-amd64.zip
-
-pause
+echo [OK] Stable mod deployed successfully.
+echo [OK] Target: "%TARGET_DIR%"
+exit /b 0
