@@ -840,30 +840,32 @@ types LocationWindowTypes
 
 							using = location_background
 
-							action_tooltip = {
-								click_type = left
-								click_mode = single
-								title = "GO_TO_LOCATION"
-								on_action = "[ShowLocation(Location.Self)]"
-							}
-
-							action_tooltip = {
-								click_type = right
-								click_mode = single
-
-								cursor = "location_menu"
-								title = "CLICK_ACTION_LOCATION_CONTEXT_MENU"
-								on_action = "[PdxGuiWidget.ToggleContextMenu]"
-							}
-							onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLocation(Location.Self)]"
-
-							# block "location_card_title_tooltip" {
-								tooltipwidget = {
-									using = location_tooltip_alt
+							block "location_card_main_action_button"{
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									title = "GO_TO_LOCATION"
+									on_action = "[ShowLocation(Location.Self)]"
 								}
-							# }
-							contextmenu_widget = {
-								LocationContextMenu = {}
+
+								action_tooltip = {
+									click_type = right
+									click_mode = single
+
+									cursor = "location_menu"
+									title = "CLICK_ACTION_LOCATION_CONTEXT_MENU"
+									on_action = "[PdxGuiWidget.ToggleContextMenu]"
+								}
+								onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLocation(Location.Self)]"
+
+								# block "location_card_title_tooltip" {
+									tooltipwidget = {
+										using = location_tooltip_alt
+									}
+								# }
+								contextmenu_widget = {
+									LocationContextMenu = {}
+								}
 							}
 
 							hbox = {
@@ -1442,8 +1444,8 @@ types LocationWindowTypes
 							click_type = left
 							click_mode = single
 							title = "MANAGE_LOCATION_BUILDINGS"
-							on_action = "[ShowProductionViewWithLocation(Location.GetId, '(bool)no')]"
-							on_action = "[OpenLateralViewWithParams('production', 'display = lists')]"
+							on_action = "[ShowLocationProductionView(Location.GetId, '(bool)no')]"
+							on_action = "[OpenLateralViewWithParams('location_production', 'display = lists')]"
 						}
 
 						hbox = {
@@ -1479,7 +1481,7 @@ types LocationWindowTypes
 										}
 										blockoverride "Icon_Size" { size = { 61% 61% } }
 										blockoverride "Icon" {
-											texture = "gfx/interface/icons/location_icons/tax_base.dds"
+											texture = "[GetConceptTexture('wealth')]"
 											texture_density = 2
 											alwaystransparent = yes
 										}
@@ -1503,7 +1505,7 @@ types LocationWindowTypes
 									size = { -1 17 }
 									autoresize = no
 									fontsize = 14
-									raw_text = "[Location.GetTotalTaxBase|W2]"
+									raw_text = "[Location.GetTotalPossibleTaxBase|W2]"
 								}
 
 								# text_single = {
@@ -1651,12 +1653,14 @@ types LocationWindowTypes
 					}
 					tooltipwidget = { BasicFunctionalTooltip = {} }
 
-					action_tooltip = {
-						click_type = left
-						click_mode = single
-						enabled = "[CanSelectPrevRelevantLocation(Location.Self)]"
-						title = "SCROLL_UP_LOCATION_FILTER"
-						on_action = "[SelectPrevRelevantLocation(Location.Self)]"
+					block "location_filter_prev_button" {
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							enabled = "[CanSelectPrevRelevantLocation(Location.Self)]"
+							title = "SCROLL_UP_LOCATION_FILTER"
+							on_action = "[ShowLocation(GetPrevRelevantLocation(Location.Self).Self)]"
+						}
 					}
 				}
 
@@ -1695,12 +1699,14 @@ types LocationWindowTypes
 					}
 					tooltipwidget = { BasicFunctionalTooltip = {} }
 
-					action_tooltip = {
-						click_type = left
-						click_mode = single
-						enabled = "[CanSelectNextRelevantLocation(Location.Self)]"
-						title = "SCROLL_DOWN_LOCATION_FILTER"
-						on_action = "[SelectNextRelevantLocation(Location.Self)]"
+					block "location_filter_next_button" {
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							enabled = "[CanSelectNextRelevantLocation(Location.Self)]"
+							title = "SCROLL_DOWN_LOCATION_FILTER"
+							on_action = "[ShowLocation(GetNextRelevantLocation(Location.Self).Self)]"
+						}
 					}
 				}
 			}
@@ -2011,7 +2017,7 @@ types LocationWindowTypes
 	# 			click_type = left
 	# 			click_mode = single
 	# 			on_action = "[OpenLateralViewWithFilter('production', PopType.GetKey)]"
-	# 			on_action = "[ShowProductionViewWithLocation(LocationView.GetLocation.GetId, '(bool)no')]"
+	# 			on_action = "[ShowLocationProductionView(LocationView.GetLocation.GetId, '(bool)no')]"
 	# 			title = "MANAGE_BUILDINGS_POP_TYPE"
 	# 		}
 
@@ -2511,6 +2517,34 @@ lateralview = {
 		widget = {
 			widgetid = "location_window_player_capital"
 			visible = "[ObjectsEqual(Player.GetCapital.Self, LocationView.GetLocation.Self)]"
+		}
+	}
+
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			parentanchor = right|vcenter
+			size = { 40 40 }
+			position = { -30 0 }
+
+			button = {
+				parentanchor = right|vcenter
+
+				size = { 25 25 }
+				texture = "gfx/interface/icons/unit_actions/go_to.dds"
+
+				modify_texture = {
+					using = color_white_texture
+					alpha = 0.1
+				}
+
+				action_tooltip = {
+					title = "GO_TO_LOCATION"
+					on_action = "[PanToLocation(LocationView.GetLocation)]"
+				}
+
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+				using = snd_UI_backward
+			}
 		}
 	}
 
@@ -3563,6 +3597,18 @@ lateralview = {
 									}
 								}
 
+								# RIVER MODIFIER
+								icon = {
+									size = { 28 28 }
+									visible = "[LocationView.GetLocation.HasRiver]"
+									texture = "[GetConceptTexture('river')]"
+									datacontext = "[LocationView.GetLocation]"
+
+									tooltipwidget = {
+										using = RiverModifier_tooltip
+									}
+								}
+
 								# SOUND TOLL
 								icon = {
 									size = { 30 30 }
@@ -4033,7 +4079,10 @@ lateralview = {
 
 			vbox = {
 				using = layoutpolicy_expanding
-				using = bg_secondary_inner_alt
+				using = bg_secondary_inner_image_alt
+				blockoverride "image" {
+					texture = "gfx/interface/illustrations/bg/bg_foreign_country.dds"
+				}
 				datacontext = "[LocationView.GetLocation]"
 
 				# INFRASTRUCTURE
@@ -4083,6 +4132,7 @@ lateralview = {
 											}
 
 											action_tooltip = {
+												visible = "[Not(And(Location.IsCapital, Location.GetOwner.IsPlayer))]"
 												click_type = right
 												click_mode = confirm
 												conditions = "LOC_CANNOT_BUILD_ROAD_TO_CAPITAL"
@@ -4209,7 +4259,7 @@ lateralview = {
 													}
 													using = bg_control_romboid
 
-                                                    button = {
+                                                    button = { # Glorp UI - Mapmode Hover
                                                         size = { 100% 100% }
                                                         datacontext = "[GetMapMode('control')]"
                                                         onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('control')]"
@@ -4337,7 +4387,7 @@ lateralview = {
 														}
 													}
 
-                                                    button = {
+                                                    button = { # Glorp UI - Mapmode Hover
                                                         size = { 100% 100% }
                                                         datacontext = "[GetMapMode('proximity')]"
                                                         onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('proximity')]"
@@ -4387,7 +4437,7 @@ lateralview = {
 																	size = { -1 21 }
 																	autoresize = no
 																	fontsize = 15
-																	raw_text = "[Location.GetTotalTaxBase|W2]"
+																	raw_text = "[Location.GetTotalPossibleTaxBase|W2]"
 																}
 																text_single = {
 																	align = left|nobaseline
@@ -4395,7 +4445,7 @@ lateralview = {
 																	size = { -1 13 }
 																	autoresize = no
 																	fontsize = 12
-																	raw_text = "[Location.GetTotalIncome|g2]@gold!"
+																	raw_text = "[Location.GetTotalIncome|g2]@income!"
 																	default_format = "#bold"
 																}
 															}
@@ -4412,30 +4462,48 @@ lateralview = {
 															using = bg_circle_piechart
 	
 															# TAX BASE CHART
+															# icon_pie_left = {
+															# 	parentanchor = center
+															# 	blockoverride "PieSize_bckg" {}
+															# 	blockoverride "PieSize" { size = { 39 39 } }
+															# 	blockoverride "pie_datamodel" {
+															# 		datacontext = "[Location.GetPopulationChart]"
+															# 		datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
+															# 		datamodel = "[PopsPiechartWidget.GetTax]"
+															# 	}
+
+															# 	###Slices and Icon
+															# 	blockoverride "SliceTooltip" {}
+															# 	blockoverride "SliceValue" { value = "[PopTaxItem.GetPercentage]" }
+															# 	blockoverride "SliceColor" { color = "[PopTaxItem.GetColor]" }
+															# 	blockoverride "Icon" { texture = "gfx/interface/icons/location_icons/tax_base.dds" }
+															# 	blockoverride "Icon_Size" { size = { 65% 65% } }
+															# 	blockoverride "datamodel" { visible = no }
+															# }
 															icon_pie_left = {
 																parentanchor = center
 																blockoverride "PieSize_bckg" {}
 																blockoverride "PieSize" { size = { 39 39 } }
-																blockoverride "pie_datamodel" {
-																	datacontext = "[Location.GetPopulationChart]"
-																	datacontext = "[LocationPopulationChart.GetPopsPiechartWidget]"
-																	datamodel = "[PopsPiechartWidget.GetTax]"
+																blockoverride "pie_datamodel" { datamodel = "[DataModelSkipFirst(Location.GetOwner.GetGovernment.GetEstates, '(int32)1')]" }
+
+																blockoverride "pieslice_item" {
+																	pieslice_no_highlight = {
+																		texture = "gfx/interface/pie_charts/piechart_alpha.dds"
+																		texture_density = 2
+																		tooltip_enabled = no
+																		value = "[Location.GetEstateTaxBasePercent(Estate.Self)]"
+																		color = "[Estate.GetType.GetMapColor]"
+																		alpha = 0.99
+																		alwaystransparent = yes
+																	}
 																}
-	
-																###Slices and Icon
-																blockoverride "SliceTooltip" {}
-																blockoverride "SliceValue" { value = "[PopTaxItem.GetPercentage]" }
-																blockoverride "SliceColor" { color = "[PopTaxItem.GetColor]" }
-																blockoverride "Icon" {
-																	texture = "gfx/interface/icons/location_icons/tax_base.dds"
-																}
+																blockoverride "Icon" { texture = "[GetConceptTexture('wealth')]" }
 																blockoverride "Icon_Size" { size = { 65% 65% } }
-																blockoverride "datamodel" { visible = no }
 															}
 														}
 													}
 
-                                                    button = {
+                                                    button = { # Glorp UI - Mapmode Hover
                                                         size = { 100% 100% }
                                                         datacontext = "[GetMapMode('tax_base')]"
                                                         onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('tax_base')]"
@@ -4456,8 +4524,6 @@ lateralview = {
 
 										# RGO
 										header_button_left = {
-                                            datamodel = "[LocationView.GetLocation.GetRawMaterial]"
-                                            onmousehierarchyenter = "[PdxGuiWidget.SetHighlightGoods(Location.GetRawMaterial.Self)]"
 											name = "location_rgo"
 											size = { 125 40}
 											enabled = "[Or(LocationView.CanUpgradeRGO, LocationView.CanReduceRGO)]"
@@ -4595,9 +4661,8 @@ lateralview = {
 															text_single = {
 																visible = "[Not(LocationView.GetLocation.IsMaxRGOWorkersUnderConstruction)]"
 																align = left|nobaseline
-																minimumsize = { 37 17 }
-																maximumsize = { 37 17 }
-																autoresize = yes
+																maximumsize = { 70 -1 }
+																fontsize = 14
 																datacontext = "[Location.GetRawMaterial]"
 																raw_text = "[Location.GetMaxRGOWorkers|0]/[Location.GetMaximumMaxRGOWorkersValueForUI|0] @[Goods.GetPriceDifferenceIconName(Location.GetMarket.GetPrice(Goods.Self))]!"
 															}
@@ -4637,7 +4702,7 @@ lateralview = {
 														enabled = "[And(IsCabinetActionAllowed('develop_province'), Location.GetOwner.IsPlayer)]"
 														conditions = "[GetCabinetActionTooltip('develop_province')]"
 													}
-                                                    datacontext = "[GetMapMode('development')]"
+                                                    datacontext = "[GetMapMode('development')]" # Glorp UI - Mapmode Hover
                                                     onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('development')]"
                                                     action_tooltip = {
                                                         click_type = right
@@ -4905,7 +4970,7 @@ lateralview = {
 											widget = {
 												size = { 80 35 }
 												sneaky_button = {
-                                                    onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('institution')]"
+                                                    onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('institution')]" # Glorp UI - Mapmode Hover
 													size = { 100% 100% }
 													action_tooltip = {
 														click_type = left
@@ -4962,7 +5027,7 @@ lateralview = {
 														click_mode = single
 														title = "BUILD_FOOD_BUILDINGS_LOCATION"
 														on_action = "[OpenLateralViewWithFilter('production', 'food_production')]"
-														on_action = "[ShowProductionViewWithLocation(Location.GetId, '(bool)no')]"
+														on_action = "[ShowLocationProductionView(Location.GetId, '(bool)no')]"
 														enabled = "[Location.GetOwner.IsPlayer]"
 													}
 													action_tooltip = {
@@ -4975,7 +5040,7 @@ lateralview = {
 													}
 													enabled = "[Location.GetOwner.IsPlayer]"
 
-                                                    datacontext = "[GetMapMode('food_productivity')]"
+                                                    datacontext = "[GetMapMode('food_productivity')]" # Glorp UI - Mapmode Hover
                                                     onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('food_productivity')]"
                                                     action_tooltip = {
                                                         click_type = right
@@ -5045,7 +5110,7 @@ lateralview = {
 													}
 													enabled = "[Location.GetOwner.IsPlayer]"
 
-                                                    datacontext = "[GetMapMode('food')]"
+                                                    datacontext = "[GetMapMode('food')]" # Glorp UI - Mapmode Hover
                                                     onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('food')]"
                                                     action_tooltip = {
                                                         click_type = right
@@ -5282,9 +5347,9 @@ lateralview = {
 															action_tooltip = {
 																click_type = left
 																click_mode = single
-																on_action = "[OpenLateralViewWithParams('production', 'display = lists')]"
-																on_action = "[OpenLateralViewWithFilter('production', PopType.GetKey)]"
-																on_action = "[ShowProductionViewWithLocation(LocationView.GetLocation.GetId, '(bool)no')]"
+																on_action = "[OpenLateralViewWithParams('location_production', 'display = lists')]"
+																on_action = "[OpenLateralViewWithFilter('location_production', PopType.GetKey)]"
+																on_action = "[ShowLocationProductionView(LocationView.GetLocation.GetId, '(bool)no')]"
 																title = "MANAGE_BUILDINGS_POP_TYPE"
 															}
 
@@ -7457,6 +7522,7 @@ lateralview = {
 															size = { 35 35 }
 															enabled = "[LocationView.CanBuildArmy]"
 															# enabled = "[And(Not(LocationView.GetLocation.HasCombat), Not(LocationView.GetLocation.HasSiege))]"
+															datacontext = "[LocationView.GetLocation]"
 															tooltipwidget = {
 																using = LocationNavalMercenariesTooltip
 																blockoverride "onclick_text" {
@@ -7967,7 +8033,9 @@ lateralview = {
 													blockoverride "pie_datamodel" {
 														datamodel = "[LocationView.GetProvincePolitics]"
 													}
-
+													tooltipmeta = {
+														texture = "gfx/interface/icons/location_icons/government.dds"
+													}
 													###Slices and Icon
 													blockoverride "SliceTooltip" {
 														datacontext = "[LocationView.GetLocation]"
