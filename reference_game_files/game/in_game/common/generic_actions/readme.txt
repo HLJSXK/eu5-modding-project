@@ -34,6 +34,7 @@
 #						name = localisation name of the title for the selection stage
 #						allow_null = yes/no to allow the selection of a null object, can be a trigger to check under what circumstances should null be included / excluded instead
 #                       allow_self = yes/no to allow the actor to be added to the list (only works for countries)
+#                       move_to_next_section_on_click yes/no should the UI move to the next stage when you click on an item. Usually left to the default yes, but set to no if you have some other UI that will perform that action somewhere else
 #						top_widget = links to a widget type in the gui files to show at the top of the list. 
 #						bottom_widget = links to a widget type in the gui files to show at the bottom of the list. 
 #						column = { data = <column_id> width = <int> icon = <path> show_icon_in_cells = yes/no } adds a column to the UI to search with
@@ -70,7 +71,9 @@
 #                               possible values: finances/research/trade/productionmethods/laws/cabinet/parliament/estates/exploration/colonies/cultureacceptance/religiousdoctrines/buildings/rgo/armybuilder/navybuilder
 # effect = effect, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc plus scope:price/scope:price_modifier/scope:payer/scope:payee returns the price details
 # cooldown = { type = <any tag> days/weeks/months/years = <integer> } adds a cooldown for the action during which time it cannot be performed again
-# allow_multiple_targets = <yes/no> allows ai to perform the same action multiple times per check
+# maximum_targets_in_one_tick = <int> allows ai to perform the same action multiple times per check, -1 for unlimited, default 1
+# disallowed_duplicates_of_targets_for_ai = {} list of target flags that can't have duplicates when maximum_targets_in_one_tick is not 1, for example target_location so AI won't target the same location twice in the same tick
+# force_click_and_confirm_or_hold = yes, optional, to always show confirmation dialog. Useful for tweaking dangerous IO actions like declaring wars without redoing UI layout
 # To use the action in GUI script, use this sort of thing:
 #
 #action_button_default = {

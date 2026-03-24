@@ -214,6 +214,22 @@
 						hidden_trigger = { always = yes }
 					}
 				}
+				trigger_if = {
+					limit = {
+						root = { NOT = { has_tag = no_ai_propose_cd } }
+						is_proposal = { international_organization = scope:recipient resolution = resolution:policy_vote }
+						scope:actor = {
+							is_ai = yes
+						}
+					}
+					custom_tooltip = {
+						text = law_debate_cooldowns_tt
+						is_target_in_variable_list = {
+							name = law_debate_cooldowns
+							target = root
+						}
+					}
+				}
 			}
 
 			scope:recipient = {
@@ -381,6 +397,22 @@
 					source = scope:vote
 					actor = scope:proposer
 					recipient = scope:recipient
+				}
+			}
+
+			#Law-specific rejection cooldowns
+			if = {
+				limit = {
+					exists = scope:recipient
+					exists = scope:target
+					scope:target = { NOT = { has_tag = no_ai_propose_cd } }
+				}
+				scope:recipient = {
+					add_to_variable_list = {
+						name = law_debate_cooldowns
+						target = scope:target
+						years = 20
+					}
 				}
 			}
 		}
@@ -759,6 +791,7 @@
 			if = {
 				limit = {
 					scope:recipient = {
+						resolution_is_active = resolution:policy_vote
 						international_organization_has_law = scope:target
 						"law_policy(scope:target)" = scope:vote
 						has_variable = ai_io_law_target
@@ -768,6 +801,30 @@
 				subtract = {
 					desc = "POLICY_REASON_TO_VOTE_FOR_PROPOSED_POLICY"
 					value = "scope:recipient.var:ai_io_law_target.ai_policy_resolution_vote_bias(scope:actor|scope:recipient)"
+				}
+			}
+			else_if = {
+				limit = {
+					scope:recipient = {
+						NOT = { resolution_is_active = resolution:policy_vote }
+						international_organization_has_law = scope:target
+					}
+				}
+				scope:target = {
+					ordered_policy_in_law = {
+						limit = { this != scope:vote }
+						order_by = "ai_policy_resolution_vote_bias(scope:actor|scope:recipient)"
+						max = 1
+						check_range_bounds = no
+						save_temporary_scope_as = evaluation_policy
+					}
+				}
+				if = {
+					limit = { exists = scope:evaluation_policy }
+					subtract = {
+						desc = "POLICY_REASON_TO_VOTE_FOR_TARGET"
+						value = "scope:evaluation_policy.ai_policy_resolution_vote_bias(scope:actor|scope:recipient)"
+					}
 				}
 			}
 

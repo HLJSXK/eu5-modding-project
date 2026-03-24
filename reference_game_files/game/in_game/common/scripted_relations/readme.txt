@@ -11,6 +11,7 @@
 #   break_on_becoming_subject = <yes/no> ends the relationship if one side becomes a subject of another country
 #   break_on_not_spying = <yes/no> ends the relationship if the perpetrator stops building a spy network in the target country, including if their spy is discovered
 #	annulled_by_peace_treaty = <yes/no> does this relationship get cancelled when an "annul treaties" peace treaty between the two countries is executed
+#   annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically
 #	disallow_war = <yes/no> does this forbid declarations of war between the two countries
 #	embargo = <yes/no> does this relationship cause an embargo between the two countries
 #   military_access = <yes/no> does this relationship give military access between the two countries (if it's mutual, either way; if it's one way, then the receiver gets the rights)
@@ -53,6 +54,7 @@
 #	cancel_enabled = <triggers> can we cancel a relationship that is either mutual or is one way that we are giving
 #	break_enabled = <triggers> can we break a one way relationship we are receiving
 #	will_expire_trigger = <triggers> criteria for this relationship auto-expiring
+#   should_ai_offer_trigger = <triggers> if false ai will not consider sending this relation
 #
 #	wants_to_give = <ai evaluation> - use this one for both mutual and one way relations. Calculation when a request is being evaluated.
 #	wants_to_receive = <ai evaluation> - one way relations only. Calculation when an offer is being evaluated.
@@ -61,6 +63,10 @@
 #   wants_to_keep = <ai evaluation> - use this for both mutual and one way relations. If evaluation results in values below or equal 0 ai will try to cancel/break relation
 #   wants_to_keep_diplo_chance = <diplo evaluation> - use this for both mutual and one way relations.
 #   show_break_alert = <yes/no> - whether the relation should be shown in alert when AI is about to break it
+#
+#	giving_modifier_scale = <script math> - this is the scale the modifier is applied for the giver, scope:first is the giving country, scope:second is the receiving country
+#	receiving_modifier_scale = <script math> - this is the scale the modifier is applied for the receiver, scope:first is the giving country, scope:second is the receiving country
+#	mutual_modifier_scale = <script math> - this is the scale the modifier is applied for both sides, scope:first is the giving country, scope:second is the receiving country
 #
 #	offer_effect = <effects> what happens when an offer is accepted
 #	request_effect = <effects> what happens when a request is accepted

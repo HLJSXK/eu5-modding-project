@@ -80,9 +80,8 @@ template mercenary_item_action {
 	And(MercenaryItem.IsLeftClickAndConfirmEnabled, MercenaryItem.IsLeftClickAndConfirmVisible),
 	And(MercenaryItem.IsRightClickAndConfirmEnabled, MercenaryItem.IsRightClickAndConfirmVisible))]"
 	visible = "[Or3(MercenaryItem.IsLeftClickVisible, MercenaryItem.IsLeftClickAndConfirmVisible, MercenaryItem.IsRightClickAndConfirmVisible)]"
-	tooltipwidget = {
-		BasicFunctionalTooltip = {}
-	}
+	tagtooltip_enabled = yes
+	tooltip = "[MercenaryItem.GetMercenary.GetName]"
 
 	action_tooltip = {
 		click_type = left
@@ -120,20 +119,94 @@ template mercenary_item_action {
 		on_action = "[MercenaryItem.OnRightClickAndConfirm]"
 	}
 }
+template header_button_background_pattern {
+	modify_texture = {
+		texture = "[GetGraphicalCultureTexture('header_pattern')]"
+		texture_density = 2
+		spriteType = corneredtiled
+		blend_mode = overlay
+	}
+	modify_texture = {
+		texture = "gfx/interface/component_overlay/cloth_texture.dds"
+		texture_density = 2
+		spriteType = Corneredtiled
+		spriteborder = { 0 0 }
+		blend_mode = overlay
+		alpha = 0.2
+	}
+}
+template mercenary_background {
+	background = {
+		texture = "gfx/interface/colors/black.dds"
+		margin = { 1 1 }
+		margin_bottom = 2
+		texture_density = 2
+		alpha = 0.4
+	}
+	background = {
+		visible = "[Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, ObjectsEqual(MercenaryItem.GetMercenary.GetCustomer, Player.Self)),
+		 And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), ObjectsEqual(MercenaryItem.GetMercenary.GetOwner, Player.Self)))]"
+		using = color_society_texture
+		alpha = 0.8
+		using = header_button_background_pattern
+	}
+	background = {
+		visible = "[Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, MercenaryItem.GetMercenary.GetCustomer.IsAllied),
+		 And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), MercenaryItem.GetMercenary.GetOwner.IsAllied))]"
+		using = color_diplomacy_texture
+		alpha = 0.8
+		using = header_button_background_pattern
+	}
+	background = {
+		visible = "[Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, GetPlayer.IsEnemy(MercenaryItem.GetMercenary.GetCustomer)),
+		 And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), GetPlayer.IsEnemy(MercenaryItem.GetMercenary.GetOwner)))]"
+		using = color_military_texture
+		alpha = 0.8
+		using = header_button_background_pattern
+	}
+	background = {
+		visible = "[Not(Or3(
+					Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, ObjectsEqual(MercenaryItem.GetMercenary.GetCustomer, Player.Self)),
+					And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), ObjectsEqual(MercenaryItem.GetMercenary.GetOwner, Player.Self))),
+					Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, MercenaryItem.GetMercenary.GetCustomer.IsAllied),
+					And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), MercenaryItem.GetMercenary.GetOwner.IsAllied)),
+					Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, GetPlayer.IsEnemy(MercenaryItem.GetMercenary.GetCustomer)),
+					And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), GetPlayer.IsEnemy(MercenaryItem.GetMercenary.GetOwner))))
+				)]"
+		using = color_bg_brown_texture
+		alpha = 0.8
+		using = header_button_background_pattern
+	}
+}
+
 template mercenary_card {
 	hbox = {
 		using = layoutpolicy_expanding
-		margin = {5 5}
+		margin = {3 3}
 
 		# Commander
 		widget = {
 			size = { 67 72 }
-			visible = "[MercenaryItem.GetMercenary.HasLeader]"
+			enabled = "[MercenaryItem.GetMercenary.HasLeader]"
 
 			character_frame_small = {
-				datacontext = "[MercenaryItem.GetMercenary.GetLeader]"
+				blockoverride "portrait_datacontext" {
+					datacontext = "[MercenaryItem.GetMercenary.GetLeader]"
+				}
 				blockoverride "character_frame_size" {
 					size = { 67 72 }
+				}
+				blockoverride "character_frame_texture" {
+					texture = "gfx/interface/component_decoration/character_frames/character_non_stretchable_frame_2.dds"
+				}
+				blockoverride "character_portrait_visible" {
+					visible = yes
+				}
+				blockoverride "character_portrait_ani_visible" {
+					visible = no
+				}
+				blockoverride "character_frame_estate_visible" {
+					visible = no
 				}
 			}
 		}
@@ -150,26 +223,32 @@ template mercenary_card {
 					datacontext = "[MercenaryItem.GetMercenary]"
 					using = mercenary_item_action
 					using = bg_paper_card
-					using = bg_card_header_01_military
-					using = layoutpolicy_expanding
-					size = {-1 30}
+					using = mercenary_background
+					layoutpolicy_horizontal = expanding
+					size = {-1 35}
 					
 					# BUTTON CONTENT
 					hbox = {
 						layoutpolicy_horizontal = expanding
 						margin = {10 0}
 						spacing = 5
-	
+
 						country_flag_small = {
-							datacontext = "[MercenaryItem.GetMercenary.GetCustomer]"
+							datacontext = "[MercenaryItem.GetMercenary.GetOwner]"
 							visible = "[Country.Exists]"
 							enabled = "[Country.Exists]"
-
 							tooltipwidget = {
-								using = Mercenary_customer_tooltip
+								using = Mercenary_owner_tooltip
 							}
 							
-							block "country_sort_highlight" {}
+							block "country_owner_sort_highlight" {}
+						}
+
+						icon = {
+							visible = "[Not(MercenaryItem.GetMercenary.GetOwner.Exists)]"
+							size = { 22 22 }
+							texture = "gfx/interface/icons/character_roles/mercenary.dds"
+							texture_density = 2
 						}
 						
 						text_single = {
@@ -182,22 +261,47 @@ template mercenary_card {
 							block "name_sort_highlight" {}
 						}
 
-						hbox = {
-							spacing = 2
-							datamodel = "[MercenaryItem.GetMercenary.GetSubUnitCounts]"
-							datacontext = "[MercenaryItem.GetMercenary]"
+						offerMercenaryIcon = {
+							blockoverride "mercenary_icon_army_visible" { visible = "[ArmyBuilderLateralView.Vars.NotExistOrHasValue('unit_type', 'army')]" }
+							blockoverride "mercenary_icon_navy_visible" { visible = "[ArmyBuilderLateralView.Vars.NotExistOrHasValue('unit_type', 'navy')]" }
+							size = {25 25}
+							visible = "[ObjectsEqual(Player.Self, MercenaryItem.GetMercenary.GetOwner)]"
 							tooltipwidget = {
-								using = Mercenary_tooltip
+								using = unit_is_player_mercenary_tooltip
 							}
-							item = {
-								icon = {
-									size = { 26 26 }
-									visible = "[GreaterThan_int32(SubUnitCounts.GetCount,'(int32)0')]"
-									texture = "[GetSubUnitCategoryIcon(SubUnitCounts.GetCategory)]"
-									texture_density = 2
+						}
+
+						country_flag_small = {
+							datacontext = "[MercenaryItem.GetMercenary.GetCustomer]"
+							visible = "[And(MercenaryItem.GetMercenary.GetCustomer.Exists, Not(ObjectsEqual(MercenaryItem.GetMercenary.GetCustomer, MercenaryItem.GetMercenary.GetOwner)))]"
+							enabled = "[Country.Exists]"
+
+							tooltipwidget = {
+								using = Mercenary_customer_tooltip
+							}
+							
+							block "country_sort_highlight" {}
+						}
+
+						#MAINTENANCE COST
+						hbox = {
+							spacing = 5
+							margin = {8 0}
+
+							widget = {
+								size = {70 25}
+								text_single = {
+									visible = "[Not(Or(And(MercenaryItem.GetMercenary.GetCustomer.Exists, ObjectsEqual(MercenaryItem.GetMercenary.GetCustomer, Player.Self)),
+			 And(Not(MercenaryItem.GetMercenary.GetCustomer.Exists), ObjectsEqual(MercenaryItem.GetMercenary.GetOwner, Player.Self))))]"
+									size = {70 25}
+									autoresize = no
+									align = left
+									text = "[MercenaryItem.GetMercenary.GetHireCost(Player.Self)]"
 								}
+		
 							}
-							expand = {}
+
+							block "cost_sort_highlight" {}
 						}
 					}
 				}
@@ -208,81 +312,89 @@ template mercenary_card {
 				using = layoutpolicy_expanding
 
 				hbox = {
-					margin = { 5 0 }
-					spacing = 10
-					layoutpolicy_horizontal = expanding
-					
-					hbox = {
-						margin = { 10 0 }
-						spacing = 10
-						datacontext = "[MercenaryItem.GetMercenary.GetOwner]"
-						visible = "[Country.Exists]"
-						country_flag_small = {
-							enabled = "[Country.Exists]"
-							blockoverride "tooltip" {
-								tooltipwidget = {
-									using = Mercenary_owner_tooltip
-								}
-							}
-							
-							block "country_owner_sort_highlight" {}
+					margin_left = 5
+					using = layoutpolicy_expanding
+
+					text_single = {
+						visible = "[MercenaryItem.GetMercenary.IsShip]"
+						size = {50 20}
+						autoresize = no
+						align = right|nobaseline
+						text = "MERCENARY_STRENGTH_SHIP_SIZE"
+						datacontext = "[MercenaryItem.GetMercenary]"
+						tooltipwidget = {
+							using = mercenary_card_strength_tooltip
 						}
-	
-						divider_flavor_01 = {
-							
-							blockoverride "divider_margin" {}
-							size = {14 -1}
+
+						block "mercenary_size_sort_highlight_01" {}
+					}
+
+					text_single = {
+						visible = "[Not(MercenaryItem.GetMercenary.IsShip)]"
+						datacontext = "[MercenaryItem.GetMercenary]"
+						size = {60 20}
+						autoresize = no
+						align = right|nobaseline
+						text = "MERCENARY_STRENGTH_ARMY_SIZE"
+						
+						tooltipwidget = {
+							using = mercenary_card_strength_tooltip
 						}
+
+						block "mercenary_size_sort_highlight_02" {}
+					}
+
+					divider_flavor_01 = { 
+						blockoverride "divider_margin" {}
+						size = {14 -1}
 					}
 
 					hbox = {
-						spacing = 3
-						margin = {4 0}
-						visible = "[MercenaryItem.GetMercenary.IsEmployed]"
-						tooltipwidget = {
-							SimpleContextualTooltipType = {
-								blockoverride "title_icon" {
-									icon = {
-										using = tooltip_title_icon_size
-										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+						layoutpolicy_horizontal = expanding
+						hbox = {
+							datamodel = "[MercenaryItem.GetMercenary.GetSubUnitCounts]"
+							datacontext = "[MercenaryItem.GetMercenary]"
+							spacing = 2
+							tooltipwidget = {
+								using = Mercenary_tooltip
+							}
+							item = {
+								widget = {
+									visible = "[Or(And(MercenaryItem.GetMercenary.IsShip, Not(SubUnitCounts.GetCategory.IsArmy)), 
+									And(Not(MercenaryItem.GetMercenary.IsShip), SubUnitCounts.GetCategory.IsArmy))]"
+									size = { 50 20 }
+									hbox = {
+										icon = {
+											size = { 20 20 }
+											texture = "[GetSubUnitCategoryIcon(SubUnitCounts.GetCategory)]"
+										}
+				
+										text_single = {
+											size = { 30 20 }
+											autoresize = no
+											align = left|nobaseline
+											text = "[SubUnitCounts.GetCount]"
+										}
 									}
 								}
-	
-								blockoverride "concept_link" {
-									text = "[mercenary|e]"
-								}
-								textcontext =  "MERCENARY_TIME_REMAINING"
 							}
-						}
-
-						icon = {
-							size = { 18 18 }
-							texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
-							texture_density = 2
-
-							glow = {
-								name = "drop_shadow"
-								glow_radius = 2
-								color = {0.0 0.0 0.0 1.0}
-								alpha = 0.3
-							}
-						}
-
-						text_single = {
-							using = layoutpolicy_expanding
-							size = {60 -1}
-							autoresize = yes
-							align = center|nobaseline
-							raw_text = "[MercenaryItem.GetMercenary.GetMonthsLeftOnContract|2]"
-
-							block "mercenary_length_sort_highlight_01" {}
 						}
 					}
 
-					hbox = {
-						spacing = 3
-						margin = {4 0}
+					divider_flavor_01 = { 
+						blockoverride "divider_margin" {}
+						size = {14 -1}
+					}
+
+					text_single = {
 						visible = "[MercenaryItem.GetMercenary.IsAvailable]"
+						size = {60 20}
+						autoresize = no
+						align = center
+
+						raw_text = "[MercenaryItem.GetMercenary.GetContractLengthInMonths|2] @mercenary_contract_expiring!"
+
+						block "mercenary_length_sort_highlight_02" {}
 
 						tooltipwidget = {
 							SimpleContextualTooltipType = {
@@ -299,111 +411,31 @@ template mercenary_card {
 								textcontext =  "MERCENARY_TIME_REMAINING_NONE"
 							}
 						}
-						icon = {
-							size = { 18 18 }
-							texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"								
-						}
-
-						text_single = {
-							using = layoutpolicy_expanding
-							size = {60 -1}
-							autoresize = yes
-							align = center|nobaseline
-
-							raw_text = "[MercenaryItem.GetMercenary.GetContractLengthInMonths|2]"
-
-							block "mercenary_length_sort_highlight_02" {}
-						}
 					}
 
-					divider_flavor_01 = { 
-						blockoverride "divider_margin" {}
-						size = {14 -1}
-					}
+					text_single = {
+						visible = "[MercenaryItem.GetMercenary.IsEmployed]"
+						size = {60 20}
+						autoresize = no
+						align = center
+						raw_text = "[MercenaryItem.GetMercenary.GetMonthsLeftOnContract|2] @mercenary_contract_expiring!"
 
-					hbox = {
-						spacing = 3
-						margin = {4 0}
-						visible = "[MercenaryItem.GetMercenary.IsShip]"
+						block "mercenary_length_sort_highlight_01" {}
 
-						expand = {}
-
-						icon = {
-							size = { 22 22 }
-							texture = "gfx/interface/icons/unit_category/navy_light_ship.dds"
-							texture_density = 2
-							datacontext = "[MercenaryItem.GetMercenary]"
-							tooltipwidget = {
-								using = mercenary_card_strength_tooltip
-							}
-						}
-
-						text_single = {
-							maximumsize = {60 -1}
-							autoresize = yes
-							align = center
-							text = "MERCENARY_STRENGTH_SHIP_SIZE"
-							datacontext = "[MercenaryItem.GetMercenary]"
-							tooltipwidget = {
-								using = mercenary_card_strength_tooltip
-							}
-
-							block "mercenary_size_sort_highlight_01" {}
-						}
-					}
-
-					hbox = {
-						spacing = 3
-						margin = {4 0}
-						visible = "[MercenaryItem.GetMercenary.IsShip]"
-						datacontext = "[MercenaryItem.GetMercenary]"								
 						tooltipwidget = {
-							using = mercenary_card_strength_tooltip
-						}
-						icon = {
-							size = { 22 22 }
-							texture = "gfx/interface/icons/unit_actions/select_transport.dds"
-							texture_density = 2
-						}
-
-						text_single = {
-							using = layoutpolicy_expanding
-							size = {60 -1}
-							autoresize = yes
-							align = center
-							text = "MERCENARY_STRENGTH_SHIP_TPC"
-							datacontext = "[MercenaryItem.GetMercenary]"								
-
-							block "mercenary_tpc_sort_highlight" {}
-						}
-					}
-
-					hbox = {
-						spacing = 3
-						margin = {8 0}
-						visible = "[Not(MercenaryItem.GetMercenary.IsShip)]"
-						datacontext = "[MercenaryItem.GetMercenary]"
-						tooltipwidget = {
-							using = mercenary_card_strength_tooltip
-						}
-
-						expand = {}
-
-						icon = {
-							size = { 22 22 }
-							texture = "gfx/interface/icons/unit_category/total_strength.dds"
-							texture_density = 2
-						}
-						expand = {}
-
-						text_single = {
-							maximumsize = {60 -1}
-							minimumsize = {25 -1}
-							autoresize = yes
-							align = right
-							text = "MERCENARY_STRENGTH_ARMY_SIZE"								
-
-							block "mercenary_size_sort_highlight_02" {}
+							SimpleContextualTooltipType = {
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/alerts_icons/mercenary_contract_expiring.dds"
+									}
+								}
+	
+								blockoverride "concept_link" {
+									text = "[mercenary|e]"
+								}
+								textcontext =  "MERCENARY_TIME_REMAINING"
+							}
 						}
 					}
 
@@ -417,15 +449,56 @@ template mercenary_card {
 						margin = {2 0}
 
 						text_single = {
-							maximumsize = {60 -1}
-							minimumsize = {25 -1}
-							autoresize = yes
-							align = left
-							datacontext = "[MercenaryItem.GetMercenary]"
-							text = "[MercenaryItem.GetMercenary.GetHireCost(Player.Self)|0V]"
+							visible = "[MercenaryItem.GetMercenary.IsEmployed]"
+							size = { 60 20 }
+							autoresize = no
+							raw_text = "#R -[MercenaryItem.GetMercenary.GetMonthlyMaintenanceCost(MercenaryItem.GetMercenary.GetCustomer)|2]#!@expense!"
+							align = nobaseline
+
+							tooltipwidget = {
+								SimpleContextualStringPairTooltipType = {
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[GetConceptTexture('mercenary_monthly_fee')]"
+										}
+									}
+									blockoverride "concept_link" {
+										text = "[mercenary_monthly_fee|e]"
+									}
+									blockoverride "tooltip_title_text" {
+										text = "SORT_CHARTER_MAINTENANCE"
+									}
+									lowpriotextcontext = "[MercenaryItem.GetMercenary.GetMonthlyMaintenanceCostInfo(MercenaryItem.GetMercenary.GetCustomer)]"
+								}
+							}
 						}
 
-						block "cost_sort_highlight" {}
+						text_single = {
+							visible = "[Not(MercenaryItem.GetMercenary.IsEmployed)]"
+							size = { 60 20 }
+							autoresize = no
+							raw_text = "#R -[MercenaryItem.GetMercenary.GetMonthlyMaintenanceCost(Player.Self)|2]#!@expense!"
+							align = nobaseline
+
+							tooltipwidget = {
+								SimpleContextualStringPairTooltipType = {
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[GetConceptTexture('mercenary_monthly_fee')]"
+										}
+									}
+									blockoverride "concept_link" {
+										text = "[mercenary_monthly_fee|e]"
+									}
+									blockoverride "tooltip_title_text" {
+										text = "SORT_CHARTER_MAINTENANCE"
+									}
+									lowpriotextcontext = "[MercenaryItem.GetMercenary.GetMonthlyMaintenanceCostInfo(Player.Self)]"
+								}
+							}
+						}
 					}
 				}
 			}
@@ -433,7 +506,7 @@ template mercenary_card {
 	}
 }
 
-template Detatch_From_Unit_Template {
+template Detach_From_Unit_Template {
 	ContextualTooltipType = {
 		blockoverride "title_icon" {
 			icon = {
@@ -450,7 +523,9 @@ template Detatch_From_Unit_Template {
 		}
 	
 		blockoverride "title_text" {
-			text = "DETACH_SUBUNIT_FROM"
+			block "detach_title_text" {
+				text = "DETACH_SUBUNIT_FROM"
+			}
 		}
 		blockoverride "concept_link" {
 			text = [unit|e]
@@ -499,11 +574,93 @@ types UnitCardTypes
 	# 	texture_density = 2
 	# }
 
+	type SubUnitCategoryCard = widget
+	{
+		size = { 60 90 }
+		using = bg_card
+
+		tooltipwidget = {
+			using = SubUnitCategory_tooltip
+		}
+
+		vbox = {
+			margin = { 0 10 }
+			spacing = 5
+			icon = {
+				size = { 40 40}
+				texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+			}
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 20 }
+				autoresize = no
+				align = center
+				block "unit_template_subunit_category_amount" {
+					text = "[UnitTemplate.GetSubUnitCategoryAmount(SubUnitCategory.Self)]"
+				}
+			}
+		}
+	}
+
+	type SmallSubUnitCategoryCard = hbox {
+		spacing = 1
+		icon = {
+			size = { 20 20}
+			texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+		}
+		text_single = {
+			size = {25 20 }
+			autoresize = no
+			align = center
+			block "unit_template_subunit_category_amount" {
+				text = "[UnitTemplate.GetSubUnitCategoryAmount(SubUnitCategory.Self)]"
+			}
+		}
+	}
+
+	type SubUnitCategoryStrengthCard = widget {
+		size = {56 20}
+		tooltipwidget = {
+			using = Detach_From_Unit_Template
+			blockoverride "detach_title_text" {
+				text = "[SubUnitCategory.GetNameWithNoTooltip]"
+			}
+		}
+		hbox = {
+			spacing = 3
+			expand = {}
+			text_single = {
+				visible = "[Unit.IsArmy]"
+				maximumsize = {33 20}
+				align = nobaseline
+				text = "[SubUnitCategory.GetTotalStrength(Unit.Self)]"
+			}
+			text_single = {
+				visible = "[Not(Unit.IsArmy)]"
+				maximumsize = {33 20}
+				align = nobaseline
+				text = "[SubUnitCategory.GetCount(Unit.Self)]"
+			}
+			icon = {
+				size = {20 20}
+				texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+
+				glow = {
+					name = "drop_shadow"
+					glow_radius = 3
+					color = {0.0 0.0 0.0 1.0}
+					alpha = 0.5
+				}
+			}
+			expand = {}
+		}
+	}
+
 	type SubUnitCategoryCardButton = button_regular {
 		using = layoutpolicy_expanding
 		enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
 		action_tooltip = {
-			click_type = left
+			click_type = right
 			title = "DETACH_SUBUNIT_FROM"
 			enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
 			conditions = "[GetDetachCategoryInfoPossible(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
@@ -512,15 +669,32 @@ types UnitCardTypes
 		
 		action_tooltip = {
 			click_modifier = shift
-			click_type = left
+			click_type = right
 			title = "DETACH_HALF_SUBUNIT_FROM"
 			enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
 			conditions = "[GetDetachCategoryInfoPossible(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
 			on_action = "[DetachHalfCategory(Unit.Self,SubUnitCategory.Self)]"
 		}
 
-		block "subunitcategory_card_tooltip" {
-			tooltip = "[GetDetachCategoryInfo(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
+		action_tooltip = {
+			click_type = left
+			title = "DETACH_SUBUNIT_FROM_AND_SELECT"
+			enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
+			conditions = "[GetDetachCategoryInfoPossible(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
+			on_action = "[DetachCategoryAndSelect(Unit.Self,SubUnitCategory.Self)]"
+		}
+
+		action_tooltip = {
+			click_modifier = shift
+			click_type = left
+			title = "DETACH_HALF_SUBUNIT_FROM_AND_SELECT"
+			enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
+			conditions = "[GetDetachCategoryInfoPossible(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
+			on_action = "[DetachHalfCategoryAndSelect(Unit.Self,SubUnitCategory.Self)]"
+		}
+
+		tooltipwidget = {
+			using = Detach_From_Unit_Template
 		}
 
 		hbox = {

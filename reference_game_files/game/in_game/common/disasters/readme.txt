@@ -1,6 +1,6 @@
 ﻿# Disasters
 #
-# monthly_spawn_chance: script value for how likely the disease is to spawn per month (0..1) (scope:disaster is the disaster)
+# monthly_spawn_chance: script value for how likely the disease is to spawn per month (0..1) (root = country, scope:disaster is the disaster)
 # modifier: modifier applied to a country that has this disaster ongoing
 # can_start: trigger to see if the disaster can start (root = country, scope:disaster = disaster type)
 # can_end: trigger to see if the disaster should end (root = country, scope:disaster = disaster type)

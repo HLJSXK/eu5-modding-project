@@ -135,6 +135,15 @@ template Law_tooltip {
 				textcontext = "[Player.GetGovernment.GetPolicyForLaw(Law.Self).GetEffectOnlyText]"
 			}
 
+			TooltipRowList = {
+				visible = "[Law.GetTagObject.CanShowTags]"
+				blockoverride "block_title" {
+					text = "CUSTOM_TAGS_TITLE"
+				}
+				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "[Law.GetTagObject.ShowTags]"
+			}
+
 			TooltipStringPairList = {
 				visible = "[Player.GetGovernment.HasPolicyForLaw(Law.Self)]"
 				textcontext = "[Player.GetGovernment.GetImplementedTooltipForLaw(Law.Self)]"
@@ -327,10 +336,7 @@ template IO_Law_tooltip {
 					text = "RESOLUTIONS"
 				}
 
-				visible = "[And3(
-					Not(ResolutionGlue.EnactResolutionIsActive),
-					Not(ResolutionGlue.RepealResolutionIsActive), 
-					Not(EqualTo_string(InternationalOrganizationsView.GetInternationalOrganization.GetType.GetNameKey,'middle_kingdom')))]"
+				visible = "[ResolutionGlue.CanResolutionBeVoted]"				
 				
 				TooltipListScrollArea = {
 					blockoverride "scrollarea_content" {
@@ -346,7 +352,7 @@ template IO_Law_tooltip {
 
 									expand = {}
 
-									hbox = {
+									hbox = {										
 										spacing = 5
 
 										tooltipwidget = {
@@ -402,18 +408,37 @@ template Policy_tooltip {
 				textcontext = "[Policy.GetPolicyPartOfDescription]"
 			}
 
-			TooltipStringPairList = {
-				visible = "[Not(StringIsEmpty(Policy.GetModifierText))]"
-				blockoverride "block_title" {
-					text = "[modifiers|e]"
+			TooltipContentSection = {
+				block "country_datacontext" {
+					visible = "[IsPlayerValid]"
+					datacontext = "[Player]"
 				}
+				
+				TooltipStringPairList = {
+					visible = "[Not(StringIsEmpty(Policy.GetModifierTextFor(Country.Self)))]"
+					blockoverride "block_title" {
+						text = "[modifiers|e]"
+					}
 
-				textcontext = "[Policy.GetModifierText]"
+					textcontext = "[Policy.GetModifierTextFor(Country.Self)]"
+				}
 			}
 
 			TooltipTextBlock = {
 				visible = "[Not(StringIsEmpty(Policy.GetImplementableTooltip))]"
 				textcontext = "[Policy.GetImplementableTooltip]"
+			}
+
+			TooltipRowList = {
+				visible = "[Policy.GetTagObject.CanShowTags]"
+				blockoverride "block_title" {
+					text = "CUSTOM_TAGS_TITLE"
+				}
+				blockoverride "set_textcontext" {
+					ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				}
+				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "[Policy.GetTagObject.ShowTags]"
 			}
 
 			TooltipRowList = {
@@ -527,7 +552,7 @@ template PolicyTrigger_tooltip {
 # 		blockoverride "tooltip_content" {
 # 			# block "tooltip_text" {
 # 				text_single = {
-# 					text = "[AlertItem.GetTooltip]"
+# 					text = "[AlertEntry.GetTooltip]"
 # 				}
 # 			# }
 
@@ -579,6 +604,7 @@ template GovernmentReform_tooltip {
 			text = [government_reform|E]
 		}
 
+		# [SD] Update CGovernmentReform::GetTooltip() accordingly to keep Europedia up-to date
 		blockoverride "tooltip_content" {
 			TooltipDebugTextBlock = {
 				blockoverride "text" {
@@ -588,7 +614,7 @@ template GovernmentReform_tooltip {
 
 			# block "reform_tooltip" {
 				TooltipRowList = {
-					visible = "[GovernmentReform.HasTooltip]"
+					visible = "[GovernmentReform.IsMajor]"
 					blockoverride "block_title" {
 						text = "[major_reform|e]"
 					}
@@ -965,12 +991,12 @@ template EstatePrivilege_tooltip_alt {
 				textcontext = "[UIAction.GetEffects]"
 			}
 
-			TooltipStringPairList = {
-				name = "LoyaltyEffects"
-				blockoverride "block_title" { text = "ESTATE_PRIVILEGE_LOYALTY_IMPACT_T" }
-				visible = "[Not(StringIsEmpty(EstatePrivilege.GetLoyaltyEffectsOnGrant))]"
-				textcontext = "[EstatePrivilege.GetLoyaltyEffectsOnGrant]"
-			}
+			# TooltipStringPairList = {
+			# 	name = "LoyaltyEffects"
+			# 	blockoverride "block_title" { text = "ESTATE_PRIVILEGE_LOYALTY_IMPACT_T" }
+			# 	visible = "[Not(StringIsEmpty(EstatePrivilege.GetLoyaltyEffectsOnGrant))]"
+			# 	textcontext = "[EstatePrivilege.GetLoyaltyEffectsOnGrant]"
+			# }
 
 			TooltipRequirementsList = {
 				name = "Conditions"
@@ -1384,6 +1410,10 @@ template EstateType_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipRowList = {
+				textcontext = "[EstateType.GetTooltip]"
+			}
+		
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "[EstateType.GetFlavorText]"
@@ -2333,28 +2363,14 @@ template Estate_tooltip {
 						raw_text = "[Estate.GetLastMonthsIncomeAfterTaxWithTooltip]@gold!"
 					}
 				}
-
-				TooltipManualTableField = {
+				
+				TooltipStringPairList = {
 					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
-					text_single = {
-						text = "ESTATE_FOOD_INCOME"
-					}
-					expand = {}
-					text_single = {
-						raw_text = "[Estate.GetFoodIncome|+=2]@gold!"
-					}
+					textcontext = "[Estate.GetEconomyInfo]"
 				}
 
-				TooltipManualTableField = {
-					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
-					text_single = {
-						text = "ESTATE_TRADE_INCOME"
-					}
-					expand = {}
-					text_single = {
-						raw_text = "[Estate.GetTradeIncome|+=2]@gold!"
-					}
-				}
+
+	
 				TooltipManualTableField = {
 					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
 					text_single = {

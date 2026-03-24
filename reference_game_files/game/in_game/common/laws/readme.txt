@@ -15,6 +15,7 @@
 # - law_country_goup: <country tag> for laws that are unique for some country
 # - unique: <yes/no> Default: no
 # - custom_tags = { <strings> }	#A list of custom strings to use to identify that law
+# -	show_tags_in_ui = yes/no #expose the tags in the tooltips and UI
 # anything else is a tag of a policy that can be chosen for this law
 #
 # Policies:
@@ -22,6 +23,7 @@
 # - potential: trigger for whether the action is possible (root = country)
 # - allow: trigger for whether the action can start (root = country)
 # - custom_tags = { <strings> }	#A list of custom strings to use to identify that policy
+# -	show_tags_in_ui = yes/no #expose the tags in the tooltips and UI
 # - years:
 # - months:
 # - weeks:

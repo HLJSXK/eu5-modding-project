@@ -1,4 +1,102 @@
 ﻿#Timur's Actions
+rot_declare_conquest_ambition = {
+	type = situation
+	potential = {
+		scope:actor = {
+			tag = TIM
+		}
+	}
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	ai_tick = yearly
+	ai_tick_frequency = 1
+
+	cooldown = {
+		type = rot_declare_conquest_ambition
+		years = 5
+	}
+	
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:rise_of_timur = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = region
+		target_flag = target
+		name = "rot_declare_conquest_ambition_select_region"
+		none_available_msg_key = "rot_declare_conquest_ambition_no_regions"
+		column = {
+			data = name
+		}
+		column = {
+			data = population
+		}
+		visible = {
+			scope:actor.capital.region != root
+			any_area_in_region = {
+				adjacent_to_owned_by = scope:actor
+			}
+		}
+	}
+
+	effect = {
+		custom_tooltip = {
+			text = rot_declare_conquest_ambition_tt
+			scope:recipient = {
+				if = {
+					limit = { has_variable = rot_conquest_ambition }
+					#clear up all the previous modifiers first
+					var:rot_conquest_ambition = {
+						every_location_in_region = {
+							remove_location_modifier = rot_timur_scare
+						}
+					}
+				}
+				set_variable = {
+					name = rot_conquest_ambition
+					value = scope:target
+				}
+			}
+		}
+		custom_tooltip = rot_declare_conquest_ambition_at
+		if = {
+			limit = {
+				scope:actor = {
+					ruler ?= { has_character_modifier = timmy_wants_to_play }
+				}
+			}
+			custom_tooltip = rot_declare_conquest_ambition_bt
+		}
+	}
+
+	ai_will_do = {
+		if = {
+			limit = {
+				NOT = { scope:recipient = { has_variable = rot_conquest_ambition } }
+				trigger_if = {
+					limit = { has_game_rule = historical_ai_choices }
+					scope:target ?= region:persia_region
+				}
+			}
+			value = 1000
+		}
+		else = {
+			value = -100
+		}
+	}
+}
+
 rot_plan_invasion = {
 	type = situation	
 	potential = {
@@ -22,6 +120,28 @@ rot_plan_invasion = {
 
 	select_trigger = {
 		looking_for_a = country
+		interaction_source_list = {
+			if = {
+				limit = {
+					scope:recipient = {
+						has_variable = rot_conquest_ambition
+					}
+				}
+				scope:recipient = {
+					var:rot_conquest_ambition = {
+						every_country_with_capital_in_geography = {
+							limit = { this != scope:actor }
+							add_to_list = source
+						}
+					}
+				}
+			}
+			scope:actor = {
+				every_neighbor_country = {
+					add_to_list = source
+				}
+			}
+		}
 		target_flag = target
 		name = "rot_plan_invasion_select_country"
 		none_available_msg_key = "rot_plan_invasion_no_countries"
@@ -32,24 +152,35 @@ rot_plan_invasion = {
 			data = expected_army_size
 		}
 		visible = {
-			NOT = { has_truce_with = scope:actor }
-			NOT = { is_allied_with = { target = scope:actor } }
-			NOT = { is_subject_of = scope:actor }
-			is_neighbor_of = scope:actor
-			within_diplomatic_range = scope:actor
+			is_real_country = yes
 			scope:actor = {
-				NOT = { has_casus_belli_of_type_on = { type = casus_belli:cb_timurs_conquests target = PREV } }
+				can_declare_war_on = root
+				NOT = { has_truce_with = root }
+				NOT = { is_allied_with = { target = root } }
 			}
 		}
 	}
 
 	cooldown = {
 		type = rot_plan_invasion
-		months = 18
+		months = 3
 	}
 
 	automation_tick = never
 	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = {
+		if = {
+			limit = {
+				at_war = yes
+			}
+			value = 18
+		}
+		else = {
+			value = 3
+		}
+	}
 
 	effect = {
 		scope:actor = {
@@ -57,40 +188,83 @@ rot_plan_invasion = {
 				limit = {
 					exists = scope:target
 				}
-				add_casus_belli = {
-					target = scope:target
-					type = casus_belli:cb_timurs_conquests
+				if = {
+					limit = {
+						scope:target = {
+							capital = {
+								OR = {
+									region = scope:actor.capital.region
+									AND = {
+										scope:recipient = { has_variable = rot_conquest_ambition }
+										region = scope:recipient.var:rot_conquest_ambition
+									}
+								}
+							}
+						}
+					}
+					drop_antagonism_bomb = {
+						target = scope:target.capital
+						modifier = antagonism_started_invasion
+					}
+					declare_war_with_cb = {
+						target = scope:target
+						type = casus_belli:cb_timurs_conquests
+					}
 				}
-				drop_antagonism_bomb = {
-					target = scope:target.capital
-					modifier = antagonism_planned_invasion
+				else = {
+					add_casus_belli = {
+						target = scope:target
+						type = casus_belli:cb_timurs_conquests
+					}
+					drop_antagonism_bomb = {
+						target = scope:target.capital
+						modifier = antagonism_planned_invasion
+					}
 				}
 			}
 			else = {
 				custom_tooltip = rot_plan_invasion_tt
+				if = {
+					limit = {
+						scope:recipient = { has_variable = rot_conquest_ambition }
+					}
+					custom_tooltip = rot_plan_invasion_bt
+				}
+				else = {
+					custom_tooltip = rot_plan_invasion_at
+				}
 			}
 		}
 	}
 	ai_will_do = {
-		add = 100
-		multiply = {
+		value = -20
+		if = {
+			limit = { exists = scope:target }
 			if = {
-				limit = { exists = scope:target }
-				value = {
-					value = "scope:actor.opinion(scope:target)"
-					multiply = -1
+				limit = {
+					scope:target = {
+						capital = {
+							OR = {
+								region = scope:actor.capital.region
+								AND = {
+									scope:recipient = { has_variable = rot_conquest_ambition }
+									region = scope:recipient.var:rot_conquest_ambition
+								}
+							}
+						}
+					}
 				}
+				add = 200
 			}
-			else = {
-				value = 1	#We need that else or otherwise the whole chance is multiplied with 0
+			add = {
+				value = "scope:actor.opinion(scope:target)"
+				multiply = -1
 			}
-		}
-		add = {
-			if = {
-				limit = { exists = scope:target }
+			add = {
 				value = "scope:actor.antagonism(scope:actor)"
 				divide = -10
 			}
+			multiply = "scope:actor.relative_military_strength(scope:target)"
 		}
 	}
 }

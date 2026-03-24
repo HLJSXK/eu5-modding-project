@@ -7,6 +7,7 @@
 # block_when_at_war = yes/no, default is yes
 # use_enroute = yes/no, whether to use diplomats that take time or not
 # diplomatic_cost = <diplomatic_cost_id>, if spy network/trust/favor cost is required
+# diplomatic_cost_modifier = <script value> multiplier for the diplomatic cost. 1 if not specified.
 # potential = trigger, scope:actor is the country attempting to perform the action
 # allow = trigger, scope:actor is the country attempting to perform the action
 # price = a scripted standard price, listed in \common\prices\ and referenced by name (like price:<price_id>) or as a result of a script (like scope:target.price)
@@ -35,6 +36,7 @@
 #						name = localisation name of the title for the selection stage
 #						allow_null = yes/no to allow the selection of a null object, can be a trigger to check under what circumstances should null be included / excluded instead
 #                       allow_self = yes/no to allow the actor to be added to the list (only works for countries)
+#                       move_to_next_section_on_click yes/no should the UI move to the next stage when you click on an item. Usually left to the default yes, but set to no if you have some other UI that will perform that action somewhere else
 #						top_widget = links to a widget type in the gui files to show at the top of the list. 
 #						bottom_widget = links to a widget type in the gui files to show at the bottom of the list. 
 #						column = { data = <column_id> width = <int> icon = <path> show_icon_in_cells = yes/no } adds a column to the UI to search with

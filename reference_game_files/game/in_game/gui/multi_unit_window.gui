@@ -1,8 +1,178 @@
-lateralview = {
+lateralview_unattached = {
 	name = "multi_unit_window"
+
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			parentanchor = right|vcenter
+			size = { 40 40 }
+			position = { -30 0 }
+			
+			button_minimize = {
+				visible = "[Not(MultiUnitWindow.IsCompactViewEnabled)]"
+				parentanchor = right|vcenter
+
+				action_tooltip = {
+					title = "COLLAPSE"
+					on_action = "[MultiUnitWindow.ToggleCompactView]"
+				}
+
+				input_action = "toggle_window_collapse"
+			}
+
+			button_minimize = {
+				visible = "[MultiUnitWindow.IsCompactViewEnabled]"
+				parentanchor = right|vcenter
+
+				blockoverride "button_texture" {
+					using = max_button_alt_texture
+				}
+
+				action_tooltip = {
+					title = "EXPAND"
+					on_action = "[MultiUnitWindow.ToggleCompactView]"
+				}
+
+				input_action = "toggle_window_collapse"
+			}
+		}
+	}
 
 	blockoverride "panel_header" {
 		window_header_alt = {
+			visible = "[MultiUnitWindow.HasOneUnitItem]"
+			using = bg_main_inner_alt
+			blockoverride "window_header_alt_color_texture"{
+				using = color_default_brown_texture
+			}
+			
+			blockoverride "header_text_object" {
+				hbox = {
+					button = {
+						using = layoutpolicy_expanding
+						onclick = "[MultiUnitWindow.Vars.Toggle('edit_name')]"
+						tooltipwidget = {
+							ContextualTooltipType = {
+								blockoverride "title_icon" {
+									country_flag_mid = {
+										blockoverride "tooltip" {}
+										datacontext = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetCountry]"
+									}
+								}
+
+								blockoverride "title_text" {
+									text = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetNameWithNoTooltip]"
+								}
+
+								blockoverride "concept_link" {
+									text = "[unit|e]"
+								}
+
+								blockoverride "tooltip_content" {
+									TooltipTextBlock = {
+										blockoverride "text" {
+											text = "UNIT_NAME_TT"
+										}
+									}
+									TooltipFunctionalBlock = {
+										using = tooltip_left_click_template
+
+										blockoverride "action_left_text" {
+											text = "RENAME_UNIT"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				hbox = {
+					visible = "[Not(MultiUnitWindow.Vars.Exists('edit_name'))]"
+					spacing = 5
+					expand = {}
+
+					country_flag_small = {
+						datacontext = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetCountry]"
+						blockoverride "tooltip" {}
+						
+						blockoverride "contextmenu" {}
+					}
+
+					header_title = {
+						layoutpolicy_horizontal = fixed
+						autoresize = yes
+						maximumsize = { 250 -1 }
+						text = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetNameWithNoTooltip]"
+						alwaystransparent = yes
+					}
+
+					tooltipwidget = {
+						ContextualTooltipType = {
+							blockoverride "title_icon" {
+								country_flag_mid = {
+									blockoverride "tooltip" {}
+									datacontext = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetCountry]"
+								}
+							}
+
+							blockoverride "title_text" {
+								text = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetNameWithNoTooltip]"
+							}
+
+							blockoverride "concept_link" {
+								text = "[unit|e]"
+							}
+
+							blockoverride "tooltip_content" {
+								TooltipTextBlock = {
+									blockoverride "text" {
+										text = "UNIT_NAME_TT"
+									}
+								}
+								TooltipFunctionalBlock = {
+									using = tooltip_left_click_template
+
+									blockoverride "action_left_text" {
+										text = "RENAME_UNIT"
+									}
+								}
+							}
+						}
+					}
+
+					expand = {}
+				}
+
+				hbox = {
+					editbox = {
+						name = "unit_name"
+						using = layoutpolicy_expanding
+						default_format = "#high"
+						using = Font_Size_Medium
+						align = center|nobaseline
+
+						text = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetNameWithNoTooltip]"
+
+						ontextedited = "[MultiUnitWindow.OnUnitNameEdited]"
+						oneditingfinished = "[MultiUnitWindow.RenameUnit]"
+						oneditingfinished = "[MultiUnitWindow.Vars.Clear('edit_name')]"
+						onfocusout = "[MultiUnitWindow.Vars.Clear('edit_name')]"
+
+						focus_on_visible = yes
+						focuspolicy = all
+						alwaystransparent = no
+
+						maxcharacters = 25
+
+						visible = "[And(MultiUnitWindow.CanRenameUnit, MultiUnitWindow.Vars.Exists('edit_name'))]"
+						multiline = no
+					}
+				}
+			}
+		}
+
+		window_header_alt = {
+			visible = "[Not(MultiUnitWindow.HasOneUnitItem)]"
 			using = bg_main_inner_alt
 			blockoverride "window_header_alt_color_texture"{
 				using = color_default_brown_texture
@@ -16,34 +186,65 @@ lateralview = {
 
 	blockoverride "panel_content" {
 		vbox = {
-			using = layoutpolicy_expanding
+			layoutpolicy_horizontal = expanding
 			using = bg_main_inner_notabs_alt
 			using = window_main_tabs_margin_alt
 
-			widget = {
+			vbox = {
 				layoutpolicy_horizontal = expanding
-				size = { -1 79 }
+				minimumsize = { -1 79 }
 				name = "multi_unit_main_content"
 
 				hbox = {
+					layoutpolicy_horizontal = expanding
 					margin = {5 0}
 					margin_top = 10
+					name = "multi_unit_actions"
+
 					hbox = {
 						using = bg_market_card
 						using = bg_cabinet_card_frame
 						using = layoutpolicy_expanding
-	
-						hbox = {
-							name = "multi_unit_actions"
-							layoutpolicy_horizontal = expanding
+
+						flowcontainer = {
+							wrap_count = 10
+							ignoreinvisible = yes
+							visible = "[Not(MultiUnitWindow.HasOneUnitItem)]"
+
 							spacing = 2
 							margin = {7 5}
-							
+
 							datamodel = "[MultiUnitWindow.GetAllActionItems]"
 							item = {
 								unit_action_item = {}
 							}
 						}
+
+						flowcontainer = {
+							wrap_count = 10
+							ignoreinvisible = yes
+							
+							visible = "[MultiUnitWindow.HasOneUnitItem]"
+
+							spacing = 2
+							margin = {7 5}
+
+							datacontext = "[MultiUnitWindow.AccessFirstUnitItem.AccessUnit.GetQuickUnitActions]"
+							datacontext = "[Pin('unit_actions')]"
+							flowcontainer = {
+								spacing = 2
+								wrap_count = 10
+								ignoreinvisible = yes
+								datamodel = "[QuickUnitActions.AccessList]"
+								item = {
+									unit_action_item = {
+										visible = "[PinCollection.IsPinnedWithDefaultValue( UnitActionItem.GetKey, UnitActionItem.IsPinnedByDefault)]"
+									}
+								}
+							}
+						}
+
+						expand = {}
 	
 						hbox = {
 							margin = {5 0}
@@ -76,7 +277,59 @@ lateralview = {
 				}
 			}
 
+			scroll_list = {
+				visible = "[MultiUnitWindow.IsCompactViewEnabled]"
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "scroll_list_setup" {
+					name = "scroll_list_name"
+					layoutpolicy_horizontal = expanding
+					scrollbarpolicy_horizontal = always_off
+					scrollbar_vertical = {
+						using = Scrollbar_Vertical
+					}
+
+					autoresizescrollarea = yes
+					size = "[ToVector2f('(float)-1.0', PdxGuiWidget.GetRemainingHeightInParent('lateralview_container', '(float)10.0'))]"
+					max_height = "[PdxGuiWidget.GetRemainingHeightInParent('lateralview_container', '(float)10.0')]"
+				}
+
+				blockoverride "scroll_list_layout" {
+					vbox = {
+						#visible = "[Not(PdxGuiWidget.FindParent('scroll_list_name').HasMoveFromLastFrame)]"
+						set_parent_dimension_to_minimum = height
+						layoutpolicy_horizontal = expanding
+						spacing = 5
+
+						datamodel = "[MultiUnitWindow.AccessUnitItems]"
+						item = {
+							# UNIT CARD
+							widget = {
+								
+								layoutpolicy_horizontal = expanding
+								size = { -1 80 }
+								hbox = {
+									margin_right = 10
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										datacontext = "[UnitItem.AccessUnit]"
+										datacontext = "[UnitItem.AccessUnit.GetLocation]"
+										
+										using = bg_market_card
+										using = bg_cabinet_card_frame
+
+										unit_card = {}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			filtered_sorted_list = {
+				visible = "[Not(MultiUnitWindow.IsCompactViewEnabled)]"
+				layoutpolicy_horizontal = expanding
 				datacontext = "[MultiUnitWindow.GetUnitsSortSearch]"
 
 				blockoverride "scroll_list_is_empty" {
@@ -87,26 +340,49 @@ lateralview = {
 					text = "ARMY_SCROLL_LIST_EMPTY"
 				}
 
-				blockoverride "scroll_list_content" {
-					addcolumn = 100%
-					addrow = 85
+				blockoverride "scroll_list_vbox" {
+					layoutpolicy_horizontal = expanding
+				}
 
-					datamodel = "[MultiUnitWindow.AccessFilteredUnitItems]"
-					item = {
-						# UNIT CARD
-						widget = {
-							size = { 100% 85 }
+				blockoverride "scroll_list_setup" {
+					name = "scroll_list_name"
+					layoutpolicy_horizontal = expanding
+					scrollbarpolicy_horizontal = always_off
+					scrollbar_vertical = {
+						using = Scrollbar_Vertical
+					}
+
+					autoresizescrollarea = yes
+					size = "[ToVector2f('(float)-1.0', PdxGuiWidget.GetRemainingHeightInParent('lateralview_container', '(float)10.0'))]"
+					max_height = "[PdxGuiWidget.GetRemainingHeightInParent('lateralview_container', '(float)10.0')]"
+				}
+
+				blockoverride "scroll_list_layout" {
+					vbox = {
+						#visible = "[Not(PdxGuiWidget.FindParent('scroll_list_name').HasMoveFromLastFrame)]"
+						set_parent_dimension_to_minimum = height
+						layoutpolicy_horizontal = expanding
+						spacing = 5
+
+						datamodel = "[MultiUnitWindow.AccessFilteredUnitItems]"
+						item = {
+							# UNIT CARD
 							widget = {
-								size = { 99% 78 }
-								parentanchor = center
+								
+								layoutpolicy_horizontal = expanding
+								size = { -1 80 }
 								hbox = {
-									datacontext = "[UnitItem.AccessUnit]"
-									datacontext = "[UnitItem.AccessUnit.GetLocation]"
-									
-									using = bg_market_card
-									using = bg_cabinet_card_frame
+									margin_right = 10
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										datacontext = "[UnitItem.AccessUnit]"
+										datacontext = "[UnitItem.AccessUnit.GetLocation]"
+										
+										using = bg_market_card
+										using = bg_cabinet_card_frame
 
-									unit_card = {}
+										unit_card = {}
+									}
 								}
 							}
 						}

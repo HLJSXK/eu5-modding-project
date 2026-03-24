@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.
+- Updated documentation to reflect the new reference baseline.
+
 ## [2.0.0] - 2026-03-24
 
 ### Changed

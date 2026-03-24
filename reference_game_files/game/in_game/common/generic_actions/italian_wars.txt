@@ -2,7 +2,7 @@
 	type = situation
 	
 	ai_tick = monthly
-	ai_tick_frequency = 6
+	ai_tick_frequency = 1
 
 	automation_tick = never
 	automation_tick_frequency = 12
@@ -105,43 +105,12 @@
 
 	ai_will_do = {
 		add = {
-			value = 20
+			value = 5
 			desc = BASE_VALUE
 		}
 		if = {
 			limit = { exists = scope:target }
-			if = {
-				limit = {
-					scope:actor = {
-						NOR = {
-							is_member_of_international_organization = international_organization:italian_league_1
-							is_member_of_international_organization = international_organization:italian_league_2
-							is_member_of_international_organization = international_organization:italian_league_3
-							is_leader_of_international_organization = international_organization:foreign_league_france
-							is_leader_of_international_organization = international_organization:foreign_league_hre
-							is_leader_of_international_organization = international_organization:foreign_league_iberia
-						}
-					}
-				}
-				add = {
-					value = 40
-					desc = BASE_VALUE
-				}
-			}
-			add = {
-				desc = "Our opinion of target IO Leader"
-				scope:actor = {
-					value = "opinion(scope:target.leader_country)"
-					#divide = 5
-				}
-			}
-			scope:target.leader_country = {
-				add = {
-					value = modifier:diplomatic_reputation
-					multiply = 5
-					desc = "IO_LEADER_DIP_REP"
-				}
-            }
+			#Kindly ask the AI to try and avoid foreign leagues
 			if = {
 				limit = {
 					scope:target = {
@@ -152,325 +121,73 @@
 						}
 					}
 				}
-				add = {
-					value = -25
+				add = {																			#Inertia for joining foreign leagues
+					value = -10
 					desc = "FOREIGN_LEAGUE"
 				}
-				add = {
+				add = {																			#More members = Less likely to join
 					desc = "IW_BALANCE_OF_POWER"
 					value = scope:target.total_members
-					multiply = -5
+					multiply = -1
 				}
 			}
-			scope:target = {
-				every_international_organization_member = {
-					limit = {
-						giving_scripted_relation = {
-							type = relation_type:alliance
-							target = scope:actor
-						}
-					}
-					add = {
-						value = 5
-						desc = "IO_HOSTS_FRIENDS"
-					}
-				}
-				every_international_organization_member = {
-					limit = {
-						OR = {
-							is_rival_of = scope:actor
-							is_enemy_of = scope:actor
-						}
-					}
-					add = {
-						value = -20
-						desc = "IO_HOSTS_ENEMIES_OR_RIVALS"
-					}
-				}
-			}
-			subtract = {
-				desc = "IO_LEADER_ANTAGONISM"
-				scope:target = {
-					leader_country = {
-						scope:actor = {
-							value = this_antagonism_towards_prev
-							multiply = 2
-						}
-					}
-				}
-			}
+
+			#Let's calculate our standing with our current league IO if they exist
 			if = {
 				limit = { 
-					scope:actor = { is_member_of_international_organization = international_organization:italian_league_1 }
+					scope:actor = { is_member_of_any_italian_wars_league = yes }
 				}
-				international_organization:italian_league_1 = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
+				scope:actor = {
+					subtract = {															#Trust is a factor that includes diplomatic reputation
+						scope:league_leader_current = {
+							scope:actor = { 
+								value = this_trust_of_prev 
+								multiply = 0.25
+							}
+						}
+						desc = "our trust towards our leader"
+					}
+					subtract = {																	#Up to +25 if scope actor is 100% stronger than current leader
+						value = 25
+						multiply = "scope:actor.relative_strength(scope:league_leader_current)"
+						desc = "our relative strength against our leader"
+					}
+					add = {																	#From +30 to -30 based on member's opinion of Leader
+						scope:league_leader_current = {
 							scope:actor = {
-								value = "opinion(prev)"
+								value = this_opinion_of_prev
+								multiply = -0.15
 							}
 						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
+						desc = "our opinion of our leader"
 					}
 				}
 			}
-			else_if = {
-				limit = { 
-					scope:actor = { is_member_of_international_organization = international_organization:italian_league_2 }
-				}
-				international_organization:italian_league_2 = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
-							scope:actor = {
-								value = "opinion(prev)"
-							}
-						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
+			scope:target.leader_country = { save_temporary_scope_as = league_leader_to_join }
+
+			#Calculations for our 
+			add = {															#Trust is a factor that includes diplomatic reputation
+				scope:league_leader_to_join = {
+					scope:actor = { 
+						value = this_trust_of_prev 
+						multiply = 0.25
 					}
 				}
+				desc = "target leader trust"
 			}
-			else_if = {
-				limit = { 
-					scope:actor = { is_member_of_international_organization = international_organization:italian_league_3 }
-				}
-				international_organization:italian_league_3 = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
-							scope:actor = {
-								value = "opinion(prev)"
-							}
-						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
-					}
-				}
+			subtract = {																	#Up to +25 if scope actor is 100% stronger than current leader
+				value = 25
+				multiply = "scope:actor.relative_strength(scope:league_leader_to_join)"
+				desc = "target leader relative strength"
 			}
-			else_if = {
-				limit = { 
-					scope:actor = { is_member_of_international_organization = international_organization:foreign_league_france }
-				}
-				international_organization:foreign_league_france = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
-							scope:actor = {
-								value = "opinion(prev)"
-							}
-						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
+			add = {																	#From +30 to -30 based on member's opinion of Leader
+				scope:league_leader_to_join = {
+					scope:actor = {
+						value = this_opinion_of_prev
+						multiply = 0.15
 					}
 				}
-			}
-			else_if = {
-				limit = { 
-					scope:actor = { is_member_of_international_organization = international_organization:foreign_league_iberia }
-				}
-				international_organization:foreign_league_iberia = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
-							scope:actor = {
-								value = "opinion(prev)"
-							}
-						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
-					}
-				}
-			}
-			else = {
-				international_organization:foreign_league_hre = {
-					leader_country = {
-						subtract = {
-							desc = "CURRENT_LEAGUE_LEADER_OPINION"
-							scope:actor = {
-								value = "opinion(prev)"
-							}
-						}
-						subtract = {
-							value = modifier:diplomatic_reputation
-							multiply = 5
-							desc = "CURRENT_LEAGUE_LEADER_DIP_REP"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							giving_scripted_relation = {
-								type = relation_type:alliance
-								target = scope:actor
-							}
-						}
-						subtract = {
-							value = 5
-							desc = "CURRENT_IO_HOSTS_FRIENDS"
-						}
-					}
-					every_international_organization_member = {
-						limit = {
-							this != scope:actor
-							OR = {
-								is_rival_of = scope:actor
-								is_enemy_of = scope:actor
-							}
-						}
-						add = {
-							value = 20
-							desc = "CURRENTIO_HOSTS_ENEMIES_OR_RIVALS"
-						}
-					}
-				}
+				desc = "target leader opinion"
 			}
 		}
 	}
@@ -502,14 +219,8 @@ create_italian_league = {
 		scope:actor ?= {
 			at_war = no
 			is_during_bankruptcy = no
-			num_locations >= 12
-			OR = {
-				max_manpower >= 5
-				army_size >= {
-					value = expected_army_size
-					multiply = 0.5
-				}
-			}
+			is_subject = no
+			#We can not be a leader of another League
 			custom_tooltip = {
 				text = is_not_leader_of_any_leagues_tt
 				NOR = {
@@ -521,13 +232,40 @@ create_italian_league = {
 					is_leader_of_international_organization = international_organization:italian_league_3
 				}
 			}
+
+			#Are we in a union?
+			trigger_if = {
+				limit = { exists = union }
+				OR = {
+					union = {
+						country_has_special_status = {
+							type = special_status:senior_partner
+							country = prev
+						}
+					}
+					NOT = {
+						any_union_partner = {
+							OR = {
+								is_leader_of_international_organization = international_organization:foreign_league_france
+								is_leader_of_international_organization = international_organization:foreign_league_hre
+								is_leader_of_international_organization = international_organization:foreign_league_iberia
+								is_leader_of_international_organization = international_organization:italian_league_1
+								is_leader_of_international_organization = international_organization:italian_league_2
+								is_leader_of_international_organization = international_organization:italian_league_3
+							}
+						}
+					}
+				}
+			}
 		}
+
+		#Max only 3 Italian Leagues can exist
 		custom_tooltip = {
 			text = not_3_italian_leagues_exist
-			OR = {
-				NOT = { exists = international_organization:italian_league_1 }
-				NOT = { exists = international_organization:italian_league_2 }
-				NOT = { exists = international_organization:italian_league_3 }
+			NAND = {
+				unique_international_organization_type_exists = international_organization_type:italian_league_1
+				unique_international_organization_type_exists = international_organization_type:italian_league_2
+				unique_international_organization_type_exists = international_organization_type:italian_league_3
 			}
 		}
 	}
@@ -617,90 +355,45 @@ create_italian_league = {
 		}
 	}
 
-	ai_will_do = {	
-		add = -25
+	ai_will_do = {
 		add = {
-			desc = "COUNTRY_RANK_TOOLTIP"
 			value = 5
-			multiply = scope:actor.country_rank_level
+			desc = BASE_VALUE
 		}
 		add = {
-			desc = "IS_BANKRUPT_TOOLTIP"
-			if = {
-				limit = {	
-					scope:actor ?= { 
-						is_during_bankruptcy = yes
-					}
-				}
-				value = -1000
-			}
-		}
-		add = {
-			desc = "SIZE_OF_COUNTRY_TOOLTIP"
-			value = scope:actor.total_population
-			add = scope:actor.num_locations
+			value = scope:actor.total_control_scaled_population
 			divide = 100
+			ceiling = yes
+			desc = "total_control_scaled_population"
 		}
+
 		if = {
-			limit = {
-				scope:actor ?= { num_loans > 0 }
+			limit = { 
+				scope:actor = { is_member_of_any_italian_wars_league = yes }
 			}
-			add = {
-				desc = "PENDING_LOANS_TOOLTIP"
-				value = scope:actor.num_loans
-				multiply = -5
-			}
-		}
-		add = {
-			desc = "game_concept_army"
-			value = scope:actor.army_size
-			multiply = 5
-		}
-		if = {	
-			limit = {
-				scope:actor = { is_member_of_international_organization = international_organization:italian_league_1 }
-			}
-			add = {	#Up to +25 if scope actor is 100% stronger than current leader
-				value = 25
-				multiply = "scope:actor.relative_strength(international_organization:italian_league_1.leader_country)"
-			}
-			add = {	#From +20 to -20 based on member's opinion of Leader
-				international_organization:italian_league_1.leader_country = {
-					scope:actor = {
-						value = this_opinion_of_prev
-						multiply = -0.1
+			scope:actor = {
+				subtract = {															#Trust is a factor that includes diplomatic reputation
+					scope:league_leader_current = {
+						scope:actor = { 
+							value = this_trust_of_prev 
+							multiply = 0.25
+						}
 					}
+					desc = "our trust towards our leader"
 				}
-			}
-		}
-		else_if = {
-			limit = {
-				scope:actor = { is_member_of_international_organization = international_organization:italian_league_2 }
-			}
-			add = {
-				value = 25
-				multiply = "scope:actor.relative_strength(international_organization:italian_league_2.leader_country)"
-			}
-			add = {
-				international_organization:italian_league_2.leader_country = {
-					scope:actor = {
-						value = this_opinion_of_prev
-						multiply = -0.1
-					}
+				add = {																	#Up to +35 if scope actor is 100% stronger than current leader
+					value = 35
+					multiply = "scope:actor.relative_strength(scope:league_leader_current)"
+					desc = "our relative strength against our leader"
 				}
-			}
-		}
-		else = {
-			add = {
-				value = 25
-				multiply = "scope:actor.relative_strength(international_organization:italian_league_3.leader_country)"
-			}
-			add = {
-				international_organization:italian_league_3.leader_country = {
-					scope:actor = {
-						value = this_opinion_of_prev
-						multiply = -0.1
+				add = {																	#From +30 to -30 based on member's opinion of Leader
+					scope:league_leader_current = {
+						scope:actor = {
+							value = this_opinion_of_prev
+							multiply = -0.15
+						}
 					}
+					desc = "our opinion of our leader"
 				}
 			}
 		}
@@ -945,13 +638,24 @@ plan_campaign_in_italy = {
 					target = scope:target.owner
 					years = 10
 				}
+
+				if = {
+					limit = { is_ai = yes }
+					declare_war_with_cb = {
+						target = scope:target.owner
+						type = casus_belli:cb_conquer_province 
+					}
+				}
 			}
 			
 		}
 	}
 
 	ai_will_do = {
-		add = 10
+		add = {
+			value = 10
+			desc = BASE_VALUE
+		}
 		if = {
 			limit = { exists = scope:target }
 			add = {

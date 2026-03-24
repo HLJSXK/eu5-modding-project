@@ -24,6 +24,7 @@
 #						name = localisation name of the title for the selection stage
 #						allow_null = yes/no to allow the selection of a null object, can be a trigger to check under what circumstances should null be included / excluded instead
 #                       allow_self = yes/no to allow the actor to be added to the list (only works for countries)
+#                       move_to_next_section_on_click yes/no should the UI move to the next stage when you click on an item. Usually left to the default yes, but set to no if you have some other UI that will perform that action somewhere else
 #						top_widget = links to a widget type in the gui files to show at the top of the list. 
 #						bottom_widget = links to a widget type in the gui files to show at the bottom of the list. 
 #						column = { data = <column_id> width = <int> icon = <path> show_icon_in_cells = yes/no } adds a column to the UI to search with

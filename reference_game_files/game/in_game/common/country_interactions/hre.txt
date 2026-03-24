@@ -114,66 +114,8 @@ bestow_elector_status = {
 	}
 	ai_will_do = {
 		add = {
-			desc = "EMPIRE_NEED_ELECTORS"
-			value = 10
-		}
-		if = {
-			limit = { scope:actor = { is_allied_with = { target = scope:recipient } } }
-			add = {
-				desc = "game_concept_alliance"
-				value = 20
-			}
-		}
-		if = {
-			limit = {
-				scope:actor = {
-					is_rival_of = scope:recipient
-				}
-			}
-			add = {
-				desc = "game_concept_rival"
-				value = -1000
-			}
-		}
-		if = {
-			limit = {
-				scope:actor = {
-					is_enemy_of = scope:recipient
-				}
-			}
-			add = {
-				desc = "game_concept_enemy"
-				value = -100
-			}
-		}
-		add = {
-			desc = "DIPLOMATIC_REPUTATION"
-			value = {
-				value = scope:recipient.modifier:diplomatic_reputation
-				multiply = 3
-			}
-		}
-		add = {
-			desc = "OUR_OPINION_TOOLTIP"
-			value = "scope:actor.opinion(scope:recipient)"
-		}
-		add = {
-			desc = "THEIR_OPINION_TOOLTIP"
-			value = "scope:recipient.opinion(scope:actor)"
-		}
-		if = {
-			limit = { scope:actor.culture.language = scope:recipient.culture.language }
-			add = {
-				desc = "UPKEEP_SAME_LANGUAGE"
-				value = 25
-			}
-		}
-		add = {
-			desc = "game_concept_trust"
-			scope:recipient = {
-				value = "trust(scope:actor)"
-				divide = 5
-			}
+			desc = "TARGET_ACCEPTANCE"
+			value = "scope:actor.reverse_country_interaction_acceptance(country_interaction:request_elector_status|scope:recipient)"
 		}
 	}
 }
@@ -362,12 +304,112 @@ request_elector_status = {
 	}
 	ai_will_do = {
 		add = {
-			desc = "EMPIRE_NEED_ELECTORS"
-			value = 100
+			desc = "TARGET_ACCEPTANCE"
+			value = "scope:actor.country_interaction_acceptance(country_interaction:request_elector_status|scope:recipient)"
 		}
 	}
 	
 	accept = {
+		add = {
+			desc = "EMPIRE_NEED_ELECTORS"
+			value = 10
+		}
+		if = {
+			limit = { "scope:recipient.antagonism(scope:actor)" > 0 }
+			subtract = {
+				desc = "DIPLOREASON_ANTAGONISM"
+				value = "scope:actor.antagonism(scope:recipient)"
+			}
+		}
+		if = {
+			limit = { scope:actor = { government_type = government_type:monarchy } }
+			if = {
+				limit = {
+					scope:actor = { total_population_in_international_organization = { international_organization = international_organization:hre value < 100 } }
+				}
+				subtract = {
+					desc = "HRE_TINY_NATION"
+					value = 100
+				}
+			}
+			else_if = {
+				limit = {
+					scope:actor = { total_population_in_international_organization = { international_organization = international_organization:hre value < 250 } }
+				}
+				subtract = {
+					desc = "HRE_SMALL_NATION"
+					value = 50
+				}
+			}
+			if = {
+				limit = { scope:actor = { country_rank = country_rank:rank_county } }
+				subtract = {
+					desc = "rank_duchy"
+					value = 75
+				}
+			}
+			add = {
+				desc = "DIPLOREASON_DYNASTIC_POWER_IN_HRE"
+				value = "scope:actor.dynastic_power(international_organization:hre)"
+				multiply = 1.5
+			}
+		}
+		if = {
+			limit = {
+				scope:actor = {
+					OR = {
+						has_ruler = yes
+						has_heir = yes
+					}
+					ruler_or_heir_if_regent ?= {
+						has_dynasty = yes
+						dynasty ?= scope:recipient.ruler.dynasty
+					}
+				}
+			}
+			add = {
+				desc = "opinion_same_dynasty"
+				value = 50
+			}
+		}
+		if = {
+			limit = {
+				scope:actor.great_power_score > 0
+				scope:recipient.great_power_score > 0
+			}
+			if = {
+				limit = { scope:actor.great_power_score < scope:recipient.great_power_score }
+				subtract = {
+					desc = "RELATIVE_GREAT_POWER_SCORE"
+					value = scope:actor.great_power_score
+					divide = scope:recipient.great_power_score
+					multiply = 100
+					if = {
+						limit = {
+							scope:recipient = {
+								any_rival = {
+									this != scope:actor
+									is_neighbor_of = scope:actor
+								}
+							}
+						}
+						divide = 10	#"the enemy of my enemy" type of deal
+					}
+					min = -50
+					max = 50
+				}
+			}
+			else = {
+				add = {
+					desc = "RELATIVE_GREAT_POWER_SCORE"
+					value = scope:recipient.great_power_score
+					divide = scope:actor.great_power_score
+					multiply = 100
+					min = -50
+					max = 50
+				}
+			}
+		}
 		if = {
 			limit = { scope:actor = { is_allied_with = { target = scope:recipient } } }
 			add = {
@@ -389,11 +431,37 @@ request_elector_status = {
 		if = {
 			limit = {
 				scope:recipient = {
+					NOT = { is_rival_of = scope:actor }
+					NOT = { is_enemy_of = scope:actor }
+					OR = {
+						any_rival = {
+							OR = {
+								is_rival_of = scope:actor
+								is_enemy_of = scope:actor
+							}
+						}
+						any_enemy = {
+							OR = {
+								is_rival_of = scope:actor
+								is_enemy_of = scope:actor
+							}
+						}
+					}
+				}
+			}
+			add = {
+				desc = "DIPLOREASON_THE_ENEMY_OF_MY_ENEMY"
+				value = 100
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = {
 					is_enemy_of = scope:actor
 				}
 			}
 			add = {
-				desc = "game_concept_enemy"
+				desc = "game_concept_rival_enemy"
 				value = -100
 			}
 		}
@@ -405,12 +473,12 @@ request_elector_status = {
 			}
 		}
 		add = {
-			desc = "OUR_OPINION_TOOLTIP"
-			value = "scope:actor.opinion(scope:actor)"
-		}
-		add = {
 			desc = "THEIR_OPINION_TOOLTIP"
-			value = "scope:actor.opinion(scope:recipient)"
+			value = "scope:recipient.opinion(scope:actor)"
+			if = {
+				limit = { "scope:recipient.opinion(scope:actor)" > 0 }
+				divide = 4
+			}
 		}
 		if = {
 			limit = { scope:actor.culture.language = scope:recipient.culture.language }
@@ -421,8 +489,8 @@ request_elector_status = {
 		}
 		add = {
 			desc = "game_concept_trust"
-			scope:actor = {
-				value = "trust(scope:recipient)"
+			scope:recipient = {
+				value = "trust(scope:actor)"
 				divide = 5
 			}
 		}
@@ -514,6 +582,16 @@ bestow_free_city_status = {
 			}
 			divide = 2
 		}
+		if = {
+			limit = {
+				exists = scope:recipient
+				scope:recipient = { has_cooldown = ai_spam_protection_bestow_free_city_status }
+			}
+			subtract = {
+				desc = "DIPLOREASON_ALREADY_DID_ACTION"
+				value = 10000
+			}
+		}
 	}
 
 	accept = {
@@ -556,6 +634,17 @@ bestow_free_city_status = {
 		}
 		else = {
 			value = 0
+		}
+	}
+
+	reject_effect = {
+		hidden_effect = {
+			scope:recipient = {
+				add_cooldown = {
+					type = ai_spam_protection_bestow_free_city_status
+					years = 5
+				}
+			}
 		}
 	}
 }
@@ -677,6 +766,17 @@ request_free_city_status = {
 			desc = "TARGET_ACCEPTANCE"
 			value = "scope:actor.country_interaction_acceptance(country_interaction:request_free_city_status|scope:recipient)"
 		}
+		if = {
+			limit = {
+				exists = scope:actor
+				scope:actor = { has_cooldown = ai_spam_protection_request_free_city_status }
+			}
+			subtract = {
+				desc = "DIPLOREASON_ALREADY_DID_ACTION"
+				value = 10000
+			}
+		}
+
 	}
 	accept = {
 		add = {
@@ -705,6 +805,16 @@ request_free_city_status = {
 			divide = {
 				desc = "HRE_NON_REPUBLIC"
 				value = 2
+			}
+		}
+	}
+	reject_effect = {
+		hidden_effect = {
+			scope:actor = {
+				add_cooldown = {
+					type = ai_spam_protection_request_free_city_status
+					years = 5
+				}
 			}
 		}
 	}
@@ -1276,20 +1386,45 @@ request_county_privileges = {
 						"opinion(scope:actor)" > 0
 					}
 				}
-				divide = 10
+				divide = 4
 			}
 			else = {
-				divide = 5
+				divide = 2
 			}
 		}
 		add = {
-			desc = "game_concept_rival"
-			if = {
-				limit = {	
-					scope:recipient = { 
-						is_rival_of = scope:actor 
-					}
+			desc = "DIPLOMATIC_REPUTATION"
+			value = {
+				value = scope:actor.modifier:diplomatic_reputation
+				multiply = 3
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = { 
+					is_allied_with = { target = scope:actor }
 				}
+			}
+			add = {
+				desc = "HAS_ALLIANCE"
+				value = 25
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = { is_rival_of = scope:actor }
+			}
+			add = {
+				desc = "game_concept_rival"
+				value = -1000
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = { is_enemy_of = scope:actor }
+			}
+			add = {
+				desc = "game_concept_rival_enemy"
 				value = -100
 			}
 		}
@@ -1300,15 +1435,15 @@ request_county_privileges = {
 				divide = 5
 			}
 		}
-		add = {
-			desc = "IS_AT_WAR"
-			if = {
-				limit = {	
-					scope:recipient = { 
-						at_war = yes
-					}
+		if = {
+			limit = {
+				scope:recipient = { 
+					at_war = yes
 				}
-				value = -25
+			}
+			add = {
+				desc = "IS_AT_WAR"
+				value = -1000
 			}
 		}
 	}
@@ -1534,6 +1669,57 @@ enforce_religious_unity = {
 		scope:recipient = {
 			change_religion = scope:actor.religion
 			change_religion_for_ruler_and_family = { country = scope:recipient religion = scope:actor.religion }
+			hidden_effect = {
+				set_variable = {
+					name = hre_got_religion_enforced
+					value = yes
+					days = 3
+				}
+			}
+		}
+		hidden_effect = {
+			scope:actor = {
+				set_variable = {
+					name = imperial_authority_change_action
+					value = scope:recipient.total_population
+				}
+				if = {
+					limit = {
+						exists = international_organization:hre
+						international_organization:hre.international_organization_population > 0
+					}
+					change_variable = {
+						name = imperial_authority_change_action
+						divide = international_organization:hre.international_organization_population
+					}
+				}
+				else = {
+					change_variable = {
+						name = imperial_authority_change_action
+						divide = 1000
+					}
+				}
+				change_variable = {
+					name = imperial_authority_change_action
+					max = 0.2
+					min = 0.01
+					multiply = 100
+				}
+			}
+		}
+		custom_tooltip = {
+			text = hre.imperial_authority_change_action.tt
+			international_organization:hre = {
+				change_variable = {
+					name = imperial_authority
+					add = { value = scope:actor.var:imperial_authority_change_action }
+				}
+			}
+		}
+		hidden_effect = {
+			scope:actor = {
+				remove_variable = imperial_authority_change_action
+			}
 		}
 	}
 	reject_effect = {
@@ -1562,6 +1748,7 @@ enforce_religious_unity = {
 			value = 50
 		}
 		add = hre_default_diplo_action_acceptance
+		add = hre_add_recipient_trust
 	}
 }
 demand_unlawful_territory = {
@@ -1574,11 +1761,6 @@ demand_unlawful_territory = {
 		}
 	}
 	allow = {
-		has_gold_org_country_trigger = {
-			international_organization = international_organization:hre
-			country = scope:actor
-			value = demand_unlawful_territory_cost
-		}
 	}
 	select_trigger = {
 		looking_for_a = country
@@ -1646,10 +1828,8 @@ demand_unlawful_territory = {
 		}
 	}
 	effect = {
-		pay_gold_org_country_effect = {
-			international_organization = international_organization:hre
-			country = scope:actor
-			value = demand_unlawful_territory_cost
+		scope:recipient = {
+			add_opinion = { target = scope:actor modifier = opinion_demanded_unlawful_territory }
 		}
 		if = {
 			limit = { exists = scope:target }
@@ -1732,20 +1912,31 @@ demand_unlawful_territory = {
 							modifier = opinion_released_from_unlawful_territory
 							target = scope:actor
 						}
+						if = {
+							limit = { religion = religion:catholic }
+							international_organization:catholic_church = {
+								add_country_to_international_organization = scope:target_country
+							}
+						}
+						international_organization:hre = {
+							add_country_to_international_organization = scope:target_country
+						}
 					}
+				}
+			}
+		}
+
+		# AI loves to spam diplo actions, so better have a 2 months cd for them
+		hidden_effect = {
+			scope:actor = {
+				add_cooldown = {
+					type = ai_spam_protection_demand_unlawful_territory
+					months = 2
 				}
 			}
 		}
 	}
 	reject_effect = {
-		pay_gold_org_country_effect = {
-			international_organization = international_organization:hre
-			country = scope:actor
-			value = demand_unlawful_territory_cost
-		}
-		scope:actor = {
-			add_prestige = prestige_mild_penalty
-		}
 		if = {
 			limit = { exists = scope:target }
 			scope:actor = {
@@ -1769,13 +1960,82 @@ demand_unlawful_territory = {
 				}
 			}
 		}
+		hidden_effect = {
+			scope:recipient = {
+				add_cooldown = {
+					type = ai_spam_protection_demand_unlawful_territory_rejected
+					years = 5
+				}
+			}
+		}
 	}
 	ai_will_do = {
+		# Note: as the rejection gives the Emperor a casus belli the AI does not have to consider if the target accepts the demand or not
+		# In general, the Emperor should always want to demand land
 		add = {
-			desc = "TARGET_ACCEPTANCE"
-			value = "scope:actor.country_interaction_acceptance(country_interaction:demand_unlawful_territory|scope:recipient)"
+			desc = "VOTE_BASE_VALUE"
+			value = 100
 		}
-	}	
+
+		# Emperor should not demand land from people they like
+		subtract = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:recipient)"
+		}
+		
+		# The Emperor should want to demand land from someone who is overly aggressive against the HRE
+		add = {
+			value = "scope:actor.antagonism(scope:recipient)"
+			multiply = 2
+		}
+		if = {
+			limit = {
+				scope:actor = { opinion = { target = scope:recipient value > 50 } }
+			}
+			# Does the Emperor REALLY want to annoy someone they kinda like?
+			subtract = {
+				desc = "THEIR_OPINION_TOOLTIP"
+				value = "scope:recipient.opinion(scope:actor)"
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = { has_cooldown = ai_spam_protection_demand_unlawful_territory_rejected }
+			}
+			# Additional spam protection for countries who have refused already
+			subtract = {
+				desc = "DIPLOREASON_THEY_REJECTED_DEMAND_ALREADY"
+				value = 10000
+			}
+		}
+
+		# The Emperor should not bother someone if they already have the cb against them
+		if = {
+			limit = {
+				scope:actor = {
+					has_casus_belli_of_type_on = {
+						type = casus_belli:cb_following_through_on_threat
+						target = scope:target.owner
+					}
+				}
+			}
+			subtract = {
+				desc = "DIPLOREASON_NO_REASON_FOR_DIPLOMACY"
+				value = 1000
+			}
+		}
+
+		# General spam protection so the AI is not overly aggressive with its demand
+		if = {
+			limit = {
+				scope:actor = { has_cooldown = ai_spam_protection_demand_unlawful_territory }
+			}
+			subtract = {
+				desc = "DIPLOREASON_WE_ALREADY_MADE_DEMAND"
+				value = 10000
+			}
+		}
+	}
 	accept = {
 		subtract = {
 			desc = "VOTE_BASE_VALUE"
@@ -1793,6 +2053,18 @@ demand_unlawful_territory = {
 			}
 		}
 		add = hre_default_diplo_action_acceptance
+		add = hre_add_actor_trust
+		if = {
+			limit = {
+				scope:recipient = {
+					has_opinion = { modifier = opinion_demanded_unlawful_territory target = scope:actor }
+				}
+			}
+			add = {
+				desc = "DIPLOREASON_HAS_COMPLIED_WITH_DEMAND_BEFORE"
+				value = "scope:recipient.get_opinion(scope:actor|opinion_demanded_unlawful_territory)"
+			}
+		}
 	}
 }
 ask_to_vote_for_me_as_emperor = {
@@ -2014,6 +2286,8 @@ ask_to_vote_for_me_as_emperor = {
 bolster_imperial_army = {
 	type = diplomacy
 	category = CATEGORY_HRE_ACTIONS
+	ai_limit_per_check = 5
+	use_enroute = yes
 	potential = {
 		scope:actor = {
 			is_emperor = yes
@@ -2063,11 +2337,11 @@ bolster_imperial_army = {
 		enabled = {
 			OR = {
 				AND = {
-					attacker_leader = scope:actor
+					is_an_attacker = scope:actor
 					can_join_as_attacker = scope:recipient
 				}
 				AND = {
-					defender_leader = scope:actor
+					is_a_defender = scope:actor
 					can_join_as_defender = scope:recipient
 				}
 			}
@@ -2118,13 +2392,90 @@ bolster_imperial_army = {
 			desc = "TARGET_ACCEPTANCE"
 			value = "scope:actor.country_interaction_acceptance(country_interaction:bolster_imperial_army|scope:recipient)"
 		}
-	}	
+
+		# The Emperor is already winning
+		if = {
+			limit = {
+				exists = scope:target
+				scope:actor = {
+					war_score_in_war_whole_side = { war = scope:target value >= 25 }
+				}
+			}
+			subtract = {
+				desc = "DIPLOREASON_IS_WINNING"
+				value = 1000
+			}
+		}
+	}
 	accept = {
 		subtract = {
 			desc = "VOTE_BASE_VALUE"
 			value = 25
 		}
 		add = hre_default_diplo_action_acceptance
+		if = {
+			limit = { scope:recipient = { at_war = yes } }
+			subtract = {
+				desc = "DIPLOREASON_RECIPIENT_AT_WAR"
+				value = 100
+			}
+		}
+		if = {
+			limit = { scope:recipient = { is_during_bankruptcy = yes } }
+			subtract = {
+				desc = "IS_BANKRUPT_TOOLTIP"
+				value = 1000
+			}
+		}
+		if = {
+			limit = { scope:recipient = { has_any_active_disaster = yes } }
+			subtract = {
+				desc = "DIPLOREASON_RECIPIENT_IS_IN_A_DISASTER"
+				value = 100
+			}
+		}
+		subtract = {
+			desc = "DIPLOREASON_RECIPIENT_WAR_EXHAUSTION"
+			value = "scope:recipient.war_exhaustion"
+			multiply = 20
+		}
+		if = {
+			limit = {
+				scope:recipient = { stability < 0 }
+			}
+			add = {
+				desc = "DIPLOREASON_RECIPIENT_STABILITY"
+				value = "scope:recipient.stability"
+				multiply = 4
+			}
+		}
+		if = {
+			limit = {
+				scope:recipient = { government_power < 50 }
+			}
+			add = {
+				desc = "DIPLOREASON_RECIPIENT_GOVERNMENT_POWER"
+				value = "scope:recipient.government_power"
+				subtract = 50
+				multiply = 4
+			}
+		}
+		subtract = {
+			desc = "DIPLOREASON_RECIPIENT_LOANS"
+			value = "scope:recipient.num_loans"
+			multiply = 25
+		}
+		if = {
+			limit = {
+				scope:recipient = {
+					monthly_balance < 0
+				}
+			}
+			subtract = {
+				desc = "DIPLOREASON_RECIPIENT_NEGATIVE_BALANCE"
+				value = 50
+			}
+		}
 	}
 }
 

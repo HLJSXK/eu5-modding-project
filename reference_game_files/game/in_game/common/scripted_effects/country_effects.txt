@@ -579,19 +579,45 @@ lock_production_method_effect = {
     }
 }
 
-lots_of_hussites = {
-	every_owned_location = {
-		limit = { region = root.capital.region }
-		every_pop = {
-			limit = { religion = religion:catholic }
-			random_list = {
-				10 = { }																# ~10% no change
-				10 = { split_pop = { fraction = 0.05 religion = religion:hussite } }	# ~10% convert 5%
-				20 = { split_pop = { fraction = 0.1  religion = religion:hussite } }	# ~20% convert 10%
-				40 = { split_pop = { fraction = 0.2  religion = religion:hussite } }	# ~40% convert 20%
-				10 = { split_pop = { fraction = 0.4  religion = religion:hussite } }	# ~10% convert 40%
-				5  = { split_pop = { fraction = 0.55 religion = religion:hussite } }	# ~5% convert 55%
-				5  = { split_pop = { fraction = 0.7  religion = religion:hussite } }	# ~5% convert 70%
+lots_of_religion = {
+	custom_description = {
+		text = lots_of_religion_text
+		object = $religion$
+		value = $other_religion$
+		every_owned_location = {
+			limit = { region = root.capital.region }
+			every_pop = {
+				limit = { religion = $other_religion$ }
+				random_list = {
+					10 = { }														# ~10% no change
+					10 = { split_pop = { fraction = 0.05 religion = $religion$ } }	# ~10% convert 5%
+					20 = { split_pop = { fraction = 0.1  religion = $religion$ } }	# ~20% convert 10%
+					40 = { split_pop = { fraction = 0.2  religion = $religion$ } }	# ~40% convert 20%
+					10 = { split_pop = { fraction = 0.4  religion = $religion$ } }	# ~10% convert 40%
+					5  = { split_pop = { fraction = 0.55 religion = $religion$ } }	# ~5% convert 55%
+					5  = { split_pop = { fraction = 0.7  religion = $religion$ } }	# ~5% convert 70%
+				}
+			}
+		}
+	}
+}
+
+upset_countries_of_religion = {
+	custom_description = {
+		text = upset_countries_of_religion_text
+		object = $religion$
+		save_temporary_scope_as = root_country
+		$religion$ = {
+			every_country_in_religion = {
+				limit = {
+					this != scope:root_country
+					NOT = { is_subject_of = scope:root_country }
+					NOT = { is_allied_with = { target = scope:root_country } }
+				}
+				add_opinion = {
+					modifier = $modifier$
+					target = scope:root_country
+				}
 			}
 		}
 	}
@@ -948,6 +974,42 @@ set_new_ruler_with_union_fratricide = {
 	}
 }
 
+set_new_ruler_with_union_if_senior = {
+	if = {
+		limit = { exists = union }
+		save_scope_as = root_country
+		if = {
+			limit = {
+				union ?= {
+					country_has_special_status = { type = special_status:senior_partner country = scope:root_country }
+				}
+			}
+			set_new_ruler_with_union = { character = $character$ }
+		}
+		else = {
+			$character$ = { save_scope_as = breakaway_ruler }
+			union ?= {
+				every_international_organization_member = {
+					limit = { this != scope:root_country }
+					trigger_event_silently = unionevents.100
+				}
+			}
+			set_new_ruler = $character$
+			every_subject = {
+				limit = { subject_type = { has_overlords_ruler = yes } }
+				set_new_foreign_ruler_no_update = $character$
+			}
+		}
+	}
+	else = {
+		set_new_ruler = $character$
+		every_subject = {
+			limit = { subject_type = { has_overlords_ruler = yes } }
+			set_new_foreign_ruler_no_update = $character$
+		}
+	}
+}
+
 set_new_ruler_with_union = {
 	if = {
 		limit = { exists = union }
@@ -1121,32 +1183,45 @@ nudge_towards_openness = {
 }
 
 add_decree_monthly_celestial_authority_loss = {
-	custom_tooltip = decree_monthly_celestial_authority_loss_tt
-	international_organization:middle_kingdom = {
-		if = {
-			limit = { has_variable = decrees_counter }
-			change_variable = {
-				name = decrees_counter
-				add = 1
-			}
-		}
-		else = {
-			set_variable = {
-				name = decrees_counter
-				value = 1
-			}
-		}
+	add_country_modifier = {
+		modifier = celestial_decree_maintenance
+		years = 10
+		mode = add_and_extend
 	}
+	#custom_tooltip = decree_monthly_celestial_authority_loss_tt
+	#international_organization:middle_kingdom = {
+	#	if = {
+	#		limit = { has_variable = decrees_counter }
+	#		change_variable = {
+	#			name = decrees_counter
+	#			add = 1
+	#		}
+	#	}
+	#	else = {
+	#		set_variable = {
+	#			name = decrees_counter
+	#			value = 1
+	#		}
+	#	}
+	#}
 }
 
 remove_decree_monthly_celestial_authority_loss = {
-	custom_tooltip = end_decree_monthly_celestial_authority_loss_tt
-	international_organization:middle_kingdom = {
-		set_variable = {
-			name = decrees_counter
-			value = 0
-		}
+	change_country_modifier_size = {
+		modifier = celestial_decree_maintenance
+		value = -1
 	}
+	if = {
+		limit = { country_modifier_strength = { modifier = celestial_decree_maintenance value <= 0 } }
+		remove_country_modifier = celestial_decree_maintenance
+	}
+	#custom_tooltip = end_decree_monthly_celestial_authority_loss_tt
+	#international_organization:middle_kingdom = {
+	#	set_variable = {
+	#		name = decrees_counter
+	#		value = 0
+	#	}
+	#}
 }
 
 create_alliance = {
@@ -1188,16 +1263,6 @@ save_ruler_regent_as_target_character = {
 	}
 	else = {
 		regent ?= { save_scope_as = target_character }
-	}
-}
-
-change_tag = {
-	change_country_tag = $tag$
-	hidden_effect = {
-		change_country_flag = $tag$
-		change_country_color = map_$tag$
-		change_country_name = $tag$
-		change_country_adjective = $tag$_ADJ
 	}
 }
 
@@ -2390,7 +2455,21 @@ cc_setup_new_town = {
 			price = price:create_market
 			instant = yes
 			price_modifier = 0
-		}	
+		}
+	}
+	if = {
+		limit = {
+			scope:actor = {
+				is_human = yes
+			}
+			ironman = yes
+		}
+		scope:actor = {
+			set_variable = {
+				name = unlock_achievement_its_just_business
+				months = 1
+			}
+		}
 	}
 }
 
@@ -2517,5 +2596,101 @@ donate_gold_to_international_organization = {
 	add_gold = {
 		value = $value$
 		multiply = -1
+	}
+}
+
+move_imperial_work_of_art = {
+	if = {
+		limit = {
+			imperial_work_of_art_can_be_moved = {
+				work_of_art = $work_of_art$
+				country = $country$
+				international_organization = $international_organization$
+			}
+		}
+		$work_of_art$ = {
+			move_art = $location$
+			set_art_owner = $country$
+		}
+	}
+}
+
+reject_hegemon_ultimatum_effect = {
+	if = {
+		limit = {
+			exists = scope:actor
+			exists = scope:recipient
+		}
+		scope:actor = {
+			add_casus_belli = {
+				type = casus_belli:cb_hegemon_ultimatum
+				target = scope:recipient
+			}
+			add_opinion = {
+				modifier = opinion_disobeyed_hegemon_demand
+				target = scope:recipient
+			}
+			add_prestige = prestige_extreme_penalty
+			set_variable = {
+				name = hegemon_war_reason_var
+				value = $type$
+			}
+		}
+	}
+}
+enforce_religion_effect = {
+	$target$ = {
+		change_religion = $actor$.religion
+		change_religion_for_ruler_and_family = { country = $target$ religion = $actor$.religion }
+		add_cooldown = {
+			type = convert_religion
+			years = 10
+		}
+		capital = {
+			every_pop = {
+				limit = {
+					NOT = {
+						religion = $actor$.religion
+					}
+				}
+				split_pop = {
+					fraction = 0.16
+					religion = $actor$.religion
+				}
+			}
+		}
+	}
+}
+
+enforce_culture_effect = {
+	$target$ = {
+		change_culture = $actor$.culture
+		add_cooldown = {
+			type = convert_culture
+			years = 10
+		}
+		every_cabinet = {
+			limit = {
+				has_cabinet_action = yes
+				or = {
+					cabinet_action = cabinet_action:assimilate_area
+					cabinet_action = cabinet_action:promote_culture
+				}
+			}
+			stop_cabinet_action = {}
+		}
+		capital = {
+			every_pop = {
+				limit = {
+					NOT = {
+						culture = $actor$.culture
+					}
+				}
+				split_pop = {
+					fraction = 0.16
+					culture = $actor$.culture
+				}
+			}
+		}
 	}
 }

@@ -126,8 +126,8 @@ Core text files (`.txt`, `.yml`, `.gui`) and small graphics are included.
 
 ## Version Information
 
-- **Game Version**: Europa Universalis 5 (November 2025 release)
-- **Extraction Date**: January 29, 2026
+- **Game Version**: Europa Universalis 5 1.1.10
+- **Baseline Update Date**: March 25, 2026
 - **Purpose**: Modding reference and documentation
 
 ## Related Documentation

@@ -224,7 +224,7 @@ flavor_eng.2 = {
 	dynamic_historical_event = {
 		tag = ENG
         tag = GBR
-		from = 1337.1.1
+		from = 1400.1.1
 		to = 1500.1.1
 		monthly_chance = 10
 	}
@@ -284,6 +284,38 @@ flavor_eng.2 = {
 				target = root
 				modifier = eng_no_english_in_france
 			}
+		}
+
+		end_situation = situation:hundred_years_war 
+
+		hidden_effect = {
+			c:ENG = { 
+				remove_country_modifier = hundred_years_war_impact
+				remove_opinion_mutual_effect = {
+					modifier = opinion_hyw_enemies
+					target = c:FRA
+				}
+				remove_casus_belli = {
+					target = c:FRA
+					type = casus_belli:cb_hundred_years_war
+				}
+			}
+			c:FRA = { 
+				remove_country_modifier = hundred_years_war_impact
+				remove_casus_belli = {
+					target = c:ENG
+					type = casus_belli:cb_hundred_years_war_fra
+				}
+			}
+
+			every_country = {
+				limit = {
+					NOT = { tag = FRA }
+					capital.sub_continent = sub_continent:western_europe
+				}
+				trigger_event_non_silently = hundred_years_war.101
+			}
+			c:FRA = { trigger_event_non_silently = flavor_fra.26 }
 		}
 
 	}
@@ -1143,7 +1175,7 @@ flavor_eng.11 = {
 	trigger = {
 
 		at_war = no
-
+		country_exists = c:SCO
 		location:berwick = {
 			owner = root
 			controller = root
@@ -1516,21 +1548,18 @@ flavor_eng.14 = {
 
 	}
 
-	# Redirect to the clergy
+	# siphon
 	option = {
 		name = flavor_eng.14.a
+		historical_option = yes
 
 		country_eng_14_effect = yes
 
 		add_estate_satisfaction = { type = estate_type:clergy_estate
-			value = estate_satisfaction_severe_bonus
-			value = estate_satisfaction_severe_bonus
+			value = estate_satisfaction_severe_penalty
 		}
 
-		add_gold_to_estate = {
-			estate_type = estate_type:clergy_estate
-			value = { value = root.monthly_income_trade_and_tax multiply = 3 }
-		}
+		change_gold_effect = { scale = 3 }
 
 	}
 
@@ -1551,18 +1580,21 @@ flavor_eng.14 = {
 
 	}
 
-	# siphon
+	# Redirect to the clergy
 	option = {
 		name = flavor_eng.14.c
-		historical_option = yes
 
 		country_eng_14_effect = yes
 
 		add_estate_satisfaction = { type = estate_type:clergy_estate
-			value = estate_satisfaction_severe_penalty
+			value = estate_satisfaction_severe_bonus
+			value = estate_satisfaction_severe_bonus
 		}
 
-		change_gold_effect = { scale = 3 }
+		add_gold_to_estate = {
+			estate_type = estate_type:clergy_estate
+			value = { value = root.monthly_income_trade_and_tax multiply = 3 }
+		}
 
 	}
 
@@ -1922,8 +1954,8 @@ flavor_eng.17 = {
 				any_location_in_area = {
 					is_discovered_by = root
 					OR = {
-						location_rank = location_rank:town
-						location_rank = location_rank:city
+						location_rank ?= location_rank:town
+						location_rank ?= location_rank:city
 					}
 				}
 			}
@@ -4746,6 +4778,7 @@ flavor_eng.49 = {
 	}
 
 	trigger = {
+		dynasty_exists = plantagenet_dynasty
 		ruler ?= {
 			dynasty = dynasty:plantagenet_dynasty
 			is_married = yes
@@ -5878,7 +5911,7 @@ flavor_eng.65 = {
 
 	option = {
 		name = flavor_eng.65.b
-		trigger = { ruler = { has_trait = charismatic_negotiator } }
+		trigger = { ruler_or_regent = { has_trait = charismatic_negotiator } }
 
 		every_owned_location = {
 			limit = {
@@ -7667,9 +7700,6 @@ flavor_eng.89 = {
 	immediate = {
 		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
 		character:wls_owain_glyndwr ?= { save_scope_as = owain_glyndwr }
-
-		location:london = { save_scope_as = target_location }
-
 	}
 
 	option = {
@@ -11649,10 +11679,11 @@ flavor_eng.124 = {
 		}
 
 		character:eng_anne_boleyn ?= {
-			 is_alive = yes
-			 is_married = yes
-			 is_pregnant = no
-			 any_child = {
+			any_spouse ?= { this = root.ruler_or_regent }
+			is_alive = yes
+			is_married = yes
+			is_pregnant = no
+			any_child = {
 				is_female = no
 				is_alive = yes
 				count < 1
@@ -11668,6 +11699,8 @@ flavor_eng.124 = {
 		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
 		character:eng_anne_boleyn ?= { save_scope_as = anne_boleyn }
 
+		ruler_or_regent = { save_scope_as = target_character }
+
 		capital = { save_scope_as = target_location }
 
 	}
@@ -11676,15 +11709,13 @@ flavor_eng.124 = {
 		historical_option = yes
 		name = flavor_eng.124.a
 
-		character:eng_anne_boleyn = {
-			kill_character = {
-				target = this
-				reason = execution
-				killer = ruler
-			}
+		kill_character = {
+			target = scope:anne_boleyn
+			reason = execution
+			killer = scope:target_character
 		}
 
-		ruler = { add_trait = trait:malevolent }
+		scope:target_character = { add_trait = trait:malevolent }
 
 		add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_severe_bonus }
 
@@ -11698,7 +11729,7 @@ flavor_eng.124 = {
 	option = {
 		name = flavor_eng.124.b
 
-		ruler = { add_trait = trait:benevolent }
+		scope:target_character = { add_trait = trait:benevolent }
 
 		change_societal_value = {
 			type = belligerent_vs_conciliatory
@@ -12968,8 +12999,9 @@ flavor_eng.137 = {
 
 		random_area = {
 			limit = {
-				any_location_in_area = {
+				any_ownable_location_in_area = {
 					is_coastal = yes
+					has_owner = yes
 					owner = {
 						OR = {
 							is_subject_type = colonial_nation
@@ -14573,9 +14605,8 @@ flavor_eng.152 = {
 
 		region:guinea_region = {
 			any_location_in_region = {
-				OR = {
-					has_owner = no
-					owner != root
+				owner ?= {
+					NOT = { this = root }
 				}
 				NOT = {
 					dominant_religion ?= {
@@ -14613,10 +14644,16 @@ flavor_eng.152 = {
 		region:guinea_region = {
 			random_location_in_region = {
 				limit = {
-					owner != root
-					NOT = { dominant_religion.group = root.religion.group }
+					owner ?= {
+						NOT = { this = root }
+					}
+					NOT = {
+						dominant_religion ?= {
+							group = root.religion.group
+						}
+					}
 					is_coastal = yes
-					location_rank = location_rank:rural_settlement
+					location_rank ?= location_rank:rural_settlement
 					OR = {
 						has_building_with_at_least_one_level = slave_market
 						market = { is_produced_in_market = goods:slaves_goods }
@@ -14630,10 +14667,10 @@ flavor_eng.152 = {
 		region:caribbean_region = {
 			random_location_in_region = {
 				limit = {
-				is_discovered_by = root
-				is_coastal = yes
-				owner ?= { is_subject_type = colonial_nation }
-				market = { is_traded_in_market = goods:slaves_goods }
+					is_discovered_by = root
+					is_coastal = yes
+					owner ?= { is_subject_type = colonial_nation }
+					market = { is_traded_in_market = goods:slaves_goods }
 				}
 				save_scope_as = slave_selling_location
 			}
@@ -14666,10 +14703,16 @@ flavor_eng.152 = {
 		scope:slave_trading_location.market = {
 			ordered_location_in_market = {
 				limit = {
-					owner != root
-					NOT = { dominant_religion.group = root.religion.group }
+					owner ?= {
+						NOT = { this = root }
+					}
+					NOT = {
+						dominant_religion ?= {
+							group = root.religion.group
+						}
+					}
 					is_coastal = yes
-					NOT = { location_rank = location_rank:rural_settlement }
+					NOT = { location_rank ?= location_rank:rural_settlement }
 					OR = {
 						has_building_with_at_least_one_level = slave_market
 						market = { is_produced_in_market = goods:slaves_goods }
@@ -15342,8 +15385,9 @@ flavor_eng.158 = {
 
 		modifier:has_a_parliamentary_system = yes
 
+		dynasty_exists = tudor_dynasty
 		ruler ?= {
-			dynasty = dynasty:tudor_dynasty
+			dynasty ?= dynasty:tudor_dynasty
 		}
 
 		OR = {
@@ -17462,7 +17506,7 @@ flavor_eng.177 = {
 			any_location_in_area = {
 				any_neighbor_location = {
 					is_discovered_by = root
-					owner = {
+					owner ?= {
 						has_tribal_government = yes
 					}
 				}

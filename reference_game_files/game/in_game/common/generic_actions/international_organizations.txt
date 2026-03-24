@@ -21,6 +21,7 @@
 		looking_for_a = location
 		target_flag = target
 		source = actor
+		source_flags = only_actual_locations
 		name = "add_location_to_international_organization_select_location"
 		none_available_msg_key = "add_location_to_international_organization_no_locations"
 		column = {
@@ -94,7 +95,7 @@
 	automation_tick = never
 	automation_tick_frequency = 12
 
-	allow_multiple_targets = yes
+	maximum_targets_in_one_tick = 10
 }
 
 remove_location_from_international_organization = {
@@ -200,6 +201,7 @@ remove_location_from_international_organization = {
 }
 
 contribute_to_organization_treasury = {
+	#needed in code, don't remove it
 	type = internationalorganization	
 	ai_tick = monthly
 	ai_tick_frequency = 12
@@ -252,9 +254,20 @@ contribute_to_organization_treasury = {
 		if = {
 			limit = { exists = scope:target_value }
 			scope:actor = {
-				donate_gold_to_international_organization = {
-					international_organization = scope:recipient
-					value = scope:target_value
+				if = {
+					limit = { scope:recipient = { modifier:unlock_withdraw_from_organization_treasury = no } }
+					#Only apply the opinion bonuses IF the actor has no opportunity to ever withdraw his money back
+					#We don't want anyone to commit treasury fraud to improve their public image, do we?
+					donate_gold_to_international_organization = {
+						international_organization = scope:recipient
+						value = scope:target_value
+					}
+				}
+				else = {
+					add_gold = {
+						value = scope:target_value
+						multiply = -1
+					}
 				}
 			}
 			scope:recipient = {
@@ -263,11 +276,76 @@ contribute_to_organization_treasury = {
 		}
 	}
 	ai_will_do = {
-		add = -100
-		add = {
-			value = scope:actor.gold
-			divide = scope:target_value
-			multiply = 100
+		add = -100	#There is not much gain for the AI to donate their money away
+	}
+}
+
+withdraw_from_organization_treasury = {
+	#needed in code, don't remove it
+	type = internationalorganization	
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	automation_tick = never
+	automation_tick_frequency = 12
+	potential = {
+	}
+	allow = {
+	}
+	cooldown = {
+		type = withdraw_from_organization_treasury
+		years = 1
+	}
+	select_trigger = {
+		looking_for_a = international_organization
+		source = actor
+		target_flag = recipient
+		name = "choose_international_organization"
+		column = {
+			data = name
 		}
+		visible = {
+			has_enabled_currency = gold
+			modifier:unlock_withdraw_from_organization_treasury = yes
+			leader_country ?= scope:actor
+			gold > 0
+		}
+		enabled = {
+			scope:actor = {
+				is_subject = no
+			}
+		}
+	}
+	select_trigger = {
+		looking_for_a = value
+		target_flag = target_value
+		name = "withdraw_from_organization_treasury_select_gold_amount"
+		min = {
+			value = scope:recipient.gold
+			divide = 100
+		}
+		max = scope:recipient.gold
+		step = {
+			value = scope:recipient.gold
+			divide = 20
+		}
+		default = scope:recipient.gold	#just have ALL the IOs gold as default
+	}
+	effect = {
+		if = {
+			limit = { exists = scope:target_value }
+			scope:actor = {
+				add_gold = scope:target_value
+			}
+			scope:recipient = {
+				add_gold = {
+					value = scope:target_value
+					multiply = -1
+				}
+			}
+		}
+	}
+	ai_will_do = {
+		add = 10	#Right now, there are no instances of IOs which have this action unlocked and where the AI wants to keep gold in the IO
 	}
 }
