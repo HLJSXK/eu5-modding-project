@@ -1,0 +1,186 @@
+﻿OGAS_Auto_Road_Check_Complete = {
+	if = {
+		limit = { var:OGAS_Auto_Road_Mode = 1 }
+		OGAS_Auto_Road_Check_Complete_Proximity = yes
+	}
+	else_if = {
+		limit = { var:OGAS_Auto_Road_Mode = 2 }
+		OGAS_Auto_Road_Check_Complete_Market_Access = yes
+	}
+}
+
+OGAS_Auto_Road_Refresh = {
+	every_country = {
+		every_owned_location = {
+			remove_variable = OGAS_Cache_Auto_Road_Complete
+			remove_variable = OGAS_Cache_Auto_Road_Ongoing
+			remove_variable = OGAS_Cache_Auto_Road_Source
+			remove_variable = OGAS_Cache_Auto_Road_Value
+			remove_variable = OGAS_Cache_Auto_Road_InQueue
+			remove_variable = OGAS_Cache_Auto_Road_Queue_Next
+		}
+		remove_variable = OGAS_Auto_Road_Queue_Head
+		remove_variable = OGAS_Auto_Road_Queue_Tail
+		if = {
+			limit = { is_ai = yes }
+			remove_variable = OGAS_Auto_Road_Mode
+			remove_variable = OGAS_Auto_Road_Construct
+			remove_variable = OGAS_Auto_Road_Min_Gold
+		}
+	}
+	if = {
+		limit = { NOT = { has_variable = OGAS_Auto_Road_Construct } }
+		set_variable = { name = OGAS_Auto_Road_Construct value = 0 }
+	}
+	if = {
+		limit = { NOT = { has_variable = OGAS_Auto_Road_Mode } }
+		set_variable = { name = OGAS_Auto_Road_Mode value = 1 }
+	}
+	if = {
+		limit = { NOT = { has_variable = OGAS_Auto_Road_Min_Gold } }
+		set_variable = { name = OGAS_Auto_Road_Min_Gold value = OGAS_deposit_gold }
+	}
+	if = {
+		limit = { var:OGAS_Auto_Road_Mode = 1 }
+		OGAS_Auto_Road_Pathfinding_Proximity = yes
+		OGAS_Auto_Road_Check_Complete_Proximity = yes
+		OGAS_Auto_Road_Calculate_Value_Proximity = yes
+	}
+	else_if = {
+		limit = { var:OGAS_Auto_Road_Mode = 2 }
+		OGAS_Auto_Road_Pathfinding_Market_Access = yes
+		OGAS_Auto_Road_Check_Complete_Market_Access = yes
+		OGAS_Auto_Road_Calculate_Value_Market_Access = yes
+	}
+	refresh_map_colors = yes
+}
+
+OGAS_Auto_Road_Queue_Enqueue = {
+	save_scope_as = OGAS_Auto_Road_Queue_New_Node
+	if = {
+		limit = {
+			NOT = {
+				has_variable = OGAS_Cache_Auto_Road_InQueue
+			}
+		}
+		set_variable = OGAS_Cache_Auto_Road_InQueue
+		remove_variable = OGAS_Cache_Auto_Road_Queue_Next
+		root = {
+			if = {
+				limit = {
+					has_variable = OGAS_Auto_Road_Queue_Tail
+				}
+				var:OGAS_Auto_Road_Queue_Tail = {
+					set_variable = {
+						name = OGAS_Cache_Auto_Road_Queue_Next
+						value = scope:OGAS_Auto_Road_Queue_New_Node
+					}
+				}
+				set_variable = {
+					name = OGAS_Auto_Road_Queue_Tail
+					value = scope:OGAS_Auto_Road_Queue_New_Node
+				}
+			}
+			else = {
+				set_variable = {
+					name = OGAS_Auto_Road_Queue_Head
+					value = scope:OGAS_Auto_Road_Queue_New_Node
+				}
+				set_variable = {
+					name = OGAS_Auto_Road_Queue_Tail
+					value = scope:OGAS_Auto_Road_Queue_New_Node
+				}
+			}
+		}
+	}
+}
+
+OGAS_Auto_Construct_Road = {
+	if = {
+		limit = { NOT = { has_variable = OGAS_Auto_Road_Min_Gold } }
+		set_variable = { name = OGAS_Auto_Road_Min_Gold value = OGAS_deposit_gold }
+	}
+	if = {
+		limit = {
+			root.var:OGAS_Auto_Road_Construct = 1
+		}
+		ordered_owned_location = {
+			limit = {
+				has_variable = OGAS_Cache_Auto_Road_Ongoing
+				has_road_constructions = no
+			}
+			order_by = var:OGAS_Cache_Auto_Road_Value
+			max = 100
+			if = {
+				limit = {
+					root.gold > root.var:OGAS_Auto_Road_Min_Gold
+				}
+				save_scope_as = OGAS_Auto_Construct_Road_Scope_From
+				if = {
+					limit = {
+						has_variable = OGAS_Cache_Auto_Road_Source
+					}
+					var:OGAS_Cache_Auto_Road_Source = {
+						save_scope_as = OGAS_Auto_Construct_Road_Scope_To
+					}
+				}
+				if = {
+					limit = {
+						owner = {
+							has_advance = railroad_advance
+						}
+					}
+					owner = {
+						construct_road = {  
+							road_type = road_type:railroad
+							from = scope:OGAS_Auto_Construct_Road_Scope_From
+							to = scope:OGAS_Auto_Construct_Road_Scope_To
+						}
+					}
+				}
+				else_if = {
+					limit = {
+						owner = {
+							has_advance = modern_road_advance
+						}
+					}
+					owner = {
+						construct_road = {  
+							road_type = road_type:modern_road
+							from = scope:OGAS_Auto_Construct_Road_Scope_From
+							to = scope:OGAS_Auto_Construct_Road_Scope_To
+						}
+					}
+				}
+				else_if = {
+					limit = {
+						owner = {
+							has_advance = paved_road_advance
+						}
+					}
+					owner = {
+						construct_road = {  
+							road_type = road_type:paved_road
+							from = scope:OGAS_Auto_Construct_Road_Scope_From
+							to = scope:OGAS_Auto_Construct_Road_Scope_To
+						}
+					}
+				}
+				else_if = {
+					limit = {
+						owner = {
+							has_advance = road_building
+						}
+					}
+					owner = {
+						construct_road = {  
+							road_type = road_type:gravel_road
+							from = scope:OGAS_Auto_Construct_Road_Scope_From
+							to = scope:OGAS_Auto_Construct_Road_Scope_To
+						}
+					}
+				}
+			}
+		}
+	}
+}
