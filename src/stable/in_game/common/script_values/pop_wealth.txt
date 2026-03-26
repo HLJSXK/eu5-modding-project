@@ -1,4 +1,4 @@
-
+﻿
 local_nobles_tax_share = {
     add = num_pop_type:nobles
     multiply = 150
@@ -31,17 +31,25 @@ local_tribesmen_tax_share = {
 }
 
 local_peasant_enfranchisment_clamped = {
-    add = modifier:local_peasant_enfranchisment
+    value = modifier:local_peasant_enfranchisment
+    if = {
+        limit = { exists = owner }
+        add = owner.modifier:global_peasant_enfranchisment
+    }
+    min = 0.1
+    max = 1
+}
+
+local_peasant_oppression_clamped = {
+    value = 1
+    subtract = local_peasant_enfranchisment_clamped
     min = 0
     max = 1
 }
 
 local_commoner_share_transferred_to_nobles = {
     add = local_commoner_tax_share
-    multiply = {
-        value = 1
-        subtract = local_peasant_enfranchisment_clamped
-    }
+    multiply = local_peasant_oppression_clamped
 }
 
 local_nobles_effective_tax_share = {
@@ -115,7 +123,7 @@ local_nobles_savings = {
     if = {
         limit = {
             exists = owner
-            owner = { has_estate = estate_type:nobles_estate }
+            owner = { country_has_estate = estate_type:nobles_estate }
         }
         value = "owner.estate(estate_type:nobles_estate).estate_gold"
     }
@@ -126,7 +134,7 @@ local_clergy_savings = {
     if = {
         limit = {
             exists = owner
-            owner = { has_estate = estate_type:clergy_estate }
+            owner = { country_has_estate = estate_type:clergy_estate }
         }
         value = "owner.estate(estate_type:clergy_estate).estate_gold"
     }
@@ -137,7 +145,7 @@ local_burghers_savings = {
     if = {
         limit = {
             exists = owner
-            owner = { has_estate = estate_type:burghers_estate }
+            owner = { country_has_estate = estate_type:burghers_estate }
         }
         value = "owner.estate(estate_type:burghers_estate).estate_gold"
     }
@@ -148,7 +156,7 @@ local_commoner_savings = {
     if = {
         limit = {
             exists = owner
-            owner = { has_estate = estate_type:peasants_estate }
+            owner = { country_has_estate = estate_type:peasants_estate }
         }
         value = "owner.estate(estate_type:peasants_estate).estate_gold"
     }
@@ -159,7 +167,7 @@ local_tribesmen_savings = {
     if = {
         limit = {
             exists = owner
-            owner = { has_estate = estate_type:tribes_estate }
+            owner = { country_has_estate = estate_type:tribes_estate }
         }
         value = "owner.estate(estate_type:tribes_estate).estate_gold"
     }
@@ -331,7 +339,7 @@ local_gdp = {
     add = local_clergy_gdp_display
     add = local_burghers_gdp_display
     add = local_commoner_gdp_display
-    add = local_tribe_gdp_display
+    add = local_tribesmen_gdp_display
 }
 
 local_noble_sol_pressure = {
@@ -364,7 +372,6 @@ local_tribesmen_sol_pressure = {
     subtract = 0.2
 }
 
-
 # Per-class intermediate values for GUI display.
 local_noble_gdp_nonlinear_component = {
     add = local_noble_sol_pressure
@@ -374,6 +381,7 @@ local_noble_gdp_nonlinear_component = {
             value = local_noble_sol_pressure
             multiply = 0.45
         }
+        min = 0.05
     }
 }
 
@@ -385,6 +393,7 @@ local_clergy_gdp_nonlinear_component = {
             value = local_clergy_sol_pressure
             multiply = 0.45
         }
+        min = 0.05
     }
 }
 
@@ -396,6 +405,7 @@ local_burghers_gdp_nonlinear_component = {
             value = local_burghers_sol_pressure
             multiply = 0.45
         }
+        min = 0.05
     }
 }
 
@@ -407,6 +417,7 @@ local_commoner_gdp_nonlinear_component = {
             value = local_commoner_sol_pressure
             multiply = 0.45
         }
+        min = 0.05
     }
 }
 
@@ -418,6 +429,7 @@ local_tribesmen_gdp_nonlinear_component = {
             value = local_tribesmen_sol_pressure
             multiply = 0.45
         }
+        min = 0.05
     }
 }
 
@@ -525,7 +537,7 @@ local_commoner_pop_display = {
     multiply = 1000
 }
 
-local_tribe_pop_display = {
+local_tribesmen_pop_display = {
     add = num_pop_type:tribesmen
     multiply = 1000
 }
@@ -533,55 +545,85 @@ local_tribe_pop_display = {
 local_noble_gdp_display = {
     add = local_nobles_income_pool
     multiply = local_nobles_effective_tax_share
-    divide = local_total_tax_share
+    divide = {
+        add = local_total_tax_share
+        min = 0.001
+    }
 }
 
 local_noble_gdp_per_capita_display = {
     add = local_noble_gdp_display
-    divide = num_pop_type:nobles + 0.001
+    divide = {
+        add = num_pop_type:nobles
+        min = 0.001
+    }
 }
 
 local_clergy_gdp_display = {
     add = local_clergy_income_pool
     multiply = local_clergy_tax_share
-    divide = local_total_tax_share
+    divide = {
+        add = local_total_tax_share
+        min = 0.001
+    }
 }
 
 local_clergy_gdp_per_capita_display = {
     add = local_clergy_gdp_display
-    divide = num_pop_type:clergy + 0.001
+    divide = {
+        add = num_pop_type:clergy
+        min = 0.001
+    }
 }
 
 local_burghers_gdp_display = {
     add = local_burghers_income_pool
     multiply = local_burghers_tax_share
-    divide = local_total_tax_share
+    divide = {
+        add = local_total_tax_share
+        min = 0.001
+    }
 }
 
 local_burghers_gdp_per_capita_display = {
     add = local_burghers_gdp_display
-    divide = num_pop_type:burghers + 0.001
+    divide = {
+        add = num_pop_type:burghers
+        min = 0.001
+    }
 }
 
 local_commoner_gdp_display = {
     add = local_commoner_income_pool
     multiply = local_commoner_effective_tax_share
-    divide = local_total_tax_share
+    divide = {
+        add = local_total_tax_share
+        min = 0.001
+    }
 }
 
 local_commoner_gdp_per_capita_display = {
     add = local_commoner_gdp_display
-    divide = local_commoner_population + 0.001
+    divide = {
+        add = local_commoner_population
+        min = 0.001
+    }
 }
 
-local_tribe_gdp_display = {
+local_tribesmen_gdp_display = {
     add = local_tribesmen_income_pool
     multiply = local_tribesmen_tax_share
-    divide = local_total_tax_share
+    divide = {
+        add = local_total_tax_share
+        min = 0.001
+    }
 }
 
-local_tribe_gdp_per_capita_display = {
-    add = local_tribe_gdp_display
-    divide = num_pop_type:tribesmen + 0.001
+local_tribesmen_gdp_per_capita_display = {
+    add = local_tribesmen_gdp_display
+    divide = {
+        add = num_pop_type:tribesmen
+        min = 0.001
+    }
 }
 

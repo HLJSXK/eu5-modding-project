@@ -1,0 +1,203 @@
+﻿OGAS_Auto_Road_Check_Complete_Proximity = {
+	if = {
+		limit = {
+			NOT = {
+				has_variable = OGAS_Auto_Road_Queue_Head
+			}
+		}
+		every_owned_location = {
+			limit = {
+				has_variable = OGAS_Cache_Auto_Road_Ongoing
+				OR = {
+					NOT = { has_variable = OGAS_Cache_Auto_Road_Source }
+					AND = {
+						has_variable = OGAS_Cache_Auto_Road_Source
+						has_latest_road_to = var:OGAS_Cache_Auto_Road_Source
+					}
+					# 0.0133 proximity = 0.01 control
+					proximity >= { value = var:OGAS_Cache_Auto_Road_Ongoing subtract = 0.0133 }
+					var:OGAS_Cache_Auto_Road_Ongoing <= 0
+				}
+			}
+			if = {
+				limit = {
+					proximity > 0
+				}
+				set_variable = OGAS_Cache_Auto_Road_Complete
+			}
+			remove_variable = OGAS_Cache_Auto_Road_Ongoing
+			remove_variable = OGAS_Cache_Auto_Road_Source
+			remove_variable = OGAS_Cache_Auto_Road_Value
+		}
+	}
+}
+
+OGAS_Auto_Road_Relax_Road_Proximity = {
+	if = {
+		limit = {
+			has_variable = OGAS_Auto_Road_Queue_Head
+		}
+		var:OGAS_Auto_Road_Queue_Head = {
+			save_scope_as = current_location
+		}
+		scope:current_location = {
+			#advance queue head
+			if = {
+				limit = {
+					has_variable = OGAS_Cache_Auto_Road_Queue_Next
+				}
+				var:OGAS_Cache_Auto_Road_Queue_Next = {
+					save_scope_as = OGAS_Auto_Road_Queue_Next_Scope
+				}
+				root = {
+					set_variable = {
+						name = OGAS_Auto_Road_Queue_Head
+						value = scope:OGAS_Auto_Road_Queue_Next_Scope
+					}
+				}
+			}
+			else = {
+				root = {
+					remove_variable = OGAS_Auto_Road_Queue_Head
+					remove_variable = OGAS_Auto_Road_Queue_Tail
+				}
+			}
+			remove_variable = OGAS_Cache_Auto_Road_Queue_Next
+			remove_variable = OGAS_Cache_Auto_Road_InQueue
+
+			#only consider that can contribute
+			if = {
+				limit = {
+					scope:current_location.proximity_prediction > 0
+				}
+				every_neighbor_location = {
+					limit = {
+						is_ownable = yes
+						owner ?= root
+					}
+					#initialization for new found location
+					if = {
+						limit = {
+							NOT = {
+								has_variable = OGAS_Cache_Auto_Road_Ongoing
+							}
+						}
+						set_variable = {
+							name = OGAS_Cache_Auto_Road_Ongoing
+							value = 0
+						}
+					}
+					#relax
+					if = {
+						limit = {
+							scope:current_location.proximity_prediction > var:OGAS_Cache_Auto_Road_Ongoing
+							NOT = { is_strait_connection_to = { target = scope:current_location } }
+						}
+						set_variable = {
+							name = OGAS_Cache_Auto_Road_Ongoing
+							value = scope:current_location.proximity_prediction
+						}
+						set_variable = {
+							name = OGAS_Cache_Auto_Road_Source
+							value = scope:current_location
+						}
+						OGAS_Auto_Road_Queue_Enqueue = yes
+					}
+				}
+			}
+		}
+	}
+}
+
+
+OGAS_Auto_Road_Calculate_Value_Proximity = {
+	# Calculate value of each road
+	ordered_owned_location = {
+		limit = {
+			has_variable = OGAS_Cache_Auto_Road_Ongoing
+			NOT = {
+				has_variable = OGAS_Cache_Auto_Road_Complete
+			}
+		}
+		order_by = var:OGAS_Cache_Auto_Road_Ongoing
+		max = num_locations
+		if = {
+			limit = {
+				NOT = {
+					has_variable = OGAS_Cache_Auto_Road_Value
+				}
+			}
+			set_variable = {
+				name = OGAS_Cache_Auto_Road_Value
+				value = 0
+			}
+		}
+		change_variable = {
+			name = OGAS_Cache_Auto_Road_Value
+			add = value_prediction
+		}
+		save_scope_as = current_location
+		if = {
+			limit = { has_variable = OGAS_Cache_Auto_Road_Source }
+			var:OGAS_Cache_Auto_Road_Source = {
+				if = {
+					limit = {
+						NOT = {
+							has_variable = OGAS_Cache_Auto_Road_Complete
+						}
+					}
+					if = {
+						limit = {
+							NOT = {
+								has_variable = OGAS_Cache_Auto_Road_Value
+							}
+						}
+						set_variable = {
+							name = OGAS_Cache_Auto_Road_Value
+							value = 0
+						}
+					}
+					change_variable = {
+						name = OGAS_Cache_Auto_Road_Value
+						add = scope:current_location.sum_value_prediction
+					}
+				}
+			}
+		}
+	}
+}
+
+
+OGAS_Auto_Road_Pathfinding_Proximity = {
+	# init
+	remove_variable = OGAS_Auto_Road_Queue_Head
+	remove_variable = OGAS_Auto_Road_Queue_Tail
+	ordered_owned_location = {
+		order_by = proximity
+		max = num_locations
+		remove_variable = OGAS_Cache_Auto_Road_InQueue
+		remove_variable = OGAS_Cache_Auto_Road_Queue_Next
+		if = {
+			limit = {
+				proximity > 0
+			}
+			set_variable = {
+				name = OGAS_Cache_Auto_Road_Ongoing
+				value = proximity
+			}
+			OGAS_Auto_Road_Queue_Enqueue = yes
+		}
+	}
+
+	while = {
+        limit = {
+			has_variable = OGAS_Auto_Road_Queue_Head
+		}
+		# 10 is enough
+		count = {
+			value = num_locations
+			multiply = 10
+		}
+		OGAS_Auto_Road_Relax_Road_Proximity = yes
+	}
+}

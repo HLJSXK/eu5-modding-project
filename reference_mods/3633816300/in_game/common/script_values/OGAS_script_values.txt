@@ -1,0 +1,255 @@
+﻿proximity_prediction = {
+	#if road source location is constructing new road, must use proximity_prediction marked before, because proximity now is not the best
+	if = {
+		limit = {
+			has_variable = OGAS_Cache_Auto_Road_Ongoing
+		}
+		value = var:OGAS_Cache_Auto_Road_Ongoing
+	}
+	#only those compeled location or some port location which had better proximity from sea
+	else = {
+		value = proximity
+	}
+	subtract = {
+		value = 1
+		divide = {
+			value = 1
+			add = {
+				#all buff of distance_from_capital
+				add = owner.modifier:global_distance_from_capital_speed_propagation
+				add = owner.modifier:land_cost_on_distance_from_capital_speed_propagation
+				add = modifier:local_distance_from_capital_speed_propagation
+				add = {
+					if = {
+						limit = { topography = mountains }
+						value = -0.5
+					}
+					if = {
+						limit = { topography = hills }
+						value = -0.25
+					}
+					if = {
+						limit = { topography = plateau }
+						value = -0.125
+					}
+					if = {
+						limit = { topography = wetlands }
+						value = -0.25
+					}
+				}
+			}
+		}
+		multiply = {
+			value = owner.modifier:road_cost_on_distance_from_capital
+			if = {
+				limit = { owner = { has_advance = railroad_advance } }
+				subtract = 15
+			}
+			else_if = {
+				limit = { owner = { has_advance = modern_road_advance } }
+				subtract = 10
+			}
+			else_if = {
+				limit = { owner = { has_advance = paved_road_advance } }
+				subtract = 5
+			}
+			else_if = {
+				limit = { owner = { has_advance = road_building } }
+				subtract = 0
+			}
+		}
+		min = 0.01
+	}
+}
+
+# different from proximity_prediction
+# current_location is known
+market_access_prediction = {
+	scope:current_location = {
+		if = {
+			limit = {
+				has_variable = OGAS_Cache_Auto_Road_Ongoing
+			}
+			value = var:OGAS_Cache_Auto_Road_Ongoing
+		}
+		else = {
+			value = market_access
+		}
+		if = {
+			# remove local market access buff
+			# but if market_access = 1, we don't know if it is from buff or not
+			limit = { market_access < 1 }
+			subtract = modifier:local_market_access
+		}
+		
+	}
+	subtract = {
+		value = 1
+		if = {
+			limit = { owner = { has_advance = railroad_advance } }
+			add = -0.4
+		}
+		else_if = {
+			limit = { owner = { has_advance = modern_road_advance } }
+			add = -0.3
+		}
+		else_if = {
+			limit = { owner = { has_advance = paved_road_advance } }
+			add = -0.2
+		}
+		else_if = {
+			limit = { owner = { has_advance = road_building } }
+			add = -0.1
+		}
+		multiply = {
+			value = "distance_to(scope:current_location)"
+			multiply = {
+				value = movement_cost_sum
+				add = scope:current_location.movement_cost_sum
+			}
+			# strange but true logic
+			if = {
+				limit = { area = scope:current_location.area }
+				divide = 2000
+			}
+			else = {
+				divide = 4000
+			}
+		}
+	}
+	add = modifier:local_market_access
+	max = 1
+}
+
+movement_cost_sum = {
+	if = {
+		limit = { topography = mountains }
+		value = 2
+	}
+	else_if = {
+		limit = { topography = hills }
+		value = 1.5
+	}
+	else_if = {
+		limit = { topography = plateau }
+		value = 1.25
+	}
+	else_if = {
+		limit = { topography = wetlands }
+		value = 1.5
+	}
+	else = {
+		value = 1
+	}
+
+	if = {
+		limit = { vegetation = desert }
+		add = 1.1
+	}
+	else_if = {
+		limit = { vegetation = farmland }
+		add = 1.1
+	}
+	else_if = {
+		limit = { vegetation = woods }
+		add = 1.25
+	}
+	else_if = {
+		limit = { vegetation = forest }
+		add = 1.5
+	}
+	else_if = {
+		limit = { vegetation = jungle }
+		add = 2
+	}
+	else = {
+		add = 1
+	}
+}
+
+# only for initialisation
+OGAS_deposit_gold = {
+	value = monthly_balance
+	multiply = 12
+	#00_hardcoded build_gravel_road
+	if = {
+		limit = {
+			has_advance = road_building
+		}
+		min = 500
+	}
+	#00_hardcoded build_paved_road
+	if = {
+		limit = {
+			has_advance = paved_road_advance
+		}
+		min = 1250
+	}
+	#00_hardcoded build_modern_road
+	if = {
+		limit = {
+			has_advance = modern_road_advance
+		}
+		min = 2500
+	}
+	#00_hardcoded build_railroad
+	if = {
+		limit = {
+			has_advance = railroad_advance
+		}
+		min = 5000
+	}
+	divide = 1000
+	round = yes
+	min = 1
+	max = 100
+	multiply = 1000
+}
+
+value_prediction = {
+	value = var:OGAS_Cache_Auto_Road_Ongoing
+	if = {
+		limit = { proximity >= 0 }
+		subtract = proximity
+	}
+	multiply = {
+		value = location_tax_base
+		if = {
+			limit = { local_control > 0 }
+			divide = local_control
+		}
+		else = {
+			add = 0.01
+		}
+		
+	}
+}
+
+sum_value_prediction = {
+	value = var:OGAS_Cache_Auto_Road_Value
+	add = value_prediction
+}
+
+market_access_value_prediction = {
+	value = var:OGAS_Cache_Auto_Road_Ongoing
+	if = {
+		limit = { market_access >= 0 }
+		subtract = market_access
+	}
+	multiply = {
+		value = location_tax_base
+		if = {
+			limit = { market_access > 0 }
+			divide = market_access
+		}
+		else = {
+			add = 0.01
+		}
+		
+	}
+}
+
+sum_market_access_value_prediction = {
+	value = var:OGAS_Cache_Auto_Road_Value
+	add = market_access_value_prediction
+}
