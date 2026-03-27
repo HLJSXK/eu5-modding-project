@@ -28,6 +28,7 @@ Mod-focused documentation for the EU5 Modding Project.
 - [Task Summary Establish New City](task_summaries/Task_Summary_Establish_New_City.md)
 - [Task Summary Large Research Project](task_summaries/Task_Summary_Large_Research_Project.md)
 - [Task Summary Fix Dynamic Missions Errors](task_summaries/Task_Summary_Fix_Dynamic_Missions_Errors.md)
+- [Task Summary AI Programming Techniques 20260327](task_summaries/Task_Summary_AI_Programming_Techniques_20260327.md)
 
 ## Split Notice
 
