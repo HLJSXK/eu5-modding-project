@@ -15,6 +15,7 @@ When proposing code edits or generating new scripts, you must evaluate your know
 ### Constraints
 - NEVER hallucinate or guess Paradox script syntax. 
 - If you cannot verify a command using the steps above, explicitly tell the user: "I cannot verify this syntax, please check the official wiki or logs."
+- If a syntax pattern causes bugs, do NOT remove the feature as a first response. You MUST follow the 3-step rule in order (Direct Edit -> docs/ -> vanilla_files/) and replace it with a verified working syntax.
 ```
 
 ## Path Mapping In This Repository
@@ -24,3 +25,10 @@ When proposing code edits or generating new scripts, you must evaluate your know
 - `reference_game_files/` -> vanilla script source files (equivalent role to `vanilla_files/` in the prompt)
 
 When step 3 says `vanilla_files/`, use `reference_game_files/` in this repository.
+
+## Required Behavior For Bug Fixing
+
+- When a previously implemented script/GUI expression fails, the default action is **syntax replacement based on verification**, not feature removal.
+- Removal or fallback simplification is only allowed when:
+  - the syntax cannot be verified in `docs/` and `reference_game_files/`, and
+  - the tool explicitly reports this uncertainty to the user.
