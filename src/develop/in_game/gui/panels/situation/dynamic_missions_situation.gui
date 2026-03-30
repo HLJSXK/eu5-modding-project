@@ -1,20 +1,31 @@
-# Dynamic Missions Situation Panel (Debug-First)
+# Dynamic Missions Situation Panel
 #
-# This panel intentionally reads country-scope variables from Player.MakeScope.
-# Goal: each player sees their own mission state in multiplayer.
+# Architecture: fixed 4-card template, per-mission content via single-line text selectors.
 #
-# dm_gui_mission_type:
-#   0 = idle
-#   1 = develop_city
-#   2 = large_research_project
-#   3 = establish_new_city
-#   4 = claim_province
+# Adding a new mission only requires:
+#   1. A dm_mission_{key} boolean variable (set in scripted effect)
+#   2. 2-3 localization keys: DM_{ID}_NAME, DM_{ID}_HINT, DM_{ID}_ACTION_HINT
+#   3. Three single-line entries in this file (one per card slot below)
+#
+# Standard variable schema (set by every dm_start_mission_X effect):
+#   dm_active_mission         boolean — any mission active
+#   dm_mission_{key}          boolean — specific mission active
+#   dm_months_elapsed         int     — elapsed months counter
+#   dm_time_limit             int     — mission time limit in months
+#   dm_primary_progress       int?    — numeric progress value (e.g. research points)
+#   dm_primary_goal           int?    — target for primary_progress
+#   dm_prosperity_target      int?    — prosperity threshold to display
+#   dm_has_actions            boolean? — mission has available decisions
 
 situation_panel = {
 
+	# -----------------------------------------------------------------------
+	# HEADER: title + dynamic mission subtitle
+	# -----------------------------------------------------------------------
 	blockoverride "situation_header_left" {
 		vbox = {
 			layoutpolicy_horizontal = expanding
+			spacing = 2
 
 			text_single = {
 				text = "DM_PANEL_TITLE"
@@ -22,122 +33,317 @@ situation_panel = {
 				fontsize = 15
 			}
 
+			# Idle subtitle
 			text_single = {
 				text = "DM_PANEL_IDLE_TITLE"
-				default_format = "#subtle_name"
-				fontsize = 14
+				default_format = "#low"
+				fontsize = 13
 				visible = "[Not(Player.MakeScope.GetVariable('dm_active_mission').IsSet)]"
 			}
 
+			# *** ADD ONE LINE HERE PER NEW MISSION ***
 			text_single = {
-				text = "DM_PANEL_MISSION_ACTIVE_TITLE"
+				text = "DM_DEVELOP_NAME"
 				default_format = "#subtle_name"
-				fontsize = 14
-				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
 			}
+			text_single = {
+				text = "DM_RESEARCH_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+			}
+			text_single = {
+				text = "DM_URBANIZE_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+			}
+			text_single = {
+				text = "DM_CLAIM_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+			}
+			# *** END MISSION LIST ***
 		}
 	}
 
+	# -----------------------------------------------------------------------
+	# MAIN CONTENT: 4 fixed cards
+	# -----------------------------------------------------------------------
 	blockoverride "situation_panel_main_content" {
 		vbox = {
 			layoutpolicy_horizontal = expanding
 			spacing = 8
 
-			text_multi = {
-				layoutpolicy_horizontal = expanding
-				autoresize = yes
-				max_width = 360
-				text = "DM_PANEL_IDLE_DESC"
-				default_format = "#low"
-				fontsize = 13
+			# ===============================================================
+			# CARD 1: IDLE STATE
+			# ===============================================================
+			situation_card_common = {
 				visible = "[Not(Player.MakeScope.GetVariable('dm_active_mission').IsSet)]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_IDLE_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_PANEL_IDLE_DESC"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
 			}
 
-			text_multi = {
-				layoutpolicy_horizontal = expanding
-				autoresize = yes
-				max_width = 360
-				text = "DM_PANEL_MISSION_HINT_DEVELOP"
-				default_format = "#low"
-				fontsize = 13
-				visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+			# ===============================================================
+			# CARD 2: DESCRIPTION
+			# One shared card; mission name and hint selected by visibility.
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" {
+					# *** ADD ONE text_single HERE PER NEW MISSION ***
+					text_single = {
+						text = "DM_DEVELOP_NAME"
+						visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+					}
+					text_single = {
+						text = "DM_RESEARCH_NAME"
+						visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+					}
+					text_single = {
+						text = "DM_URBANIZE_NAME"
+						visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+					}
+					text_single = {
+						text = "DM_CLAIM_NAME"
+						visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+					}
+					# *** END MISSION LIST ***
+				}
+				blockoverride "common_bottom_content" {
+					# *** ADD ONE text_multi HERE PER NEW MISSION ***
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_DEVELOP_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+					}
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_RESEARCH_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+					}
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_URBANIZE_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+					}
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_CLAIM_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+					}
+					# *** END MISSION LIST ***
+				}
 			}
 
-			text_multi = {
-				layoutpolicy_horizontal = expanding
-				autoresize = yes
-				max_width = 360
-				text = "DM_PANEL_MISSION_HINT_RESEARCH"
-				default_format = "#low"
-				fontsize = 13
-				visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+			# ===============================================================
+			# CARD 3: UNIVERSAL PROGRESS
+			# Reads standard variables. No per-mission branching needed.
+			# Slots show/hide based on which optional variables are set.
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_PROGRESS_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 8
+						margin = { 6 4 }
+
+						# Slot: Months elapsed — always shown
+						widget = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_MONTHS_ELAPSED"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_months_elapsed').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Time limit — always shown, reads dm_time_limit variable
+						widget = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_TIME_LIMIT"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_time_limit').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Primary progress — only when dm_primary_progress is set (e.g. research)
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_primary_progress').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_PROGRESS_LABEL"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_primary_progress').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Primary goal — only when dm_primary_goal is set
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_primary_goal').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_GOAL_LABEL"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_primary_goal').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Prosperity target — only when dm_prosperity_target is set
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_prosperity_target').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_PROSPERITY_TARGET"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_prosperity_target').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+					}
+				}
 			}
 
-			text_multi = {
-				layoutpolicy_horizontal = expanding
-				autoresize = yes
-				max_width = 360
-				text = "DM_PANEL_MISSION_HINT_ESTABLISH"
-				default_format = "#low"
-				fontsize = 13
-				visible = "[Player.MakeScope.GetVariable('dm_mission_establish_city').IsSet]"
+			# ===============================================================
+			# CARD 4: AVAILABLE ACTIONS
+			# Only shown when the active mission has decisions (dm_has_actions set).
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_has_actions').IsSet]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_ACTIONS_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					# *** ADD ONE text_multi HERE PER NEW MISSION THAT HAS DECISIONS ***
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_RESEARCH_ACTION_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+					}
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_URBANIZE_ACTION_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+					}
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_CLAIM_ACTION_HINT"
+						default_format = "#low"
+						fontsize = 13
+						visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+					}
+					# *** END MISSION LIST ***
+				}
 			}
 
-			text_multi = {
-				layoutpolicy_horizontal = expanding
-				autoresize = yes
-				max_width = 360
-				text = "DM_PANEL_MISSION_HINT_CLAIM"
-				default_format = "#low"
-				fontsize = 13
-				visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_BLOCK_TITLE"
-				default_format = "#subtle_name"
-				fontsize = 13
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_MISSION_TYPE"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_ACTIVE"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_FLAG_DEVELOP"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_FLAG_RESEARCH"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_FLAG_ESTABLISH"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_FLAG_CLAIM"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_MONTHS"
-				fontsize = 12
-			}
-
-			text_single = {
-				text = "DM_PANEL_DEBUG_LINE_RESEARCH_PROGRESS"
-				fontsize = 12
-			}
 		}
 	}
 }
