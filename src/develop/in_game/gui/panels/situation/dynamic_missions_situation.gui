@@ -1,73 +1,50 @@
-# Dynamic Missions Situation Panel
+# Dynamic Missions Situation Panel (Debug-First)
 #
-# Layout routes to one of five content blocks based on the country-scope variable
-# dm_gui_mission_type (set monthly via script on each country):
-#   0 = idle   (no active mission)
+# This panel intentionally reads country-scope variables from Player.MakeScope.
+# Goal: each player sees their own mission state in multiplayer.
+#
+# dm_gui_mission_type:
+#   0 = idle
 #   1 = develop_city
 #   2 = large_research_project
 #   3 = establish_new_city
 #   4 = claim_province
-#
-# Variable access pattern (per-player):
-#   Player.MakeScope.GetVariable('var_name').GetValue|0
-#
-# For visibility gating, GetValue returns a ScriptValue; use .IsEqual(N) or compare via
-# GetValue|0 in a text widget for debugging. A reliable alternative is storing boolean
-# country variables (dm_gui_idle, dm_gui_develop, ...) and using HasVariable checks.
-#
-# CURRENT APPROACH: store dm_gui_mission_type as an integer and branch on GetValue equality.
-# Adjust the visible expressions below if the engine requires a different comparator.
 
 situation_panel = {
-
-	########################################################################
-	# HEADER: mission phase indicator
-	########################################################################
 
 	blockoverride "situation_header_left" {
 		vbox = {
 			layoutpolicy_horizontal = expanding
 
-			# Shown when idle (dm_gui_mission_type == 0)
+			text_single = {
+				text = "DM_PANEL_TITLE"
+				default_format = "#subtle_name"
+				fontsize = 15
+			}
+
 			text_single = {
 				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(0)]"
 				text = "DM_PANEL_IDLE_TITLE"
 				default_format = "#subtle_name"
-				fontsize = 15
+				fontsize = 14
 			}
 
-			# Shown during any active mission (dm_gui_mission_type > 0)
 			text_single = {
 				visible = "[Not(Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(0))]"
 				text = "DM_PANEL_MISSION_ACTIVE_TITLE"
 				default_format = "#subtle_name"
-				fontsize = 15
-			}
-
-			# Progress counter (months elapsed) - only shown during active mission
-			text_single = {
-				visible = "[Not(Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(0))]"
-				text = "DM_PANEL_MONTHS_ELAPSED"
-				fontsize = 13
+				fontsize = 14
 			}
 		}
 	}
 
-	########################################################################
-	# MAIN CONTENT: one vbox per state, mutually exclusive via visible=
-	########################################################################
-
 	blockoverride "situation_panel_main_content" {
-
-		# ------------------------------------------------------------------
-		# STATE 0 — IDLE: no active mission
-		# ------------------------------------------------------------------
 		vbox = {
-			visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(0)]"
 			layoutpolicy_horizontal = expanding
-			spacing = 10
+			spacing = 8
 
 			text_multi = {
+				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(0)]"
 				layoutpolicy_horizontal = expanding
 				autoresize = yes
 				max_width = 360
@@ -75,189 +52,91 @@ situation_panel = {
 				default_format = "#low"
 				fontsize = 13
 			}
-		}
-
-		# ------------------------------------------------------------------
-		# STATE 1 — DEVELOP CITY
-		# ------------------------------------------------------------------
-		vbox = {
-			visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(1)]"
-			layoutpolicy_horizontal = expanding
-			spacing = 10
-
-			situation_card_expandable = {
-				blockoverride "header_button_onclick" {
-					onclick = "[LateralView.Vars.Toggle( 'dm_develop_req_toggled' )]"
-				}
-				blockoverride "header_text" {
-					text = "END_REQUIREMENTS"
-				}
-				blockoverride "header_icon" {
-					texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
-				}
-				blockoverride "bottom_content" {
-					TooltipRequirementsList = {
-						textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
-					}
-				}
-				blockoverride "bottom_content_onclick" {
-					visible = "[LateralView.Vars.Exists( 'dm_develop_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_yes" {
-					visible = "[LateralView.Vars.Exists( 'dm_develop_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_not" {
-					visible = "[Not(LateralView.Vars.Exists( 'dm_develop_req_toggled' ))]"
-				}
-				blockoverride "visible_hint" {}
-				blockoverride "onaction_hint" {}
-			}
 
 			text_multi = {
+				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(1)]"
 				layoutpolicy_horizontal = expanding
 				autoresize = yes
 				max_width = 360
-				text = "DM_PANEL_DEVELOP_CITY_DESC"
+				text = "DM_PANEL_MISSION_HINT_DEVELOP"
 				default_format = "#low"
 				fontsize = 13
-			}
-		}
-
-		# ------------------------------------------------------------------
-		# STATE 2 — LARGE RESEARCH PROJECT
-		# ------------------------------------------------------------------
-		vbox = {
-			visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(2)]"
-			layoutpolicy_horizontal = expanding
-			spacing = 10
-
-			situation_card_expandable = {
-				blockoverride "header_button_onclick" {
-					onclick = "[LateralView.Vars.Toggle( 'dm_research_req_toggled' )]"
-				}
-				blockoverride "header_text" {
-					text = "END_REQUIREMENTS"
-				}
-				blockoverride "header_icon" {
-					texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
-				}
-				blockoverride "bottom_content" {
-					TooltipRequirementsList = {
-						textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
-					}
-				}
-				blockoverride "bottom_content_onclick" {
-					visible = "[LateralView.Vars.Exists( 'dm_research_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_yes" {
-					visible = "[LateralView.Vars.Exists( 'dm_research_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_not" {
-					visible = "[Not(LateralView.Vars.Exists( 'dm_research_req_toggled' ))]"
-				}
-				blockoverride "visible_hint" {}
-				blockoverride "onaction_hint" {}
 			}
 
 			text_multi = {
+				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(2)]"
 				layoutpolicy_horizontal = expanding
 				autoresize = yes
 				max_width = 360
-				text = "DM_PANEL_LARGE_RESEARCH_DESC"
+				text = "DM_PANEL_MISSION_HINT_RESEARCH"
 				default_format = "#low"
 				fontsize = 13
-			}
-		}
-
-		# ------------------------------------------------------------------
-		# STATE 3 — ESTABLISH NEW CITY
-		# ------------------------------------------------------------------
-		vbox = {
-			visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(3)]"
-			layoutpolicy_horizontal = expanding
-			spacing = 10
-
-			situation_card_expandable = {
-				blockoverride "header_button_onclick" {
-					onclick = "[LateralView.Vars.Toggle( 'dm_establish_req_toggled' )]"
-				}
-				blockoverride "header_text" {
-					text = "END_REQUIREMENTS"
-				}
-				blockoverride "header_icon" {
-					texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
-				}
-				blockoverride "bottom_content" {
-					TooltipRequirementsList = {
-						textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
-					}
-				}
-				blockoverride "bottom_content_onclick" {
-					visible = "[LateralView.Vars.Exists( 'dm_establish_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_yes" {
-					visible = "[LateralView.Vars.Exists( 'dm_establish_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_not" {
-					visible = "[Not(LateralView.Vars.Exists( 'dm_establish_req_toggled' ))]"
-				}
-				blockoverride "visible_hint" {}
-				blockoverride "onaction_hint" {}
 			}
 
 			text_multi = {
+				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(3)]"
 				layoutpolicy_horizontal = expanding
 				autoresize = yes
 				max_width = 360
-				text = "DM_PANEL_ESTABLISH_CITY_DESC"
+				text = "DM_PANEL_MISSION_HINT_ESTABLISH"
 				default_format = "#low"
 				fontsize = 13
-			}
-		}
-
-		# ------------------------------------------------------------------
-		# STATE 4 — CLAIM PROVINCE
-		# ------------------------------------------------------------------
-		vbox = {
-			visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(4)]"
-			layoutpolicy_horizontal = expanding
-			spacing = 10
-
-			situation_card_expandable = {
-				blockoverride "header_button_onclick" {
-					onclick = "[LateralView.Vars.Toggle( 'dm_claim_req_toggled' )]"
-				}
-				blockoverride "header_text" {
-					text = "END_REQUIREMENTS"
-				}
-				blockoverride "header_icon" {
-					texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
-				}
-				blockoverride "bottom_content" {
-					TooltipRequirementsList = {
-						textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
-					}
-				}
-				blockoverride "bottom_content_onclick" {
-					visible = "[LateralView.Vars.Exists( 'dm_claim_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_yes" {
-					visible = "[LateralView.Vars.Exists( 'dm_claim_req_toggled' )]"
-				}
-				blockoverride "icon_replace_visible_not" {
-					visible = "[Not(LateralView.Vars.Exists( 'dm_claim_req_toggled' ))]"
-				}
-				blockoverride "visible_hint" {}
-				blockoverride "onaction_hint" {}
 			}
 
 			text_multi = {
+				visible = "[Player.MakeScope.GetVariable('dm_gui_mission_type').GetValue.IsEqual(4)]"
 				layoutpolicy_horizontal = expanding
 				autoresize = yes
 				max_width = 360
-				text = "DM_PANEL_CLAIM_PROVINCE_DESC"
+				text = "DM_PANEL_MISSION_HINT_CLAIM"
 				default_format = "#low"
 				fontsize = 13
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_BLOCK_TITLE"
+				default_format = "#subtle_name"
+				fontsize = 13
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_MISSION_TYPE"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_ACTIVE"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_FLAG_DEVELOP"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_FLAG_RESEARCH"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_FLAG_ESTABLISH"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_FLAG_CLAIM"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_MONTHS"
+				fontsize = 12
+			}
+
+			text_single = {
+				text = "DM_PANEL_DEBUG_LINE_RESEARCH_PROGRESS"
+				fontsize = 12
 			}
 		}
 	}

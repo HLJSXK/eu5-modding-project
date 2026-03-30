@@ -1,301 +1,242 @@
-﻿namespace = dynamic_missions
+﻿#namespace = dynamic_missions
 
-# Dynamic Missions: Choose Your Goal
+# =============================================================================
+# MISSION SELECTION
+# =============================================================================
+
 dynamic_missions.1 = {
 	type = country_event
 	title = dynamic_missions.1.title
 	desc = dynamic_missions.1.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = happy
 		10 = interior
 	}
-	
+
 	trigger = {
-		is_ai = no
-		NOT = { has_variable = active_dynamic_mission }
+		can_receive_dynamic_mission = yes
 	}
-	
-	# Option 1: Focus on Developing a City
+
+	# Mission 1: Develop City
 	option = {
 		name = dynamic_missions.1.option_a
 		trigger = { can_start_develop_city_mission = yes }
-		set_variable = { name = active_dynamic_mission value = yes }
 		trigger_event_non_silently = { id = dynamic_missions.2 }
 		custom_tooltip = dynamic_missions.1.option_a.tooltip
 	}
 
-	# Option 2: Large Research Project
+	# Mission 2: Large Research Project
 	option = {
-		name = "Start a Large Research Project"
+		name = dynamic_missions.1.option_b
 		trigger = { can_start_large_research_project = yes }
-		set_variable = { name = active_dynamic_mission value = yes }
-		# Join the global situation as participant
-		situation:large_research_project_situation = {
-			add_participant = root
-		}
-		# Initialize mission variables
-		set_variable = { name = dm_months_elapsed value = 0 }
-		set_variable = { name = dm_research_progress value = 0 }
-		custom_tooltip = "Embark on a 5-year research project to gain a significant technology boost."
+		dm_clear_all_mission_state = yes
+		dm_start_mission_large_research = yes
+		custom_tooltip = dynamic_missions.1.option_b.tooltip
 	}
-	
-	# Option 3: Establish a New City
+
+	# Mission 3: Establish New City
 	option = {
 		name = dynamic_missions.1.option_d
 		trigger = { can_start_establish_new_city_mission = yes }
-		set_variable = { name = active_dynamic_mission value = yes }
 		trigger_event_non_silently = { id = dynamic_missions.30 }
 		custom_tooltip = dynamic_missions.1.option_d.tooltip
 	}
-	
-	# Option 4: Claim a Province
+
+	# Mission 4: Claim Province
 	option = {
 		name = dynamic_missions.1.option_e
 		trigger = { can_start_claim_province_mission = yes }
-		set_variable = { name = active_dynamic_mission value = yes }
 		trigger_event_non_silently = { id = dynamic_missions.40 }
 		custom_tooltip = dynamic_missions.1.option_e.tooltip
 	}
-	
-	# Option 5: Not now
+
+	# Not now
 	option = {
 		name = dynamic_missions.1.option_c
 		custom_tooltip = dynamic_missions.1.option_c.tooltip
 	}
 }
 
-# Dynamic Missions: Select Target City
+# =============================================================================
+# DEVELOP CITY MISSION
+# =============================================================================
+
+# Select target city/town
 dynamic_missions.2 = {
 	type = country_event
 	title = dynamic_missions.2.title
 	desc = dynamic_missions.2.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = exterior
 		10 = city
 	}
-	
-	immediate = {
-		every_owned_location = {
+
+	# Option A: Use capital (if valid)
+	option = {
+		name = dynamic_missions.2.option_a
+		trigger = {
+			capital = {
+				OR = {
+					location_rank = location_rank:town
+					location_rank = location_rank:city
+				}
+				prosperity < 100
+			}
+		}
+
+		dm_clear_all_mission_state = yes
+		capital = { save_scope_as = dm_selected_target }
+		set_variable = { name = dm_target_location value = scope:dm_selected_target }
+		dm_start_mission_develop_city = yes
+		custom_tooltip = dynamic_missions.2.option_a.tooltip
+	}
+
+	# Option B: Auto-pick a valid city/town
+	option = {
+		name = dynamic_missions.2.option_b
+		trigger = {
+			any_owned_location = {
+				OR = {
+					location_rank = location_rank:town
+					location_rank = location_rank:city
+				}
+				prosperity < 100
+			}
+		}
+
+		dm_clear_all_mission_state = yes
+		random_owned_location = {
 			limit = {
 				OR = {
 					location_rank = location_rank:town
 					location_rank = location_rank:city
 				}
+				prosperity < 100
 			}
-			add_to_list = eligible_cities
+			save_scope_as = dm_selected_target
 		}
-	}
-	
-		option = {
-			name = dynamic_missions.2.option_a
-			capital = {
-				save_scope_as = target_city
-				set_variable = { name = selected_for_development value = yes }
-				set_variable = { name = initial_building_count value = num_buildings }
-			}
-			# Join the global situation as participant
-			situation:develop_city_situation = {
-				add_participant = root
-			}
-			# Initialize mission variables
-			set_variable = { name = dm_months_elapsed value = 0 }
-			custom_tooltip = dynamic_missions.2.option_a.tooltip
-		}
-	
-	option = {
-		name = dynamic_missions.2.option_b
-		remove_variable = active_dynamic_mission
+		set_variable = { name = dm_target_location value = scope:dm_selected_target }
+		dm_start_mission_develop_city = yes
 		custom_tooltip = dynamic_missions.2.option_b.tooltip
+	}
+
+	# Option C: Cancel
+	option = {
+		name = dynamic_missions.2.option_c
+		dm_clear_all_mission_state = yes
+		custom_tooltip = dynamic_missions.2.option_c.tooltip
 	}
 }
 
-# Dynamic Missions: City Development Complete
+# Develop City Success
 dynamic_missions.3 = {
 	type = country_event
 	title = dynamic_missions.3.title
 	desc = dynamic_missions.3.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = happy
 		10 = city
 	}
-	
+
 	option = {
 		name = dynamic_missions.3.option_a
-		situation:develop_city_situation = {
-			var:target_location = { add_development = 1 }
+		if = {
+			limit = { has_variable = dm_target_location }
+			var:dm_target_location = { add_development = 1 }
 		}
-		remove_variable = active_dynamic_mission
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 		custom_tooltip = dynamic_missions.3.option_a.tooltip
 	}
 }
 
-# Dynamic Missions: City Development Failed
+# Develop City Failure
 dynamic_missions.4 = {
 	type = country_event
 	title = dynamic_missions.4.title
 	desc = dynamic_missions.4.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = sad
 		10 = city
 	}
-	
+
 	option = {
 		name = dynamic_missions.4.option_a
-		remove_variable = active_dynamic_mission
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 		custom_tooltip = dynamic_missions.4.option_a.tooltip
 	}
 }
 
-# --- Large Research Project Events ---
+# =============================================================================
+# LARGE RESEARCH PROJECT MISSION
+# =============================================================================
 
-# Dynamic Missions: Select University to Conscript
-dynamic_missions.21 = {
-	type = country_event
-	title = dynamic_missions.21.title
-	desc = dynamic_missions.21.desc
-	fire_only_once = no
-	
-	illustration_tags = {
-		10 = interior
-		10 = library
-	}
-	
-	# TODO: Implement dynamic location selection
-	# For now, use a simple option to conscript first available university
-	option = {
-		name = "Conscript a university"
-		random_owned_location = {
-			limit = {
-				has_building = building_type:university
-				NOT = { has_location_modifier = dm_conscripted_university_debuff }
-			}
-			add_location_modifier = { modifier = dm_conscripted_university_debuff years = -1 mode = add_and_extend }
-		}
-		situation:large_research_project_situation = {
-			if = {
-				limit = { NOT = { has_variable = conscripted_universities_count } }
-				set_variable = { name = conscripted_universities_count value = 0 }
-			}
-			change_variable = { name = conscripted_universities_count add = 1 }
-		}
-	}
-}
-
-# Dynamic Missions: Appoint Lead Scientist
-dynamic_missions.22 = {
-	type = country_event
-	title = dynamic_missions.22.title
-	desc = dynamic_missions.22.desc
-	fire_only_once = no
-	
-	illustration_tags = {
-		10 = character
-		10 = interior
-	}
-	
-	# TODO: Implement dynamic character selection
-	# For now, use a simple option to appoint first available character
-	option = {
-		name = "Appoint a lead scientist"
-		random_character = {
-			# TODO: Add proper court character filter
-			save_scope_as = scientist
-			add_character_modifier = { modifier = dm_lead_scientist_debuff years = -1 mode = add_and_extend }
-		}
-		situation:large_research_project_situation = {
-			set_variable = { name = lead_scientist_appointed value = yes }
-			set_variable = { name = lead_scientist_char value = scope:scientist }
-			change_variable = { name = research_progress add = 5 }
-		}
-	}
-}
-
-# Dynamic Missions: Large Research Project Success
+# Research Success
 dynamic_missions.23 = {
 	type = country_event
 	title = dynamic_missions.23.title
 	desc = dynamic_missions.23.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = happy
 		10 = interior
 	}
-	
-	immediate = {
-		# add_technology_progress = { category = adm progress = 20 }
-	}
-	
+
 	option = {
 		name = dynamic_missions.23.option_a
-		remove_variable = active_dynamic_mission
+		add_prestige = 10
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 	}
 }
 
-# Dynamic Missions: Large Research Project Failure
+# Research Failure
 dynamic_missions.24 = {
 	type = country_event
 	title = dynamic_missions.24.title
 	desc = dynamic_missions.24.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = sad
 		10 = interior
 	}
-	
+
 	option = {
 		name = dynamic_missions.24.option_a
-		remove_variable = active_dynamic_mission
+		add_prestige = -5
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 	}
 }
 
-
 # =============================================================================
-# ESTABLISH NEW CITY MISSION EVENTS
+# ESTABLISH NEW CITY MISSION
 # =============================================================================
 
-# Dynamic Missions: Select Target Town for New City
+# Select target town
 dynamic_missions.30 = {
 	type = country_event
 	title = dynamic_missions.30.title
 	desc = dynamic_missions.30.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = exterior
 		10 = town
 	}
-	
-	immediate = {
-		# Build list of eligible towns
-		every_owned_location = {
-			limit = {
-				location_rank = location_rank:town
-				# is_occupied = no
-				# is_under_siege = no
-			}
-			add_to_list = eligible_towns
-		}
-	}
-	
-	# Dynamic options for each eligible town
-	# Note: In actual implementation, you may need to use a fixed number of options
-	# or implement a selection mechanism via variables
-	
-	# Option 1: Select Capital (if it's a town)
+
+	# Option A: Use capital if it is a town
 	option = {
 		name = dynamic_missions.30.option_capital
 		trigger = {
@@ -303,124 +244,64 @@ dynamic_missions.30 = {
 				location_rank = location_rank:town
 			}
 		}
-		
-			capital = {
-				save_scope_as = target_town
-				set_variable = { name = selected_for_new_city value = yes }
-			}
-			
-			# Join the global situation as participant
-			situation:establish_new_city_situation = {
-				add_participant = root
-			}
-			# Initialize mission variables
-			set_variable = { name = dm_months_elapsed value = 0 }
-		
+
+		dm_clear_all_mission_state = yes
+		capital = { save_scope_as = dm_selected_town }
+		set_variable = { name = dm_target_location value = scope:dm_selected_town }
+		dm_start_mission_establish_city = yes
 		custom_tooltip = dynamic_missions.30.option_capital.tooltip
 	}
-	
-	# Option 2: Select First Eligible Town
+
+	# Option B: Auto-pick any eligible town
 	option = {
 		name = dynamic_missions.30.option_first_town
 		trigger = {
-			any_in_list = {
-				list = eligible_towns
-				count >= 1
+			any_owned_location = {
+				location_rank = location_rank:town
+				is_occupied = no
+				is_under_siege = no
 			}
 		}
-		
-			random_in_list = {
-				list = eligible_towns
-				save_scope_as = target_town
-				set_variable = { name = selected_for_new_city value = yes }
+
+		dm_clear_all_mission_state = yes
+		random_owned_location = {
+			limit = {
+				location_rank = location_rank:town
+				is_occupied = no
+				is_under_siege = no
 			}
-			
-			# Join the global situation as participant
-			situation:establish_new_city_situation = {
-				add_participant = root
-			}
-			# Initialize mission variables
-			set_variable = { name = dm_months_elapsed value = 0 }
-		
+			save_scope_as = dm_selected_town
+		}
+		set_variable = { name = dm_target_location value = scope:dm_selected_town }
+		dm_start_mission_establish_city = yes
 		custom_tooltip = dynamic_missions.30.option_first_town.tooltip
 	}
-	
-	# Option 3: Cancel
+
+	# Option C: Cancel
 	option = {
 		name = dynamic_missions.30.option_cancel
-		remove_variable = active_dynamic_mission
+		dm_clear_all_mission_state = yes
 		custom_tooltip = dynamic_missions.30.option_cancel.tooltip
 	}
 }
 
-# Dynamic Missions: Select Character for Regional Governor
-dynamic_missions.31 = {
-	type = country_event
-	title = dynamic_missions.31.title
-	desc = dynamic_missions.31.desc
-	fire_only_once = no
-	
-	illustration_tags = {
-		10 = character
-		10 = interior
-	}
-	
-	# TODO: Implement dynamic character selection
-	# For now, use a simple option to appoint first available character
-	option = {
-		name = "Appoint a regional governor"
-		random_character = {
-			# TODO: Add proper court character filter
-			save_scope_as = governor
-			add_character_modifier = {
-				modifier = dm_regional_governor_debuff
-				years = -1
-				mode = add_and_extend
-			}
-		}
-		
-		situation:establish_new_city_situation = {
-			set_variable = { name = governor_character value = scope:governor }
-			var:target_location = {
-				add_location_modifier = {
-					modifier = dm_governor_control_bonus
-					years = -1
-					mode = add_and_extend
-				}
-			}
-		}
-		
-		add_legitimacy = -5
-		custom_tooltip = dynamic_missions.31.effect.tooltip
-	}
-	
-	# Option: Cancel
-	option = {
-		name = dynamic_missions.31.option_cancel
-		# Remove the "used" flag so player can try again
-		remove_country_modifier = dm_appoint_governor_used
-		custom_tooltip = dynamic_missions.31.option_cancel.tooltip
-	}
-}
-
-# Dynamic Missions: New City Established - Success
+# Establish City Success
 dynamic_missions.33 = {
 	type = country_event
 	title = dynamic_missions.33.title
 	desc = dynamic_missions.33.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = happy
 		10 = city
 	}
-	
+
 	option = {
 		name = dynamic_missions.33.option_a
-		
-		# Apply permanent reward modifier
-		situation:establish_new_city_situation = {
-			var:target_location = {
+		if = {
+			limit = { has_variable = dm_target_location }
+			var:dm_target_location = {
 				add_location_modifier = {
 					modifier = dm_country_pearl
 					years = -1
@@ -428,255 +309,161 @@ dynamic_missions.33 = {
 				}
 			}
 		}
-		
-		# Set completion flag to prevent re-triggering
-		set_variable = { name = has_completed_establish_city_mission value = yes }
-		
-		# Remove active mission variable
-		remove_variable = active_dynamic_mission
-		
-		# Trigger next mission selection after 30 days
+		set_variable = { name = has_completed_establish_city_mission value = 1 }
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
-		
 		custom_tooltip = dynamic_missions.33.option_a.tooltip
 	}
 }
 
-# Dynamic Missions: City Development Failed
+# Establish City Failure
 dynamic_missions.34 = {
 	type = country_event
 	title = dynamic_missions.34.title
 	desc = dynamic_missions.34.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = sad
 		10 = town
 	}
-	
+
 	option = {
 		name = dynamic_missions.34.option_a
-		
-		# Remove active mission variable (but don't set completion flag)
-		remove_variable = active_dynamic_mission
-		
-		# Trigger next mission selection after 30 days
+		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
-		
 		custom_tooltip = dynamic_missions.34.option_a.tooltip
 	}
 }
 
-
 # =============================================================================
-# NOTIFICATION EVENTS FOR DEVELOP CITY MISSION
-# =============================================================================
-
-# Subject Stole Progress - Notification to Overlord
-dynamic_missions.10 = {
-	type = country_event
-	title = dynamic_missions.10.title
-	desc = dynamic_missions.10.desc
-	fire_only_once = no
-	
-	illustration_tags = {
-		10 = sad
-		10 = interior
-	}
-	
-	option = {
-		name = dynamic_missions.10.option_a
-		# No mechanical effect, just notification
-		custom_tooltip = dynamic_missions.10.option_a.tooltip
-	}
-}
-
-# Subject Contributed to Development - Notification to Overlord
-dynamic_missions.11 = {
-	type = country_event
-	title = dynamic_missions.11.title
-	desc = dynamic_missions.11.desc
-	fire_only_once = no
-	
-	illustration_tags = {
-		10 = happy
-		10 = interior
-	}
-	
-	option = {
-		name = dynamic_missions.11.option_a
-		# No mechanical effect, just notification
-		custom_tooltip = dynamic_missions.11.option_a.tooltip
-	}
-}
-
-# =============================================================================
-# AI EVALUATION EVENT FOR DEVELOP CITY MISSION
+# CLAIM PROVINCE MISSION (SIMPLIFIED)
 # =============================================================================
 
-# AI Evaluation - Subjects decide whether to help or hinder
-dynamic_missions.100 = {
-	type = country_event
-	title = dynamic_missions.100.title
-	desc = dynamic_missions.100.desc
-	fire_only_once = no
-	hidden = yes  # This is a silent event for AI decision-making
-	
-	trigger = {
-		is_ai = yes
-		is_subject = yes
-		overlord = {
-			# has_active_situation = develop_city_situation
-		}
-	}
-	
-	# AI evaluates whether to use available actions
-	immediate = {
-		# Check if disloyal and can steal progress
-		if = {
-			limit = {
-				subject_loyalty < 50
-				NOT = { has_country_modifier = dm_steal_progress_cooldown }
-				opinion = {
-					target = overlord
-					value < 0
-				}
-			}
-			# 30% chance to steal if conditions are met
-			random = {
-				chance = 30
-				# Execute the steal progress action
-				# Note: This would normally trigger the generic action
-				# For now, we'll just set a flag for future implementation
-			}
-		}
-		
-		# Check if loyal and can contribute
-		if = {
-			limit = {
-				subject_loyalty >= 50
-				NOT = { has_country_modifier = dm_contribute_development_cooldown }
-				opinion = {
-					target = overlord
-					value >= 50
-				}
-			}
-			# 20% chance to contribute if conditions are met
-			random = {
-				chance = 20
-				# Execute the contribute action
-				# Note: This would normally trigger the generic action
-			}
-		}
-	}
-	
-	option = {
-		name = "OK"
-		# Silent event, no player interaction
-	}
-}
-
-
-# =============================================================================
-# CLAIM PROVINCE MISSION EVENTS (IDs 40-52)
-# =============================================================================
-
-# Dynamic Missions: Start Claim Province Mission
+# Claim Province intro
 dynamic_missions.40 = {
 	type = country_event
 	title = dynamic_missions.40.title
 	desc = dynamic_missions.40.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = exterior
 		10 = military
 	}
-	
-	# Option: Select a province to claim
+
 	option = {
 		name = dynamic_missions.40.option_a
 		trigger_event_non_silently = { id = dynamic_missions.41 }
 		custom_tooltip = dynamic_missions.40.option_a.tooltip
 	}
-	
-	# Option: Cancel
+
 	option = {
 		name = dynamic_missions.40.option_b
-		remove_variable = active_dynamic_mission
+		dm_clear_all_mission_state = yes
 		custom_tooltip = dynamic_missions.40.option_b.tooltip
 	}
 }
 
-# Dynamic Missions: Select Province to Claim
+# Auto-select one neighboring foreign location as claim target
 dynamic_missions.41 = {
 	type = country_event
 	title = dynamic_missions.41.title
 	desc = dynamic_missions.41.desc
 	fire_only_once = no
-	
+
 	illustration_tags = {
 		10 = map
 		10 = military
 	}
-	
+
 	immediate = {
-		# Build list of eligible neighboring provinces
-		# Note: every_neighboring_location is commented out, using simplified version
+		# Last matching location in iteration becomes claim candidate.
 		every_owned_location = {
 			limit = {
-				NOT = { is_in_list = eligible_provinces }
+				any_neighboring_location = {
+					owner = {
+						exists = yes
+						NOT = { this = root }
+						NOT = { is_subject_of = root }
+					}
+				}
 			}
-			add_to_list = eligible_provinces
+			every_neighboring_location = {
+				limit = {
+					owner = {
+						exists = yes
+						NOT = { this = root }
+						NOT = { is_subject_of = root }
+					}
+				}
+				save_scope_as = dm_claim_candidate
+			}
 		}
 	}
-	
-	# Dynamic options for each eligible province
-	# Note: In actual implementation, would need multiple option blocks
-	# For now, showing the pattern for the first province
+
 	option = {
 		name = dynamic_missions.41.option_province
 		trigger = {
-			any_in_list = {
-				list = eligible_provinces
-				count >= 1
-			}
+			exists = scope:dm_claim_candidate
 		}
-		
-		# Get first eligible province
-		random_in_list = {
-			list = eligible_provinces
-			limit = { always = yes }
-			save_scope_as = selected_province
-			owner = { save_scope_as = target_owner }
+
+		dm_clear_all_mission_state = yes
+		set_variable = { name = dm_target_location value = scope:dm_claim_candidate }
+		dm_start_mission_claim_province = yes
+		add_country_modifier = {
+			modifier = dm_claim_province_active
+			years = -1
+			mode = add_and_extend
 		}
-		
-		# Save target information to country variables
-		scope:selected_province = {
-			save_scope_as = target_province
-			set_variable = { name = claimed_by_player value = yes }
-			owner = { save_scope_as = target_owner }
-		}
-		set_variable = { name = claim_target_province value = scope:target_province }
-		set_variable = { name = claim_target_country value = scope:target_owner }
-		
-		# Join the global situation as participant
-		situation:claim_province_situation = {
-			add_participant = root
-		}
-		# Initialize mission variables
-		set_variable = { name = dm_months_elapsed value = 0 }
-		
 		custom_tooltip = dynamic_missions.41.option_province.tooltip
 	}
-	
-	# Option: Cancel
+
 	option = {
 		name = dynamic_missions.41.option_cancel
-		remove_variable = active_dynamic_mission
+		dm_clear_all_mission_state = yes
 		custom_tooltip = dynamic_missions.41.option_cancel.tooltip
 	}
 }
 
-# Rival support and diplomacy events removed - multiplayer compatibility
-# Players manage their own claim wars independently
+# Claim Success (target now owned)
+dynamic_missions.50 = {
+	type = country_event
+	title = dynamic_missions.50.title
+	desc = dynamic_missions.50.desc
+	fire_only_once = no
+
+	illustration_tags = {
+		10 = happy
+		10 = military
+	}
+
+	option = {
+		name = dynamic_missions.50.option_a
+		add_prestige = 10
+		dm_clear_all_mission_state = yes
+		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
+		custom_tooltip = dynamic_missions.50.option_a.tooltip
+	}
+}
+
+# Claim Failure (timeout)
+dynamic_missions.51 = {
+	type = country_event
+	title = dynamic_missions.51.title
+	desc = dynamic_missions.51.desc
+	fire_only_once = no
+
+	illustration_tags = {
+		10 = sad
+		10 = military
+	}
+
+	option = {
+		name = dynamic_missions.51.option_a
+		add_prestige = -10
+		dm_clear_all_mission_state = yes
+		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
+		custom_tooltip = dynamic_missions.51.option_a.tooltip
+	}
+}

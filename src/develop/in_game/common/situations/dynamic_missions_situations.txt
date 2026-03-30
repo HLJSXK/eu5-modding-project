@@ -1,27 +1,14 @@
 # Dynamic Missions - Single Unified Situation
 #
-# Design: One always-active situation acts as the mission manager.
-# Panel display is driven by the COUNTRY-scope variable dm_gui_mission_type:
-#   0 = idle (no active mission)
+# One always-active situation acts as mission manager UI.
+# Mission runtime state is stored on COUNTRY variables.
+#
+# dm_gui_mission_type routing:
+#   0 = idle
 #   1 = develop_city
 #   2 = large_research_project
 #   3 = establish_new_city
 #   4 = claim_province
-#
-# All per-mission progress variables live on the COUNTRY scope (not situation scope).
-# GUI routing also reads COUNTRY scope, so each player can see their own mission panel state.
-#
-# Country-scope variables used by missions:
-#   dm_gui_mission_type         - int: per-country panel routing state (0..4)
-#   dm_active_mission            - boolean: a mission is in progress
-#   dm_mission_develop_city      - boolean: develop city mission active
-#   dm_mission_large_research    - boolean: large research mission active
-#   dm_mission_establish_city    - boolean: establish city mission active
-#   dm_mission_claim_province    - boolean: claim province mission active
-#   dm_months_elapsed            - int: mission timer
-#   dm_target_location           - scope ref: target location
-#   dm_research_progress         - int: research mission progress
-#   has_completed_establish_city_mission - boolean: one-time completion flag
 
 dynamic_missions_situation = {
 	monthly_spawn_chance = monthly_spawn_chance_very_high
@@ -35,13 +22,11 @@ dynamic_missions_situation = {
 		always = no
 	}
 
-	# Only visible to human players
 	visible = {
 		is_ai = no
 	}
 
 	on_start = {
-		# Initialize per-country GUI state for all human players
 		every_country = {
 			limit = { is_ai = no }
 			set_variable = { name = dm_gui_mission_type value = 0 }
@@ -49,29 +34,20 @@ dynamic_missions_situation = {
 	}
 
 	on_monthly = {
-		# Iterate all human player countries and process their active mission (if any)
 		every_country = {
 			limit = { is_ai = no }
 
-			# ---------------------------------------------------------------
-			# NO ACTIVE MISSION: Update GUI to idle state
-			# ---------------------------------------------------------------
+			# No active mission -> idle panel
 			if = {
 				limit = { NOT = { has_variable = dm_active_mission } }
 				set_variable = { name = dm_gui_mission_type value = 0 }
 			}
 
-			# ---------------------------------------------------------------
-			# MISSION TYPE 1: Develop City
-			# Goal: target location prosperity >= 100 within 60 months (5 years)
-			# ---------------------------------------------------------------
+			# Mission 1: Develop City
 			else_if = {
 				limit = { has_variable = dm_mission_develop_city }
-
-				# Update GUI state
 				set_variable = { name = dm_gui_mission_type value = 1 }
 
-				# Check success
 				if = {
 					limit = {
 						has_variable = dm_target_location
@@ -79,7 +55,6 @@ dynamic_missions_situation = {
 					}
 					trigger_event_non_silently = dynamic_missions.3
 				}
-				# Check time limit
 				else_if = {
 					limit = {
 						has_variable = dm_months_elapsed
@@ -87,26 +62,31 @@ dynamic_missions_situation = {
 					}
 					trigger_event_non_silently = dynamic_missions.4
 				}
-				# Tick timer
 				else = {
 					change_variable = { name = dm_months_elapsed add = 1 }
 				}
 			}
 
-			# ---------------------------------------------------------------
-			# MISSION TYPE 2: Large Research Project
-			# Goal: dm_research_progress >= 100 within 60 months
-			# ---------------------------------------------------------------
+			# Mission 2: Large Research Project
 			else_if = {
 				limit = { has_variable = dm_mission_large_research }
-
 				set_variable = { name = dm_gui_mission_type value = 2 }
 
+				# Base progress tick
 				if = {
-					limit = {
-						has_variable = dm_research_progress
-						var:dm_research_progress >= 100
-					}
+					limit = { NOT = { has_variable = dm_research_progress } }
+					set_variable = { name = dm_research_progress value = 0 }
+				}
+				change_variable = { name = dm_research_progress add = 1 }
+
+				# Optional funding acceleration
+				if = {
+					limit = { has_country_modifier = dm_increased_funding_modifier }
+					change_variable = { name = dm_research_progress add = 2 }
+				}
+
+				if = {
+					limit = { var:dm_research_progress >= 100 }
 					trigger_event_non_silently = dynamic_missions.23
 				}
 				else_if = {
@@ -121,21 +101,15 @@ dynamic_missions_situation = {
 				}
 			}
 
-			# ---------------------------------------------------------------
-			# MISSION TYPE 3: Establish New City
-			# Goal: target location rank reaches city within 120 months (10 years)
-			# ---------------------------------------------------------------
+			# Mission 3: Establish New City
 			else_if = {
 				limit = { has_variable = dm_mission_establish_city }
-
 				set_variable = { name = dm_gui_mission_type value = 3 }
 
 				if = {
 					limit = {
 						has_variable = dm_target_location
-						var:dm_target_location ?= {
-							location_rank = location_rank:city
-						}
+						var:dm_target_location ?= { location_rank = location_rank:city }
 					}
 					trigger_event_non_silently = dynamic_missions.33
 				}
@@ -151,13 +125,9 @@ dynamic_missions_situation = {
 				}
 			}
 
-			# ---------------------------------------------------------------
-			# MISSION TYPE 4: Claim Province
-			# Goal: player owns all locations in target province within 60 months
-			# ---------------------------------------------------------------
+			# Mission 4: Claim Province (simplified: one target location)
 			else_if = {
 				limit = { has_variable = dm_mission_claim_province }
-
 				set_variable = { name = dm_gui_mission_type value = 4 }
 
 				if = {
@@ -177,6 +147,11 @@ dynamic_missions_situation = {
 				else = {
 					change_variable = { name = dm_months_elapsed add = 1 }
 				}
+			}
+
+			# Recover from inconsistent state
+			else = {
+				dm_clear_all_mission_state = yes
 			}
 		}
 	}
