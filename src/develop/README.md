@@ -107,6 +107,7 @@ develop/
 For detailed design documentation, see:
 - [Dynamic Missions Design](../../docs/design/Dynamic_Missions_Design.md) - Complete system design for all missions
 - [Framework Architecture](../../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical implementation details
+- [AI Tool Workflow Prompt (EU5)](../../docs/guides/AI_Tool_Workflow_Prompt.md) - Required 3-step syntax verification workflow for AI tools
 
 ## Version History
 
