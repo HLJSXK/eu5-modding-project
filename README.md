@@ -20,7 +20,7 @@ This repository keeps only mod-related content and documentation.
 
 1. Clone repository
 2. Use `src/stable/` as baseline for practical balance mods
-3. Use `src/develop/` for dynamic mission patterns and experiments
+3. Use `src/develop/` for active Dynamic Missions development
 4. Read technical docs in `docs/technical/`
 
 ## Build / Deploy (Stable)

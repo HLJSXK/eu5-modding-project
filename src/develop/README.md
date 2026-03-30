@@ -4,6 +4,11 @@
 
 This mod implements a dynamic mission system for Europa Universalis V, allowing players to engage with procedurally-generated, context-aware missions that adapt to their gameplay situation.
 
+## Status
+
+- **Development state:** Active (resumed on 2026-03-31)
+- **Current focus:** Unified mission manager situation, mission-state routing, and multiplayer-safe UI behavior
+
 ## Features
 
 ### 🏙️ Establish New City Mission
@@ -81,6 +86,7 @@ develop/
 - Fully synchronized for multiplayer games
 - All players must have the mod installed
 - Tested for desync prevention
+- Mission UI routing variables are country-scoped so each player can see their own mission panel state
 
 ### Performance
 
@@ -104,7 +110,7 @@ For detailed design documentation, see:
 ## Credits
 
 **Created by:** EU5 Modding Project Team
-**Last Updated:** January 28, 2026
+**Last Updated:** March 31, 2026
 
 ## License
 

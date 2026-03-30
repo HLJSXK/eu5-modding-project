@@ -1,6 +1,15 @@
 # TODO List
 
-更新时间: 2026-03-26
+更新时间: 2026-03-31
+
+## Dynamic Missions（重启开发）
+- [x] 重启 Dynamic Missions 开发并同步文档状态
+  - 目标: 从“暂停”状态切回“活跃开发”，确保项目文档一致
+  - 验收: README / src 文档已明确标注 resumed 与当前方向
+- [x] 修复多人下局势面板状态串扰风险（作用域隔离）
+  - 问题: 若以 situation 变量驱动面板，不同玩家可能看到同一状态
+  - 方案: 改为以 country 变量 `dm_gui_mission_type` 驱动 GUI
+  - 验收: GUI 从 `Player.MakeScope` 读取，按玩家分别显示
 
 ## 高优先级
 - [x] 首要任务: 专注推进 Global SOL 局势编写与联调（当前最高优先级）
