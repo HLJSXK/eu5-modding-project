@@ -23,7 +23,10 @@ dynamic_missions.1 = {
 	option = {
 		name = dynamic_missions.1.option_a
 		trigger = { can_start_develop_city_mission = yes }
-		trigger_event_non_silently = { id = dynamic_missions.2 }
+		dm_clear_all_mission_state = yes
+		capital = { save_scope_as = dm_selected_target }
+		set_variable = { name = dm_target_location value = scope:dm_selected_target }
+		dm_start_mission_develop_city = yes
 		custom_tooltip = dynamic_missions.1.option_a.tooltip
 	}
 
@@ -36,11 +39,14 @@ dynamic_missions.1 = {
 		custom_tooltip = dynamic_missions.1.option_b.tooltip
 	}
 
-	# Mission 3: Establish New City
+	# Mission 3: Promote Urbanization
 	option = {
 		name = dynamic_missions.1.option_d
-		trigger = { can_start_establish_new_city_mission = yes }
-		trigger_event_non_silently = { id = dynamic_missions.30 }
+		trigger = { can_start_promote_urbanization_mission = yes }
+		dm_clear_all_mission_state = yes
+		capital = { save_scope_as = dm_selected_capital }
+		set_variable = { name = dm_target_location value = scope:dm_selected_capital }
+		dm_start_mission_promote_urbanization = yes
 		custom_tooltip = dynamic_missions.1.option_d.tooltip
 	}
 
@@ -62,75 +68,6 @@ dynamic_missions.1 = {
 # =============================================================================
 # DEVELOP CITY MISSION
 # =============================================================================
-
-# Select target city/town
-dynamic_missions.2 = {
-	type = country_event
-	title = dynamic_missions.2.title
-	desc = dynamic_missions.2.desc
-	fire_only_once = no
-
-	illustration_tags = {
-		10 = exterior
-		10 = interior
-	}
-
-	# Option A: Use capital (if valid)
-	option = {
-		name = dynamic_missions.2.option_a
-		trigger = {
-			capital = {
-				OR = {
-					location_rank = location_rank:town
-					location_rank = location_rank:city
-				}
-				prosperity < 100
-			}
-		}
-
-		dm_clear_all_mission_state = yes
-		capital = { save_scope_as = dm_selected_target }
-		set_variable = { name = dm_target_location value = scope:dm_selected_target }
-		dm_start_mission_develop_city = yes
-		custom_tooltip = dynamic_missions.2.option_a.tooltip
-	}
-
-	# Option B: Auto-pick a valid city/town
-	option = {
-		name = dynamic_missions.2.option_b
-		trigger = {
-			any_owned_location = {
-				OR = {
-					location_rank = location_rank:town
-					location_rank = location_rank:city
-				}
-				prosperity < 100
-			}
-		}
-
-		dm_clear_all_mission_state = yes
-		random_owned_location = {
-			limit = {
-				OR = {
-					location_rank = location_rank:town
-					location_rank = location_rank:city
-				}
-				prosperity < 100
-			}
-			save_scope_as = dm_selected_target
-		}
-		set_variable = { name = dm_target_location value = scope:dm_selected_target }
-		dm_start_mission_develop_city = yes
-		custom_tooltip = dynamic_missions.2.option_b.tooltip
-	}
-
-	# Option C: Cancel
-	option = {
-		name = dynamic_missions.2.option_c
-		dm_clear_all_mission_state = yes
-		custom_tooltip = dynamic_missions.2.option_c.tooltip
-	}
-}
 
 # Develop City Success
 dynamic_missions.3 = {
@@ -221,67 +158,12 @@ dynamic_missions.24 = {
 }
 
 # =============================================================================
-# ESTABLISH NEW CITY MISSION
+# PROMOTE URBANIZATION MISSION
 # =============================================================================
 
-# Select target town
-dynamic_missions.30 = {
-	type = country_event
-	title = dynamic_missions.30.title
-	desc = dynamic_missions.30.desc
-	fire_only_once = no
-
-	illustration_tags = {
-		10 = exterior
-		10 = interior
-	}
-
-	# Option A: Use capital if it is a town
-	option = {
-		name = dynamic_missions.30.option_capital
-		trigger = {
-			capital = {
-				location_rank = location_rank:town
-			}
-		}
-
-		dm_clear_all_mission_state = yes
-		capital = { save_scope_as = dm_selected_town }
-		set_variable = { name = dm_target_location value = scope:dm_selected_town }
-		dm_start_mission_establish_city = yes
-		custom_tooltip = dynamic_missions.30.option_capital.tooltip
-	}
-
-	# Option B: Auto-pick any eligible town
-		option = {
-			name = dynamic_missions.30.option_first_town
-			trigger = {
-				any_owned_location = {
-					location_rank = location_rank:town
-				}
-			}
-
-		dm_clear_all_mission_state = yes
-			random_owned_location = {
-				limit = {
-					location_rank = location_rank:town
-				}
-				save_scope_as = dm_selected_town
-			}
-		set_variable = { name = dm_target_location value = scope:dm_selected_town }
-		dm_start_mission_establish_city = yes
-		custom_tooltip = dynamic_missions.30.option_first_town.tooltip
-	}
-
-	# Option C: Cancel
-	option = {
-		name = dynamic_missions.30.option_cancel
-		dm_clear_all_mission_state = yes
-		custom_tooltip = dynamic_missions.30.option_cancel.tooltip
-	}
-}
-
-# Establish City Success
+# Urbanization Success
+# Fires when capital prosperity reaches 75.
+# Upgrades capital by one rank and grants dm_urbanization_legacy for 20 years.
 dynamic_missions.33 = {
 	type = country_event
 	title = dynamic_missions.33.title
@@ -290,29 +172,35 @@ dynamic_missions.33 = {
 
 	illustration_tags = {
 		10 = happy
-		10 = interior
+		10 = exterior
 	}
 
 	option = {
 		name = dynamic_missions.33.option_a
-		if = {
-			limit = { has_variable = dm_target_location }
-			var:dm_target_location = {
-				add_location_modifier = {
-					modifier = dm_country_pearl
-					years = -1
-					mode = add_and_extend
-				}
+		capital = {
+			# Upgrade capital by one rank
+			if = {
+				limit = { location_rank = location_rank:village }
+				change_location_rank = location_rank:town
+			}
+			else_if = {
+				limit = { location_rank = location_rank:town }
+				change_location_rank = location_rank:city
+			}
+			# Grant the urbanization legacy modifier (20 years)
+			add_location_modifier = {
+				modifier = dm_urbanization_legacy
+				years = 20
+				mode = add_and_extend
 			}
 		}
-		set_variable = { name = has_completed_establish_city_mission value = 1 }
 		dm_clear_all_mission_state = yes
 		trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 		custom_tooltip = dynamic_missions.33.option_a.tooltip
 	}
 }
 
-# Establish City Failure
+# Urbanization Failure (timeout)
 dynamic_missions.34 = {
 	type = country_event
 	title = dynamic_missions.34.title
