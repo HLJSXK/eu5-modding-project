@@ -130,6 +130,28 @@ This section covers the modding of specific game content types.
 
 Events are pop-up messages that present the player with information and choices. They are defined in `.txt` files within the `in_game/events/` folder. Unlike EU4, EU5 does not use `mean_time_to_happen` for events; all events must be fired explicitly through on_actions, decisions, or other scripts. [7]
 
+#### Event Option Tooltips
+
+When hovering over an option button, the tooltip is rendered by `ContextualTooltipType` (defined in `eventwindow.gui`). It has two parts:
+
+- **Title line**: `EventOption.GetText` — returns the option's `name` field as a plain string, **not** resolved through the localization system in this context. In debug mode this shows the raw key (e.g., `my_event.1.option_a`). This is expected behavior; vanilla options behave identically.
+- **Content**: `EventOption.GetTooltip` — shows the output of any `custom_tooltip` entries inside the option block.
+
+To add meaningful hover content, use `custom_tooltip = <key>` explicitly inside the option block and define the key in the localization file. The `.tt` suffix (e.g., `my_event.1.a.tt`) is a community convention — it must be referenced via `custom_tooltip`, it is **not** picked up automatically.
+
+```
+# event file
+option = {
+    name = my_event.1.a
+    custom_tooltip = my_event.1.a.tt
+    ...
+}
+
+# localization file
+my_event.1.a: "Option button text"
+my_event.1.a.tt: "Tooltip description shown on hover."
+```
+
 ### 6.2. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
