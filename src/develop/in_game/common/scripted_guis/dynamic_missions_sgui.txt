@@ -1,74 +1,99 @@
 # Dynamic Missions — Scripted GUIs
-# Invoked by situation panel buttons.
+#
+# Architecture: dispatch pattern — one sgui per action type, branching on active mission.
+# Adding a new mission with a toggle action:  add one else_if block to dm_toggle_action_sgui.
+# Adding a new mission with a one-shot action: add one else_if block to dm_oneshot_action_sgui.
 
-# Toggle research funding modifier on/off.
-dm_toggle_research_funding_sgui = {
+# =============================================================================
+# TOGGLE ACTION (dispatch)
+# Handles all toggle-type actions across all missions.
+# is_shown requires dm_has_toggle_action so the button only appears for missions that use it.
+# =============================================================================
+dm_toggle_action_sgui = {
 	scope = country
-	is_shown = { has_variable = dm_mission_large_research }
+	is_shown = { has_variable = dm_has_toggle_action }
 	effect = {
 		if = {
-			limit = { has_country_modifier = dm_increased_funding_modifier }
-			remove_country_modifier = dm_increased_funding_modifier
-			remove_variable = dm_research_funding_on
+			limit = { has_variable = dm_action_toggle_on }
+			# --- Toggle OFF ---
+			remove_variable = dm_action_toggle_on
+			if = {
+				limit = { has_variable = dm_mission_large_research }
+				remove_country_modifier = dm_increased_funding_modifier
+			}
+			else_if = {
+				limit = { has_variable = dm_mission_promote_urbanization }
+				remove_country_modifier = dm_urbanization_investment_active
+				if = {
+					limit = { has_variable = dm_target_location }
+					var:dm_target_location = {
+						remove_location_modifier = dm_urbanization_investment_bonus
+					}
+				}
+			}
+			# *** ADD NEW MISSION TOGGLE-OFF HERE ***
 		}
 		else = {
-			add_country_modifier = {
-				modifier = dm_increased_funding_modifier
-				years = -1
-				mode = add_and_extend
-			}
-			set_variable = dm_research_funding_on
-		}
-	}
-}
-
-# Toggle urbanization investment modifier on/off.
-dm_toggle_urbanization_investment_sgui = {
-	scope = country
-	is_shown = { has_variable = dm_mission_promote_urbanization }
-	effect = {
-		if = {
-			limit = { has_country_modifier = dm_urbanization_investment_active }
-			remove_country_modifier = dm_urbanization_investment_active
-			remove_variable = dm_urbanization_investment_on
-			var:dm_target_location = {
-				remove_location_modifier = dm_urbanization_investment_bonus
-			}
-		}
-		else = {
-			add_country_modifier = {
-				modifier = dm_urbanization_investment_active
-				years = -1
-				mode = add_and_extend
-			}
-			set_variable = dm_urbanization_investment_on
-			var:dm_target_location = {
-				add_location_modifier = {
-					modifier = dm_urbanization_investment_bonus
+			# --- Toggle ON ---
+			set_variable = dm_action_toggle_on
+			if = {
+				limit = { has_variable = dm_mission_large_research }
+				add_country_modifier = {
+					modifier = dm_increased_funding_modifier
 					years = -1
 					mode = add_and_extend
 				}
 			}
+			else_if = {
+				limit = { has_variable = dm_mission_promote_urbanization }
+				add_country_modifier = {
+					modifier = dm_urbanization_investment_active
+					years = -1
+					mode = add_and_extend
+				}
+				if = {
+					limit = { has_variable = dm_target_location }
+					var:dm_target_location = {
+						add_location_modifier = {
+							modifier = dm_urbanization_investment_bonus
+							years = -1
+							mode = add_and_extend
+						}
+					}
+				}
+			}
+			# *** ADD NEW MISSION TOGGLE-ON HERE ***
 		}
 	}
 }
 
-# Execute border reconnaissance (one-time, 1-year cooldown).
-dm_claim_border_recon_sgui = {
+# =============================================================================
+# ONE-SHOT ACTION (dispatch)
+# Handles all one-shot / cooldown-gated actions across all missions.
+# is_valid branches per mission so each mission can define its own cost/cooldown check.
+# =============================================================================
+dm_oneshot_action_sgui = {
 	scope = country
-	is_shown = { has_variable = dm_mission_claim_province }
+	is_shown = { has_variable = dm_has_oneshot_action }
 	is_valid = {
+		# Currently only dm_mission_claim_province uses oneshot actions.
+		# Conditions apply directly since is_shown already gates on dm_has_oneshot_action.
+		# When a second oneshot mission is added: use OR = { AND = { has_variable = dm_mission_X ... } AND = { ... } }
 		NOT = { has_country_modifier = dm_border_reconnaissance_cooldown }
 		manpower >= 200
 	}
 	effect = {
-		add_manpower = -200
-		add_army_tradition = 5
-		add_country_modifier = {
-			modifier = dm_border_reconnaissance_cooldown
-			years = 1
-			mode = add_and_extend
+		if = {
+			limit = { has_variable = dm_mission_claim_province }
+			add_manpower = -200
+			add_army_tradition = 5
+			add_country_modifier = {
+				modifier = dm_border_reconnaissance_cooldown
+				years = 1
+				mode = add_and_extend
+			}
+			custom_tooltip = dm_claim_border_reconnaissance_tooltip
 		}
-		custom_tooltip = dm_claim_border_reconnaissance_tooltip
+		# *** ADD NEW MISSION EFFECT HERE ***
 	}
 }

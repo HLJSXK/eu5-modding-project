@@ -2,10 +2,18 @@
 #
 # Architecture: fixed 4-card template, per-mission content via single-line text selectors.
 #
-# Adding a new mission only requires:
+# Adding a new mission requires:
 #   1. A dm_mission_{key} boolean variable (set in scripted effect)
-#   2. 2-3 localization keys: DM_{ID}_NAME, DM_{ID}_HINT, DM_{ID}_ACTION_HINT
-#   3. Three single-line entries in this file (one per card slot below)
+#   2. Localization keys: DM_{ID}_NAME, DM_{ID}_HINT
+#   3. Three single-line entries in this file (header + Cards 2)
+#   4. If the mission has a TOGGLE action:
+#        - set dm_has_toggle_action in dm_start_mission_X
+#        - add one else_if block to dm_toggle_action_sgui (both toggle-on and toggle-off)
+#        - add a dm_toggle_off_button + dm_toggle_on_button pair below in Card 4
+#   5. If the mission has a ONE-SHOT action:
+#        - set dm_has_oneshot_action in dm_start_mission_X
+#        - add one else_if block to dm_oneshot_action_sgui
+#        - add a dm_oneshot_action_button entry below in Card 4
 #
 # Standard variable schema (set by every dm_start_mission_X effect):
 #   dm_active_mission         boolean — any mission active
@@ -15,7 +23,72 @@
 #   dm_primary_progress       int?    — numeric progress value (e.g. research points)
 #   dm_primary_goal           int?    — target for primary_progress
 #   dm_prosperity_target      int?    — prosperity threshold to display
-#   dm_has_actions            boolean? — mission has available decisions
+#   dm_has_actions            boolean? — mission has any action (shows Card 4)
+#   dm_has_toggle_action      boolean? — mission uses the toggle action slot
+#   dm_has_oneshot_action     boolean? — mission uses the one-shot action slot
+#   dm_action_toggle_on       boolean? — toggle action is currently active
+
+# =============================================================================
+# CARD 4 BUTTON TYPES
+# Reusable types for action buttons in Card 4.
+# All toggle buttons call dm_toggle_action_sgui; all one-shot buttons call dm_oneshot_action_sgui.
+# Per-mission customization is done via blockoverride of: button_label, button_tooltip.
+# For one-shot buttons, also override: button_text, button_enabled.
+# =============================================================================
+
+types DynamicMissionsTypes {
+
+# Toggle button — inactive state
+type dm_toggle_off_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 48 }
+	onclick = "[GetScriptedGui('dm_toggle_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_tooltip" { tooltip = "" }
+	hbox = {
+		margin = { 12 0 }
+		spacing = 8
+		block "button_label" {
+			text_single = { text = "" fontsize = 13 }
+		}
+		text_single = { text = "DM_STATUS_INACTIVE" fontsize = 12 }
+	}
+}
+
+# Toggle button — active state (green tint)
+type dm_toggle_on_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 48 }
+	onclick = "[GetScriptedGui('dm_toggle_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_tooltip" { tooltip = "" }
+	icon = {
+		size = { 100% 100% }
+		ignore_layout = yes
+		using = color_mid_green_texture
+		alpha = 0.35
+	}
+	hbox = {
+		margin = { 12 0 }
+		spacing = 8
+		block "button_label" {
+			text_single = { text = "" fontsize = 13 }
+		}
+		text_single = { text = "DM_STATUS_ACTIVE" fontsize = 12 }
+	}
+}
+
+# One-shot action button (cooldown-gated)
+type dm_oneshot_action_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 32 }
+	using = bg_button_flavor_1
+	fontsize = 13
+	onclick = "[GetScriptedGui('dm_oneshot_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_enabled" { enabled = yes }
+	block "button_text" { text = "" }
+	block "button_tooltip" { tooltip = "" }
+}
+
+} # end DynamicMissionsTypes
 
 situation_panel = {
 
@@ -309,111 +382,50 @@ situation_panel = {
 						spacing = 6
 						margin = { 6 4 }
 
-						# Research: toggle funding — off state
-						button_regular = {
-							layoutpolicy_horizontal = expanding
-							size = { -1 48 }
-							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Not(Player.MakeScope.GetVariable('dm_research_funding_on').IsSet))]"
-							hbox = {
-								margin = { 12 0 }
-								spacing = 8
-								text_single = {
-									text = "dm_increase_research_funding_decision"
-									fontsize = 13
-								}
-								text_single = {
-									text = "DM_STATUS_INACTIVE"
-									fontsize = 12
-								}
+						# *** ADD NEW MISSION ACTION ENTRIES HERE ***
+						# Toggle pair:  dm_toggle_off_button + dm_toggle_on_button
+						#               blockoverride "button_label" and "button_tooltip"
+						# One-shot:     dm_oneshot_action_button
+						#               blockoverride "button_text", "button_tooltip", "button_enabled"
+
+						# Research: toggle funding
+						dm_toggle_off_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Not(Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet))]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_increase_research_funding_decision" fontsize = 13 }
 							}
-							onclick = "[GetScriptedGui('dm_toggle_research_funding_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
-							tooltip = "dm_increase_research_funding_decision_desc"
+							blockoverride "button_tooltip" { tooltip = "dm_increase_research_funding_decision_desc" }
 						}
-						# Research: toggle funding — on state (green tint)
-						button_regular = {
-							layoutpolicy_horizontal = expanding
-							size = { -1 48 }
-							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Player.MakeScope.GetVariable('dm_research_funding_on').IsSet)]"
-							icon = {
-								size = { 100% 100% }
-								ignore_layout = yes
-								using = color_mid_green_texture
-								alpha = 0.35
+						dm_toggle_on_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet)]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_increase_research_funding_decision" fontsize = 13 }
 							}
-							hbox = {
-								margin = { 12 0 }
-								spacing = 8
-								text_single = {
-									text = "dm_increase_research_funding_decision"
-									fontsize = 13
-								}
-								text_single = {
-									text = "DM_STATUS_ACTIVE"
-									fontsize = 12
-								}
-							}
-							onclick = "[GetScriptedGui('dm_toggle_research_funding_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
-							tooltip = "dm_increase_research_funding_decision_desc"
+							blockoverride "button_tooltip" { tooltip = "dm_increase_research_funding_decision_desc" }
 						}
 
-						# Urbanization: toggle investment — off state
-						button_regular = {
-							layoutpolicy_horizontal = expanding
-							size = { -1 48 }
-							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Not(Player.MakeScope.GetVariable('dm_urbanization_investment_on').IsSet))]"
-							hbox = {
-								margin = { 12 0 }
-								spacing = 8
-								text_single = {
-									text = "dm_invest_urbanization_decision"
-									fontsize = 13
-								}
-								text_single = {
-									text = "DM_STATUS_INACTIVE"
-									fontsize = 12
-								}
+						# Urbanization: toggle investment
+						dm_toggle_off_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Not(Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet))]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_invest_urbanization_decision" fontsize = 13 }
 							}
-							onclick = "[GetScriptedGui('dm_toggle_urbanization_investment_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
-							tooltip = "dm_invest_urbanization_decision_desc"
+							blockoverride "button_tooltip" { tooltip = "dm_invest_urbanization_decision_desc" }
 						}
-						# Urbanization: toggle investment — on state (green tint)
-						button_regular = {
-							layoutpolicy_horizontal = expanding
-							size = { -1 48 }
-							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Player.MakeScope.GetVariable('dm_urbanization_investment_on').IsSet)]"
-							icon = {
-								size = { 100% 100% }
-								ignore_layout = yes
-								using = color_mid_green_texture
-								alpha = 0.35
+						dm_toggle_on_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet)]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_invest_urbanization_decision" fontsize = 13 }
 							}
-							hbox = {
-								margin = { 12 0 }
-								spacing = 8
-								text_single = {
-									text = "dm_invest_urbanization_decision"
-									fontsize = 13
-								}
-								text_single = {
-									text = "DM_STATUS_ACTIVE"
-									fontsize = 12
-								}
-							}
-							onclick = "[GetScriptedGui('dm_toggle_urbanization_investment_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
-							tooltip = "dm_invest_urbanization_decision_desc"
+							blockoverride "button_tooltip" { tooltip = "dm_invest_urbanization_decision_desc" }
 						}
 
-						# Claim Province: border reconnaissance (one-time, cooldown-gated)
-						button_regular = {
-							layoutpolicy_horizontal = expanding
-							size = { -1 32 }
+						# Claim Province: border reconnaissance
+						dm_oneshot_action_button = {
 							visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
-							enabled = "[Not(Player.HasModifier('dm_border_reconnaissance_cooldown'))]"
-							using = bg_button_flavor_1
-							text = "dm_claim_border_reconnaissance_decision"
-							fontsize = 13
-							onclick = "[GetScriptedGui('dm_claim_border_recon_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
-							tooltip = "dm_claim_border_reconnaissance_tooltip"
+							blockoverride "button_enabled" { enabled = "[Not(Player.HasModifier('dm_border_reconnaissance_cooldown'))]" }
+							blockoverride "button_text" { text = "dm_claim_border_reconnaissance_decision" }
+							blockoverride "button_tooltip" { tooltip = "dm_claim_border_reconnaissance_tooltip" }
 						}
 					}
 				}
