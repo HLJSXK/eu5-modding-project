@@ -20,7 +20,7 @@ This repository keeps only mod-related content and documentation.
 
 1. Clone repository
 2. Use `src/stable/` as baseline for practical balance mods
-3. Use `src/develop/` for dynamic mission patterns and experiments
+3. Use `src/develop/` for active Dynamic Missions development
 4. Read technical docs in `docs/technical/`
 
 ## Build / Deploy (Stable)
@@ -59,6 +59,7 @@ If write permission is denied, run terminal as Administrator.
 
 - `src/` - Active mod source files
 - `docs/` - Modding documentation and design notes
+- `reference_official_defines/` - Official define/type references for EU5 syntax verification
 - `reference_game_files/` - Vanilla reference assets
 - `reference_mods/` - Community mod references
 - `assets/` - Images and media assets
@@ -66,6 +67,7 @@ If write permission is denied, run terminal as Administrator.
 ## Documentation
 
 - `docs/README.md` - Documentation index
+- `docs/guides/AI_Tool_Workflow_Prompt.md` - AI tool prompt and EU5 syntax verification workflow
 - `docs/technical/EU5_Modding_Knowledge_Base.md`
 - `docs/technical/EU5_Mod_Framework_Guide.md`
 - `docs/design/Dynamic_Missions_Design.md`

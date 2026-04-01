@@ -1,230 +1,122 @@
-﻿# Dynamic Missions: Scripted Effects
-# These effects provide reusable logic for complex calculations
+﻿# Dynamic Missions: Scripted Effects (Unified Mission Manager)
+#
+# Scope conventions:
+# - root = country (unless explicitly changed)
+# - Mission state is stored on country variables
 
 # =============================================================================
-# CLAIM PROVINCE MISSION EFFECTS
+# CLEANUP HELPERS
 # =============================================================================
 
-# Calculate Player Coalition Strength
-# Sums up military strength of player and all supporters
-dm_calculate_player_coalition_strength = {
-	# Start with player's own military strength
-	set_variable = { 
-		name = player_coalition_strength 
-		value = root.military_strength 
-	}
-	
-	# Add strength from each supporter
+dm_clear_mission_flags = {
+	remove_variable = dm_active_mission
+	remove_variable = dm_mission_develop_city
+	remove_variable = dm_mission_large_research
+	remove_variable = dm_mission_promote_urbanization
+	remove_variable = dm_mission_claim_province
+}
+
+dm_clear_mission_runtime = {
+	remove_variable = dm_months_elapsed
+	remove_variable = dm_primary_progress
+	remove_variable = dm_time_limit
+	remove_variable = dm_primary_goal
+	remove_variable = dm_prosperity_target
+	remove_variable = dm_has_actions
+	remove_variable = dm_has_toggle_action
+	remove_variable = dm_has_oneshot_action
+	remove_variable = dm_target_location
+}
+
+dm_clear_mission_modifiers = {
+	# Country toggles — guarded so removal only appears in tooltips when actually active
 	if = {
-		limit = { has_variable = player_supporters_list }
-		every_in_list = {
-			list = player_supporters_list
-			limit = { exists = yes }
-			root = {
-				change_variable = {
-					name = player_coalition_strength
-					add = prev.military_strength
-				}
-			}
-		}
+		limit = { has_country_modifier = dm_increased_funding_modifier }
+		remove_country_modifier = dm_increased_funding_modifier
 	}
-}
-
-# Calculate Target Coalition Strength
-# Sums up military strength of target, their supporters, allies, and guarantors
-dm_calculate_target_coalition_strength = {
-	situation:claim_province_situation = {
-		var:target_country = {
-			# Start with target's own military strength
-			set_variable = { 
-				name = target_coalition_strength 
-				value = military_strength 
-			}
-			
-			# Add strength from rivals who accepted support
-			if = {
-				limit = { 
-					situation:claim_province_situation = { 
-						has_variable = target_supporters_list 
-					}
-				}
-				situation:claim_province_situation = {
-					every_in_list = {
-						list = target_supporters_list
-						limit = { exists = yes }
-						situation:claim_province_situation.var:target_country = {
-							change_variable = {
-								name = target_coalition_strength
-								add = prev.military_strength
-							}
-						}
-					}
-				}
-			}
-			
-			# Add strength from all allies
-			every_ally = {
-				limit = { exists = yes }
-				prev = {
-					change_variable = {
-						name = target_coalition_strength
-						add = prev.military_strength
-					}
-				}
-			}
-			
-			# Add strength from defensive pact members
-			every_country_in_defensive_pact = {
-				limit = { exists = yes }
-				prev = {
-					change_variable = {
-						name = target_coalition_strength
-						add = prev.military_strength
-					}
-				}
-			}
-			
-			# Add strength from countries guaranteeing independence
-			every_country_guaranteeing_independence = {
-				limit = { exists = yes }
-				prev = {
-					change_variable = {
-						name = target_coalition_strength
-						add = prev.military_strength
-					}
-				}
-			}
-		}
-	}
-}
-
-# Check if AI Should Surrender
-# Determines if target should surrender based on 5x strength ratio
-dm_check_ai_surrender_condition = {
-	# Calculate both coalition strengths
-	dm_calculate_player_coalition_strength = yes
-	dm_calculate_target_coalition_strength = yes
-	
-	# Check if player coalition is 5x stronger
-	situation:claim_province_situation = {
-		var:target_country = {
-			if = {
-				limit = {
-					root.var:player_coalition_strength >= {
-						value = var:target_coalition_strength
-						multiply = 5.0
-					}
-				}
-				# AI will surrender
-				situation:claim_province_situation = {
-					set_variable = { name = ai_will_surrender value = yes }
-				}
-			}
-			else = {
-				# AI will fight
-				situation:claim_province_situation = {
-					set_variable = { name = ai_will_fight value = yes }
-				}
-			}
-		}
-	}
-}
-
-# Calculate AI Willingness to Support Player
-# Used when player seeks rival support
-# Scope: potential supporter country
-# Formula: Base -100 + (Target Opinion/2) + (Player Opinion/2) + (DipRep*10) + (Allied?200:0)
-dm_calculate_rival_support_willingness = {
-	# Save the player and target for reference
-	save_scope_as = potential_supporter
-	situation:claim_province_situation.owner = { save_scope_as = claim_player }
-	situation:claim_province_situation.var:target_country = { save_scope_as = claim_target }
-	
-	# Start with very negative base
-	set_variable = { name = support_willingness value = -100 }
-	
-	# Add half of opinion toward target (negative opinion helps)
-	change_variable = {
-		name = support_willingness
-		add = {
-			value = opinion
-			target = scope:claim_target
-			divide = 2
-		}
-	}
-	
-	# Add half of opinion toward player (positive opinion helps)
-	change_variable = {
-		name = support_willingness
-		add = {
-			value = opinion
-			target = scope:claim_player
-			divide = 2
-		}
-	}
-	
-	# Add diplomatic reputation bonus (10 per point)
-	change_variable = {
-		name = support_willingness
-		add = {
-			value = scope:claim_player.modifier:diplomatic_reputation
-			multiply = 10
-		}
-	}
-	
-	# Massive bonus if already allied
 	if = {
-		limit = { is_ally_of = scope:claim_player }
-		change_variable = {
-			name = support_willingness
-			add = 200
+		limit = { has_country_modifier = dm_urbanization_investment_active }
+		remove_country_modifier = dm_urbanization_investment_active
+	}
+	if = {
+		limit = { has_country_modifier = dm_claim_province_active }
+		remove_country_modifier = dm_claim_province_active
+	}
+
+	# GUI toggle state variable (single var — only one mission active at a time)
+	remove_variable = dm_action_toggle_on
+
+	# Target-location temporary modifiers
+	if = {
+		limit = { has_variable = dm_target_location }
+		var:dm_target_location = {
+			remove_location_modifier = dm_migration_boost
+			remove_location_modifier = dm_urbanization_investment_bonus
 		}
 	}
 }
 
-# Execute War Declaration with Supporters
-# Declares war with claim province CB and adds all supporters
-dm_execute_claim_war_declaration = {
-	situation:claim_province_situation = {
-		owner = {
-			# Declare war with claim province CB
-			declare_war_with_cb = {
-				target = situation:claim_province_situation.var:target_country
-				type = casus_belli:cb_conquer_province
-				province = situation:claim_province_situation.var:target_province
-			}
-			
-			# Add all player supporters to the war
-			if = {
-				limit = { 
-					situation:claim_province_situation = { 
-						has_variable = player_supporters_list 
-					}
-				}
-				situation:claim_province_situation = {
-					every_in_list = {
-						list = player_supporters_list
-						limit = { exists = yes }
-						# Join war as co-belligerent
-						join_war = {
-							war = situation:claim_province_situation.owner.current_war
-							side = attacker
-						}
-					}
-				}
+dm_clear_all_mission_state = {
+	dm_clear_mission_modifiers = yes
+	dm_clear_mission_flags = yes
+	dm_clear_mission_runtime = yes
+}
+
+
+# =============================================================================
+# START HELPERS
+# =============================================================================
+
+dm_start_mission_develop_city = {
+	dm_clear_mission_flags = yes
+	set_variable = { name = dm_active_mission value = 1 }
+	set_variable = { name = dm_mission_develop_city value = 1 }
+	set_variable = { name = dm_months_elapsed value = 0 }
+	set_variable = { name = dm_time_limit value = 60 }
+}
+
+dm_start_mission_large_research = {
+	dm_clear_mission_flags = yes
+	set_variable = { name = dm_active_mission value = 1 }
+	set_variable = { name = dm_mission_large_research value = 1 }
+	set_variable = { name = dm_months_elapsed value = 0 }
+	set_variable = { name = dm_time_limit value = 60 }
+	set_variable = { name = dm_primary_progress value = 0 }
+	set_variable = { name = dm_primary_goal value = 100 }
+	set_variable = { name = dm_has_actions value = 1 }
+	set_variable = dm_has_toggle_action
+	remove_variable = dm_target_location
+}
+
+dm_start_mission_promote_urbanization = {
+	dm_clear_mission_flags = yes
+	set_variable = { name = dm_active_mission value = 1 }
+	set_variable = { name = dm_mission_promote_urbanization value = 1 }
+	set_variable = { name = dm_months_elapsed value = 0 }
+	set_variable = { name = dm_time_limit value = 120 }
+	set_variable = { name = dm_prosperity_target value = 75 }
+	set_variable = { name = dm_has_actions value = 1 }
+	set_variable = dm_has_toggle_action
+	# dm_target_location must be set to capital by the caller before invoking this effect.
+	# Automatically apply migration boost for the duration of the mission.
+	if = {
+		limit = { has_variable = dm_target_location }
+		var:dm_target_location = {
+			add_location_modifier = {
+				modifier = dm_migration_boost
+				years = -1
+				mode = add_and_extend
 			}
 		}
 	}
 }
 
-# Transfer Province Ownership
-# Transfers the claimed province to the player
-dm_transfer_claimed_province = {
-	situation:claim_province_situation = {
-		var:target_province = {
-			every_location_in_province = {
-				set_owner = situation:claim_province_situation.owner
-			}
-		}
-	}
+dm_start_mission_claim_province = {
+	dm_clear_mission_flags = yes
+	set_variable = { name = dm_active_mission value = 1 }
+	set_variable = { name = dm_mission_claim_province value = 1 }
+	set_variable = { name = dm_months_elapsed value = 0 }
+	set_variable = { name = dm_time_limit value = 60 }
+	set_variable = { name = dm_has_actions value = 1 }
+	set_variable = dm_has_oneshot_action
 }
