@@ -1,0 +1,436 @@
+# Dynamic Missions Situation Panel
+#
+# Architecture: fixed 4-card template, per-mission content via single-line text selectors.
+#
+# Adding a new mission requires:
+#   1. A dm_mission_{key} boolean variable (set in scripted effect)
+#   2. Localization keys: DM_{ID}_NAME, DM_{ID}_HINT
+#   3. Three single-line entries in this file (header + Cards 2)
+#   4. If the mission has a TOGGLE action:
+#        - set dm_has_toggle_action in dm_start_mission_X
+#        - add one else_if block to dm_toggle_action_sgui (both toggle-on and toggle-off)
+#        - add a dm_toggle_off_button + dm_toggle_on_button pair below in Card 4
+#   5. If the mission has a ONE-SHOT action:
+#        - set dm_has_oneshot_action in dm_start_mission_X
+#        - add one else_if block to dm_oneshot_action_sgui
+#        - add a dm_oneshot_action_button entry below in Card 4
+#
+# Standard variable schema (set by every dm_start_mission_X effect):
+#   dm_active_mission         boolean — any mission active
+#   dm_mission_{key}          boolean — specific mission active
+#   dm_months_elapsed         int     — elapsed months counter
+#   dm_time_limit             int     — mission time limit in months
+#   dm_primary_progress       int?    — numeric progress value (e.g. research points)
+#   dm_primary_goal           int?    — target for primary_progress
+#   dm_prosperity_target      int?    — prosperity threshold to display
+#   dm_has_actions            boolean? — mission has any action (shows Card 4)
+#   dm_has_toggle_action      boolean? — mission uses the toggle action slot
+#   dm_has_oneshot_action     boolean? — mission uses the one-shot action slot
+#   dm_action_toggle_on       boolean? — toggle action is currently active
+
+# =============================================================================
+# CARD 4 BUTTON TYPES
+# Reusable types for action buttons in Card 4.
+# All toggle buttons call dm_toggle_action_sgui; all one-shot buttons call dm_oneshot_action_sgui.
+# Per-mission customization is done via blockoverride of: button_label, button_tooltip.
+# For one-shot buttons, also override: button_text, button_enabled.
+# =============================================================================
+
+types DynamicMissionsTypes {
+
+# Toggle button — inactive state
+type dm_toggle_off_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 48 }
+	onclick = "[GetScriptedGui('dm_toggle_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_tooltip" { tooltip = "" }
+	hbox = {
+		margin = { 12 0 }
+		spacing = 8
+		block "button_label" {
+			text_single = { text = "" fontsize = 13 }
+		}
+		text_single = { text = "DM_STATUS_INACTIVE" fontsize = 12 }
+	}
+}
+
+# Toggle button — active state (green tint)
+type dm_toggle_on_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 48 }
+	onclick = "[GetScriptedGui('dm_toggle_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_tooltip" { tooltip = "" }
+	icon = {
+		size = { 100% 100% }
+		ignore_layout = yes
+		using = color_mid_green_texture
+		alpha = 0.35
+	}
+	hbox = {
+		margin = { 12 0 }
+		spacing = 8
+		block "button_label" {
+			text_single = { text = "" fontsize = 13 }
+		}
+		text_single = { text = "DM_STATUS_ACTIVE" fontsize = 12 }
+	}
+}
+
+# One-shot action button (cooldown-gated)
+type dm_oneshot_action_button = button_regular {
+	layoutpolicy_horizontal = expanding
+	size = { -1 32 }
+	using = bg_button_flavor_1
+	fontsize = 13
+	onclick = "[GetScriptedGui('dm_oneshot_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	block "button_enabled" { enabled = yes }
+	block "button_text" { text = "" }
+	block "button_tooltip" { tooltip = "" }
+}
+
+} # end DynamicMissionsTypes
+
+situation_panel = {
+
+	# -----------------------------------------------------------------------
+	# HEADER: title + dynamic mission subtitle
+	# -----------------------------------------------------------------------
+	blockoverride "situation_header_left" {
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 2
+
+			text_single = {
+				text = "DM_PANEL_TITLE"
+				default_format = "#subtle_name"
+				fontsize = 15
+			}
+
+			# Idle subtitle
+			text_single = {
+				text = "DM_PANEL_IDLE_TITLE"
+				default_format = "#low"
+				fontsize = 13
+				visible = "[Not(Player.MakeScope.GetVariable('dm_active_mission').IsSet)]"
+			}
+
+			# *** ADD ONE LINE HERE PER NEW MISSION ***
+			text_single = {
+				text = "DM_DEVELOP_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+			}
+			text_single = {
+				text = "DM_RESEARCH_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+			}
+			text_single = {
+				text = "DM_URBANIZE_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+			}
+			text_single = {
+				text = "DM_CLAIM_NAME"
+				default_format = "#subtle_name"
+				fontsize = 13
+				visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+			}
+			# *** END MISSION LIST ***
+		}
+	}
+
+	# -----------------------------------------------------------------------
+	# MAIN CONTENT: 4 fixed cards
+	# -----------------------------------------------------------------------
+	blockoverride "situation_panel_main_content" {
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 8
+
+			# ===============================================================
+			# CARD 1: IDLE STATE
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Not(Player.MakeScope.GetVariable('dm_active_mission').IsSet)]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_IDLE_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_PANEL_IDLE_DESC"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
+			}
+
+			# ===============================================================
+			# CARD 2: DESCRIPTION
+			# One card per mission. Each card uses text = "key" in the header
+			# blockoverride (required by situation_card_common template).
+			# Adding a new mission: copy one block, change the 3 key values.
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+				blockoverride "common_header_text" { text = "DM_DEVELOP_NAME" }
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_DEVELOP_HINT"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
+			}
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+				blockoverride "common_header_text" { text = "DM_RESEARCH_NAME" }
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_RESEARCH_HINT"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
+			}
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+				blockoverride "common_header_text" { text = "DM_URBANIZE_NAME" }
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_URBANIZE_HINT"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
+			}
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+				blockoverride "common_header_text" { text = "DM_CLAIM_NAME" }
+				blockoverride "common_bottom_content" {
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						max_width = 360
+						margin = { 6 4 }
+						text = "DM_CLAIM_HINT"
+						default_format = "#low"
+						fontsize = 13
+					}
+				}
+			}
+
+			# ===============================================================
+			# CARD 3: UNIVERSAL PROGRESS
+			# Reads standard variables. No per-mission branching needed.
+			# Slots show/hide based on which optional variables are set.
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_PROGRESS_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 8
+						margin = { 6 4 }
+
+						# Slot: Months elapsed — always shown
+						widget = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_MONTHS_ELAPSED"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_months_elapsed').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Time limit — always shown, reads dm_time_limit variable
+						widget = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_TIME_LIMIT"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_time_limit').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Primary progress — only when dm_primary_progress is set (e.g. research)
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_primary_progress').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_PROGRESS_LABEL"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_primary_progress').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Primary goal — only when dm_primary_goal is set
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_primary_goal').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_GOAL_LABEL"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_primary_goal').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+						# Slot: Prosperity target — only when dm_prosperity_target is set
+						widget = {
+							visible = "[Player.MakeScope.GetVariable('dm_prosperity_target').IsSet]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 50 }
+							using = bg_square_wood_tile
+							vbox = {
+								parentanchor = center
+								text_single = {
+									align = center|nobaseline
+									text = "DM_PANEL_PROSPERITY_TARGET"
+									default_format = "#subtle_name"
+									fontsize = 12
+								}
+								text_single = {
+									align = center|nobaseline
+									text = "[Player.MakeScope.GetVariable('dm_prosperity_target').GetValue|0]"
+									fontsize = 14
+								}
+							}
+						}
+
+					}
+				}
+			}
+
+			# ===============================================================
+			# CARD 4: AVAILABLE ACTIONS
+			# Only shown when the active mission has decisions (dm_has_actions set).
+			# ===============================================================
+			situation_card_common = {
+				visible = "[Player.MakeScope.GetVariable('dm_has_actions').IsSet]"
+				blockoverride "common_header_text" {
+					text = "DM_PANEL_ACTIONS_TITLE"
+				}
+				blockoverride "common_bottom_content" {
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 6
+						margin = { 6 4 }
+
+						# *** ADD NEW MISSION ACTION ENTRIES HERE ***
+						# Toggle pair:  dm_toggle_off_button + dm_toggle_on_button
+						#               blockoverride "button_label" and "button_tooltip"
+						# One-shot:     dm_oneshot_action_button
+						#               blockoverride "button_text", "button_tooltip", "button_enabled"
+
+						# Research: toggle funding
+						dm_toggle_off_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Not(Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet))]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_increase_research_funding_decision" fontsize = 13 }
+							}
+							blockoverride "button_tooltip" { tooltip = "dm_increase_research_funding_decision_desc" }
+						}
+						dm_toggle_on_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_large_research').IsSet, Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet)]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_increase_research_funding_decision" fontsize = 13 }
+							}
+							blockoverride "button_tooltip" { tooltip = "dm_increase_research_funding_decision_desc" }
+						}
+
+						# Urbanization: toggle investment
+						dm_toggle_off_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Not(Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet))]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_invest_urbanization_decision" fontsize = 13 }
+							}
+							blockoverride "button_tooltip" { tooltip = "dm_invest_urbanization_decision_desc" }
+						}
+						dm_toggle_on_button = {
+							visible = "[And(Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet, Player.MakeScope.GetVariable('dm_action_toggle_on').IsSet)]"
+							blockoverride "button_label" {
+								text_single = { text = "dm_invest_urbanization_decision" fontsize = 13 }
+							}
+							blockoverride "button_tooltip" { tooltip = "dm_invest_urbanization_decision_desc" }
+						}
+
+						# Claim Province: border reconnaissance
+						dm_oneshot_action_button = {
+							visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+							blockoverride "button_enabled" { enabled = "[Not(Player.HasModifier('dm_border_reconnaissance_cooldown'))]" }
+							blockoverride "button_text" { text = "dm_claim_border_reconnaissance_decision" }
+							blockoverride "button_tooltip" { tooltip = "dm_claim_border_reconnaissance_tooltip" }
+						}
+					}
+				}
+			}
+
+		}
+	}
+}

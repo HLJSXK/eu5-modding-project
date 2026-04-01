@@ -7,6 +7,7 @@ Mod-focused documentation for the EU5 Modding Project.
 ### User Guides
 
 - [Project User Guide](guides/Project_User_Guide.md)
+- [AI Tool Workflow Prompt (EU5)](guides/AI_Tool_Workflow_Prompt.md)
 
 ### Technical
 

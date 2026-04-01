@@ -1,242 +1,145 @@
-﻿# Dynamic Missions - Situations
-# Global situations that players can join as participants
+﻿# Dynamic Missions - Single Unified Situation
+#
+# One always-active situation acts as mission manager UI.
+# Mission runtime state is stored on COUNTRY variables.
+# GUI visibility is driven by dm_mission_* boolean variables (.IsSet pattern).
 
-# Develop City Mission
-develop_city_situation = {
-	# Always active, never ends
+dynamic_missions_situation = {
+	monthly_spawn_chance = 1
+	hint_tag = hint_dynamic_missions
+
 	can_start = {
 		always = yes
 	}
-	
+
 	can_end = {
 		always = no
 	}
-	
+
 	visible = {
-		always = yes
+		is_ai = no
 	}
-	
-	monthly_spawn_chance = {
-		add = 100  # Spawn immediately at game start
-	}
-	
+
 	on_start = {
-		# Initialize global situation
-		set_variable = { name = situation_active value = yes }
-	}
-	
-	on_monthly = {
-		# Check each participant's progress
-		every_participant = {
-			# Check if target location reached prosperity goal
-			if = {
-				limit = {
-					has_variable = dm_target_location
-					var:dm_target_location ?= {
-						prosperity >= 100
-					}
-				}
-				
-				# Mission success
-				set_variable = { name = dm_mission_success value = yes }
-				trigger_event_non_silently = dynamic_missions.3
+		every_country = {
+			limit = {
+				is_ai = no
+				can_receive_dynamic_mission = yes
 			}
-			
-			# Check time limit (60 months = 5 years)
-			if = {
-				limit = {
-					has_variable = dm_months_elapsed
-					var:dm_months_elapsed >= 60
-					NOT = { has_variable = dm_mission_success }
-				}
-				
-				# Mission failed
-				set_variable = { name = dm_mission_failed value = yes }
-				trigger_event_non_silently = dynamic_missions.4
-			}
-			
-			# Increment month counter
-			if = {
-				limit = { has_variable = dm_months_elapsed }
-				change_variable = { name = dm_months_elapsed add = 1 }
-			}
+			trigger_event_non_silently = { id = dynamic_missions.1 days = 30 }
 		}
 	}
-}
 
-# Large Research Project Mission
-large_research_project_situation = {
-	can_start = {
-		always = yes
-	}
-	
-	can_end = {
-		always = no
-	}
-	
-	visible = {
-		always = yes
-	}
-	
-	monthly_spawn_chance = {
-		add = 100
-	}
-	
-	on_start = {
-		set_variable = { name = situation_active value = yes }
-	}
-	
 	on_monthly = {
-		every_participant = {
-			# Check if research progress reached goal
-			if = {
-				limit = {
-					has_variable = dm_research_progress
-					var:dm_research_progress >= 100
-				}
-				
-				# Mission success
-				set_variable = { name = dm_mission_success value = yes }
-				trigger_event_non_silently = dynamic_missions.23
-			}
-			
-			# Check time limit (60 months)
-			if = {
-				limit = {
-					has_variable = dm_months_elapsed
-					var:dm_months_elapsed >= 60
-					NOT = { has_variable = dm_mission_success }
-				}
-				
-				# Mission failed
-				set_variable = { name = dm_mission_failed value = yes }
-				trigger_event_non_silently = dynamic_missions.24
-			}
-			
-			# Increment counters
-			if = {
-				limit = { has_variable = dm_months_elapsed }
-				change_variable = { name = dm_months_elapsed add = 1 }
-			}
-		}
-	}
-}
+		every_country = {
+			limit = { is_ai = no }
 
-# Establish New City Mission
-establish_new_city_situation = {
-	can_start = {
-		always = yes
-	}
-	
-	can_end = {
-		always = no
-	}
-	
-	visible = {
-		always = yes
-	}
-	
-	monthly_spawn_chance = {
-		add = 100
-	}
-	
-	on_start = {
-		set_variable = { name = situation_active value = yes }
-	}
-	
-	on_monthly = {
-		every_participant = {
-			# Check if target location became a city
+			# Mission 1: Develop City
 			if = {
-				limit = {
-					has_variable = dm_target_location
-					var:dm_target_location ?= {
-						location_rank = location_rank:city
+				limit = { has_variable = dm_mission_develop_city }
+
+				if = {
+					limit = {
+						has_variable = dm_target_location
+						var:dm_target_location ?= { prosperity >= 100 }
 					}
+					trigger_event_non_silently = dynamic_missions.3
 				}
-				
-				# Mission success
-				set_variable = { name = dm_mission_success value = yes }
-				trigger_event_non_silently = dynamic_missions.33
-			}
-			
-			# Check time limit (120 months = 10 years)
-			if = {
-				limit = {
-					has_variable = dm_months_elapsed
-					var:dm_months_elapsed >= 120
-					NOT = { has_variable = dm_mission_success }
-				}
-				
-				# Mission failed
-				set_variable = { name = dm_mission_failed value = yes }
-				trigger_event_non_silently = dynamic_missions.34
-			}
-			
-			# Increment month counter
-			if = {
-				limit = { has_variable = dm_months_elapsed }
-				change_variable = { name = dm_months_elapsed add = 1 }
-			}
-		}
-	}
-}
-
-# Claim Province Mission
-claim_province_situation = {
-	can_start = {
-		always = yes
-	}
-	
-	can_end = {
-		always = no
-	}
-	
-	visible = {
-		always = yes
-	}
-	
-	monthly_spawn_chance = {
-		add = 100
-	}
-	
-	on_start = {
-		set_variable = { name = situation_active value = yes }
-	}
-	
-	on_monthly = {
-		every_participant = {
-			# Check if target province is owned
-			if = {
-				limit = {
-					has_variable = dm_target_location
-					var:dm_target_location ?= {
-						owner = root
+				else_if = {
+					limit = {
+						has_variable = dm_months_elapsed
+						var:dm_months_elapsed >= 60
 					}
+					trigger_event_non_silently = dynamic_missions.4
 				}
-				
-				# Mission success
-				set_variable = { name = dm_mission_success value = yes }
-				trigger_event_non_silently = dynamic_missions.100
-			}
-			
-			# Check time limit (60 months = 5 years)
-			if = {
-				limit = {
-					has_variable = dm_months_elapsed
-					var:dm_months_elapsed >= 60
-					NOT = { has_variable = dm_mission_success }
+				else = {
+					change_variable = { name = dm_months_elapsed add = 1 }
 				}
-				
-				# Mission failed
-				set_variable = { name = dm_mission_failed value = yes }
-				trigger_event_non_silently = dynamic_missions.100
 			}
-			
-			# Increment month counter
-			if = {
-				limit = { has_variable = dm_months_elapsed }
-				change_variable = { name = dm_months_elapsed add = 1 }
+
+			# Mission 2: Large Research Project
+			else_if = {
+				limit = { has_variable = dm_mission_large_research }
+
+				# Base progress tick
+				if = {
+					limit = { NOT = { has_variable = dm_primary_progress } }
+					set_variable = { name = dm_primary_progress value = 0 }
+				}
+				change_variable = { name = dm_primary_progress add = 1 }
+
+				# Optional funding acceleration
+				if = {
+					limit = { has_country_modifier = dm_increased_funding_modifier }
+					change_variable = { name = dm_primary_progress add = 2 }
+				}
+
+				if = {
+					limit = { var:dm_primary_progress >= 100 }
+					trigger_event_non_silently = dynamic_missions.23
+				}
+				else_if = {
+					limit = {
+						has_variable = dm_months_elapsed
+						var:dm_months_elapsed >= 60
+					}
+					trigger_event_non_silently = dynamic_missions.24
+				}
+				else = {
+					change_variable = { name = dm_months_elapsed add = 1 }
+				}
+			}
+
+			# Mission 3: Promote Urbanization
+			# Success: capital prosperity reaches 75 (rank upgrade awarded in the event).
+			else_if = {
+				limit = { has_variable = dm_mission_promote_urbanization }
+
+				if = {
+					limit = {
+						capital = { prosperity >= 75 }
+					}
+					trigger_event_non_silently = dynamic_missions.33
+				}
+				else_if = {
+					limit = {
+						has_variable = dm_months_elapsed
+						var:dm_months_elapsed >= 120
+					}
+					trigger_event_non_silently = dynamic_missions.34
+				}
+				else = {
+					change_variable = { name = dm_months_elapsed add = 1 }
+				}
+			}
+
+			# Mission 4: Claim Province (simplified: one target location)
+			else_if = {
+				limit = { has_variable = dm_mission_claim_province }
+
+				if = {
+					limit = {
+						has_variable = dm_target_location
+						var:dm_target_location ?= { owner = prev }
+					}
+					trigger_event_non_silently = dynamic_missions.50
+				}
+				else_if = {
+					limit = {
+						has_variable = dm_months_elapsed
+						var:dm_months_elapsed >= 60
+					}
+					trigger_event_non_silently = dynamic_missions.51
+				}
+				else = {
+					change_variable = { name = dm_months_elapsed add = 1 }
+				}
+			}
+
+			# Recover from inconsistent state (dm_active_mission set but no valid mission flag)
+			else_if = {
+				limit = { has_variable = dm_active_mission }
+				dm_clear_all_mission_state = yes
 			}
 		}
 	}

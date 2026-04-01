@@ -29,7 +29,7 @@ For detailed documentation, see [stable/README.md](stable/README.md).
 
 ### `develop/`
 
-The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system and is currently under development pause.
+The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system and development has resumed.
 
 **Features:**
 - **Establish New City Mission** - Multi-stage city development system
@@ -37,7 +37,7 @@ The **development branch** of the EU5 MP mod, formerly known as `dynamic_mission
 - **Custom GUI** - Situation panels and interfaces
 - **Full localization** - English and Simplified Chinese
 
-**Status:** Development paused — kept for future reference and resumption.
+**Status:** Active development resumed (2026-03-31) — mission framework and GUI routing are being iterated.
 
 For detailed documentation, see the [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md) documents.
 
@@ -59,14 +59,14 @@ For new work, choose one of the maintained bases:
 
 ## Dual-Mod Strategy
 
-As of 2026-03-23, the project maintains two parallel mods:
+As of 2026-03-31, the project maintains two parallel mods:
 
 | Mod | Directory | Status | Focus |
 |-----|-----------|--------|-------|
 | Stable | `src/stable/` | Active | Game balance (based on ref mod 3644897537) |
-| Develop | `src/develop/` | Paused | Dynamic mission system |
+| Develop | `src/develop/` | Active | Dynamic mission system |
 
-This is a temporary measure while dynamic mission development is deferred. The `stable` mod provides the core MP balance experience, while `develop` is preserved for future resumption.
+The `stable` mod provides the core MP balance experience, while `develop` is the active feature branch for Dynamic Missions.
 
 ## Creating New Mods
 
