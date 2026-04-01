@@ -1,517 +1,384 @@
-﻿gls_refresh_country_pool = {
-	clear_global_variable_list = gls_all_country_pool
-	clear_global_variable_list = gls_nobles_country_pool
-	clear_global_variable_list = gls_clergy_country_pool
-	clear_global_variable_list = gls_burghers_country_pool
-	clear_global_variable_list = gls_commoners_country_pool
-	clear_global_variable_list = gls_tribesmen_country_pool
-	every_country = {
-		if = {
-			limit = { total_population >= 1 }
-			add_to_global_variable_list = { name = gls_all_country_pool target = this }
+gls_update_country_monthly_cache = {
+	# root = country
+	set_variable = {
+		name = gls_country_wealth_anchor_cached
+		value = {
+			value = monthly_income_trade_and_tax
+			min = 0
 		}
-		if = {
-			limit = { num_pop_type_in_country:nobles >= 1 }
-			add_to_global_variable_list = { name = gls_nobles_country_pool target = this }
-		}
-		if = {
-			limit = { num_pop_type_in_country:clergy >= 1 }
-			add_to_global_variable_list = { name = gls_clergy_country_pool target = this }
-		}
-		if = {
-			limit = { num_pop_type_in_country:burghers >= 1 }
-			add_to_global_variable_list = { name = gls_burghers_country_pool target = this }
-		}
-		if = {
-			limit = {
-				OR = {
-					num_pop_type_in_country:laborers >= 1
-					num_pop_type_in_country:peasants >= 1
-					num_pop_type_in_country:soldiers >= 1
+	}
+
+	set_variable = {
+		name = gls_nobles_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:nobles_estate }
+				value = "estate(estate_type:nobles_estate).estate_gold"
+				divide = {
+					value = 200
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 8
+					}
+					min = 80
 				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 3
 			}
-			add_to_global_variable_list = { name = gls_commoners_country_pool target = this }
 		}
-		if = {
-			limit = { num_pop_type_in_country:tribesmen >= 1 }
-			add_to_global_variable_list = { name = gls_tribesmen_country_pool target = this }
+	}
+
+	set_variable = {
+		name = gls_clergy_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:clergy_estate }
+				value = "estate(estate_type:clergy_estate).estate_gold"
+				divide = {
+					value = 100
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 3
+					}
+					min = 60
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 2
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_burghers_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:burghers_estate }
+				value = "estate(estate_type:burghers_estate).estate_gold"
+				divide = {
+					value = 100
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 3
+					}
+					min = 60
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 2
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_commoner_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:peasants_estate }
+				value = "estate(estate_type:peasants_estate).estate_gold"
+				divide = {
+					value = 0
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 2
+					}
+					min = 45
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 1.5
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_tribesmen_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:tribes_estate }
+				value = "estate(estate_type:tribes_estate).estate_gold"
+				divide = {
+					value = 0
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 1
+					}
+					min = 35
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 1.5
+			}
 		}
 	}
 }
 
-gls_calculate_country_scores = {
+gls_update_country_yearly_cache = {
 	# root = country
-	set_variable = { name = gls_all_score value = 0 }
-	set_variable = { name = gls_nobles_score value = 0 }
-	set_variable = { name = gls_clergy_score value = 0 }
-	set_variable = { name = gls_burghers_score value = 0 }
-	set_variable = { name = gls_commoners_score value = 0 }
-	set_variable = { name = gls_tribesmen_score value = 0 }
+	set_variable = { name = gls_location_count value = 0 }
+	set_variable = { name = gls_location_scale_sum value = 0 }
+
+	set_variable = { name = gls_sum_nobles_offset value = 0 }
+	set_variable = { name = gls_sum_clergy_offset value = 0 }
+	set_variable = { name = gls_sum_burghers_offset value = 0 }
+	set_variable = { name = gls_sum_commoners_offset value = 0 }
+	set_variable = { name = gls_sum_tribesmen_offset value = 0 }
+	set_variable = { name = gls_sum_all_offset value = 0 }
+
+	set_variable = { name = gls_pop_nobles value = 0 }
+	set_variable = { name = gls_pop_clergy value = 0 }
+	set_variable = { name = gls_pop_burghers value = 0 }
+	set_variable = { name = gls_pop_commoners value = 0 }
+	set_variable = { name = gls_pop_tribesmen value = 0 }
+	set_variable = { name = gls_pop_all value = 0 }
 
 	if = {
 		limit = { num_locations > 0 }
 		every_owned_location = {
+			limit = { is_land = yes }
+			save_scope_as = gls_cached_location
+
 			set_variable = {
-				name = gls_loc_dev
-				value = { add = development }
+				name = gls_location_avg_scale
+				value = { add = local_average_gdp_per_capita_scale }
 			}
-
-			set_variable = { name = gls_loc_nobles_score value = 0 }
-			if = {
-				limit = { owner = { num_pop_type_in_country:nobles > 0 } }
-				set_variable = {
-					name = gls_loc_nobles_score
-					value = {
-						add = local_noble_gdp_display
-						multiply = var:gls_loc_dev
-					}
-				}
-			}
-
-			set_variable = { name = gls_loc_clergy_score value = 0 }
-			if = {
-				limit = { owner = { num_pop_type_in_country:clergy > 0 } }
-				set_variable = {
-					name = gls_loc_clergy_score
-					value = {
-						add = local_clergy_gdp_display
-						multiply = var:gls_loc_dev
-					}
-				}
-			}
-
-			set_variable = { name = gls_loc_burghers_score value = 0 }
-			if = {
-				limit = { owner = { num_pop_type_in_country:burghers > 0 } }
-				set_variable = {
-					name = gls_loc_burghers_score
-					value = {
-						add = local_burghers_gdp_display
-						multiply = var:gls_loc_dev
-					}
-				}
-			}
-
-			set_variable = { name = gls_loc_commoners_score value = 0 }
-			if = {
-				limit = {
-					owner = {
-						OR = {
-							num_pop_type_in_country:laborers > 0
-							num_pop_type_in_country:peasants > 0
-							num_pop_type_in_country:soldiers > 0
-						}
-					}
-				}
-				set_variable = {
-					name = gls_loc_commoners_score
-					value = {
-						add = local_commoner_gdp_display
-						multiply = var:gls_loc_dev
-					}
-				}
-			}
-
-			set_variable = { name = gls_loc_tribesmen_score value = 0 }
-			if = {
-				limit = { owner = { num_pop_type_in_country:tribesmen > 0 } }
-				set_variable = {
-					name = gls_loc_tribesmen_score
-					value = {
-						add = local_tribesmen_gdp_display
-						multiply = var:gls_loc_dev
-					}
-				}
-			}
-
-				set_variable = {
-					name = gls_loc_all_score
-					value = {
-						add = var:gls_loc_nobles_score
-						add = var:gls_loc_clergy_score
-						add = var:gls_loc_burghers_score
-						add = var:gls_loc_commoners_score
-						add = var:gls_loc_tribesmen_score
-					}
-				}
 
 			owner = {
-					change_variable = { name = gls_all_score add = prev.var:gls_loc_all_score }
-				change_variable = { name = gls_nobles_score add = prev.var:gls_loc_nobles_score }
-				change_variable = { name = gls_clergy_score add = prev.var:gls_loc_clergy_score }
-				change_variable = { name = gls_burghers_score add = prev.var:gls_loc_burghers_score }
-				change_variable = { name = gls_commoners_score add = prev.var:gls_loc_commoners_score }
-				change_variable = { name = gls_tribesmen_score add = prev.var:gls_loc_tribesmen_score }
+				change_variable = { name = gls_location_count add = 1 }
+				change_variable = { name = gls_location_scale_sum add = prev.var:gls_location_avg_scale }
 			}
-
-			remove_variable = gls_loc_dev
-			remove_variable = gls_loc_nobles_score
-			remove_variable = gls_loc_clergy_score
-			remove_variable = gls_loc_burghers_score
-			remove_variable = gls_loc_commoners_score
-			remove_variable = gls_loc_tribesmen_score
-				remove_variable = gls_loc_all_score
-		}
-	}
-
-	if = {
-		limit = { num_locations > 0 }
 
 			if = {
-				limit = { total_population > 0 }
-				set_variable = {
-					name = gls_all_score
-					value = {
-						add = var:gls_all_score
-						divide = total_population
-						divide = num_locations
+				limit = { num_pop_type:nobles > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_nobles_offset
+						add = {
+							value = scope:gls_cached_location.local_noble_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:nobles
+						}
 					}
+					change_variable = { name = gls_pop_nobles add = scope:gls_cached_location.num_pop_type:nobles }
 				}
 			}
 
-		if = {
-			limit = { num_pop_type_in_country:nobles > 0 }
-			set_variable = {
-				name = gls_nobles_score
-				value = {
-					add = var:gls_nobles_score
-					divide = num_pop_type_in_country:nobles
-					divide = num_locations
-				}
-			}
-		}
-
-		if = {
-			limit = { num_pop_type_in_country:clergy > 0 }
-			set_variable = {
-				name = gls_clergy_score
-				value = {
-					add = var:gls_clergy_score
-					divide = num_pop_type_in_country:clergy
-					divide = num_locations
-				}
-			}
-		}
-
-		if = {
-			limit = { num_pop_type_in_country:burghers > 0 }
-			set_variable = {
-				name = gls_burghers_score
-				value = {
-					add = var:gls_burghers_score
-					divide = num_pop_type_in_country:burghers
-					divide = num_locations
-				}
-			}
-		}
-
-		if = {
-			limit = {
-				OR = {
-					num_pop_type_in_country:laborers > 0
-					num_pop_type_in_country:peasants > 0
-					num_pop_type_in_country:soldiers > 0
-				}
-			}
-			set_variable = {
-				name = gls_commoners_score
-				value = {
-					add = var:gls_commoners_score
-					divide = {
-						add = num_pop_type_in_country:laborers
-						add = num_pop_type_in_country:peasants
-						add = num_pop_type_in_country:soldiers
+			if = {
+				limit = { num_pop_type:clergy > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_clergy_offset
+						add = {
+							value = scope:gls_cached_location.local_clergy_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:clergy
+						}
 					}
-					divide = num_locations
+					change_variable = { name = gls_pop_clergy add = scope:gls_cached_location.num_pop_type:clergy }
 				}
 			}
-		}
 
-		if = {
-			limit = { num_pop_type_in_country:tribesmen > 0 }
-			set_variable = {
-				name = gls_tribesmen_score
-				value = {
-					add = var:gls_tribesmen_score
-					divide = num_pop_type_in_country:tribesmen
-					divide = num_locations
+			if = {
+				limit = { num_pop_type:burghers > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_burghers_offset
+						add = {
+							value = scope:gls_cached_location.local_burghers_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:burghers
+						}
+					}
+					change_variable = { name = gls_pop_burghers add = scope:gls_cached_location.num_pop_type:burghers }
+				}
+			}
+
+			if = {
+				limit = { local_commoner_population > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_commoners_offset
+						add = {
+							value = scope:gls_cached_location.local_commoner_demand_scale_offset
+							multiply = scope:gls_cached_location.local_commoner_population
+						}
+					}
+					change_variable = { name = gls_pop_commoners add = scope:gls_cached_location.local_commoner_population }
+				}
+			}
+
+			if = {
+				limit = { num_pop_type:tribesmen > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_tribesmen_offset
+						add = {
+							value = scope:gls_cached_location.local_tribesmen_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:tribesmen
+						}
+					}
+					change_variable = { name = gls_pop_tribesmen add = scope:gls_cached_location.num_pop_type:tribesmen }
 				}
 			}
 		}
 	}
+
+	set_variable = {
+		name = gls_pop_all
+		value = {
+			add = var:gls_pop_nobles
+			add = var:gls_pop_clergy
+			add = var:gls_pop_burghers
+			add = var:gls_pop_commoners
+			add = var:gls_pop_tribesmen
+		}
+	}
+
+	set_variable = {
+		name = gls_sum_all_offset
+		value = {
+			add = var:gls_sum_nobles_offset
+			add = var:gls_sum_clergy_offset
+			add = var:gls_sum_burghers_offset
+			add = var:gls_sum_commoners_offset
+			add = var:gls_sum_tribesmen_offset
+		}
+	}
+
+	set_variable = { name = gls_country_location_avg_scale value = 0 }
+	if = {
+		limit = { var:gls_location_count > 0 }
+		set_variable = {
+			name = gls_country_location_avg_scale
+			value = {
+				add = var:gls_location_scale_sum
+				divide = var:gls_location_count
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_nobles value = 0 }
+	if = {
+		limit = { var:gls_pop_nobles > 0 }
+		set_variable = {
+			name = gls_country_sol_nobles
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_nobles_offset
+					divide = var:gls_pop_nobles
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_clergy value = 0 }
+	if = {
+		limit = { var:gls_pop_clergy > 0 }
+		set_variable = {
+			name = gls_country_sol_clergy
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_clergy_offset
+					divide = var:gls_pop_clergy
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_burghers value = 0 }
+	if = {
+		limit = { var:gls_pop_burghers > 0 }
+		set_variable = {
+			name = gls_country_sol_burghers
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_burghers_offset
+					divide = var:gls_pop_burghers
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_commoners value = 0 }
+	if = {
+		limit = { var:gls_pop_commoners > 0 }
+		set_variable = {
+			name = gls_country_sol_commoners
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_commoners_offset
+					divide = var:gls_pop_commoners
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_tribesmen value = 0 }
+	if = {
+		limit = { var:gls_pop_tribesmen > 0 }
+		set_variable = {
+			name = gls_country_sol_tribesmen
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_tribesmen_offset
+					divide = var:gls_pop_tribesmen
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_all value = 0 }
+	if = {
+		limit = { var:gls_pop_all > 0 }
+		set_variable = {
+			name = gls_country_sol_all
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_all_offset
+					divide = var:gls_pop_all
+				}
+			}
+		}
+	}
+}
+
+gls_update_country_visual_cache = {
+	gls_update_country_monthly_cache = yes
+	if = {
+		limit = {
+			OR = {
+				current_month = 1
+				NOT = { has_variable = gls_country_sol_all }
+			}
+		}
+		gls_update_country_yearly_cache = yes
+	}
+}
+
+gls_update_country_visual_cache_full = {
+	gls_update_country_monthly_cache = yes
+	gls_update_country_yearly_cache = yes
 }
 
 gls_recalculate_global_living_standard = {
-	gls_refresh_country_pool = yes
 	every_country = {
-		gls_calculate_country_scores = yes
-	}
-
-	situation:global_living_standard = {
-		# Clear previous cycle ranking state so stale entries never persist.
-			remove_variable = gls_all_top1_country
-			remove_variable = gls_all_top1_value
-			remove_variable = gls_all_top2_country
-			remove_variable = gls_all_top2_value
-			remove_variable = gls_all_top3_country
-			remove_variable = gls_all_top3_value
-
-		remove_variable = gls_nobles_top1_country
-		remove_variable = gls_nobles_top1_value
-		remove_variable = gls_nobles_top2_country
-		remove_variable = gls_nobles_top2_value
-		remove_variable = gls_nobles_top3_country
-		remove_variable = gls_nobles_top3_value
-
-		remove_variable = gls_clergy_top1_country
-		remove_variable = gls_clergy_top1_value
-		remove_variable = gls_clergy_top2_country
-		remove_variable = gls_clergy_top2_value
-		remove_variable = gls_clergy_top3_country
-		remove_variable = gls_clergy_top3_value
-
-		remove_variable = gls_burghers_top1_country
-		remove_variable = gls_burghers_top1_value
-		remove_variable = gls_burghers_top2_country
-		remove_variable = gls_burghers_top2_value
-		remove_variable = gls_burghers_top3_country
-		remove_variable = gls_burghers_top3_value
-
-		remove_variable = gls_commoners_top1_country
-		remove_variable = gls_commoners_top1_value
-		remove_variable = gls_commoners_top2_country
-		remove_variable = gls_commoners_top2_value
-		remove_variable = gls_commoners_top3_country
-		remove_variable = gls_commoners_top3_value
-
-		remove_variable = gls_tribesmen_top1_country
-		remove_variable = gls_tribesmen_top1_value
-		remove_variable = gls_tribesmen_top2_country
-		remove_variable = gls_tribesmen_top2_value
-		remove_variable = gls_tribesmen_top3_country
-		remove_variable = gls_tribesmen_top3_value
-	}
-
-	# All population top 3
-	ordered_in_global_list = {
-		variable = gls_all_country_pool
-		order_by = { add = { value = var:gls_all_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_all_top1_country value = prev }
-			set_variable = { name = gls_all_top1_value value = prev.var:gls_all_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_all_country_pool
-		limit = { this != situation:global_living_standard.var:gls_all_top1_country }
-		order_by = { add = { value = var:gls_all_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_all_top2_country value = prev }
-			set_variable = { name = gls_all_top2_value value = prev.var:gls_all_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_all_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_all_top1_country
-			this != situation:global_living_standard.var:gls_all_top2_country
-		}
-		order_by = { add = { value = var:gls_all_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_all_top3_country value = prev }
-			set_variable = { name = gls_all_top3_value value = prev.var:gls_all_score }
-		}
-	}
-
-	# Nobles top 3
-	ordered_in_global_list = {
-		variable = gls_nobles_country_pool
-		order_by = { add = { value = var:gls_nobles_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_nobles_top1_country value = prev }
-			set_variable = { name = gls_nobles_top1_value value = prev.var:gls_nobles_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_nobles_country_pool
-		limit = { this != situation:global_living_standard.var:gls_nobles_top1_country }
-		order_by = { add = { value = var:gls_nobles_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_nobles_top2_country value = prev }
-			set_variable = { name = gls_nobles_top2_value value = prev.var:gls_nobles_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_nobles_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_nobles_top1_country
-			this != situation:global_living_standard.var:gls_nobles_top2_country
-		}
-		order_by = { add = { value = var:gls_nobles_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_nobles_top3_country value = prev }
-			set_variable = { name = gls_nobles_top3_value value = prev.var:gls_nobles_score }
-		}
-	}
-
-	# Clergy top 3
-	ordered_in_global_list = {
-		variable = gls_clergy_country_pool
-		order_by = { add = { value = var:gls_clergy_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_clergy_top1_country value = prev }
-			set_variable = { name = gls_clergy_top1_value value = prev.var:gls_clergy_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_clergy_country_pool
-		limit = { this != situation:global_living_standard.var:gls_clergy_top1_country }
-		order_by = { add = { value = var:gls_clergy_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_clergy_top2_country value = prev }
-			set_variable = { name = gls_clergy_top2_value value = prev.var:gls_clergy_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_clergy_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_clergy_top1_country
-			this != situation:global_living_standard.var:gls_clergy_top2_country
-		}
-		order_by = { add = { value = var:gls_clergy_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_clergy_top3_country value = prev }
-			set_variable = { name = gls_clergy_top3_value value = prev.var:gls_clergy_score }
-		}
-	}
-
-	# Burghers top 3
-	ordered_in_global_list = {
-		variable = gls_burghers_country_pool
-		order_by = { add = { value = var:gls_burghers_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_burghers_top1_country value = prev }
-			set_variable = { name = gls_burghers_top1_value value = prev.var:gls_burghers_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_burghers_country_pool
-		limit = { this != situation:global_living_standard.var:gls_burghers_top1_country }
-		order_by = { add = { value = var:gls_burghers_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_burghers_top2_country value = prev }
-			set_variable = { name = gls_burghers_top2_value value = prev.var:gls_burghers_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_burghers_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_burghers_top1_country
-			this != situation:global_living_standard.var:gls_burghers_top2_country
-		}
-		order_by = { add = { value = var:gls_burghers_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_burghers_top3_country value = prev }
-			set_variable = { name = gls_burghers_top3_value value = prev.var:gls_burghers_score }
-		}
-	}
-
-	# Commoners top 3
-	ordered_in_global_list = {
-		variable = gls_commoners_country_pool
-		order_by = { add = { value = var:gls_commoners_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_commoners_top1_country value = prev }
-			set_variable = { name = gls_commoners_top1_value value = prev.var:gls_commoners_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_commoners_country_pool
-		limit = { this != situation:global_living_standard.var:gls_commoners_top1_country }
-		order_by = { add = { value = var:gls_commoners_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_commoners_top2_country value = prev }
-			set_variable = { name = gls_commoners_top2_value value = prev.var:gls_commoners_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_commoners_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_commoners_top1_country
-			this != situation:global_living_standard.var:gls_commoners_top2_country
-		}
-		order_by = { add = { value = var:gls_commoners_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_commoners_top3_country value = prev }
-			set_variable = { name = gls_commoners_top3_value value = prev.var:gls_commoners_score }
-		}
-	}
-
-	# Tribesmen top 3
-	ordered_in_global_list = {
-		variable = gls_tribesmen_country_pool
-		order_by = { add = { value = var:gls_tribesmen_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_tribesmen_top1_country value = prev }
-			set_variable = { name = gls_tribesmen_top1_value value = prev.var:gls_tribesmen_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_tribesmen_country_pool
-		limit = { this != situation:global_living_standard.var:gls_tribesmen_top1_country }
-		order_by = { add = { value = var:gls_tribesmen_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_tribesmen_top2_country value = prev }
-			set_variable = { name = gls_tribesmen_top2_value value = prev.var:gls_tribesmen_score }
-		}
-	}
-	ordered_in_global_list = {
-		variable = gls_tribesmen_country_pool
-		limit = {
-			this != situation:global_living_standard.var:gls_tribesmen_top1_country
-			this != situation:global_living_standard.var:gls_tribesmen_top2_country
-		}
-		order_by = { add = { value = var:gls_tribesmen_score } }
-		max = 1
-		check_range_bounds = yes
-		situation:global_living_standard = {
-			set_variable = { name = gls_tribesmen_top3_country value = prev }
-			set_variable = { name = gls_tribesmen_top3_value value = prev.var:gls_tribesmen_score }
+		if = {
+			limit = { total_population > 0 }
+			gls_update_country_visual_cache_full = yes
 		}
 	}
 }
-
