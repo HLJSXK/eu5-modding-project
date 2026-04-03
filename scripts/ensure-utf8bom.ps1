@@ -4,9 +4,9 @@
 # both file types; files without it silently produce broken in-game text.
 #
 # Usage:
-#   .\scripts\ensure-utf8bom.ps1                  # fix all .yml under repo root
-#   .\scripts\ensure-utf8bom.ps1 -Path src\stable  # fix a specific subtree
-#   .\scripts\ensure-utf8bom.ps1 -DryRun           # report only, no writes
+#   .\scripts\ensure-utf8bom.ps1                    # fix all .yml and .txt under repo root
+#   .\scripts\ensure-utf8bom.ps1 -Path src\stable  # fix .yml and .txt in a specific subtree
+#   .\scripts\ensure-utf8bom.ps1 -DryRun           # report only, no writes, for .yml and .txt
 
 param(
     [string]$Path = (Split-Path $PSScriptRoot -Parent),
