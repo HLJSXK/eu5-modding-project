@@ -21,6 +21,7 @@
 
 - 当前主维护分支
 - 用于多人平衡和稳定玩法
+- 核心功能: Standard of Living (SOL) 系统、经济与需求系统、反滚雪球调整
 
 ### `src/develop/`
 
@@ -38,6 +39,7 @@
 
 - `docs/technical/EU5_Modding_Knowledge_Base.md`
 - `docs/technical/EU5_Mod_Framework_Guide.md`
+- `docs/design/Stable_SOL_Rebuild_20260402.md` — Standard of Living (SOL) 系统架构与命名约定
 - `docs/design/Dynamic_Missions_Design.md`
 - `docs/task_summaries/`
 
