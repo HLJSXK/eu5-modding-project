@@ -131,6 +131,7 @@ if errorlevel 8 (
     echo [ERROR] Copy failed. Robocopy exit code: %errorlevel%
     exit /b 1
 )
+cmd /c "exit /b 0"
 
 if exist "%TARGET_DIR_DEVELOP%" (
     echo [INFO] Removing previous deployment: "%TARGET_DIR_DEVELOP%"
