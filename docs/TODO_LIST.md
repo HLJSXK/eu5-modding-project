@@ -1,6 +1,6 @@
 # TODO List
 
-更新时间: 2026-04-02
+更新时间: 2026-04-03
 
 ## Dynamic Missions（重启开发）
 - [x] 重启 Dynamic Missions 开发并同步文档状态
@@ -12,15 +12,15 @@
   - 验收: GUI 仅从对应玩家的 `Player.MakeScope` / country scope 中的 `dm_mission_*` 标志读取，按玩家分别显示
 
 ## 高优先级
-- [x] 首要任务: 专注推进 Global SOL 局势编写与联调（当前最高优先级）
-  - 范围: 评分计算、排行逻辑、面板展示、运行时稳定性、日志清零
-  - 验收: 各阶层排行可分化显示，且无 scope/type/div0 类报错
+- [x] 首要任务: 专注推进 Standard of Living (SOL) 局势编写与联调（当前最高优先级）
+  - 范围: 评分计算、面板展示、运行时稳定性、日志清零
+  - 验收: 各阶层SOL可分化显示，且无 scope/type/div0 类报错
 - [x] 修复 Glorp UI 覆盖冲突（重要）
 
-## Global SOL 后续任务
-- [x] 重构 Global SOL 为“本国优先”局势面板（移除全球排行榜）
+## Standard of Living (SOL) 后续任务
+- [x] 重构 SOL 为”本国优先”局势面板（移除跨国排行榜）
   - 目标: 仅展示本国SOL与中间变量，降低全局计算开销
-  - 验收: 面板不再依赖 global top3 变量，显示本国六项SOL与缓存中间值
+  - 验收: 面板不再依赖跨国 top3 变量，显示本国六项SOL与缓存中间值
 - [x] 将存款压力改为国家级月缓存并接入 pop_wealth
   - 目标: 避免每地点重复计算同一国家存款压力
   - 验收: `pop_wealth` 优先读取国家缓存变量，并保留缺失时回退逻辑
@@ -52,6 +52,13 @@
 ## 数据与版本同步
 - [x] 将最新 1.1.10 版本的游戏原版文件放入项目
   - 目标: 更新 reference 基线，避免后续对照偏差
+
+## 命名与清理
+- [x] 统一 SOL 命名（2026-04-03）
+  - 目标: 移除所有"Global"前缀区分，将 Standard of Living 视为统一连续系统
+  - 已完成: 将 `global_living_standard.*` 文件重命名为 `standard_of_living.*`
+  - 待处理: AS（Antisnowballing 参考mod）残留文件清理 — 详见 AS 清理清单
+  - 命名约定: `gls_` 前缀（国家级）和 `local_` 前缀（地点级）保留，内部局势 ID `global_living_standard` 暂保留
 
 ## 备注
 - 以上条目用于防遗忘，不代表最终实现顺序。
