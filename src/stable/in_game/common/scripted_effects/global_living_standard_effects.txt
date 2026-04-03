@@ -1,4 +1,7 @@
-﻿gls_update_country_monthly_cache = {
+﻿gls_compute_savings_pressure = {
+	# 计算财富锚点和各阶层存款压力。
+	# 地图着色依赖这些值（通过 local_*_savings_pressure → local_average_gdp_per_capita_scale）。
+	# 调用者：Pass A（所有国家，每年）、Pass B（人类，每月）
 	# root = country
 	set_variable = {
 		name = gls_country_wealth_anchor_cached
@@ -123,7 +126,15 @@
 		}
 	}
 
-	# GUI display variables (Section 1 / 2 / 3 / 4 of the situation panel)
+}
+
+gls_compute_panel_display = {
+	# 计算面板 UI 展示变量（税率、资产、目标存款、制度加成）。
+	# 依赖：gls_country_wealth_anchor_cached（由 gls_compute_savings_pressure 设置）。
+	# 调用者：Pass B（人类，每月）
+	# root = country
+
+	# Section 1 / 2 / 3 / 4 of the situation panel
 	set_variable = {
 		name = gls_nobles_tax_pct
 		value = {
@@ -335,7 +346,34 @@
 	}
 }
 
-gls_update_country_yearly_cache = {
+gls_update_location_map = {
+	# 设置地图着色所需的地点变量，对 AI 和人类国家均执行。
+	# 调用者：Pass A（所有国家，每年）
+	# root = country
+	if = {
+		limit = { num_locations > 0 }
+		every_owned_location = {
+			limit = { is_land = yes }
+			set_variable = {
+				name = gls_location_avg_scale
+				value = { add = local_average_gdp_per_capita_scale }
+			}
+			set_variable = {
+				name = gls_location_sol_weighted
+				value = {
+					value = var:gls_location_avg_scale
+					multiply = development
+				}
+			}
+		}
+	}
+	set_variable = { name = gls_map_cache_initialized value = 1 }
+}
+
+gls_accumulate_panel_stats = {
+	# 地点循环累加 + 聚合/SoL/需求计算，仅对人类国家执行。
+	# 依赖：gls_institution_bonus（由 gls_compute_panel_display 设置）。
+	# 调用者：Pass B 内年度条件块（人类，每年）
 	# root = country
 	set_variable = { name = gls_location_count value = 0 }
 	set_variable = { name = gls_location_scale_sum value = 0 }
@@ -362,18 +400,6 @@ gls_update_country_yearly_cache = {
 		every_owned_location = {
 			limit = { is_land = yes }
 			save_scope_as = gls_cached_location
-
-			set_variable = {
-				name = gls_location_avg_scale
-				value = { add = local_average_gdp_per_capita_scale }
-			}
-			set_variable = {
-				name = gls_location_sol_weighted
-				value = {
-					value = var:gls_location_avg_scale
-					multiply = development
-				}
-			}
 
 			owner = {
 				change_variable = { name = gls_location_count add = 1 }
@@ -800,29 +826,21 @@ gls_update_country_yearly_cache = {
 	# Pop counts stored as raw game units; GUI appends "K" for display.
 }
 
-gls_update_country_visual_cache = {
-	gls_update_country_monthly_cache = yes
-	if = {
-		limit = {
-			OR = {
-				current_month = 1
-				NOT = { has_variable = gls_country_sol_all }
-			}
-		}
-		gls_update_country_yearly_cache = yes
-	}
-}
-
-gls_update_country_visual_cache_full = {
-	gls_update_country_monthly_cache = yes
-	gls_update_country_yearly_cache = yes
+gls_full_refresh_country = {
+	# 单国完整刷新：存款压力 + 面板展示 + 地图地点变量 + 面板统计累加。
+	# 调用者：gls_recalculate_global_living_standard（on_start、决议手动触发）
+	# root = country
+	gls_compute_savings_pressure = yes
+	gls_compute_panel_display = yes
+	gls_update_location_map = yes
+	gls_accumulate_panel_stats = yes
 }
 
 gls_recalculate_global_living_standard = {
 	every_country = {
 		if = {
 			limit = { total_population > 0 }
-			gls_update_country_visual_cache_full = yes
+			gls_full_refresh_country = yes
 		}
 	}
 }
