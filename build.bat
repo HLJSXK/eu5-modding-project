@@ -88,6 +88,13 @@ if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRETKEY%"=="" set "COS_SECRET_
 if "%COS_SECRET_ID%"=="" if not "%TENCENTCLOUD_SECRET_ID%"=="" set "COS_SECRET_ID=%TENCENTCLOUD_SECRET_ID%"
 if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRET_KEY%"=="" set "COS_SECRET_KEY=%TENCENTCLOUD_SECRET_KEY%"
 
+echo [INFO] Ensuring UTF-8 BOM on all .yml and .txt files under src...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%scripts\ensure-utf8bom.ps1" -Path "%REPO_ROOT%src"
+if errorlevel 1 (
+    echo [ERROR] UTF-8 BOM fix step failed.
+    exit /b 1
+)
+
 if not exist "%SOURCE_DIR%" (
     echo [ERROR] Source directory not found: "%SOURCE_DIR%"
     exit /b 1
@@ -124,6 +131,7 @@ if errorlevel 8 (
     echo [ERROR] Copy failed. Robocopy exit code: %errorlevel%
     exit /b 1
 )
+cmd /c "exit /b 0"
 
 if exist "%TARGET_DIR_DEVELOP%" (
     echo [INFO] Removing previous deployment: "%TARGET_DIR_DEVELOP%"
