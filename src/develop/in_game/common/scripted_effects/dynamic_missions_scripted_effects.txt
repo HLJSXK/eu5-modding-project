@@ -26,6 +26,7 @@ dm_clear_mission_runtime = {
 	remove_variable = dm_has_toggle_action
 	remove_variable = dm_has_oneshot_action
 	remove_variable = dm_target_location
+	remove_variable = dm_bar_value
 }
 
 dm_clear_mission_modifiers = {
@@ -80,6 +81,7 @@ dm_start_mission_develop_city = {
 	set_variable = { name = dm_mission_develop_city value = 1 }
 	set_variable = { name = dm_months_elapsed value = 0 }
 	set_variable = { name = dm_time_limit value = 60 }
+	dm_update_bar_value = yes
 }
 
 dm_start_mission_large_research = {
@@ -93,6 +95,7 @@ dm_start_mission_large_research = {
 	set_variable = { name = dm_has_actions value = 1 }
 	set_variable = dm_has_toggle_action
 	remove_variable = dm_target_location
+	dm_update_bar_value = yes
 }
 
 dm_start_mission_promote_urbanization = {
@@ -116,6 +119,7 @@ dm_start_mission_promote_urbanization = {
 			}
 		}
 	}
+	dm_update_bar_value = yes
 }
 
 dm_start_mission_claim_province = {
@@ -126,4 +130,86 @@ dm_start_mission_claim_province = {
 	set_variable = { name = dm_time_limit value = 60 }
 	set_variable = { name = dm_has_actions value = 1 }
 	set_variable = dm_has_oneshot_action
+	dm_update_bar_value = yes
+}
+
+
+# =============================================================================
+# MONTHLY TICK
+# =============================================================================
+
+# Called by monthly_country_pulse (dynamic_missions_country_monthly.txt).
+# Increments the elapsed counter then refreshes the progress bar.
+dm_monthly_tick = {
+	change_variable = { name = dm_months_elapsed add = 1 }
+	dm_update_bar_value = yes
+}
+
+
+# =============================================================================
+# PROGRESS BAR UPDATE
+# =============================================================================
+#
+# Computes dm_bar_value (int 0-100) for the active mission and stores it on
+# the country. Card 3 in the GUI reads this variable directly — no per-mission
+# GUI branching is needed.
+#
+# HOW TO ADD BAR SUPPORT FOR A NEW MISSION:
+#   1. Add one else_if block below (same pattern as existing missions).
+#   2. Call dm_update_bar_value at the end of dm_start_mission_X so the bar
+#      is initialised when the panel first opens.
+#   3. No other changes required.
+
+dm_update_bar_value = {
+	if = {
+		limit = { has_variable = dm_mission_develop_city }
+		# Time-based: elapsed / limit * 100
+		set_variable = {
+			name = dm_bar_value
+			value = {
+				value = var:dm_months_elapsed
+				multiply = 100
+				divide = var:dm_time_limit
+			}
+		}
+		clamp_variable = { name = dm_bar_value max = 100 min = 0 }
+	}
+	else_if = {
+		limit = { has_variable = dm_mission_large_research }
+		# Progress-based: dm_primary_progress is already tracked on 0-100 scale.
+		set_variable = { name = dm_bar_value value = var:dm_primary_progress }
+	}
+	else_if = {
+		limit = { has_variable = dm_mission_promote_urbanization }
+		# Prosperity-based: read target location prosperity, scale to 0-100.
+		if = {
+			limit = { has_variable = dm_target_location }
+			var:dm_target_location = {
+				root = {
+					set_variable = {
+						name = dm_bar_value
+						value = {
+							value = prev.prosperity   # prev = the location scope
+							multiply = 100
+							divide = var:dm_prosperity_target
+						}
+					}
+				}
+			}
+			clamp_variable = { name = dm_bar_value max = 100 min = 0 }
+		}
+	}
+	else_if = {
+		limit = { has_variable = dm_mission_claim_province }
+		# Time-based: same pattern as develop_city.
+		set_variable = {
+			name = dm_bar_value
+			value = {
+				value = var:dm_months_elapsed
+				multiply = 100
+				divide = var:dm_time_limit
+			}
+		}
+		clamp_variable = { name = dm_bar_value max = 100 min = 0 }
+	}
 }
