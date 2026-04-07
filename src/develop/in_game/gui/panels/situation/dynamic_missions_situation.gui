@@ -1,12 +1,15 @@
 # Dynamic Missions Situation Panel
 #
-# Architecture: fixed 4-card template, per-mission content via single-line text selectors.
+# Architecture: fixed 5-card template (overview, objectives, rewards, progress, actions)
+#               per-mission content via visibility-gated text children within each card.
+#               Idle state: header subtitle only — no idle card shown.
 #
 # Adding a new mission requires:
 #   1. A dm_mission_{key} boolean variable (set in scripted effect)
-#   2. Localization keys: DM_{ID}_NAME, DM_{ID}_HINT
-#   3. Three single-line entries in this file (header + Cards 2)
-#   4. If the mission has a TOGGLE action:
+#   2. Localization keys: DM_{ID}_NAME, DM_{ID}_OVERVIEW, DM_{ID}_OBJECTIVES, DM_{ID}_REWARDS
+#   3. One text_multi entry per card in Cards A/B/C (overview, objectives, rewards) — follow existing pattern
+#   4. One text_single entry in the header block (line ~117) — follow existing pattern
+#   5. If the mission has a TOGGLE action:
 #        - set dm_has_toggle_action in dm_start_mission_X
 #        - add one else_if block to dm_toggle_action_sgui (both toggle-on and toggle-off)
 #        - add a dm_toggle_off_button + dm_toggle_on_button pair below in Card 4
@@ -27,6 +30,9 @@
 #   dm_has_toggle_action      boolean? — mission uses the toggle action slot
 #   dm_has_oneshot_action     boolean? — mission uses the one-shot action slot
 #   dm_action_toggle_on       boolean? — toggle action is currently active
+#   dm_bar_value              int 0-100 — progress percentage for the progress bar in Card 3
+#                               time-based missions:     change_variable add = 100/time_limit each month
+#                               progress-based missions: set_variable value = var:dm_primary_progress each month
 
 # =============================================================================
 # CARD 4 BUTTON TYPES
@@ -86,6 +92,16 @@ type dm_oneshot_action_button = button_regular {
 	block "button_enabled" { enabled = yes }
 	block "button_text" { text = "" }
 	block "button_tooltip" { tooltip = "" }
+}
+
+# Abandon mission button — uses button_regular_alt_red (defaults.gui L21)
+# Visible only when a mission is active. Fires dm_abandon_action_sgui → event 60.
+type dm_abandon_button = button_regular_alt_red {
+	layoutpolicy_horizontal = expanding
+	size = { -1 36 }
+	onclick = "[GetScriptedGui('dm_abandon_action_sgui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+	tooltip = "DM_ABANDON_TOOLTIP"
+	text = "DM_ABANDON_LABEL"
 }
 
 } # end DynamicMissionsTypes
@@ -152,89 +168,143 @@ situation_panel = {
 			spacing = 8
 
 			# ===============================================================
-			# CARD 1: IDLE STATE
+			# CARD A: MISSION OVERVIEW
+			# Brief description of the active mission.
+			# Visible only when a mission is active (idle state shows header subtitle only).
+			# Adding a new mission: add one text_multi entry gated on dm_mission_{key}.
 			# ===============================================================
 			situation_card_common = {
-				visible = "[Not(Player.MakeScope.GetVariable('dm_active_mission').IsSet)]"
-				blockoverride "common_header_text" {
-					text = "DM_PANEL_IDLE_TITLE"
-				}
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" { text = "DM_PANEL_OVERVIEW_TITLE" }
 				blockoverride "common_bottom_content" {
-					text_multi = {
+					vbox = {
 						layoutpolicy_horizontal = expanding
-						autoresize = yes
-						max_width = 360
+						spacing = 2
 						margin = { 6 4 }
-						text = "DM_PANEL_IDLE_DESC"
-						default_format = "#low"
-						fontsize = 13
+						# *** ADD ONE text_multi ENTRY HERE PER NEW MISSION ***
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+							text = "DM_DEVELOP_OVERVIEW"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+							text = "DM_RESEARCH_OVERVIEW"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+							text = "DM_URBANIZE_OVERVIEW"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+							text = "DM_CLAIM_OVERVIEW"
+						}
+						# *** END MISSION LIST ***
 					}
 				}
 			}
 
 			# ===============================================================
-			# CARD 2: DESCRIPTION
-			# One card per mission. Each card uses text = "key" in the header
-			# blockoverride (required by situation_card_common template).
-			# Adding a new mission: copy one block, change the 3 key values.
+			# CARD B: MISSION OBJECTIVES
+			# Completion conditions and quantitative targets.
+			# Adding a new mission: add one text_multi entry gated on dm_mission_{key}.
 			# ===============================================================
 			situation_card_common = {
-				visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
-				blockoverride "common_header_text" { text = "DM_DEVELOP_NAME" }
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" { text = "DM_PANEL_OBJECTIVES_TITLE" }
 				blockoverride "common_bottom_content" {
-					text_multi = {
+					vbox = {
 						layoutpolicy_horizontal = expanding
-						autoresize = yes
-						max_width = 360
+						spacing = 2
 						margin = { 6 4 }
-						text = "DM_DEVELOP_HINT"
-						default_format = "#low"
-						fontsize = 13
+						# *** ADD ONE text_multi ENTRY HERE PER NEW MISSION ***
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+							text = "DM_DEVELOP_OBJECTIVES"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+							text = "DM_RESEARCH_OBJECTIVES"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+							text = "DM_URBANIZE_OBJECTIVES"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+							text = "DM_CLAIM_OBJECTIVES"
+						}
+						# *** END MISSION LIST ***
 					}
 				}
 			}
+
+			# ===============================================================
+			# CARD C: MISSION REWARDS
+			# Success rewards and failure / abandonment penalties.
+			# Adding a new mission: add one text_multi entry gated on dm_mission_{key}.
+			# ===============================================================
 			situation_card_common = {
-				visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
-				blockoverride "common_header_text" { text = "DM_RESEARCH_NAME" }
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
+				blockoverride "common_header_text" { text = "DM_PANEL_REWARDS_TITLE" }
 				blockoverride "common_bottom_content" {
-					text_multi = {
+					vbox = {
 						layoutpolicy_horizontal = expanding
-						autoresize = yes
-						max_width = 360
+						spacing = 2
 						margin = { 6 4 }
-						text = "DM_RESEARCH_HINT"
-						default_format = "#low"
-						fontsize = 13
-					}
-				}
-			}
-			situation_card_common = {
-				visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
-				blockoverride "common_header_text" { text = "DM_URBANIZE_NAME" }
-				blockoverride "common_bottom_content" {
-					text_multi = {
-						layoutpolicy_horizontal = expanding
-						autoresize = yes
-						max_width = 360
-						margin = { 6 4 }
-						text = "DM_URBANIZE_HINT"
-						default_format = "#low"
-						fontsize = 13
-					}
-				}
-			}
-			situation_card_common = {
-				visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
-				blockoverride "common_header_text" { text = "DM_CLAIM_NAME" }
-				blockoverride "common_bottom_content" {
-					text_multi = {
-						layoutpolicy_horizontal = expanding
-						autoresize = yes
-						max_width = 360
-						margin = { 6 4 }
-						text = "DM_CLAIM_HINT"
-						default_format = "#low"
-						fontsize = 13
+						# *** ADD ONE text_multi ENTRY HERE PER NEW MISSION ***
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_develop_city').IsSet]"
+							text = "DM_DEVELOP_REWARDS"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_large_research').IsSet]"
+							text = "DM_RESEARCH_REWARDS"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_promote_urbanization').IsSet]"
+							text = "DM_URBANIZE_REWARDS"
+						}
+						text_multi = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							max_width = 360
+							visible = "[Player.MakeScope.GetVariable('dm_mission_claim_province').IsSet]"
+							text = "DM_CLAIM_REWARDS"
+						}
+						# *** END MISSION LIST ***
 					}
 				}
 			}
@@ -250,10 +320,24 @@ situation_panel = {
 					text = "DM_PANEL_PROGRESS_TITLE"
 				}
 				blockoverride "common_bottom_content" {
-					hbox = {
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 6
+						margin = { 6 4 }
+
+						# Progress bar — reads dm_bar_value (int 0-100, updated monthly per mission).
+						# Expression: FixedPointToFloat treats integer N as N/1000; × 1000 restores 0-100.
+						# To add bar support to a new mission: set dm_bar_value in on_monthly — no GUI change needed.
+						progressbar = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 16 }
+							using = morale_progressbar_bar
+							value = "[Multiply_float(FixedPointToFloat(Player.MakeScope.GetVariable('dm_bar_value').GetValue), '(float)1000')]"
+						}
+
+						hbox = {
 						layoutpolicy_horizontal = expanding
 						spacing = 8
-						margin = { 6 4 }
 
 						# Slot: Months elapsed — always shown
 						widget = {
@@ -429,6 +513,15 @@ situation_panel = {
 						}
 					}
 				}
+			}
+
+			# ===============================================================
+			# ABANDON BUTTON
+			# Standalone below all cards — distinct red styling signals danger.
+			# Fires event 60 for confirmation before applying failure consequences.
+			# ===============================================================
+			dm_abandon_button = {
+				visible = "[Player.MakeScope.GetVariable('dm_active_mission').IsSet]"
 			}
 
 		}
