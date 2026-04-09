@@ -1,0 +1,520 @@
+﻿# War Momentum - Territory and Occupation Effects
+#
+# noicthy_apply_occupation:  Counts occupied and auto-conquered locations monthly.
+#                            Regular occupation: every_owned_location where controller != owner.
+#                            Auto-conquest: iterates enemy locations for noicthy_original_owner tags.
+#                            Both merge into unified fort/non-fort counts (forts 5x weight).
+#
+# noicthy_update_territory:  Calls apply_occupation, compares against civil war penalty,
+#                            applies the worse of the two as the occupation modifier.
+#                            Also handles capital resilience, capital fallen, and display variables.
+
+noicthy_apply_occupation = {
+	# Count occupied and conquered locations: forts and non-forts separately.
+	# Occupied = our locations controlled by enemy. Conquered = auto-conquered by enemy.
+	# Both merge into the same counters for a unified occupation ratio.
+	set_local_variable = {
+		name = noicthy_occupied_forts
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_occupied_non_forts
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_total_forts
+		value = num_forts
+	}
+	set_local_variable = {
+		name = noicthy_total_non_forts
+		value = { add = num_locations subtract = num_forts }
+	}
+
+	# Regular occupation: our locations where controller != us
+	every_owned_location = {
+		limit = {
+			NOT = {
+				controller = prev
+			}
+		}
+
+		if = {
+			limit = { has_fort = yes }
+			change_local_variable = { name = noicthy_occupied_forts add = 1 }
+		}
+		else = {
+			change_local_variable = { name = noicthy_occupied_non_forts add = 1 }
+		}
+	}
+
+	# Auto-conquest: provinces taken by nations with auto_conquer modifiers.
+	# Tagged with noicthy_original_owner on the location. Iterates all enemies to find
+	# tagged locations. ALL tagged locations add to totals (they left our num_locations).
+	# Only enemy-held ones add to occupied counts. Re-occupied ones don't penalize.
+	if = {
+		limit = { has_variable = noicthy_was_auto_conquered }
+
+		save_temporary_scope_as = noicthy_ac_victim
+
+		every_war = {
+			limit = { is_in_war = scope:noicthy_ac_victim }
+
+			every_war_participant = {
+				limit = {
+					NOT = {
+						is_fighting_war_together_with = scope:noicthy_ac_victim
+					}
+				}
+
+				every_owned_location = {
+					limit = {
+						has_variable = noicthy_original_owner
+						exists = var:noicthy_original_owner
+						var:noicthy_original_owner = scope:noicthy_ac_victim
+					}
+
+					# Add to totals (denominator) since these left our num_locations/num_forts
+					if = {
+						limit = { has_fort = yes }
+						change_local_variable = { name = noicthy_total_forts add = 1 }
+					}
+					else = { change_local_variable = { name = noicthy_total_non_forts add = 1 } }
+
+					# Only enemy-held ones count as occupied (numerator)
+					if = {
+						limit = {
+							NOT = {
+								controller = scope:noicthy_ac_victim
+							}
+						}
+
+						if = {
+							limit = { has_fort = yes }
+							change_local_variable = { name = noicthy_occupied_forts add = 1 }
+						}
+						else = {
+							change_local_variable = { name = noicthy_occupied_non_forts add = 1 }
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# Compute weighted occupation ratio (forts 5x weight)
+	set_local_variable = {
+		name = noicthy_total_location_weight
+
+		value = {
+			add = local_var:noicthy_total_forts
+			multiply = 5
+			add = local_var:noicthy_total_non_forts
+		}
+	}
+	set_local_variable = {
+		name = noicthy_occupied_location_weight
+
+		value = {
+			add = local_var:noicthy_occupied_forts
+			multiply = 5
+			add = local_var:noicthy_occupied_non_forts
+		}
+	}
+
+	set_local_variable = {
+		name = noicthy_occupation_size
+		value = 0
+	}
+	if = {
+		limit = { local_var:noicthy_total_location_weight > 0 }
+
+		set_local_variable = {
+			name = noicthy_occupation_size
+
+			value = {
+				add = local_var:noicthy_occupied_location_weight
+				divide = local_var:noicthy_total_location_weight
+			}
+		}
+	}
+	if = {
+		limit = { local_var:noicthy_occupation_size > 1 }
+		set_local_variable = { name = noicthy_occupation_size value = 1 }
+	}
+}
+
+# Master territory update: occupation, civil war, capital, and display variables.
+
+noicthy_update_territory = {
+	# Count occupation (includes auto-conquest transfers)
+	noicthy_apply_occupation = yes
+
+	# Civil war territory
+	set_local_variable = {
+		name = noicthy_civil_war_penalty
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_civil_war_crown_forts
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_civil_war_crown_locs
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_civil_war_pretender_forts
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_civil_war_pretender_locs
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_civil_war_opponent_weight
+		value = 0
+	}
+
+	if = {
+		limit = { in_civil_war = yes }
+
+		# Crown = original country, Pretender = rebel breakaway
+		# If we are the rebel, swap perspective so crown/pretender labels are always correct
+		set_local_variable = {
+			name = noicthy_civil_war_crown_forts
+			value = num_forts
+		}
+		set_local_variable = {
+			name = noicthy_civil_war_crown_locs
+			value = { add = num_locations subtract = num_forts }
+		}
+		set_local_variable = {
+			name = noicthy_civil_war_my_weight
+			value = { add = num_forts multiply = 4 add = num_locations }
+		}
+
+		civil_war_opponent = {
+			set_local_variable = {
+				name = noicthy_civil_war_pretender_forts
+				value = num_forts
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_pretender_locs
+				value = { add = num_locations subtract = num_forts }
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_opponent_weight
+				value = { add = num_forts multiply = 4 add = num_locations }
+			}
+		}
+
+		# If we are the rebel side, swap crown and pretender/rebel values
+		if = {
+			limit = { is_rebel_country = yes }
+
+			set_local_variable = {
+				name = noicthy_civil_war_swap
+				value = local_var:noicthy_civil_war_crown_forts
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_crown_forts
+				value = local_var:noicthy_civil_war_pretender_forts
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_pretender_forts
+				value = local_var:noicthy_civil_war_swap
+			}
+
+			set_local_variable = {
+				name = noicthy_civil_war_swap
+				value = local_var:noicthy_civil_war_crown_locs
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_crown_locs
+				value = local_var:noicthy_civil_war_pretender_locs
+			}
+			set_local_variable = {
+				name = noicthy_civil_war_pretender_locs
+				value = local_var:noicthy_civil_war_swap
+			}
+		}
+
+		if = {
+			limit = {
+				local_var:noicthy_civil_war_opponent_weight > 0
+				local_var:noicthy_civil_war_my_weight < local_var:noicthy_civil_war_opponent_weight
+			}
+
+			set_local_variable = {
+				name = noicthy_civil_war_penalty
+
+				value = {
+					add = 1
+
+					subtract = {
+						add = local_var:noicthy_civil_war_my_weight
+						divide = local_var:noicthy_civil_war_opponent_weight
+					}
+				}
+			}
+		}
+	}
+
+	# Effective occupation: worse of raw occupation and civil war penalty
+	set_local_variable = {
+		name = noicthy_effective_occupation
+		value = local_var:noicthy_occupation_size
+	}
+	if = {
+		limit = {
+			local_var:noicthy_civil_war_penalty > local_var:noicthy_effective_occupation
+		}
+
+		set_local_variable = {
+			name = noicthy_effective_occupation
+			value = local_var:noicthy_civil_war_penalty
+		}
+	}
+	if = {
+		limit = { local_var:noicthy_effective_occupation > 1 }
+		set_local_variable = { name = noicthy_effective_occupation value = 1 }
+	}
+
+	# Apply occupation modifier once with the effective value
+	remove_country_modifier = noicthy_war_momentum_occupation
+	if = {
+		limit = { local_var:noicthy_effective_occupation > 0 }
+
+		add_country_modifier = {
+			modifier = noicthy_war_momentum_occupation
+			days = -1
+			size = local_var:noicthy_effective_occupation
+		}
+	}
+
+	# --- DISPLAY (player only) ---
+	if = {
+		limit = { is_ai = no }
+
+		set_variable = {
+			name = noicthy_display_occupied_forts
+			value = local_var:noicthy_occupied_forts
+		}
+		set_variable = {
+			name = noicthy_display_total_forts
+			value = local_var:noicthy_total_forts
+		}
+		set_variable = {
+			name = noicthy_display_occupied_unfortified_locations
+			value = local_var:noicthy_occupied_non_forts
+		}
+		set_variable = {
+			name = noicthy_display_total_unfortified_locations
+			value = local_var:noicthy_total_non_forts
+		}
+		set_variable = {
+			name = noicthy_display_occupation_fort_defense
+			value = { add = local_var:noicthy_effective_occupation multiply = 0.5 }
+		}
+		set_variable = {
+			name = noicthy_display_occupation_war_exhaustion
+			value = { add = local_var:noicthy_effective_occupation multiply = 0.4 }
+		}
+
+		# Per-category occupation contributions for GUI parentheses
+		if = {
+			limit = { local_var:noicthy_total_location_weight > 0 }
+
+			set_variable = {
+				name = noicthy_display_occupied_forts_fort_defense
+
+				value = {
+					add = local_var:noicthy_occupied_forts
+					multiply = 5
+					divide = local_var:noicthy_total_location_weight
+					multiply = 0.5
+				}
+			}
+			set_variable = {
+				name = noicthy_display_occupied_forts_war_exhaustion
+
+				value = {
+					add = local_var:noicthy_occupied_forts
+					multiply = 5
+					divide = local_var:noicthy_total_location_weight
+					multiply = 0.4
+				}
+			}
+			set_variable = {
+				name = noicthy_display_occupied_locations_fort_defense
+
+				value = {
+					add = local_var:noicthy_occupied_non_forts
+					divide = local_var:noicthy_total_location_weight
+					multiply = 0.5
+				}
+			}
+			set_variable = {
+				name = noicthy_display_occupied_locations_war_exhaustion
+
+				value = {
+					add = local_var:noicthy_occupied_non_forts
+					divide = local_var:noicthy_total_location_weight
+					multiply = 0.4
+				}
+			}
+		}
+
+		# Civil war display variables
+		set_variable = {
+			name = noicthy_display_civil_war_penalty
+			value = local_var:noicthy_civil_war_penalty
+		}
+		set_variable = {
+			name = noicthy_display_civil_war_crown_forts
+			value = local_var:noicthy_civil_war_crown_forts
+		}
+		set_variable = {
+			name = noicthy_display_civil_war_crown_locs
+			value = local_var:noicthy_civil_war_crown_locs
+		}
+
+		# Totals for fraction display (crown + pretender)
+		set_variable = {
+			name = noicthy_display_civil_war_total_forts
+
+			value = {
+				add = local_var:noicthy_civil_war_crown_forts
+				add = local_var:noicthy_civil_war_pretender_forts
+			}
+		}
+		set_variable = {
+			name = noicthy_display_civil_war_total_locs
+
+			value = {
+				add = local_var:noicthy_civil_war_crown_locs
+				add = local_var:noicthy_civil_war_pretender_locs
+			}
+		}
+		set_variable = {
+			name = noicthy_display_civil_war_pretender_forts
+			value = local_var:noicthy_civil_war_pretender_forts
+		}
+		set_variable = {
+			name = noicthy_display_civil_war_pretender_locs
+			value = local_var:noicthy_civil_war_pretender_locs
+		}
+
+		# Flag for GUI to know which side we are (1 = rebel/pretender, 0 = crown)
+		if = {
+			limit = { is_rebel_country = yes }
+			set_variable = { name = noicthy_display_civil_war_is_rebel value = 1 }
+		}
+		else = {
+			set_variable = { name = noicthy_display_civil_war_is_rebel value = 0 }
+		}
+
+		# Per-category civil war effects: signed contribution of each category.
+		# Positive = this category hurts you (opponent holds more). Negative = helps you (you hold more).
+		# Uses opponent weight as denominator so contributions sum to the total penalty.
+		if = {
+			limit = {
+				local_var:noicthy_civil_war_penalty > 0
+				local_var:noicthy_civil_war_opponent_weight > 0
+			}
+
+			# Fort gap: (opponent forts - my forts) * 5 / opponent weight * modifier
+			# Positive when opponent has more forts (hurts). Negative when I have more (helps).
+			set_variable = {
+				name = noicthy_display_civil_war_forts_fort_defense
+
+				value = {
+					add = local_var:noicthy_civil_war_pretender_forts
+					subtract = local_var:noicthy_civil_war_crown_forts
+					multiply = 5
+					divide = local_var:noicthy_civil_war_opponent_weight
+					multiply = 0.5
+				}
+			}
+			set_variable = {
+				name = noicthy_display_civil_war_forts_war_exhaustion
+
+				value = {
+					add = local_var:noicthy_civil_war_pretender_forts
+					subtract = local_var:noicthy_civil_war_crown_forts
+					multiply = 5
+					divide = local_var:noicthy_civil_war_opponent_weight
+					multiply = 0.4
+				}
+			}
+
+			# Location gap: (opponent locs - my locs) / opponent weight * modifier
+			set_variable = {
+				name = noicthy_display_civil_war_locs_fort_defense
+
+				value = {
+					add = local_var:noicthy_civil_war_pretender_locs
+					subtract = local_var:noicthy_civil_war_crown_locs
+					divide = local_var:noicthy_civil_war_opponent_weight
+					multiply = 0.5
+				}
+			}
+			set_variable = {
+				name = noicthy_display_civil_war_locs_war_exhaustion
+
+				value = {
+					add = local_var:noicthy_civil_war_pretender_locs
+					subtract = local_var:noicthy_civil_war_crown_locs
+					divide = local_var:noicthy_civil_war_opponent_weight
+					multiply = 0.4
+				}
+			}
+		}
+	} # end display guard
+
+	# Capital resilience: local_defensive offsets part of the global penalty
+	set_local_variable = {
+		name = noicthy_combined_size
+
+		value = {
+			add = var:noicthy_war_momentum_army_size
+			add = local_var:noicthy_effective_occupation
+		}
+	}
+
+	capital ?= {
+		remove_location_modifier = noicthy_war_momentum_capital
+		if = {
+			limit = { local_var:noicthy_combined_size > 0 }
+
+			add_location_modifier = {
+				modifier = noicthy_war_momentum_capital
+				days = -1
+				size = local_var:noicthy_combined_size
+			}
+		}
+	}
+
+	# Capital resilience display (always set, needed for observer mode)
+	set_variable = {
+		name = noicthy_display_capital_resilience
+		value = { add = local_var:noicthy_combined_size multiply = 0.25 }
+	}
+
+	# Capital fallen: flat penalty if capital is under enemy occupation
+	remove_country_modifier = noicthy_war_momentum_capital_fallen
+	if = {
+		limit = {
+			capital ?= {
+				NOT = {
+					controller = prev
+				}
+			}
+		}
+
+		add_country_modifier = {
+			modifier = noicthy_war_momentum_capital_fallen
+			days = -1
+		}
+	}
+}

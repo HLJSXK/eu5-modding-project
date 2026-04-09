@@ -1,0 +1,280 @@
+﻿# War Momentum - Diplomatic Pressure Effects
+# War leaders accumulate war exhaustion from trapped participants.
+# Coalition members below 5 WE provide support, above 5 add pressure.
+
+noicthy_update_pressure = {
+	set_local_variable = {
+		name = noicthy_pressure
+		value = 0
+	}
+	set_local_variable = {
+		name = noicthy_leader_tax
+		value = country_tax_base
+	}
+
+	if = {
+		limit = { local_var:noicthy_leader_tax > 0 }
+		save_scope_as = noicthy_pressure_leader
+
+		# Pressure from subjects with limited diplomacy fighting in the same war.
+		# Iterates this country's subjects only. Typically 0-5.
+		every_subject = {
+			limit = {
+				at_war = yes
+				has_limited_diplomacy = yes
+				is_fighting_war_together_with = scope:noicthy_pressure_leader
+			}
+
+			set_local_variable = {
+				name = noicthy_contribution
+
+				value = {
+					add = war_exhaustion
+					multiply = country_tax_base
+					divide = local_var:noicthy_leader_tax
+					multiply = 0.001
+				}
+			}
+
+			# Only count contributions >= 0.001 (scale up for CFixedPoint comparison)
+			set_local_variable = {
+				name = noicthy_contribution_check
+				value = { add = local_var:noicthy_contribution multiply = 1000 }
+			}
+			if = {
+				limit = { local_var:noicthy_contribution_check >= 1 }
+
+				change_local_variable = {
+					name = noicthy_pressure
+					add = local_var:noicthy_contribution
+				}
+
+				# Tag for display map building (same pattern as coalition members)
+				set_variable = {
+					name = noicthy_sub_pressure_contribution
+					value = local_var:noicthy_contribution
+				}
+			}
+		}
+
+		# Pressure from coalition non-leaders in wars this country leads.
+		# Uses every_war (global) since every_current_war is trigger-only.
+		# Filtered to wars this country leads (1-2 wars typically). Inside each,
+		# every_war_participant checks coalition membership (0 outside coalition wars).
+		every_war = {
+			limit = {
+				is_in_war = scope:noicthy_pressure_leader
+				OR = {
+					attacker_leader = { this = scope:noicthy_pressure_leader }
+					defender_leader = { this = scope:noicthy_pressure_leader }
+				}
+			}
+
+			# Identify the enemy leader so we can check coalition membership against them
+			if = {
+				limit = { attacker_leader = { this = scope:noicthy_pressure_leader } }
+				defender_leader = { save_scope_as = noicthy_war_enemy_leader }
+			}
+			else = { attacker_leader = { save_scope_as = noicthy_war_enemy_leader } }
+
+			every_war_participant = {
+				limit = {
+					NOT = {
+						this = scope:noicthy_pressure_leader
+					}
+					NOT = {
+						is_subject_of = scope:noicthy_pressure_leader
+					}
+
+					# Same side as the leader in this war
+					is_fighting_war_together_with = scope:noicthy_pressure_leader
+
+					# In a coalition against the enemy in this war
+					is_member_of_international_organization_of_type = {
+						type = coalition
+						target = scope:noicthy_war_enemy_leader
+					}
+				}
+
+				set_local_variable = {
+					name = noicthy_contribution
+
+					value = {
+						add = war_exhaustion
+						subtract = 5
+						multiply = country_tax_base
+						divide = local_var:noicthy_leader_tax
+						multiply = 0.001
+					}
+				}
+
+				# Only count contributions with abs >= 0.001 (scale up for CFixedPoint comparison)
+				set_local_variable = {
+					name = noicthy_contribution_check
+					value = { add = local_var:noicthy_contribution multiply = 1000 }
+				}
+				if = {
+					limit = {
+						OR = {
+							local_var:noicthy_contribution_check >= 1
+							NOT = {
+								local_var:noicthy_contribution_check > -1
+							}
+						}
+					}
+
+					change_local_variable = {
+						name = noicthy_pressure
+						add = local_var:noicthy_contribution
+					}
+
+					# Tag the participant with their contribution so we can build maps later
+					set_variable = {
+						name = noicthy_coal_pressure_contribution
+						value = local_var:noicthy_contribution
+					}
+				}
+			}
+		}
+	}
+
+	# --- GAMEPLAY: clamp and apply modifier ---
+
+	if = {
+		limit = { local_var:noicthy_pressure > 1 }
+		set_local_variable = { name = noicthy_pressure value = 1 }
+	}
+	if = {
+		limit = {
+			NOT = {
+				local_var:noicthy_pressure > -1
+			}
+		}
+
+		set_local_variable = { name = noicthy_pressure value = -1 }
+	}
+
+	remove_country_modifier = noicthy_war_momentum_diplomatic_pressure
+	if = {
+		limit = {
+			OR = {
+				local_var:noicthy_pressure > 0
+				NOT = {
+					local_var:noicthy_pressure >= 0
+				}
+			}
+		}
+
+		add_country_modifier = {
+			modifier = noicthy_war_momentum_diplomatic_pressure
+			days = -1
+			size = local_var:noicthy_pressure
+		}
+	}
+
+	# --- DISPLAY (player only) ---
+	# Build maps from tagged participants and store display variables.
+
+	if = {
+		limit = { is_ai = no }
+
+		clear_variable_map = noicthy_pressure_map
+		clear_variable_map = noicthy_pressure_visible_map
+
+		# Maps from tagged subjects
+		every_subject = {
+			limit = { has_variable = noicthy_sub_pressure_contribution }
+
+			save_temporary_scope_as = noicthy_sub_entry
+
+			set_local_variable = {
+				name = noicthy_display_pressure
+				value = var:noicthy_sub_pressure_contribution
+			}
+			set_local_variable = {
+				name = noicthy_pressure_visible
+				value = { add = var:noicthy_sub_pressure_contribution multiply = 10000000 }
+			}
+
+			scope:noicthy_pressure_leader = {
+				add_to_variable_map = {
+					name = noicthy_pressure_map
+					key = scope:noicthy_sub_entry
+					value = local_var:noicthy_display_pressure
+				}
+				add_to_variable_map = {
+					name = noicthy_pressure_visible_map
+					key = scope:noicthy_sub_entry
+					value = local_var:noicthy_pressure_visible
+				}
+			}
+
+			remove_variable = noicthy_sub_pressure_contribution
+		}
+
+		# Maps from tagged coalition participants
+		every_country_together_in_war_with = {
+			limit = { has_variable = noicthy_coal_pressure_contribution }
+
+			save_temporary_scope_as = noicthy_coal_entry
+
+			set_local_variable = {
+				name = noicthy_display_pressure
+				value = var:noicthy_coal_pressure_contribution
+			}
+			set_local_variable = {
+				name = noicthy_pressure_visible
+				value = { add = var:noicthy_coal_pressure_contribution multiply = 10000000 }
+			}
+
+			scope:noicthy_pressure_leader = {
+				add_to_variable_map = {
+					name = noicthy_pressure_map
+					key = scope:noicthy_coal_entry
+					value = local_var:noicthy_display_pressure
+				}
+				add_to_variable_map = {
+					name = noicthy_pressure_visible_map
+					key = scope:noicthy_coal_entry
+					value = local_var:noicthy_pressure_visible
+				}
+			}
+
+			remove_variable = noicthy_coal_pressure_contribution
+		}
+
+		# Display totals
+		if = {
+			limit = {
+				OR = {
+					local_var:noicthy_pressure > 0
+					NOT = {
+						local_var:noicthy_pressure >= 0
+					}
+				}
+			}
+
+			set_variable = { name = noicthy_display_has_pressure value = 1 }
+			set_variable = {
+				name = noicthy_display_pressure
+				value = local_var:noicthy_pressure
+			}
+		}
+		else = {
+			remove_variable = noicthy_display_has_pressure
+			remove_variable = noicthy_display_pressure
+		}
+	}
+	else = {
+		# AI: clean up tags without building maps
+		every_subject = {
+			limit = { has_variable = noicthy_sub_pressure_contribution }
+			remove_variable = noicthy_sub_pressure_contribution
+		}
+
+		every_country_together_in_war_with = {
+			limit = { has_variable = noicthy_coal_pressure_contribution }
+			remove_variable = noicthy_coal_pressure_contribution
+		}
+	}
+}

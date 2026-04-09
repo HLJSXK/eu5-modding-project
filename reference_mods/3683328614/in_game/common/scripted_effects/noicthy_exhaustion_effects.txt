@@ -1,0 +1,68 @@
+﻿# War Momentum - War Exhaustion Effects
+# Penalizes based on proportion of military strength lost from peak.
+
+noicthy_update_exhaustion = {
+	set_local_variable = {
+		name = noicthy_exhaustion_size
+		value = 0
+	}
+	if = {
+		limit = { var:noicthy_potential_peak > 0 }
+
+		set_local_variable = {
+			name = noicthy_exhaustion_size
+
+			value = {
+				add = 1
+
+				subtract = {
+					add = local_var:noicthy_effective_strength
+					divide = var:noicthy_potential_peak
+				}
+			}
+		}
+	}
+
+	# Trapped participants get half exhaustion
+	if = {
+		limit = {
+			local_var:noicthy_exhaustion_size > 0
+			noicthy_is_trapped_in_war = yes
+		}
+
+		set_local_variable = {
+			name = noicthy_exhaustion_size
+			value = { add = local_var:noicthy_exhaustion_size multiply = 0.5 }
+		}
+	}
+
+	if = {
+		limit = { local_var:noicthy_exhaustion_size > 1 }
+		set_local_variable = { name = noicthy_exhaustion_size value = 1 }
+	}
+	if = {
+		limit = { local_var:noicthy_exhaustion_size < 0 }
+		set_local_variable = { name = noicthy_exhaustion_size value = 0 }
+	}
+
+	remove_country_modifier = noicthy_war_momentum_army_exhaustion
+	if = {
+		limit = { local_var:noicthy_exhaustion_size > 0 }
+
+		add_country_modifier = {
+			modifier = noicthy_war_momentum_army_exhaustion
+			days = -1
+			size = local_var:noicthy_exhaustion_size
+		}
+	}
+}
+
+# Diplomatic pressure: war leaders accumulate war exhaustion from trapped participants.
+# Reads each participant's actual war_exhaustion (game state), weighted by relative tax base.
+# Subjects with limited diplomacy: always positive (frustrated, want peace).
+# Coalition non-leaders: positive above 5 WE, negative below 5 WE (fresh allies bolster resolve).
+# Cost: non-leaders and countries without subjects skip almost immediately (trigger fails).
+# War leaders iterate: every_subject (a handful), every_war filtered to led wars (1-2 typically),
+# every_war_participant filtered to coalition members (0 outside coalition wars),
+# every_country_together_in_war_with for map building (same count as above).
+# The every_war global scan is the most expensive single operation in the mod.
