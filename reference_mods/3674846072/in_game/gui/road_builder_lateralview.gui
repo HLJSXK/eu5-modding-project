@@ -1,0 +1,329 @@
+lateralview = {
+	name = "road_builder_lateralview"
+
+	widget = {
+		visible = "[TutorialIsRunning]"
+		widget = {
+			widgetid = "road_builder_player_capital"
+			visible = "[ObjectsEqual(Player.GetCapital.Self, RoadBuilder.GetLocation.Self)]"
+		}
+	}
+
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "ROAD_BUILDER_TAB"
+			}
+		}
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			margin = { 10 5 }
+			spacing = 5
+
+			# --- EINE BOX FÜR ALLE STRASSENTYPEN ---
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				
+				text_single = {
+					layoutpolicy_horizontal = expanding
+					text = "ROAD_BUILDER_CATEGORIES_ALL" # Lokalisierbarer Key
+					default_format = "#medium"
+					margin_left = 5
+					margin_bottom = 5
+				}
+
+				dynamicgridbox = {
+					name = "all_roads_grid"
+					datamodel = "[RoadBuilder.GetRoadTypes]"
+					flipdirection = yes
+					datamodel_wrap = 4
+					
+					item = {
+						widget = {
+							size = { 130 45 }
+							
+							button_main_tab_alt = {
+								size = { 125 40 }
+								parentanchor = center
+								datacontext = "[RoadTypeItem.GetRoadType]"
+								down = "[RoadTypeItem.GetIsSelected]"
+								enabled = "[RoadTypeItem.IsEnabled]"
+								onclick = "[RoadBuilder.SelectRoadType(RoadTypeItem.GetRoadType)]"
+								
+								tooltipwidget = { 
+									using = RoadType_tooltip 
+								}
+								
+								blockoverride "tab_text" {
+									text = "[RoadTypeItem.GetRoadType.GetNameWithNoTooltip]"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = preferred
+
+				hbox = {
+					datamodel = "[RoadBuilder.GetRoadCostCalculations]"
+					spacing = 5
+					margin = { 10 10 }
+					item = {
+						button = {
+							size = { 32 32 }
+							using = header_button_template
+							onclick = "[RoadCostCalculation.OnClick]"
+							down = "[RoadCostCalculation.GetIsSelected]"
+							tooltip = "[RoadCostCalculation.GetName]" # KORREKTUR: Tooltip für Kosten-Filter hinzugefügt
+							
+							icon = {
+								size = { 24 24 }
+								parentanchor = center
+								texture = "[GetRoadCostCalculationIcon(RoadCostCalculation.Self)]"
+								
+								modify_texture = {
+									using = color_gold_texture
+									alpha = 0.4
+								}
+							}
+						}
+					}
+				}
+			}
+
+			filtered_sorted_list = {
+				datacontext = "[RoadBuilder.GetRoadDestinationsSearch]"
+				layoutpolicy_vertical = expanding
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "scroll_list_is_empty" {
+					visible = "[IsDataModelEmpty(RoadBuilder.GetRoadDestinationsItems)]"
+				}
+
+				blockoverride "scroll_list_content" {
+					addcolumn = 100%
+					addrow = 42
+					datamodel = "[RoadBuilder.GetRoadDestinationsItems]"
+
+					item = {
+						widget = {
+							size = { 100% 42 }
+							
+							background = {
+								using = paper_card_texture
+								alpha = 0.3
+							}
+
+							card_list_button = {
+								size = { 100% 42 }
+								enabled = "[RoadDestinationItem.CanBuildRoad]"
+								onclick = "[RoadDestinationItem.BuildRoad]"
+								tooltip = "[RoadBuilder.GetTooltipForLocation(RoadDestinationItem.GetLocation)]" # KORREKTUR: Tooltip für Zielorte hinzugefügt
+								
+								hbox = {
+									spacing = 10
+									margin = { 12 0 }
+
+									icon = {
+										size = { 20 20 }
+										texture = "[RoadDestinationItem.GetLocation.GetRankIcon]"
+									}
+
+									text_single = {
+										layoutpolicy_horizontal = expanding
+										text = "[RoadDestinationItem.GetLocation.GetNameWithNoTooltip]"
+										default_format = "#yellow_titles"
+									}
+
+									text_single = {
+										size = { 60 20 }
+										text = "[RoadDestinationItem.GetDistance]"
+										align = right|nobaseline
+									}
+
+									text_single = {
+										size = { 90 20 }
+										raw_text = "[RoadDestinationItem.GetCost|2]@gold!"
+										align = right|nobaseline
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template road_destination_entry {
+	onmousehierarchyenter = "[RoadDestinationItem.OnMouseHierarchyEnter]"
+	  onmousehierarchyleave = "[RoadDestinationItem.OnMouseHierarchyLeave]"
+
+	background = {
+		using = paper_card_texture
+		margin = { 1 1 }
+		margin_bottom = 1
+		alpha = 0.3
+		block "card_shadow_margin" {}
+	}
+
+	card_list_button = {
+		size = {100% 40}
+		enabled = "[RoadDestinationItem.CanBuildRoad]"
+		onclick = "[RoadDestinationItem.BuildRoad]"
+		
+		tooltipwidget = {
+			ContextualTooltipType = {
+				blockoverride "title_text" {
+					text = "ROAD_BUILDER_DESTINATION_TITLE_TT"
+				}
+				blockoverride "concept_link" {
+					text = [road|e]
+				}
+				blockoverride "title_icon" {
+					icon = {
+						using = tooltip_title_icon_size
+						texture = "[GetRoadTypeIcon(RoadDestinationItem.GetRoadType)]"
+					}
+				}
+				blockoverride "tooltip_content" {							
+					TooltipStringPairList = {
+						textcontext = "[StringToConditionListOnlyPassedAndNeutralIfNot(RoadDestinationItem.CanBuildRoad, RoadBuilder.GetTooltipForLocation(RoadDestinationItem.GetLocation)).GetOutput]"
+					}
+					
+					TooltipStringPairList = {
+						blockoverride "block_title" {
+							text = "HAS_ROAD_IN_BOTH_LOC"
+						}
+						
+						textcontext = "[ShowModifierEffect('has_road')]"
+					}
+				}				
+			}
+		}
+
+		action_tooltip = {
+			click_type = left
+			click_mode = single
+			title = "[RoadDestinationItem.GetTitle]"
+			cost = "[RoadDestinationItem.GetCostString]"
+			enabled = "[RoadDestinationItem.CanBuildRoad]"
+			visible = yes
+			on_action = "[PlayAudioEffect('UI_action_road_build')]"
+			conditions = "[RoadBuilder.GetConditionsForLocation(RoadDestinationItem.GetLocation)]"
+		}		
+		
+		modify_texture = {
+			using = color_dark_blue_texture
+			blend_mode = multiply
+			alpha = 0.1
+		}
+
+		hbox = {
+			spacing = 5
+			margin = {5 0}
+			margin_left = 10
+
+			widget = {
+				size = {200 18}
+				hbox = {
+					spacing = 5
+
+					icon = {
+						size = { 18 18 }
+						texture = "[RoadDestinationItem.GetLocation.GetRankIcon]"
+					}
+
+					text_single = {
+						maximumsize = { 180 -1 }
+						default_format = "#yellow_titles"
+						using = Font_Type_Standard
+						text = "[RoadDestinationItem.GetLocation.GetNameWithNoTooltip]"
+						autoresize = yes
+
+						sort_by_highlight = {
+							size = { 100% 100% }
+							name = "name"
+						}
+					}
+
+					expand = {}
+				}
+			}
+
+			text_single = {
+				size = {35 18}
+				autoresize = no
+				align = left|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				text = "[RoadDestinationItem.GetDistance]"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "distance"
+				}
+			}
+
+			text_single = {
+				size = {55 18}
+				align = right|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				text = "[RoadDestinationItem.GetLocation.GetTopography.GetIcon][RoadDestinationItem.GetLocation.GetTopography.GetNameNoUnderline]"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "topography"
+				}
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				autoresize = no
+				size = {20 18}
+				margin_right = 5
+				align = right|nobaseline
+				default_format = "#yellow_titles"
+				using = Font_Type_Standard
+				raw_text = "[RoadDestinationItem.GetCost|2]@gold!"
+				
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "cost"
+				}
+			}
+		}
+	}
+}
+
+template upgrade_road_ranking_tt {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "ROAD_BUILDER_UPGRADE_TOOLTIP_TITLE"
+		}
+
+		blockoverride "title_icon" {}
+
+		blockoverride "tooltip_content" {
+			TooltipListBase = {
+				TooltipStringPairList = {
+					lowpriotextcontext = "[RoadBuilder.GetUpgradeTooltip]"
+				}
+			}
+		}
+	}
+}
