@@ -1,0 +1,495 @@
+﻿nd_mandate_crisis = {
+	monthly_spawn_chance = monthly_spawn_chance_low
+
+	can_start = {
+		has_game_rule = nd_mandate_crisis_enabled
+		exists = international_organization:middle_kingdom
+		exists = international_organization:middle_kingdom.leader_country
+		NOT = { is_situation_active = situation:red_turban_rebellions }
+		international_organization:middle_kingdom.leader_country = {
+			NOT = { has_variable = nd_mc_cooldown }
+			has_any_active_disaster = no
+			in_civil_war = no
+			international_organization:middle_kingdom = {
+				var:celestial_authority <= 30
+			}
+			weighted_calc_true_if = {
+				amount >= 2
+				1 = { stability < 0 }
+				1 = { government_power < 40 }
+				1 = { legitimacy < 40 }
+				1 = {
+					weighted_calc_true_if = {
+						amount >= 2
+						1 = { estate_satisfaction:nobles_estate < 0.5 }
+						1 = { estate_satisfaction:clergy_estate < 0.5 }
+						1 = { estate_satisfaction:burghers_estate < 0.5 }
+						2 = { estate_satisfaction:peasants_estate < 0.5 }
+					}
+				}
+			}
+		}
+	}
+
+	can_end = {
+		nd_mandate_crisis_end_trigger = yes
+	}
+
+	visible = {
+		OR = {
+			AND = {
+				exists = international_organization:middle_kingdom
+				is_leader_of_international_organization = international_organization:middle_kingdom
+			}
+			AND = {
+				exists = international_organization:middle_kingdom.leader_country
+				OR = {
+					is_neighbor_of = international_organization:middle_kingdom.leader_country
+					is_subject_of = international_organization:middle_kingdom.leader_country
+					is_enemy_of = international_organization:middle_kingdom.leader_country
+				}
+			}
+			capital ?= { sub_continent ?= sub_continent:east_asia }
+			AND = {
+				exists = international_organization:nd_mandate_challengers
+				is_member_of_international_organization = international_organization:nd_mandate_challengers
+			}
+		}
+	}
+
+	on_start = {
+		# Safety: destroy stale IO from previous crisis
+		if = {
+			limit = { exists = international_organization:nd_mandate_challengers }
+			destroy_international_organization_no_instigator = { target = international_organization:nd_mandate_challengers }
+		}
+
+		international_organization:middle_kingdom.leader_country = {
+			# Initialize phase tracking
+			set_variable = { name = nd_mc_phase value = 1 }
+			set_variable = { name = nd_mc_tags_released value = 0 }
+
+			# Apply Phase 1 modifier
+			add_country_modifier = {
+				modifier = nd_mandate_crisis_unrest
+				months = -1
+				mode = replace
+			}
+
+			# Notify emperor
+			trigger_event_non_silently = nd_mandate_crisis.1
+		}
+
+		# Notify neighbors
+		every_country = {
+			limit = {
+				NOT = { nd_mc_is_emperor_trigger = yes }
+				OR = {
+					AND = {
+						exists = international_organization:middle_kingdom.leader_country
+						is_neighbor_of = international_organization:middle_kingdom.leader_country
+					}
+					capital ?= { sub_continent ?= sub_continent:east_asia }
+				}
+			}
+			trigger_event_non_silently = {
+				id = nd_mandate_crisis.2
+				days = 1
+			}
+		}
+	}
+
+	on_monthly = {
+		if = {
+			limit = {
+				exists = international_organization:middle_kingdom
+				exists = international_organization:middle_kingdom.leader_country
+			}
+			international_organization:middle_kingdom.leader_country = {
+				# Phase 1: Flavor events
+				if = {
+					limit = {
+						has_variable = nd_mc_phase
+						var:nd_mc_phase = 1
+					}
+					random_list = {
+						600 = { }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.10 }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.11 }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.12 }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.13 }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.14 }
+						100 = { trigger_event_non_silently = nd_mandate_crisis.15 }
+					}
+
+					# Check Phase 2 transition: 12+ months and authority still critical
+					if = {
+						limit = {
+							situation:nd_mandate_crisis = { years_since_situation_start > 0 }
+							international_organization:middle_kingdom = {
+								var:celestial_authority < 20
+							}
+						}
+						# Transition to Phase 2
+						set_variable = { name = nd_mc_phase value = 2 }
+						remove_country_modifier = nd_mandate_crisis_unrest
+						add_country_modifier = {
+							modifier = nd_mandate_crisis_fragmentation
+							months = -1
+							mode = replace
+						}
+						trigger_event_non_silently = nd_mandate_crisis.23
+					}
+				}
+
+				# Phase 2: Country releases
+				if = {
+					limit = {
+						has_variable = nd_mc_phase
+						var:nd_mc_phase = 2
+					}
+					# Accelerating release pace
+					random = {
+						chance = {
+							value = 20
+							if = {
+								limit = { var:nd_mc_tags_released >= 3 }
+								add = 15
+							}
+							if = {
+								limit = { var:nd_mc_tags_released >= 6 }
+								add = 15
+							}
+						}
+						# Try historical tags first (check if emperor owns the location)
+						random_list = {
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = MNG location = shangyuan } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_MNG }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CSO location = qiaoxian } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CSO }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CTW location = hanchuan } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CTW }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CHE location = dehua_jiujiang } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CHE }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = WUU location = gaoyou } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_WUU }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CXI location = baxian } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CXI }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CSI location = jingzhao } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CSI }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CDN location = dongguan } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CDN }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CNP location = nanping } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CNP }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CKO location = kaifeng } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CKO }
+							}
+							10 = {
+								trigger = { nd_mc_can_release_tag = { tag = CNA location = liaoyang } }
+								trigger_event_non_silently = { id = nd_mandate_crisis.20 days = { 5 15 } }
+								hidden_effect = { set_variable = nd_mc_release_current_tag_CNA }
+							}
+							# Dynamic culture warlord fallback
+							50 = {
+								trigger = {
+									any_owned_location = {
+										NOT = { dominant_culture = root.culture }
+										province != root.capital.province
+									}
+								}
+								trigger_event_non_silently = { id = nd_mandate_crisis.21 days = { 5 15 } }
+							}
+							100 = { }
+						}
+					}
+
+					# Foreign opportunity events for neighbors
+					random = {
+						chance = 3
+						random_country = {
+							limit = {
+								exists = international_organization:middle_kingdom.leader_country
+								is_neighbor_of = international_organization:middle_kingdom.leader_country
+								NOT = { nd_mc_is_emperor_trigger = yes }
+								NOT = {
+									culture = {
+										has_culture_group = culture_group:chinese_group
+									}
+								}
+								at_war = no
+							}
+							trigger_event_non_silently = nd_mandate_crisis.32
+						}
+					}
+				}
+			}
+		}
+
+		# Warlord flavor: "Claim the Mandate" for hostile warlords
+		if = {
+			limit = {
+				exists = international_organization:nd_mandate_challengers
+				international_organization:middle_kingdom.leader_country = {
+					has_variable = nd_mc_phase
+					var:nd_mc_phase = 2
+				}
+			}
+			international_organization:nd_mandate_challengers = {
+				random_international_organization_member = {
+					limit = {
+						has_variable = nd_mc_emperor_allegiance
+						var:nd_mc_emperor_allegiance < -20
+						NOT = { has_variable = nd_mc_claimed_mandate }
+					}
+					random = {
+						chance = 10
+						trigger_event_non_silently = { id = nd_mandate_crisis.31 days = { 5 15 } }
+					}
+				}
+			}
+		}
+	}
+
+	on_ended = {
+		# Determine resolution path
+		if = {
+			# Path C: New Dynasty (challenger controls 65%+)
+			limit = {
+				exists = international_organization:nd_mandate_challengers
+				exists = international_organization:middle_kingdom
+				international_organization:nd_mandate_challengers = {
+					international_organization_has_leader = yes
+				}
+				international_organization:middle_kingdom = {
+					any_international_organization_owned_location = {
+						is_owned_or_owned_by_subjects_or_below_of = international_organization:nd_mandate_challengers.leader_country
+						percent >= 0.65
+					}
+				}
+			}
+			international_organization:nd_mandate_challengers.leader_country = {
+				trigger_event_non_silently = nd_mandate_crisis.5
+				add_country_modifier = {
+					modifier = nd_mandate_crisis_new_dynasty
+					years = 10
+					mode = replace
+				}
+			}
+		}
+		else_if = {
+			# Path A: Reform (Phase 1 success)
+			limit = {
+				exists = international_organization:middle_kingdom.leader_country
+				international_organization:middle_kingdom.leader_country = {
+					has_variable = nd_mc_phase
+					var:nd_mc_phase = 1
+				}
+			}
+			international_organization:middle_kingdom.leader_country = {
+				trigger_event_non_silently = nd_mandate_crisis.3
+				add_country_modifier = {
+					modifier = nd_mandate_crisis_reformed
+					years = 10
+					mode = replace
+				}
+			}
+		}
+		else_if = {
+			# Path B: Reconquest
+			limit = {
+				exists = international_organization:middle_kingdom.leader_country
+			}
+			international_organization:middle_kingdom.leader_country = {
+				trigger_event_non_silently = nd_mandate_crisis.4
+				add_country_modifier = {
+					modifier = nd_mandate_crisis_reconquest
+					years = 10
+					mode = replace
+				}
+			}
+		}
+
+		# Cleanup
+		if = {
+			limit = { exists = international_organization:middle_kingdom.leader_country }
+			international_organization:middle_kingdom.leader_country = {
+				nd_mc_cleanup_variables = yes
+			}
+		}
+
+		# Cleanup warlord variables
+		every_country = {
+			limit = { has_variable = nd_mc_emperor_allegiance }
+			remove_variable = nd_mc_emperor_allegiance
+			if = {
+				limit = { has_variable = nd_mc_claimed_mandate }
+				remove_variable = nd_mc_claimed_mandate
+			}
+		}
+
+		# Destroy challenger IO
+		if = {
+			limit = { exists = international_organization:nd_mandate_challengers }
+			destroy_international_organization_no_instigator = { target = international_organization:nd_mandate_challengers }
+		}
+	}
+
+	tooltip = {
+		if = {
+			limit = {
+				has_owner = yes
+				owner ?= { nd_mc_is_emperor_trigger = yes }
+			}
+			custom_tooltip = nd_mc_emperor_tt
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				exists = international_organization:nd_mandate_challengers
+				owner ?= {
+					is_leader_of_international_organization = international_organization:nd_mandate_challengers
+				}
+			}
+			custom_tooltip = nd_mc_challenger_tt
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+					var:nd_mc_emperor_allegiance >= 50
+				}
+			}
+			custom_tooltip = nd_mc_loyalist_tt
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+					var:nd_mc_emperor_allegiance < 0
+				}
+			}
+			custom_tooltip = nd_mc_rebel_tt
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+				}
+			}
+			custom_tooltip = nd_mc_neutral_tt
+		}
+	}
+
+	map_color = {
+		if = {
+			limit = {
+				has_owner = yes
+				owner ?= { nd_mc_is_emperor_trigger = yes }
+			}
+			value = rgb { 254 206 27 }
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				exists = international_organization:nd_mandate_challengers
+				owner ?= {
+					is_leader_of_international_organization = international_organization:nd_mandate_challengers
+				}
+			}
+			value = rgb { 200 30 30 }
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+					var:nd_mc_emperor_allegiance >= 50
+				}
+			}
+			value = rgb { 70 180 30 }
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+					var:nd_mc_emperor_allegiance < 0
+				}
+			}
+			value = rgb { 220 100 40 }
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				owner ?= {
+					has_reform = government_reform:warring_state
+					has_variable = nd_mc_emperor_allegiance
+				}
+			}
+			value = rgb { 140 140 140 }
+		}
+	}
+
+	legend_key = {
+		desc = "nd_mc_legend_emperor"
+		color = rgb { 254 206 27 }
+		require_color_on_map = yes
+	}
+	legend_key = {
+		desc = "nd_mc_legend_challenger"
+		color = rgb { 200 30 30 }
+		require_color_on_map = yes
+	}
+	legend_key = {
+		desc = "nd_mc_legend_loyalist"
+		color = rgb { 70 180 30 }
+		require_color_on_map = yes
+	}
+	legend_key = {
+		desc = "nd_mc_legend_rebel"
+		color = rgb { 220 100 40 }
+		require_color_on_map = yes
+	}
+	legend_key = {
+		desc = "nd_mc_legend_neutral"
+		color = rgb { 140 140 140 }
+		require_color_on_map = yes
+	}
+}

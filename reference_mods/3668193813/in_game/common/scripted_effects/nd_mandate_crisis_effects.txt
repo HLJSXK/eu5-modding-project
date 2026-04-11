@@ -1,0 +1,233 @@
+﻿# Create the Mandate Challengers IO if it does not exist
+nd_mc_create_io = {
+	if = {
+		limit = {
+			NOT = { exists = international_organization:nd_mandate_challengers }
+		}
+		create_international_organization = {
+			type = international_organization_type:nd_mandate_challengers
+			hidden_effect = {
+				add_country_to_international_organization = prev
+				set_leader_country = prev
+				set_variable = nd_mc_empty_io
+			}
+		}
+	}
+}
+
+# Setup a released country as a warring state in the Mandate Crisis
+nd_mc_released_country_setup = {
+	set_variable = { name = nd_mc_emperor_allegiance value = 0 }
+	set_variable = unlocked_warring_state
+	change_government_type = government_type:monarchy
+	add_reform = government_reform:warring_state
+
+	add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_radical_bonus }
+	add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_radical_bonus }
+	add_estate_satisfaction = { type = estate_type:peasants_estate value = estate_satisfaction_radical_bonus }
+	add_estate_satisfaction = { type = estate_type:burghers_estate value = estate_satisfaction_radical_bonus }
+
+	change_heir_selection = heir_selection:cognatic_primogeniture
+
+	# Join religious sects if applicable
+	if = {
+		limit = {
+			OR = {
+				religion = religion:mahayana
+				religion = religion:sanjiao
+			}
+		}
+		random_international_organization = {
+			limit = {
+				international_organization_type = international_organization_type:sect
+				international_organization_has_policy = policy:confucianism_policy
+			}
+			add_country_to_international_organization = prev
+		}
+		random_international_organization = {
+			limit = {
+				international_organization_type = international_organization_type:sect
+				international_organization_has_policy = policy:daoism_policy
+			}
+			add_country_to_international_organization = prev
+		}
+	}
+
+	if = {
+		limit = { exists = scope:target_location }
+		set_capital = scope:target_location
+	}
+
+	if = {
+		limit = { exists = scope:target_character }
+		scope:target_character = {
+			move_country = prev
+		}
+		set_new_ruler = scope:target_character
+	}
+
+	every_province = {
+		limit = { any_location_in_province = { NOT = { integration_level = core } } }
+		change_province_integration = core
+		change_province_food_percentage = 1
+	}
+}
+
+# Add a country to the challengers IO and declare war on the emperor
+# Parameters: $country$
+nd_mc_add_country_to_challengers_and_dow = {
+	add_stability = stability_severe_penalty
+	$country$ = {
+		nd_mc_create_io = yes
+		if = {
+			limit = { exists = international_organization:nd_mandate_challengers }
+			if = {
+				limit = { international_organization:nd_mandate_challengers = { has_variable = nd_mc_empty_io } }
+				international_organization:nd_mandate_challengers = {
+					remove_variable = nd_mc_empty_io
+					set_leader_country = prev
+				}
+			}
+			else = {
+				international_organization:nd_mandate_challengers = {
+					add_country_to_international_organization_no_update = prev
+					if = {
+						limit = { international_organization_has_leader = no }
+						set_leader_country = prev
+					}
+				}
+			}
+			hidden_effect = {
+				international_organization:nd_mandate_challengers = {
+					every_international_organization_member = {
+						add_truce_with = { target = $country$ mutual = yes months = 6 }
+					}
+				}
+			}
+		}
+	}
+	declare_war_with_cb = {
+		target = $country$
+		type = casus_belli:cb_conquer_enemy
+	}
+	$country$ = {
+		raise_all_levies = { type = army instant = yes }
+	}
+}
+
+# Release a historical tag as a mandate challenger
+# Parameters: $tag$, $culture$, $accepted_culture$
+nd_mc_release_warlord_tag = {
+	if = {
+		limit = { NOT = { country_exists = c:$tag$ } }
+		custom_tooltip = {
+			text = nd_mc_release_country_tt
+			create_country_from_cores_in_our_locations = c:$tag$
+			c:$tag$ = {
+				save_scope_as = target_country
+				change_country_color = map_$tag$
+				change_culture = $culture$
+				nd_mc_released_country_setup = yes
+				add_accepted_culture = $accepted_culture$
+			}
+		}
+	}
+	custom_tooltip = {
+		text = nd_mc_lose_characters_tt
+		ordered_character = {
+			order_by = total_abilities
+			limit = {
+				culture = $culture$
+				is_ruler = no
+				is_heir = no
+				is_loyal = yes
+				in_cabinet = no
+				is_general = no
+				is_explorer = no
+				is_admiral = no
+				is_consort = no
+			}
+			max = 8
+			check_range_bounds = no
+			move_country = c:$tag$
+		}
+	}
+}
+
+# Release a dynamic culture warlord
+# Parameters: $culture$
+nd_mc_release_cultural_warlord = {
+	culture:$culture$ = { save_scope_as = target_culture }
+	ordered_owned_location = {
+		limit = {
+			NOT = { dominant_culture = root.culture }
+			dominant_culture = scope:target_culture
+			province != root.capital.province
+		}
+		order_by = {
+			value = population
+			if = {
+				limit = { location_rank = location_rank:town }
+				multiply = 5
+			}
+			if = {
+				limit = { location_rank = location_rank:city }
+				multiply = 10
+			}
+		}
+		check_range_bounds = no
+		max = 1
+		save_scope_as = target_location
+		create_dynasty_from_location = random
+		last_dynasty_in_location = { save_scope_as = target_dynasty }
+		create_country_from_location = {
+			save_scope_as = target_country
+			nd_mc_released_country_setup = yes
+			set_capital = prev
+			create_character = {
+				culture = scope:target_culture
+				age = 30
+				dynasty = scope:target_dynasty
+				save_scope_as = target_character
+				prev = { set_new_ruler = prev }
+			}
+		}
+	}
+}
+
+# Cleanup all Mandate Crisis variables on the emperor
+nd_mc_cleanup_variables = {
+	remove_variable = nd_mc_phase
+	remove_variable = nd_mc_tags_released
+	# Action-used variables
+	if = { limit = { has_variable = nd_mc_used_reform_bureaucracy } remove_variable = nd_mc_used_reform_bureaucracy }
+	if = { limit = { has_variable = nd_mc_used_purge_eunuchs } remove_variable = nd_mc_used_purge_eunuchs }
+	if = { limit = { has_variable = nd_mc_used_appease_generals } remove_variable = nd_mc_used_appease_generals }
+	if = { limit = { has_variable = nd_mc_used_grant_autonomy } remove_variable = nd_mc_used_grant_autonomy }
+	if = { limit = { has_variable = nd_mc_used_imperial_edict } remove_variable = nd_mc_used_imperial_edict }
+	# Release tag tracking variables
+	if = { limit = { has_variable = nd_mc_release_current_tag_MNG } remove_variable = nd_mc_release_current_tag_MNG }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CSO } remove_variable = nd_mc_release_current_tag_CSO }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CTW } remove_variable = nd_mc_release_current_tag_CTW }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CHE } remove_variable = nd_mc_release_current_tag_CHE }
+	if = { limit = { has_variable = nd_mc_release_current_tag_WUU } remove_variable = nd_mc_release_current_tag_WUU }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CXI } remove_variable = nd_mc_release_current_tag_CXI }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CSI } remove_variable = nd_mc_release_current_tag_CSI }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CDN } remove_variable = nd_mc_release_current_tag_CDN }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CNP } remove_variable = nd_mc_release_current_tag_CNP }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CKO } remove_variable = nd_mc_release_current_tag_CKO }
+	if = { limit = { has_variable = nd_mc_release_current_tag_CNA } remove_variable = nd_mc_release_current_tag_CNA }
+	# Modifiers
+	if = {
+		limit = { has_country_modifier = nd_mandate_crisis_unrest }
+		remove_country_modifier = nd_mandate_crisis_unrest
+	}
+	if = {
+		limit = { has_country_modifier = nd_mandate_crisis_fragmentation }
+		remove_country_modifier = nd_mandate_crisis_fragmentation
+	}
+	set_variable = {
+		name = nd_mc_cooldown
+		years = 30
+	}
+}
