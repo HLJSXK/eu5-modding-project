@@ -1,0 +1,40 @@
+﻿# SOL Migration Notice — Version Stamp & Load Check
+#
+# on_game_start_after_lobby_human_country fires ONLY on new games (CMF hook).
+# on_game_load_after_lobby_human_country fires ONLY on save loads (CMF hook).
+#
+# Both hooks are country-scoped (human players only).
+# Global variable SOL_migration_v2_seen persists in saves.
+# One flag per save — fires once for the first human player who loads, then done.
+
+# ── New game: stamp version so save load never triggers the migration event ──
+# Scope: none (global)
+on_game_start_after_lobby = {
+	on_actions = {
+		SOL_new_game_version_stamp
+	}
+}
+
+SOL_new_game_version_stamp = {
+	effect = {
+		set_global_variable = SOL_migration_v2_seen
+	}
+}
+
+# ── Save load: check if player needs migration notification ──
+# Scope: country
+on_game_load_after_lobby_human_country = {
+	on_actions = {
+		SOL_migration_check
+	}
+}
+
+SOL_migration_check = {
+	trigger = {
+		NOT = { has_global_variable = SOL_migration_v2_seen }
+	}
+	effect = {
+		set_global_variable = SOL_migration_v2_seen
+		trigger_event_non_silently = sol_migration.1
+	}
+}
