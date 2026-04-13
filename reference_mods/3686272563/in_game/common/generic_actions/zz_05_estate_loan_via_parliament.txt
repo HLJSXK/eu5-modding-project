@@ -1,0 +1,167 @@
+﻿estate_loan_via_parliament = {
+    type = parliament
+    sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+
+    ai_tick = daily
+    ai_tick_frequency = 100
+    automation_tick = daily
+    automation_tick_frequency = 7
+    player_automated_category = parliament
+
+    allow = {
+	hidden_trigger = {
+        	scope:actor = { is_ai = no } ### Makes it so that only player has this action.
+    	}        
+ 
+	scope:actor = {
+            is_active_parliament = yes
+           
+        }
+
+        # Blocked if the country has ruined its estate credit.
+        custom_tooltip = {
+            text = estate_loan_via_parliament_req_credit_tt
+            scope:actor = { NOT = { has_country_modifier = estate_credit_ruined } }
+        }
+
+        # Requires at least 50% support for the current Parliament issue
+        custom_tooltip = {
+            text = estate_loan_via_parliament_req_support_tt
+            scope:actor = { parliament_issue_support >= 0.5 }
+        }
+
+        custom_tooltip = {
+            text = estate_loan_via_parliament_req_once_tt
+            scope:actor = { NOT = { has_variable = estate_loan_used_this_parliament } }
+        }
+
+        custom_tooltip = {
+            text = estate_loan_via_parliament_req_estates_tt
+            scope:actor = {
+                any_estate = {
+                    NOT = { estate_type = estate_type:crown_estate }
+                    estate_gold > 0.01
+                }
+            }
+        }
+    }
+
+    effect = {
+        scope:actor = {
+
+            # Spend political capital: consume 50% support for the current Parliament issue
+            change_parliament_issue_support = { value = -0.5 }
+
+            # Prevent reuse during this parliament session
+            set_variable = { name = estate_loan_used_this_parliament value = 1 }
+
+            # Loan state (cleared on repayment / default)
+            set_variable = { name = estate_loan_active value = 1 }
+
+            # Fixed loan duration: 60 months
+            set_variable = { name = estate_loan_months_left value = 60 }
+            remove_variable = estate_loan_repayment_prompted
+
+            # Reset stored amounts
+            set_variable = { name = estate_loan_principal value = 0 }
+remove_variable = estate_loan_share_nobles
+            remove_variable = estate_loan_share_clergy
+            remove_variable = estate_loan_share_burghers
+            remove_variable = estate_loan_share_peasants
+            remove_variable = estate_loan_share_tribes
+            remove_variable = estate_loan_share_cossacks
+            remove_variable = estate_loan_share_brahmins
+            remove_variable = estate_loan_share_vaisyas
+            remove_variable = estate_loan_share_jains
+            remove_variable = estate_loan_share_dhimmi
+            remove_variable = estate_loan_share_eunuchs
+
+            # Collect 25% of each estate's gold as the principal
+            every_estate = {
+                limit = {
+                    NOT = { estate_type = estate_type:crown_estate }
+                    estate_gold > 0.01
+                }
+
+                # Grab current estate gold as a numeric value and compute the 25% share.
+                # NOTE: `estate_gold` exists as an estate trigger in vanilla.
+                save_temporary_scope_value_as = {
+                    name = estate_loan_gold_now
+                    value = estate_gold
+                }
+                save_temporary_scope_value_as = {
+                    name = estate_loan_share_now
+                    value = {
+                        value = scope:estate_loan_gold_now
+                        multiply = 0.25
+                    }
+                }
+
+				# Store the share per estate type ON THE COUNTRY so repayment can find it later.
+				# (Inside every_estate, set_variable would otherwise write to the estate scope.)
+				if = {
+					limit = { estate_type = estate_type:nobles_estate }
+					owner = { set_variable = { name = estate_loan_share_nobles value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:clergy_estate }
+					owner = { set_variable = { name = estate_loan_share_clergy value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:burghers_estate }
+					owner = { set_variable = { name = estate_loan_share_burghers value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:peasants_estate }
+					owner = { set_variable = { name = estate_loan_share_peasants value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:tribes_estate }
+					owner = { set_variable = { name = estate_loan_share_tribes value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:cossacks_estate }
+					owner = { set_variable = { name = estate_loan_share_cossacks value = scope:estate_loan_share_now } }
+				}
+				else_if = {
+					limit = { estate_type = estate_type:dhimmi_estate }
+					owner = { set_variable = { name = estate_loan_share_dhimmi value = scope:estate_loan_share_now } }
+				}
+
+                # Subtract gold from the estate and give it to the Crown.
+					save_scope_as = estate_loan_estate
+
+					owner = {
+                        # Visible call: negative value = tooltip shows "estate loses X" correctly
+                        add_gold_to_estate = {
+                            estate_type = scope:estate_loan_estate.estate_type
+                            value = { value = scope:estate_loan_share_now multiply = -1 }
+                        }
+                        # Hidden correction: positive 2X cancels the above gain and nets to -X
+                        hidden_effect = {
+                            add_gold_to_estate = {
+                                estate_type = scope:estate_loan_estate.estate_type
+                                value = { value = scope:estate_loan_share_now multiply = 2 }
+                            }
+                        }
+                        add_gold = { value = scope:estate_loan_share_now }
+                        change_variable = { name = estate_loan_principal add = scope:estate_loan_share_now }
+					}
+
+            }
+
+            # Political cost lasts for the fixed 60-month (5-year) loan duration.
+# --- Inflation from Emergency Loan (Estate Loan) ---
+# Inflation = ( (sum of 25% of each non-Crown estate's gold) / country_estate_loan_size ) * 0.001
+# The preview value is precomputed when Parliament starts (see common/on_action/zz_estate_loan_on_action.txt)
+# so the tooltip shows the correct inflation even before taking the first loan.
+if = {
+    limit = { has_variable = estate_loan_inflation_preview }
+    add_inflation = { value = var:estate_loan_inflation_preview }
+}
+add_country_modifier = { modifier = estate_loan_penalty years = 5 mode = add }
+        }
+    }
+
+    ai_will_do = { add = -1000 }
+}

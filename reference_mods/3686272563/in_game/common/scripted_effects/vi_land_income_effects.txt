@@ -1,0 +1,795 @@
+﻿# ============================================================
+# VI LAND INCOME MOD - SCRIPTED EFFECTS
+# ============================================================
+
+# ── vi_land_income_init_effect ──────────────────────────────
+# Initialises all Land Income variables for a new game or
+# first load on an existing save (save-compat).
+# Sets vi_ac_X = 0 (AC starts at zero; BLO provides the base).
+# vi_lo_X display variables are computed on the next monthly tick.
+# Scope: country (root, is_ai = no)
+
+vi_land_income_init_effect = {
+	# Step 1: Initialise AC variables to 0 (no parliament actions yet)
+	set_variable = { name = vi_ac_crown    value = 0 }
+	set_variable = { name = vi_ac_nobles   value = 0 }
+	set_variable = { name = vi_ac_clergy   value = 0 }
+	set_variable = { name = vi_ac_burghers value = 0 }
+	set_variable = { name = vi_ac_peasants value = 0 }
+	set_variable = { name = vi_ac_dhimmi   value = 0 }
+	set_variable = { name = vi_ac_tribes   value = 0 }
+	set_variable = { name = vi_ac_cossacks value = 0 }
+	# Step 2: Compute LO variables (BLO + AC) — MUST be before income formulas
+	# Income formulas (SCL, CoD, SLT, DILT, PI) all read var:vi_lo_crown/vi_lo_peasants
+	set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+	set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   }
+	set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   }
+	set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value }
+	set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value }
+	set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   }
+	set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   }
+	set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value }
+	# Step 2b: Compute land share variables (LO/TUL) for estate land-share effects
+	# vi_land_tul must be set first — share values divide by it
+	set_variable = { name = vi_land_tul   value = vi_land_tul_value   }
+	set_variable = { name = vi_share_crown    value = vi_share_crown_value    }
+	set_variable = { name = vi_share_nobles   value = vi_share_nobles_value   }
+	set_variable = { name = vi_share_clergy   value = vi_share_clergy_value   }
+	set_variable = { name = vi_share_burghers value = vi_share_burghers_value }
+	set_variable = { name = vi_share_peasants value = vi_share_peasants_value }
+	set_variable = { name = vi_share_dhimmi   value = vi_share_dhimmi_value   }
+	set_variable = { name = vi_share_tribes   value = vi_share_tribes_value   }
+	set_variable = { name = vi_share_cossacks value = vi_share_cossacks_value }
+	# GUI flag: 1 if Christian (for clergy tooltip), 0 otherwise
+	if = {
+		limit = { religion.group = religion_group:christian }
+		set_variable = { name = vi_share_is_christian value = 1 }
+	}
+	else = { set_variable = { name = vi_share_is_christian value = 0 } }
+	# Step 3: Compute income display variables (read var:vi_lo_crown/vi_lo_peasants)
+	set_variable = { name = vi_land_tal          value = vi_land_tal_value          }
+	set_variable = { name = vi_land_tul          value = vi_land_tul_value          }
+	set_variable = { name = vi_land_tal_display  value = vi_land_tal_display_value  }
+	set_variable = { name = vi_land_tul_display  value = vi_land_tul_display_value  }
+	set_variable = { name = vi_land_blc          value = vi_land_blc_value          }
+	set_variable = { name = vi_land_sai          value = vi_land_sai_value          }
+	set_variable = { name = vi_land_scl          value = vi_land_scl_value          }
+	set_variable = { name = vi_land_cod          value = vi_land_cod_value          }
+	set_variable = { name = vi_land_slt          value = vi_land_slt_value          }
+	set_variable = { name = vi_land_dilt         value = vi_land_dilt_value         }
+	set_variable = { name = vi_land_pi           value = vi_land_pi_value           }
+}
+
+
+# Called monthly from vi_land_monthly_update (is_ai = no).
+# Scope: country (root)
+#
+# CRITICAL: add_gold_to_estate requires NEGATIVE value to ADD gold to estate.
+#           Positive value = DEDUCT gold from estate.
+#
+# 1. Stores display variables
+# 2. Adds DILT to treasury via add_gold (positive = add)
+# 3. ERL per non-crown estate: BLE_X × (rent_rate - land_tax) → negative for add
+# 4. PI to peasants_estate → negative for add
+# ============================================================
+
+vi_land_distribute_income_effect = {
+
+	# ── Step 1: Refresh LO display variables (LO = BLO + AC) ─
+	# MUST come before income formulas — SCL/CoD/SLT/DILT/PI read var:vi_lo_crown
+	set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+	set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   }
+	set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   }
+	set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value }
+	set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value }
+	set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   }
+	set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   }
+	set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value }
+	# ── Step 1b: Compute land share variables (LO/TUL) ────────
+	# vi_land_tul set here first — share values divide by it
+	set_variable = { name = vi_land_tul   value = vi_land_tul_value   }
+	set_variable = { name = vi_share_crown    value = vi_share_crown_value    }
+	set_variable = { name = vi_share_nobles   value = vi_share_nobles_value   }
+	set_variable = { name = vi_share_clergy   value = vi_share_clergy_value   }
+	set_variable = { name = vi_share_burghers value = vi_share_burghers_value }
+	set_variable = { name = vi_share_peasants value = vi_share_peasants_value }
+	set_variable = { name = vi_share_dhimmi   value = vi_share_dhimmi_value   }
+	set_variable = { name = vi_share_tribes   value = vi_share_tribes_value   }
+	set_variable = { name = vi_share_cossacks value = vi_share_cossacks_value }
+	# GUI flag: 1 if Christian (for clergy tooltip), 0 otherwise
+	if = {
+		limit = { religion.group = religion_group:christian }
+		set_variable = { name = vi_share_is_christian value = 1 }
+	}
+	else = { set_variable = { name = vi_share_is_christian value = 0 } }
+	# ── Step 2: Compute income display variables ──────────────
+	set_variable = { name = vi_land_tal   value = vi_land_tal_value   }
+	set_variable = { name = vi_land_tul   value = vi_land_tul_value   }
+	set_variable = { name = vi_land_tal_display  value = vi_land_tal_display_value  }
+	set_variable = { name = vi_land_tul_display  value = vi_land_tul_display_value  }
+	set_variable = { name = vi_land_blc   value = vi_land_blc_value   }
+	set_variable = { name = vi_land_sai   value = vi_land_sai_value   }
+	set_variable = { name = vi_land_scl   value = vi_land_scl_value   }
+	set_variable = { name = vi_land_cod   value = vi_land_cod_value   }
+	set_variable = { name = vi_land_slt   value = vi_land_slt_value   }
+	set_variable = { name = vi_land_dilt  value = vi_land_dilt_value  }
+	set_variable = { name = vi_land_pi    value = vi_land_pi_value    }
+
+	# ── Cache TUL into temp scope for ERL calculations ───────
+	save_temporary_scope_value_as = {
+		name = land_tul
+		value = { value = vi_land_tul_value }
+	}
+
+	# ── 1. DILT to treasury ─────────────────────────────────
+	# Handled by vi_land_dilt_auto auto_modifier (monthly_gold_income = 1, scales_with = vi_land_dilt_value)
+	# This makes it visible in Income of Egypt tooltip and GetEstimatedBalance.
+	# NO add_gold call here.
+
+	# ── 2. ERL per non-crown estate ──────────────────────────
+	# ERL_X = LO_X × (rent_rate - land_tax) = vi_lo_X_value × 0.05
+	# LO_X = BLO + AC = vi_lo_X_value (BLO+AC, includes parliament transfers)
+	# NEGATIVE value = ADD gold to estate
+
+	# Nobles
+	if = {
+		limit = { country_has_estate = estate_type:nobles_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:nobles_estate
+			value = {
+				value = vi_lo_nobles_value
+				multiply = 0.05			# rent_rate(0.075) - land_tax(0.025)
+				multiply = -1			# negate: negative = ADD gold
+				max = 0
+			}
+		}
+	}
+
+	# Clergy
+	if = {
+		limit = { country_has_estate = estate_type:clergy_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:clergy_estate
+			value = {
+				value = vi_lo_clergy_value
+				multiply = 0.05
+				multiply = -1
+				max = 0
+			}
+		}
+	}
+
+	# Burghers
+	if = {
+		limit = { country_has_estate = estate_type:burghers_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:burghers_estate
+			value = {
+				value = vi_lo_burghers_value
+				multiply = 0.05
+				multiply = -1
+				max = 0
+			}
+		}
+	}
+
+	# Dhimmi
+	if = {
+		limit = { country_has_estate = estate_type:dhimmi_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:dhimmi_estate
+			value = {
+				value = vi_lo_dhimmi_value
+				multiply = 0.05
+				multiply = -1
+				max = 0
+			}
+		}
+	}
+
+	# Tribes
+	if = {
+		limit = { country_has_estate = estate_type:tribes_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:tribes_estate
+			value = {
+				value = vi_lo_tribes_value
+				multiply = 0.05
+				multiply = -1
+				max = 0
+			}
+		}
+	}
+
+	# Cossacks
+	if = {
+		limit = { country_has_estate = estate_type:cossacks_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:cossacks_estate
+			value = {
+				value = vi_lo_cossacks_value
+				multiply = 0.05
+				multiply = -1
+				max = 0
+			}
+		}
+	}
+
+	# ── 3. PI → Peasants estate ───────────────────────────────
+	# PI = poor peasants + peasant ERL — one combined negative call
+	if = {
+		limit = { country_has_estate = estate_type:peasants_estate }
+		add_gold_to_estate = {
+			estate_type = estate_type:peasants_estate
+			value = {
+				value = vi_land_pi_value
+				multiply = -1		# negate: negative = ADD gold
+				max = 0
+			}
+		}
+	}
+}
+
+# ── VI Land Actions: Confiscation Consequences ────────────────────────────────
+# Called immediately after AC variables and LO display are updated.
+# scope:actor = the country (country scope)
+# scope:vi_la_estate = the estate being confiscated from
+# scope:vi_la_raw = transfer amount in raw land units
+#
+# Tier thresholds (fraction of estate's pre-transfer LO):
+#   Tier 1: ≤ 5%   — weak sat penalty only
+#   Tier 2: 5–10%  — mild sat penalty
+#   Tier 3: 10–15% — severe sat + weak stability
+#   Tier 4: 15–20% — extreme sat + weak stability + weak prestige
+#   Tier 5: >20%   — ultimate sat + mild stability + mild prestige
+#
+# vi_la_raw is compared against vi_lo_X_value (the estate's LO before the transfer).
+# The LO display variables (vi_lo_X) are already updated by this point,
+# so we use the script_values which recompute from BLO+AC — these still reflect
+# post-transfer values. Therefore we use vi_la_raw vs the ORIGINAL lo stored
+# in a temporary variable computed before the AC change.
+# HOWEVER: since we don't have a pre-transfer snapshot, we use vi_la_raw vs
+# (vi_lo_X_value + vi_la_raw) which equals the original estate LO.
+# fraction = vi_la_raw / (vi_lo_X_value + vi_la_raw)
+# Tier boundaries in raw units vs original LO:
+#   T1: vi_la_raw * 20 <= (vi_lo_X_value + vi_la_raw)    → vi_la_raw * 19 <= vi_lo_X_value
+#   T2: vi_la_raw * 10 <= (vi_lo_X_value + vi_la_raw)    → vi_la_raw * 9  <= vi_lo_X_value
+#   T3: vi_la_raw * 20/3 <= (vi_lo_X_value + vi_la_raw)  → vi_la_raw * 17/3 <= vi_lo_X_value
+#   T4: vi_la_raw * 5  <= (vi_lo_X_value + vi_la_raw)    → vi_la_raw * 4  <= vi_lo_X_value
+#   T5: otherwise
+#
+# Simplified: compare scope:vi_la_raw against var:vi_lo_X * threshold_multiplier
+# where vi_lo_X is the POST-transfer value. This introduces slight inaccuracy at
+# large transfer sizes but is acceptable for consequence purposes.
+# We compare scope:vi_la_raw directly against the POST-transfer vi_lo_X scaled by
+# equivalent thresholds adjusted for post-transfer:
+#   Original fraction f = raw / original_LO = raw / (post_LO + raw)
+#   f < 0.05 ↔ raw < 0.05 * post_LO / 0.95 ≈ pre_LO * 0.05
+#   f < 0.10 ↔ raw < pre_LO * 0.10
+#   f < 0.15 ↔ raw < pre_LO * 0.15
+#   f < 0.20 ↔ raw < pre_LO * 0.20
+# We use these adjusted multipliers against post-transfer vi_lo_X (= vi_lo_X_value after update).
+# ─────────────────────────────────────────────────────────────────────────────
+vi_la_confiscation_consequences_effect = {
+	# Tiered consequences based on fraction of estate land confiscated.
+	# When estate satisfaction > 60%: harsher fixed hits (Tier 1-4) or scaled hit (Tier 5).
+	# When estate satisfaction <= 60%: standard fixed hits.
+	# Tier 5 (>20%): always -50% of current satisfaction when sat > 60%.
+	# Stability/prestige hits same regardless of satisfaction level.
+	if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:nobles_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:clergy_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:burghers_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:peasants_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:dhimmi_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:tribes_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate }
+		if = { limit = { scope:vi_la_estate.satisfaction > 0.6 }
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.20 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.25 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.30 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				save_temporary_scope_value_as = { name = vi_la_sat_hit  value = { value = scope:vi_la_estate.satisfaction  multiply = -0.5 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = scope:vi_la_sat_hit }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+		else = {
+			if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.05 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.05 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.10 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.10 }
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.15 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.15 }
+				add_stability = -2.5
+			}
+			else_if = {
+				limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.20 } }
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.20 }
+				add_stability = -5.0
+				add_prestige = -5
+			}
+			else = {
+				add_estate_satisfaction = { type = estate_type:cossacks_estate  value = -0.30 }
+				add_stability = -7
+				add_prestige = -7
+			}
+		}
+	}
+}
+
+# ── VI Land Actions: Grant Consequences ───────────────────────────────────────
+# Called immediately after AC variables and LO display are updated.
+# scope:actor = the country (country scope)
+# scope:vi_la_estate = the estate receiving the grant
+# scope:vi_la_raw = transfer amount in raw land units
+#
+# Receiving estate gets satisfaction bonus (tiered).
+# All OTHER estates get satisfaction penalty from Tier 3 upward.
+# Crown prestige hit from Tier 4 upward.
+#
+# Tier thresholds use same adjusted multipliers as confiscation,
+# but here vi_lo_X is the POST-transfer value of the RECEIVING estate.
+# For the "other estates" penalty, vi_lo_crown is the post-transfer source.
+# We use vi_lo_crown post-transfer as the denominator since it was the source.
+# ─────────────────────────────────────────────────────────────────────────────
+vi_la_grant_consequences_effect = {
+	# ── Determine tier using Crown's post-transfer LO as denominator ──────────
+	# (Crown was the source; vi_lo_crown is now post-transfer = original - raw)
+	# Adjusted thresholds vs post-transfer Crown LO:
+	#   f < 0.05 ↔ raw < pre_crown * 0.05
+	#   f < 0.10 ↔ raw < pre_crown * 0.10
+	#   f < 0.15 ↔ raw < pre_crown * 0.15
+	#   f < 0.20 ↔ raw < pre_crown * 0.20
+
+	# ── Receiving estate satisfaction bonus ───────────────────────────────────
+	if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:nobles_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:nobles_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:nobles_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_nobles  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:nobles_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:nobles_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:clergy_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:clergy_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:clergy_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_clergy  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:clergy_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:clergy_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:burghers_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:burghers_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:burghers_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_burghers  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:burghers_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:burghers_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:peasants_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:peasants_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:peasants_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_peasants  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:peasants_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:peasants_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:dhimmi_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:dhimmi_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:dhimmi_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_dhimmi  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:dhimmi_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:dhimmi_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:tribes_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:tribes_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:tribes_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_tribes  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:tribes_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:tribes_estate  value =  0.30 } }
+	}
+	else_if = {
+		limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate }
+		if      = { limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.05 } }  add_estate_satisfaction = { type = estate_type:cossacks_estate  value =  0.05 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.10 } }  add_estate_satisfaction = { type = estate_type:cossacks_estate  value =  0.10 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.15 } }  add_estate_satisfaction = { type = estate_type:cossacks_estate  value =  0.15 } }
+		else_if = { limit = { scope:vi_la_raw < { value = var:vi_lo_cossacks  multiply = 0.20 } }  add_estate_satisfaction = { type = estate_type:cossacks_estate  value =  0.20 } }
+		else                                                                                     = { add_estate_satisfaction = { type = estate_type:cossacks_estate  value =  0.30 } }
+	}
+
+	# ── Other estates satisfaction penalty (Tier 3+) and Crown prestige (Tier 4+) ──
+	# Tier 1 & 2: no other-estate reaction
+	if = { limit = { scope:vi_la_raw < { value = var:vi_lo_crown  multiply = 0.15 } }
+		# Tiers 1 & 2 — no further consequences
+	}
+	# Tier 3: other estates −0.05, no prestige hit
+	else_if = {
+		limit = { scope:vi_la_raw < { value = var:vi_lo_crown  multiply = 0.20 } }
+		# Hit all estates except the receiving one
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }  country_has_estate = estate_type:nobles_estate }   add_estate_satisfaction = { type = estate_type:nobles_estate   value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }  country_has_estate = estate_type:clergy_estate }   add_estate_satisfaction = { type = estate_type:clergy_estate   value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:burghers_estate }  country_has_estate = estate_type:burghers_estate } add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:peasants_estate }  country_has_estate = estate_type:peasants_estate } add_estate_satisfaction = { type = estate_type:peasants_estate value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }  country_has_estate = estate_type:dhimmi_estate }   add_estate_satisfaction = { type = estate_type:dhimmi_estate   value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }  country_has_estate = estate_type:tribes_estate }   add_estate_satisfaction = { type = estate_type:tribes_estate   value = -0.05 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate }  country_has_estate = estate_type:cossacks_estate } add_estate_satisfaction = { type = estate_type:cossacks_estate value = -0.05 } }
+	}
+	# Tier 4: other estates −0.07, Crown prestige −5
+	else_if = {
+		limit = { scope:vi_la_raw < { value = var:vi_lo_crown  multiply = 0.25 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }  country_has_estate = estate_type:nobles_estate }   add_estate_satisfaction = { type = estate_type:nobles_estate   value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }  country_has_estate = estate_type:clergy_estate }   add_estate_satisfaction = { type = estate_type:clergy_estate   value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:burghers_estate }  country_has_estate = estate_type:burghers_estate } add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:peasants_estate }  country_has_estate = estate_type:peasants_estate } add_estate_satisfaction = { type = estate_type:peasants_estate value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }  country_has_estate = estate_type:dhimmi_estate }   add_estate_satisfaction = { type = estate_type:dhimmi_estate   value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }  country_has_estate = estate_type:tribes_estate }   add_estate_satisfaction = { type = estate_type:tribes_estate   value = -0.07 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate }  country_has_estate = estate_type:cossacks_estate } add_estate_satisfaction = { type = estate_type:cossacks_estate value = -0.07 } }
+		add_prestige = -5
+	}
+	# Tier 5: other estates −0.10, Crown prestige −5
+	else = {
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }  country_has_estate = estate_type:nobles_estate }   add_estate_satisfaction = { type = estate_type:nobles_estate   value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }  country_has_estate = estate_type:clergy_estate }   add_estate_satisfaction = { type = estate_type:clergy_estate   value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:burghers_estate }  country_has_estate = estate_type:burghers_estate } add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:peasants_estate }  country_has_estate = estate_type:peasants_estate } add_estate_satisfaction = { type = estate_type:peasants_estate value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }  country_has_estate = estate_type:dhimmi_estate }   add_estate_satisfaction = { type = estate_type:dhimmi_estate   value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }  country_has_estate = estate_type:tribes_estate }   add_estate_satisfaction = { type = estate_type:tribes_estate   value = -0.10 } }
+		if      = { limit = { NOT = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate }  country_has_estate = estate_type:cossacks_estate } add_estate_satisfaction = { type = estate_type:cossacks_estate value = -0.10 } }
+		add_prestige = -5
+	}
+}

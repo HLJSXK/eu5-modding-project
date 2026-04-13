@@ -1,0 +1,205 @@
+﻿# ============================================================
+# VI LAND ACTIONS MOD - SCRIPT VALUES
+# ============================================================
+# Land Ownership (LO) model:
+#
+#   BLO (Basic Land Ownership) = TUL × estate_power(X)
+#       Recalculated every month. Tracks estate power changes.
+#
+#   AC  (Accumulated Changes) = sum of parliament action deltas
+#       Persistent variable: vi_ac_X
+#       Modified only by parliament land actions.
+#       Initialized to 0 at game start.
+#
+#   LO  = BLO + AC
+#       Display variable: vi_lo_X
+#       Updated monthly from vi_lo_X_blo + vi_ac_X.
+#       This is what the GUI tooltip shows (× 0.25 = mln. acres).
+#
+# Parliament action sliders use vi_lo_X (LO) as the max,
+# and modify vi_ac_X (AC) to record the permanent change.
+#
+# DCF price formula (Purchase / Sale):
+#   annual_rent = transfer_mln_acres × 4 × rent_rate × 12
+#              = transfer_mln_acres × 4 × 0.075 × 12
+#              = transfer_mln_acres × 3.6
+#   price      = transfer_mln_acres × 3.6 × PV_factor
+#
+# PV_factor = (1 − (1.01)^−t) / 0.01  where t = 1837 − current_year
+# ============================================================
+
+# ── BLO script_values ──────────────────────────────────────
+# Each = TUL × estate_power(X). Recalculated every month.
+
+vi_lo_crown_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:crown_estate)"
+}
+
+vi_lo_nobles_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:nobles_estate)"
+}
+
+vi_lo_clergy_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:clergy_estate)"
+}
+
+vi_lo_burghers_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:burghers_estate)"
+}
+
+vi_lo_peasants_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:peasants_estate)"
+}
+
+vi_lo_dhimmi_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:dhimmi_estate)"
+}
+
+vi_lo_tribes_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:tribes_estate)"
+}
+
+vi_lo_cossacks_blo = {
+	value = 0
+	every_owned_location = { add = { value = rgo_workers } }
+	multiply = "estate_power(estate_type:cossacks_estate)"
+}
+
+# ── LO display script_values ────────────────────────────────
+# LO = BLO + AC. Used monthly to refresh vi_lo_X display variables.
+# AC defaults to 0 if the variable is not yet set (save-compat guard).
+
+vi_lo_crown_value = {
+	value = vi_lo_crown_blo
+	if = {
+		limit = { has_variable = vi_ac_crown }
+		add = var:vi_ac_crown
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_nobles_value = {
+	value = vi_lo_nobles_blo
+	if = {
+		limit = { has_variable = vi_ac_nobles }
+		add = var:vi_ac_nobles
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_clergy_value = {
+	value = vi_lo_clergy_blo
+	if = {
+		limit = { has_variable = vi_ac_clergy }
+		add = var:vi_ac_clergy
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_burghers_value = {
+	value = vi_lo_burghers_blo
+	if = {
+		limit = { has_variable = vi_ac_burghers }
+		add = var:vi_ac_burghers
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_peasants_value = {
+	value = vi_lo_peasants_blo
+	if = {
+		limit = { has_variable = vi_ac_peasants }
+		add = var:vi_ac_peasants
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_dhimmi_value = {
+	value = vi_lo_dhimmi_blo
+	if = {
+		limit = { has_variable = vi_ac_dhimmi }
+		add = var:vi_ac_dhimmi
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_tribes_value = {
+	value = vi_lo_tribes_blo
+	if = {
+		limit = { has_variable = vi_ac_tribes }
+		add = var:vi_ac_tribes
+	}
+	min = 0		# LO cannot be negative
+}
+
+vi_lo_cossacks_value = {
+	value = vi_lo_cossacks_blo
+	if = {
+		limit = { has_variable = vi_ac_cossacks }
+		add = var:vi_ac_cossacks
+	}
+	min = 0		# LO cannot be negative
+}
+
+# ── DCF Present Value factor ───────────────────────────────
+# PV_factor = (1 − (1.01)^−t) / 0.01  where t = 1837 − current_year
+# Approximated by midpoint value of each 10-year bracket.
+# Max error: < 0.2 at start of game, < 5% in late game (1794+).
+
+vi_land_dcf_pv_factor = {
+	value = 0
+	if           = { limit = { current_year < 1454 } add = 97.89 }	# t≈393
+	else_if      = { limit = { current_year < 1464 } add = 97.67 }	# t≈383
+	else_if      = { limit = { current_year < 1474 } add = 97.43 }	# t≈373
+	else_if      = { limit = { current_year < 1484 } add = 97.16 }	# t≈363
+	else_if      = { limit = { current_year < 1494 } add = 96.87 }	# t≈353
+	else_if      = { limit = { current_year < 1504 } add = 96.54 }	# t≈343
+	else_if      = { limit = { current_year < 1514 } add = 96.18 }	# t≈333
+	else_if      = { limit = { current_year < 1524 } add = 95.78 }	# t≈323
+	else_if      = { limit = { current_year < 1534 } add = 95.33 }	# t≈313
+	else_if      = { limit = { current_year < 1544 } add = 94.84 }	# t≈303
+	else_if      = { limit = { current_year < 1554 } add = 94.31 }	# t≈293
+	else_if      = { limit = { current_year < 1564 } add = 93.71 }	# t≈283
+	else_if      = { limit = { current_year < 1574 } add = 93.05 }	# t≈273
+	else_if      = { limit = { current_year < 1584 } add = 92.32 }	# t≈263
+	else_if      = { limit = { current_year < 1594 } add = 91.52 }	# t≈253
+	else_if      = { limit = { current_year < 1604 } add = 90.63 }	# t≈243
+	else_if      = { limit = { current_year < 1614 } add = 89.66 }	# t≈233
+	else_if      = { limit = { current_year < 1624 } add = 88.57 }	# t≈223
+	else_if      = { limit = { current_year < 1634 } add = 87.38 }	# t≈213
+	else_if      = { limit = { current_year < 1644 } add = 86.06 }	# t≈203
+	else_if      = { limit = { current_year < 1654 } add = 84.60 }	# t≈193
+	else_if      = { limit = { current_year < 1664 } add = 82.99 }	# t≈183
+	else_if      = { limit = { current_year < 1674 } add = 81.21 }	# t≈173
+	else_if      = { limit = { current_year < 1684 } add = 79.24 }	# t≈163
+	else_if      = { limit = { current_year < 1694 } add = 77.07 }	# t≈153
+	else_if      = { limit = { current_year < 1704 } add = 74.67 }	# t≈143
+	else_if      = { limit = { current_year < 1714 } add = 72.02 }	# t≈133
+	else_if      = { limit = { current_year < 1724 } add = 69.09 }	# t≈123
+	else_if      = { limit = { current_year < 1734 } add = 65.86 }	# t≈113
+	else_if      = { limit = { current_year < 1744 } add = 62.29 }	# t≈103
+	else_if      = { limit = { current_year < 1754 } add = 58.34 }	# t≈93
+	else_if      = { limit = { current_year < 1764 } add = 53.98 }	# t≈83
+	else_if      = { limit = { current_year < 1774 } add = 49.17 }	# t≈73
+	else_if      = { limit = { current_year < 1784 } add = 43.85 }	# t≈63
+	else_if      = { limit = { current_year < 1794 } add = 37.97 }	# t≈53
+	else_if      = { limit = { current_year < 1804 } add = 31.48 }	# t≈43
+	else_if      = { limit = { current_year < 1814 } add = 24.32 }	# t≈33
+	else_if      = { limit = { current_year < 1824 } add = 16.40 }	# t≈23
+	else_if      = { limit = { current_year < 1834 } add = 7.65  }	# t≈13
+	else_if      = { limit = { current_year >= 1834 } add = 1.48 }	# t≈1.5
+}

@@ -1,0 +1,183 @@
+﻿namespace = estate_loan
+
+# Monthly maintenance tick (silent)
+# Decrements the loan timer even when Parliament is not in session.
+estate_loan.100 = {
+	type = country_event
+	hidden = yes
+	title = estate_loan_hidden_title
+
+	immediate = {
+		# Keep the Parliament tooltip inflation preview updated (player only).
+		if = {
+			limit = { is_ai = no }
+			set_variable = { name = estate_loan_preview_principal value = 0 }
+			set_variable = { name = estate_loan_inflation_preview value = 0 }
+			every_estate = {
+				limit = {
+					NOT = { estate_type = estate_type:crown_estate }
+					estate_gold > 0.01
+				}
+				save_temporary_scope_value_as = { name = estate_loan_gold_now value = estate_gold }
+				save_temporary_scope_value_as = {
+					name = estate_loan_share_now
+					value = { value = scope:estate_loan_gold_now multiply = 0.25 }
+				}
+				owner = { change_variable = { name = estate_loan_preview_principal add = scope:estate_loan_share_now } }
+			}
+			save_temporary_scope_value_as = { name = estate_loan_normal_loan_size value = country_estate_loan_size }
+			if = {
+				limit = { scope:estate_loan_normal_loan_size > 0 }
+				save_temporary_scope_value_as = {
+					name = estate_loan_inflation_calc
+					value = {
+						value = var:estate_loan_preview_principal
+						divide = scope:estate_loan_normal_loan_size
+						multiply = 0.001
+					}
+				}
+				set_variable = { name = estate_loan_inflation_preview value = scope:estate_loan_inflation_calc }
+			}
+			remove_variable = estate_loan_preview_principal
+		}
+
+		if = {
+			limit = { has_variable = estate_loan_active }
+
+			# If we already prompted repayment, do nothing.
+			if = {
+				limit = { has_variable = estate_loan_repayment_prompted }
+				# no-op
+			}
+			else = {
+				# Tick down remaining months
+				change_variable = { name = estate_loan_months_left add = -1 }
+
+				# When the timer reaches 0 (or below), prompt repayment.
+				if = {
+					limit = { var:estate_loan_months_left <= 0 }
+					set_variable = { name = estate_loan_repayment_prompted value = 1 }
+					trigger_event_non_silently = estate_loan.101
+				}
+			}
+		}
+	}
+}
+
+# Repayment popup (player-facing)
+estate_loan.101 = {
+	type = country_event
+	hidden = no
+	title = estate_loan_repayment_title
+	desc = estate_loan_repayment_desc
+
+	option = {
+		name = estate_loan_repayment_pay
+		# Pay the principal back (may push treasury negative; vanilla borrowing/bankruptcy handles it)
+		custom_tooltip = estate_loan_repayment_pay_tt
+
+			# Deduct the full principal from the country's treasury once.
+			# (Doing the subtraction per-estate can fail due to scope/effect quirks.)
+			add_gold = { value = var:estate_loan_principal multiply = -1 }
+
+				# Repay estates using the per-estate-type shares recorded at loan start.
+				# IMPORTANT: add_gold_to_estate MUST execute in country scope.
+				# Positive value = tooltip shows "estate gains X" correctly.
+				# Hidden call with multiply = -2 cancels the wrong deduction and nets to true addition.
+				if = {
+					limit = { has_variable = estate_loan_share_nobles }
+					add_gold_to_estate = { estate_type = estate_type:nobles_estate value = var:estate_loan_share_nobles }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:nobles_estate value = { value = var:estate_loan_share_nobles multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_clergy }
+					add_gold_to_estate = { estate_type = estate_type:clergy_estate value = var:estate_loan_share_clergy }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:clergy_estate value = { value = var:estate_loan_share_clergy multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_burghers }
+					add_gold_to_estate = { estate_type = estate_type:burghers_estate value = var:estate_loan_share_burghers }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:burghers_estate value = { value = var:estate_loan_share_burghers multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_peasants }
+					add_gold_to_estate = { estate_type = estate_type:peasants_estate value = var:estate_loan_share_peasants }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:peasants_estate value = { value = var:estate_loan_share_peasants multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_tribes }
+					add_gold_to_estate = { estate_type = estate_type:tribes_estate value = var:estate_loan_share_tribes }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:tribes_estate value = { value = var:estate_loan_share_tribes multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_cossacks }
+					add_gold_to_estate = { estate_type = estate_type:cossacks_estate value = var:estate_loan_share_cossacks }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:cossacks_estate value = { value = var:estate_loan_share_cossacks multiply = -2 } }
+					}
+				}
+				if = {
+					limit = { has_variable = estate_loan_share_dhimmi }
+					add_gold_to_estate = { estate_type = estate_type:dhimmi_estate value = var:estate_loan_share_dhimmi }
+					hidden_effect = {
+						add_gold_to_estate = { estate_type = estate_type:dhimmi_estate value = { value = var:estate_loan_share_dhimmi multiply = -2 } }
+					}
+				}
+
+				# Clear per-estate repayment bookkeeping variables (and per-estate variables, if any remain)
+				remove_variable = estate_loan_share_nobles
+				remove_variable = estate_loan_share_clergy
+				remove_variable = estate_loan_share_burghers
+				remove_variable = estate_loan_share_peasants
+				remove_variable = estate_loan_share_tribes
+				remove_variable = estate_loan_share_cossacks
+				remove_variable = estate_loan_share_dhimmi
+
+			# Cleanup state + penalties
+			remove_variable = estate_loan_active
+			remove_variable = estate_loan_principal
+			remove_variable = estate_loan_months_left
+			remove_variable = estate_loan_repayment_prompted
+			remove_country_modifier = estate_loan_penalty
+	}
+
+	option = {
+		name = estate_loan_repayment_default
+		custom_tooltip = estate_loan_repayment_default_tt
+			# Default penalties:
+			# -50% legitimacy (reduce current legitimacy by 50%)
+			save_temporary_scope_value_as = { name = legitimacy_now value = legitimacy }
+			save_temporary_scope_value_as = {
+				name = legitimacy_hit
+				value = { value = scope:legitimacy_now multiply = -0.5 }
+			}
+			add_legitimacy = { value = scope:legitimacy_hit }
+
+			# Stability hit is ABSOLUTE (not relative)
+			add_stability = { value = -50 }
+
+			# -25% estate satisfaction (all estates)
+			add_all_estate_satisfaction = { value = -0.25 }
+
+			# Keep the money (no repayment), but close the loan.
+
+			# Lingering consequence: credit is ruined for 10 years.
+			add_country_modifier = { modifier = estate_credit_ruined years = 10 mode = add }
+
+			remove_variable = estate_loan_active
+			remove_variable = estate_loan_principal
+			remove_variable = estate_loan_months_left
+			remove_variable = estate_loan_repayment_prompted
+			remove_country_modifier = estate_loan_penalty
+	}
+}
