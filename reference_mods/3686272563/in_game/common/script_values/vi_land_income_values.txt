@@ -1,0 +1,564 @@
+﻿# ============================================================
+# VI LAND INCOME MOD - SCRIPT VALUES
+# ============================================================
+# Named parameters:
+#   sai_rate      = 0.08   (subsistence agriculture income rate)
+#   rent_rate     = 0.075  (rent rate)
+#   demesne_admin = 0.2    (demesne admin cost modifier)
+#   land_tax      = 0.025  (land tax rate)
+#
+# Land Ownership model:
+#   BLOC = TUL × Crown_Power
+#   BLOX = TUL × Estate_Power_X
+#   ACC  = Σ parliament action changes for Crown  (vi_ac_crown)
+#   ACE  = Σ parliament action changes for estate (vi_ac_X)
+#   LOC  = BLOC + ACC  (vi_lo_crown)
+#   LOE  = BLOX + ACE  (vi_lo_X)
+#
+# Income formulas (all use LOC/LOE, not BLOC/BLOX):
+#   SCL  = LOC × control × rent_rate × (1 − demesne_admin)
+#   CoD  = LOC × (1−control) × rent_rate
+#        + LOC × control × rent_rate × demesne_admin
+#   SLT  = (TUL − LOC) × land_tax
+#   DILT = SCL + SLT
+#   ERL_X = LOE × (rent_rate − land_tax)          [in distribute_effect]
+#   PI   = SAI − TUL×rent_rate + CoD + LOE_commoners×(rent_rate−land_tax)
+#
+# Display: LOC×0.25, LOE×0.25, TAL×0.25 (mln. acres)
+#
+# Player-only: variables updated via vi_land_monthly_update (is_ai = no).
+# ============================================================
+
+# ── Stage 1: Total Available Land ──────────────────────────
+vi_land_tal_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = max_rgo_workers }
+	}
+}
+
+# ── Stage 1: Total Used Land ───────────────────────────────
+vi_land_tul_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+}
+
+# ── Stage 1: Display values (×0.25 for mln. acres scale) ──
+vi_land_tal_display_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = max_rgo_workers }
+	}
+	multiply = 0.25
+}
+
+vi_land_tul_display_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+	multiply = 0.25
+}
+
+# ── Stage 2: Base Land Crown (BLOC) ────────────────────────
+# BLOC = TUL × Crown_Power
+# Kept for display/reference only. Income formulas use LOC (vi_lo_crown).
+vi_land_blc_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+	multiply = "estate_power(estate_type:crown_estate)"
+}
+
+# ── Stage 2: Subsistence Agriculture Income (SAI) ──────────
+# SAI = TUL × sai_rate
+vi_land_sai_value = {
+	value = 0
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+	multiply = 0.08		# sai_rate
+}
+
+# ── Stage 2: State Income from Crown Lands (SCL) ───────────
+# SCL = LOC × control × rent_rate × (1 − demesne_admin)
+#     = vi_lo_crown × control × 0.075 × 0.8
+vi_land_scl_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_lo_crown }
+		add = var:vi_lo_crown
+		multiply = average_control_in_home_region
+		multiply = 0.075	# rent_rate
+		multiply = 0.8		# (1 − demesne_admin) = (1 − 0.2)
+	}
+}
+
+# ── Stage 2: Cost of Demesne (CoD) ─────────────────────────
+# CoD = LOC × (1−control) × rent_rate
+#     + LOC × control × rent_rate × demesne_admin
+#
+# Part A: LOC × rent_rate × (1−control)
+#       = LOC × rent_rate − LOC × control × rent_rate
+# Part B: LOC × control × rent_rate × demesne_admin
+vi_land_cod_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_lo_crown }
+		# Part A term 1: LOC × rent_rate
+		add = {
+			value = var:vi_lo_crown
+			multiply = 0.075	# rent_rate
+		}
+		# Part A term 2: − LOC × control × rent_rate
+		add = {
+			value = var:vi_lo_crown
+			multiply = average_control_in_home_region
+			multiply = -0.075	# −rent_rate
+		}
+		# Part B: + LOC × control × rent_rate × demesne_admin
+		add = {
+			value = var:vi_lo_crown
+			multiply = average_control_in_home_region
+			multiply = 0.075	# rent_rate
+			multiply = 0.2		# demesne_admin
+		}
+	}
+}
+
+# ── Stage 2: State Income from Land Taxes (SLT) ────────────
+# SLT = (TUL − LOC) × land_tax
+#     = TUL × land_tax − LOC × land_tax
+vi_land_slt_value = {
+	value = 0
+	# TUL × land_tax
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+	multiply = 0.025	# land_tax
+	# − LOC × land_tax (guarded — vi_lo_crown may not be set for AI)
+	if = {
+		limit = { has_variable = vi_lo_crown }
+		add = {
+			value = var:vi_lo_crown
+			multiply = -0.025	# −land_tax
+		}
+	}
+}
+
+# ── Stage 2: Demesne Income and Land Tax (DILT) ────────────
+# DILT = SCL + SLT
+#      = LOC×control×0.075×0.8 + TUL×0.025 − LOC×0.025
+vi_land_dilt_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_lo_crown }
+		# SCL: LOC × control × rent_rate × (1−demesne_admin)
+		add = {
+			value = var:vi_lo_crown
+			multiply = average_control_in_home_region
+			multiply = 0.075	# rent_rate
+			multiply = 0.8		# (1 − demesne_admin)
+		}
+		# SLT: TUL×land_tax − LOC×land_tax
+		add = {
+			value = 0
+			every_owned_location = {
+				add = { value = rgo_workers }
+			}
+			multiply = 0.025	# land_tax
+			add = {
+				value = var:vi_lo_crown
+				multiply = -0.025	# −land_tax
+			}
+		}
+	}
+}
+
+# ── Stage 2: Land Share per Estate (share = LO / TUL) ──────
+# Used by estate land-share effect auto_modifiers.
+# Guards:
+#   1. has_variable = vi_lo_X   — player-only init; AI never sets these
+#   2. var:vi_land_tul > 0      — avoid divide-by-zero if TUL is zero
+# Returns value in range [0.0, 1.0].
+
+vi_share_crown_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_crown
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_crown
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_nobles_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_nobles
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_nobles
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_clergy_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_clergy
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_clergy
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_burghers_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_burghers
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_burghers
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_peasants_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_peasants
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_peasants
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_dhimmi_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_dhimmi
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_dhimmi
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_tribes_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_tribes
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_tribes
+		divide = var:vi_land_tul
+	}
+}
+
+vi_share_cossacks_value = {
+	value = 0
+	if = {
+		limit = {
+			has_variable = vi_lo_cossacks
+			var:vi_land_tul > 0
+		}
+		add = var:vi_lo_cossacks
+		divide = var:vi_land_tul
+	}
+}
+
+# ── Stage 2: Peasantry Income (PI) ─────────────────────────
+# PI = SAI − TUL×rent_rate + CoD + Commoners_ERL
+#
+# Commoners_ERL = LOE_commoners × (rent_rate − land_tax)
+#               = vi_lo_peasants × 0.05
+#               (Commoners = estate_type:peasants_estate in EU5)
+#
+# Expanded (CoD substituted):
+# PI = TUL×sai_rate
+#    − TUL×rent_rate
+#    + LOC×rent_rate − LOC×control×rent_rate + LOC×control×rent_rate×demesne_admin
+#    + LOE_commoners×rent_rate − LOE_commoners×land_tax
+vi_land_pi_value = {
+	value = 0
+	# TUL × sai_rate
+	every_owned_location = {
+		add = { value = rgo_workers }
+	}
+	multiply = 0.08		# sai_rate
+	# − TUL × rent_rate
+	add = {
+		value = 0
+		every_owned_location = {
+			add = { value = rgo_workers }
+		}
+		multiply = -0.075	# −rent_rate
+	}
+	# + CoD terms (guarded — vi_lo_crown may not be set for AI)
+	if = {
+		limit = { has_variable = vi_lo_crown }
+		# + CoD Part A term 1: LOC × rent_rate
+		add = {
+			value = var:vi_lo_crown
+			multiply = 0.075	# rent_rate
+		}
+		# + CoD Part A term 2: − LOC × control × rent_rate
+		add = {
+			value = var:vi_lo_crown
+			multiply = average_control_in_home_region
+			multiply = -0.075	# −rent_rate
+		}
+		# + CoD Part B: LOC × control × rent_rate × demesne_admin
+		add = {
+			value = var:vi_lo_crown
+			multiply = average_control_in_home_region
+			multiply = 0.075	# rent_rate
+			multiply = 0.2		# demesne_admin
+		}
+	}
+	# + Commoners_ERL (guarded — vi_lo_peasants may not be set for AI)
+	if = {
+		limit = { has_variable = vi_lo_peasants }
+		# + LOE_commoners × rent_rate
+		add = {
+			value = var:vi_lo_peasants
+			multiply = 0.075	# rent_rate
+		}
+		# − LOE_commoners × land_tax
+		add = {
+			value = var:vi_lo_peasants
+			multiply = -0.025	# −land_tax
+		}
+	}
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ---------------------------------------------------------
+# ESTATE LAND-SHARE EFFECT MAGNITUDE SCRIPT_VALUES
+#
+# Each auto_modifier uses scales_with = vi_share_X_pos/neg_value.
+# Tier thresholds (vi_share_X = LO/TUL):
+#   T1: 0.00-0.10 (inactive)
+#   T2: 0.10-0.25   T3: 0.25-0.50   T4: 0.50-0.70
+#   T5: 0.70-0.90   T6: 0.90+
+# ---------------------------------------------------------
+
+# Positive: monthly_prestige  T2=0.02  T3=0.04  T4=0.06  T5=0.08  T6=0.10
+vi_share_crown_prestige_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_crown }
+		if           = { limit = { var:vi_share_crown >= 0.90 } add = 0.1 }
+		else_if      = { limit = { var:vi_share_crown >= 0.70 } add = 0.08 }
+		else_if      = { limit = { var:vi_share_crown >= 0.50 } add = 0.06 }
+		else_if      = { limit = { var:vi_share_crown >= 0.25 } add = 0.04 }
+		else         = {                                         add = 0.02 }
+	}
+}
+# Negative: stability_decay  T2=0.001(0.1%)  T3=0.002(0.2%)  T4=0.004(0.4%)  T5=0.010(1.0%)  T6=0.015(1.5%)
+vi_share_crown_decay_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_crown }
+		if           = { limit = { var:vi_share_crown >= 0.90 } add = 0.015 }
+		else_if      = { limit = { var:vi_share_crown >= 0.70 } add = 0.01 }
+		else_if      = { limit = { var:vi_share_crown >= 0.50 } add = 0.004 }
+		else_if      = { limit = { var:vi_share_crown >= 0.25 } add = 0.002 }
+		else         = {                                         add = 0.001 }
+	}
+}
+# Positive: diplomatic_reputation  T2=0.5  T3=1.0  T4=1.5  T5=2.0  T6=3.0
+vi_share_nobles_dr_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_nobles }
+		if           = { limit = { var:vi_share_nobles >= 0.90 } add = 3.0  }
+		else_if      = { limit = { var:vi_share_nobles >= 0.70 } add = 2.0  }
+		else_if      = { limit = { var:vi_share_nobles >= 0.50 } add = 1.5  }
+		else_if      = { limit = { var:vi_share_nobles >= 0.25 } add = 1.0  }
+		else         = {                                          add = 0.5  }
+	}
+}
+# Positive: country_cabinet_efficiency  T2=0.05  T3=0.10  T4=0.18  T5=0.25  T6=0.35
+vi_share_nobles_cabinet_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_nobles }
+		if           = { limit = { var:vi_share_nobles >= 0.90 } add = 0.35 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.70 } add = 0.25 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.50 } add = 0.18 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.25 } add = 0.10 }
+		else         = {                                          add = 0.05 }
+	}
+}
+# Negative: monthly_legitimacy  T2=-0.10  T3=-0.25  T4=-0.50  T5=-0.75  T6=-1.0
+vi_share_nobles_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_nobles }
+		if           = { limit = { var:vi_share_nobles >= 0.90 } add = -1.0 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.70 } add = -0.75 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.50 } add = -0.5 }
+		else_if      = { limit = { var:vi_share_nobles >= 0.25 } add = -0.25 }
+		else         = {                                         add = -0.1 }
+	}
+}
+# Positive: research_speed_modifier (+monthly_religious_influence for Christians)  T2=0.025(2.5%) T3=0.05(5%) T4=0.10(10%) T5=0.15(15%) T6=0.20(20%)
+vi_share_clergy_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_clergy }
+		if           = { limit = { var:vi_share_clergy >= 0.90 } add = 0.2 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.70 } add = 0.15 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.50 } add = 0.1 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.25 } add = 0.05 }
+		else         = {                                         add = 0.025 }
+	}
+}
+# Negative: estate_enrichment  T2=0.025(2.5%)  T3=0.05(5%)  T4=0.10(10%)  T5=0.15(15%)  T6=0.20(20%)
+vi_share_clergy_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_clergy }
+		if           = { limit = { var:vi_share_clergy >= 0.90 } add = 0.2 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.70 } add = 0.15 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.50 } add = 0.1 }
+		else_if      = { limit = { var:vi_share_clergy >= 0.25 } add = 0.05 }
+		else         = {                                         add = 0.025 }
+	}
+}
+# Positive: global_production_efficiency  T2=2%  T3=5%  T4=8%  T5=12%  T6=15%
+vi_share_burghers_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_burghers }
+		if           = { limit = { var:vi_share_burghers >= 0.90 } add = 0.15 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.70 } add = 0.12 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.50 } add = 0.08 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.25 } add = 0.05 }
+		else         = {                                         add = 0.02 }
+	}
+}
+# Negative: monthly_inflation  T2=0.0002(0.02%)  T3=0.0005(0.05%)  T4=0.0008(0.08%)  T5=0.0012(0.12%)  T6=0.0015(0.15%)
+vi_share_burghers_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_burghers }
+		if           = { limit = { var:vi_share_burghers >= 0.90 } add = 0.0015 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.70 } add = 0.0012 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.50 } add = 0.0008 }
+		else_if      = { limit = { var:vi_share_burghers >= 0.25 } add = 0.0005 }
+		else         = {                                         add = 0.0002 }
+	}
+}
+# Positive: global_peasant_enfranchisment  T2=0.15  T3=0.30  T4=0.40  T5=0.60  T6=0.80
+vi_share_peasants_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_peasants }
+		if           = { limit = { var:vi_share_peasants >= 0.90 } add = 0.8 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.70 } add = 0.6 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.50 } add = 0.4 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.25 } add = 0.3 }
+		else         = {                                         add = 0.15 }
+	}
+}
+# Negative: global_pop_promotion_speed_modifier  T2=-0.15(-15%)  T3=-0.30(-30%)  T4=-0.40(-40%)  T5=-0.60(-60%)  T6=-0.80(-80%)
+vi_share_peasants_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_peasants }
+		if           = { limit = { var:vi_share_peasants >= 0.90 } add = -0.8 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.70 } add = -0.6 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.50 } add = -0.4 }
+		else_if      = { limit = { var:vi_share_peasants >= 0.25 } add = -0.3 }
+		else         = {                                         add = -0.15 }
+	}
+}
+# Positive: tolerance_heretic  T2=0.1  T3=0.2  T4=0.3  T5=0.5  T6=0.7
+vi_share_dhimmi_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_dhimmi }
+		if           = { limit = { var:vi_share_dhimmi >= 0.90 } add = 0.7 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.70 } add = 0.5 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.50 } add = 0.3 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.25 } add = 0.2 }
+		else         = {                                         add = 0.1 }
+	}
+}
+# Negative: global_pop_conversion_speed_modifier  T2=-0.05  T3=-0.10  T4=-0.20  T5=-0.35  T6=-0.50
+vi_share_dhimmi_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_dhimmi }
+		if           = { limit = { var:vi_share_dhimmi >= 0.90 } add = -0.5 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.70 } add = -0.35 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.50 } add = -0.2 }
+		else_if      = { limit = { var:vi_share_dhimmi >= 0.25 } add = -0.1 }
+		else         = {                                         add = -0.05 }
+	}
+}
+# Positive: monthly_war_exhaustion (negative = reduction)  T2=-0.01  T3=-0.02  T4=-0.04  T5=-0.06  T6=-0.08
+vi_share_tribes_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_tribes }
+		if           = { limit = { var:vi_share_tribes >= 0.90 } add = -0.08 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.70 } add = -0.06 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.50 } add = -0.04 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.25 } add = -0.02 }
+		else         = {                                         add = -0.01 }
+	}
+}
+# Negative: global_monthly_food_modifier  T2=-0.01  T3=-0.02  T4=-0.04  T5=-0.06  T6=-0.08
+vi_share_tribes_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_tribes }
+		if           = { limit = { var:vi_share_tribes >= 0.90 } add = -0.08 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.70 } add = -0.06 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.50 } add = -0.04 }
+		else_if      = { limit = { var:vi_share_tribes >= 0.25 } add = -0.02 }
+		else         = {                                         add = -0.01 }
+	}
+}
+# Positive: monthly_war_exhaustion (negative = reduction)  T2=-0.01  T3=-0.02  T4=-0.04  T5=-0.06  T6=-0.08
+vi_share_cossacks_pos_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_cossacks }
+		if           = { limit = { var:vi_share_cossacks >= 0.90 } add = -0.08 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.70 } add = -0.06 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.50 } add = -0.04 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.25 } add = -0.02 }
+		else         = {                                         add = -0.01 }
+	}
+}
+# Negative: global_monthly_food_modifier  T2=-0.01  T3=-0.02  T4=-0.04  T5=-0.06  T6=-0.08
+vi_share_cossacks_neg_value = {
+	value = 0
+	if = {
+		limit = { has_variable = vi_share_cossacks }
+		if           = { limit = { var:vi_share_cossacks >= 0.90 } add = -0.08 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.70 } add = -0.06 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.50 } add = -0.04 }
+		else_if      = { limit = { var:vi_share_cossacks >= 0.25 } add = -0.02 }
+		else         = {                                         add = -0.01 }
+	}
+}

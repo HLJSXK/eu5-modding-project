@@ -1,0 +1,80 @@
+﻿# events/pest_disease_events.txt
+# Pest/Disease Mod — EXACT 500 worldwide selection using vanilla global list primitives.
+#
+# IMPORTANT:
+# Events fired with trigger_event_silently MUST HAVE NO trigger block.
+
+namespace = pest_disease
+
+pest_disease.1 = {
+    type = country_event
+    hidden = yes
+
+    title = pest_disease.1.t
+    desc  = pest_disease.1.d
+
+    immediate = {
+        # 1) Rebuild candidate list of ALL AgroPlant RGO locations worldwide
+        clear_global_variable_list = pest_disease_candidates
+
+        every_region = {
+            every_location_in_region = {
+                limit = {
+		    exists = raw_material  ### this is very important as it limits which locations are used in  calculations, removing oceans and other not needed locations in calculations.
+                    OR = {
+                        raw_material = goods:cocoa
+                        raw_material = goods:coffee
+                        raw_material = goods:fruit
+                        raw_material = goods:incense
+                        raw_material = goods:legumes
+                        raw_material = goods:maize
+                        raw_material = goods:millet
+                        raw_material = goods:olives
+                        raw_material = goods:pepper
+                        raw_material = goods:potato
+                        raw_material = goods:rice
+                        raw_material = goods:saffron
+                        raw_material = goods:sugar
+                        raw_material = goods:tea
+                        raw_material = goods:tobacco
+                        raw_material = goods:wheat
+                        raw_material = goods:wine
+                    }
+                }
+                add_to_global_variable_list = { name = pest_disease_candidates target = this }
+            }
+        }
+
+        # 2) Pick EXACTLY 500 unique locations (or as many as exist if <500)
+        # Engine hard-limits while loops to 1000 iterations max (cannot be changed from script)
+        set_variable = { name = pest_picks_remaining value = 1000 }
+
+        while = {
+            max = 1000
+            limit = {
+                var:pest_picks_remaining >= 1
+                global_variable_list_size = { name = pest_disease_candidates value >= 1 }
+            }
+
+            random_in_global_list = {
+                variable = pest_disease_candidates
+                save_scope_as = pest_pick_location
+            }
+
+            scope:pest_pick_location = {
+                add_location_modifier = {
+                    modifier = pest_disease_effect
+                    months = 12
+                    mode = replace
+                }
+            }
+
+            remove_list_variable = {
+                name = pest_disease_candidates
+                target = scope:pest_pick_location
+            }
+
+            change_variable = { name = pest_picks_remaining add = -1 }
+        }
+    }
+}

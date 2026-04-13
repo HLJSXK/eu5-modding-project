@@ -1,0 +1,231 @@
+﻿# Overrides vanilla marry_noble with gender-based costs
+marry_noble = { 
+
+    sound = UI_action_character_marry_noble
+
+    is_consort_action = yes
+    on_own_nation = yes
+    context_menu_click_mode = click
+    
+    message = yes
+    
+    potential = {
+        scope:actor = {
+            OR = {
+                government_type = government_type:monarchy
+                succession_law = heir_selection:signoria_selection
+                succession_law = heir_selection:matrilineal_non_exclusive
+            }
+        }
+    }
+    
+    ai_tick = daily
+    ai_tick_frequency = 120
+    
+    allow = {
+        # Player needs enough gold (gender-based check)
+        custom_tooltip = {
+            text = noble_marriage_cost_tt
+            trigger_if = {
+                limit = { scope:actor = { always = yes } }
+                scope:actor = {
+                    # Check based on recipient gender
+                    trigger_if = {
+                        limit = { scope:recipient = { is_female = no } }
+                        # Male pays wedding cost: 3 months minimum
+                        gold >= {
+                            value = 3
+                            add = {
+                                value = monthly_income_trade_and_tax
+                                multiply = 3
+                            }
+                        }
+                    }
+                    trigger_else = {
+                        # Female pays dowry: 4.5 months minimum
+                        gold >= {
+                            value = 5
+                            add = {
+                                value = monthly_income_trade_and_tax
+                                multiply = 4.5
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    select_trigger = {
+        looking_for_a = character
+        source = actor
+        target_flag = recipient
+        name = "choose_character"
+        column = {
+            data = name
+        }
+        visible = {
+            is_alive = yes
+        }
+        enabled = {
+            is_eligible_for_royal_marriage = yes
+        }
+    }
+
+    select_trigger = {
+        top_widget = marry_noble_character_top
+        looking_for_a = character
+        source = actor
+        target_flag = target
+        name = "marry_noble_select_title"
+        none_available_msg_key = "marry_noble_no_characters"
+        column = {
+            data = character_info
+        }
+        visible = {
+            OR = {
+                scope:actor = { modifier:can_marry_only_overlord_dynasty_characters = no }
+                AND = {
+                    scope:actor = { modifier:can_marry_only_overlord_dynasty_characters = yes }
+                    has_dynasty = yes
+                    OR = {
+                        owner = { any_subject = { this = scope:actor } }
+                        dynasty = {
+                            any_character_in_dynasty = {
+                                owner = { any_subject = { this = scope:actor } }
+                            }
+                        }
+                    }
+                }
+            }
+            OR = {
+                has_estate = estate_type:nobles_estate
+                AND = {
+                    scope:actor = { succession_law = heir_selection:signoria_selection }
+                    has_estate = estate_type:burghers_estate
+                }
+            }
+            NOT = { is_same_gender = scope:recipient }
+            NOT = { is_close_relative = scope:recipient }
+            character_can_marry_trigger = yes
+            not = { is_spouse_of = scope:recipient }
+            modifier:blocked_from_character_interactions = no
+            character_can_marry_recipient_trigger = yes
+        }
+    }
+    
+    effect = {
+        if = {    
+            limit = {
+                exists = scope:recipient
+                exists = scope:target
+            }
+            scope:recipient = {
+                marry_character = scope:target
+            }
+        }
+        
+        # Apply gender-based costs (player only)
+        scope:actor = {
+            if = {
+                limit = {
+                    scope:recipient = { is_female = no }
+                }
+                # Male marrying → Wedding cost
+                noble_wedding_cost_male_effect = yes
+            }
+            else = {
+                # Female marrying → Dowry cost
+                noble_wedding_dowry_female_effect = yes
+            }
+        }
+        
+        # Vanilla legitimacy penalty
+        if = {    
+            limit = {
+                scope:actor ?= { NOT = { has_estate_privilege = estate_privilege:noble_marriage_rights } }
+            }
+            scope:actor = {
+                add_legitimacy = legitimacy_mild_penalty
+            }
+        }
+        
+        # Vanilla special character handling
+        if = {
+            limit = {
+                scope:recipient = character:vij_bukka_raya_sangama
+            }
+            scope:target = {
+                add_to_list = bukka_raya_previous_spouses
+            }
+        }
+    }
+
+    ai_will_do = {
+        # Vanilla AI logic (unchanged)
+        add = {
+            if= {
+                limit = {
+                    scope:recipient ?= {
+                        is_married = yes
+                    }
+                }
+                value = -1000
+            }
+        }
+
+        add = {
+            if = {
+                limit = {
+                    scope:recipient = {
+                        is_ruler = yes
+                    }
+                }
+                value = scope:recipient.age_in_years
+                subtract = 30
+                multiply = 5
+            }
+        }
+        
+        add = {
+            if = {
+                limit = {
+                    scope:recipient = {
+                        OR = {
+                            is_heir = yes
+                            AND = {
+                                exists = father
+                                father = {
+                                    is_ruler = yes
+                                }
+                            }
+                            AND = {
+                                exists = mother
+                                mother = {
+                                    is_ruler = yes
+                                }
+                            }
+                        }
+                    }
+                }
+                value = scope:recipient.age_in_years
+                subtract = 30
+                multiply = 5
+            }
+        }
+
+        add = {
+            if = {
+                limit = {
+                    scope:target = {
+                        is_female = yes
+                        age_in_years = 35
+                    }
+                }
+                value = 35
+                subtract = scope:target.age_in_years
+                multiply = 10
+            }
+        }
+    }
+}

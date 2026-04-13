@@ -1,0 +1,171 @@
+﻿revoke_estate_privilege_via_parliament = {
+    type = parliament
+
+    sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+# ─────────────────────────────────────────────────────────────
+# AI / Automation Tick Control
+#
+# This block controls HOW OFTEN the AI and player automation
+# CONSIDER this action — NOT how often it executes.
+#
+# ai_tick = daily
+#   → The AI is allowed to consider this action once per day.
+#     This is a lightweight scheduling hook, not full evaluation.
+#
+# ai_tick_frequency = 100
+#   → Throttles AI consideration to roughly 1 out of 100 days.
+#     Prevents unnecessary AI evaluations and avoids spam.
+#
+# automation_tick = daily
+#   → Enables this action for player automation systems.
+#
+# automation_tick_frequency = 7
+#   → Player automation checks this action roughly once per week,
+#     preventing repeated or accidental rapid execution.
+#
+# player_automated_category = parliament
+#   → Associates this action with the Parliament automation toggle.
+#
+# Performance impact:
+#   Negligible. With ai_will_do set to a strongly negative value,
+#   the AI will never execute this action, and evaluation short-
+#   circuits early. Safe to keep for clarity and future extensibility.
+# ─────────────────────────────────────────────────────────────
+
+    ai_tick = daily
+    ai_tick_frequency = 100
+    automation_tick = daily
+    automation_tick_frequency = 7
+    player_automated_category = parliament
+
+    # ------------------------------------------------------------
+    # COST REQUIREMENTS (USER REQUEST)
+    #   - Require 75% parliament support
+    #   - Pay gold equal to the current Estate Bribe amount (Estates UI):
+    #       12 * estate_tax_base   (same as vanilla bribe_estate)
+    # ------------------------------------------------------------
+    allow = {
+        scope:actor = {
+            is_active_parliament = yes
+        }
+
+        # NOTE: Parliament UI shows the global threshold (usually 50%),
+        # but this action *actually* requires 75% support.
+        custom_tooltip = {
+            text = revoke_estate_privilege_via_parliament_req_support_tt
+            scope:actor = { parliament_issue_support >= 0.75 }
+        }
+
+        # Informational requirement: gold cost equals the Estate Bribe amount
+        custom_tooltip = {
+            text = revoke_estate_privilege_via_parliament_req_bribe_tt
+            always = yes
+        }
+    }
+
+    # 1) Select an estate to target
+    select_trigger = {
+        looking_for_a = estate
+        source = actor
+        target_flag = target_estate
+        name = "revoke_estate_privilege_via_parliament_select_estate"
+        none_available_msg_key = "trigger_no_revoke_estate_privilege_via_parliament_no_estates"
+        show_why_not_enabled = yes
+        column = { data = name }
+        column = { data = estate_tax_base }
+
+        visible = {
+            estate_tax_base > 0.01
+            num_privileges > 0
+        }
+        enabled = {
+            scope:actor = {
+                gold >= {
+                    value = root.estate_tax_base
+                    multiply = 12
+                }
+            }
+        }
+    }
+
+    # 2) Select which privilege to revoke (from the chosen estate)
+    select_trigger = {
+        looking_for_a = estate_privilege
+        interaction_source_list = {
+            scope:actor = {
+                every_estate_privilege = {
+                    limit = {
+                        exists = scope:target_estate
+                        estate_type = scope:target_estate.estate_type
+                    }
+                    add_to_list = source
+                }
+            }
+        }
+        target_flag = target_privilege
+        name = "revoke_estate_privilege_via_parliament_select_privilege"
+        none_available_msg_key = "trigger_no_revoke_estate_privilege_via_parliament_no_privileges"
+        show_why_not_enabled = yes
+        column = { data = estate_privilege_with_icon }
+
+        enabled = {
+            exists = scope:target_estate
+            scope:actor = {
+                gold >= {
+                    value = scope:target_estate.estate_tax_base
+                    multiply = 12
+                }
+            }
+        }
+    }
+
+    effect = {
+        scope:actor = {
+            if = {
+                limit = {
+                    exists = scope:target_estate
+                    exists = scope:target_privilege
+                }
+
+                # Pay the "Estate Bribe" amount (same formula as vanilla bribe_estate)
+                add_gold = {
+                    value = scope:target_estate.estate_tax_base
+                    multiply = -12
+                }
+                add_gold_to_estate = {
+                    estate_type = scope:target_estate.estate_type
+                    value = {
+                        value = scope:target_estate.estate_tax_base
+                        multiply = 12
+                    }
+                }
+
+                # Spend 75% parliament support (absolute)
+                change_parliament_issue_support = {
+                    value = 0.75
+                    multiply = -1
+                }
+
+                # Additional balancing costs (mod):
+                # - Legitimacy: -10 (percentage points)
+                # - Estate satisfaction: -15 (percentage points) for the targeted estate
+                # - Parliament backlash: -0.10 parliament_base_support for 10 years
+                add_legitimacy = -10
+                add_estate_satisfaction = { type = scope:target_estate.estate_type value = -0.15 }
+                add_country_modifier = { modifier = revoke_privilege_parliament_backlash years = 10 mode = add_and_extend }
+
+
+                # Revoke the selected privilege
+                custom_tooltip = { text = parliament_revoked_selected_privilege_tt }
+                revoke_estate_privilege = scope:target_privilege
+            }
+            else = {
+                custom_tooltip = revoke_estate_privilege_via_parliament_select_estate
+            }
+        }
+    }
+
+    ai_will_do = {
+        add = -1000 # Player-focused action; AI disabled by default
+    }
+}

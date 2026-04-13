@@ -1,0 +1,160 @@
+﻿# ============================================================
+# VI BUREAUCRACY COST — REDISTRIBUTION EFFECTS
+# ============================================================
+# Called monthly from vi_bureaucracy_monthly_update (player-only)
+#
+# Source value: var:vi_bureaucracy_display (computed same tick, positive)
+#
+# Split:
+#   30% → capital market demand (Paper, Books, Cloth, Furniture)
+#   70% → gold to estates (Nobles, Clergy, Burghers, Dhimmis if present)
+#          weighted by estate_power() of each present estate
+#
+# KEY RULES:
+#   - return = yes is NOT valid in scripted effects — use nested if blocks
+#   - add_gold_to_estate NEGATIVE value = ADDING gold to estate
+#   - add_gold_to_estate POSITIVE value = DEDUCTING gold from estate
+# ============================================================
+
+vi_distribute_bureaucracy_expense_effect = {
+
+	if = {
+		limit = {
+			has_variable = vi_bureaucracy_display
+			var:vi_bureaucracy_display > 0
+		}
+
+		save_temporary_scope_value_as = {
+			name = vi_bur_total
+			value = var:vi_bureaucracy_display
+		}
+
+		# 30% → capital market demand
+		save_temporary_scope_value_as = {
+			name = vi_bur_demand_budget
+			value = {
+				value = scope:vi_bur_total
+				multiply = 0.30
+			}
+		}
+
+		# 70% → estate gold
+		save_temporary_scope_value_as = {
+			name = vi_bur_estate_budget
+			value = {
+				value = scope:vi_bur_total
+				multiply = 0.70
+			}
+		}
+
+		vi_bur_place_market_demand_effect = yes
+		vi_bur_distribute_estate_gold_effect = yes
+	}
+}
+
+# ── MARKET DEMAND ─────────────────────────────────────────────────────────────
+# Capital market only — single scope switch, no iteration.
+
+vi_bur_place_market_demand_effect = {
+	capital.market = {
+		remove_temporary_demand = demand:vi_bur_base
+		add_temporary_demand = {
+			type = demand:vi_bur_base
+			scale = scope:vi_bur_demand_budget
+			months = 2
+		}
+	}
+}
+
+# ── ESTATE GOLD DISTRIBUTION ──────────────────────────────────────────────────
+# CRITICAL: add_gold_to_estate requires NEGATIVE value to ADD gold to estate.
+
+vi_bur_distribute_estate_gold_effect = {
+
+	set_variable = { name = vi_bur_estate_power_total value = 0 }
+
+	if = {
+		limit = { country_has_estate = estate_type:nobles_estate }
+		change_variable = {
+			name = vi_bur_estate_power_total
+			add = "estate_power(estate_type:nobles_estate)"
+		}
+	}
+	if = {
+		limit = { country_has_estate = estate_type:clergy_estate }
+		change_variable = {
+			name = vi_bur_estate_power_total
+			add = "estate_power(estate_type:clergy_estate)"
+		}
+	}
+	if = {
+		limit = { country_has_estate = estate_type:burghers_estate }
+		change_variable = {
+			name = vi_bur_estate_power_total
+			add = "estate_power(estate_type:burghers_estate)"
+		}
+	}
+	if = {
+		limit = { country_has_estate = estate_type:dhimmi_estate }
+		change_variable = {
+			name = vi_bur_estate_power_total
+			add = "estate_power(estate_type:dhimmi_estate)"
+		}
+	}
+
+	if = {
+		limit = { var:vi_bur_estate_power_total > 0 }
+
+		if = {
+			limit = { country_has_estate = estate_type:nobles_estate }
+			add_gold_to_estate = {
+				estate_type = estate_type:nobles_estate
+				value = {
+					value = "estate_power(estate_type:nobles_estate)"
+					divide = var:vi_bur_estate_power_total
+					multiply = scope:vi_bur_estate_budget
+					multiply = -1
+				}
+			}
+		}
+
+		if = {
+			limit = { country_has_estate = estate_type:clergy_estate }
+			add_gold_to_estate = {
+				estate_type = estate_type:clergy_estate
+				value = {
+					value = "estate_power(estate_type:clergy_estate)"
+					divide = var:vi_bur_estate_power_total
+					multiply = scope:vi_bur_estate_budget
+					multiply = -1
+				}
+			}
+		}
+
+		if = {
+			limit = { country_has_estate = estate_type:burghers_estate }
+			add_gold_to_estate = {
+				estate_type = estate_type:burghers_estate
+				value = {
+					value = "estate_power(estate_type:burghers_estate)"
+					divide = var:vi_bur_estate_power_total
+					multiply = scope:vi_bur_estate_budget
+					multiply = -1
+				}
+			}
+		}
+
+		if = {
+			limit = { country_has_estate = estate_type:dhimmi_estate }
+			add_gold_to_estate = {
+				estate_type = estate_type:dhimmi_estate
+				value = {
+					value = "estate_power(estate_type:dhimmi_estate)"
+					divide = var:vi_bur_estate_power_total
+					multiply = scope:vi_bur_estate_budget
+					multiply = -1
+				}
+			}
+		}
+	}
+}

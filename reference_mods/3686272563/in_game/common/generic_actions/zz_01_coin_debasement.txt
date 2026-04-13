@@ -1,0 +1,72 @@
+﻿coin_debasement = {
+    type = parliament
+    sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+
+    ai_tick = daily
+    ai_tick_frequency = 100
+    automation_tick = daily
+    automation_tick_frequency = 7
+    player_automated_category = parliament
+
+    allow = {
+        hidden_trigger = {
+            scope:actor = { is_ai = no }
+        }
+
+        scope:actor = { is_active_parliament = yes }
+
+        custom_tooltip = {
+            text = coin_debasement_req_once_tt
+            scope:actor = { NOT = { has_variable = coin_debasement_used_this_parliament } }
+        }
+    }
+
+    effect = {
+        scope:actor = {
+            # Per-session lock
+            set_variable = { name = coin_debasement_used_this_parliament value = 1 }
+
+            # Gold gained: tax_base * 12, MINIMUM 50 (floor) — use `min` not `max`
+            save_temporary_scope_value_as = {
+                name = vi_debasement_gold
+                value = {
+                    value = country_tax_base
+                    multiply = 12
+                    min = 50
+                }
+            }
+            add_gold = { value = scope:vi_debasement_gold }
+
+            # Inflation: (gold gained / country_estate_loan_size) * 0.5
+            save_temporary_scope_value_as = {
+                name = vi_debasement_loan_size
+                value = country_estate_loan_size
+            }
+            if = {
+                limit = { scope:vi_debasement_loan_size > 0 }
+                save_temporary_scope_value_as = {
+                    name = vi_debasement_inflation
+                    value = {
+                        value = scope:vi_debasement_gold
+                        divide = scope:vi_debasement_loan_size
+                        multiply = 0.5
+                        multiply = 0.01  # add_inflation uses 0-1 scale (0.01 = 1% inflation)
+                    }
+                }
+                add_inflation = { value = scope:vi_debasement_inflation }
+            }
+
+            # Prestige -5 absolute
+            add_prestige = -5
+
+            # Trade efficiency -2.5% for 25 years (stacking)
+            add_country_modifier = {
+                modifier = coin_debasement_trade_penalty
+                years = 25
+                mode = add_and_extend
+            }
+        }
+    }
+
+    ai_will_do = { add = -1000 }
+}

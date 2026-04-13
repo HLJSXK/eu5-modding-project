@@ -1,0 +1,492 @@
+﻿# ============================================================
+# VI LAND INCOME MOD - Land Actions (single button)
+# ============================================================
+# One parliament action. Three-step picker chain:
+#   Step 1: parliament_issue picker - choose action mode
+#           Confiscation / Grant / Purchase / Sale
+#           Per-mode once-per-session locks shown here.
+#   Step 2: estate picker - choose target estate
+#   Step 3: value slider  - land in mln acres (x 0.25)
+#
+# Per-mode session locks: each mode sets its own variable.
+# All 4 can be used in one session, one use each.
+# The main allow block has NO once-per-session condition -
+# the button stays available until all 4 modes are used.
+# ============================================================
+
+land_actions = {
+	type = parliament
+	sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+	show_message = no
+
+	ai_tick = daily
+	ai_tick_frequency = 100
+	automation_tick = daily
+	automation_tick_frequency = 7
+	player_automated_category = parliament
+
+	allow = {
+		hidden_trigger = {
+			scope:actor = { is_ai = no }
+		}
+		scope:actor = { is_active_parliament = yes }
+	}
+
+	# -- Step 1: choose action mode ----------------------------
+	select_trigger = {
+		looking_for_a = parliament_issue
+		interaction_source_list = {
+			parliament_issue:vi_la_mode_confiscation = { add_to_list = source }
+			parliament_issue:vi_la_mode_grant        = { add_to_list = source }
+			parliament_issue:vi_la_mode_purchase     = { add_to_list = source }
+			parliament_issue:vi_la_mode_sale         = { add_to_list = source }
+		}
+		target_flag = vi_la_mode
+		name = "vi_la_select_mode"
+		none_available_msg_key = "vi_la_no_modes_available"
+		column = { data = parliament_issue_widget }
+
+		enabled = {
+			# Each mode has its own once-per-session lock
+			custom_tooltip = {
+				text = vi_la_confiscation_req_once_tt
+				OR = {
+					NOT = { this = parliament_issue:vi_la_mode_confiscation }
+					AND = {
+						this = parliament_issue:vi_la_mode_confiscation
+						scope:actor = { NOT = { has_variable = vi_la_confiscation_used } }
+					}
+				}
+			}
+			custom_tooltip = {
+				text = vi_la_grant_req_once_tt
+				OR = {
+					NOT = { this = parliament_issue:vi_la_mode_grant }
+					AND = {
+						this = parliament_issue:vi_la_mode_grant
+						scope:actor = { NOT = { has_variable = vi_la_grant_used } }
+					}
+				}
+			}
+			custom_tooltip = {
+				text = vi_la_purchase_req_once_tt
+				OR = {
+					NOT = { this = parliament_issue:vi_la_mode_purchase }
+					AND = {
+						this = parliament_issue:vi_la_mode_purchase
+						scope:actor = { NOT = { has_variable = vi_la_purchase_used } }
+					}
+				}
+			}
+			custom_tooltip = {
+				text = vi_la_sale_req_once_tt
+				OR = {
+					NOT = { this = parliament_issue:vi_la_mode_sale }
+					AND = {
+						this = parliament_issue:vi_la_mode_sale
+						scope:actor = { NOT = { has_variable = vi_la_sale_used } }
+					}
+				}
+			}
+		}
+	}
+
+	# -- Step 2: choose target estate -------------------------
+	select_trigger = {
+		looking_for_a = estate
+		source = actor
+		target_flag = vi_la_estate
+		name = "vi_la_select_estate"
+		none_available_msg_key = "vi_la_no_valid_estates"
+		show_why_not_enabled = yes
+		column = { data = name }
+		column = { data = estate_gold }
+
+		visible = {
+			NOT = { estate_type = estate_type:crown_estate }
+			owner = { country_has_estate = prev.estate_type }
+		}
+
+		enabled = {
+			custom_tooltip = {
+				text = vi_la_req_estate_has_land_tt
+				owner = {
+					OR = {
+						# Grant/Sale: estate just needs to exist
+						AND = {
+							NOT = { scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation }
+							NOT = { scope:vi_la_mode = parliament_issue:vi_la_mode_purchase }
+							country_has_estate = prev.estate_type
+						}
+						# Confiscation/Purchase: estate must hold land
+						AND = {
+							OR = {
+								scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation
+								scope:vi_la_mode = parliament_issue:vi_la_mode_purchase
+							}
+							OR = {
+								AND = { prev.estate_type = estate_type:nobles_estate   has_variable = vi_lo_nobles   var:vi_lo_nobles > 0.001 }
+								AND = { prev.estate_type = estate_type:clergy_estate   has_variable = vi_lo_clergy   var:vi_lo_clergy > 0.001 }
+								AND = { prev.estate_type = estate_type:burghers_estate has_variable = vi_lo_burghers var:vi_lo_burghers > 0.001 }
+								AND = { prev.estate_type = estate_type:peasants_estate has_variable = vi_lo_peasants var:vi_lo_peasants > 0.001 }
+								AND = { prev.estate_type = estate_type:dhimmi_estate   has_variable = vi_lo_dhimmi   var:vi_lo_dhimmi > 0.001 }
+								AND = { prev.estate_type = estate_type:tribes_estate   has_variable = vi_lo_tribes   var:vi_lo_tribes > 0.001 }
+								AND = { prev.estate_type = estate_type:cossacks_estate has_variable = vi_lo_cossacks var:vi_lo_cossacks > 0.001 }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# -- Step 3: choose transfer amount (in mln acres, x0.25) -
+	# Four separate value steps, each visible only for its mode.
+	# Only one will be shown at a time.
+	# Purchase max is capped to what the treasury can afford.
+	# Sale max is capped to what the estate gold can afford.
+	# vi_lo_X in mln acres = vi_lo_X x 0.25; step = 5%; default = 10%.
+	# DCF price = mln_acres x 3.6 x pv_factor - affordability cap = treasury / (3.6 x pv)
+
+	# -- Step 3: choose transfer amount (mln. acres) -----------
+	# Single value step - visible blocks on value steps are not supported by the engine.
+	# Max logic:
+	#   Confiscation / Purchase: limited by the ESTATE's LO (Crown buys/takes from estate)
+	#   Grant / Sale:            limited by the CROWN's LO (Crown gives/sells from own land)
+	# Step = 5% of source; Default = 10% of source.
+	select_trigger = {
+		looking_for_a = value
+		target_flag = vi_la_amount
+		name = "vi_la_select_amount"
+		min = { value = 0 }
+		max = {
+			# Grant / Sale - Crown LO is the source (original OR pattern preserved)
+			# Grant: x 0.0625 (25% cap). Sale: x 0.25 (full land; affordability caps separately)
+			if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_grant
+						scope:vi_la_mode = parliament_issue:vi_la_mode_sale
+					}
+					scope:actor = { has_variable = vi_lo_crown }
+				}
+				if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_grant }
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.0625
+				}
+				else = {
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.25
+				}
+			}
+			# Confiscation - Estate LO x 0.0625 (25% cap)
+			else_if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation
+					}
+					exists = scope:vi_la_estate
+				}
+				if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.0625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.0625 }
+			}
+			# Purchase - Estate LO x 0.25 (full land; affordability caps separately)
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.25 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.25 }
+			else = { value = 0 }
+		}
+		step = {
+			# Grant / Sale - Crown LO (original OR pattern preserved)
+			# Grant: x 0.00625 (10% of cap, step = default; 0.003125 rejected by parser). Sale: x 0.0125 (5% of full land)
+			if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_grant
+						scope:vi_la_mode = parliament_issue:vi_la_mode_sale
+					}
+					scope:actor = { has_variable = vi_lo_crown }
+				}
+				if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_grant }
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.00625
+				}
+				else = {
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.0125
+				}
+			}
+			# Confiscation - 5% of cap per estate (0.0625 x 0.10 = 0.00625 (0.003125 rejected by parser))
+			else_if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation
+					}
+					exists = scope:vi_la_estate
+				}
+				if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.00625 }
+			}
+			# Purchase - 5% of full land per estate
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.0125 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.0125 }
+			else = { value = 0.01 }
+		}
+		default = {
+			# Grant / Sale - Crown LO (original OR pattern preserved)
+			# Grant: x 0.00625 (10% of cap). Sale: x 0.025 (10% of full land)
+			if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_grant
+						scope:vi_la_mode = parliament_issue:vi_la_mode_sale
+					}
+					scope:actor = { has_variable = vi_lo_crown }
+				}
+				if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_grant }
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.00625
+				}
+				else = {
+					value = scope:actor.var:vi_lo_crown
+					multiply = 0.025
+				}
+			}
+			# Confiscation - 10% of cap per estate (0.0625 x 0.10 = 0.00625)
+			else_if = {
+				limit = {
+					exists = scope:vi_la_mode
+					OR = {
+						scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation
+					}
+					exists = scope:vi_la_estate
+				}
+				if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.00625 }
+				else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.00625 }
+			}
+			# Purchase - 10% of full land per estate
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:nobles_estate   scope:actor = { has_variable = vi_lo_nobles } }   value = scope:actor.var:vi_lo_nobles   multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:clergy_estate   scope:actor = { has_variable = vi_lo_clergy } }   value = scope:actor.var:vi_lo_clergy   multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:burghers_estate scope:actor = { has_variable = vi_lo_burghers } } value = scope:actor.var:vi_lo_burghers multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:peasants_estate scope:actor = { has_variable = vi_lo_peasants } } value = scope:actor.var:vi_lo_peasants multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:dhimmi_estate   scope:actor = { has_variable = vi_lo_dhimmi } }   value = scope:actor.var:vi_lo_dhimmi   multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:tribes_estate   scope:actor = { has_variable = vi_lo_tribes } }   value = scope:actor.var:vi_lo_tribes   multiply = 0.025 }
+			else_if = { limit = { exists = scope:vi_la_estate scope:vi_la_estate.estate_type = estate_type:cossacks_estate scope:actor = { has_variable = vi_lo_cossacks } } value = scope:actor.var:vi_lo_cossacks multiply = 0.025 }
+			else = { value = 0 }
+		}
+	}
+
+	# -- Effect: branch on mode --------------------------------
+	# NOTE: vi_la_amount is now in mln acres. Convert back to raw units (-0.25 = x4)
+	# for change_variable on vi_lo_X, and for DCF price calculation.
+	# DCF price = raw_amount x 0.9 x pv_factor
+	#           = (vi_la_amount x 4) x 0.9 x pv_factor
+	#           = vi_la_amount x 3.6 x pv_factor
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = scope:vi_la_mode
+					exists = scope:vi_la_estate
+					exists = scope:vi_la_amount
+					scope:vi_la_amount > 0
+				}
+
+				scope:vi_la_estate = { save_scope_as = vi_la_estate_scope }
+
+				# Convert mln acres back to raw units for variable changes
+				save_temporary_scope_value_as = {
+					name = vi_la_raw
+					value = { value = scope:vi_la_amount  multiply = 4 }
+				}
+
+				# -- CONFISCATION ------------------------------------------
+				if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_confiscation }
+
+					set_variable = { name = vi_la_confiscation_used value = 1 }
+					# Consequences first - reads vi_lo_X at pre-transfer value, matching tooltip evaluation
+					vi_la_confiscation_consequences_effect = yes
+
+					change_variable = { name = vi_ac_crown add = scope:vi_la_raw }
+					if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   change_variable = { name = vi_ac_nobles   subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   change_variable = { name = vi_ac_clergy   subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } change_variable = { name = vi_ac_burghers subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } change_variable = { name = vi_ac_peasants subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   change_variable = { name = vi_ac_dhimmi   subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   change_variable = { name = vi_ac_tribes   subtract = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } change_variable = { name = vi_ac_cossacks subtract = scope:vi_la_raw } }
+					# Immediately refresh LO display variables
+					set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+					if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value } }
+				}
+
+				# -- GRANT -------------------------------------------------
+				else_if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_grant }
+
+					set_variable = { name = vi_la_grant_used value = 1 }
+					# Consequences first - reads vi_lo_crown at pre-transfer value, matching tooltip evaluation
+					vi_la_grant_consequences_effect = yes
+
+					change_variable = { name = vi_ac_crown subtract = scope:vi_la_raw }
+					if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   change_variable = { name = vi_ac_nobles   add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   change_variable = { name = vi_ac_clergy   add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } change_variable = { name = vi_ac_burghers add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } change_variable = { name = vi_ac_peasants add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   change_variable = { name = vi_ac_dhimmi   add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   change_variable = { name = vi_ac_tribes   add = scope:vi_la_raw } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } change_variable = { name = vi_ac_cossacks add = scope:vi_la_raw } }
+					# Immediately refresh LO display variables
+					set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+					if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   } }
+					else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value } }
+				}
+
+				# -- PURCHASE ----------------------------------------------
+				else_if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_purchase }
+
+					# DCF price = vi_la_amount x 3.6 x pv_factor
+					save_temporary_scope_value_as = {
+						name = vi_la_price
+						value = { value = scope:vi_la_amount  multiply = 3.6  multiply = vi_land_dcf_pv_factor }
+					}
+
+					# Store price for insufficient gold message
+					set_variable = { name = vi_la_price_display  value = scope:vi_la_price }
+
+					if = {
+						limit = { gold >= scope:vi_la_price }
+						set_variable = { name = vi_la_purchase_used value = 1 }
+						# Crown pays estate - show as single signed gold line:
+						# "Crown pays -X to [Estate]" via custom label + add_gold auto-tooltip
+						custom_tooltip = vi_la_purchase_crown_pays_tt
+						add_gold = { value = scope:vi_la_price  multiply = -1 }
+						# Actual estate gold change - hidden to avoid wrong auto-tooltip
+						hidden_effect = {
+							add_gold_to_estate = {
+								estate_type = scope:vi_la_estate_scope.estate_type
+								value = { value = scope:vi_la_price  multiply = -1 }
+							}
+						}
+						change_variable = { name = vi_ac_crown add = scope:vi_la_raw }
+						if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   change_variable = { name = vi_ac_nobles   subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   change_variable = { name = vi_ac_clergy   subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } change_variable = { name = vi_ac_burghers subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } change_variable = { name = vi_ac_peasants subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   change_variable = { name = vi_ac_dhimmi   subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   change_variable = { name = vi_ac_tribes   subtract = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } change_variable = { name = vi_ac_cossacks subtract = scope:vi_la_raw } }
+						# Immediately refresh LO display variables
+						set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+						if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value } }
+					}
+					else = {
+						custom_tooltip = vi_la_purchase_insufficient_gold_tt
+					}
+				}
+
+				# -- SALE --------------------------------------------------
+				else_if = {
+					limit = { scope:vi_la_mode = parliament_issue:vi_la_mode_sale }
+
+					save_temporary_scope_value_as = {
+						name = vi_la_price
+						value = { value = scope:vi_la_amount  multiply = 3.6  multiply = vi_land_dcf_pv_factor }
+					}
+
+					# Store price for insufficient gold message
+					set_variable = { name = vi_la_price_display  value = scope:vi_la_price }
+
+					if = {
+						limit = { scope:vi_la_estate_scope.estate_gold >= scope:vi_la_price }
+						set_variable = { name = vi_la_sale_used value = 1 }
+						# Crown receives from estate - show as single signed gold line:
+						# "Crown receives +X from [Estate]" via custom label + add_gold auto-tooltip
+						custom_tooltip = vi_la_sale_crown_receives_tt
+						add_gold = { value = scope:vi_la_price }
+						# Actual estate gold deduction - hidden to avoid wrong auto-tooltip
+						hidden_effect = {
+							add_gold_to_estate = {
+								estate_type = scope:vi_la_estate_scope.estate_type
+								value = { value = scope:vi_la_price }
+							}
+						}
+						change_variable = { name = vi_ac_crown subtract = scope:vi_la_raw }
+						if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   change_variable = { name = vi_ac_nobles   add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   change_variable = { name = vi_ac_clergy   add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } change_variable = { name = vi_ac_burghers add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } change_variable = { name = vi_ac_peasants add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   change_variable = { name = vi_ac_dhimmi   add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   change_variable = { name = vi_ac_tribes   add = scope:vi_la_raw } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } change_variable = { name = vi_ac_cossacks add = scope:vi_la_raw } }
+						# Immediately refresh LO display variables
+						set_variable = { name = vi_lo_crown    value = vi_lo_crown_value    }
+						if      = { limit = { scope:vi_la_estate.estate_type = estate_type:nobles_estate }   set_variable = { name = vi_lo_nobles   value = vi_lo_nobles_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:clergy_estate }   set_variable = { name = vi_lo_clergy   value = vi_lo_clergy_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:burghers_estate } set_variable = { name = vi_lo_burghers value = vi_lo_burghers_value } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:peasants_estate } set_variable = { name = vi_lo_peasants value = vi_lo_peasants_value } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:dhimmi_estate }   set_variable = { name = vi_lo_dhimmi   value = vi_lo_dhimmi_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:tribes_estate }   set_variable = { name = vi_lo_tribes   value = vi_lo_tribes_value   } }
+						else_if = { limit = { scope:vi_la_estate.estate_type = estate_type:cossacks_estate } set_variable = { name = vi_lo_cossacks value = vi_lo_cossacks_value } }
+					}
+					else = {
+						custom_tooltip = vi_la_sale_insufficient_estate_gold_tt
+					}
+				}
+			}
+		}
+	}
+
+	ai_will_do = { add = -1000 }
+}

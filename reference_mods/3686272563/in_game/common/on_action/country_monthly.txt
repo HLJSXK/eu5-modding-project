@@ -1,0 +1,645 @@
+﻿# VI's Total Realism Mod - Combined Singleton On-Actions
+# 
+# monthly_country_pulse is a SINGLETON: only ONE file across all mods may define it.
+# This file merges injections from:
+#   - Drought mod v8           (drought_monthly_polling)
+#   - Circular Economy v13     (eed_monthly_distribute_court_diplomatic)
+#   - Bureaucracy Cost v19     (vi_bureaucracy_monthly_update, vi_bureaucracy_init, on_game_start)
+#   - Parliament mod v30       (estate_loan.100 event, on_parliament_started)
+#   - Land Income mod v55      (vi_land_monthly_update, vi_land_income_init, on_game_start,
+#                               on_parliament_started land action session lock resets)
+#
+# yearly_country_pulse is a SINGLETON: merged injection from:
+#   - Pest & Disease mod v7    (pest_disease_mod)
+#
+# All vanilla content is preserved verbatim.
+
+monthly_country_pulse = {
+	on_actions = {
+		on_papal_opinion_added
+		on_papal_opinion_removed
+		on_papacy_reform_removed
+		#on_papal_authority_updated
+		france_naples_administration_broken
+		on_new_appanage
+		on_vassalized_appanage
+		on_former_independent_appanage
+		on_disloyal_independent_appanage
+		on_annexing_subject_monthly_pulse
+		on_settle_the_frontier_monthly_pulse
+		wor_on_wallenstein_prison_occupation
+		wor_on_wallenstein_prison_timeout
+		on_fraticide_underage_succession_waiting
+
+		# ── TRM: Drought System (drought mod v8) ──────────────────
+		drought_monthly_polling
+
+		# ── TRM: Circular Economy distribution (circular economy v13) ──
+		eed_monthly_distribute_court_diplomatic
+
+		# ── TRM: Bureaucracy Cost update (bureaucracy cost v19) ───
+		vi_bureaucracy_monthly_update
+
+		# ── TRM: Land Income monthly update (land income mod v55) ─
+		vi_land_monthly_update
+	}
+	
+	random_events = {
+		10 = empires.1
+		10 = empires.2
+		10 = empires.3
+		1 = border_friction.1
+		1 = border_friction.2
+		
+		20 = flavor_dan.9 #Skane Fish Market comes to an end
+		10 = flavor_pol.1200 #Nicolaus Copernicus
+
+		30 = war_of_religions.1201
+		100 = war_of_religions.1204
+
+		20 = war_of_religions.1401
+
+		10 = little_ice_age.4
+	
+		chance_to_happen = 5
+	}
+	
+	events = {
+		#earthquake events 
+		earthquake_events.1			#Earthquake in Constantinople
+		earthquake_events.1000		#The Gallipoli Earthquake
+
+		#other events
+		devotion_events.21			#Change government form if low devotion
+		banking.1					#Spawn the Fuggers
+		banking.3					#Spawn the Welser
+		military_order_events.9 	#The Banners of Outremer
+		flavor_pap.9000 			#Give Rome back to the Pope
+		flavor_pap.9001				#Or he'll come for someone else's land
+		mayan_events.1				#The Start of a New K'atun
+		flavor_plc.15
+
+		turmoil_in_brandenburg.1200 #Hohenzollern event for the Emperor if they have BB as subject
+		turmoil_in_brandenburg.2 #Get rid of a modifier which serves no longer a purpose to BB
+
+
+		# ── TRM: Parliament - Estate Loan countdown/repayment ─────
+		estate_loan.100
+	}
+
+	# ── Army Mod v13: Mercenary mechanics (WE morale offset, starting XP, Living off the Land) ──
+	# VI Army Mod - Mercenary WE Morale Offset
+	# Cancels war_exhaustion_impact land_morale_modifier penalty exactly for pure mercenary units.
+	# Pure mercenary = no levies and no regulars in the unit.
+	# Step 1: save WE * 0.025 at country scope.
+	# Step 2: iterate every_unit, limit to pure mercenary units.
+	# Step 3: add vi_unit_we_morale_offset at size = 0 with mode = replace (resets cleanly each month).
+	# Step 4: change_unit_modifier_size sets size to WE * 0.025 = exact cancel.
+	# months = 2 ensures self-expiry if the unit is disbanded or mod removed.
+	effect = {
+		# size= is a multiplier on the base modifier value (0.025)
+		# so passing war_exhaustion directly gives: 0.025 * WE = exact cancel
+		save_temporary_scope_value_as = {
+			name = vi_we_offset
+			value = war_exhaustion
+		}
+		every_unit = {
+			limit = {
+				has_mercenaries = yes
+				NOT = { has_levies = yes }
+				NOT = { has_regulars = yes }
+			}
+			add_unit_modifier = {
+				modifier = vi_unit_we_morale_offset
+				months = 2
+				mode = replace
+				size = 0
+			}
+			change_unit_modifier_size = {
+				modifier = vi_unit_we_morale_offset
+				value = scope:vi_we_offset
+			}
+		}
+
+		# VI Army Mod - Mercenary Starting XP Initialization
+		# Applies 50 starting experience to subunits of newly hired/assembled mercenary
+		# companies, excluding Offered Armies (which preserve their existing XP).
+		#
+		# Two iterators are required because the engine splits companies by perspective:
+		#   every_hired_mercenary   = companies where you are CUSTOMER but not owner
+		#                             (Pool Companies and others' Captain Companies)
+		#   every_rented_out_merc   = companies where you are OWNER (your own Gather)
+		#                             even when you are also the customer
+		#
+		# Vanilla confirms this split in institution_events.txt (event 81):
+		#   any_rented_out_mercenary { has_customer = yes ... } -> your own companies
+		#   any_hired_mercenary { mercenary_home = { owner = { ... } } } -> foreign pool
+		#
+		# Offered Armies are excluded by having the OR condition fail:
+		#   - They appear in every_hired_mercenary (you are customer)
+		#   - But mercenary_home owner is a regular country, not army-type -> FALSE
+		#   - And is_mercenary_owned_by = root -> FALSE (offering country owns it)
+		#
+		# Fires exactly once per company via vi_merc_xp_initialized flag.
+		# has_mercenary_modifier gate on both blocks prevents re-application.
+
+		# Block A: Pool Companies and others' Captain Companies.
+		# every_hired_mercenary = companies where player is customer but not owner.
+		# Offered Armies appear in every_rented_out_mercenary (Block B), not here.
+		# No owner filter needed: all companies in this iterator get 50 XP.
+		every_hired_mercenary = {
+			limit = {
+				NOT = { has_mercenary_modifier = vi_merc_xp_initialized }
+			}
+			every_mercenary_sub_unit = {
+				add_subunit_experience = 50
+			}
+			add_mercenary_modifier = {
+				modifier = vi_merc_xp_initialized
+				years = 1000
+				mode = add_and_extend
+			}
+		}
+
+		# Block B: Your own Gather Captain Companies — Offered Armies excluded.
+		# every_rented_out_mercenary = companies player owns (Gather AND Offered Army).
+		# Distinguish by mercenary_home: Offered Army home owner = offering country (NOT root).
+		# Gather home owner = player (root) or home is null -> passes the filter.
+		# NOT { mercenary_home = { NOT = { owner = root } } } = home is null OR home owner is root.
+		every_rented_out_mercenary = {
+			limit = {
+				NOT = { has_mercenary_modifier = vi_merc_xp_initialized }
+				NOT = { mercenary_home = { NOT = { owner = root } } }
+			}
+			every_mercenary_sub_unit = {
+				add_subunit_experience = 50
+			}
+			add_mercenary_modifier = {
+				modifier = vi_merc_xp_initialized
+				years = 1000
+				mode = add_and_extend
+			}
+		}
+
+		# VI Army Mod - Living Off the Land (passive, automatic)
+		# Pure mercenary armies in hostile territory (owner at war with hiring country)
+		# replenish their full food storage each month by foraging off the land.
+		every_unit = {
+			limit = {
+				has_mercenaries = yes
+				NOT = { has_levies = yes }
+				NOT = { has_regulars = yes }
+				is_moving = no
+				in_combat = no
+				is_exiled = no
+				unit_location = {
+					exists = owner
+					owner = { is_at_war_with = root }
+				}
+			}
+			add_food_percentage = 1.0
+		}
+	}
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VANILLA on_actions (preserved verbatim from game files)
+# ──────────────────────────────────────────────────────────────────────────────
+
+on_papal_opinion_added = {
+	trigger = {
+		OR = {
+			modifier:papal_relations < 0
+			modifier:papal_relations > 0
+		}
+		country_exists = c:PAP
+		not = { tag = PAP }
+	}
+	effect = {
+		c:PAP = {
+			remove_opinion = {
+				target = prev
+				modifier = opinion_papal_relations
+			}
+		}
+		reverse_add_opinion = {
+			target = c:PAP
+			modifier = opinion_papal_relations
+			scale = modifier:papal_relations
+		}
+	}
+}
+
+on_papal_opinion_removed = {
+	trigger = {
+		country_exists = c:PAP
+		not = { tag = PAP }
+		c:PAP = {
+			has_opinion = {
+				target = prev
+				modifier = opinion_papal_relations
+			}
+		}
+		modifier:papal_relations = 0
+	}
+	effect = {
+		c:PAP = {
+			remove_opinion = {
+				target = prev
+				modifier = opinion_papal_relations
+			}
+		}
+	}
+}
+
+on_papacy_reform_removed = {
+	trigger = {
+		tag = PAP
+		NOT = {
+			has_reform = government_reform:papacy_reform
+		}
+	}
+	effect = {
+		trigger_event_non_silently = catholic_flavor.9000
+	}
+}
+
+france_naples_administration_broken = {
+	trigger = {
+		has_variable = france_naples_union
+		NOT = { c:NAP ?= { in_union_with = c:FRA } }
+	}
+	effect = {
+		if = {
+			limit = {
+				has_country_modifier = fra_aligned_neapolitan_court
+			}
+			remove_country_modifier = fra_aligned_neapolitan_court
+		}	
+		if = {
+			limit = {
+				has_country_modifier = fra_tight_grip_over_neapolitan_court
+			}
+			remove_country_modifier = fra_tight_grip_over_neapolitan_court
+		}			
+		if = {
+			limit = {
+				has_country_modifier = fra_neapolitan_court_autonomy
+			}
+			remove_country_modifier = fra_neapolitan_court_autonomy
+		}	
+		c:NAP = {
+			if = {
+				limit = {
+					has_country_modifier = nap_aligned_neapolitan_court
+				}
+				remove_country_modifier = nap_aligned_neapolitan_court
+			}	
+			if = {
+				limit = {
+					has_country_modifier = nap_tight_grip_over_neapolitan_court
+				}
+				remove_country_modifier = nap_tight_grip_over_neapolitan_court
+			}			
+			if = {
+				limit = {
+					has_country_modifier = nap_neapolitan_court_autonomy
+				}
+				remove_country_modifier = nap_neapolitan_court_autonomy
+			}			
+		}
+		remove_variable = france_naples_union		
+	}	
+}
+
+wor_on_wallenstein_prison_occupation = {
+	trigger = {
+		global_var:wallensteins_prison ?= {
+			has_siege = yes
+			siege = {
+				any_besieging_unit = {
+					owner = {
+						has_variable = wallenstein_rescue_mission
+					}
+				}
+			}
+		}
+	}
+	effect = {
+		trigger_event_non_silently = war_of_religions.1203
+	}
+}
+
+wor_on_wallenstein_prison_timeout = {
+	trigger = {
+		global_var:wallensteins_prison ?= {
+			has_siege = yes
+			siege = {
+				any_besieging_unit = {
+					owner = {
+						has_variable = wallenstein_rescue_mission
+					}
+				}
+			}
+		}
+	}
+	effect = {
+		trigger_event_silently = war_of_religions.1204
+	}
+}
+
+# root = overlord
+# scope:target = subject
+on_annexing_subject_monthly_pulse = {
+	on_actions = {
+	}
+	
+	random_events = {
+		1 = subject_interaction_events.46
+		1 = subject_interaction_events.47
+		1 = subject_interaction_events.48
+		1 = flavor_fra.1102
+		100 = 0
+
+		chance_to_happen = 1
+	}
+}
+
+on_fraticide_underage_succession_waiting = {
+	trigger = {
+		has_variable = fraticide_succession_has_child_sons
+	}
+	effect = {
+		if = {
+			limit = {
+				list_size = { name = rival_male_children value > 0 }
+			}
+			if = {
+				limit = {
+					any_in_list = {
+						list = rival_male_children
+						is_alive = yes
+						is_adult = yes
+					}
+				}
+				trigger_event_silently = succession.5
+			}
+			else = {
+				every_in_list = {
+					list = rival_male_children
+					limit = { is_alive = no }
+					remove_from_list = rival_male_children
+				}
+			}
+		}
+		else = {
+			trigger_event_silently = succession.5
+		}
+	}
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRM: DROUGHT SYSTEM (drought mod v8)
+# ──────────────────────────────────────────────────────────────────────────────
+# ARCHITECTURE: Region-based, player-only.
+# CRITICAL FIX: Process END before START to avoid popup conflicts.
+# Rules:
+#   1. ALL events fired via trigger_event_silently in effect only.
+#   2. Events fired via trigger_event_silently must have NO trigger block.
+#   3. monthly_country_pulse runs on the 1st of each month only.
+#   4. save_scope_as is transient to a single event execution only.
+#   5. is_player does NOT exist in EU5. Use "is_ai = no" instead.
+
+drought_monthly_polling = {
+	trigger = {
+		is_ai = no
+		exists = capital
+	}
+
+	effect = {
+		# END POLL - PROCESS FIRST!
+		if = {
+			limit = {
+				any_owned_location = {
+					has_location_modifier = drought_region_marker
+					region = {
+						NOT = {
+							any_location_in_region = {
+								OR = {
+									has_location_modifier = drought_effect_mild
+									has_location_modifier = drought_effect_moderate
+									has_location_modifier = drought_effect_severe
+									has_location_modifier = drought_effect_catastrophic
+								}
+							}
+						}
+					}
+				}
+			}
+			trigger_event_silently = drought.2
+		}
+
+		# START POLL - PROCESS SECOND
+		if = {
+			limit = {
+				any_owned_location = {
+					always = yes
+				}
+			}
+			random = {
+				chance = 1
+				trigger_event_silently = drought.1
+			}
+		}
+	}
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRM: CIRCULAR ECONOMY distribution (circular economy v13)
+# Scope: country (root)
+# ──────────────────────────────────────────────────────────────────────────────
+eed_monthly_distribute_court_diplomatic = {
+	trigger = {
+		is_ai = no
+	}
+	effect = {
+		eed_distribute_court_expense_effect = yes
+		eed_distribute_diplomatic_expense_effect = yes
+		eed_distribute_fort_expense_effect = yes
+		eed_distribute_cultural_expense_effect = yes
+		eed_distribute_stability_expense_effect = yes
+		eed_distribute_army_expense_effect = yes
+		eed_distribute_navy_expense_effect = yes
+	}
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRM: BUREAUCRACY COST (bureaucracy cost v19)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Initialize variables at game start for all player countries
+on_game_start = {
+	on_actions = {
+		vi_bureaucracy_init
+		vi_land_income_init
+	}
+}
+
+vi_bureaucracy_init = {
+	effect = {
+		every_country = {
+			limit = { is_ai = no }
+			set_variable = {
+				name = vi_bureaucracy_display
+				value = vi_bureaucracy_cost_value
+			}
+			if = {
+				limit = {
+					NOT = { has_variable = vi_bureaucracy_level_multiplier }
+				}
+				set_variable = {
+					name = vi_bureaucracy_level_multiplier
+					value = 0.25
+				}
+			}
+			set_variable = { name = vi_bureaucracy_cost_t1 value = vi_bureaucracy_cost_t1 }
+			set_variable = { name = vi_bureaucracy_cost_t2 value = vi_bureaucracy_cost_t2 }
+			set_variable = { name = vi_bureaucracy_cost_t3 value = vi_bureaucracy_cost_t3 }
+			set_variable = { name = vi_bureaucracy_cost_t4 value = vi_bureaucracy_cost_t4 }
+		}
+	}
+}
+
+vi_bureaucracy_monthly_update = {
+	trigger = { is_ai = no }
+	effect = {
+		set_variable = {
+			name = vi_bureaucracy_display
+			value = vi_bureaucracy_cost_value
+		}
+		set_variable = {
+			name = vi_bureaucracy_cost_t1
+			value = vi_bureaucracy_cost_t1
+		}
+		set_variable = {
+			name = vi_bureaucracy_cost_t2
+			value = vi_bureaucracy_cost_t2
+		}
+		set_variable = {
+			name = vi_bureaucracy_cost_t3
+			value = vi_bureaucracy_cost_t3
+		}
+		set_variable = {
+			name = vi_bureaucracy_cost_t4
+			value = vi_bureaucracy_cost_t4
+		}
+		if = {
+			limit = {
+				NOT = { has_variable = vi_bureaucracy_policy_initialized }
+				NOT = { has_policy = vi_skeleton_bureaucracy_policy }
+				NOT = { has_policy = vi_minimal_bureaucracy_policy }
+				NOT = { has_policy = vi_standard_bureaucracy_policy }
+				NOT = { has_policy = vi_expanded_bureaucracy_policy }
+			}
+			add_policy = policy:vi_skeleton_bureaucracy_policy
+			set_variable = { name = vi_bureaucracy_policy_initialized value = 1 }
+		}
+
+		# ── Redistribute bureaucracy cost ──────────────────────
+		# 30% → market demand (Paper, Books, Cloth, Furniture) across all markets
+		# 70% → estate gold weighted by estate power (Nobles, Clergy, Burghers, Dhimmis)
+		vi_distribute_bureaucracy_expense_effect = yes
+	}
+}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRM: LAND INCOME (land income mod v55)
+# ──────────────────────────────────────────────────────────────────────────────
+
+vi_land_income_init = {
+	effect = {
+		every_country = {
+			limit = { is_ai = no }
+			vi_land_income_init_effect = yes
+		}
+	}
+}
+
+vi_land_monthly_update = {
+	trigger = {
+		is_ai = no
+	}
+	effect = {
+		# Save-compatibility init: runs once on existing saves
+		# where on_game_start was never triggered for this mod.
+		if = {
+			limit = { NOT = { has_variable = vi_ac_crown } }
+			vi_land_income_init_effect = yes
+		}
+		vi_land_distribute_income_effect = yes
+	}
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CONSOLIDATED on_parliament_started
+# Merges: Parliament mod v30 (estate loan + fiscal parliament session locks)
+#       + Land Income mod v55 (land action session locks)
+# NOTE: zz_estate_loan_on_action.txt no longer defines on_parliament_started.
+# ──────────────────────────────────────────────────────────────────────────────
+
+on_parliament_started = {
+	effect = {
+		# ── Parliament mod: fiscal action session locks ────────────────────
+		remove_variable = estate_loan_used_this_parliament
+		remove_variable = coin_debasement_used_this_parliament
+		remove_variable = recoinage_used_this_parliament
+		remove_variable = sell_offices_used_this_parliament
+		# Confiscate wealth: per-estate type country variables
+		remove_variable = vi_confiscated_nobles_this_parliament
+		remove_variable = vi_confiscated_clergy_this_parliament
+		remove_variable = vi_confiscated_burghers_this_parliament
+		remove_variable = vi_confiscated_peasants_this_parliament
+		remove_variable = vi_confiscated_dhimmi_this_parliament
+		# Compute the expected inflation from taking 'Emergency loan to the Crown' right now,
+		# so the Parliament interaction tooltip shows the correct value even before the first loan is taken.
+		# Inflation = ( (sum of 25% of each non-Crown estate's gold) / country_estate_loan_size ) * 0.001
+		if = {
+			limit = { is_ai = no }
+			set_variable = { name = estate_loan_preview_principal value = 0 }
+			set_variable = { name = estate_loan_inflation_preview value = 0 }
+			every_estate = {
+				limit = {
+					NOT = { estate_type = estate_type:crown_estate }
+					estate_gold > 0.01
+				}
+				save_temporary_scope_value_as = { name = estate_loan_gold_now value = estate_gold }
+				save_temporary_scope_value_as = {
+					name = estate_loan_share_now
+					value = { value = scope:estate_loan_gold_now multiply = 0.25 }
+				}
+				owner = { change_variable = { name = estate_loan_preview_principal add = scope:estate_loan_share_now } }
+			}
+			save_temporary_scope_value_as = { name = estate_loan_normal_loan_size value = country_estate_loan_size }
+			if = {
+				limit = { scope:estate_loan_normal_loan_size > 0 }
+				save_temporary_scope_value_as = {
+					name = estate_loan_inflation_calc
+					value = {
+						value = var:estate_loan_preview_principal
+						divide = scope:estate_loan_normal_loan_size
+						multiply = 0.001
+					}
+				}
+				set_variable = { name = estate_loan_inflation_preview value = scope:estate_loan_inflation_calc }
+			}
+			remove_variable = estate_loan_preview_principal
+		}
+
+		# ── Land Income mod: land action session locks ─────────────────────
+		remove_variable = vi_la_confiscation_used
+		remove_variable = vi_la_grant_used
+		remove_variable = vi_la_purchase_used
+		remove_variable = vi_la_sale_used
+	}
+}

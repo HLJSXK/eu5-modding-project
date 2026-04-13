@@ -1,0 +1,205 @@
+﻿confiscate_estate_wealth = {
+    type = parliament
+    sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+
+    ai_tick = daily
+    ai_tick_frequency = 100
+    automation_tick = daily
+    automation_tick_frequency = 7
+    player_automated_category = parliament
+
+    allow = {
+        hidden_trigger = {
+            scope:actor = { is_ai = no }
+        }
+
+        scope:actor = { is_active_parliament = yes }
+    }
+
+    select_trigger = {
+        looking_for_a = estate
+        source = actor
+        target_flag = vi_confiscate_estate
+        name = "confiscate_wealth_select_estate"
+        none_available_msg_key = "trigger_no_confiscate_wealth_no_estates"
+        show_why_not_enabled = yes
+        column = { data = name }
+        column = { data = estate_gold }
+
+        visible = {
+            NOT = { estate_type = estate_type:tribes_estate }
+            NOT = { estate_type = estate_type:cossacks_estate }
+            NOT = { estate_type = estate_type:crown_estate }
+        }
+
+        enabled = {
+            custom_tooltip = {
+                text = confiscate_wealth_req_once_per_estate_tt
+                # Use country-scope variables per estate type to track usage
+                NOT = {
+                    owner = {
+                        OR = {
+                            AND = {
+                                prev.estate_type = estate_type:nobles_estate
+                                has_variable = vi_confiscated_nobles_this_parliament
+                            }
+                            AND = {
+                                prev.estate_type = estate_type:clergy_estate
+                                has_variable = vi_confiscated_clergy_this_parliament
+                            }
+                            AND = {
+                                prev.estate_type = estate_type:burghers_estate
+                                has_variable = vi_confiscated_burghers_this_parliament
+                            }
+                            AND = {
+                                prev.estate_type = estate_type:peasants_estate
+                                has_variable = vi_confiscated_peasants_this_parliament
+                            }
+                            AND = {
+                                prev.estate_type = estate_type:dhimmi_estate
+                                has_variable = vi_confiscated_dhimmi_this_parliament
+                            }
+                        }
+                    }
+                }
+            }
+            custom_tooltip = {
+                text = confiscate_wealth_req_has_gold_tt
+                estate_gold > 0.01
+            }
+        }
+    }
+
+    effect = {
+        scope:actor = {
+            if = {
+                limit = { exists = scope:vi_confiscate_estate }
+
+                # Mark this estate type as confiscated this session (country-scope variable, persists reliably)
+                if = {
+                    limit = { scope:vi_confiscate_estate.estate_type = estate_type:nobles_estate }
+                    set_variable = { name = vi_confiscated_nobles_this_parliament value = 1 }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate.estate_type = estate_type:clergy_estate }
+                    set_variable = { name = vi_confiscated_clergy_this_parliament value = 1 }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate.estate_type = estate_type:burghers_estate }
+                    set_variable = { name = vi_confiscated_burghers_this_parliament value = 1 }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate.estate_type = estate_type:peasants_estate }
+                    set_variable = { name = vi_confiscated_peasants_this_parliament value = 1 }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate.estate_type = estate_type:dhimmi_estate }
+                    set_variable = { name = vi_confiscated_dhimmi_this_parliament value = 1 }
+                }
+
+                # Gain 90% of chosen estate's gold
+                scope:vi_confiscate_estate = {
+                    save_temporary_scope_value_as = {
+                        name = vi_confiscate_take
+                        value = { value = estate_gold multiply = 0.9 }
+                    }
+                    save_scope_as = vi_confiscate_estate_scope
+                    owner = {
+                        # Visible call: negative value = tooltip shows "estate loses X" correctly
+                        add_gold_to_estate = {
+                            estate_type = scope:vi_confiscate_estate_scope.estate_type
+                            value = { value = scope:vi_confiscate_take multiply = -1 }
+                        }
+                        # Hidden correction: positive 2X cancels the above gain and nets to -X
+                        hidden_effect = {
+                            add_gold_to_estate = {
+                                estate_type = scope:vi_confiscate_estate_scope.estate_type
+                                value = { value = scope:vi_confiscate_take multiply = 2 }
+                            }
+                        }
+                        add_gold = { value = scope:vi_confiscate_take }
+                    }
+                }
+
+                # Prestige +5 absolute, scaled by estate power (0-1)
+                # estate_power returns 0-1 (displays as %). No divide needed.
+                save_temporary_scope_value_as = {
+                    name = vi_confiscate_power
+                    value = "estate_power(scope:vi_confiscate_estate_scope.estate_type)"
+                }
+                add_prestige = {
+                    value = 5
+                    multiply = scope:vi_confiscate_power
+                }
+
+                # Stability: -10 absolute * estate_power (0-1)
+                add_stability = {
+                    value = -10
+                    multiply = scope:vi_confiscate_power
+                }
+
+                # Chosen estate immediate sat hit (-50% of CURRENT satisfaction) applied in estate-specific blocks below
+
+                # Other estates: -10% immediate satisfaction
+                every_estate = {
+                    limit = {
+                        NOT = { estate_type = scope:vi_confiscate_estate_scope.estate_type }
+                        NOT = { estate_type = estate_type:crown_estate }
+                        NOT = { estate_type = estate_type:tribes_estate }
+                        NOT = { estate_type = estate_type:cossacks_estate }
+                    }
+                    owner = {
+                        add_estate_satisfaction = { type = prev.estate_type value = -0.10 }
+                    }
+                }
+
+                # Solidarity resentment: -5% global estate target sat for 10 years
+                add_country_modifier = { modifier = confiscate_wealth_other_estates_target_sat years = 10 mode = add_and_extend }
+
+                # Estate-specific penalties
+                if = {
+                    limit = { scope:vi_confiscate_estate_scope.estate_type = estate_type:nobles_estate }
+                    add_estate_satisfaction = {
+                        type = estate_type:nobles_estate
+                        value = { value = estate_satisfaction:nobles_estate multiply = -0.5 }
+                    }
+                    add_country_modifier = { modifier = confiscate_wealth_nobles_penalty years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate_scope.estate_type = estate_type:clergy_estate }
+                    add_estate_satisfaction = {
+                        type = estate_type:clergy_estate
+                        value = { value = estate_satisfaction:clergy_estate multiply = -0.5 }
+                    }
+                    add_country_modifier = { modifier = confiscate_wealth_clergy_penalty years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate_scope.estate_type = estate_type:burghers_estate }
+                    add_estate_satisfaction = {
+                        type = estate_type:burghers_estate
+                        value = { value = estate_satisfaction:burghers_estate multiply = -0.5 }
+                    }
+                    add_country_modifier = { modifier = confiscate_wealth_burghers_penalty years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate_scope.estate_type = estate_type:peasants_estate }
+                    add_estate_satisfaction = {
+                        type = estate_type:peasants_estate
+                        value = { value = estate_satisfaction:peasants_estate multiply = -0.5 }
+                    }
+                    add_country_modifier = { modifier = confiscate_wealth_peasants_penalty years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_confiscate_estate_scope.estate_type = estate_type:dhimmi_estate }
+                    add_estate_satisfaction = {
+                        type = estate_type:dhimmi_estate
+                        value = { value = estate_satisfaction:dhimmi_estate multiply = -0.5 }
+                    }
+                    add_country_modifier = { modifier = confiscate_wealth_dhimmi_penalty years = 10 mode = add_and_extend }
+                }
+            }
+        }
+    }
+
+    ai_will_do = { add = -1000 }
+}

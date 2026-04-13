@@ -1,0 +1,137 @@
+﻿sell_government_offices = {
+    type = parliament
+    sound = PARLIAMENT_ASK_FOR_LAW_CHANGES
+
+    ai_tick = daily
+    ai_tick_frequency = 100
+    automation_tick = daily
+    automation_tick_frequency = 7
+    player_automated_category = parliament
+
+    allow = {
+        hidden_trigger = {
+            scope:actor = { is_ai = no }
+        }
+
+        scope:actor = { is_active_parliament = yes }
+
+        custom_tooltip = {
+            text = sell_offices_req_once_tt
+            scope:actor = { NOT = { has_variable = sell_offices_used_this_parliament } }
+        }
+
+        custom_tooltip = {
+            text = sell_offices_req_no_cooldown_tt
+            scope:actor = { NOT = { has_cooldown = sell_government_offices_cooldown } }
+        }
+    }
+
+    select_trigger = {
+        looking_for_a = estate
+        source = actor
+        target_flag = vi_sell_offices_estate
+        name = "sell_offices_select_estate"
+        none_available_msg_key = "trigger_no_sell_offices_no_estates"
+        show_why_not_enabled = yes
+        column = { data = name }
+        column = { data = estate_tax_base }
+
+        visible = {
+            NOT = { estate_type = estate_type:tribes_estate }
+            NOT = { estate_type = estate_type:cossacks_estate }
+            NOT = { estate_type = estate_type:crown_estate }
+        }
+        enabled = {
+            estate_tax_base > 0.01
+            custom_tooltip = {
+                text = sell_offices_req_estate_power_tt
+                owner = { "estate_power(prev.estate_type)" > 0.1 }
+            }
+        }
+    }
+
+    effect = {
+        scope:actor = {
+            if = {
+                limit = { exists = scope:vi_sell_offices_estate }
+
+                set_variable = { name = sell_offices_used_this_parliament value = 1 }
+                add_cooldown = { type = sell_government_offices_cooldown years = 10 }
+
+                # Gain 50% of chosen estate's gold
+                scope:vi_sell_offices_estate = {
+                    save_temporary_scope_value_as = {
+                        name = vi_sell_offices_take
+                        value = { value = estate_gold multiply = 0.5 }
+                    }
+                    save_scope_as = vi_sell_offices_estate_scope
+                    owner = {
+                        # Visible call: negative value = tooltip shows "estate loses X" correctly
+                        add_gold_to_estate = {
+                            estate_type = scope:vi_sell_offices_estate_scope.estate_type
+                            value = { value = scope:vi_sell_offices_take multiply = -1 }
+                        }
+                        # Hidden correction: positive 2X cancels the above gain and nets to -X
+                        hidden_effect = {
+                            add_gold_to_estate = {
+                                estate_type = scope:vi_sell_offices_estate_scope.estate_type
+                                value = { value = scope:vi_sell_offices_take multiply = 2 }
+                            }
+                        }
+                        add_gold = { value = scope:vi_sell_offices_take }
+                    }
+                }
+
+                # Chosen estate: +10% satisfaction and power modifier
+                add_estate_satisfaction = { type = scope:vi_sell_offices_estate.estate_type value = 0.10 }
+
+                if = {
+                    limit = { scope:vi_sell_offices_estate.estate_type = estate_type:nobles_estate }
+                    add_country_modifier = { modifier = sell_offices_nobles_power years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_sell_offices_estate.estate_type = estate_type:clergy_estate }
+                    add_country_modifier = { modifier = sell_offices_clergy_power years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_sell_offices_estate.estate_type = estate_type:burghers_estate }
+                    add_country_modifier = { modifier = sell_offices_burghers_power years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_sell_offices_estate.estate_type = estate_type:peasants_estate }
+                    add_country_modifier = { modifier = sell_offices_peasants_power years = 10 mode = add_and_extend }
+                }
+                else_if = {
+                    limit = { scope:vi_sell_offices_estate.estate_type = estate_type:dhimmi_estate }
+                    add_country_modifier = { modifier = sell_offices_dhimmi_power years = 10 mode = add_and_extend }
+                }
+
+                # Other estates: satisfaction debuff scaled by each LOSER's own power
+                # More powerful losing estate = feels the insult more keenly
+                every_estate = {
+                    limit = {
+                        NOT = { estate_type = scope:vi_sell_offices_estate.estate_type }
+                        NOT = { estate_type = estate_type:crown_estate }
+                        NOT = { estate_type = estate_type:tribes_estate }
+                        NOT = { estate_type = estate_type:cossacks_estate }
+                    }
+                    owner = {
+                        add_estate_satisfaction = {
+                            type = prev.estate_type
+                            value = {
+                                value = -0.10
+                                multiply = "estate_power(prev.estate_type)"
+                                min = -0.15  # floor so even weak estates feel meaningful resentment
+                            }
+                        }
+                    }
+                }
+
+                # Country-wide penalties
+                add_country_modifier = { modifier = sell_offices_penalties years = 10 mode = add_and_extend }
+            }
+        }
+    }
+
+    ai_will_do = { add = -1000 }
+}

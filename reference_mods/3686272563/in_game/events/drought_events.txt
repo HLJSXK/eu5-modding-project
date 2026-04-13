@@ -1,0 +1,273 @@
+﻿# ============================================================
+# DROUGHT SYSTEM - EVENTS (CORRECTED - NO FLAVOR TEXT)
+# ============================================================
+# EU5 events do NOT support 'flavor' text!
+#
+# Severity Distribution:
+#   Mild: 55% (24-36 months)
+#   Moderate: 30% (18-30 months)
+#   Severe: 12% (12-24 months)
+#   Catastrophic: 3% (12-18 months)
+#
+# Wetlands exclusion: topography = wetlands locations are skipped
+# (confirmed vanilla syntax from cossacks_estate_events.txt, little_ice_age.txt)
+# ============================================================
+
+namespace = drought
+
+# ============================================================
+# drought.1 - START POLL (Hidden)
+# ============================================================
+drought.1 = {
+	type = country_event
+	hidden = yes
+	title = drought.1.t
+	
+	immediate = {
+		random_owned_location = {
+			limit = {
+				NOT = {
+					OR = {
+						has_location_modifier = drought_effect_mild
+						has_location_modifier = drought_effect_moderate
+						has_location_modifier = drought_effect_severe
+						has_location_modifier = drought_effect_catastrophic
+					}
+				}
+				
+				NOT = {
+					has_location_modifier = drought_cooldown_effect
+				}
+				
+				# Wetlands are naturally wet - no drought here
+				NOT = { topography = wetlands }
+				
+				region = {
+					NOT = {
+						any_location_in_region = {
+							OR = {
+								has_location_modifier = drought_effect_mild
+								has_location_modifier = drought_effect_moderate
+								has_location_modifier = drought_effect_severe
+								has_location_modifier = drought_effect_catastrophic
+							}
+						}
+					}
+				}
+			}
+			
+			save_scope_as = drought_origin
+			
+			random_list = {
+				# TIER I - MILD (55% chance, 24-36 months avg=30)
+				55 = {
+					scope:drought_origin.region = {
+						save_scope_as = drought_affected_region
+						
+						every_location_in_region = {
+							limit = {
+								# Skip wetland locations
+								NOT = { topography = wetlands }
+							}
+							
+							add_location_modifier = {
+								modifier = drought_effect_mild
+								months = 30
+								mode = replace
+							}
+							
+							add_location_modifier = {
+								modifier = drought_region_marker
+								months = 48
+								mode = replace
+							}
+						}
+					}
+				}
+				
+				# TIER II - MODERATE (30% chance, 18-30 months avg=24)
+				30 = {
+					scope:drought_origin.region = {
+						save_scope_as = drought_affected_region
+						
+						every_location_in_region = {
+							limit = {
+								# Skip wetland locations
+								NOT = { topography = wetlands }
+							}
+							
+							add_location_modifier = {
+								modifier = drought_effect_moderate
+								months = 24
+								mode = replace
+							}
+							
+							add_location_modifier = {
+								modifier = drought_region_marker
+								months = 48
+								mode = replace
+							}
+						}
+					}
+				}
+				
+				# TIER III - SEVERE (12% chance, 12-24 months avg=18)
+				12 = {
+					scope:drought_origin.region = {
+						save_scope_as = drought_affected_region
+						
+						every_location_in_region = {
+							limit = {
+								# Skip wetland locations
+								NOT = { topography = wetlands }
+							}
+							
+							add_location_modifier = {
+								modifier = drought_effect_severe
+								months = 18
+								mode = replace
+							}
+							
+							add_location_modifier = {
+								modifier = drought_region_marker
+								months = 48
+								mode = replace
+							}
+						}
+					}
+				}
+				
+				# TIER IV - CATASTROPHIC (3% chance, 12-18 months avg=15)
+				3 = {
+					scope:drought_origin.region = {
+						save_scope_as = drought_affected_region
+						
+						every_location_in_region = {
+							limit = {
+								# Skip wetland locations
+								NOT = { topography = wetlands }
+							}
+							
+							add_location_modifier = {
+								modifier = drought_effect_catastrophic
+								months = 15
+								mode = replace
+							}
+							
+							add_location_modifier = {
+								modifier = drought_region_marker
+								months = 48
+								mode = replace
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		if = {
+			limit = {
+				exists = scope:drought_affected_region
+			}
+			trigger_event_non_silently = drought.3
+		}
+	}
+}
+
+# ============================================================
+# drought.2 - END POLL (Hidden)
+# ============================================================
+drought.2 = {
+	type = country_event
+	hidden = yes
+	title = drought.2.t
+	
+	immediate = {
+		random_owned_location = {
+			limit = {
+				has_location_modifier = drought_region_marker
+				region = {
+					NOT = {
+						any_location_in_region = {
+							OR = {
+								has_location_modifier = drought_effect_mild
+								has_location_modifier = drought_effect_moderate
+								has_location_modifier = drought_effect_severe
+								has_location_modifier = drought_effect_catastrophic
+							}
+						}
+					}
+				}
+			}
+			
+			save_scope_as = drought_end_origin
+		}
+		
+		if = {
+			limit = {
+				exists = scope:drought_end_origin
+			}
+			
+			scope:drought_end_origin.region = {
+				save_scope_as = drought_affected_region
+				
+				every_location_in_region = {
+					limit = {
+						has_location_modifier = drought_region_marker
+					}
+					
+					remove_location_modifier = drought_region_marker
+					
+					if = {
+						limit = {
+							OR = {
+								has_location_modifier = drought_effect_mild
+								has_location_modifier = drought_effect_moderate
+								has_location_modifier = drought_effect_severe
+								has_location_modifier = drought_effect_catastrophic
+							}
+						}
+						remove_location_modifier = drought_effect_mild
+						remove_location_modifier = drought_effect_moderate
+						remove_location_modifier = drought_effect_severe
+						remove_location_modifier = drought_effect_catastrophic
+					}
+					
+					add_location_modifier = {
+						modifier = drought_cooldown_effect
+						months = 5
+						mode = replace
+					}
+				}
+			}
+			
+			trigger_event_non_silently = drought.4
+		}
+	}
+}
+
+# ============================================================
+# drought.3 - START POPUP (Visible)
+# ============================================================
+drought.3 = {
+	type = country_event
+	title = drought_start.t
+	desc = drought_start.desc
+	
+	option = {
+		name = drought_start.opt_acknowledge
+	}
+}
+
+# ============================================================
+# drought.4 - END POPUP (Visible)
+# ============================================================
+drought.4 = {
+	type = country_event
+	title = drought_end.t
+	desc = drought_end.desc
+	
+	option = {
+		name = drought_end.opt_relief
+	}
+}
