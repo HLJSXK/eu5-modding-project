@@ -21,7 +21,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from parser import STRATA, load_demand_matrix, load_goods_prices
+from parser import EU5_POP_TYPES, STRATA, STRATA_TO_POP_TYPES, load_demand_matrix, load_goods_prices
 from simulator import (
     PRESETS,
     STRATA_PARAMS,
@@ -251,9 +251,16 @@ with st.sidebar:
         st.success(f"Saved '{_name}'")
         st.rerun()
 
-    if st.button("Clear / Reset", use_container_width=True):
-        st.session_state.pop("_preset", None)
-        st.rerun()
+    col_clr, col_rel = st.columns(2)
+    with col_clr:
+        if st.button("Clear / Reset", use_container_width=True):
+            st.session_state.pop("_preset", None)
+            st.rerun()
+    with col_rel:
+        if st.button("Reload files", use_container_width=True,
+                     help="Re-parse mod files (use after editing demand values)"):
+            st.cache_data.clear()
+            st.rerun()
 
 # ---------------------------------------------------------------------------
 # Build scenario from sidebar
@@ -305,6 +312,23 @@ STRATA_LABELS = {
 }
 
 # ---------------------------------------------------------------------------
+# Global strata filter
+# ---------------------------------------------------------------------------
+
+active_strata = st.multiselect(
+    "Display strata",
+    options=STRATA,
+    default=STRATA,
+    format_func=lambda s: STRATA_LABELS[s],
+    key="active_strata_filter",
+)
+if not active_strata:
+    active_strata = list(STRATA)
+
+# EU5 pop types that belong to the selected strata (for Tab 1 detail table)
+active_pop_types = [pt for s in active_strata for pt in STRATA_TO_POP_TYPES[s]]
+
+# ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
 
@@ -318,8 +342,6 @@ tab1, tab2, tab3 = st.tabs([
 # TAB 1: Base Goods Demand Table
 # ===========================================================================
 with tab1:
-    from parser import EU5_POP_TYPES
-
     st.subheader("Base goods demand per 1000 pops (vanilla + inject, before SOL scaling)")
     st.caption(
         "Formula: **(vanilla_demand_add × vanilla_demand_multiply + inject_demand_add) × inject_demand_multiply**  |  "
@@ -343,8 +365,8 @@ with tab1:
 
     df_pt = pd.DataFrame(rows_pt).sort_values("Spend/pop avg", ascending=False)
 
-    # Only show demand columns (not spend_ cols) in the table
-    pt_display_cols = ["Good", "Category", "Price"] + EU5_POP_TYPES + ["Spend/pop avg"]
+    # Only show demand columns for pop types belonging to selected strata
+    pt_display_cols = ["Good", "Category", "Price"] + active_pop_types + ["Spend/pop avg"]
     st.dataframe(
         df_pt[pt_display_cols].reset_index(drop=True),
         use_container_width=True,
@@ -368,9 +390,9 @@ with tab1:
     )
 
     # Summary metrics row
-    col_headers = st.columns(len(STRATA) + 1)
+    col_headers = st.columns(len(active_strata) + 1)
     col_headers[0].metric("Goods with demand", len(demand_matrix))
-    for i, s in enumerate(STRATA):
+    for i, s in enumerate(active_strata):
         base_annual = base_idx[s]
         scaled      = base_annual * d_scale[s]
         col_headers[i + 1].metric(
@@ -395,7 +417,7 @@ with tab1:
 
     df_strata = pd.DataFrame(rows_strata).sort_values("Scaled spend sum", ascending=False)
     display_cols = ["Good", "Category", "Price"]
-    for s in STRATA:
+    for s in active_strata:
         display_cols.append(f"Base ({s[:3].title()})")
     display_cols.append("Scaled spend sum")
 
@@ -414,14 +436,14 @@ with tab1:
 
     st.subheader("Current demand scale (at scenario state)")
     ds_df = pd.DataFrame({
-        "Strata":           [STRATA_LABELS[s] for s in STRATA],
-        "GDP/cap":          [round(gdp_pc[s], 3)    for s in STRATA],
-        "GDP nonlinear":    [round(nl[s], 3)         for s in STRATA],
-        "Savings pressure": [round(sp_pressure[s], 3) for s in STRATA],
-        "Demand scale":     [round(d_scale[s], 3)    for s in STRATA],
-        "Savings":          [round(params.strata[s].savings, 1) for s in STRATA],
-        "Savings target":   [round(sav_targets[s], 1) for s in STRATA],
-        "Savings ratio":    [round(params.strata[s].savings / max(1e-9, sav_targets[s]), 2) for s in STRATA],
+        "Strata":           [STRATA_LABELS[s] for s in active_strata],
+        "GDP/cap":          [round(gdp_pc[s], 3)    for s in active_strata],
+        "GDP nonlinear":    [round(nl[s], 3)         for s in active_strata],
+        "Savings pressure": [round(sp_pressure[s], 3) for s in active_strata],
+        "Demand scale":     [round(d_scale[s], 3)    for s in active_strata],
+        "Savings":          [round(params.strata[s].savings, 1) for s in active_strata],
+        "Savings target":   [round(sav_targets[s], 1) for s in active_strata],
+        "Savings ratio":    [round(params.strata[s].savings / max(1e-9, sav_targets[s]), 2) for s in active_strata],
     })
     st.dataframe(ds_df, use_container_width=True, hide_index=True)
 
@@ -445,7 +467,7 @@ with tab2:
 
     x_gdp = np.linspace(0, 15, 400)
     fig1 = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         sens, thresh, _, _ = STRATA_PARAMS[s]
         sp   = x_gdp * sens - thresh
         denom = np.maximum(0.05, 1.0 + sp * 0.45)
@@ -481,7 +503,7 @@ with tab2:
 
     x_ratio = np.linspace(0, 8, 400)
     fig2 = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         _, _, pmin, pmax = STRATA_PARAMS[s]
         raw  = (x_ratio - 1.0) * 0.50
         y_sp = np.clip(raw, pmin, pmax)
@@ -516,7 +538,7 @@ with tab2:
     )
 
     fig3 = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         _, _, pmin, pmax = STRATA_PARAMS[s]
         inst_bon = num_institutions * 0.05
         raw  = (x_ratio - 1.0) * 0.50
@@ -548,7 +570,7 @@ with tab2:
     # Summary table
     st.subheader("Current scenario breakdown")
     summary = []
-    for s in STRATA:
+    for s in active_strata:
         sav_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
         summary.append({
             "Strata":            STRATA_LABELS[s],
@@ -582,7 +604,7 @@ with tab3:
     # ---- Savings over time ----
     st.markdown("#### Savings over time (estate gold)")
     fig_sav = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         df_s = df_sim[df_sim["strata"] == s]
         if df_s.empty:
             continue
@@ -613,7 +635,7 @@ with tab3:
     # ---- Savings ratio over time ----
     st.markdown("#### Savings ratio (savings / savings_target)")
     fig_ratio = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         df_s = df_sim[df_sim["strata"] == s]
         if df_s.empty:
             continue
@@ -638,7 +660,7 @@ with tab3:
     st.markdown("#### Demand scale over time  `sol_gdp_per_capita_scale`")
     st.caption("Step function — only updates at the vertical tick marks (SOL situation pulse).")
     fig_ds = go.Figure()
-    for s in STRATA:
+    for s in active_strata:
         df_s = df_sim[df_sim["strata"] == s]
         if df_s.empty:
             continue
@@ -662,7 +684,7 @@ with tab3:
     st.markdown("#### Monthly income vs spending (end state)")
     last_month = df_sim[df_sim["month"] == df_sim["month"].max()]
     bar_data = []
-    for s in STRATA:
+    for s in active_strata:
         row = last_month[last_month["strata"] == s]
         if row.empty:
             continue
@@ -687,7 +709,7 @@ with tab3:
     st.subheader("End-state summary")
     end_state = df_sim[df_sim["month"] == df_sim["month"].max()].copy()
     summary_rows = []
-    for s in STRATA:
+    for s in active_strata:
         row = end_state[end_state["strata"] == s]
         if row.empty:
             continue
