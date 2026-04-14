@@ -1,13 +1,19 @@
 ﻿# SOL Migration Notice — Version Stamp & Load Check
 #
-# on_game_start_after_lobby_human_country fires ONLY on new games (CMF hook).
-# on_game_load_after_lobby_human_country fires ONLY on save loads (CMF hook).
+# Two execution paths, mutually exclusive via cmf_active check:
 #
-# Both hooks are country-scoped (human players only).
-# Global variable SOL_migration_v2_seen persists in saves.
-# One flag per save — fires once for the first human player who loads, then done.
+# PATH A — CMF present:
+#   on_game_start_after_lobby     → SOL_new_game_version_stamp  (stamps version, no event)
+#   on_game_load_after_lobby_human_country → SOL_migration_check_country  (fires event if old save)
+#
+# PATH B — CMF absent (built-in GUI fallback):
+#   sol_after_lobby_caller  scripted GUI + widget → SOL_new_game_version_stamp  (new game)
+#   sol_load_after_lobby_caller scripted GUI + widget → SOL_migration_fire_event (old save)
+#   See: SOL_migration_caller.gui / SOL_migration_scripted_guis.txt
 
-# ── New game: stamp version so save load never triggers the migration event ──
+# ── PATH A: CMF hooks ────────────────────────────────────────────────────────
+
+# New game only (CMF fires this after lobby — vanilla on_game_start fires before)
 # Scope: none (global)
 on_game_start_after_lobby = {
 	on_actions = {
@@ -21,20 +27,35 @@ SOL_new_game_version_stamp = {
 	}
 }
 
-# ── Save load: check if player needs migration notification ──
+# Save load only (CMF fires this per human-player country after lobby)
 # Scope: country
 on_game_load_after_lobby_human_country = {
 	on_actions = {
-		SOL_migration_check
+		SOL_migration_check_country
 	}
 }
 
-SOL_migration_check = {
+SOL_migration_check_country = {
 	trigger = {
 		NOT = { has_global_variable = SOL_migration_v2_seen }
 	}
 	effect = {
 		set_global_variable = SOL_migration_v2_seen
 		trigger_event_non_silently = sol_migration.1
+	}
+}
+
+# ── SHARED: called by both paths ─────────────────────────────────────────────
+
+# Fires migration event for all human players from global scope.
+# Used by the non-CMF scripted GUI path (sol_load_after_lobby_caller).
+# Scope: none (global)
+SOL_migration_fire_event = {
+	effect = {
+		set_global_variable = SOL_migration_v2_seen
+		every_country = {
+			limit = { is_ai = no }
+			trigger_event_non_silently = sol_migration.1
+		}
 	}
 }
