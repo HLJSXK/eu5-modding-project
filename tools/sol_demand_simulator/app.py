@@ -24,7 +24,7 @@ import streamlit as st
 
 from parser import EU5_POP_TYPES, STRATA, STRATA_TO_POP_TYPES, load_demand_matrix, load_goods_prices
 from simulator import (
-    PRESETS,
+    PRESSURE_MODES,
     STRATA_PARAMS,
     ScenarioParams,
     StrataState,
@@ -35,6 +35,7 @@ from simulator import (
     fn1_gdp_per_capita,
     fn2_gdp_nonlinear,
     fn3_savings_pressure,
+    savings_pressure_curve_np,
     simulate,
 )
 
@@ -121,6 +122,12 @@ def dict_to_params(d: dict) -> ScenarioParams:
         update_interval_years   = d["update_interval_years"],
         sim_years               = d["sim_years"],
         ema_alpha               = d.get("ema_alpha", 1.0),
+        pressure_mode           = d.get("pressure_mode",           "linear"),
+        pressure_linear_slope   = d.get("pressure_linear_slope",   0.50),
+        pressure_tanh_k         = d.get("pressure_tanh_k",         1.0),
+        pressure_quadratic_norm = d.get("pressure_quadratic_norm", 2.0),
+        pressure_deadband_delta = d.get("pressure_deadband_delta", 0.15),
+        pressure_deadband_slope = d.get("pressure_deadband_slope", 0.50),
         strata = {
             s: StrataState(v["pop_count"], v["tax_rate"], v["savings"])
             for s, v in d["strata"].items()
@@ -135,12 +142,10 @@ with st.sidebar:
     st.header("Scenario Setup")
 
     # ---- Preset management ----
-    user_presets  = load_user_presets()
-    builtin_names = list(PRESETS.keys())
-    user_names    = list(user_presets.keys())
+    user_presets = load_user_presets()
+    user_names   = list(user_presets.keys())
 
-    # Built-ins shown plain; user presets prefixed with "★ "
-    all_options  = ["(custom)"] + builtin_names + [f"★ {n}" for n in user_names]
+    all_options  = ["(custom)"] + [f"★ {n}" for n in user_names]
     selected_opt = st.selectbox("Presets", all_options, key="preset_select")
 
     is_custom   = selected_opt == "(custom)"
@@ -154,10 +159,44 @@ with st.sidebar:
         del_clicked  = st.button("Delete", disabled=not is_user, use_container_width=True)
 
     if load_clicked:
-        st.session_state["_preset"] = (
-            dict_to_params(user_presets[actual_name]) if is_user
-            else PRESETS[actual_name]()
-        )
+        p = dict_to_params(user_presets[actual_name])
+        st.session_state["_preset"] = p
+        # Push preset values directly into widget session state so Streamlit
+        # honours them even when the widgets have already been interacted with.
+        comm = p.strata.get("commoners")
+        st.session_state.update({
+            "w_monthly_income":            float(p.monthly_income),
+            "w_num_institutions":          int(p.num_institutions),
+            "w_tax_base":                  float(p.tax_base),
+            "w_effective_control":         int(round(p.effective_control * 100)),
+            "w_enfranchisement":           float(p.peasant_enfranchisement),
+            "w_pop_nobles":                float(p.strata["nobles"].pop_count),
+            "w_pop_clergy":                float(p.strata["clergy"].pop_count),
+            "w_pop_burghers":              float(p.strata["burghers"].pop_count),
+            "w_pop_laborers":              float(p.pop_laborers),
+            "w_pop_peasants":              float(p.pop_peasants),
+            "w_pop_soldiers":              float(p.pop_soldiers),
+            "w_pop_tribesmen":             float(p.strata["tribesmen"].pop_count),
+            "w_tr_nobles":                 int(round(p.strata["nobles"].tax_rate    * 100)),
+            "w_tr_clergy":                 int(round(p.strata["clergy"].tax_rate    * 100)),
+            "w_tr_burghers":               int(round(p.strata["burghers"].tax_rate  * 100)),
+            "w_tr_commoners":              int(round((comm.tax_rate if comm else 0.05) * 100)),
+            "w_tr_tribesmen":              int(round(p.strata["tribesmen"].tax_rate * 100)),
+            "w_sv_nobles":                 float(p.strata["nobles"].savings),
+            "w_sv_clergy":                 float(p.strata["clergy"].savings),
+            "w_sv_burghers":               float(p.strata["burghers"].savings),
+            "w_sv_commoners":              float(comm.savings if comm else 0.0),
+            "w_sv_tribesmen":              float(p.strata["tribesmen"].savings),
+            "w_update_interval":           p.update_interval_years,
+            "w_sim_years":                 min([10,25,50,100], key=lambda x: abs(x - p.sim_years)),
+            "w_ema_alpha":                 float(p.ema_alpha),
+            "w_pressure_mode":             p.pressure_mode,
+            "w_pressure_linear_slope":     float(p.pressure_linear_slope),
+            "w_pressure_tanh_k":           float(p.pressure_tanh_k),
+            "w_pressure_quadratic_norm":   float(p.pressure_quadratic_norm),
+            "w_pressure_deadband_delta":   float(p.pressure_deadband_delta),
+            "w_pressure_deadband_slope":   float(p.pressure_deadband_slope),
+        })
         st.rerun()
 
     if del_clicked:
@@ -185,66 +224,108 @@ with st.sidebar:
     monthly_income   = st.number_input("Monthly income (gold/month)",
                                        min_value=0.0,
                                        value=float(_pv("monthly_income", 30)),
-                                       step=5.0, help="owner.monthly_income_trade_and_tax — drives savings targets")
+                                       step=5.0, key="w_monthly_income",
+                                       help="owner.monthly_income_trade_and_tax — drives savings targets")
     num_institutions = st.slider("Embraced institutions", 0, 10,
                                  int(_pv("num_institutions", 2)),
+                                 key="w_num_institutions",
                                  help="+5% demand per institution")
 
     st.subheader("Location")
     tax_base          = st.number_input("Tax base (gold/month)",
                                         min_value=0.0,
                                         value=float(_pv("tax_base", 8)),
-                                        step=1.0, help="location_tax_base")
+                                        step=1.0, key="w_tax_base",
+                                        help="location_tax_base")
     effective_control = st.slider("Effective control (%)", 1, 100,
                                   int(_pv("effective_control", 0.75) * 100),
+                                  key="w_effective_control",
                                   help="local_effective_control") / 100.0
     enfranchisement   = st.slider("Peasant enfranchisement", 0.1, 1.0,
                                   float(_pv("peasant_enfranchisement", 0.5)),
-                                  step=0.05,
+                                  step=0.05, key="w_enfranchisement",
                                   help="1.0 = full freedom; 0.1 = maximum serfdom (commoner wealth → nobles)")
 
     st.subheader("Pop Counts (per strata)")
-    pop_nobles    = st.number_input("Nobles",    min_value=0.0, value=float(_sv("nobles",    "pop_count", 0.2)),  step=0.05)
-    pop_clergy    = st.number_input("Clergy",    min_value=0.0, value=float(_sv("clergy",    "pop_count", 0.15)), step=0.05)
-    pop_burghers  = st.number_input("Burghers",  min_value=0.0, value=float(_sv("burghers",  "pop_count", 0.15)), step=0.05)
+    pop_nobles    = st.number_input("Nobles",    min_value=0.0, value=float(_sv("nobles",    "pop_count", 0.2)),  step=0.05, key="w_pop_nobles")
+    pop_clergy    = st.number_input("Clergy",    min_value=0.0, value=float(_sv("clergy",    "pop_count", 0.15)), step=0.05, key="w_pop_clergy")
+    pop_burghers  = st.number_input("Burghers",  min_value=0.0, value=float(_sv("burghers",  "pop_count", 0.15)), step=0.05, key="w_pop_burghers")
     _comm_total = float(_sv("commoners", "pop_count", 2.0))
     _comm_each  = round(_comm_total / 3, 4)
-    pop_laborers  = st.number_input("  Laborers",  min_value=0.0, value=float(_pv("pop_laborers",  _comm_each)), step=0.05)
-    pop_peasants  = st.number_input("  Peasants",  min_value=0.0, value=float(_pv("pop_peasants",  _comm_each)), step=0.05)
-    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  _comm_each)), step=0.05)
+    pop_laborers  = st.number_input("  Laborers",  min_value=0.0, value=float(_pv("pop_laborers",  _comm_each)), step=0.05, key="w_pop_laborers")
+    pop_peasants  = st.number_input("  Peasants",  min_value=0.0, value=float(_pv("pop_peasants",  _comm_each)), step=0.05, key="w_pop_peasants")
+    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  _comm_each)), step=0.05, key="w_pop_soldiers")
     pop_commoners = pop_laborers + pop_peasants + pop_soldiers
     st.caption(f"Commoners total: {pop_commoners:.3f}")
-    pop_tribesmen = st.number_input("Tribesmen", min_value=0.0, value=float(_sv("tribesmen", "pop_count", 0.0)),  step=0.05)
+    pop_tribesmen = st.number_input("Tribesmen", min_value=0.0, value=float(_sv("tribesmen", "pop_count", 0.0)),  step=0.05, key="w_pop_tribesmen")
 
     st.subheader("Tax Rates (% of income to crown)")
-    tr_nobles    = st.slider("Nobles tax",    0, 100, int(_sv("nobles",    "tax_rate", 0.15) * 100)) / 100
-    tr_clergy    = st.slider("Clergy tax",    0, 100, int(_sv("clergy",    "tax_rate", 0.10) * 100)) / 100
-    tr_burghers  = st.slider("Burghers tax",  0, 100, int(_sv("burghers",  "tax_rate", 0.10) * 100)) / 100
-    tr_commoners = st.slider("Commoners tax", 0, 100, int(_sv("commoners", "tax_rate", 0.05) * 100)) / 100
-    tr_tribesmen = st.slider("Tribesmen tax", 0, 100, int(_sv("tribesmen", "tax_rate", 0.00) * 100)) / 100
+    tr_nobles    = st.slider("Nobles tax",    0, 100, int(_sv("nobles",    "tax_rate", 0.15) * 100), key="w_tr_nobles")    / 100
+    tr_clergy    = st.slider("Clergy tax",    0, 100, int(_sv("clergy",    "tax_rate", 0.10) * 100), key="w_tr_clergy")    / 100
+    tr_burghers  = st.slider("Burghers tax",  0, 100, int(_sv("burghers",  "tax_rate", 0.10) * 100), key="w_tr_burghers")  / 100
+    tr_commoners = st.slider("Commoners tax", 0, 100, int(_sv("commoners", "tax_rate", 0.05) * 100), key="w_tr_commoners") / 100
+    tr_tribesmen = st.slider("Tribesmen tax", 0, 100, int(_sv("tribesmen", "tax_rate", 0.00) * 100), key="w_tr_tribesmen") / 100
 
     st.subheader("Initial Savings (estate gold)")
-    sv_nobles    = st.number_input("Nobles savings",    min_value=0.0, value=float(_sv("nobles",    "savings", 0)), step=50.0)
-    sv_clergy    = st.number_input("Clergy savings",    min_value=0.0, value=float(_sv("clergy",    "savings", 0)), step=50.0)
-    sv_burghers  = st.number_input("Burghers savings",  min_value=0.0, value=float(_sv("burghers",  "savings", 0)), step=50.0)
-    sv_commoners = st.number_input("Commoners savings", min_value=0.0, value=float(_sv("commoners", "savings", 0)), step=50.0)
-    sv_tribesmen = st.number_input("Tribesmen savings", min_value=0.0, value=float(_sv("tribesmen", "savings", 0)), step=50.0)
+    sv_nobles    = st.number_input("Nobles savings",    min_value=0.0, value=float(_sv("nobles",    "savings", 0)), step=50.0, key="w_sv_nobles")
+    sv_clergy    = st.number_input("Clergy savings",    min_value=0.0, value=float(_sv("clergy",    "savings", 0)), step=50.0, key="w_sv_clergy")
+    sv_burghers  = st.number_input("Burghers savings",  min_value=0.0, value=float(_sv("burghers",  "savings", 0)), step=50.0, key="w_sv_burghers")
+    sv_commoners = st.number_input("Commoners savings", min_value=0.0, value=float(_sv("commoners", "savings", 0)), step=50.0, key="w_sv_commoners")
+    sv_tribesmen = st.number_input("Tribesmen savings", min_value=0.0, value=float(_sv("tribesmen", "savings", 0)), step=50.0, key="w_sv_tribesmen")
 
     st.subheader("Simulation Settings")
     update_interval  = st.radio("Demand update interval (years)", [1, 2, 3],
                                 index=int(_pv("update_interval_years", 2)) - 1,
-                                horizontal=True)
+                                horizontal=True, key="w_update_interval")
     _sim_opts = [10, 25, 50, 100]
     _sim_raw  = int(_pv("sim_years", 25))
     _sim_val  = min(_sim_opts, key=lambda x: abs(x - _sim_raw))  # snap to nearest valid
-    sim_years = st.select_slider("Simulation duration (years)", _sim_opts, value=_sim_val)
+    sim_years = st.select_slider("Simulation duration (years)", _sim_opts, value=_sim_val, key="w_sim_years")
     ema_alpha = st.slider(
         "EMA smoothing α",
         min_value=0.05, max_value=1.0,
         value=float(_pv("ema_alpha", 1.0)),
-        step=0.05,
+        step=0.05, key="w_ema_alpha",
         help="d_new = α × d_computed + (1−α) × d_old  |  1.0 = no smoothing (vanilla); lower values damp oscillation",
     )
+    _pm_keys = list(PRESSURE_MODES.keys())
+    pressure_mode = st.selectbox(
+        "Savings pressure function",
+        options=_pm_keys,
+        format_func=lambda k: PRESSURE_MODES[k],
+        index=_pm_keys.index(_pv("pressure_mode", "linear")),
+        key="w_pressure_mode",
+        help="Shape of the savings→demand feedback curve (fn3). See Tab 2 for the curves.",
+    )
+
+    # Initialize all params from preset/defaults
+    pressure_linear_slope   = float(_pv("pressure_linear_slope",   0.50))
+    pressure_tanh_k         = float(_pv("pressure_tanh_k",         1.0))
+    pressure_quadratic_norm = float(_pv("pressure_quadratic_norm", 2.0))
+    pressure_deadband_delta = float(_pv("pressure_deadband_delta", 0.15))
+    pressure_deadband_slope = float(_pv("pressure_deadband_slope", 0.50))
+
+    # Show sliders only for the active mode
+    if pressure_mode == "linear":
+        pressure_linear_slope   = st.slider("Slope", 0.05, 2.0, pressure_linear_slope, 0.05,
+                                            key="w_pressure_linear_slope",
+                                            help="Multiplier on (r−1). Vanilla = 0.5")
+    elif pressure_mode == "tanh":
+        pressure_tanh_k         = st.slider("k (steepness)", 0.1, 5.0, pressure_tanh_k, 0.1,
+                                            key="w_pressure_tanh_k",
+                                            help="tanh(k·(r−1)). Higher k = faster saturation.")
+    elif pressure_mode == "quadratic":
+        pressure_quadratic_norm = st.slider("Norm", 0.5, 5.0, pressure_quadratic_norm, 0.25,
+                                            key="w_pressure_quadratic_norm",
+                                            help="|r−1| = norm → pressure reaches pmax.")
+    elif pressure_mode == "deadband":
+        pressure_deadband_delta = st.slider("δ (dead-zone half-width)", 0.02, 0.50,
+                                            pressure_deadband_delta, 0.02,
+                                            key="w_pressure_deadband_delta",
+                                            help="No response when |r−1| < δ.")
+        pressure_deadband_slope = st.slider("Slope (outside dead zone)", 0.05, 2.0,
+                                            pressure_deadband_slope, 0.05,
+                                            key="w_pressure_deadband_slope")
 
     # ---- Save / overwrite user preset ----
     st.divider()
@@ -255,8 +336,6 @@ with st.sidebar:
                                     label_visibility="collapsed")
     _name     = save_name_input.strip()
     _btn_label = "Overwrite" if _name in user_presets else "Save"
-    if _name in builtin_names and _name not in user_presets:
-        st.caption("⚠️ Same name as a built-in preset.")
 
     if st.button(_btn_label, disabled=not _name, use_container_width=True, type="primary"):
         ups = load_user_presets()
@@ -269,7 +348,13 @@ with st.sidebar:
             "update_interval_years": int(update_interval),
             "sim_years":             int(sim_years),
             "ema_alpha":             float(ema_alpha),
-            "pop_laborers":          pop_laborers,
+            "pressure_mode":           pressure_mode,
+            "pressure_linear_slope":   pressure_linear_slope,
+            "pressure_tanh_k":         pressure_tanh_k,
+            "pressure_quadratic_norm": pressure_quadratic_norm,
+            "pressure_deadband_delta": pressure_deadband_delta,
+            "pressure_deadband_slope": pressure_deadband_slope,
+            "pop_laborers":            pop_laborers,
             "pop_peasants":          pop_peasants,
             "pop_soldiers":          pop_soldiers,
             "strata": {
@@ -318,6 +403,12 @@ params = ScenarioParams(
     update_interval_years = int(update_interval),
     sim_years             = int(sim_years),
     ema_alpha             = float(ema_alpha),
+    pressure_mode           = pressure_mode,
+    pressure_linear_slope   = pressure_linear_slope,
+    pressure_tanh_k         = pressure_tanh_k,
+    pressure_quadratic_norm = pressure_quadratic_norm,
+    pressure_deadband_delta = pressure_deadband_delta,
+    pressure_deadband_slope = pressure_deadband_slope,
 )
 
 # ---------------------------------------------------------------------------
@@ -496,98 +587,33 @@ with tab2:
         "across the full input range. The vertical marker shows the current scenario value."
     )
 
-    # ---- Chart 1: GDP nonlinear component vs GDP per capita ----
-    st.markdown("#### Function 2 — Nonlinear GDP component  `local_*_gdp_nonlinear_component`")
-    st.caption(
-        "`sol_pressure = gdp_per_cap × sensitivity − threshold`  →  "
-        "`nonlinear = sol_pressure / (1 + sol_pressure × 0.45)`"
-    )
-
-    x_gdp = np.linspace(0, 15, 400)
-    fig1 = go.Figure()
-    for s in active_strata:
-        sens, thresh, _, _ = STRATA_PARAMS[s]
-        sp   = x_gdp * sens - thresh
-        denom = np.maximum(0.05, 1.0 + sp * 0.45)
-        y_nl = sp / denom
-        fig1.add_trace(go.Scatter(
-            x=x_gdp, y=y_nl,
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        # Mark current scenario position
-        current_x = gdp_pc[s]
-        current_y = nl[s]
-        fig1.add_trace(go.Scatter(
-            x=[current_x], y=[current_y],
-            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
-            showlegend=False, name=f"{s} (current)",
-        ))
-
-    fig1.add_hline(y=0, line_dash="dot", line_color="gray")
-    fig1.update_layout(
-        xaxis_title="GDP per capita (gold/month per pop-unit)",
-        yaxis_title="GDP nonlinear component",
-        legend_title="Strata",
-        height=380,
-    )
-    st.plotly_chart(fig1, use_container_width=True)
-
-    # ---- Chart 2: Savings pressure vs savings/target ratio ----
-    st.markdown("#### Function 3 — Savings pressure  `local_*_savings_pressure`")
-    st.caption(
-        "`pressure = clamp( (savings/target − 1) × 0.50,  −0.50,  max )`"
-    )
-
     x_ratio = np.linspace(0, 8, 400)
-    fig2 = go.Figure()
-    for s in active_strata:
-        _, _, pmin, pmax = STRATA_PARAMS[s]
-        raw  = (x_ratio - 1.0) * 0.50
-        y_sp = np.clip(raw, pmin, pmax)
-        fig2.add_trace(go.Scatter(
-            x=x_ratio, y=y_sp,
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        # Mark current
-        current_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
-        current_sp    = sp_pressure[s]
-        fig2.add_trace(go.Scatter(
-            x=[current_ratio], y=[current_sp],
-            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
-            showlegend=False,
-        ))
+    x_gdp   = np.linspace(0, 15, 400)
 
-    fig2.add_hline(y=0, line_dash="dot", line_color="gray")
-    fig2.update_layout(
-        xaxis_title="Savings / Savings Target ratio",
-        yaxis_title="Savings pressure",
-        legend_title="Strata",
-        height=380,
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-
-    # ---- Chart 3: Combined demand scale vs savings ratio ----
-    st.markdown("#### Combined — `sol_gdp_per_capita_scale` vs savings ratio")
+    # ---- Chart 1: Combined demand scale vs savings ratio (primary output) ----
+    st.markdown("#### `sol_gdp_per_capita_scale` vs savings/target ratio")
     st.caption(
         "`scale = 1 + institutions×0.05 + gdp_nonlinear + savings_pressure`  "
-        "(gdp_nonlinear is fixed at the current scenario GDP; savings ratio varies)"
+        "— gdp_nonlinear fixed at current GDP; diamond = current scenario state."
     )
 
     fig3 = go.Figure()
     for s in active_strata:
         _, _, pmin, pmax = STRATA_PARAMS[s]
         inst_bon = num_institutions * 0.05
-        raw  = (x_ratio - 1.0) * 0.50
-        y_sp = np.clip(raw, pmin, pmax)
+        y_sp = savings_pressure_curve_np(
+            x_ratio, pmin, pmax, pressure_mode,
+            slope=pressure_linear_slope,
+            k=pressure_tanh_k,
+            norm=pressure_quadratic_norm,
+            delta=pressure_deadband_delta,
+        )
         y_sc = 1.0 + inst_bon + nl[s] + y_sp
         fig3.add_trace(go.Scatter(
             x=x_ratio, y=y_sc,
             name=STRATA_LABELS[s],
             line=dict(color=STRATA_COLORS[s], width=2),
         ))
-        # Mark current
         current_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
         current_scale = d_scale[s]
         fig3.add_trace(go.Scatter(
@@ -601,9 +627,81 @@ with tab2:
         xaxis_title="Savings / Savings Target ratio",
         yaxis_title="sol_gdp_per_capita_scale",
         legend_title="Strata",
-        height=380,
+        height=400,
     )
     st.plotly_chart(fig3, use_container_width=True)
+
+    # ---- Chart 2: Savings pressure vs savings/target ratio ----
+    st.markdown("#### Savings pressure component  `local_*_savings_pressure`")
+    st.caption(
+        f"Current mode: **{PRESSURE_MODES[pressure_mode]}**  |  "
+        "`pmin = −0.50` for all strata; `pmax` varies."
+    )
+
+    fig2 = go.Figure()
+    for s in active_strata:
+        _, _, pmin, pmax = STRATA_PARAMS[s]
+        y_sp = savings_pressure_curve_np(
+            x_ratio, pmin, pmax, pressure_mode,
+            slope=pressure_linear_slope,
+            k=pressure_tanh_k,
+            norm=pressure_quadratic_norm,
+            delta=pressure_deadband_delta,
+        )
+        fig2.add_trace(go.Scatter(
+            x=x_ratio, y=y_sp,
+            name=STRATA_LABELS[s],
+            line=dict(color=STRATA_COLORS[s], width=2),
+        ))
+        current_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
+        current_sp    = sp_pressure[s]
+        fig2.add_trace(go.Scatter(
+            x=[current_ratio], y=[current_sp],
+            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
+            showlegend=False,
+        ))
+
+    fig2.add_hline(y=0, line_dash="dot", line_color="gray")
+    fig2.update_layout(
+        xaxis_title="Savings / Savings Target ratio",
+        yaxis_title="Savings pressure",
+        legend_title="Strata",
+        height=360,
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+    # ---- Chart 3: GDP nonlinear component vs GDP per capita ----
+    st.markdown("#### GDP nonlinear component  `local_*_gdp_nonlinear_component`")
+    st.caption(
+        "`sol_pressure = gdp_per_cap × sensitivity − threshold`  →  "
+        "`nonlinear = sol_pressure / (1 + sol_pressure × 0.45)`"
+    )
+
+    fig1 = go.Figure()
+    for s in active_strata:
+        sens, thresh, _, _ = STRATA_PARAMS[s]
+        sp    = x_gdp * sens - thresh
+        denom = np.maximum(0.05, 1.0 + sp * 0.45)
+        y_nl  = sp / denom
+        fig1.add_trace(go.Scatter(
+            x=x_gdp, y=y_nl,
+            name=STRATA_LABELS[s],
+            line=dict(color=STRATA_COLORS[s], width=2),
+        ))
+        fig1.add_trace(go.Scatter(
+            x=[gdp_pc[s]], y=[nl[s]],
+            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
+            showlegend=False, name=f"{s} (current)",
+        ))
+
+    fig1.add_hline(y=0, line_dash="dot", line_color="gray")
+    fig1.update_layout(
+        xaxis_title="GDP per capita (gold/month per pop-unit)",
+        yaxis_title="GDP nonlinear component",
+        legend_title="Strata",
+        height=360,
+    )
+    st.plotly_chart(fig1, use_container_width=True)
 
     # Summary table
     st.subheader("Current scenario breakdown")

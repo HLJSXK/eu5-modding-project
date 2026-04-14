@@ -15,9 +15,11 @@ The simulation loop models the demand-update interval (the SOL situation pulse):
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 
 from parser import STRATA
@@ -25,6 +27,13 @@ from parser import STRATA
 # ---------------------------------------------------------------------------
 # Per-strata constants (directly from SOL_pop_values.txt)
 # ---------------------------------------------------------------------------
+
+PRESSURE_MODES = {
+    "linear":    "Linear (vanilla) — slope 0.5",
+    "tanh":      "Tanh (smooth sigmoid) — fast saturation",
+    "quadratic": "Quadratic — zero slope near target",
+    "deadband":  "Deadband ±15% — stable buffer zone",
+}
 
 STRATA_PARAMS = {
     # (sensitivity, threshold, pressure_min, pressure_max)
@@ -93,6 +102,16 @@ class ScenarioParams:
     # d_new = ema_alpha × d_computed + (1 - ema_alpha) × d_old
     # 1.0 = no smoothing (vanilla behaviour); lower values damp oscillation
     ema_alpha: float = 1.0
+
+    # Savings pressure function shape (see PRESSURE_MODES)
+    pressure_mode: str = "linear"
+
+    # Per-mode tunable parameters
+    pressure_linear_slope:   float = 0.50   # linear: ramp slope
+    pressure_tanh_k:         float = 1.0    # tanh:  steepness factor k in tanh(k·d)
+    pressure_quadratic_norm: float = 2.0    # quadratic: |d|=norm → pressure reaches pmax
+    pressure_deadband_delta: float = 0.15   # deadband: dead-zone half-width
+    pressure_deadband_slope: float = 0.50   # deadband: ramp slope outside dead zone
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +197,15 @@ def fn3_savings_pressure(p: ScenarioParams, savings: Dict[str, float]) -> Dict[s
     """
     Function 3: Savings pressure = f(savings / savings_target).
 
-    Replicates:
+    Replicates (base):
         local_*_savings_target
         local_*_savings_pressure
+
+    Extended with configurable function shape via p.pressure_mode:
+        "linear"    — vanilla clamp(0.5*(r-1), pmin, pmax)
+        "tanh"      — pmax * tanh(r-1), smooth saturation
+        "quadratic" — sign(d) * pmax * (d/2)^2, zero slope at equilibrium
+        "deadband"  — dead zone ±15% around target, then linear outside
     """
     income = max(0.0, p.monthly_income)
     targets = {
@@ -190,13 +215,61 @@ def fn3_savings_pressure(p: ScenarioParams, savings: Dict[str, float]) -> Dict[s
         "commoners": max(45.0,    0.0 + 2.0 * income),
         "tribesmen": max(35.0,    0.0 + 1.0 * income),
     }
+    mode = getattr(p, "pressure_mode", "linear")
     result: Dict[str, float] = {}
     for s in STRATA:
-        target     = targets[s]
-        raw        = (savings[s] / target - 1.0) * 0.50
+        target           = targets[s]
+        d                = savings[s] / max(1e-9, target) - 1.0   # savings ratio − 1
         _, _, pmin, pmax = STRATA_PARAMS[s]
-        result[s]  = _clamp(raw, pmin, pmax)
+
+        if mode == "tanh":
+            k   = getattr(p, "pressure_tanh_k", 1.0)
+            raw = pmax * math.tanh(k * d)
+        elif mode == "quadratic":
+            norm = getattr(p, "pressure_quadratic_norm", 2.0)
+            raw  = math.copysign(pmax * (d / norm) ** 2, d)
+        elif mode == "deadband":
+            δ     = getattr(p, "pressure_deadband_delta", 0.15)
+            slope = getattr(p, "pressure_deadband_slope", 0.50)
+            raw   = 0.0 if abs(d) < δ else slope * (d - math.copysign(δ, d))
+        else:  # "linear" / default
+            slope = getattr(p, "pressure_linear_slope", 0.50)
+            raw   = d * slope
+
+        result[s] = _clamp(raw, pmin, pmax)
     return result
+
+
+def savings_pressure_curve_np(
+    x_ratio: np.ndarray,
+    pmin: float,
+    pmax: float,
+    mode: str,
+    slope: float = 0.50,
+    k: float = 1.0,
+    norm: float = 2.0,
+    delta: float = 0.15,
+) -> np.ndarray:
+    """
+    Compute savings_pressure for an array of savings/target ratios.
+    Used by Tab 2 chart — not part of the simulation engine.
+
+    Args:
+        slope: linear / deadband ramp slope
+        k:     tanh steepness factor
+        norm:  quadratic normalization (|d|=norm → pmax)
+        delta: deadband half-width
+    """
+    d = x_ratio - 1.0
+    if mode == "tanh":
+        raw = pmax * np.tanh(k * d)
+    elif mode == "quadratic":
+        raw = np.sign(d) * pmax * (d / norm) ** 2
+    elif mode == "deadband":
+        raw = np.where(np.abs(d) < delta, 0.0, slope * (d - np.sign(d) * delta))
+    else:  # linear
+        raw = d * slope
+    return np.clip(raw, pmin, pmax)
 
 
 def compute_savings_targets(p: ScenarioParams) -> Dict[str, float]:
@@ -366,116 +439,3 @@ def simulate(
     return pd.DataFrame(records)
 
 
-# ---------------------------------------------------------------------------
-# Preset scenarios
-# ---------------------------------------------------------------------------
-
-def preset_new_save() -> ScenarioParams:
-    return ScenarioParams(
-        monthly_income=30, num_institutions=2,
-        tax_base=8, effective_control=0.75,
-        peasant_enfranchisement=0.5,
-        strata={
-            "nobles":    StrataState(0.2,  0.15, 0),
-            "clergy":    StrataState(0.15, 0.10, 0),
-            "burghers":  StrataState(0.15, 0.10, 0),
-            "commoners": StrataState(2.0,  0.05, 0),
-            "tribesmen": StrataState(0.0,  0.00, 0),
-        },
-        update_interval_years=2, sim_years=30,
-    )
-
-
-def preset_serfdom() -> ScenarioParams:
-    """Low enfranchisement: nobles siphon commoner wealth."""
-    return ScenarioParams(
-        monthly_income=25, num_institutions=1,
-        tax_base=8, effective_control=0.65,
-        peasant_enfranchisement=0.1,
-        strata={
-            "nobles":    StrataState(0.3,  0.10, 0),
-            "clergy":    StrataState(0.15, 0.10, 0),
-            "burghers":  StrataState(0.10, 0.10, 0),
-            "commoners": StrataState(2.5,  0.05, 0),
-            "tribesmen": StrataState(0.0,  0.00, 0),
-        },
-        update_interval_years=2, sim_years=30,
-    )
-
-
-def preset_free_cities() -> ScenarioParams:
-    """High burgher population, full enfranchisement."""
-    return ScenarioParams(
-        monthly_income=50, num_institutions=4,
-        tax_base=12, effective_control=0.85,
-        peasant_enfranchisement=1.0,
-        strata={
-            "nobles":    StrataState(0.1,  0.15, 0),
-            "clergy":    StrataState(0.15, 0.10, 0),
-            "burghers":  StrataState(0.5,  0.10, 0),
-            "commoners": StrataState(1.5,  0.05, 0),
-            "tribesmen": StrataState(0.0,  0.00, 0),
-        },
-        update_interval_years=1, sim_years=30,
-    )
-
-
-def preset_tribal() -> ScenarioParams:
-    """Mostly tribesmen, low institutions, low control."""
-    return ScenarioParams(
-        monthly_income=10, num_institutions=0,
-        tax_base=3, effective_control=0.50,
-        peasant_enfranchisement=0.8,
-        strata={
-            "nobles":    StrataState(0.05, 0.10, 0),
-            "clergy":    StrataState(0.05, 0.05, 0),
-            "burghers":  StrataState(0.0,  0.00, 0),
-            "commoners": StrataState(0.2,  0.05, 0),
-            "tribesmen": StrataState(2.0,  0.00, 0),
-        },
-        update_interval_years=3, sim_years=30,
-    )
-
-
-def preset_large_empire() -> ScenarioParams:
-    """Large, developed empire with many institutions."""
-    return ScenarioParams(
-        monthly_income=150, num_institutions=8,
-        tax_base=25, effective_control=0.90,
-        peasant_enfranchisement=0.6,
-        strata={
-            "nobles":    StrataState(0.4,  0.15, 500),
-            "clergy":    StrataState(0.3,  0.10, 200),
-            "burghers":  StrataState(0.4,  0.10, 200),
-            "commoners": StrataState(4.0,  0.05, 100),
-            "tribesmen": StrataState(0.0,  0.00, 0),
-        },
-        update_interval_years=2, sim_years=30,
-    )
-
-
-def preset_rich_old_save() -> ScenarioParams:
-    """Old save with established savings and high wealth."""
-    return ScenarioParams(
-        monthly_income=80, num_institutions=5,
-        tax_base=18, effective_control=0.85,
-        peasant_enfranchisement=0.65,
-        strata={
-            "nobles":    StrataState(0.25, 0.15, 1200),
-            "clergy":    StrataState(0.20, 0.10, 450),
-            "burghers":  StrataState(0.30, 0.10, 480),
-            "commoners": StrataState(3.0,  0.05, 180),
-            "tribesmen": StrataState(0.0,  0.00, 0),
-        },
-        update_interval_years=2, sim_years=30,
-    )
-
-
-PRESETS = {
-    "New Save (小国/新存档)":          preset_new_save,
-    "Serfdom (农奴制/领主主导)":        preset_serfdom,
-    "Free Cities (自由城市/富裕商人)":  preset_free_cities,
-    "Tribal Nation (部落国家)":         preset_tribal,
-    "Large Empire (大帝国)":            preset_large_empire,
-    "Rich Old Save (老存档/富裕)":      preset_rich_old_save,
-}
