@@ -1,59 +1,53 @@
-﻿# SOL built-in after-lobby detection logic.
-# Mirrors CMF's cmf_after_lobby_caller / cmf_load_after_lobby_caller scripted GUIs.
-# Both are no-ops when CMF is present (cmf_active is set by CMF in on_game_start).
+﻿# SOL built-in after-lobby detection logic. No CMF dependency.
 #
-# Uses sol_game_started_after_lobby to track whether the player has ever passed
-# the lobby with this mod active — same role as CMF's cmf_game_started_after_lobby.
+# Widget 1 — sol_after_lobby_caller (trigger_on_create, visible = Country.IsValid)
+# Fires when player has selected a country (new game AND save loads).
+# Uses sol_game_started_after_lobby to distinguish:
+#   - absent = first ever post-lobby entry for this save
+#   - present = subsequent load (widget skips)
+# Uses current_year <= 1337 to distinguish new game from old save on first entry.
 #
-# For old saves (no sol_game_started_after_lobby yet), uses current_year <= 1337
-# as a fallback to distinguish a truly fresh new game from an old save.
-# Edge case: a new game saved in year 1337 then loaded will correctly skip
-# (SOL_migration_v2_seen is already stamped from first session).
+# Widget 2 — sol_load_after_lobby_caller (_show, visible = Country.IsValid AND NOT IsLobbyOpen)
+# Fires after the lobby ends. Fires migration event when:
+#   - NOT a new game (sol_is_new_game absent)
+#   - sol_game_started_after_lobby is set (Widget 1 has run this session)
+#   - SOL_migration_v2_seen is NOT set (player hasn't seen migration notice yet)
+#
+# Order note: if Widget 2 fires before Widget 1 on the very first load of an old save,
+# sol_game_started_after_lobby is not yet set → condition fails safely → migration fires
+# on the next load instead (one-load delay, acceptable).
+#
+# Scope: none (global) for both.
 
-# Scope: none (global) — called by sol_after_lobby_caller widget (trigger_on_create)
-# Fires for both new games and save loads. Distinguishes via tracking variable + year.
 sol_after_lobby_caller = {
 	effect = {
 		if = {
-			limit = { NOT = { has_global_variable = cmf_active } }
+			limit = { NOT = { has_global_variable = sol_game_started_after_lobby } }
+			# First time our widget fires for this save
+			set_global_variable = { name = sol_game_started_after_lobby value = yes }
 			if = {
-				limit = { NOT = { has_global_variable = sol_game_started_after_lobby } }
-				# First ever post-lobby entry for this save (or fresh new game)
-				set_global_variable = { name = sol_game_started_after_lobby value = yes }
-				if = {
-					limit = { current_year <= 1337 }
-					# New game: stamp version immediately so Widget 2 skips migration
-					set_global_variable = { name = sol_is_new_game value = yes }
-					set_global_variable = SOL_migration_v2_seen
-				}
-				# else: old save first load — leave SOL_migration_v2_seen unset
-				#   Widget 2 (sol_load_after_lobby_caller) will fire SOL_migration_fire_event
+				limit = { current_year <= 1337 }
+				# New game: stamp version and set transient flag for Widget 2
+				set_global_variable = { name = sol_is_new_game value = yes }
+				set_global_variable = SOL_migration_v2_seen
 			}
-			# else: sol_game_started_after_lobby already set = subsequent save load, nothing to do
+			# else current_year > 1337: old save — leave SOL_migration_v2_seen unset;
+			# Widget 2 will fire SOL_migration_fire_event
 		}
+		# else sol_game_started_after_lobby already set: subsequent load, nothing to do
 	}
 }
 
-# Scope: none (global) — called by sol_load_after_lobby_caller widget (_show state)
-# Fires after lobby ends (Country.IsValid AND NOT IsLobbyOpen).
-# Order-independent with Widget 1: if Widget 2 fires first on a first-ever old-save
-# load, sol_game_started_after_lobby is not yet set, so the condition below fails
-# safely. Widget 1 then runs and sets sol_game_started_after_lobby. The migration
-# event fires on the next load instead (one-load delay, acceptable for old saves).
 sol_load_after_lobby_caller = {
 	effect = {
 		if = {
-			limit = { NOT = { has_global_variable = cmf_active } }
-			if = {
-				limit = {
-					NOT = { has_global_variable = sol_is_new_game }
-					has_global_variable = sol_game_started_after_lobby
-					NOT = { has_global_variable = SOL_migration_v2_seen }
-				}
-				# Old save load: delegate to on_action (handles every_country iteration)
-				trigger_event_silently = { on_action = SOL_migration_fire_event }
+			limit = {
+				NOT = { has_global_variable = sol_is_new_game }
+				has_global_variable = sol_game_started_after_lobby
+				NOT = { has_global_variable = SOL_migration_v2_seen }
 			}
-			remove_global_variable = sol_is_new_game
+			trigger_event_silently = { on_action = SOL_migration_fire_event }
 		}
+		remove_global_variable = sol_is_new_game
 	}
 }

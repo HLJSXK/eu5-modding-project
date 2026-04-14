@@ -1,54 +1,17 @@
-﻿# SOL Migration Notice — Version Stamp & Load Check
+﻿# SOL Migration Notice
 #
-# Two execution paths, mutually exclusive via cmf_active check:
-#
-# PATH A — CMF present:
-#   on_game_start_after_lobby     → SOL_new_game_version_stamp  (stamps version, no event)
-#   on_game_load_after_lobby_human_country → SOL_migration_check_country  (fires event if old save)
-#
-# PATH B — CMF absent (built-in GUI fallback):
-#   sol_after_lobby_caller  scripted GUI + widget → SOL_new_game_version_stamp  (new game)
-#   sol_load_after_lobby_caller scripted GUI + widget → SOL_migration_fire_event (old save)
+# Detection is entirely built-in via GUI widgets — no CMF dependency.
+#   Widget 1 (sol_after_lobby_caller):   detects new game vs old save, stamps new games
+#   Widget 2 (sol_load_after_lobby_caller): fires migration event for old saves
 #   See: SOL_migration_caller.gui / SOL_migration_scripted_guis.txt
-
-# ── PATH A: CMF hooks ────────────────────────────────────────────────────────
-
-# New game only (CMF fires this after lobby — vanilla on_game_start fires before)
-# Scope: none (global)
-on_game_start_after_lobby = {
-	on_actions = {
-		SOL_new_game_version_stamp
-	}
-}
-
-SOL_new_game_version_stamp = {
-	effect = {
-		set_global_variable = SOL_migration_v2_seen
-	}
-}
-
-# Save load only (CMF fires this per human-player country after lobby)
-# Scope: country
-on_game_load_after_lobby_human_country = {
-	on_actions = {
-		SOL_migration_check_country
-	}
-}
-
-SOL_migration_check_country = {
-	trigger = {
-		NOT = { has_global_variable = SOL_migration_v2_seen }
-	}
-	effect = {
-		set_global_variable = SOL_migration_v2_seen
-		trigger_event_non_silently = sol_migration.1
-	}
-}
-
-# ── SHARED: called by both paths ─────────────────────────────────────────────
+#
+# Tracking variables (all global, persist in saves):
+#   sol_game_started_after_lobby — set once our widget has run; marks "we've been past lobby"
+#   sol_is_new_game              — transient; set by Widget 1, cleared by Widget 2
+#   SOL_migration_v2_seen        — permanent stamp; prevents re-firing
 
 # Fires migration event for all human players from global scope.
-# Used by the non-CMF scripted GUI path (sol_load_after_lobby_caller).
+# Called by sol_load_after_lobby_caller scripted GUI via trigger_event_silently.
 # Scope: none (global)
 SOL_migration_fire_event = {
 	effect = {
