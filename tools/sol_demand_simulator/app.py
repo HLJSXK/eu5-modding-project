@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace as dc_replace
 from pathlib import Path
 
 # Ensure local imports resolve when launched from any CWD
@@ -67,6 +68,24 @@ def _load_matrix():
 prices        = _load_prices()
 demand_matrix = _load_matrix()
 
+
+def _reweight_commoners(dm: dict, pop_lab: float, pop_peas: float, pop_sold: float) -> dict:
+    """
+    Return a copy of the demand matrix where strata_demand["commoners"] is
+    recomputed as a population-weighted average of laborers / peasants / soldiers
+    demands instead of the default arithmetic mean.
+    """
+    total = max(1e-9, pop_lab + pop_peas + pop_sold)
+    w = {"laborers": pop_lab / total, "peasants": pop_peas / total, "soldiers": pop_sold / total}
+    result = {}
+    for good, entry in dm.items():
+        weighted_comm = sum(entry.demand_per_pop_type[pt] * w[pt] for pt in w)
+        result[good] = dc_replace(
+            entry,
+            strata_demand={**entry.strata_demand, "commoners": weighted_comm},
+        )
+    return result
+
 # ---------------------------------------------------------------------------
 # User preset persistence
 # ---------------------------------------------------------------------------
@@ -88,15 +107,20 @@ def save_user_presets(presets: dict) -> None:
 
 
 def dict_to_params(d: dict) -> ScenarioParams:
+    comm_total = d["strata"].get("commoners", {}).get("pop_count", 0.0)
+    each = comm_total / 3.0
     return ScenarioParams(
         monthly_income          = d["monthly_income"],
         num_institutions        = d["num_institutions"],
         tax_base                = d["tax_base"],
         effective_control       = d["effective_control"],
         peasant_enfranchisement = d["peasant_enfranchisement"],
+        pop_laborers            = d.get("pop_laborers", each),
+        pop_peasants            = d.get("pop_peasants", each),
+        pop_soldiers            = d.get("pop_soldiers", each),
         update_interval_years   = d["update_interval_years"],
         sim_years               = d["sim_years"],
-        ema_alpha               = d.get("ema_alpha", 1.0),  # default for old saves
+        ema_alpha               = d.get("ema_alpha", 1.0),
         strata = {
             s: StrataState(v["pop_count"], v["tax_rate"], v["savings"])
             for s, v in d["strata"].items()
@@ -183,7 +207,13 @@ with st.sidebar:
     pop_nobles    = st.number_input("Nobles",    min_value=0.0, value=float(_sv("nobles",    "pop_count", 0.2)),  step=0.05)
     pop_clergy    = st.number_input("Clergy",    min_value=0.0, value=float(_sv("clergy",    "pop_count", 0.15)), step=0.05)
     pop_burghers  = st.number_input("Burghers",  min_value=0.0, value=float(_sv("burghers",  "pop_count", 0.15)), step=0.05)
-    pop_commoners = st.number_input("Commoners", min_value=0.0, value=float(_sv("commoners", "pop_count", 2.0)),  step=0.1)
+    _comm_total = float(_sv("commoners", "pop_count", 2.0))
+    _comm_each  = round(_comm_total / 3, 4)
+    pop_laborers  = st.number_input("  Laborers",  min_value=0.0, value=float(_pv("pop_laborers",  _comm_each)), step=0.05)
+    pop_peasants  = st.number_input("  Peasants",  min_value=0.0, value=float(_pv("pop_peasants",  _comm_each)), step=0.05)
+    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  _comm_each)), step=0.05)
+    pop_commoners = pop_laborers + pop_peasants + pop_soldiers
+    st.caption(f"Commoners total: {pop_commoners:.3f}")
     pop_tribesmen = st.number_input("Tribesmen", min_value=0.0, value=float(_sv("tribesmen", "pop_count", 0.0)),  step=0.05)
 
     st.subheader("Tax Rates (% of income to crown)")
@@ -239,6 +269,9 @@ with st.sidebar:
             "update_interval_years": int(update_interval),
             "sim_years":             int(sim_years),
             "ema_alpha":             float(ema_alpha),
+            "pop_laborers":          pop_laborers,
+            "pop_peasants":          pop_peasants,
+            "pop_soldiers":          pop_soldiers,
             "strata": {
                 "nobles":    {"pop_count": pop_nobles,    "tax_rate": tr_nobles,    "savings": sv_nobles},
                 "clergy":    {"pop_count": pop_clergy,    "tax_rate": tr_clergy,    "savings": sv_clergy},
@@ -267,11 +300,14 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 
 params = ScenarioParams(
-    monthly_income       = monthly_income,
-    num_institutions     = num_institutions,
-    tax_base             = tax_base,
-    effective_control    = effective_control,
+    monthly_income          = monthly_income,
+    num_institutions        = num_institutions,
+    tax_base                = tax_base,
+    effective_control       = effective_control,
     peasant_enfranchisement = enfranchisement,
+    pop_laborers            = pop_laborers,
+    pop_peasants            = pop_peasants,
+    pop_soldiers            = pop_soldiers,
     strata = {
         "nobles":    StrataState(pop_nobles,    tr_nobles,    sv_nobles),
         "clergy":    StrataState(pop_clergy,    tr_clergy,    sv_clergy),
@@ -285,8 +321,10 @@ params = ScenarioParams(
 )
 
 # ---------------------------------------------------------------------------
-# Compute current-state values (used in multiple tabs)
+# Reweight commoners demand by actual sub-pop counts, then compute state
 # ---------------------------------------------------------------------------
+
+demand_matrix_w = _reweight_commoners(demand_matrix, pop_laborers, pop_peasants, pop_soldiers)
 
 gdp_pc       = fn1_gdp_per_capita(params)
 nl           = fn2_gdp_nonlinear(gdp_pc)
@@ -294,7 +332,7 @@ sp_pressure  = fn3_savings_pressure(params, {s: params.strata[s].savings for s i
 d_scale      = compute_demand_scale(params)
 sav_targets  = compute_savings_targets(params)
 income_est   = compute_monthly_income_from_gdp(params)
-base_idx     = compute_base_demand_index(demand_matrix)
+base_idx     = compute_base_demand_index(demand_matrix_w)
 
 STRATA_COLORS = {
     "nobles":    "#e8b84b",
@@ -352,7 +390,7 @@ with tab1:
     # ---- Per-pop-type detail table ----
     st.markdown("#### By EU5 pop type (full breakdown)")
     rows_pt = []
-    for good, entry in demand_matrix.items():
+    for good, entry in demand_matrix_w.items():
         row: dict = {"Good": good, "Price": entry.price, "Category": entry.category}
         total_spend = 0.0
         for pt in EU5_POP_TYPES:
@@ -403,7 +441,7 @@ with tab1:
         )
 
     rows_strata = []
-    for good, entry in demand_matrix.items():
+    for good, entry in demand_matrix_w.items():
         row = {"Good": good, "Price": entry.price, "Category": entry.category}
         spend_sum = 0.0
         for s in STRATA:
@@ -597,7 +635,7 @@ with tab3:
     )
 
     with st.spinner("Running simulation…"):
-        df_sim = simulate(params, demand_matrix)
+        df_sim = simulate(params, demand_matrix_w)
 
     update_tick_years = df_sim[df_sim["update_tick"]]["year"].tolist()
 

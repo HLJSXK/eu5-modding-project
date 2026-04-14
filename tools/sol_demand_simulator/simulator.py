@@ -80,6 +80,15 @@ class ScenarioParams:
     update_interval_years: int      # 1, 2, or 3
     sim_years: int                  # total simulation duration in years
 
+    # --- fields with defaults below this line ---
+
+    # Commoner sub-type pop counts (stored for UI round-trip; not used in formulas here).
+    # app.py uses these to build a population-weighted demand matrix before simulation.
+    # If all zero, app.py falls back to equal three-way split.
+    pop_laborers: float = 0.0
+    pop_peasants: float = 0.0
+    pop_soldiers: float = 0.0
+
     # Demand scale smoothing (EMA)
     # d_new = ema_alpha × d_computed + (1 - ema_alpha) × d_old
     # 1.0 = no smoothing (vanilla behaviour); lower values damp oscillation
