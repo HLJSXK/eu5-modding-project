@@ -1,0 +1,53 @@
+﻿# SOL built-in after-lobby detection logic. No CMF dependency.
+#
+# Widget 1 — sol_after_lobby_caller (trigger_on_create, visible = Country.IsValid)
+# Fires when player has selected a country (new game AND save loads).
+# Uses sol_game_started_after_lobby to distinguish:
+#   - absent = first ever post-lobby entry for this save
+#   - present = subsequent load (widget skips)
+# Uses current_year <= 1337 to distinguish new game from old save on first entry.
+#
+# Widget 2 — sol_load_after_lobby_caller (_show, visible = Country.IsValid AND NOT IsLobbyOpen)
+# Fires after the lobby ends. Fires migration event when:
+#   - NOT a new game (sol_is_new_game absent)
+#   - sol_game_started_after_lobby is set (Widget 1 has run this session)
+#   - SOL_migration_v2_seen is NOT set (player hasn't seen migration notice yet)
+#
+# Order note: if Widget 2 fires before Widget 1 on the very first load of an old save,
+# sol_game_started_after_lobby is not yet set → condition fails safely → migration fires
+# on the next load instead (one-load delay, acceptable).
+#
+# Scope: none (global) for both.
+
+sol_after_lobby_caller = {
+	effect = {
+		if = {
+			limit = { NOT = { has_global_variable = sol_game_started_after_lobby } }
+			# First time our widget fires for this save
+			set_global_variable = { name = sol_game_started_after_lobby value = yes }
+			if = {
+				limit = { current_year <= 1337 }
+				# New game: stamp version and set transient flag for Widget 2
+				set_global_variable = { name = sol_is_new_game value = yes }
+				set_global_variable = SOL_migration_v2_seen
+			}
+			# else current_year > 1337: old save — leave SOL_migration_v2_seen unset;
+			# Widget 2 will fire SOL_migration_fire_event
+		}
+		# else sol_game_started_after_lobby already set: subsequent load, nothing to do
+	}
+}
+
+sol_load_after_lobby_caller = {
+	effect = {
+		if = {
+			limit = {
+				NOT = { has_global_variable = sol_is_new_game }
+				has_global_variable = sol_game_started_after_lobby
+				NOT = { has_global_variable = SOL_migration_v2_seen }
+			}
+			trigger_event_silently = { on_action = SOL_migration_fire_event }
+		}
+		remove_global_variable = sol_is_new_game
+	}
+}

@@ -1,0 +1,390 @@
+﻿# War Momentum - Army Penalty and Display Effects
+# Calculates fort defense penalty from military strength loss.
+# Populates variable maps for tooltip component and loss breakdowns.
+
+noicthy_calculate_army_penalty = {
+	# Calculate combined military strength for subjects with co-belligerent overlords
+	set_local_variable = {
+		name = noicthy_combined_army
+		value = local_var:noicthy_effective_strength
+	}
+	set_local_variable = {
+		name = noicthy_combined_peak
+		value = var:noicthy_potential_peak
+	}
+
+	# Subject+overlord combination: only subjects fighting with their overlord. A handful at most.
+	if = {
+		limit = { noicthy_is_subject_with_overlord_in_war = yes }
+
+		overlord = {
+			# Add overlord's effective strength (military_strength - max_manpower + manpower)
+			change_local_variable = {
+				name = noicthy_combined_army
+				add = { add = military_strength subtract = max_manpower add = manpower }
+			}
+			if = {
+				limit = { has_variable = noicthy_potential_peak }
+
+				change_local_variable = {
+					name = noicthy_combined_peak
+					add = var:noicthy_potential_peak
+				}
+			}
+			else = {
+				change_local_variable = {
+					name = noicthy_combined_peak
+					add = { add = military_strength subtract = max_manpower add = manpower }
+				}
+			}
+		}
+	}
+
+	if = {
+		limit = { local_var:noicthy_combined_peak > 0 }
+
+		set_variable = {
+			name = noicthy_war_momentum_army_size
+
+			value = {
+				add = 1
+
+				subtract = {
+					add = local_var:noicthy_combined_army
+					divide = local_var:noicthy_combined_peak
+				}
+			}
+		}
+	}
+	else = {
+		set_variable = { name = noicthy_war_momentum_army_size value = 0 }
+	}
+
+	if = {
+		limit = { var:noicthy_war_momentum_army_size > 1 }
+		set_variable = { name = noicthy_war_momentum_army_size value = 1 }
+	}
+	if = {
+		limit = { var:noicthy_war_momentum_army_size < 0 }
+		set_variable = { name = noicthy_war_momentum_army_size value = 0 }
+	}
+
+	remove_country_modifier = noicthy_war_momentum_army
+	if = {
+		limit = { var:noicthy_war_momentum_army_size > 0 }
+
+		add_country_modifier = {
+			modifier = noicthy_war_momentum_army
+			days = -1
+			size = var:noicthy_war_momentum_army_size
+		}
+	}
+}
+
+# Populate variable maps for self and overlord component display in the tooltip.
+
+noicthy_display_army_components = {
+	# Self: total strength current and peak
+	clear_variable_map = noicthy_army_breakdown
+	clear_variable_map = noicthy_army_peak_breakdown
+
+	set_local_variable = {
+		name = noicthy_total_display
+		value = { add = local_var:noicthy_effective_strength multiply = 1000 }
+	}
+	set_local_variable = {
+		name = noicthy_total_peak_display
+		value = { add = var:noicthy_potential_peak multiply = 1000 }
+	}
+
+	add_to_variable_map = {
+		name = noicthy_army_breakdown
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_total_display
+	}
+	add_to_variable_map = {
+		name = noicthy_army_peak_breakdown
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_total_peak_display
+	}
+
+	# Self: per-component current and peak (* 1000 for display)
+	clear_variable_map = noicthy_army_strength_map
+	clear_variable_map = noicthy_army_strength_peak_map
+	clear_variable_map = noicthy_manpower_map
+	clear_variable_map = noicthy_manpower_peak_map
+
+	set_local_variable = {
+		name = noicthy_army_str_display
+		value = { add = local_var:noicthy_effective_army multiply = 1000 }
+	}
+	set_local_variable = {
+		name = noicthy_army_str_peak_display
+		value = { add = var:noicthy_army_peak multiply = 1000 }
+	}
+	set_local_variable = {
+		name = noicthy_manpower_display
+		value = { add = manpower multiply = 1000 }
+	}
+	set_local_variable = {
+		name = noicthy_manpower_peak_display
+		value = { add = var:noicthy_manpower_peak multiply = 1000 }
+	}
+
+	add_to_variable_map = {
+		name = noicthy_army_strength_map
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_army_str_display
+	}
+	add_to_variable_map = {
+		name = noicthy_army_strength_peak_map
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_army_str_peak_display
+	}
+
+	# Manpower: raw manpower as current (not capped), capped peak as denominator
+	add_to_variable_map = {
+		name = noicthy_manpower_map
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_manpower_display
+	}
+	add_to_variable_map = {
+		name = noicthy_manpower_peak_map
+		key = scope:noicthy_army_self
+		value = local_var:noicthy_manpower_peak_display
+	}
+
+	# Overlord display: re-enter overlord scope for GUI data (cheap scope lookup)
+	if = {
+		limit = { noicthy_is_subject_with_overlord_in_war = yes }
+
+		overlord = {
+			# Overlord total effective strength (* 1000 for display)
+			set_local_variable = {
+				name = noicthy_overlord_strength
+
+				value = {
+					add = military_strength
+					subtract = max_manpower
+					add = manpower
+					multiply = 1000
+				}
+			}
+			if = {
+				limit = { has_variable = noicthy_potential_peak }
+
+				set_local_variable = {
+					name = noicthy_overlord_peak
+					value = { add = var:noicthy_potential_peak multiply = 1000 }
+				}
+			}
+			else = {
+				set_local_variable = {
+					name = noicthy_overlord_peak
+					value = local_var:noicthy_overlord_strength
+				}
+			}
+
+			# Overlord components (* 1000 for display)
+			set_local_variable = {
+				name = noicthy_overlord_army
+				value = { add = military_strength subtract = max_manpower multiply = 1000 }
+			}
+			set_local_variable = {
+				name = noicthy_overlord_manpower
+				value = { add = manpower multiply = 1000 }
+			}
+
+			if = {
+				limit = { has_variable = noicthy_army_peak }
+
+				set_local_variable = {
+					name = noicthy_overlord_army_peak
+					value = { add = var:noicthy_army_peak multiply = 1000 }
+				}
+			}
+			else = {
+				set_local_variable = {
+					name = noicthy_overlord_army_peak
+					value = local_var:noicthy_overlord_army
+				}
+			}
+			if = {
+				limit = { has_variable = noicthy_manpower_peak }
+
+				set_local_variable = {
+					name = noicthy_overlord_manpower_peak
+					value = { add = var:noicthy_manpower_peak multiply = 1000 }
+				}
+			}
+			else = {
+				set_local_variable = {
+					name = noicthy_overlord_manpower_peak
+					value = local_var:noicthy_overlord_manpower
+				}
+			}
+
+			save_temporary_scope_as = noicthy_overlord_ref
+
+			prev = {
+				add_to_variable_map = {
+					name = noicthy_army_breakdown
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_strength
+				}
+				add_to_variable_map = {
+					name = noicthy_army_peak_breakdown
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_peak
+				}
+				add_to_variable_map = {
+					name = noicthy_army_strength_map
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_army
+				}
+				add_to_variable_map = {
+					name = noicthy_army_strength_peak_map
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_army_peak
+				}
+				add_to_variable_map = {
+					name = noicthy_manpower_map
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_manpower
+				}
+				add_to_variable_map = {
+					name = noicthy_manpower_peak_map
+					key = scope:noicthy_overlord_ref
+					value = local_var:noicthy_overlord_manpower_peak
+				}
+			}
+		}
+	}
+}
+
+# Populate per-component loss contribution maps.
+# Distributes the total WE and fort defense penalties proportionally between
+# army strength and manpower based on each component's raw loss from peak.
+
+noicthy_display_army_losses = {
+	clear_variable_map = noicthy_army_we_map
+	clear_variable_map = noicthy_army_fort_def_map
+	clear_variable_map = noicthy_manpower_we_map
+	clear_variable_map = noicthy_manpower_fort_def_map
+
+	if = {
+		limit = { var:noicthy_potential_peak > 0 }
+
+		set_local_variable = {
+			name = noicthy_raw_army_loss
+
+			value = {
+				add = var:noicthy_army_peak
+				subtract = local_var:noicthy_effective_army
+			}
+		}
+		if = {
+			limit = { local_var:noicthy_raw_army_loss < 0 }
+			set_local_variable = { name = noicthy_raw_army_loss value = 0 }
+		}
+
+		set_local_variable = {
+			name = noicthy_raw_manpower_loss
+
+			value = {
+				add = var:noicthy_manpower_peak
+				subtract = local_var:noicthy_effective_manpower
+			}
+		}
+		if = {
+			limit = { local_var:noicthy_raw_manpower_loss < 0 }
+			set_local_variable = { name = noicthy_raw_manpower_loss value = 0 }
+		}
+
+		set_local_variable = {
+			name = noicthy_raw_sum
+
+			value = {
+				add = local_var:noicthy_raw_army_loss
+				add = local_var:noicthy_raw_manpower_loss
+			}
+		}
+
+		if = {
+			limit = { local_var:noicthy_raw_sum > 0 }
+
+			# WE total: reuse noicthy_exhaustion_size from noicthy_update_exhaustion (runs first)
+			# Scale by 0.5 to match the static modifier's monthly_war_exhaustion multiplier
+			set_local_variable = {
+				name = noicthy_we_total
+				value = { add = local_var:noicthy_exhaustion_size multiply = 0.5 }
+			}
+
+			set_local_variable = {
+				name = noicthy_def_total
+				value = { add = var:noicthy_war_momentum_army_size multiply = 0.5 }
+			}
+
+			# Distribute proportionally
+			set_local_variable = {
+				name = noicthy_army_we
+
+				value = {
+					add = local_var:noicthy_raw_army_loss
+					divide = local_var:noicthy_raw_sum
+					multiply = local_var:noicthy_we_total
+				}
+			}
+			set_local_variable = {
+				name = noicthy_manpower_we
+
+				value = {
+					add = local_var:noicthy_raw_manpower_loss
+					divide = local_var:noicthy_raw_sum
+					multiply = local_var:noicthy_we_total
+				}
+			}
+			set_local_variable = {
+				name = noicthy_army_fort_def
+
+				value = {
+					add = local_var:noicthy_raw_army_loss
+					divide = local_var:noicthy_raw_sum
+					multiply = local_var:noicthy_def_total
+				}
+			}
+			set_local_variable = {
+				name = noicthy_manpower_fort_def
+
+				value = {
+					add = local_var:noicthy_raw_manpower_loss
+					divide = local_var:noicthy_raw_sum
+					multiply = local_var:noicthy_def_total
+				}
+			}
+
+			add_to_variable_map = {
+				name = noicthy_army_we_map
+				key = scope:noicthy_army_self
+				value = local_var:noicthy_army_we
+			}
+			add_to_variable_map = {
+				name = noicthy_manpower_we_map
+				key = scope:noicthy_army_self
+				value = local_var:noicthy_manpower_we
+			}
+			add_to_variable_map = {
+				name = noicthy_army_fort_def_map
+				key = scope:noicthy_army_self
+				value = local_var:noicthy_army_fort_def
+			}
+			add_to_variable_map = {
+				name = noicthy_manpower_fort_def_map
+				key = scope:noicthy_army_self
+				value = local_var:noicthy_manpower_fort_def
+			}
+		}
+	}
+}
+
+# Cost: scalar math + one trigger check + one modifier swap. Negligible.

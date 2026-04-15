@@ -1,0 +1,67 @@
+﻿# War Momentum - Scripted Triggers
+# "noicthy" prefix = "No One Is Coming To Help You", the mod's original name. Kept for save compatibility.
+
+# Two situations qualify:
+#   1. Subject with limited diplomacy (fiefdom, vassal, march) fighting alongside overlord.
+#      These subjects cannot negotiate peace independently.
+#   2. Coalition member in a coalition war who is not the war leader.
+#      Coalition members cannot separate peace whether the coalition is attacking or defending.
+#      Verified by checking: an enemy war leader exists that this country AND a friendly war leader
+#      are both in a coalition against. The friendly war leader must be the one leading the war
+#      against that enemy, confirming this is the same war (not a separate conflict).
+
+# Country scope. Returns true if this country is a subject fighting alongside their overlord.
+# Used for combined fort defense calculation.
+noicthy_is_subject_with_overlord_in_war = {
+	is_subject = yes
+
+	overlord = {
+		is_fighting_war_together_with = prev
+	}
+}
+
+# Country scope. Returns true if this country cannot separate peace in any of its current wars.
+# Used to halve the war exhaustion penalty for participants with no agency over when the war ends.
+noicthy_is_trapped_in_war = {
+	OR = {
+		# Subject with limited diplomacy fighting alongside their overlord
+		AND = {
+			has_limited_diplomacy = yes
+			overlord = { is_fighting_war_together_with = prev }
+		}
+
+		# Non-leader coalition member in a coalition war
+		any_enemy_war_leader = {
+			save_temporary_scope_as = noicthy_coalition_target
+
+			prev = {
+				# I am in a coalition against this enemy war leader
+				is_member_of_international_organization_of_type = {
+					type = coalition
+					target = scope:noicthy_coalition_target
+				}
+
+				# A country fighting on my side also meets both conditions:
+				# they are in the coalition against this enemy AND they lead the war against them.
+				# This confirms the coalition and the war are the same conflict.
+				any_country_together_in_war_with = {
+					save_temporary_scope_as = noicthy_coalition_ally
+
+					is_member_of_international_organization_of_type = {
+						type = coalition
+						target = scope:noicthy_coalition_target
+					}
+
+					# This ally leads a war against the coalition target
+					any_current_war = {
+						is_in_war = scope:noicthy_coalition_target
+						OR = {
+							attacker_leader = { this = scope:noicthy_coalition_ally }
+							defender_leader = { this = scope:noicthy_coalition_ally }
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,80 @@
+﻿# Is this country the current Emperor of China (Middle Kingdom leader)?
+nd_mc_is_emperor_trigger = {
+	exists = international_organization:middle_kingdom
+	is_leader_of_international_organization = international_organization:middle_kingdom
+}
+
+# Is this country a warring state in the Mandate Crisis?
+nd_mc_is_warring_state_trigger = {
+	has_reform = government_reform:warring_state
+	has_variable = nd_mc_emperor_allegiance
+}
+
+# Can we release a historical tag during the Mandate Crisis?
+# Parameters: $tag$, $location$
+nd_mc_can_release_tag = {
+	NOT = { country_exists = c:$tag$ }
+	owns = location:$location$
+	location:$location$ = { is_capital = no }
+}
+
+# End trigger for the Mandate Crisis situation
+nd_mandate_crisis_end_trigger = {
+	OR = {
+		# Path A: Reform (Phase 1 only)
+		AND = {
+			exists = international_organization:middle_kingdom
+			exists = international_organization:middle_kingdom.leader_country
+			international_organization:middle_kingdom.leader_country = {
+				has_variable = nd_mc_phase
+				var:nd_mc_phase = 1
+				stability >= 30
+				government_power >= 50
+			}
+			international_organization:middle_kingdom = {
+				var:celestial_authority >= 60
+			}
+		}
+
+		# Path B: Reconquest (emperor controls 65%+ and challengers dissolved)
+		AND = {
+			exists = international_organization:middle_kingdom
+			exists = international_organization:middle_kingdom.leader_country
+			international_organization:middle_kingdom.leader_country = {
+				has_variable = nd_mc_phase
+				var:nd_mc_phase = 2
+			}
+			international_organization:middle_kingdom = {
+				any_international_organization_owned_location = {
+					is_owned_or_owned_by_subjects_or_below_of = international_organization:middle_kingdom.leader_country
+					percent >= 0.65
+				}
+			}
+			OR = {
+				NOT = { exists = international_organization:nd_mandate_challengers }
+				international_organization:nd_mandate_challengers = { total_members < 1 }
+			}
+		}
+
+		# Path C: New Dynasty (challenger controls 65%+)
+		AND = {
+			exists = international_organization:nd_mandate_challengers
+			exists = international_organization:middle_kingdom
+			international_organization:nd_mandate_challengers = {
+				international_organization_has_leader = yes
+			}
+			international_organization:middle_kingdom = {
+				any_international_organization_owned_location = {
+					is_owned_or_owned_by_subjects_or_below_of = international_organization:nd_mandate_challengers.leader_country
+					percent >= 0.65
+				}
+			}
+		}
+
+		# Safety valve: 50 years max
+		situation:nd_mandate_crisis = { years_since_situation_start > 50 }
+
+		# Middle Kingdom dissolved
+		NOT = { exists = international_organization:middle_kingdom }
+	}
+}

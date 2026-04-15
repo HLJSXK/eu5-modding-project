@@ -1,0 +1,939 @@
+﻿### ============================================================
+### SECTION: Gold Transfer Scaling
+### ============================================================
+# Taken from the 'Reasonable Prices' mod, but with adjusted value caps.
+# R.P. capped these too low; raised caps to 10x lower than vanilla,
+# which still feels like a large difference while remaining functional.
+
+TRY_REPLACE:change_gold_effect = {
+	add_gold = {
+		value = 1
+		multiply = $scale$
+
+		add = {
+			value = monthly_income_trade_and_tax
+			multiply = $scale$
+		}
+		if = {
+			limit = {
+				$scale$ >  0
+			}
+			min = {
+				value = $scale$
+			}
+			max = {
+				value = 1000 # Vanilla: 10,000 (in R.P, this was 50)
+				multiply = $scale$
+			}
+
+		}
+
+		if = {
+			limit = {
+				$scale$ < 0
+			}
+			max = {
+				value = $scale$
+			}
+			min = {
+				value = 1000 # Vanilla: 10,000 (in R.P, this was 50)
+				multiply = $scale$
+			}
+
+		}
+	}
+}
+
+TRY_REPLACE:change_estate_gold_effect = {
+	add_gold_to_estate = {
+		estate_type = $estate$
+		value = {
+			value = $scale$
+
+			add = {
+				value = monthly_income_trade_and_tax
+				multiply = $scale$
+			}
+			if = {
+				limit = {
+					$scale$ >  0
+				}
+				min = {
+					value = $scale$
+				}
+				max = {
+					value = 1000 # Vanilla: 10,000 (in R.P, this was 50)
+					multiply = $scale$
+				}
+
+			}
+
+			if = {
+				limit = {
+					$scale$ < 0
+				}
+				max = {
+					value = $scale$
+				}
+				min = {
+					value = 1000 # Vanilla: 10,000 (in R.P, this was 50)
+					multiply = $scale$
+				}
+
+			}
+		}
+	}
+}
+
+### ============================================================
+### SECTION: Standard of Living Computation
+### ============================================================
+# SOL calculation effects: savings pressure, panel display, map coloring,
+# and panel stat accumulation. Called from yearly_country_pulse (Pass A/B).
+
+gls_compute_savings_pressure = {
+	# 计算财富锚点和各阶层存款压力。
+	# 地图着色依赖这些值（通过 local_*_savings_pressure → local_average_gdp_per_capita_scale）。
+	# 调用者：Pass A（所有国家，每年）、Pass B（人类，每月）
+	# root = country
+	set_variable = {
+		name = gls_country_wealth_anchor_cached
+		value = {
+			value = monthly_income_trade_and_tax
+			min = 0
+		}
+	}
+
+	set_variable = {
+		name = gls_nobles_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:nobles_estate }
+				value = "estate(estate_type:nobles_estate).estate_gold"
+				divide = {
+					value = 200
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 8
+					}
+					min = 80
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 3
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_clergy_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:clergy_estate }
+				value = "estate(estate_type:clergy_estate).estate_gold"
+				divide = {
+					value = 100
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 3
+					}
+					min = 60
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 2
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_burghers_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:burghers_estate }
+				value = "estate(estate_type:burghers_estate).estate_gold"
+				divide = {
+					value = 100
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 3
+					}
+					min = 60
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 2
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_commoner_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:peasants_estate }
+				value = "estate(estate_type:peasants_estate).estate_gold"
+				divide = {
+					value = 0
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 2
+					}
+					min = 45
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 1.5
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_tribesmen_savings_pressure
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:tribes_estate }
+				value = "estate(estate_type:tribes_estate).estate_gold"
+				divide = {
+					value = 0
+					add = {
+						value = var:gls_country_wealth_anchor_cached
+						multiply = 1
+					}
+					min = 35
+				}
+				subtract = 1
+				multiply = 0.50
+				min = -0.50
+				max = 1.5
+			}
+		}
+	}
+
+}
+
+gls_compute_panel_display = {
+	# 计算面板 UI 展示变量（税率、资产、目标存款、制度加成）。
+	# 依赖：gls_country_wealth_anchor_cached（由 gls_compute_savings_pressure 设置）。
+	# 调用者：Pass B（人类，每月）
+	# root = country
+
+	# Section 1 / 2 / 3 / 4 of the situation panel
+	set_variable = {
+		name = gls_nobles_tax_pct
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:nobles_estate }
+				value = "estate_tax_percentage:nobles_estate"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_clergy_tax_pct
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:clergy_estate }
+				value = "estate_tax_percentage:clergy_estate"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_burghers_tax_pct
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:burghers_estate }
+				value = "estate_tax_percentage:burghers_estate"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_commoner_tax_pct
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:peasants_estate }
+				value = "estate_tax_percentage:peasants_estate"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_tribesmen_tax_pct
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:tribes_estate }
+				value = "estate_tax_percentage:tribes_estate"
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_nobles_gold
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:nobles_estate }
+				value = "estate(estate_type:nobles_estate).estate_gold"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_clergy_gold
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:clergy_estate }
+				value = "estate(estate_type:clergy_estate).estate_gold"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_burghers_gold
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:burghers_estate }
+				value = "estate(estate_type:burghers_estate).estate_gold"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_commoner_gold
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:peasants_estate }
+				value = "estate(estate_type:peasants_estate).estate_gold"
+			}
+		}
+	}
+	set_variable = {
+		name = gls_tribesmen_gold
+		value = {
+			value = 0
+			if = {
+				limit = { country_has_estate = estate_type:tribes_estate }
+				value = "estate(estate_type:tribes_estate).estate_gold"
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_nobles_target
+		value = {
+			value = 200
+			add = {
+				value = var:gls_country_wealth_anchor_cached
+				multiply = 8
+			}
+			min = 80
+		}
+	}
+	set_variable = {
+		name = gls_clergy_target
+		value = {
+			value = 100
+			add = {
+				value = var:gls_country_wealth_anchor_cached
+				multiply = 3
+			}
+			min = 60
+		}
+	}
+	set_variable = {
+		name = gls_burghers_target
+		value = {
+			value = 100
+			add = {
+				value = var:gls_country_wealth_anchor_cached
+				multiply = 3
+			}
+			min = 60
+		}
+	}
+	set_variable = {
+		name = gls_commoner_target
+		value = {
+			value = 0
+			add = {
+				value = var:gls_country_wealth_anchor_cached
+				multiply = 2
+			}
+			min = 45
+		}
+	}
+	set_variable = {
+		name = gls_tribesmen_target
+		value = {
+			value = 0
+			add = {
+				value = var:gls_country_wealth_anchor_cached
+				multiply = 1
+			}
+			min = 35
+		}
+	}
+
+	set_variable = {
+		name = gls_num_institutions
+		value = { add = num_embraced_institutions }
+	}
+	set_variable = {
+		name = gls_institution_bonus
+		value = {
+			add = num_embraced_institutions
+			multiply = 0.05
+		}
+	}
+
+	# Acknowledge GUI-only display variables — used via GetVariable in the situation panel.
+	# This block puts them in an active call-graph path so the engine stops reporting them
+	# as unused. The condition is always false at runtime; cost is zero.
+	if = {
+		limit = {
+			always = no
+			has_variable = gls_nobles_tax_pct
+			has_variable = gls_clergy_tax_pct
+			has_variable = gls_burghers_tax_pct
+			has_variable = gls_commoner_tax_pct
+			has_variable = gls_tribesmen_tax_pct
+			has_variable = gls_nobles_nonlinear
+			has_variable = gls_clergy_nonlinear
+			has_variable = gls_burghers_nonlinear
+			has_variable = gls_commoner_nonlinear
+			has_variable = gls_tribesmen_nonlinear
+			has_variable = gls_nobles_gold
+			has_variable = gls_clergy_gold
+			has_variable = gls_burghers_gold
+			has_variable = gls_commoner_gold
+			has_variable = gls_tribesmen_gold
+			has_variable = gls_nobles_target
+			has_variable = gls_clergy_target
+			has_variable = gls_burghers_target
+			has_variable = gls_commoner_target
+			has_variable = gls_tribesmen_target
+			has_variable = gls_num_institutions
+			has_variable = gls_institution_bonus
+			has_variable = gls_avg_development
+			has_variable = gls_avg_control
+			has_variable = gls_development_multiplier
+			has_variable = gls_demand_nobles
+			has_variable = gls_demand_clergy
+			has_variable = gls_demand_burghers
+			has_variable = gls_demand_commoners
+			has_variable = gls_demand_tribesmen
+		}
+		change_variable = { name = gls_nobles_tax_pct add = 0 }
+	}
+}
+
+gls_update_location_map = {
+	# 设置地图着色所需的地点变量，对 AI 和人类国家均执行。
+	# 调用者：Pass A（所有国家，每年）
+	# root = country
+	if = {
+		limit = { num_locations > 0 }
+		every_owned_location = {
+			limit = { is_land = yes }
+			set_variable = {
+				name = gls_location_avg_scale
+				value = { add = local_average_gdp_per_capita_scale }
+			}
+			set_variable = {
+				name = gls_location_sol_weighted
+				value = {
+					value = var:gls_location_avg_scale
+					multiply = development
+				}
+			}
+		}
+	}
+	set_variable = { name = gls_map_cache_initialized value = 1 }
+}
+
+gls_accumulate_panel_stats = {
+	# 地点循环累加 + 聚合/SoL/需求计算，仅对人类国家执行。
+	# 依赖：gls_institution_bonus（由 gls_compute_panel_display 设置）。
+	# 调用者：Pass B 内年度条件块（人类，每年）
+	# root = country
+	set_variable = { name = gls_location_count value = 0 }
+	set_variable = { name = gls_location_scale_sum value = 0 }
+	set_variable = { name = gls_country_wealth value = 0 }
+	set_variable = { name = gls_development_sum value = 0 }
+	set_variable = { name = gls_control_sum value = 0 }
+
+	set_variable = { name = gls_sum_nobles_offset value = 0 }
+	set_variable = { name = gls_sum_clergy_offset value = 0 }
+	set_variable = { name = gls_sum_burghers_offset value = 0 }
+	set_variable = { name = gls_sum_commoners_offset value = 0 }
+	set_variable = { name = gls_sum_tribesmen_offset value = 0 }
+	set_variable = { name = gls_sum_all_offset value = 0 }
+
+	set_variable = { name = gls_pop_nobles value = 0 }
+	set_variable = { name = gls_pop_clergy value = 0 }
+	set_variable = { name = gls_pop_burghers value = 0 }
+	set_variable = { name = gls_pop_commoners value = 0 }
+	set_variable = { name = gls_pop_tribesmen value = 0 }
+	set_variable = { name = gls_pop_all value = 0 }
+
+	if = {
+		limit = { num_locations > 0 }
+		every_owned_location = {
+			limit = { is_land = yes }
+			save_scope_as = gls_cached_location
+
+			owner = {
+				change_variable = { name = gls_location_count add = 1 }
+				change_variable = { name = gls_location_scale_sum add = prev.var:gls_location_avg_scale }
+				change_variable = { name = gls_country_wealth add = scope:gls_cached_location.local_wealth_display }
+				change_variable = { name = gls_development_sum add = scope:gls_cached_location.development }
+				change_variable = { name = gls_control_sum add = scope:gls_cached_location.local_control }
+			}
+
+			if = {
+				limit = { num_pop_type:nobles > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_nobles_offset
+						add = {
+							value = scope:gls_cached_location.local_noble_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:nobles
+						}
+					}
+					change_variable = { name = gls_pop_nobles add = scope:gls_cached_location.num_pop_type:nobles }
+				}
+			}
+
+			if = {
+				limit = { num_pop_type:clergy > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_clergy_offset
+						add = {
+							value = scope:gls_cached_location.local_clergy_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:clergy
+						}
+					}
+					change_variable = { name = gls_pop_clergy add = scope:gls_cached_location.num_pop_type:clergy }
+				}
+			}
+
+			if = {
+				limit = { num_pop_type:burghers > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_burghers_offset
+						add = {
+							value = scope:gls_cached_location.local_burghers_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:burghers
+						}
+					}
+					change_variable = { name = gls_pop_burghers add = scope:gls_cached_location.num_pop_type:burghers }
+				}
+			}
+
+			if = {
+				limit = { local_commoner_population > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_commoners_offset
+						add = {
+							value = scope:gls_cached_location.local_commoner_demand_scale_offset
+							multiply = scope:gls_cached_location.local_commoner_population
+						}
+					}
+					change_variable = { name = gls_pop_commoners add = scope:gls_cached_location.local_commoner_population }
+				}
+			}
+
+			if = {
+				limit = { num_pop_type:tribesmen > 0 }
+				owner = {
+					change_variable = {
+						name = gls_sum_tribesmen_offset
+						add = {
+							value = scope:gls_cached_location.local_tribesmen_demand_scale_offset
+							multiply = scope:gls_cached_location.num_pop_type:tribesmen
+						}
+					}
+					change_variable = { name = gls_pop_tribesmen add = scope:gls_cached_location.num_pop_type:tribesmen }
+				}
+			}
+		}
+	}
+
+	set_variable = {
+		name = gls_pop_all
+		value = {
+			add = var:gls_pop_nobles
+			add = var:gls_pop_clergy
+			add = var:gls_pop_burghers
+			add = var:gls_pop_commoners
+			add = var:gls_pop_tribesmen
+		}
+	}
+
+	set_variable = {
+		name = gls_sum_all_offset
+		value = {
+			add = var:gls_sum_nobles_offset
+			add = var:gls_sum_clergy_offset
+			add = var:gls_sum_burghers_offset
+			add = var:gls_sum_commoners_offset
+			add = var:gls_sum_tribesmen_offset
+		}
+	}
+
+	set_variable = { name = gls_country_location_avg_scale value = 0 }
+	if = {
+		limit = { var:gls_location_count > 0 }
+		set_variable = {
+			name = gls_country_location_avg_scale
+			value = {
+				add = var:gls_location_scale_sum
+				divide = var:gls_location_count
+			}
+		}
+	}
+
+	set_variable = { name = gls_avg_development value = 0 }
+	if = {
+		limit = { var:gls_location_count > 0 }
+		set_variable = {
+			name = gls_avg_development
+			value = {
+				add = var:gls_development_sum
+				divide = var:gls_location_count
+			}
+		}
+	}
+
+	set_variable = { name = gls_avg_control value = 0 }
+	if = {
+		limit = { var:gls_location_count > 0 }
+		set_variable = {
+			name = gls_avg_control
+			value = {
+				add = var:gls_control_sum
+				divide = var:gls_location_count
+			}
+		}
+	}
+
+	# Development demand multiplier = avg_development / 10 (display + demand formula)
+	set_variable = {
+		name = gls_development_multiplier
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_avg_development > 0 }
+				add = var:gls_avg_development
+				divide = 10
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_nobles value = 0 }
+	if = {
+		limit = { var:gls_pop_nobles > 0 }
+		set_variable = {
+			name = gls_country_sol_nobles
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_nobles_offset
+					divide = var:gls_pop_nobles
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_clergy value = 0 }
+	if = {
+		limit = { var:gls_pop_clergy > 0 }
+		set_variable = {
+			name = gls_country_sol_clergy
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_clergy_offset
+					divide = var:gls_pop_clergy
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_burghers value = 0 }
+	if = {
+		limit = { var:gls_pop_burghers > 0 }
+		set_variable = {
+			name = gls_country_sol_burghers
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_burghers_offset
+					divide = var:gls_pop_burghers
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_commoners value = 0 }
+	if = {
+		limit = { var:gls_pop_commoners > 0 }
+		set_variable = {
+			name = gls_country_sol_commoners
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_commoners_offset
+					divide = var:gls_pop_commoners
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_tribesmen value = 0 }
+	if = {
+		limit = { var:gls_pop_tribesmen > 0 }
+		set_variable = {
+			name = gls_country_sol_tribesmen
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_tribesmen_offset
+					divide = var:gls_pop_tribesmen
+				}
+			}
+		}
+	}
+
+	set_variable = { name = gls_country_sol_all value = 0 }
+	if = {
+		limit = { var:gls_pop_all > 0 }
+		set_variable = {
+			name = gls_country_sol_all
+			value = {
+				add = 1
+				add = {
+					value = var:gls_sum_all_offset
+					divide = var:gls_pop_all
+				}
+			}
+		}
+	}
+
+	# Nonlinear income component per estate (= sol - 1 - savings_pressure).
+	# Derived after per-estate SOL is known; monthly cache must run first.
+	set_variable = {
+		name = gls_nobles_nonlinear
+		value = {
+			value = 0
+			if = {
+				limit = { has_variable = gls_country_sol_nobles }
+				add = var:gls_country_sol_nobles
+				subtract = 1
+				if = {
+					limit = { has_variable = gls_nobles_savings_pressure }
+					subtract = var:gls_nobles_savings_pressure
+				}
+			}
+		}
+	}
+	set_variable = {
+		name = gls_clergy_nonlinear
+		value = {
+			value = 0
+			if = {
+				limit = { has_variable = gls_country_sol_clergy }
+				add = var:gls_country_sol_clergy
+				subtract = 1
+				if = {
+					limit = { has_variable = gls_clergy_savings_pressure }
+					subtract = var:gls_clergy_savings_pressure
+				}
+			}
+		}
+	}
+	set_variable = {
+		name = gls_burghers_nonlinear
+		value = {
+			value = 0
+			if = {
+				limit = { has_variable = gls_country_sol_burghers }
+				add = var:gls_country_sol_burghers
+				subtract = 1
+				if = {
+					limit = { has_variable = gls_burghers_savings_pressure }
+					subtract = var:gls_burghers_savings_pressure
+				}
+			}
+		}
+	}
+	set_variable = {
+		name = gls_commoner_nonlinear
+		value = {
+			value = 0
+			if = {
+				limit = { has_variable = gls_country_sol_commoners }
+				add = var:gls_country_sol_commoners
+				subtract = 1
+				if = {
+					limit = { has_variable = gls_commoner_savings_pressure }
+					subtract = var:gls_commoner_savings_pressure
+				}
+			}
+		}
+	}
+	set_variable = {
+		name = gls_tribesmen_nonlinear
+		value = {
+			value = 0
+			if = {
+				limit = { has_variable = gls_country_sol_tribesmen }
+				add = var:gls_country_sol_tribesmen
+				subtract = 1
+				if = {
+					limit = { has_variable = gls_tribesmen_savings_pressure }
+					subtract = var:gls_tribesmen_savings_pressure
+				}
+			}
+		}
+	}
+
+	# Demand deviation per estate = (sol_<estate> + institution_bonus) × (avg_development / 10) - 1
+	# Stored as offset from baseline (0 = neutral); displayed as signed %.
+	set_variable = {
+		name = gls_demand_nobles
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_pop_nobles > 0 }
+				add = var:gls_country_sol_nobles
+				if = {
+					limit = { has_variable = gls_institution_bonus }
+					add = var:gls_institution_bonus
+				}
+				if = {
+					limit = { var:gls_avg_development > 0 }
+					multiply = var:gls_avg_development
+					divide = 10
+				}
+				subtract = 1
+			}
+		}
+	}
+	set_variable = {
+		name = gls_demand_clergy
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_pop_clergy > 0 }
+				add = var:gls_country_sol_clergy
+				if = {
+					limit = { has_variable = gls_institution_bonus }
+					add = var:gls_institution_bonus
+				}
+				if = {
+					limit = { var:gls_avg_development > 0 }
+					multiply = var:gls_avg_development
+					divide = 10
+				}
+				subtract = 1
+			}
+		}
+	}
+	set_variable = {
+		name = gls_demand_burghers
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_pop_burghers > 0 }
+				add = var:gls_country_sol_burghers
+				if = {
+					limit = { has_variable = gls_institution_bonus }
+					add = var:gls_institution_bonus
+				}
+				if = {
+					limit = { var:gls_avg_development > 0 }
+					multiply = var:gls_avg_development
+					divide = 10
+				}
+				subtract = 1
+			}
+		}
+	}
+	set_variable = {
+		name = gls_demand_commoners
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_pop_commoners > 0 }
+				add = var:gls_country_sol_commoners
+				if = {
+					limit = { has_variable = gls_institution_bonus }
+					add = var:gls_institution_bonus
+				}
+				if = {
+					limit = { var:gls_avg_development > 0 }
+					multiply = var:gls_avg_development
+					divide = 10
+				}
+				subtract = 1
+			}
+		}
+	}
+	set_variable = {
+		name = gls_demand_tribesmen
+		value = {
+			value = 0
+			if = {
+				limit = { var:gls_pop_tribesmen > 0 }
+				add = var:gls_country_sol_tribesmen
+				if = {
+					limit = { has_variable = gls_institution_bonus }
+					add = var:gls_institution_bonus
+				}
+				if = {
+					limit = { var:gls_avg_development > 0 }
+					multiply = var:gls_avg_development
+					divide = 10
+				}
+				subtract = 1
+			}
+		}
+	}
+
+	# Pop counts stored as raw game units; GUI appends "K" for display.
+}
+
+gls_full_refresh_country = {
+	# 单国完整刷新：存款压力 + 面板展示 + 地图地点变量 + 面板统计累加。
+	# 调用者：gls_recalculate_global_living_standard（on_start、决议手动触发）
+	# root = country
+	gls_compute_savings_pressure = yes
+	gls_compute_panel_display = yes
+	gls_update_location_map = yes
+	gls_accumulate_panel_stats = yes
+}
+
+gls_recalculate_global_living_standard = {
+	every_country = {
+		if = {
+			limit = { total_population > 0 }
+			gls_full_refresh_country = yes
+		}
+	}
+}

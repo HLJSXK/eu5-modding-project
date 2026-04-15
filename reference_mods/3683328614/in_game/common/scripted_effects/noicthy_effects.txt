@@ -1,0 +1,290 @@
+﻿# War Momentum
+# "noicthy" prefix = "No One Is Coming To Help You", the mod's original name. Kept for save compatibility.
+#
+# Penalizes nations losing a war with reduced fort defense and increased war exhaustion.
+#
+# Systems:
+#   Military Strength  Loss from wartime peak drives fort defense and war exhaustion penalties.
+#                      army = military_strength - max_manpower (regulars + mercs + levies)
+#                      manpower = current reserves, capped at 4x regular_army_size.
+#                      Subjects combine with overlord.
+#   War Exhaustion     Trapped participants (limited diplomacy subjects, coalition non-leaders) get half penalty.
+#   Diplomatic Pressure  War leaders gain/lose WE from allies. Subjects always add pressure.
+#                        Coalition members: above 5 WE add pressure, below 5 reduce leader's WE.
+#                        Weighted by partner's economic significance relative to leader.
+#   Occupation         Percentage of territory under enemy control (forts 5x weight).
+#                      Counted monthly via every_owned_location (controller != owner).
+#   Auto-conquest      Nations with auto_conquer modifiers annex instead of occupying.
+#                      Tagged on_location_changed_owner, recounted monthly from enemy locations.
+#                      Merged into regular fort/non-fort counts. Re-occupied = no penalty.
+#                      Blanket cleanup on_ending_war. Annexation cleans stale tags.
+#   Civil War          Territory ratio between sides: 1 - (your_weight / enemy_weight)
+#   Capital            Resilience offsets half the penalty. Capital fallen = flat -25% fort defense.
+#
+# Fort defense = army loss + max(occupation, civil war). War exhaustion = same formula.
+# Runs monthly via monthly_country_pulse for countries at war (~30 out of hundreds).
+
+# Bump this when changes require a reinit on existing saves.
+@noicthy_version = 201 # 2.0.1
+
+# Entry point: called once per month for each country at war (or with residual state).
+# At war: update all systems. At peace: clean up all variables and modifiers.
+
+noicthy_monthly_update = {
+	if = {
+		limit = { at_war = yes }
+
+		# Snapshot engine values once. Local variables are the single source of truth
+		# for all sub-effects. Engine values must not be read again after this point.
+		set_local_variable = { name = noicthy_mil_strength value = military_strength }
+		set_local_variable = { name = noicthy_reg_capacity value = regular_army_size }
+		set_local_variable = { name = noicthy_raw_manpower value = manpower }
+		set_local_variable = { name = noicthy_max_manpower value = max_manpower }
+
+		# Two components: Army Strength and Manpower.
+		# Army Strength = military_strength - max_manpower (regulars + levies + mercs combined).
+		# military_strength includes max manpower capacity, not current reserves,
+		# so we subtract max_manpower to isolate actual combat power.
+		# Manpower is capped at 4x regular_army_size (excess reserves beyond what can
+		# realistically reinforce existing troops don't reduce the penalty).
+		set_local_variable = {
+			name = noicthy_effective_army
+
+			value = {
+				add = local_var:noicthy_mil_strength
+				subtract = local_var:noicthy_max_manpower
+			}
+		}
+		set_local_variable = {
+			name = noicthy_manpower_cap
+			value = { add = local_var:noicthy_reg_capacity multiply = 4 }
+		}
+		set_local_variable = {
+			name = noicthy_effective_manpower
+			value = local_var:noicthy_raw_manpower
+		}
+		if = {
+			limit = { local_var:noicthy_raw_manpower > local_var:noicthy_manpower_cap }
+
+			set_local_variable = {
+				name = noicthy_effective_manpower
+				value = local_var:noicthy_manpower_cap
+			}
+		}
+
+		# Effective strength: army + capped manpower.
+		set_local_variable = {
+			name = noicthy_effective_strength
+
+			value = {
+				add = local_var:noicthy_effective_army
+				add = local_var:noicthy_effective_manpower
+			}
+		}
+
+		noicthy_update_peaks = yes
+		noicthy_update_exhaustion = yes
+		noicthy_update_army = yes
+		noicthy_update_pressure = yes
+		noicthy_update_territory = yes
+	}
+	else = {
+		noicthy_cleanup = yes
+	}
+}
+
+# Track peak fielded army and military strength.
+# Cost: scalar math only, no iteration. Negligible.
+
+noicthy_update_peaks = {
+	# Peak military strength (ratchets upward, used for both fort defense and war exhaustion)
+	# Uses noicthy_effective_strength (army + capped manpower) set by noicthy_monthly_update.
+	if = {
+		limit = {
+			NOT = {
+				has_variable = noicthy_potential_peak
+			}
+		}
+
+		set_variable = {
+			name = noicthy_potential_peak
+			value = local_var:noicthy_effective_strength
+		}
+	}
+	if = {
+		limit = { local_var:noicthy_effective_strength > var:noicthy_potential_peak }
+
+		set_variable = {
+			name = noicthy_potential_peak
+			value = local_var:noicthy_effective_strength
+		}
+	}
+
+	# Per-component peaks (ratchet upward, for GUI display)
+	if = {
+		limit = {
+			NOT = {
+				has_variable = noicthy_army_peak
+			}
+		}
+
+		set_variable = {
+			name = noicthy_army_peak
+			value = local_var:noicthy_effective_army
+		}
+	}
+	if = {
+		limit = { local_var:noicthy_effective_army > var:noicthy_army_peak }
+
+		set_variable = {
+			name = noicthy_army_peak
+			value = local_var:noicthy_effective_army
+		}
+	}
+
+	if = {
+		limit = {
+			NOT = {
+				has_variable = noicthy_manpower_peak
+			}
+		}
+
+		set_variable = {
+			name = noicthy_manpower_peak
+			value = local_var:noicthy_effective_manpower
+		}
+	}
+	if = {
+		limit = { local_var:noicthy_effective_manpower > var:noicthy_manpower_peak }
+
+		set_variable = {
+			name = noicthy_manpower_peak
+			value = local_var:noicthy_effective_manpower
+		}
+	}
+}
+
+# Fort defense and war exhaustion base: penalize based on military strength lost from peak.
+# Subjects fighting alongside their overlord combine military strength,
+# so the overlord's military presence backs the subject's forts.
+# Countries with no military strength are not penalized.
+# Cost: ~30 variable sets + 12 map writes for self. Subject branch adds one overlord
+# scope lookup and similar work. No iteration. Bulk is GUI display variable population.
+
+noicthy_update_army = {
+	noicthy_calculate_army_penalty = yes
+
+	# Display (player only): populate variable maps for tooltip rendering.
+	if = {
+		limit = { is_ai = no }
+		save_temporary_scope_as = noicthy_army_self
+		noicthy_display_army_components = yes
+		noicthy_display_army_losses = yes
+	}
+}
+
+# Remove all war momentum state when a country leaves all wars.
+# Runs once on the first monthly tick after peace.
+
+noicthy_cleanup = {
+	# --- Gameplay state ---
+	remove_variable = noicthy_war_momentum_army_size   # military strength loss ratio (0-1)
+	remove_variable = noicthy_potential_peak            # peak effective strength during war
+	remove_variable = noicthy_army_peak                 # peak army strength component
+	remove_variable = noicthy_manpower_peak             # peak manpower component (capped)
+	remove_variable = noicthy_was_auto_conquered        # flag: lost territory to auto-conquer
+
+	# --- Country modifiers ---
+	remove_country_modifier = noicthy_war_momentum_army
+	remove_country_modifier = noicthy_war_momentum_army_exhaustion
+	remove_country_modifier = noicthy_war_momentum_diplomatic_pressure
+	remove_country_modifier = noicthy_war_momentum_occupation
+	remove_country_modifier = noicthy_war_momentum_capital_fallen
+
+	capital ?= {
+		remove_location_modifier = noicthy_war_momentum_capital
+	}
+
+	# --- GUI display variables ---
+	remove_variable = noicthy_display_occupied_forts
+	remove_variable = noicthy_display_total_forts
+	remove_variable = noicthy_display_occupied_unfortified_locations
+	remove_variable = noicthy_display_total_unfortified_locations
+	remove_variable = noicthy_display_occupation_fort_defense
+	remove_variable = noicthy_display_occupation_war_exhaustion
+	remove_variable = noicthy_display_occupied_forts_fort_defense
+	remove_variable = noicthy_display_occupied_forts_war_exhaustion
+	remove_variable = noicthy_display_occupied_locations_fort_defense
+	remove_variable = noicthy_display_occupied_locations_war_exhaustion
+	remove_variable = noicthy_display_civil_war_penalty
+	remove_variable = noicthy_display_civil_war_crown_forts
+	remove_variable = noicthy_display_civil_war_crown_locs
+	remove_variable = noicthy_display_civil_war_total_forts
+	remove_variable = noicthy_display_civil_war_total_locs
+	remove_variable = noicthy_display_civil_war_pretender_forts
+	remove_variable = noicthy_display_civil_war_pretender_locs
+	remove_variable = noicthy_display_civil_war_is_rebel
+	remove_variable = noicthy_display_civil_war_forts_fort_defense
+	remove_variable = noicthy_display_civil_war_forts_war_exhaustion
+	remove_variable = noicthy_display_civil_war_locs_fort_defense
+	remove_variable = noicthy_display_civil_war_locs_war_exhaustion
+	remove_variable = noicthy_display_capital_resilience
+	remove_variable = noicthy_display_has_pressure
+	remove_variable = noicthy_display_pressure
+
+	# --- GUI variable maps ---
+	clear_variable_map = noicthy_army_breakdown
+	clear_variable_map = noicthy_army_peak_breakdown
+	clear_variable_map = noicthy_army_strength_map
+	clear_variable_map = noicthy_army_strength_peak_map
+	clear_variable_map = noicthy_army_we_map
+	clear_variable_map = noicthy_army_fort_def_map
+	clear_variable_map = noicthy_manpower_map
+	clear_variable_map = noicthy_manpower_peak_map
+	clear_variable_map = noicthy_manpower_we_map
+	clear_variable_map = noicthy_manpower_fort_def_map
+	clear_variable_map = noicthy_pressure_map
+	clear_variable_map = noicthy_pressure_visible_map
+}
+
+# One-time init and version migration.
+# Cleans orphaned location modifiers and auto-conquest tags globally.
+# Sets Bouvet Island version marker. Guarded so only one country triggers per tick.
+
+noicthy_init = {
+	set_global_variable = {
+		name = noicthy_rebuilding
+		value = 1
+	}
+
+	# Clean orphaned capital resilience modifiers and stale auto-conquest transfer tags
+	every_ownable_location = {
+		limit = {
+			OR = {
+				has_location_modifier = noicthy_war_momentum_capital
+				has_variable = noicthy_original_owner
+			}
+		}
+
+		remove_location_modifier = noicthy_war_momentum_capital
+		remove_variable = noicthy_original_owner
+	}
+
+	# Reset peaks for all countries at war so they rebuild from current (correct) values.
+	# Prevents stale peaks from prior versions causing incorrect penalty calculations.
+	every_country = {
+		limit = { has_variable = noicthy_potential_peak }
+		remove_variable = noicthy_potential_peak
+		remove_variable = noicthy_army_peak
+		remove_variable = noicthy_manpower_peak
+	}
+
+	# Set version marker on Bouvet Island
+	location:bouvet_island = {
+		remove_location_modifier = noicthy_active
+		add_location_modifier = { modifier = noicthy_active days = -1 }
+		set_variable = { name = noicthy_version value = @noicthy_version }
+	}
+
+	remove_global_variable = noicthy_rebuilding
+}

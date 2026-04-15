@@ -1,0 +1,398 @@
+﻿# War Momentum - Override of vanilla WarExhaustionTooltip
+# Adds War Momentum breakdowns: military strength, occupation, fort defense,
+# and diplomatic pressure.
+# File prefixed aaa_ to load before vanilla.
+
+# Critically important note from the modder: I hate gui modding so much.
+
+template WarExhaustionTooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" { text = "WAR_EXHAUSTION_TOOLTIP_T" }
+
+		blockoverride "concept_link" { text = "[war_exhaustion|e]" }
+
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "gfx/interface/icons/resources/war_exhaustion.dds"
+			}
+		}
+
+		blockoverride "title_button" {
+			hint_button = {
+				action_tooltip = {
+					title = "OPEN_HINT"
+					on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_war_exhaustion')]"
+				}
+			}
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipScrolledStringPairList = {
+				block "content_datacontext" {  }
+
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 150 }
+					minimumsize = { -1 30 }
+				}
+				blockoverride "block_title" { text = "WAR_EXHAUSTION_TT_TEXT" }
+				textcontext = "[Country.GetCurrencyTooltipDescription('war_exhaustion')]"
+			}
+			TooltipScrolledStringPairList = {
+				block "content_datacontext" {  }
+				block "change_visibility" {  }
+
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 300 }
+					minimumsize = { -1 30 }
+				}
+				blockoverride "block_title" { text = "WAR_EXHAUSTION_TOOLTIP" }
+				textcontext = "[Country.GetDescriptionFor('monthly_war_exhaustion')]"
+			}
+
+			TooltipTextBlock = { blockoverride "text" { text = "MAX_WAR_EXHAUSTION_TT_TEXT" } }
+
+			### War Momentum (scrollable outer container)
+
+			TooltipListScrollArea = {
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 375 }
+					minimumsize = { -1 30 }
+				}
+
+				blockoverride "scrollarea_content" {
+					vbox = {
+						set_parent_dimension_to_minimum = height
+						layoutpolicy_horizontal = expanding
+
+						### War Momentum: Capital
+
+						TooltipListBase = {
+							visible = "[Country.HasModifier('noicthy_war_momentum_capital_fallen')]"
+
+							blockoverride "block_title" { text = "NOICTHY_CAPITAL_FALLEN_HEADER" }
+
+							TooltipManualTableField = {
+								text_single = { text = "NOICTHY_FORT_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = { raw_text = "#R -25%#!" }
+							}
+						}
+
+						TooltipListBase = {
+							visible = "[And(Not(Country.HasModifier('noicthy_war_momentum_capital_fallen')), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_capital_resilience').GetValue, '(CFixedPoint)0'))]"
+
+							blockoverride "block_title" { text = "NOICTHY_CAPITAL_RESILIENCE_HEADER" }
+
+							TooltipManualTableField = {
+								text_single = { text = "NOICTHY_FORT_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G +[Country.MakeScope.GetVariable('noicthy_display_capital_resilience').GetValue|%0]#!"
+								}
+							}
+						}
+
+						### War Momentum: Military Strength
+
+						TooltipListBase = {
+							visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_potential_peak').GetValue, '(CFixedPoint)0')]"
+
+							blockoverride "block_title" { text = "NOICTHY_POTENTIAL_BREAKDOWN_HEADER" }
+
+							# Per-component lines with current/peak per country
+							vbox = {
+								using = layoutpolicy_expanding
+								datamodel = "[Country.MakeScope.GetMapKeys('noicthy_army_breakdown')]"
+
+								item = {
+									vbox = {
+										using = layoutpolicy_expanding
+										datacontext = "[Scope.GetCountry]"
+
+										# Army Strength (regulars + levies combined)
+										TooltipManualTableField = {
+											visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_peak_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0')]"
+											text_single = { raw_text = "[Country.GetAdjective] Army" }
+											expand = {  }
+
+											text_single = {
+												visible = "[Not(EqualTo_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_peak_map', Scope.GetCountry.MakeScope).GetValue))]"
+												raw_text = "#R [Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_map', Scope.GetCountry.MakeScope).GetValue|0]#!#W /[Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_peak_map', Scope.GetCountry.MakeScope).GetValue|0]#! (#R +[Country.MakeScope.GetVariableFromVariableMap('noicthy_army_we_map', Scope.GetCountry.MakeScope).GetValue|2]@war_exhaustion!#! / #R -[Country.MakeScope.GetVariableFromVariableMap('noicthy_army_fort_def_map', Scope.GetCountry.MakeScope).GetValue|%0]#!)"
+											}
+											text_single = {
+												visible = "[EqualTo_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_peak_map', Scope.GetCountry.MakeScope).GetValue)]"
+												raw_text = "[Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_map', Scope.GetCountry.MakeScope).GetValue|0]/[Country.MakeScope.GetVariableFromVariableMap('noicthy_army_strength_peak_map', Scope.GetCountry.MakeScope).GetValue|0]"
+											}
+										}
+
+										# Manpower (shows raw manpower / capped peak; peak in red when cap is active)
+										TooltipManualTableField = {
+											visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0')]"
+											text_single = { raw_text = "[Country.GetAdjective] Manpower" }
+											expand = {  }
+
+											# Capped: current exceeds peak (manpower above 4x regulars)
+											text_single = {
+												visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue)]"
+												raw_text = "[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue|0]/#R [Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue|0]#!"
+											}
+
+											# Losses: current below peak
+											text_single = {
+												visible = "[And(Not(EqualTo_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue)), Not(GreaterThan_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue)))]"
+												raw_text = "#R [Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue|0]#!#W /[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue|0]#! (#R +[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_we_map', Scope.GetCountry.MakeScope).GetValue|2]@war_exhaustion!#! / #R -[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_fort_def_map', Scope.GetCountry.MakeScope).GetValue|%0]#!)"
+											}
+
+											# No change: current equals peak
+											text_single = {
+												visible = "[EqualTo_CFixedPoint(Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue, Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue)]"
+												raw_text = "[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_map', Scope.GetCountry.MakeScope).GetValue|0]/[Country.MakeScope.GetVariableFromVariableMap('noicthy_manpower_peak_map', Scope.GetCountry.MakeScope).GetValue|0]"
+											}
+										}
+									}
+								}
+							}
+
+							# Summary (computed GUI-side from noicthy_war_momentum_army_size * modifier base)
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_war_momentum_army_size').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_POTENTIAL_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R +[Multiply_CFixedPoint(Country.MakeScope.GetVariable('noicthy_war_momentum_army_size').GetValue, '(CFixedPoint)0.5')|2]@war_exhaustion!#!"
+								}
+							}
+
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_war_momentum_army_size').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_FORT_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R -[Multiply_CFixedPoint(Country.MakeScope.GetVariable('noicthy_war_momentum_army_size').GetValue, '(CFixedPoint)0.5')|%0]#!"
+								}
+							}
+						}
+
+						### War Momentum: Occupation
+						TooltipListBase = {
+							visible = "[Or(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_occupation_fort_defense').GetValue, '(CFixedPoint)0'), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'))]"
+
+							blockoverride "block_title" { text = "NOICTHY_OCCUPATION_HEADER" }
+
+							# Only show fort/location lines when there are occupied ones
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_occupied_forts').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_OCCUPATION_FORTS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_occupied_forts').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_total_forts').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_occupied_forts_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_occupied_forts_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_occupied_unfortified_locations').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_OCCUPATION_LOCATIONS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_occupied_unfortified_locations').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_total_unfortified_locations').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_occupied_locations_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_occupied_locations_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Civil war territory: show only YOUR side's lines.
+							# Effect sign determines colors: positive = losing (red), negative = winning (green).
+							# Crown sees crown lines, rebel sees pretender lines.
+
+							# Crown forts: losing (red)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), Not(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0'))), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue, '(CFixedPoint)0'))]"
+								text_single = { text = "NOICTHY_CW_CROWN_FORTS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_civil_war_crown_forts').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_forts').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Crown forts: winning (green)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), Not(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0'))), Not(GreaterThanOrEqualTo_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue, '(CFixedPoint)0')))]"
+								text_single = { text = "NOICTHY_CW_CROWN_FORTS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_crown_forts').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_forts').GetValue|0]#! (#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue|%0]#! #G [Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Crown locs: losing (red)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), Not(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0'))), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue, '(CFixedPoint)0'))]"
+								text_single = { text = "NOICTHY_CW_CROWN_LOCS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_civil_war_crown_locs').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_locs').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Crown locs: winning (green)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), Not(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0'))), Not(GreaterThanOrEqualTo_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue, '(CFixedPoint)0')))]"
+								text_single = { text = "NOICTHY_CW_CROWN_LOCS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_crown_locs').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_locs').GetValue|0]#! (#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue|%0]#! #G [Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Pretender forts: losing (red)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0')), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue, '(CFixedPoint)0'))]"
+								text_single = { text = "NOICTHY_CW_PRETENDER_FORTS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_civil_war_pretender_forts').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_forts').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Pretender forts: winning (green)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0')), Not(GreaterThanOrEqualTo_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue, '(CFixedPoint)0')))]"
+								text_single = { text = "NOICTHY_CW_PRETENDER_FORTS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_pretender_forts').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_forts').GetValue|0]#! (#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_fort_defense').GetValue|%0]#! #G [Country.MakeScope.GetVariable('noicthy_display_civil_war_forts_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Pretender locs: losing (red)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0')), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue, '(CFixedPoint)0'))]"
+								text_single = { text = "NOICTHY_CW_PRETENDER_LOCS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R [Country.MakeScope.GetVariable('noicthy_display_civil_war_pretender_locs').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_locs').GetValue|0]#! (#R -[Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue|%0]#! #R +[Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							# Pretender locs: winning (green)
+							TooltipManualTableField = {
+								visible = "[And(And(GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_penalty').GetValue, '(CFixedPoint)0'), GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_is_rebel').GetValue, '(CFixedPoint)0')), Not(GreaterThanOrEqualTo_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue, '(CFixedPoint)0')))]"
+								text_single = { text = "NOICTHY_CW_PRETENDER_LOCS" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_pretender_locs').GetValue|0]#!#W /[Country.MakeScope.GetVariable('noicthy_display_civil_war_total_locs').GetValue|0]#! (#G [Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_fort_defense').GetValue|%0]#! #G [Country.MakeScope.GetVariable('noicthy_display_civil_war_locs_war_exhaustion').GetValue|2]@war_exhaustion!#!)"
+								}
+							}
+
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_occupation_fort_defense').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_OCCUPATION_DEFENSE_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R -[Country.MakeScope.GetVariable('noicthy_display_occupation_fort_defense').GetValue|%0]#!"
+								}
+							}
+
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_occupation_war_exhaustion').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_OCCUPATION_EXHAUSTION_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R +[Country.MakeScope.GetVariable('noicthy_display_occupation_war_exhaustion').GetValue|2]@war_exhaustion!#!"
+								}
+							}
+						}
+
+						### War Momentum: Diplomatic Pressure
+
+						TooltipListBase = {
+							visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_has_pressure').GetValue, '(CFixedPoint)0')]"
+
+							blockoverride "block_title" { text = "NOICTHY_PRESSURE_BREAKDOWN_HEADER" }
+
+							TooltipListScrollArea = {
+								blockoverride "block_scrollarea" {
+									maximumsize = { -1 150 }
+									minimumsize = { -1 30 }
+								}
+
+								blockoverride "scrollarea_content" {
+									vbox = {
+										set_parent_dimension_to_minimum = height
+										layoutpolicy_horizontal = expanding
+										datamodel = "[Country.MakeScope.GetMapKeys('noicthy_pressure_map')]"
+
+										item = {
+											vbox = {
+												using = layoutpolicy_expanding
+
+												# Positive pressure (frustrated allies)
+												TooltipManualTableField = {
+													visible = "[And(Not(EqualTo_CFixedPoint(InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_visible_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0')), GreaterThan_CFixedPoint(InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0'))]"
+													datacontext = "[Scope.GetCountry]"
+													text_single = { raw_text = "[Country.GetName]" }
+													expand = {  }
+
+													text_single = {
+														raw_text = "#R +[InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_map', Scope.GetCountry.MakeScope).GetValue|3]@war_exhaustion!#!"
+													}
+												}
+
+												# Negative pressure (fresh allies bolster resolve)
+												TooltipManualTableField = {
+													visible = "[And(Not(EqualTo_CFixedPoint(InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_visible_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0')), Not(GreaterThanOrEqualTo_CFixedPoint(InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_map', Scope.GetCountry.MakeScope).GetValue, '(CFixedPoint)0')))]"
+													datacontext = "[Scope.GetCountry]"
+													text_single = { raw_text = "[Country.GetName]" }
+													expand = {  }
+
+													text_single = {
+														raw_text = "#G [InGameTopbar.GetPlayer.MakeScope.GetVariableFromVariableMap('noicthy_pressure_map', Scope.GetCountry.MakeScope).GetValue|3]@war_exhaustion!#!"
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
+							# Summary (positive = pressure, negative = support)
+							TooltipManualTableField = {
+								visible = "[GreaterThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_pressure').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_PRESSURE_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#R +[Country.MakeScope.GetVariable('noicthy_display_pressure').GetValue|3]@war_exhaustion!#!"
+								}
+							}
+							TooltipManualTableField = {
+								visible = "[LessThan_CFixedPoint(Country.MakeScope.GetVariable('noicthy_display_pressure').GetValue, '(CFixedPoint)0')]"
+								text_single = { text = "NOICTHY_PRESSURE_TOTAL_LABEL" }
+								expand = {  }
+
+								text_single = {
+									raw_text = "#G [Country.MakeScope.GetVariable('noicthy_display_pressure').GetValue|3]@war_exhaustion!#!"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

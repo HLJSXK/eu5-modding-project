@@ -1,0 +1,164 @@
+﻿# War Momentum - On Action Implementations
+# Referenced by noicthy_hardcoded_on_actions.txt
+
+@noicthy_version = 201 # 2.0.1
+
+### Annexation and Capital
+
+# Clean capital modifier and auto-conquest flag when a country is annexed.
+# Also removes stale auto-conquest tags on the annexer's locations that referenced the annexed country.
+# root = annexing country; scope:target = country being annexed
+
+noicthy_on_annex = {
+	effect = {
+		scope:target = {
+			capital ?= { remove_location_modifier = noicthy_war_momentum_capital }
+			remove_variable = noicthy_was_auto_conquered
+		}
+
+		# Clean all auto-conquest tags on the annexer's locations.
+		# Targets tags referencing the annexed country, but also cleans any stale tags
+		# from previously destroyed countries to prevent invalid reference errors.
+		every_owned_location = {
+			limit = { has_variable = noicthy_original_owner }
+			remove_variable = noicthy_original_owner
+		}
+	}
+}
+
+# Strip capital resilience modifier from the old capital when capital moves.
+# root = country; scope:old_capital = old location; scope:new_capital = new location
+
+noicthy_on_capital_moved = {
+	effect = {
+		scope:old_capital ?= { remove_location_modifier = noicthy_war_momentum_capital }
+	}
+}
+
+### Auto-Conquest
+
+# Tag a location when an auto_conquer nation takes it during war.
+# The tag (noicthy_original_owner) stores who owned the location before conquest.
+# Monthly recount in noicthy_apply_occupation finds these tags on enemy locations
+# and merges them into the regular occupation counts.
+# Mid-war ownership transfers (recovery, third party) don't need handlers because
+# the monthly recount only finds tags on current war enemies.
+# root = location; scope:winner = new owner; scope:loser = previous owner
+
+noicthy_on_auto_conquest = {
+	trigger = {
+		exists = scope:loser
+		exists = scope:winner
+		scope:winner = {
+			OR = {
+				modifier:auto_conquer_at_war = yes
+				modifier:auto_conquer_different_religion_at_war = yes
+			}
+
+			is_at_war_with = scope:loser
+		}
+	}
+
+	effect = {
+		set_variable = { name = noicthy_original_owner value = scope:loser }
+
+		scope:loser = {
+			set_variable = { name = noicthy_was_auto_conquered value = 1 }
+		}
+	}
+}
+
+### War End
+
+# Blanket cleanup of all auto-conquest tags on both sides' locations.
+# Prevents stale tags from carrying into future wars with the same enemy.
+# Over-cleans if a country is in two concurrent auto-conquest wars (effectively impossible).
+# root = country (fires for both sides); scope:winner, scope:loser, scope:war
+
+noicthy_on_war_end_cleanup = {
+	effect = {
+		scope:winner = {
+			every_owned_location = {
+				limit = { has_variable = noicthy_original_owner }
+				remove_variable = noicthy_original_owner
+			}
+
+			remove_variable = noicthy_was_auto_conquered
+		}
+
+		scope:loser = {
+			every_owned_location = {
+				limit = { has_variable = noicthy_original_owner }
+				remove_variable = noicthy_original_owner
+			}
+
+			remove_variable = noicthy_was_auto_conquered
+		}
+	}
+}
+
+### Bootstrap and Monthly Pulse
+
+# Initialize war momentum for countries already at war on game start.
+# Player assignment may not be finalized yet, so is_ai = no fails for everyone.
+# Runs the normal update then forces display population for all countries
+# so whichever one the player controls has data immediately.
+
+noicthy_on_game_start = {
+	effect = {
+		every_country = {
+			limit = { at_war = yes }
+			noicthy_monthly_update = yes
+
+			save_temporary_scope_as = noicthy_army_self
+
+			noicthy_display_army_components = yes
+			noicthy_display_army_losses = yes
+		}
+	}
+}
+
+# Version check using Bouvet Island (non-ownable location) as a persistent marker.
+# Executes rebuild once per game load when the mod is first installed or updated.
+# Modifiers depend on the mod existing (unlike variables), so removing and re-adding
+# the mod triggers a rebuild. Version comparison catches mod updates.
+
+noicthy_init_pulse = {
+	trigger = {
+		NOT = {
+			has_global_variable = noicthy_rebuilding
+		}
+
+		location:bouvet_island = {
+			OR = {
+				NOT = {
+					has_location_modifier = noicthy_active
+				}
+
+				AND = {
+					has_variable = noicthy_version
+					var:noicthy_version < @noicthy_version
+				}
+			}
+		}
+	}
+
+	effect = {
+		noicthy_init = yes
+	}
+}
+
+# Monthly update: fires for countries at war or with residual state needing cleanup.
+
+noicthy_monthly_pulse = {
+	trigger = {
+		OR = {
+			at_war = yes
+			has_variable = noicthy_war_momentum_army_size
+		}
+	}
+
+	effect = {
+		noicthy_monthly_update = yes
+	}
+}
