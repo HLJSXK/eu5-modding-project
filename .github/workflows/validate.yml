@@ -1,0 +1,47 @@
+name: EU5 Script Validation
+
+# Run the static validator on every push and pull request that touches
+# mod source files, scripts, or localisation.
+on:
+  push:
+    paths:
+      - "src/**"
+      - "tools/validator/**"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tools/validator/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Static analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run EU5 validator (human-readable)
+        working-directory: tools/validator
+        run: python eu5_validator.py --src ../../src
+
+      - name: Run EU5 validator (JSON report)
+        if: always()
+        working-directory: tools/validator
+        run: python eu5_validator.py --src ../../src --json > /tmp/validation_report.json || true
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: /tmp/validation_report.json
+          retention-days: 14

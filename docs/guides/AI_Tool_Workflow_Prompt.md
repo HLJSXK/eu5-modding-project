@@ -27,6 +27,7 @@ You MUST go directly to Step 2 or Step 3 before writing or modifying any code:
 | Any `scripted_trigger` or `scripted_effect` not defined in this mod | Vanilla names change between patches |
 | Localization key format rules (YAML encoding, quote characters) | PDX parser rejects non-ASCII quotes; encoding errors cascade silently |
 | GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.) | Expression language is undocumented; wrong patterns produce no visible error |
+| `auto_modifier` blocks — all structural keys and modifier effect names | `auto_modifier` is an EU5-specific feature; structural keys and modifier names must be read from `reference_official_defines/types/auto_modifiers.txt` before writing |
 
 ### Declarative Verification Requirement
 
@@ -47,6 +48,7 @@ Then stop and ask the user for guidance. Do NOT guess.
 - NEVER hallucinate or guess Paradox script syntax.
 - If you cannot verify a command using the steps above, explicitly tell the user: "I cannot verify this syntax, please check the official wiki or logs."
 - If a syntax pattern causes bugs, do NOT remove the feature as a first response. You MUST follow the 3-step rule in order (Direct Edit -> reference_official_defines/ -> reference_game_files/) and replace it with a verified working syntax.
+- After generating or editing any `.txt` or `.yml` file, remind the user to run `python tools/validator/eu5_validator.py` to verify the result without loading the game.
 ```
 
 ## Path Mapping In This Repository
@@ -62,6 +64,23 @@ Then stop and ask the user for guidance. Do NOT guess.
 - Removal or fallback simplification is only allowed when:
   - the syntax cannot be verified in `reference_official_defines/`, `reference_game_files/` and `reference_mods/`, and
   - the tool explicitly reports this uncertainty to the user.
+
+## Automated Validation (No Game Load Required)
+
+Run the static validator after every edit to catch errors before pushing:
+
+```bash
+python tools/validator/eu5_validator.py        # human-readable output
+python tools/validator/eu5_validator.py --json # JSON for CI / editor
+```
+
+Fix all **errors** before committing. When a new AI violation pattern is discovered:
+
+1. Identify which Mandatory Reference Category was breached (or add a new row to the table below).
+2. Run `python tools/doc_updater/update_knowledge.py` to append to the Documented Violations table interactively.
+3. Commit the updated guide so future agent sessions inherit the new rule.
+
+Full workflow guide: `docs/guides/Auto_Testing_Workflow.md`
 
 ## Documented Violations (Learning Record)
 

@@ -24,6 +24,7 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - Any `scripted_trigger` or `scripted_effect` not defined in this mod
 - Localization YAML encoding and quote character rules
 - GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.)
+- `auto_modifier` blocks: all structural keys (`category`, `type`, `icon`, `requires_real`, `potential_trigger`, `scales_with`, `limit`, `hide_effects`, `alert`) and every modifier effect name inside the block — Reference: `reference_official_defines/types/auto_modifiers.txt`
 
 ## Declarative Verification Requirement
 
@@ -40,6 +41,22 @@ Then stop. Do not guess.
 ## Bug Fix Rule
 
 When a script/GUI pattern causes a bug: verify and replace with correct syntax. Do NOT remove the feature. Removal is only allowed if Steps 2 and 3 both fail to find any reference, and the user is explicitly told.
+
+## Automated Validation
+
+Before committing any script changes, run the static validator (no game load required):
+
+```bash
+python tools/validator/eu5_validator.py
+```
+
+Fix all **errors** before committing. Address **warnings** when time permits.
+
+If you discover a new AI error pattern during development:
+
+1. Note which Mandatory Reference Category was violated (or add a new one above).
+2. Run `python tools/doc_updater/update_knowledge.py` to record the violation.
+3. Commit the updated `docs/guides/AI_Tool_Workflow_Prompt.md`.
 
 ## Path Mapping
 
