@@ -1,0 +1,31 @@
+# EU5 file encoding requirements.
+# EU5's Jomini parser requires UTF-8 with BOM for script and localization files.
+# Used by review.py for deterministic encoding validation.
+
+encoding_rules:
+
+  required_encoding: "utf-8-bom"
+
+  file_extensions:
+    ".yml":
+      encoding: "utf-8-bom"
+      bom_bytes: "EF BB BF"
+      notes: "Localization files. Missing BOM causes silent parse failures and missing text."
+    ".txt":
+      encoding: "utf-8-bom"
+      bom_bytes: "EF BB BF"
+      notes: "Script files (modifiers, triggers, effects, events). Missing BOM causes load errors."
+
+  enforcement_script: "scripts/ensure-utf8bom.ps1"
+  enforcement_usage: ".\\scripts\\ensure-utf8bom.ps1  OR  .\\scripts\\ensure-utf8bom.ps1 -Path src\\stable -DryRun"
+
+  python_bom_check: |
+    with open(path, 'rb') as f:
+        return f.read(3) == b'\xef\xbb\xbf'
+
+  python_bom_add: |
+    with open(path, 'rb') as f:
+        content = f.read()
+    if not content.startswith(b'\xef\xbb\xbf'):
+        with open(path, 'wb') as f:
+            f.write(b'\xef\xbb\xbf' + content)
