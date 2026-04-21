@@ -3,6 +3,8 @@
 **Date:** 2026-03-23
 **Author:** Manus AI
 
+> **Note:** Analysis based on Amalgamation Synergy as of 2026-03-23. The upstream mod may have been updated since.
+
 ## 1. 概述
 
 本文档对 EU5 MP 项目的 `stable` 分支（基于社区 reference mod 3644897537，即 "Amalgamation Synergy"）进行了全面的源码级技术分析。该 mod 是一个综合性的平衡调整集合，其核心设计哲学是**减缓游戏后期的滚雪球效应（Anti-Snowballing）、增加战争的代价与惩罚、重平衡经济与税收系统，并对 AI 行为与难度加成进行合理化限制**。
