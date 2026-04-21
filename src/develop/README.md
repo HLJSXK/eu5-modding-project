@@ -6,9 +6,9 @@ This mod implements a dynamic mission system for Europa Universalis V, allowing 
 
 ## Status
 
-- **Development state:** Active (resumed on 2026-03-31)
-- **Current focus:** Stabilize core mission loop with unified mission state and debug-friendly GUI
-- **Validation state:** Not fully validated in-game yet. Prioritize simple, traceable logic for debugging.
+- **Development state:** Paused
+- **Last active:** 2026-03-31
+- **Validation state:** Not fully validated in-game. Resuming development requires full debug pass.
 
 ## Features
 
@@ -105,8 +105,8 @@ develop/
 ## Documentation
 
 For detailed design documentation, see:
-- [Dynamic Missions Design](../../docs/design/Dynamic_Missions_Design.md) - Complete system design for all missions
-- [Framework Architecture](../../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical implementation details
+- [Dynamic Missions Design](../../docs/archive/dynamic_missions/Dynamic_Missions_Design.md) - Complete system design for all missions
+- [Framework Architecture](../../docs/archive/dynamic_missions/Dynamic_Missions_Framework_Architecture.md) - Technical implementation details
 - [AI Tool Workflow Prompt (EU5)](../../docs/guides/AI_Tool_Workflow_Prompt.md) - Required 3-step syntax verification workflow for AI tools
 
 ## Version History
@@ -120,7 +120,7 @@ For detailed design documentation, see:
 ## Credits
 
 **Created by:** EU5 Modding Project Team
-**Last Updated:** March 31, 2026
+**Last Updated:** April 21, 2026 (status updated to Paused)
 
 ## License
 

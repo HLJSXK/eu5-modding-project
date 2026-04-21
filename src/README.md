@@ -29,7 +29,7 @@ For detailed documentation, see [stable/README.md](stable/README.md).
 
 ### `develop/`
 
-The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system and development has resumed.
+The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system. Development is currently paused.
 
 **Features:**
 - **Establish New City Mission** - Multi-stage city development system
@@ -37,9 +37,9 @@ The **development branch** of the EU5 MP mod, formerly known as `dynamic_mission
 - **Custom GUI** - Situation panels and interfaces
 - **Full localization** - English and Simplified Chinese
 
-**Status:** Active development resumed (2026-03-31) — mission framework and GUI routing are being iterated.
+**Status:** Paused (last active 2026-03-31).
 
-For detailed documentation, see the [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md) documents.
+For detailed documentation, see the [Dynamic Missions Design](../docs/archive/dynamic_missions/Dynamic_Missions_Design.md) documents.
 
 ### Mod Base Choice
 
@@ -64,7 +64,7 @@ As of 2026-03-31, the project maintains two parallel mods:
 | Mod | Directory | Status | Focus |
 |-----|-----------|--------|-------|
 | Stable | `src/stable/` | Active | Game balance (based on ref mod 3644897537) |
-| Develop | `src/develop/` | Active | Dynamic mission system |
+| Develop | `src/develop/` | Paused | Dynamic mission system |
 
 The `stable` mod provides the core MP balance experience, while `develop` is the active feature branch for Dynamic Missions.
 
@@ -82,7 +82,7 @@ When creating a new mod:
 ## Guidelines
 
 - Follow EU5 scripting conventions as documented in `/docs/technical/EU5_Mod_Framework_Guide.md`
-- Reference the analysis in `/docs/technical/Mod_Structure_Analysis.txt` for common patterns
+- Reference `/docs/technical/EU5_Mod_Framework_Guide.md` for common patterns
 - Use `stable/` as a clean, maintained starting point
 - Keep your mod files organized by feature or system
 - Test all changes in debug mode before releasing
@@ -93,7 +93,7 @@ When creating a new mod:
 - [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical development framework
 - [Stable Mod README](stable/README.md) - Stable mod documentation
 - [Develop Mod README](develop/README.md) - Dynamic missions mod documentation
-- [Dynamic Missions Framework](../docs/technical/Dynamic_Missions_Framework_Architecture.md) - Technical architecture
+- [Dynamic Missions Framework](../docs/archive/dynamic_missions/Dynamic_Missions_Framework_Architecture.md) - Technical architecture (paused)
 
 
 ## Community Mod References
