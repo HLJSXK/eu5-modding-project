@@ -1,16 +1,17 @@
 """LangGraph workflow definition for the EU5 mod agent.
 
-Model routing:
-  - review node  → Claude (Anthropic) — nuanced rule enforcement and violation detection
-  - all other nodes → Codex (OpenAI)  — code generation, planning, test checklist, evolution
+Per-node model configuration via env vars:
+  AGENT_MODEL_INGEST, AGENT_MODEL_PLAN, AGENT_MODEL_EXECUTE,
+  AGENT_MODEL_REVIEW, AGENT_MODEL_TEST, AGENT_MODEL_EVOLVE
+
+Provider is auto-detected from model name: claude-* → Anthropic, else → OpenAI.
+Falls back to ANTHROPIC_MODEL / OPENAI_MODEL if the per-node var is not set.
 """
 
 import os
 from functools import partial
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
@@ -22,19 +23,7 @@ from agent.nodes.record import record_findings
 from agent.nodes.review import review_output
 from agent.nodes.test import generate_test_checklist
 from agent.state import AgentState
-
-
-def _make_claude() -> ChatAnthropic:
-    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    return ChatAnthropic(model=model)
-
-
-def _make_codex() -> ChatOpenAI:
-    model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    return ChatOpenAI(
-        model=model,
-        model_kwargs={"reasoning_effort": "high"},
-    )
+from agent.tools.llm_factory import make_llm
 
 
 def _route_review(state: AgentState) -> str:
@@ -57,7 +46,6 @@ def _route_after_test(state: AgentState) -> str:
 
 
 def _revise_output(state: AgentState, llm: BaseChatModel) -> dict:
-    """Re-run execute with review issues in context (iteration already incremented by review)."""
     return execute_task(state, llm)
 
 
@@ -74,21 +62,18 @@ def _format_escalation(state: AgentState) -> dict:
 
 
 def build_graph(max_iterations: int = 3) -> StateGraph:
-    codex = _make_codex()    # code generation, planning, test, evolve
-    claude = _make_claude()  # review only
-
     graph = StateGraph(AgentState)
 
-    graph.add_node("ingest", partial(ingest_knowledge, llm=codex))
-    graph.add_node("plan", partial(plan_task, llm=codex))
-    graph.add_node("execute", partial(execute_task, llm=codex))
-    graph.add_node("review", partial(review_output, llm=claude))       # ← Claude
-    graph.add_node("test", partial(generate_test_checklist, llm=codex))
-    graph.add_node("revise", partial(_revise_output, llm=codex))
-    graph.add_node("revise_after_test", partial(_revise_output, llm=codex))
-    graph.add_node("escalate", _format_escalation)
-    graph.add_node("record", record_findings)
-    graph.add_node("evolve", partial(evolve_prompts, llm=codex))
+    graph.add_node("ingest",           partial(ingest_knowledge,      llm=make_llm("ingest")))
+    graph.add_node("plan",             partial(plan_task,              llm=make_llm("plan")))
+    graph.add_node("execute",          partial(execute_task,           llm=make_llm("execute")))
+    graph.add_node("review",           partial(review_output,          llm=make_llm("review")))
+    graph.add_node("test",             partial(generate_test_checklist,llm=make_llm("test")))
+    graph.add_node("revise",           partial(_revise_output,         llm=make_llm("execute")))
+    graph.add_node("revise_after_test",partial(_revise_output,         llm=make_llm("execute")))
+    graph.add_node("escalate",         _format_escalation)
+    graph.add_node("record",           record_findings)
+    graph.add_node("evolve",           partial(evolve_prompts,         llm=make_llm("evolve")))
 
     graph.add_edge(START, "ingest")
     graph.add_edge("ingest", "plan")
@@ -106,10 +91,6 @@ def build_graph(max_iterations: int = 3) -> StateGraph:
 
 
 def compile_graph(max_iterations: int = 3, checkpointer=None):
-    """Compile the graph with an optional checkpointer for HITL interrupt support.
-
-    The test node calls interrupt() internally, so no interrupt_before is needed here.
-    """
     graph = build_graph(max_iterations)
     cp = checkpointer or MemorySaver()
     return graph.compile(checkpointer=cp)

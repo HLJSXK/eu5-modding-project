@@ -6,6 +6,11 @@ import sys
 import uuid
 from pathlib import Path
 
+# Make `agent` importable when the script is run directly (python agent/main.py)
+_REPO_ROOT = Path(__file__).parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from dotenv import load_dotenv
 
 # Load .env from repo root or agent/ directory
