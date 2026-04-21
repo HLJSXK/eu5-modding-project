@@ -1,0 +1,100 @@
+# EU5 Known Anti-Patterns
+# ========================
+# Machine-readable knowledge store. Feed into:
+#   - scripts/validate.py  (static pre-flight checks)
+#   - scripts/gen_brief.py (generates docs/knowledge/BRIEF.md)
+#
+# Fields:
+#   id        : unique slug (no spaces)
+#   pattern   : Python regex to detect the bad form in source files
+#   bad       : human-readable description of the bad form
+#   correction: what to do instead
+#   category  : modifier | enum | encoding | gui | scope | event | localization
+#   scope     : country | location | character | global | any
+#   source    : reference file that verifies the correction (path:line if known)
+#   notes     : one-line explanation of why the bad form fails
+#
+# To add a new entry: append a YAML dict with all fields, then run:
+#   python scripts/gen_brief.py
+
+- id: location_auto_modifier_nonfunctional
+  pattern: 'category\s*=\s*location'
+  only_in_paths: ['auto_modifiers']
+  bad: "auto_modifier with category = location (inside auto_modifiers/ file)"
+  correction: "TRY_REPLACE entry in main_menu/common/static_modifiers/ with game_data.category = location"
+  category: modifier
+  scope: location
+  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
+  notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
+
+- id: location_rank_invalid_village
+  pattern: 'location_rank\s*[=?]=\s*location_rank:village'
+  bad: "location_rank:village"
+  correction: "location_rank:rural_settlement"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: location_rank_invalid_hamlet
+  pattern: 'location_rank\s*[=?]=\s*location_rank:hamlet'
+  bad: "location_rank:hamlet"
+  correction: "location_rank:rural_settlement"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: location_rank_invalid_metropolis
+  pattern: 'location_rank\s*[=?]=\s*location_rank:metropolis'
+  bad: "location_rank:metropolis"
+  correction: "location_rank:city"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/building_types/unique_buildings.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: custom_tooltip_do_not_remove
+  pattern: ''
+  bad: "Removing custom_tooltip from event options (wrong fix for dotted key confusion)"
+  correction: "Keep custom_tooltip; verify key format via Step 2/3 — dotted suffix IS valid in event options"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/common/character_interactions/ali_qushji_settles.txt"
+  notes: "AI wrongly removed custom_tooltip thinking dotted key format was invalid. Never remove; only verify format."
+
+- id: blockoverride_widget_child_invalid
+  pattern: 'blockoverride\s+"common_header_text"\s*\{[^}]*text_single'
+  bad: "text_single widget inside blockoverride \"common_header_text\""
+  correction: "blockoverride overrides a 'text' property value, not a widget container; do not add child widgets"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/common/cards.gui:1084"
+  notes: "Guessing block structure causes silent failures; always read cards.gui before using blockoverride"
+
+- id: yaml_localization_non_ascii_quotes
+  pattern: '[“”‘’]'
+  bad: "Smart/curly quotes (“”‘’) in localization YAML"
+  correction: "Use straight ASCII double-quotes (\") only; escape with \\\" inside values"
+  category: localization
+  scope: any
+  source: "reference_official_defines/docs/data_types_gui.txt"
+  notes: "PDX parser rejects non-ASCII quote characters; the failure is silent"
+
+- id: eu4_province_modifier_scope
+  pattern: 'add_province_modifier'
+  bad: "add_province_modifier (EU4 effect)"
+  correction: "add_location_modifier or add_static_modifier with location scope"
+  category: scope
+  scope: location
+  source: "reference_game_files/game/in_game/common/"
+  notes: "EU4 province scope effects do not exist in EU5; use location-scoped equivalents"
+
+- id: eu4_has_province_modifier
+  pattern: 'has_province_modifier'
+  bad: "has_province_modifier (EU4 trigger)"
+  correction: "has_location_modifier"
+  category: scope
+  scope: location
+  source: "reference_game_files/game/in_game/common/"
+  notes: "EU4 province scope triggers do not exist in EU5"
