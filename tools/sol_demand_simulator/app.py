@@ -39,6 +39,23 @@ from simulator import (
     simulate,
 )
 
+from curve_designer import (
+    SUBSTITUTE_GROUPS,
+    GROUP_GOODS,
+    GROUP_COLORS,
+    CurveDesignerState,
+    compute_demand_curve,
+    compute_demand_curve_per_strata,
+    compute_equilibrium_spend,
+    validate_budget_constraint,
+    suggest_budget_correction,
+    compute_engel_curve_points,
+    compute_engel_curve_points_per_strata,
+    compute_spend_curve_points,
+    compute_total_spend_curve,
+    luxury_sorted_groups,
+)
+
 # ---------------------------------------------------------------------------
 # Page config
 # ---------------------------------------------------------------------------
@@ -461,10 +478,11 @@ active_pop_types = [pt for s in active_strata for pt in STRATA_TO_POP_TYPES[s]]
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "Tab 1 — Base Goods Demand",
     "Tab 2 — Scaling Functions",
     "Tab 3 — Time Simulation",
+    "Tab 4 — Substitute Group Curves",
 ])
 
 # ===========================================================================
@@ -885,4 +903,342 @@ monthly_spending[s] = base_demand_index[s] × pop_count[s] × demand_scale[s]
 - Savings below target (ratio < 1) → savings_pressure < 0 → demand_scale depressed → pops buy less
 - Savings above target (ratio > 1) → savings_pressure > 0 → demand_scale elevated → pops buy more
 - This feedback drives savings toward target over time
+        """)
+
+
+# ===========================================================================
+# TAB 4: Substitute Group Curve Designer
+# ===========================================================================
+with tab4:
+    st.subheader("Per-Substitute-Group Engel Curve Designer (分阶层)")
+    st.caption(
+        "为10个替代组设计线性需求曲线，满足 **Σ(demand × price) = income**（恒等于收入）。"
+        "每组曲线: **d_g_s(y) = (α_g / P_g_s) × y**，其中 P_g_s 是按阶层计算的。"
+        "预算份额 α_g 必须总和为 1.0。"
+    )
+
+    # Initialize designer state in session_state
+    if "curve_designer" not in st.session_state:
+        cd = CurveDesignerState()
+        cd.init_from_demand_matrix(demand_matrix_w)
+        st.session_state["curve_designer"] = cd
+
+    cd: CurveDesignerState = st.session_state["curve_designer"]
+
+    # ---- Top controls: strata selector + income ----
+    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1, 1, 1])
+    with ctrl_col1:
+        selected_strata = st.selectbox(
+            "选择阶层 (Strata)",
+            options=STRATA,
+            format_func=lambda s: f"{s} ({STRATA_LABELS[s]})",
+            index=0,
+            key="cd_strata_selector",
+        )
+    with ctrl_col2:
+        check_income = st.number_input(
+            "收入电平 (gold/月/pop-unit)",
+            min_value=0.0, max_value=50.0,
+            value=5.0, step=0.5, key="cd_check_income",
+        )
+    with ctrl_col3:
+        total_share = sum(cd.budget_shares.values())
+        is_valid = abs(total_share - 1.0) < 1e-6
+        st.metric(
+            "Σ Budget Shares",
+            f"{total_share:.4f}",
+            delta=f"{total_share - 1.0:+.4f}",
+            delta_color="inverse" if not is_valid else "normal",
+        )
+
+    st.divider()
+
+    # ---- Budget Share Sliders ----
+    st.markdown("#### 预算份额配置 (α_g — 必须总和为 1.0)")
+    st.caption("α_g 控制该组从收入中获得的份额。高 α_g = 高级消费品（奢侈品），低 α_g = 低级消费品（必需品）")
+
+    share_cols = st.columns(2)
+    new_shares = {}
+    luxury_order = luxury_sorted_groups()
+
+    for idx, g_name in enumerate(luxury_order):
+        with share_cols[idx % 2]:
+            group = cd.groups[g_name]
+            color_hex = GROUP_COLORS.get(g_name, "#888")
+
+            # Header with color badge and goods list
+            goods_str = ", ".join(group.goods[:3])
+            if len(group.goods) > 3:
+                goods_str += f"…(+{len(group.goods)-3})"
+            st.markdown(
+                f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
+                f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span>",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"商品: {goods_str}", help="组内商品列表")
+
+            # Per-strata P_g for selected strata
+            P_g_s = group.base_price_sum_per_strata.get(selected_strata, 0.0)
+            b_g_s = group.slope_for_strata(selected_strata)
+            P_g_avg = group.base_price_sum
+
+            # Info columns
+            info_col1, info_col2, info_col3 = st.columns(3)
+            with info_col1:
+                st.caption(f"α_g = {group.budget_share:.3f}")
+            with info_col2:
+                st.caption(f"P_g({selected_strata[:3]}) = {P_g_s:.4f}")
+            with info_col3:
+                st.caption(f"b_g({selected_strata[:3]}) = {b_g_s:.6f}")
+
+            # Slider
+            new_share = st.slider(
+                f"α_{g_name}",
+                min_value=0.0, max_value=1.0,
+                value=float(group.budget_share),
+                step=0.01,
+                key=f"cd_share_{g_name}",
+                label_visibility="collapsed",
+            )
+            new_shares[g_name] = new_share
+
+            # Show demand at current income for selected strata
+            demand_at_income = b_g_s * check_income
+            spend_at_income = group.budget_share * check_income
+            st.caption(
+                f"→ 需求={demand_at_income:.4f} | 支出={spend_at_income:.4f} @ {check_income}"
+            )
+
+    st.divider()
+
+    # Apply / Auto-calibrate buttons
+    btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1])
+    with btn_col1:
+        apply_clicked = st.button("应用 (归一化)", type="primary", use_container_width=True)
+    with btn_col2:
+        auto_clicked = st.button("自动校准", use_container_width=True)
+    with btn_col3:
+        equal_clicked = st.button("平均分配 (0.1)", use_container_width=True)
+
+    if apply_clicked:
+        corrected = suggest_budget_correction(new_shares)
+        cd.set_budget_shares(corrected)
+        st.rerun()
+
+    if auto_clicked:
+        auto_shares = cd.auto_calibrate_budget_shares()
+        cd.set_budget_shares(auto_shares)
+        st.rerun()
+
+    if equal_clicked:
+        equal_shares = {g: 0.1 for g in SUBSTITUTE_GROUPS}
+        cd.set_budget_shares(equal_shares)
+        st.rerun()
+
+    total_share = sum(new_shares.values())
+    is_valid = abs(total_share - 1.0) < 1e-6
+    st.markdown(
+        f"**约束状态:** Σα_g = **{total_share:.4f}** "
+        f"{'✓ 满足约束' if is_valid else '✗ 将在应用时归一化'}"
+    )
+
+    st.divider()
+
+    # ---- Engel Curves per Strata ----
+    st.markdown(f"#### Engel 曲线: {selected_strata} ({STRATA_LABELS[selected_strata]})")
+    st.caption(
+        "d_g_s(y) = (α_g / P_g_s) × y，按选定阶层计算。"
+        "菱形标记 = 当前收入电平。"
+    )
+
+    income_range = np.linspace(0, 20, 200)
+    engel_lines_s = compute_engel_curve_points_per_strata(
+        selected_strata,
+        income_range,
+        cd.budget_shares,
+        {g: cd.groups[g].base_price_sum_per_strata for g in cd.groups},
+    )
+
+    fig_engel = go.Figure()
+    for g_name in luxury_sorted_groups():
+        if g_name in engel_lines_s:
+            color = GROUP_COLORS.get(g_name, "#888")
+            fig_engel.add_trace(go.Scatter(
+                x=income_range, y=engel_lines_s[g_name],
+                name=f"{g_name.title()}",
+                line=dict(color=color, width=2),
+            ))
+            d_at_income = cd.groups[g_name].demand_at_strata(selected_strata, check_income)
+            fig_engel.add_trace(go.Scatter(
+                x=[check_income], y=[d_at_income],
+                mode="markers",
+                marker=dict(size=9, color=color, symbol="diamond"),
+                showlegend=False,
+            ))
+
+    fig_engel.update_layout(
+        xaxis_title="Income (gold/月/pop-unit)",
+        yaxis_title=f"Group Demand ({selected_strata})",
+        legend_title="Group",
+        height=400,
+    )
+    st.plotly_chart(fig_engel, use_container_width=True)
+
+    # ---- Spend Curves per Strata ----
+    st.markdown(f"#### 支出曲线: {selected_strata}")
+    st.caption(
+        "spend_g_s(y) = α_g × y。注意 Σ spending = income（约束自动满足）。"
+    )
+
+    spend_lines = compute_spend_curve_points(income_range, cd.budget_shares)
+    total_spend_range = compute_total_spend_curve(income_range, cd.budget_shares)
+
+    fig_spend = go.Figure()
+    fig_spend.add_trace(go.Scatter(
+        x=income_range, y=income_range,
+        name="Income (参考)",
+        line=dict(color="gray", width=1, dash="dot"),
+    ))
+    fig_spend.add_trace(go.Scatter(
+        x=income_range, y=total_spend_range,
+        name="Σ Spending",
+        line=dict(color="black", width=2.5, dash="dash"),
+    ))
+    for g_name in luxury_sorted_groups():
+        if g_name in spend_lines:
+            color = GROUP_COLORS.get(g_name, "#888")
+            fig_spend.add_trace(go.Scatter(
+                x=income_range, y=spend_lines[g_name],
+                name=f"{g_name.title()}",
+                line=dict(color=color, width=1.5),
+                opacity=0.8,
+            ))
+
+    fig_spend.update_layout(
+        xaxis_title="Income (gold/月/pop-unit)",
+        yaxis_title="Spending (gold/月/pop-unit)",
+        legend_title="Group",
+        height=400,
+    )
+    st.plotly_chart(fig_spend, use_container_width=True)
+
+    st.divider()
+
+    # ---- Equilibrium Calculator per Strata ----
+    st.markdown(f"#### 均衡计算器 ({selected_strata})")
+    st.caption(
+        "输入收入电平，计算各替代组的均衡需求和支出。约束 Σ(demand × price) = income 自动满足。"
+    )
+
+    eq_col1, eq_col2 = st.columns([1, 2])
+    with eq_col1:
+        eq_income = st.number_input(
+            "均衡计算收入电平",
+            min_value=0.0, max_value=100.0,
+            value=5.0, step=0.5, key="cd_eq_income",
+        )
+    with eq_col2:
+        eq_is_valid, eq_total, eq_gap = validate_budget_constraint(cd.budget_shares)
+        st.markdown(
+            f"**预算份额:** Σα_g = {eq_total:.4f} "
+            f"{'✓' if eq_is_valid else '✗ (将归一化)'}"
+        )
+
+    eq_demands_s = compute_demand_curve_per_strata(
+        selected_strata,
+        eq_income,
+        cd.budget_shares,
+        {g: cd.groups[g].base_price_sum_per_strata for g in cd.groups},
+    )
+    eq_spends = compute_equilibrium_spend(eq_income, cd.budget_shares)
+
+    # Detailed table per strata
+    eq_rows = []
+    for g in luxury_sorted_groups():
+        group = cd.groups[g]
+        P_g_s = group.base_price_sum_per_strata.get(selected_strata, 0.0)
+        P_g_avg = group.base_price_sum
+        b_g_s = group.slope_for_strata(selected_strata)
+        d_s = eq_demands_s.get(g, 0.0)
+        s = eq_spends.get(g, 0.0)
+
+        # Compute per-strata income contribution
+        income_contrib = s  # spend = α_g × income
+
+        eq_rows.append({
+            "Group": g.title(),
+            "α_g": round(group.budget_share, 4),
+            f"P_g({selected_strata[:3]})": round(P_g_s, 4),
+            "P_g(avg)": round(P_g_avg, 4),
+            f"b_g({selected_strata[:3]})": round(b_g_s, 6),
+            f"需求@{eq_income}": round(d_s, 4),
+            f"支出@{eq_income}": round(s, 4),
+            "占比": f"{group.budget_share*100:.1f}%",
+        })
+
+    st.dataframe(
+        pd.DataFrame(eq_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "α_g": st.column_config.NumberColumn(format="%.4f"),
+            f"P_g({selected_strata[:3]})": st.column_config.NumberColumn(format="%.4f"),
+            "P_g(avg)": st.column_config.NumberColumn(format="%.4f"),
+            f"b_g({selected_strata[:3]})": st.column_config.NumberColumn(format="%.6f"),
+            f"需求@{eq_income}": st.column_config.NumberColumn(format="%.4f"),
+            f"支出@{eq_income}": st.column_config.NumberColumn(format="%.4f"),
+        },
+    )
+
+    total_eq_spend = sum(eq_spends.values())
+    st.markdown(
+        f"**均衡验证:** Σ支出 = **{total_eq_spend:.4f}**, 收入 = **{eq_income:.4f}**, "
+        f"gap = **{total_eq_spend - eq_income:.6f}**"
+    )
+
+    st.divider()
+
+    # ---- All Strata Comparison ----
+    st.markdown("#### 全阶层 P_g 对比")
+    st.caption("各替代组在不同阶层的基础价格总和 P_g_s")
+
+    # Build comparison table
+    pg_rows = []
+    for g in luxury_sorted_groups():
+        group = cd.groups[g]
+        row = {"Group": g.title()}
+        for s in STRATA:
+            row[s] = round(group.base_price_sum_per_strata.get(s, 0.0), 4)
+        row["avg"] = round(group.base_price_sum, 4)
+        pg_rows.append(row)
+
+    pg_df = pd.DataFrame(pg_rows)
+    st.dataframe(
+        pg_df,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # ---- How it integrates ----
+    with st.expander("如何与模拟器集成"):
+        st.markdown("""
+### 与 simulator.py 集成
+
+当前模拟器使用统一的 `sol_gdp_per_capita_scale` 缩放所有商品需求。
+
+使用分组 Engel 曲线后：
+
+```
+# 旧: 统一需求缩放
+monthly_spending[s] = base_idx[s] × pop_count[s] × demand_scale[s]
+
+# 新: 分组 Engel 曲线
+monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
+                     = Σ_g [ α_g × income_s × pop_count[s] ]
+```
+
+关键性质：
+- Σ spending = Σ (α_g × income_s × pop_count) = income_s × pop_count ✓
+- 奢侈品（高 α_g）在收入增加时获得更多支出
+- 必需品（低 α_g）保持比例稳定
         """)
