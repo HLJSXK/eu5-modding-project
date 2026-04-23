@@ -364,7 +364,132 @@ def load_demand_matrix() -> Dict[str, DemandEntry]:
     return matrix
 
 
+# ---------------------------------------------------------------------------
+# Group price / budget-share parsers
+# ---------------------------------------------------------------------------
+
+GROUP_PRICES_FILE   = MOD_ROOT / "src/stable/in_game/common/script_values/z_SOL_group_prices.txt"
+BUDGET_SHARES_FILE  = MOD_ROOT / "src/stable/in_game/common/script_values/z_SOL_group_budget_shares.txt"
+
+_STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
+_GROUPS = [
+    "alcohol", "textiles", "knowledge", "precious", "ritual",
+    "stimulants", "spices", "staple", "protein", "military",
+]
+
+
+def parse_group_prices(filepath: Path | None = None) -> Dict[str, Dict[str, float]]:
+    """Return {strata: {group: P_g_s}} from z_SOL_group_prices.txt.
+
+    Falls back to auto-calibration from demand matrix if file is absent.
+    """
+    path = filepath or GROUP_PRICES_FILE
+    if not path.exists():
+        return _auto_group_prices()
+
+    text = _read(path)
+    result: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
+    for m in re.finditer(r"local_(\w+?)_(\w+?)_P\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text):
+        strata, group, val = m.group(1), m.group(2), float(m.group(3))
+        if strata in result and group in _GROUPS:
+            result[strata][group] = val
+    return result
+
+
+def parse_budget_shares(filepath: Path | None = None) -> Dict[str, Dict[str, float]]:
+    """Return {strata: {group: alpha_g_s}} from z_SOL_group_budget_shares.txt.
+
+    Falls back to proportional-P_g_s defaults if file is absent.
+    """
+    path = filepath or BUDGET_SHARES_FILE
+    if not path.exists():
+        prices = _auto_group_prices()
+        return _shares_from_prices(prices)
+
+    text = _read(path)
+    result: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
+    for m in re.finditer(
+        r"local_(\w+?)_(\w+?)_budget_share\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text
+    ):
+        strata, group, val = m.group(1), m.group(2), float(m.group(3))
+        if strata in result and group in _GROUPS:
+            result[strata][group] = val
+    return result
+
+
+def _auto_group_prices() -> Dict[str, Dict[str, float]]:
+    """Compute P_g_s from the current demand matrix (offline calibration)."""
+    from curve_designer import GROUP_GOODS  # imported here to avoid circular at module load
+    dm = load_demand_matrix()
+    result: Dict[str, Dict[str, float]] = {s: {g: 0.0 for g in _GROUPS} for s in _STRATA_KEYS}
+    for group, goods in GROUP_GOODS.items():
+        if group not in _GROUPS:
+            continue
+        for good in goods:
+            entry = dm.get(good)
+            if entry is None:
+                continue
+            for s in _STRATA_KEYS:
+                result[s][group] += entry.strata_demand.get(s, 0.0) * entry.price
+    return result
+
+
+def _shares_from_prices(prices: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    """Compute proportional budget shares: alpha_g_s = P_g_s / Σ_h P_h_s."""
+    result: Dict[str, Dict[str, float]] = {}
+    for s, gp in prices.items():
+        total = sum(gp.values())
+        if total <= 0:
+            result[s] = {g: 1.0 / len(_GROUPS) for g in _GROUPS}
+        else:
+            result[s] = {g: v / total for g, v in gp.items()}
+    return result
+
+
+def export_group_prices_jomini(prices: Dict[str, Dict[str, float]]) -> str:
+    """Render P_g_s values as Jomini script ready to paste into z_SOL_group_prices.txt."""
+    lines = ["# Base price sums P_g_s — static; re-run --export-group-prices if goods change"]
+    for s in _STRATA_KEYS:
+        lines.append(f"\n# {s}")
+        for g in _GROUPS:
+            v = prices[s].get(g, 0.0)
+            lines.append(f"local_{s}_{g}_P = {{ value = {v:.6f} }}")
+    return "\n".join(lines)
+
+
+def export_budget_shares_jomini(
+    prices: Dict[str, Dict[str, float]],
+    shares: Dict[str, Dict[str, float]] | None = None,
+) -> str:
+    """Render alpha_g_s values as Jomini script ready to paste into z_SOL_group_budget_shares.txt."""
+    if shares is None:
+        shares = _shares_from_prices(prices)
+    lines = ["# Budget shares — must satisfy Σ_g (per strata) = 1.0"]
+    for s in _STRATA_KEYS:
+        lines.append(f"\n# {s}")
+        for g in _GROUPS:
+            v = shares[s].get(g, 0.0)
+            lines.append(f"local_{s}_{g}_budget_share = {{ value = {v:.6f} }}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
+    import sys
+
+    if "--export-group-prices" in sys.argv:
+        print("Computing group price sums from demand matrix…", file=sys.stderr)
+        prices = _auto_group_prices()
+        shares = _shares_from_prices(prices)
+        print("=== z_SOL_group_prices.txt ===")
+        print(export_group_prices_jomini(prices))
+        print("\n=== z_SOL_group_budget_shares.txt ===")
+        print(export_budget_shares_jomini(prices, shares))
+        sys.exit(0)
+
     vanilla = load_vanilla_goods()
     print(f"Vanilla goods: {len(vanilla)}")
 
