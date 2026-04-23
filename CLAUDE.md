@@ -63,7 +63,12 @@ When a script/GUI pattern causes a bug: verify and replace with correct syntax. 
 
 ## Knowledge Capture
 
-After any task where you used Step 2 or Step 3 verification and discovered a new pattern, do ALL of:
+Knowledge capture is triggered by **either** of the following:
+
+- You used Step 2 or Step 3 verification and discovered a new pattern.
+- You fixed a runtime engine error (from `error.log` or in-game logs) that revealed an undocumented EU5 engine behavior — regardless of whether Steps 2/3 were consulted.
+
+When triggered, do ALL of:
 
 1. Add an entry to `docs/knowledge/anti_patterns.yaml` (copy the format of existing entries).
 2. Add a row to the "Documented Violations" table in `docs/guides/AI_Tool_Workflow_Prompt.md`.
@@ -71,3 +76,5 @@ After any task where you used Step 2 or Step 3 verification and discovered a new
 4. Run `python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
 
 For minor discoveries (single modifier name, single typo fix), steps 1 and 4 only.
+
+**Do not wait for the user to ask.** Knowledge capture must happen in the same response as the fix, before the task is marked complete.
