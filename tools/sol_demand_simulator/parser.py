@@ -45,6 +45,15 @@ STRATA_TO_POP_TYPES: Dict[str, List[str]] = {
     "tribesmen": ["tribesmen"],
 }
 
+# Weights for aggregating commoners sub-types.
+# Soldiers excluded (0 weight) — in practice commoner demand is almost
+# entirely laborers + peasants.
+COMMONER_WEIGHTS: Dict[str, float] = {
+    "laborers": 0.5,
+    "peasants": 0.5,
+    "soldiers": 0.0,
+}
+
 # Canonical simulator strata list (used throughout the app)
 STRATA: List[str] = list(STRATA_TO_POP_TYPES.keys())
 
@@ -179,12 +188,18 @@ def _compute_base_demand_per_pop_type(
 def _aggregate_to_strata(demand_per_pt: Dict[str, float]) -> Dict[str, float]:
     """
     Collapse EU5 pop types into the 5 simulator strata.
-    commoners = mean(laborers, peasants, soldiers).
+    commoners uses COMMONER_WEIGHTS (laborers=0.5, peasants=0.5, soldiers=0).
+    All other strata map 1:1 to a single pop type.
     """
     result: Dict[str, float] = {}
     for strata, pop_types in STRATA_TO_POP_TYPES.items():
-        vals = [demand_per_pt.get(pt, 0.0) for pt in pop_types]
-        result[strata] = sum(vals) / len(vals)
+        if strata == "commoners":
+            result[strata] = sum(
+                demand_per_pt.get(pt, 0.0) * COMMONER_WEIGHTS[pt]
+                for pt in pop_types
+            )
+        else:
+            result[strata] = demand_per_pt.get(pop_types[0], 0.0)
     return result
 
 
@@ -374,7 +389,7 @@ BUDGET_SHARES_FILE  = MOD_ROOT / "src/stable/in_game/common/script_values/z_SOL_
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
     "alcohol", "textiles", "knowledge", "precious", "ritual",
-    "stimulants", "spices", "staple", "protein", "military",
+    "stimulants", "spices", "staple", "protein", "military", "household",
 ]
 
 

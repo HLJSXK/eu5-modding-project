@@ -42,7 +42,7 @@ from simulator import (
 )
 from parser import (
     EU5_POP_TYPES, STRATA, STRATA_TO_POP_TYPES, load_demand_matrix, load_goods_prices,
-    parse_group_prices, parse_budget_shares, export_budget_shares_jomini,
+    export_budget_shares_jomini,
     GROUP_PRICES_FILE, BUDGET_SHARES_FILE,
     _GROUPS as ENGEL_GROUPS, _STRATA_KEYS as ENGEL_STRATA_KEYS,
 )
@@ -51,6 +51,7 @@ from curve_designer import (
     SUBSTITUTE_GROUPS,
     GROUP_GOODS,
     GROUP_COLORS,
+    ALPHA_TABLE,
     CurveDesignerState,
     compute_demand_curve,
     compute_demand_curve_per_strata,
@@ -776,7 +777,7 @@ with tab3:
     engel_alpha_sim: dict | None = None
     if sim_mode == "engel_curve" and cd_state_for_sim is not None:
         engel_alpha_sim = {
-            s: {g: cd_state_for_sim.groups[g].budget_share for g in ENGEL_GROUPS}
+            s: cd_state_for_sim.get_strata_shares(s)
             for s in STRATA
         }
     elif sim_mode == "engel_curve":
@@ -954,29 +955,15 @@ with tab4:
         "预算份额 α_g 必须总和为 1.0。"
     )
 
-    # Load budget shares from game files if available (one-time at startup)
+    # Initialize curve designer (one-time at startup).
+    # init_from_demand_matrix loads per-strata alpha from data/alpha_table.csv if present.
     if "curve_designer" not in st.session_state:
         cd = CurveDesignerState()
         cd.init_from_demand_matrix(demand_matrix_w)
-        # Try to pre-populate from saved game files
-        try:
-            saved_shares = parse_budget_shares()
-            # Use nobles strata shares as the canonical set (all strata are shown in Tab 4)
-            # Merge: use file values for groups that have entries
-            merged: dict = {}
-            for g in ENGEL_GROUPS:
-                # average across strata as a single alpha_g for the designer slider
-                vals = [saved_shares.get(s, {}).get(g) for s in ENGEL_STRATA_KEYS]
-                vals = [v for v in vals if v is not None]
-                merged[g] = sum(vals) / len(vals) if vals else cd.budget_shares.get(g, 0.1)
-            total = sum(merged.values())
-            if total > 0:
-                merged = {g: v / total for g, v in merged.items()}
-            cd.set_budget_shares(merged)
-            st.session_state["_shares_source"] = "from file"
-        except Exception:
-            st.session_state["_shares_source"] = "default"
+        st.session_state["_shares_source"] = "from alpha_table.csv" if ALPHA_TABLE.exists() else "auto-calibrated"
         st.session_state["curve_designer"] = cd
+    if "cd_locked" not in st.session_state:
+        st.session_state["cd_locked"] = {g: False for g in SUBSTITUTE_GROUPS}
 
     cd: CurveDesignerState = st.session_state["curve_designer"]
 
@@ -997,10 +984,11 @@ with tab4:
             value=5.0, step=0.5, key="cd_check_income",
         )
     with ctrl_col3:
-        total_share = sum(cd.budget_shares.values())
+        _cur_shares = cd.get_strata_shares(selected_strata)
+        total_share = sum(_cur_shares.values())
         is_valid = abs(total_share - 1.0) < 1e-6
         st.metric(
-            "Σ Budget Shares",
+            f"Σ α ({selected_strata})",
             f"{total_share:.4f}",
             delta=f"{total_share - 1.0:+.4f}",
             delta_color="inverse" if not is_valid else "normal",
@@ -1008,12 +996,31 @@ with tab4:
 
     st.divider()
 
+    # ---- Sync slider keys when strata changes ----
+    _last_strata = st.session_state.get("_cd_last_strata", "")
+    if _last_strata != selected_strata:
+        for _g in SUBSTITUTE_GROUPS:
+            st.session_state[f"cd_share_{selected_strata}_{_g}"] = float(
+                cd.get_strata_shares(selected_strata).get(_g, 0.0)
+            )
+        st.session_state["_cd_last_strata"] = selected_strata
+
+    # ---- on_change callback for alpha sliders ----
+    def _on_alpha_change(g_name: str, strata: str) -> None:
+        _cd = st.session_state["curve_designer"]
+        _locked = {g: st.session_state.get(f"cd_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
+        _new_val = float(st.session_state[f"cd_share_{strata}_{g_name}"])
+        updated = _cd.apply_delta_with_locks(strata, g_name, _new_val, _locked)
+        for _g, _v in updated.items():
+            st.session_state[f"cd_share_{strata}_{_g}"] = float(_v)
+
     # ---- Budget Share Sliders ----
-    st.markdown("#### 预算份额配置 (α_g — 必须总和为 1.0)")
-    st.caption("α_g 控制该组从收入中获得的份额。高 α_g = 高级消费品（奢侈品），低 α_g = 低级消费品（必需品）")
+    st.markdown(f"#### 预算份额配置 — {selected_strata} (α_g_s，总和必须 = 1.0)")
+    st.caption(
+        "🔒 锁定后该组alpha不参与重分配。调整一个alpha时，其他未锁定组均分反向变化量。"
+    )
 
     share_cols = st.columns(2)
-    new_shares = {}
     luxury_order = luxury_sorted_groups()
 
     for idx, g_name in enumerate(luxury_order):
@@ -1021,45 +1028,51 @@ with tab4:
             group = cd.groups[g_name]
             color_hex = GROUP_COLORS.get(g_name, "#888")
 
-            # Header with color badge and goods list
-            goods_str = ", ".join(group.goods[:3])
-            if len(group.goods) > 3:
-                goods_str += f"…(+{len(group.goods)-3})"
-            st.markdown(
-                f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
-                f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span>",
-                unsafe_allow_html=True,
-            )
-            st.caption(f"商品: {goods_str}", help="组内商品列表")
+            # Header row: color badge + lock checkbox
+            badge_col, lock_col = st.columns([0.85, 0.15])
+            with badge_col:
+                goods_str = ", ".join(group.goods[:3])
+                if len(group.goods) > 3:
+                    goods_str += f"…(+{len(group.goods)-3})"
+                st.markdown(
+                    f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
+                    f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span> "
+                    f"<small>{goods_str}</small>",
+                    unsafe_allow_html=True,
+                )
+            with lock_col:
+                st.checkbox(
+                    "🔒",
+                    key=f"cd_lock_{g_name}",
+                    help=f"锁定 {g_name} 的 alpha，使其不参与重分配",
+                    label_visibility="collapsed",
+                )
 
-            # Per-strata P_g for selected strata
+            # Per-strata info
+            alpha_gs = cd.get_strata_shares(selected_strata).get(g_name, 0.0)
             P_g_s = group.base_price_sum_per_strata.get(selected_strata, 0.0)
             b_g_s = group.slope_for_strata(selected_strata)
-            P_g_avg = group.base_price_sum
-
-            # Info columns
             info_col1, info_col2, info_col3 = st.columns(3)
             with info_col1:
-                st.caption(f"α_g = {group.budget_share:.3f}")
+                st.caption(f"α_g_s = {alpha_gs:.4f}")
             with info_col2:
-                st.caption(f"P_g({selected_strata[:3]}) = {P_g_s:.4f}")
+                st.caption(f"P_g_s = {P_g_s:.4f}")
             with info_col3:
-                st.caption(f"b_g({selected_strata[:3]}) = {b_g_s:.6f}")
+                st.caption(f"b_g_s = {b_g_s:.6f}")
 
-            # Slider
-            new_share = st.slider(
+            # Slider with on_change redistribution
+            st.slider(
                 f"α_{g_name}",
                 min_value=0.0, max_value=1.0,
-                value=float(group.budget_share),
-                step=0.01,
-                key=f"cd_share_{g_name}",
+                step=0.001,
+                key=f"cd_share_{selected_strata}_{g_name}",
+                on_change=_on_alpha_change,
+                args=(g_name, selected_strata),
                 label_visibility="collapsed",
             )
-            new_shares[g_name] = new_share
 
-            # Show demand at current income for selected strata
             demand_at_income = b_g_s * check_income
-            spend_at_income = group.budget_share * check_income
+            spend_at_income = alpha_gs * check_income
             st.caption(
                 f"→ 需求={demand_at_income:.4f} | 支出={spend_at_income:.4f} @ {check_income}"
             )
@@ -1068,61 +1081,75 @@ with tab4:
 
     # Source badge
     shares_source = st.session_state.get("_shares_source", "default")
-    st.caption(
-        f"Budget shares source: **{shares_source}** "
-        f"({'loaded from ' + str(BUDGET_SHARES_FILE.name) if shares_source == 'from file' else 'auto-calibrated from demand matrix'})"
-    )
+    st.caption(f"Alpha 数据来源: **{shares_source}**")
 
-    # Apply / Auto-calibrate / Export buttons
-    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1, 1, 1, 1])
-    with btn_col1:
-        apply_clicked = st.button("应用 (归一化)", type="primary", use_container_width=True)
-    with btn_col2:
-        auto_clicked = st.button("自动校准", use_container_width=True)
-    with btn_col3:
-        equal_clicked = st.button("平均分配 (0.1)", use_container_width=True)
-    with btn_col4:
-        export_clicked = st.button("导出 (Export to script)", use_container_width=True,
-                                   help="Write current α_g_s to z_SOL_group_budget_shares.txt")
-
-    if apply_clicked:
-        corrected = suggest_budget_correction(new_shares)
-        cd.set_budget_shares(corrected)
-        st.rerun()
-
-    if auto_clicked:
-        auto_shares = cd.auto_calibrate_budget_shares()
-        cd.set_budget_shares(auto_shares)
-        st.rerun()
-
-    if equal_clicked:
-        equal_shares = {g: 0.1 for g in SUBSTITUTE_GROUPS}
-        cd.set_budget_shares(equal_shares)
-        st.rerun()
-
-    if export_clicked:
-        try:
-            # Build per-strata shares from the designer's single α_g × per-strata P_g_s
-            prices_by_strata = _build_engel_P_strata(demand_matrix_w)
-            # Designer uses a single alpha_g; build per-strata shares proportionally
-            # (the single alpha_g IS the strata-averaged share — write it for each strata)
-            per_strata_shares = {
-                s: {g: cd.groups[g].budget_share for g in ENGEL_GROUPS}
-                for s in ENGEL_STRATA_KEYS
-            }
-            jomini_text = export_budget_shares_jomini(prices_by_strata, per_strata_shares)
-            BUDGET_SHARES_FILE.write_text(jomini_text + "\n", encoding="utf-8-sig")
-            st.session_state["_shares_source"] = "from file"
-            st.success(f"Exported to {BUDGET_SHARES_FILE}")
-        except Exception as e:
-            st.error(f"Export failed: {e}")
-
-    total_share = sum(new_shares.values())
+    # ---- Constraint validation ----
+    cur_strata_shares = cd.get_strata_shares(selected_strata)
+    total_share = sum(cur_strata_shares.values())
     is_valid = abs(total_share - 1.0) < 1e-6
     st.markdown(
-        f"**约束状态:** Σα_g = **{total_share:.4f}** "
-        f"{'✓ 满足约束' if is_valid else '✗ 将在应用时归一化'}"
+        f"**约束状态 ({selected_strata}):** Σα_g_s = **{total_share:.6f}** "
+        f"{'✓ 满足约束' if is_valid else '✗ 不满足约束（检查alpha表格）'}"
     )
+
+    # ---- Action Buttons ----
+    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1, 1, 1, 1])
+    with btn_col1:
+        save_table_clicked = st.button("保存到Alpha表格", type="primary", use_container_width=True,
+                                       help="将当前所有阶层的alpha值写入 data/alpha_table.csv")
+    with btn_col2:
+        auto_clicked = st.button("自动校准", use_container_width=True,
+                                 help="按 P_g_s 比例自动计算各阶层的 alpha")
+    with btn_col3:
+        gen_prices_clicked = st.button("生成组价格", use_container_width=True,
+                                       help="重新计算并写入 z_SOL_group_prices.txt")
+    with btn_col4:
+        export_shares_clicked = st.button("导出预算份额", use_container_width=True,
+                                          help="从 alpha_table.csv 生成 z_SOL_group_budget_shares.txt")
+
+    if save_table_clicked:
+        try:
+            cd.save_to_alpha_table(ALPHA_TABLE)
+            st.session_state["_shares_source"] = "from alpha_table.csv"
+            st.success(f"Alpha 表格已保存 → {ALPHA_TABLE.relative_to(ALPHA_TABLE.parent.parent)}")
+        except Exception as e:
+            st.error(f"保存失败: {e}")
+
+    if auto_clicked:
+        auto_per_strata = cd.auto_calibrate_budget_shares()
+        cd.set_budget_shares_per_strata(auto_per_strata)
+        # Force the pre-slider sync block to re-read from cd on next pass
+        st.session_state["_cd_last_strata"] = ""
+        st.rerun()
+
+    if gen_prices_clicked:
+        try:
+            _scripts_dir = ALPHA_TABLE.parent.parent / "scripts"
+            import sys as _sys
+            _sys.path.insert(0, str(_scripts_dir))
+            from gen_group_prices import compute_group_prices, write_group_prices  # type: ignore
+            _prices = compute_group_prices()
+            write_group_prices(_prices)
+            st.success(f"组价格已写入 z_SOL_group_prices.txt")
+        except Exception as e:
+            st.error(f"生成失败: {e}")
+
+    if export_shares_clicked:
+        try:
+            _scripts_dir = ALPHA_TABLE.parent.parent / "scripts"
+            import sys as _sys
+            _sys.path.insert(0, str(_scripts_dir))
+            from gen_budget_shares import load_alpha_table, validate_alpha_sums, write_budget_shares  # type: ignore
+            _alpha = load_alpha_table(ALPHA_TABLE)
+            _errs = validate_alpha_sums(_alpha)
+            if _errs:
+                for _e in _errs:
+                    st.warning(_e)
+            else:
+                write_budget_shares(_alpha)
+                st.success("预算份额已写入 z_SOL_group_budget_shares.txt")
+        except Exception as e:
+            st.error(f"导出失败: {e}")
 
     st.divider()
 
@@ -1137,7 +1164,7 @@ with tab4:
     engel_lines_s = compute_engel_curve_points_per_strata(
         selected_strata,
         income_range,
-        cd.budget_shares,
+        cd.get_strata_shares(selected_strata),
         {g: cd.groups[g].base_price_sum_per_strata for g in cd.groups},
     )
 
@@ -1172,8 +1199,9 @@ with tab4:
         "spend_g_s(y) = α_g × y。注意 Σ spending = income（约束自动满足）。"
     )
 
-    spend_lines = compute_spend_curve_points(income_range, cd.budget_shares)
-    total_spend_range = compute_total_spend_curve(income_range, cd.budget_shares)
+    _strata_shares_for_charts = cd.get_strata_shares(selected_strata)
+    spend_lines = compute_spend_curve_points(income_range, _strata_shares_for_charts)
+    total_spend_range = compute_total_spend_curve(income_range, _strata_shares_for_charts)
 
     fig_spend = go.Figure()
     fig_spend.add_trace(go.Scatter(
@@ -1220,42 +1248,42 @@ with tab4:
             value=5.0, step=0.5, key="cd_eq_income",
         )
     with eq_col2:
-        eq_is_valid, eq_total, eq_gap = validate_budget_constraint(cd.budget_shares)
+        _eq_shares = cd.get_strata_shares(selected_strata)
+        eq_is_valid, eq_total, eq_gap = validate_budget_constraint(_eq_shares)
         st.markdown(
-            f"**预算份额:** Σα_g = {eq_total:.4f} "
-            f"{'✓' if eq_is_valid else '✗ (将归一化)'}"
+            f"**预算份额 ({selected_strata}):** Σα_g_s = {eq_total:.4f} "
+            f"{'✓' if eq_is_valid else '✗'}"
         )
 
     eq_demands_s = compute_demand_curve_per_strata(
         selected_strata,
         eq_income,
-        cd.budget_shares,
+        _eq_shares,
         {g: cd.groups[g].base_price_sum_per_strata for g in cd.groups},
     )
-    eq_spends = compute_equilibrium_spend(eq_income, cd.budget_shares)
+    eq_spends = compute_equilibrium_spend(eq_income, _eq_shares)
 
     # Detailed table per strata
     eq_rows = []
+    _eq_strata_shares = cd.get_strata_shares(selected_strata)
     for g in luxury_sorted_groups():
         group = cd.groups[g]
+        alpha_gs = _eq_strata_shares.get(g, 0.0)
         P_g_s = group.base_price_sum_per_strata.get(selected_strata, 0.0)
         P_g_avg = group.base_price_sum
         b_g_s = group.slope_for_strata(selected_strata)
         d_s = eq_demands_s.get(g, 0.0)
-        s = eq_spends.get(g, 0.0)
-
-        # Compute per-strata income contribution
-        income_contrib = s  # spend = α_g × income
+        sp = eq_spends.get(g, 0.0)
 
         eq_rows.append({
             "Group": g.title(),
-            "α_g": round(group.budget_share, 4),
-            f"P_g({selected_strata[:3]})": round(P_g_s, 4),
+            f"α_g_s ({selected_strata[:3]})": round(alpha_gs, 4),
+            f"P_g_s ({selected_strata[:3]})": round(P_g_s, 4),
             "P_g(avg)": round(P_g_avg, 4),
-            f"b_g({selected_strata[:3]})": round(b_g_s, 6),
+            f"b_g_s": round(b_g_s, 6),
             f"需求@{eq_income}": round(d_s, 4),
-            f"支出@{eq_income}": round(s, 4),
-            "占比": f"{group.budget_share*100:.1f}%",
+            f"支出@{eq_income}": round(sp, 4),
+            "占比": f"{alpha_gs*100:.1f}%",
         })
 
     st.dataframe(
@@ -1263,10 +1291,10 @@ with tab4:
         use_container_width=True,
         hide_index=True,
         column_config={
-            "α_g": st.column_config.NumberColumn(format="%.4f"),
-            f"P_g({selected_strata[:3]})": st.column_config.NumberColumn(format="%.4f"),
+            f"α_g_s ({selected_strata[:3]})": st.column_config.NumberColumn(format="%.4f"),
+            f"P_g_s ({selected_strata[:3]})": st.column_config.NumberColumn(format="%.4f"),
             "P_g(avg)": st.column_config.NumberColumn(format="%.4f"),
-            f"b_g({selected_strata[:3]})": st.column_config.NumberColumn(format="%.6f"),
+            "b_g_s": st.column_config.NumberColumn(format="%.6f"),
             f"需求@{eq_income}": st.column_config.NumberColumn(format="%.4f"),
             f"支出@{eq_income}": st.column_config.NumberColumn(format="%.4f"),
         },

@@ -5,28 +5,33 @@ Designs linear Engel curves per substitute group such that:
     Σ(demand × price) = income  (恒等于收入)
 
 Core formula:
-    d_g(y) = (α_g / P_g) × y       demand at income y
-    spend_g(y) = α_g × y            spending at income y
+    d_g_s(y) = (α_g_s / P_g_s) × y   demand at income y for strata s
+    spend_g_s(y) = α_g_s × y           spending at income y for strata s
 
-    P_g = Σ_i∈g (base_demand_i × price_i)   base price sum for group g
-    Σ_g α_g = 1                                 budget shares sum to 1
-    Σ_g spend_g(y) = y                          satisfied by construction
+    P_g_s = Σ_i∈g (base_demand_i_strata × price_i)   base price sum for (group, strata)
+    Σ_g α_g_s = 1  for each strata s                   budget shares sum to 1 per strata
+    Σ_g spend_g_s(y) = y                                satisfied by construction
 """
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
 
+REPO_ROOT    = Path(__file__).resolve().parent.parent.parent
+ALPHA_TABLE  = REPO_ROOT / "data" / "alpha_table.csv"
 
-# 10 substitute groups (from SOL_substitute_good_indicators.txt)
+
+# 11 substitute groups (10 from SOL_substitute_good_indicators.txt + household from SOL_substitute_effects.txt)
 SUBSTITUTE_GROUPS: List[str] = [
     "alcohol", "textiles", "knowledge", "precious", "ritual",
-    "stimulants", "spices", "staple", "protein", "military",
+    "stimulants", "spices", "staple", "protein", "military", "household",
 ]
 
-# Group -> goods mapping (from SOL_substitute_good_indicators.txt)
+# Group -> goods mapping
 GROUP_GOODS: Dict[str, List[str]] = {
     "alcohol":    ["wine", "liquor", "beer"],
     "textiles":   ["fur", "cloth", "fine_cloth", "jewelry"],
@@ -38,6 +43,7 @@ GROUP_GOODS: Dict[str, List[str]] = {
     "staple":     ["wheat", "rice", "millet", "maize", "potato", "legumes", "olives", "fruit"],
     "protein":    ["fish", "wild_game", "livestock"],
     "military":   ["horses", "elephants", "weaponry", "firearms", "coal", "salt", "victuals"],
+    "household":  ["lumber", "masonry", "tools", "pottery", "furniture", "porcelain", "lacquerware", "marble"],
 }
 
 GROUP_COLORS: Dict[str, str] = {
@@ -51,20 +57,22 @@ GROUP_COLORS: Dict[str, str] = {
     "staple":     "#27ae60",
     "protein":    "#2980b9",
     "military":   "#7f8c8d",
+    "household":  "#795548",
 }
 
 # Groups ranked by "luxury" level (higher = more elastic should be)
 LUXURY_RANK: Dict[str, int] = {
     "staple":     1,   #必需品，弹性低
     "protein":    2,
-    "alcohol":    3,
-    "military":   4,
-    "spices":     5,
-    "stimulants": 6,
-    "textiles":   7,
-    "knowledge":  8,
-    "ritual":     9,
-    "precious":   10,  # 奢侈品，弹性高
+    "household":  3,
+    "alcohol":    4,
+    "military":   5,
+    "spices":     6,
+    "stimulants": 7,
+    "textiles":   8,
+    "knowledge":  9,
+    "ritual":     10,
+    "precious":   11,  # 奢侈品，弹性高
 }
 
 
@@ -75,95 +83,139 @@ class SubstituteGroup:
     goods: List[str]
     # Computed from demand_matrix at demand_scale=1
     base_price_sum: float = 0.0   # P_g = Σ(base_demand_i × price_i), average across strata
-    # Engel curve parameter (designer input)
-    budget_share: float = 0.0     # α_g, fraction of income (0.0–1.0)
-    # Per-strata base price sums: P_g[s] = Σ_i∈g (base_demand_i_strata × price_i)
+    # Engel curve parameter — kept for backward compat; represents nobles strata or global average
+    budget_share: float = 0.0     # α_g (global / nobles fallback)
+    # Per-strata price sums: P_g_s = Σ_i∈g (base_demand_i_strata × price_i)
     base_price_sum_per_strata: Dict[str, float] = field(default_factory=dict)
+    # Per-strata budget shares: α_g_s — primary store (set by CurveDesignerState)
+    budget_share_per_strata: Dict[str, float] = field(default_factory=dict)
+
+    def _alpha_for(self, strata: str) -> float:
+        """Return alpha for given strata, fallback to global budget_share."""
+        return self.budget_share_per_strata.get(strata, self.budget_share)
 
     @property
     def slope(self) -> float:
-        """Engel curve slope: b_g = α_g / P_g (average across strata)"""
+        """Engel curve slope using global budget_share and average P_g."""
         if self.base_price_sum <= 0:
             return 0.0
         return self.budget_share / self.base_price_sum
 
     def slope_for_strata(self, strata: str) -> float:
-        """Engel curve slope for a specific strata."""
-        P = self.base_price_sum_per_strata.get(strata, 0.0)
+        """Engel curve slope b_g_s = α_g_s / P_g_s."""
+        P = self.base_price_sum_per_strata.get(strata, self.base_price_sum)
         if P <= 0:
             return 0.0
-        return self.budget_share / P
+        return self._alpha_for(strata) / P
 
     @property
     def intercept(self) -> float:
-        """Linear curve intercept (always 0 for Engel curve — demand = 0 when income = 0)."""
         return 0.0
 
     def demand_at(self, income: float) -> float:
-        """Compute group demand at given income level (average across strata)."""
         return self.slope * income
 
     def demand_at_strata(self, strata: str, income: float) -> float:
-        """Compute group demand at given income level for a specific strata."""
         return self.slope_for_strata(strata) * income
 
     def spend_at(self, income: float) -> float:
-        """Compute group spending at given income level."""
         return self.budget_share * income
+
+    def spend_at_strata(self, strata: str, income: float) -> float:
+        return self._alpha_for(strata) * income
+
+
+_STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 
 
 @dataclass
 class CurveDesignerState:
     """Complete state for the curve designer tab."""
     groups: Dict[str, SubstituteGroup] = field(default_factory=dict)
-    # Designer budget shares (sum should = 1.0)
-    budget_shares: Dict[str, float] = field(default_factory=dict)
+    # Per-strata alpha store: {strata: {group: alpha_g_s}} — primary source of truth
+    budget_shares_per_strata: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
-    def compute_base_price_sums(self, demand_matrix: dict) -> None:
-        """Compute P_g for each group from demand_matrix.
+    @property
+    def budget_shares(self) -> Dict[str, float]:
+        """Backward-compat: return nobles strata shares (or global if no strata data)."""
+        return self.budget_shares_per_strata.get("nobles", {g: g_obj.budget_share for g, g_obj in self.groups.items()})
 
-        P_g = Σ_i∈g (avg_demand_i × price_i)
-        where avg_demand_i = mean across all strata of the strata_demand.
+    def get_strata_shares(self, strata: str) -> Dict[str, float]:
+        """Return alpha values for a single strata."""
+        return self.budget_shares_per_strata.get(strata, {g: self.groups[g].budget_share for g in self.groups})
 
-        Also computes P_g[s] = Σ_i∈g (demand_i_strata × price_i) per strata.
-        """
-        from parser import STRATA
-        for g_name, group in self.groups.items():
-            total = 0.0
-            per_strata: Dict[str, float] = {}
-            for good_name in group.goods:
-                if good_name in demand_matrix:
-                    entry = demand_matrix[good_name]
-                    # Average across strata for aggregate P_g
-                    avg_demand = sum(entry.strata_demand.values()) / len(entry.strata_demand)
-                    total += avg_demand * entry.price
-                    # Per-strata P_g[s]
-                    for s in STRATA:
-                        strata_demand = entry.strata_demand.get(s, 0.0)
-                        per_strata[s] = per_strata.get(s, 0.0) + strata_demand * entry.price
-            group.base_price_sum = total
-            group.base_price_sum_per_strata = per_strata
+    def set_strata_shares(self, strata: str, shares: Dict[str, float]) -> None:
+        """Set alpha values for one strata and propagate to SubstituteGroup."""
+        self.budget_shares_per_strata[strata] = shares.copy()
+        for g_name, alpha in shares.items():
+            if g_name in self.groups:
+                self.groups[g_name].budget_share_per_strata[strata] = alpha
+                # Keep global budget_share synced to nobles strata
+                if strata == "nobles":
+                    self.groups[g_name].budget_share = alpha
+
+    def set_budget_shares_per_strata(self, all_shares: Dict[str, Dict[str, float]]) -> None:
+        """Set alpha values for all strata at once."""
+        for strata, shares in all_shares.items():
+            self.set_strata_shares(strata, shares)
 
     def set_budget_shares(self, shares: Dict[str, float]) -> None:
-        """Set budget shares and propagate to groups."""
-        self.budget_shares = shares.copy()
-        for g_name, share in shares.items():
-            if g_name in self.groups:
-                self.groups[g_name].budget_share = share
+        """Backward-compat: apply same shares to all strata."""
+        for strata in _STRATA_KEYS:
+            self.set_strata_shares(strata, shares)
+
+    def apply_delta_with_locks(
+        self,
+        strata: str,
+        changed_group: str,
+        new_alpha: float,
+        locked: Dict[str, bool],
+    ) -> Dict[str, float]:
+        """
+        Apply a change to changed_group's alpha and redistribute the delta uniformly
+        across all unlocked groups (excluding changed_group itself).
+
+        Locked groups keep their values exactly.
+        Returns the updated shares dict for this strata.
+        """
+        current = self.get_strata_shares(strata).copy()
+        old_alpha = current.get(changed_group, 0.0)
+        delta = new_alpha - old_alpha
+
+        unlocked = [
+            g for g in SUBSTITUTE_GROUPS
+            if g != changed_group and not locked.get(g, False)
+        ]
+        locked_other = [
+            g for g in SUBSTITUTE_GROUPS
+            if g != changed_group and locked.get(g, False)
+        ]
+
+        current[changed_group] = new_alpha
+
+        if unlocked and abs(delta) > 1e-9:
+            per_group_adj = -delta / len(unlocked)
+            for g in unlocked:
+                current[g] = max(0.0, current.get(g, 0.0) + per_group_adj)
+
+        # Renormalize only among changed+unlocked groups to fix float drift.
+        # Locked groups are never touched.
+        locked_sum = sum(current.get(g, 0.0) for g in locked_other)
+        adjustable = [changed_group] + unlocked
+        adj_total = sum(current.get(g, 0.0) for g in adjustable)
+        target = max(0.0, 1.0 - locked_sum)
+        if adj_total > 0 and abs(adj_total - target) > 1e-9:
+            scale = target / adj_total
+            for g in adjustable:
+                current[g] = max(0.0, current[g] * scale)
+
+        self.set_strata_shares(strata, current)
+        return current
 
     def validate_constraint(self, income: float, strata: str | None = None) -> Dict[str, float]:
-        """
-        Validate that Σ(demand × price) = income.
-
-        If strata is None, uses aggregate P_g (average across strata).
-        If strata is specified, uses per-strata P_g.
-        """
-        if strata is None:
-            group_spends = {g: g_obj.spend_at(income) for g, g_obj in self.groups.items()}
-            total_spend = sum(group_spends.values())
-        else:
-            group_spends = {g: g_obj.budget_share * income for g, g_obj in self.groups.items()}
-            total_spend = sum(group_spends.values())
+        shares = self.get_strata_shares(strata) if strata else self.budget_shares
+        group_spends = {g: shares.get(g, 0.0) * income for g in self.groups}
+        total_spend = sum(group_spends.values())
         return {
             "total_spend": total_spend,
             "total_income": income,
@@ -171,26 +223,86 @@ class CurveDesignerState:
             "group_spends": group_spends,
         }
 
-    def auto_calibrate_budget_shares(self) -> Dict[str, float]:
+    def auto_calibrate_budget_shares(self) -> Dict[str, Dict[str, float]]:
         """
-        Auto-calibrate budget shares proportional to base_price_sum.
-        α_g = P_g / Σ_h P_h
+        Per-strata auto-calibrate: α_g_s = P_g_s / Σ_h P_h_s.
+        Returns {strata: {group: alpha}}.
         """
-        total_P = sum(g.base_price_sum for g in self.groups.values())
-        if total_P <= 0:
-            return {g: 1.0 / len(self.groups) for g in self.groups}
-        return {g.name: g.base_price_sum / total_P for g in self.groups.values()}
+        result: Dict[str, Dict[str, float]] = {}
+        for s in _STRATA_KEYS:
+            total_P = sum(
+                g_obj.base_price_sum_per_strata.get(s, g_obj.base_price_sum)
+                for g_obj in self.groups.values()
+            )
+            if total_P <= 0:
+                result[s] = {g: 1.0 / len(self.groups) for g in self.groups}
+            else:
+                result[s] = {
+                    g: g_obj.base_price_sum_per_strata.get(s, g_obj.base_price_sum) / total_P
+                    for g, g_obj in self.groups.items()
+                }
+        return result
+
+    def compute_base_price_sums(self, demand_matrix: dict) -> None:
+        """Compute P_g and P_g_s for each group from demand_matrix."""
+        from parser import STRATA
+        for g_name, group in self.groups.items():
+            total = 0.0
+            per_strata: Dict[str, float] = {}
+            for good_name in group.goods:
+                if good_name in demand_matrix:
+                    entry = demand_matrix[good_name]
+                    avg_demand = sum(entry.strata_demand.values()) / len(entry.strata_demand)
+                    total += avg_demand * entry.price
+                    for s in STRATA:
+                        strata_demand = entry.strata_demand.get(s, 0.0)
+                        per_strata[s] = per_strata.get(s, 0.0) + strata_demand * entry.price
+            group.base_price_sum = total
+            group.base_price_sum_per_strata = per_strata
+
+    def load_from_alpha_table(self, path: Path = ALPHA_TABLE) -> bool:
+        """Load per-strata alpha values from alpha_table.csv. Returns True on success."""
+        if not path.exists():
+            return False
+        try:
+            all_shares: Dict[str, Dict[str, float]] = {}
+            with path.open(encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    strata = row["strata"]
+                    all_shares[strata] = {
+                        g: float(row[g]) for g in SUBSTITUTE_GROUPS if g in row
+                    }
+            self.set_budget_shares_per_strata(all_shares)
+            return True
+        except Exception:
+            return False
+
+    def save_to_alpha_table(self, path: Path = ALPHA_TABLE) -> None:
+        """Write current per-strata alpha values to alpha_table.csv."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = ["strata"] + SUBSTITUTE_GROUPS
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for strata in _STRATA_KEYS:
+                shares = self.get_strata_shares(strata)
+                row: Dict = {"strata": strata}
+                row.update({g: round(shares.get(g, 0.0), 6) for g in SUBSTITUTE_GROUPS})
+                writer.writerow(row)
 
     def init_from_demand_matrix(self, demand_matrix: dict) -> None:
-        """Initialize groups from demand_matrix."""
+        """Initialize groups from demand_matrix, then load alpha from alpha_table.csv."""
         for g_name in SUBSTITUTE_GROUPS:
             self.groups[g_name] = SubstituteGroup(
                 name=g_name,
                 goods=GROUP_GOODS[g_name],
             )
         self.compute_base_price_sums(demand_matrix)
-        auto_shares = self.auto_calibrate_budget_shares()
-        self.set_budget_shares(auto_shares)
+        # Try loading per-strata alpha from file; fall back to auto-calibration
+        if not self.load_from_alpha_table():
+            auto_shares = self.auto_calibrate_budget_shares()
+            self.set_budget_shares_per_strata(auto_shares)
 
 
 # ---------------------------------------------------------------------------

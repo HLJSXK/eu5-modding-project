@@ -9,10 +9,12 @@ Usage:
   python scripts/validate.py --changed         # validate only git-changed files
 """
 
+import csv
 import re
 import sys
 import subprocess
 from pathlib import Path
+from typing import Dict
 
 try:
     import yaml
@@ -21,6 +23,13 @@ except ImportError:
     sys.exit(1)
 
 REPO_ROOT = Path(__file__).parent.parent
+SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
+DATA_DIR      = REPO_ROOT / "data"
+ALPHA_CSV     = DATA_DIR / "alpha_table.csv"
+
+_GROUPS     = ["alcohol", "textiles", "knowledge", "precious", "ritual",
+               "stimulants", "spices", "staple", "protein", "military", "household"]
+_STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 MODIFIER_TYPES_FILE = (
     REPO_ROOT
@@ -171,6 +180,156 @@ def check_modifier_names(path: Path, content: str, whitelist: set[str]):
                 )
 
 
+# ---------------------------------------------------------------------------
+# New checks: INJECT demand_multiply, alpha sums, consistency
+# ---------------------------------------------------------------------------
+
+def check_inject_demand_multiply(path: Path, content: str) -> None:
+    """Ensure no INJECT block in z_SOL_pop_goods.txt contains demand_multiply."""
+    if path.name != "z_SOL_pop_goods.txt":
+        return
+
+    # Find every INJECT:good = { ... } block and scan its interior
+    for m in re.finditer(r"\bINJECT\s*:\s*(\w+)\s*=\s*\{", content):
+        good = m.group(1)
+        brace_start = m.end() - 1  # points at '{'
+        depth = 0
+        i = brace_start
+        inner_start = brace_start + 1
+        while i < len(content):
+            if content[i] == "{":
+                depth += 1
+            elif content[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    inner = content[inner_start:i]
+                    # Strip comments before checking
+                    inner_no_comments = re.sub(r"#[^\n]*", "", inner)
+                    if re.search(r"\bdemand_multiply\b", inner_no_comments):
+                        line_num = content[:m.start()].count("\n") + 1
+                        issues.append(
+                            f"[GOODS] {path.relative_to(REPO_ROOT)}:{line_num} — "
+                            f"demand_multiply forbidden inside INJECT block '{good}'"
+                        )
+                    break
+            i += 1
+
+
+def check_alpha_table_sum() -> None:
+    """Validate that each strata row in alpha_table.csv sums to 1.0."""
+    if not ALPHA_CSV.exists():
+        issues.append(f"[ALPHA] {ALPHA_CSV.relative_to(REPO_ROOT)} not found — run: python scripts/gen_budget_shares.py")
+        return
+    try:
+        with ALPHA_CSV.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                strata = row.get("strata", "?")
+                try:
+                    total = sum(float(row[g]) for g in _GROUPS if g in row)
+                except ValueError:
+                    issues.append(f"[ALPHA] alpha_table.csv — strata '{strata}' has non-numeric values")
+                    continue
+                if abs(total - 1.0) > 1e-3:
+                    issues.append(
+                        f"[ALPHA] alpha_table.csv — strata '{strata}' sums to {total:.6f}, expected 1.0"
+                    )
+    except Exception as e:
+        issues.append(f"[ALPHA] Could not read alpha_table.csv: {e}")
+
+
+def check_group_prices_consistency() -> None:
+    """Verify z_SOL_group_prices.txt matches values computed from demand matrix."""
+    try:
+        sys.path.insert(0, str(SIMULATOR_DIR))
+        from parser import _auto_group_prices, GROUP_PRICES_FILE, _read  # type: ignore
+        import re as _re
+
+        expected = _auto_group_prices()
+        if not GROUP_PRICES_FILE.exists():
+            issues.append(
+                f"[PRICES] {GROUP_PRICES_FILE.relative_to(REPO_ROOT)} missing — "
+                "run: python scripts/gen_group_prices.py"
+            )
+            return
+
+        text = _read(GROUP_PRICES_FILE)
+        actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
+        for m in _re.finditer(r"local_(\w+?)_(\w+?)_P\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text):
+            s, g, v = m.group(1), m.group(2), float(m.group(3))
+            if s in actual and g in _GROUPS:
+                actual[s][g] = v
+
+        stale = []
+        for s in _STRATA_KEYS:
+            for g in _GROUPS:
+                exp = expected.get(s, {}).get(g, 0.0)
+                act = actual.get(s, {}).get(g, 0.0)
+                if abs(exp - act) > 1e-4:
+                    stale.append(f"{s}_{g}_P (expected {exp:.6f}, got {act:.6f})")
+        if stale:
+            issues.append(
+                f"[PRICES] z_SOL_group_prices.txt is stale ({len(stale)} value(s)). "
+                "Run: python scripts/gen_group_prices.py"
+            )
+    except ImportError as e:
+        issues.append(f"[PRICES] Could not import parser for consistency check: {e}")
+    except Exception as e:
+        issues.append(f"[PRICES] Error during consistency check: {e}")
+
+
+def check_budget_shares_consistency() -> None:
+    """Verify z_SOL_group_budget_shares.txt matches data/alpha_table.csv."""
+    if not ALPHA_CSV.exists():
+        return  # already reported by check_alpha_table_sum
+
+    try:
+        sys.path.insert(0, str(SIMULATOR_DIR))
+        from parser import BUDGET_SHARES_FILE, _read  # type: ignore
+        import re as _re
+
+        # Load alpha table
+        alpha: Dict[str, Dict[str, float]] = {}
+        with ALPHA_CSV.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                s = row["strata"]
+                alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
+
+        if not BUDGET_SHARES_FILE.exists():
+            issues.append(
+                f"[SHARES] {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)} missing — "
+                "run: python scripts/gen_budget_shares.py"
+            )
+            return
+
+        text = _read(BUDGET_SHARES_FILE)
+        actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
+        for m in _re.finditer(
+            r"local_(\w+?)_(\w+?)_budget_share\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text
+        ):
+            s, g, v = m.group(1), m.group(2), float(m.group(3))
+            if s in actual and g in _GROUPS:
+                actual[s][g] = v
+
+        stale = []
+        for s in _STRATA_KEYS:
+            for g in _GROUPS:
+                exp = alpha.get(s, {}).get(g, 0.0)
+                act = actual.get(s, {}).get(g, 0.0)
+                if abs(exp - act) > 1e-3:
+                    stale.append(f"{s}_{g}")
+        if stale:
+            issues.append(
+                f"[SHARES] z_SOL_group_budget_shares.txt is stale ({len(stale)} value(s)). "
+                "Run: python scripts/gen_budget_shares.py"
+            )
+    except ImportError as e:
+        issues.append(f"[SHARES] Could not import parser for consistency check: {e}")
+    except Exception as e:
+        issues.append(f"[SHARES] Error during consistency check: {e}")
+
+
 def main():
     anti_patterns = load_yaml(KNOWLEDGE_DIR / "anti_patterns.yaml") or []
     enum_data = load_yaml(KNOWLEDGE_DIR / "valid_enums.yaml") or {}
@@ -213,6 +372,12 @@ def main():
         check_anti_patterns(path, content, anti_patterns)
         check_enums(path, content, enum_data)
         check_modifier_names(path, content, modifier_whitelist)
+        check_inject_demand_multiply(path, content)
+
+    # File-independent checks
+    check_alpha_table_sum()
+    check_group_prices_consistency()
+    check_budget_shares_consistency()
 
     if issues:
         print(f"[FAIL] {len(issues)} issue(s) found:\n")
