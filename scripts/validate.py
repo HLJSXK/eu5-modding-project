@@ -196,9 +196,9 @@ def main():
         sys.exit(0)
 
     for path in files:
-        # BOM check for .yml and .txt
-        if path.suffix in {".yml", ".txt"}:
-            check_bom(path)
+        # BOM check for .yml and .txt (commented it is done in build.bat)
+        # if path.suffix in {".yml", ".txt"}:
+        #     check_bom(path)
 
         try:
             content = path.read_text(encoding="utf-8-sig")

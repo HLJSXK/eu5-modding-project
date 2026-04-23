@@ -124,6 +124,31 @@ A **scope** refers to the specific game object (e.g., a country, a character, a 
 
 Script values are used for mathematical calculations and creating dynamic numerical values. They can be defined as reusable named values in the `common/script_values/` folder or created inline within other scripts. They support a wide range of arithmetic and logical operators. [6]
 
+#### Scope Navigation in Script Values — `location.` prefix rule
+
+Script values always execute in the scope they are *called from*, not from the scope implied by their name prefix. The `location.` prefix is a **scope navigation link** that transitions from an outer scope (pop, character, market, etc.) *to* a location. This means:
+
+- **Correct — pop-scope value calling a location-scope value:**
+  ```
+  sol_alcohol_demand_scale = {   # runs in pop scope
+      add = location.local_nobles_alcohol_demand_scale   # navigate to location
+  }
+  ```
+- **Correct — location-scope value referencing other location variables:**
+  ```
+  local_nobles_alcohol_demand_scale = {   # runs in location scope
+      value = local_nobles_savings_pressure   # already in location scope — no prefix
+      multiply = local_noble_gdp_per_capita_display
+  }
+  ```
+- **WRONG — using `location.` inside a location-scope value:**
+  ```
+  local_nobles_alcohol_demand_scale = {
+      value = location.local_nobles_savings_pressure   # ERROR: already in location scope
+  }
+  ```
+  Engine error: `Event target link 'location' did not get a matching scope type. Expected 'character, pop, …', but got 'location'`
+
 ## 6. Game Content Modding
 
 This section covers the modding of specific game content types.
