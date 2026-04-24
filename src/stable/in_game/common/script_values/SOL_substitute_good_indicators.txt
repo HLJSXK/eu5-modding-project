@@ -2,11 +2,12 @@
 ### SECTION: Per-Good Scarcity Flags (GUI tooltip helpers)
 ### ============================================================
 # Part A: sol_good_<good>_scarce — returns 1 when the specific good
-#   is scarce at the evaluated location market (market is in SOL_<good>_scarce_markets).
+#   is scarce at the evaluated location market.
 #
-# Part B: sol_demand_boost_<good> — returns the current total substitute
-#   demand boost (×100 = percentage points) this good receives from other
-#   group members being scarce. Mirrors the additive logic in z_SOL_pop_demand.txt.
+# Part B: sol_demand_share_<good> — returns this good's current demand
+#   share percentage (0-100) based on the weight system, using scarcity-only
+#   weights (no pop-specific modifiers, since this runs in location scope).
+#   Baseline share = 100/N; lower when scarce, higher when group-mates are scarce.
 #
 # Both sets used by SOL_substitute_tooltip.gui to drive per-good rows.
 # Scope when evaluated: location (via Location.MakeScope.ScriptValue)
@@ -22,21 +23,9 @@ sol_good_wine_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_wine = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } } add = 37.5 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } }   add = 30 }
-}
-
 sol_good_liquor_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_liquor = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets target = this } } } add = 24 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } } add = 24 }
 }
 
 sol_good_beer_scarce = {
@@ -44,10 +33,33 @@ sol_good_beer_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_beer = {
+sol_alcohol_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets target = this } } }   add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } } add = 37.5 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_wine = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_alcohol_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_liquor = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_alcohol_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_beer = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_alcohol_base_total_weight
+    multiply = 100
 }
 
 
@@ -60,23 +72,9 @@ sol_good_fur_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_fur = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } }      add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } add = 60 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } }    add = 50.1 }
-}
-
 sol_good_cloth_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_cloth = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } }        add = 13.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } add = 40 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } }    add = 33.2 }
 }
 
 sol_good_fine_cloth_scarce = {
@@ -84,23 +82,46 @@ sol_good_fine_cloth_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_fine_cloth = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } }     add = 6.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } }   add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } } add = 16.7 }
-}
-
 sol_good_jewelry_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_jewelry = {
+sol_textiles_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } }        add = 8.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } }      add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } add = 24 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets       target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_fur = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_textiles_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_cloth = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_textiles_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_fine_cloth = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_textiles_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_jewelry = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_textiles_base_total_weight
+    multiply = 100
 }
 
 
@@ -113,21 +134,9 @@ sol_good_beeswax_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_beeswax = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } } add = 75 }
-}
-
 sol_good_paper_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_paper = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } }   add = 75 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } } add = 30 }
 }
 
 sol_good_books_scarce = {
@@ -135,10 +144,33 @@ sol_good_books_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_books = {
+sol_knowledge_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } }   add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } } add = 12 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_beeswax = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_knowledge_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_paper = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_knowledge_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_books = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_knowledge_base_total_weight
+    multiply = 100
 }
 
 
@@ -151,27 +183,9 @@ sol_good_goods_gold_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_goods_gold = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } } add = 9.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } } add = 4.8 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }  add = 4.8 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }   add = 4.8 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }  add = 4.8 }
-}
-
 sol_good_silver_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_silver = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }     add = 6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }      add = 6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }       add = 6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }      add = 6 }
 }
 
 sol_good_pearls_scarce = {
@@ -179,27 +193,9 @@ sol_good_pearls_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_pearls = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }     add = 24 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }      add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }       add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }      add = 12 }
-}
-
 sol_good_amber_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_amber = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }     add = 24 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }     add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }       add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }      add = 12 }
 }
 
 sol_good_gems_scarce = {
@@ -207,27 +203,62 @@ sol_good_gems_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_gems = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }     add = 24 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }     add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }      add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }      add = 12 }
-}
-
 sol_good_ivory_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_ivory = {
+sol_precious_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }     add = 24 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }     add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }      add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }       add = 12 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets       target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets        target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets       target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_goods_gold = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_silver = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_pearls = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_amber = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_gems = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_ivory = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_precious_base_total_weight
+    multiply = 100
 }
 
 
@@ -240,21 +271,9 @@ sol_good_incense_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_incense = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } } add = 12 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } }     add = 36 }
-}
-
 sol_good_medicaments_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_medicaments = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } } add = 75 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } } add = 90 }
 }
 
 sol_good_mercury_scarce = {
@@ -262,10 +281,33 @@ sol_good_mercury_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_mercury = {
+sol_ritual_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } }     add = 25 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } } add = 10 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_incense = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_ritual_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_medicaments = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_ritual_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_mercury = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_ritual_base_total_weight
+    multiply = 100
 }
 
 
@@ -278,25 +320,9 @@ sol_good_sugar_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_sugar = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = 15.2 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }     add = 15.2 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }   add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } }  add = 15.2 }
-}
-
 sol_good_tobacco_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_tobacco = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }  add = 15.2 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }    add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }  add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } } add = 15 }
 }
 
 sol_good_tea_scarce = {
@@ -304,25 +330,9 @@ sol_good_tea_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_tea = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }   add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }   add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } }  add = 15 }
-}
-
 sol_good_cocoa_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_cocoa = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }   add = 11.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = 11.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }     add = 11.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } }  add = 11.1 }
 }
 
 sol_good_coffee_scarce = {
@@ -330,12 +340,49 @@ sol_good_coffee_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_coffee = {
+sol_stimulants_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }   add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }     add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }   add = 20 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_sugar = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_stimulants_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_tobacco = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_stimulants_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_tea = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_stimulants_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_cocoa = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_stimulants_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_coffee = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_stimulants_base_total_weight
+    multiply = 100
 }
 
 
@@ -348,23 +395,9 @@ sol_good_saffron_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_saffron = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } } add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } } add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } }  add = 20 }
-}
-
 sol_good_pepper_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_pepper = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } }  add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } }   add = 20 }
 }
 
 sol_good_cloves_scarce = {
@@ -372,23 +405,46 @@ sol_good_cloves_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_cloves = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } }  add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } }   add = 20 }
-}
-
 sol_good_chili_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_chili = {
+sol_spices_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } }  add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } }  add = 20 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_saffron = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_spices_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_pepper = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_spices_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_cloves = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_spices_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_chili = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_spices_base_total_weight
+    multiply = 100
 }
 
 
@@ -401,31 +457,9 @@ sol_good_wheat_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_wheat = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.4 }
-}
-
 sol_good_rice_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_rice = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.4 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.6 }
 }
 
 sol_good_millet_scarce = {
@@ -433,31 +467,9 @@ sol_good_millet_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_millet = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.6 }
-}
-
 sol_good_maize_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_maize = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.6 }
 }
 
 sol_good_potato_scarce = {
@@ -465,31 +477,9 @@ sol_good_potato_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_potato = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.6 }
-}
-
 sol_good_legumes_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_legumes = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }  add = 8.6 }
 }
 
 sol_good_olives_scarce = {
@@ -497,31 +487,78 @@ sol_good_olives_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_olives = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }   add = 8.6 }
-}
-
 sol_good_fruit_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_fruit = {
+sol_staple_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }    add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }  add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }  add = 8.6 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets    target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_wheat = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_rice = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_millet = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_maize = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_potato = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_legumes = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_olives = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_fruit = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_staple_base_total_weight
+    multiply = 100
 }
 
 
@@ -534,21 +571,9 @@ sol_good_fish_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_fish = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } } add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } } add = 45 }
-}
-
 sol_good_wild_game_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_wild_game = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } }      add = 30 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } } add = 45 }
 }
 
 sol_good_livestock_scarce = {
@@ -556,10 +581,33 @@ sol_good_livestock_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_livestock = {
+sol_protein_base_total_weight = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } }      add = 20 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } } add = 20 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_fish = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_protein_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_wild_game = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_protein_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_livestock = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_protein_base_total_weight
+    multiply = 100
 }
 
 
@@ -572,29 +620,9 @@ sol_good_horses_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_horses = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 33.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }  add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }  add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }      add = 6.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }      add = 13.3 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 10 }
-}
-
 sol_good_elephants_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_elephants = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }   add = 3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } } add = 3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } } add = 3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }     add = 2 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }     add = 4 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 3 }
 }
 
 sol_good_weaponry_scarce = {
@@ -602,29 +630,9 @@ sol_good_weaponry_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_weaponry = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }    add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 33.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }  add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }      add = 6.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }      add = 13.3 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 10 }
-}
-
 sol_good_firearms_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_firearms = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }    add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 33.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }  add = 10 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }      add = 6.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }      add = 13.3 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 10 }
 }
 
 sol_good_coal_scarce = {
@@ -632,29 +640,9 @@ sol_good_coal_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_coal = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }    add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 50 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }  add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }  add = 15 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }      add = 20.2 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 15 }
-}
-
 sol_good_salt_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_salt = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }    add = 7.5 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 25.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }  add = 7.5 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }  add = 7.5 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }      add = 4.9 }
-    if = { limit = { sol_pp_victuals_compat_is_on = yes market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 7.5 }
 }
 
 sol_good_victuals_scarce = {
@@ -668,88 +656,81 @@ sol_good_victuals_scarce = {
     }
 }
 
-sol_demand_boost_victuals = {
+sol_military_base_total_weight = {
     value = 0
-    if = {
-        limit = { sol_pp_victuals_compat_is_on = yes }
-        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }    add = 10 }
-        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 33.3 }
-        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }  add = 10 }
-        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }  add = 10 }
-        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }      add = 6.7 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets    target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets  target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { sol_pp_victuals_compat_is_on = yes }
+        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = 0.5 }
+        else = { add = 1 }
     }
+    min = 0.001
+}
+
+sol_demand_share_horses = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_elephants = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_weaponry = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_firearms = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_coal = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_salt = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_military_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_victuals = {
+    value = 0
+    if = { limit = { sol_pp_victuals_compat_is_on = yes }
+        add = 1
+        if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } } add = -0.5 }
+    }
+    divide = sol_military_base_total_weight
+    multiply = 100
 }
 
 
 ###############################################################
-# HOUSEHOLD group: furniture, lacquerware, lumber, marble, masonry, porcelain, pottery, tools
-# Boost formula: 60 × (price_scarce / price_receiver) / 7
-# Prices: furniture=3, lacquerware=5, lumber=1.5, marble=5,
-#         masonry=1, porcelain=3, pottery=1, tools=3
+# HOUSEHOLD group: lumber, masonry, tools, pottery, furniture, porcelain, lacquerware, marble
 ###############################################################
-
-sol_good_furniture_scarce = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_furniture = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 4.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 2.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 2.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 8.6 }
-}
-
-sol_good_lacquerware_scarce = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_lacquerware = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 5.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 2.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 1.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 5.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 1.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 5.1 }
-}
 
 sol_good_lumber_scarce = {
     value = 0
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_lumber = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 17.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 28.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 28.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 5.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 17.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 5.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 17.1 }
-}
-
-sol_good_marble_scarce = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_marble = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 5.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 2.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 1.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 5.1 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 1.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 5.1 }
 }
 
 sol_good_masonry_scarce = {
@@ -757,31 +738,9 @@ sol_good_masonry_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_masonry = {
+sol_good_tools_scarce = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 25.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 42.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 12.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 42.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 25.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 25.7 }
-}
-
-sol_good_porcelain_scarce = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } } value = 1 }
-}
-
-sol_demand_boost_porcelain = {
-    value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 4.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 2.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 2.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 8.6 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } } value = 1 }
 }
 
 sol_good_pottery_scarce = {
@@ -789,29 +748,91 @@ sol_good_pottery_scarce = {
     if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_pottery = {
+sol_good_furniture_scarce = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 25.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 42.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 12.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 42.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 25.7 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }       add = 25.7 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } } value = 1 }
 }
 
-sol_good_tools_scarce = {
+sol_good_porcelain_scarce = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } } value = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } } value = 1 }
 }
 
-sol_demand_boost_tools = {
+sol_good_lacquerware_scarce = {
     value = 0
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }      add = 4.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }      add = 14.3 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }     add = 2.9 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }   add = 8.6 }
-    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }     add = 2.9 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } value = 1 }
+}
+
+sol_good_marble_scarce = {
+    value = 0
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } } value = 1 }
+}
+
+sol_household_base_total_weight = {
+    value = 0
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets       target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets     target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets   target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = 0.5 } else = { add = 1 }
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets      target = this } } } add = 0.5 } else = { add = 1 }
+    min = 0.001
+}
+
+sol_demand_share_lumber = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_masonry = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_tools = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_pottery = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_furniture = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_porcelain = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_lacquerware = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
+}
+
+sol_demand_share_marble = {
+    value = 1
+    if = { limit = { market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } } add = -0.5 }
+    divide = sol_household_base_total_weight
+    multiply = 100
 }
