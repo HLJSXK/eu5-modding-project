@@ -468,7 +468,7 @@ def export_group_prices_jomini(prices: Dict[str, Dict[str, float]]) -> str:
         lines.append(f"\n# {s}")
         for g in _GROUPS:
             v = prices[s].get(g, 0.0)
-            lines.append(f"local_{s}_{g}_P = {{ value = {v:.6f} }}")
+            lines.append(f"local_{s}_{g}_P = {{ value = {v:.5f} }}")
     return "\n".join(lines)
 
 
@@ -484,7 +484,7 @@ def export_budget_shares_jomini(
         lines.append(f"\n# {s}")
         for g in _GROUPS:
             v = shares[s].get(g, 0.0)
-            lines.append(f"local_{s}_{g}_budget_share = {{ value = {v:.6f} }}")
+            lines.append(f"local_{s}_{g}_budget_share = {{ value = {v:.5f} }}")
     return "\n".join(lines)
 
 
