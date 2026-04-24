@@ -330,6 +330,30 @@ def check_budget_shares_consistency() -> None:
         issues.append(f"[SHARES] Error during consistency check: {e}")
 
 
+def check_loc_coverage() -> None:
+    """Verify every key in English localization also exists in simp_chinese."""
+    en_dir = REPO_ROOT / "src" / "stable" / "main_menu" / "localization" / "english"
+    zh_dir = REPO_ROOT / "src" / "stable" / "main_menu" / "localization" / "simp_chinese"
+    if not en_dir.exists():
+        return
+    key_pat = re.compile(r"^\s+(\w+)\s*:")
+    for en_file in sorted(en_dir.glob("*_l_english.yml")):
+        stem = en_file.stem[: -len("_l_english")]
+        zh_file = zh_dir / f"{stem}_l_simp_chinese.yml"
+        en_keys = {m.group(1) for line in en_file.read_text(encoding="utf-8-sig").splitlines() if (m := key_pat.match(line))}
+        if not zh_file.exists():
+            issues.append(f"[LOC] Missing simp_chinese file: {zh_file.relative_to(REPO_ROOT)}")
+            continue
+        zh_keys = {m.group(1) for line in zh_file.read_text(encoding="utf-8-sig").splitlines() if (m := key_pat.match(line))}
+        missing = sorted(en_keys - zh_keys)
+        if missing:
+            issues.append(
+                f"[LOC] {zh_file.relative_to(REPO_ROOT)}: "
+                f"{len(missing)} key(s) missing from simp_chinese: "
+                + ", ".join(missing)
+            )
+
+
 def main():
     anti_patterns = load_yaml(KNOWLEDGE_DIR / "anti_patterns.yaml") or []
     enum_data = load_yaml(KNOWLEDGE_DIR / "valid_enums.yaml") or {}
@@ -378,6 +402,7 @@ def main():
     check_alpha_table_sum()
     check_group_prices_consistency()
     check_budget_shares_consistency()
+    check_loc_coverage()
 
     if issues:
         print(f"[FAIL] {len(issues)} issue(s) found:\n")
