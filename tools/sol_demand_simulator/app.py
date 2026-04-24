@@ -1136,6 +1136,8 @@ with tab4:
 
     if export_shares_clicked:
         try:
+            cd.save_to_alpha_table(ALPHA_TABLE)
+            st.session_state["_shares_source"] = "from alpha_table.csv"
             _scripts_dir = ALPHA_TABLE.parent.parent / "scripts"
             import sys as _sys
             _sys.path.insert(0, str(_scripts_dir))
