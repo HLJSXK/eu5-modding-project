@@ -135,7 +135,7 @@ def save_user_presets(presets: dict) -> None:
 
 def dict_to_params(d: dict) -> ScenarioParams:
     comm_total = d["strata"].get("commoners", {}).get("pop_count", 0.0)
-    each = comm_total / 3.0
+    each = comm_total / 2.0
     return ScenarioParams(
         monthly_income          = d["monthly_income"],
         num_institutions        = d["num_institutions"],
@@ -144,7 +144,7 @@ def dict_to_params(d: dict) -> ScenarioParams:
         peasant_enfranchisement = d["peasant_enfranchisement"],
         pop_laborers            = d.get("pop_laborers", each),
         pop_peasants            = d.get("pop_peasants", each),
-        pop_soldiers            = d.get("pop_soldiers", each),
+        pop_soldiers            = d.get("pop_soldiers", 0.0),
         update_interval_years   = d["update_interval_years"],
         sim_years               = d["sim_years"],
         ema_alpha               = d.get("ema_alpha", 1.0),
@@ -277,10 +277,10 @@ with st.sidebar:
     pop_clergy    = st.number_input("Clergy",    min_value=0.0, value=float(_sv("clergy",    "pop_count", 0.15)), step=0.05, key="w_pop_clergy")
     pop_burghers  = st.number_input("Burghers",  min_value=0.0, value=float(_sv("burghers",  "pop_count", 0.15)), step=0.05, key="w_pop_burghers")
     _comm_total = float(_sv("commoners", "pop_count", 2.0))
-    _comm_each  = round(_comm_total / 3, 4)
+    _comm_each  = round(_comm_total / 2, 4)
     pop_laborers  = st.number_input("  Laborers",  min_value=0.0, value=float(_pv("pop_laborers",  _comm_each)), step=0.05, key="w_pop_laborers")
     pop_peasants  = st.number_input("  Peasants",  min_value=0.0, value=float(_pv("pop_peasants",  _comm_each)), step=0.05, key="w_pop_peasants")
-    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  _comm_each)), step=0.05, key="w_pop_soldiers")
+    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  0.0)),        step=0.05, key="w_pop_soldiers")
     pop_commoners = pop_laborers + pop_peasants + pop_soldiers
     st.caption(f"Commoners total: {pop_commoners:.3f}")
     pop_tribesmen = st.number_input("Tribesmen", min_value=0.0, value=float(_sv("tribesmen", "pop_count", 0.0)),  step=0.05, key="w_pop_tribesmen")
