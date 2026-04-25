@@ -64,6 +64,18 @@ from curve_designer import (
     compute_total_spend_curve,
     luxury_sorted_groups,
 )
+from engel_export import (
+    REPO_ROOT,
+    BRACKET_TABLE,
+    DEFAULT_THRESHOLDS,
+    load_bracket_table,
+    load_bracket_thresholds,
+    save_bracket_table,
+    validate_all_bracket_constraints,
+    export_bracket_budget_shares,
+    init_bracket_table_from_alpha_table,
+    BUDGET_SHARES_FILE as ENGEL_BUDGET_SHARES_FILE,
+)
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -1354,3 +1366,281 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
 - 奢侈品（高 α_g）在收入增加时获得更多支出
 - 必需品（低 α_g）保持比例稳定
         """)
+
+    st.divider()
+
+    # ===========================================================================
+    # BRACKET MODE — Non-linear Engel curve designer
+    # ===========================================================================
+    with st.expander("▶ 分档 Engel 曲线设计器（非线性需求）", expanded=False):
+        st.caption(
+            "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
+            "设计完成后点击「导出分档预算份额」，生成含 `if` 分支的 EU5 script_values 文件。"
+        )
+
+        bm_init_col, bm_init_info_col = st.columns([1, 3])
+        with bm_init_col:
+            if st.button(
+                "初始化分档数据",
+                key="bm_init_btn",
+                help="从 alpha_table.csv 生成初始 alpha_bracket_table.csv（各档相同——退化为线性）",
+            ):
+                init_bracket_table_from_alpha_table()
+                for key in list(st.session_state.keys()):
+                    if key.startswith("bm_"):
+                        del st.session_state[key]
+                st.rerun()
+        with bm_init_info_col:
+            if BRACKET_TABLE.exists():
+                st.caption(f"数据文件: `{BRACKET_TABLE.relative_to(REPO_ROOT)}`")
+            else:
+                st.info("尚未生成分档数据。请点击左侧按钮初始化。")
+
+        if not BRACKET_TABLE.exists():
+            st.stop()
+
+        # ---- Load / cache bracket state ----
+        if "bm_initialized" not in st.session_state:
+            st.session_state["bm_thresholds"] = load_bracket_thresholds(BRACKET_TABLE)
+            st.session_state["bm_alpha"]      = load_bracket_table(BRACKET_TABLE)
+            st.session_state["bm_initialized"] = True
+
+        bm_thresholds: dict = st.session_state["bm_thresholds"]
+        bm_alpha: dict      = st.session_state["bm_alpha"]
+
+        # ---- Strata + bracket selectors ----
+        bm_sel_col1, bm_sel_col2 = st.columns([1, 2])
+        with bm_sel_col1:
+            bm_strata = st.selectbox(
+                "阶层",
+                options=STRATA,
+                format_func=lambda s: f"{s} ({STRATA_LABELS[s]})",
+                key="bm_strata",
+            )
+        with bm_sel_col2:
+            bm_s_thresholds = list(bm_thresholds.get(bm_strata, DEFAULT_THRESHOLDS.get(bm_strata, [0.0])))
+            n_brackets = len(bm_s_thresholds)
+            def _bracket_label(k: int) -> str:
+                lo = bm_s_thresholds[k]
+                hi = bm_s_thresholds[k + 1] if k + 1 < n_brackets else "∞"
+                return f"bracket {k}: [{lo}, {hi})"
+            bm_bracket = st.selectbox(
+                "当前编辑分档",
+                options=list(range(n_brackets)),
+                format_func=_bracket_label,
+                key="bm_bracket",
+            )
+
+        # ---- Threshold editor ----
+        st.markdown(f"**{bm_strata} 分档阈值（income gold/月/pop-unit，bracket 0 固定为 0）**")
+        thresh_cols = st.columns(n_brackets)
+        new_thresholds = list(bm_s_thresholds)
+        for k in range(n_brackets):
+            with thresh_cols[k]:
+                new_thresholds[k] = st.number_input(
+                    f"b{k}",
+                    value=float(bm_s_thresholds[k]),
+                    min_value=0.0,
+                    max_value=1000.0,
+                    step=0.5,
+                    key=f"bm_thresh_{bm_strata}_{k}",
+                    disabled=(k == 0),
+                )
+        if new_thresholds != bm_s_thresholds:
+            st.session_state["bm_thresholds"][bm_strata] = new_thresholds
+            bm_s_thresholds = new_thresholds
+
+        st.divider()
+
+        # ---- Bracket α overview table ----
+        st.markdown(f"**全分档 α 概览 — {bm_strata}**")
+        overview_rows = []
+        for k in range(n_brackets):
+            ka = bm_alpha.get(bm_strata, {}).get(k, {})
+            row = {"bracket": _bracket_label(k)}
+            row.update({g: round(ka.get(g, 0.0), 5) for g in luxury_sorted_groups()})
+            row["Σα"] = round(sum(ka.get(g, 0.0) for g in SUBSTITUTE_GROUPS), 5)
+            overview_rows.append(row)
+        ov_df = pd.DataFrame(overview_rows)
+        st.dataframe(
+            ov_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Σα": st.column_config.NumberColumn(format="%.5f")},
+        )
+
+        st.divider()
+
+        # ---- Per-bracket α sliders ----
+        st.markdown(f"#### 分档 α 编辑器 — {bm_strata} / {_bracket_label(bm_bracket)}")
+        st.caption("调整后其他未锁定组自动再分配，确保每档 Σα = 1。")
+
+        # Sync slider keys when strata or bracket changes
+        _bm_last = st.session_state.get("_bm_last_context", "")
+        _bm_cur  = f"{bm_strata}_{bm_bracket}"
+        if _bm_last != _bm_cur:
+            bracket_init = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
+            for _g in SUBSTITUTE_GROUPS:
+                st.session_state[f"bm_share_{bm_strata}_{bm_bracket}_{_g}"] = float(
+                    bracket_init.get(_g, 0.0)
+                )
+            st.session_state["_bm_last_context"] = _bm_cur
+
+        def _bm_on_alpha_change(g_name: str, strata: str, bracket: int) -> None:
+            new_val = float(st.session_state[f"bm_share_{strata}_{bracket}_{g_name}"])
+            locked = {g: st.session_state.get(f"bm_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
+            # Use a temp CurveDesignerState for the redistribution logic
+            temp = CurveDesignerState()
+            current = st.session_state["bm_alpha"].get(strata, {}).get(bracket, {})
+            temp.set_strata_shares(strata, current)
+            updated = temp.apply_delta_with_locks(strata, g_name, new_val, locked)
+            st.session_state["bm_alpha"][strata][bracket] = updated
+            for _g, _v in updated.items():
+                st.session_state[f"bm_share_{strata}_{bracket}_{_g}"] = float(_v)
+
+        bm_share_cols = st.columns(2)
+        for idx, g_name in enumerate(luxury_sorted_groups()):
+            with bm_share_cols[idx % 2]:
+                color_hex = GROUP_COLORS.get(g_name, "#888")
+                badge_col, lock_col = st.columns([0.85, 0.15])
+                with badge_col:
+                    st.markdown(
+                        f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
+                        f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span>",
+                        unsafe_allow_html=True,
+                    )
+                with lock_col:
+                    st.checkbox("🔒", key=f"bm_lock_{g_name}", label_visibility="collapsed")
+
+                cur_alpha = bm_alpha.get(bm_strata, {}).get(bm_bracket, {}).get(g_name, 0.0)
+                st.caption(f"α = {cur_alpha:.5f}")
+                st.slider(
+                    f"bm_α_{g_name}",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.001,
+                    key=f"bm_share_{bm_strata}_{bm_bracket}_{g_name}",
+                    on_change=_bm_on_alpha_change,
+                    args=(g_name, bm_strata, bm_bracket),
+                    label_visibility="collapsed",
+                )
+
+        bm_cur_shares = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
+        bm_total = sum(bm_cur_shares.values())
+        bm_valid = abs(bm_total - 1.0) < 1e-5
+        st.markdown(
+            f"**约束状态:** Σα = **{bm_total:.6f}** "
+            f"{'✓ 满足' if bm_valid else '✗ 不满足（需重新分配）'}"
+        )
+
+        st.divider()
+
+        # ---- α(y) staircase chart ----
+        st.markdown(f"#### α(y) 阶跃曲线 — {bm_strata}")
+        st.caption(
+            "横轴：收入；纵轴：预算份额 α_g_s。"
+            "斜率跳变位置 = 分档阈值。必需品下降，奢侈品上升。"
+        )
+        income_max = max(bm_s_thresholds[-1] * 2.5, 20.0)
+        income_pts = np.linspace(0, income_max, 500)
+        fig_alpha = go.Figure()
+        for g_name in luxury_sorted_groups():
+            color = GROUP_COLORS.get(g_name, "#888")
+            alpha_vals = np.zeros_like(income_pts)
+            for i, y in enumerate(income_pts):
+                # Find bracket for income y
+                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                k = max(0, min(k, n_brackets - 1))
+                alpha_vals[i] = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+            fig_alpha.add_trace(go.Scatter(
+                x=income_pts, y=alpha_vals,
+                name=g_name.title(),
+                line=dict(color=color, width=2),
+                mode="lines",
+            ))
+        # Vertical lines at bracket boundaries
+        for thresh in bm_s_thresholds[1:]:
+            fig_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+        fig_alpha.update_layout(
+            xaxis_title="Income (gold/月/pop-unit)",
+            yaxis_title="预算份额 α_g_s",
+            legend_title="Group",
+            height=380,
+        )
+        st.plotly_chart(fig_alpha, use_container_width=True)
+
+        # ---- Piecewise Engel demand curve ----
+        st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
+        st.caption("d_g_s(y) = (α_g_s(y) / P_g_s) × y。斜率在分档阈值处跳变。")
+        fig_bm_engel = go.Figure()
+        for g_name in luxury_sorted_groups():
+            color = GROUP_COLORS.get(g_name, "#888")
+            demand_vals = np.zeros_like(income_pts)
+            group_obj = cd.groups.get(g_name)
+            P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+            for i, y in enumerate(income_pts):
+                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                k = max(0, min(k, n_brackets - 1))
+                alpha = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+                demand_vals[i] = (alpha / P_g_s * y) if P_g_s > 0 else 0.0
+            fig_bm_engel.add_trace(go.Scatter(
+                x=income_pts, y=demand_vals,
+                name=g_name.title(),
+                line=dict(color=color, width=2),
+            ))
+        for thresh in bm_s_thresholds[1:]:
+            fig_bm_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+        fig_bm_engel.update_layout(
+            xaxis_title="Income (gold/月/pop-unit)",
+            yaxis_title=f"Group Demand ({bm_strata})",
+            legend_title="Group",
+            height=380,
+        )
+        st.plotly_chart(fig_bm_engel, use_container_width=True)
+
+        st.divider()
+
+        # ---- Save + Export buttons ----
+        bm_btn1, bm_btn2 = st.columns(2)
+        with bm_btn1:
+            bm_save_clicked = st.button(
+                "保存分档Alpha表格",
+                type="primary",
+                use_container_width=True,
+                key="bm_save_btn",
+                help="写入 data/alpha_bracket_table.csv",
+            )
+        with bm_btn2:
+            bm_export_clicked = st.button(
+                "导出分档预算份额",
+                use_container_width=True,
+                key="bm_export_btn",
+                help="生成含 if 分支的 z_SOL_group_budget_shares.txt",
+            )
+
+        if bm_save_clicked:
+            errs = validate_all_bracket_constraints(bm_alpha)
+            if errs:
+                for e in errs:
+                    st.error(e)
+            else:
+                save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+                st.success(f"已保存 → {BRACKET_TABLE.relative_to(REPO_ROOT)}")
+
+        if bm_export_clicked:
+            # Reload from in-memory state (may differ from disk)
+            errs = validate_all_bracket_constraints(bm_alpha)
+            if errs:
+                for e in errs:
+                    st.error(e)
+                st.error("存在约束违反，请修复后再导出。")
+            else:
+                # Save to CSV first, then export
+                save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+                warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
+                for w in warns:
+                    st.warning(w)
+                st.success(
+                    f"分档预算份额已写入 "
+                    f"`{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`"
+                )
