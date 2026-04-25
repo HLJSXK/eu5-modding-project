@@ -170,14 +170,27 @@ class CurveDesignerState:
         changed_group: str,
         new_alpha: float,
         locked: Dict[str, bool],
+        P_gs: Dict[str, float] | None = None,
     ) -> Dict[str, float]:
         """
         Apply a change to changed_group's alpha and redistribute the delta uniformly
-        across all unlocked groups (excluding changed_group itself).
+        across all unlocked groups in b-space (b = alpha / P_g_s), so groups with
+        higher price-sums absorb proportionally more of the compensating adjustment.
 
+        P_gs: optional {group: P_g_s} override; falls back to self.groups if available,
+              then to 1.0 (degenerates to equal-alpha redistribution).
         Locked groups keep their values exactly.
         Returns the updated shares dict for this strata.
         """
+        def _p(g: str) -> float:
+            if P_gs and g in P_gs:
+                v = P_gs[g]
+            elif self.groups.get(g):
+                v = self.groups[g].base_price_sum_per_strata.get(strata, 1.0)
+            else:
+                v = 1.0
+            return v if v > 0 else 1.0
+
         current = self.get_strata_shares(strata).copy()
         old_alpha = current.get(changed_group, 0.0)
         delta = new_alpha - old_alpha
@@ -194,9 +207,10 @@ class CurveDesignerState:
         current[changed_group] = new_alpha
 
         if unlocked and abs(delta) > 1e-9:
-            per_group_adj = -delta / len(unlocked)
+            P_sum = sum(_p(g) for g in unlocked)
+            per_b = -delta / P_sum   # equal Δb per unlocked group; Σ Δalpha = -delta exactly
             for g in unlocked:
-                current[g] = max(0.0, current.get(g, 0.0) + per_group_adj)
+                current[g] = max(0.0, current.get(g, 0.0) + per_b * _p(g))
 
         # Renormalize only among changed+unlocked groups to fix float drift.
         # Locked groups are never touched.

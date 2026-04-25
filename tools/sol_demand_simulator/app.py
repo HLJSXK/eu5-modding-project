@@ -1091,10 +1091,11 @@ with tab4:
     def _bm_apply(g_name: str, strata: str, bracket: int, new_alpha: float) -> None:
         """Core redistribution — updates bm_alpha and syncs all three widget keys."""
         locked = {g: st.session_state.get(f"bm_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
+        P_gs = {g: _P(g, strata) for g in SUBSTITUTE_GROUPS}
         temp = CurveDesignerState()
         current = st.session_state["bm_alpha"].get(strata, {}).get(bracket, {})
         temp.set_strata_shares(strata, current)
-        updated = temp.apply_delta_with_locks(strata, g_name, new_alpha, locked)
+        updated = temp.apply_delta_with_locks(strata, g_name, new_alpha, locked, P_gs=P_gs)
         st.session_state["bm_alpha"][strata][bracket] = updated
         for _g, _a in updated.items():
             _a = float(_a)
