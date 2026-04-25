@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).parent.parent
 SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
 DATA_DIR      = REPO_ROOT / "data"
 ALPHA_CSV     = DATA_DIR / "alpha_table.csv"
+BRACKET_CSV   = DATA_DIR / "alpha_bracket_table.csv"
 
 _GROUPS     = ["alcohol", "textiles", "knowledge", "precious", "ritual",
                "stimulants", "spices", "staple", "protein", "military", "household"]
@@ -215,6 +216,37 @@ def check_inject_demand_multiply(path: Path, content: str) -> None:
             i += 1
 
 
+def check_bracket_table_sum() -> None:
+    """Validate that each (strata, bracket) row in alpha_bracket_table.csv sums to 1.0."""
+    if not BRACKET_CSV.exists():
+        issues.append(
+            f"[BRACKET] {BRACKET_CSV.relative_to(REPO_ROOT)} not found — "
+            "run: python tools/sol_demand_simulator/engel_export.py --init"
+        )
+        return
+    try:
+        with BRACKET_CSV.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                strata = row.get("strata", "?")
+                bracket = row.get("bracket", "?")
+                try:
+                    total = sum(float(row[g]) for g in _GROUPS if g in row)
+                except ValueError:
+                    issues.append(
+                        f"[BRACKET] alpha_bracket_table.csv — "
+                        f"strata '{strata}' bracket {bracket} has non-numeric values"
+                    )
+                    continue
+                if abs(total - 1.0) > 1e-3:
+                    issues.append(
+                        f"[BRACKET] alpha_bracket_table.csv — "
+                        f"strata '{strata}' bracket {bracket} sums to {total:.6f}, expected 1.0"
+                    )
+    except Exception as e:
+        issues.append(f"[BRACKET] Could not read alpha_bracket_table.csv: {e}")
+
+
 def check_alpha_table_sum() -> None:
     """Validate that each strata row in alpha_table.csv sums to 1.0."""
     if not ALPHA_CSV.exists():
@@ -400,6 +432,7 @@ def main():
 
     # File-independent checks
     check_alpha_table_sum()
+    check_bracket_table_sum()
     check_group_prices_consistency()
     check_budget_shares_consistency()
     check_loc_coverage()

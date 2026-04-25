@@ -74,7 +74,12 @@ from engel_export import (
     validate_all_bracket_constraints,
     export_bracket_budget_shares,
     init_bracket_table_from_alpha_table,
+    compute_piecewise_offsets,
+    export_demand_offsets,
+    export_demand_scales_with_offset,
     BUDGET_SHARES_FILE as ENGEL_BUDGET_SHARES_FILE,
+    DEMAND_OFFSETS_FILE,
+    DEMAND_SCALES_FILE,
 )
 
 # ---------------------------------------------------------------------------
@@ -1150,18 +1155,30 @@ with tab4:
         try:
             cd.save_to_alpha_table(ALPHA_TABLE)
             st.session_state["_shares_source"] = "from alpha_table.csv"
-            _scripts_dir = ALPHA_TABLE.parent.parent / "scripts"
-            import sys as _sys
-            _sys.path.insert(0, str(_scripts_dir))
-            from gen_budget_shares import load_alpha_table, validate_alpha_sums, write_budget_shares  # type: ignore
-            _alpha = load_alpha_table(ALPHA_TABLE)
-            _errs = validate_alpha_sums(_alpha)
-            if _errs:
-                for _e in _errs:
-                    st.warning(_e)
+            if BRACKET_TABLE.exists():
+                bk_alpha = load_bracket_table(BRACKET_TABLE)
+                bk_thresholds = load_bracket_thresholds(BRACKET_TABLE)
+                errs = validate_all_bracket_constraints(bk_alpha)
+                if errs:
+                    for e in errs:
+                        st.warning(e)
+                warns = export_bracket_budget_shares(bk_alpha, bk_thresholds, ENGEL_BUDGET_SHARES_FILE)
+                for w in warns:
+                    st.warning(w)
+                st.success("预算份额（分档）已写入 z_SOL_group_budget_shares.txt")
             else:
-                write_budget_shares(_alpha)
-                st.success("预算份额已写入 z_SOL_group_budget_shares.txt")
+                _scripts_dir = ALPHA_TABLE.parent.parent / "scripts"
+                import sys as _sys
+                _sys.path.insert(0, str(_scripts_dir))
+                from gen_budget_shares import load_alpha_table, validate_alpha_sums, write_budget_shares  # type: ignore
+                _alpha = load_alpha_table(ALPHA_TABLE)
+                _errs = validate_alpha_sums(_alpha)
+                if _errs:
+                    for _e in _errs:
+                        st.warning(_e)
+                else:
+                    write_budget_shares(_alpha)
+                    st.success("预算份额已写入 z_SOL_group_budget_shares.txt")
         except Exception as e:
             st.error(f"导出失败: {e}")
 
@@ -1475,28 +1492,52 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
         st.markdown(f"#### 分档 α 编辑器 — {bm_strata} / {_bracket_label(bm_bracket)}")
         st.caption("调整后其他未锁定组自动再分配，确保每档 Σα = 1。")
 
-        # Sync slider keys when strata or bracket changes
+        def _P(g: str, strata: str) -> float:
+            """P_g_s for group g at strata."""
+            obj = cd.groups.get(g)
+            return obj.base_price_sum_per_strata.get(strata, 0.0) if obj else 0.0
+
+        # Sync slider + fine-α + fine-b keys when strata or bracket changes
         _bm_last = st.session_state.get("_bm_last_context", "")
         _bm_cur  = f"{bm_strata}_{bm_bracket}"
         if _bm_last != _bm_cur:
             bracket_init = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
             for _g in SUBSTITUTE_GROUPS:
-                st.session_state[f"bm_share_{bm_strata}_{bm_bracket}_{_g}"] = float(
-                    bracket_init.get(_g, 0.0)
-                )
+                _a = float(bracket_init.get(_g, 0.0))
+                _p = _P(_g, bm_strata)
+                _b = _a / _p if _p > 0 else 0.0
+                st.session_state[f"bm_share_{bm_strata}_{bm_bracket}_{_g}"] = _a
+                st.session_state[f"bm_fine_{bm_strata}_{bm_bracket}_{_g}"]  = _a
+                st.session_state[f"bm_b_{bm_strata}_{bm_bracket}_{_g}"]     = _b
             st.session_state["_bm_last_context"] = _bm_cur
 
-        def _bm_on_alpha_change(g_name: str, strata: str, bracket: int) -> None:
-            new_val = float(st.session_state[f"bm_share_{strata}_{bracket}_{g_name}"])
+        def _bm_apply(g_name: str, strata: str, bracket: int, new_alpha: float) -> None:
+            """Core redistribution — updates bm_alpha and syncs all three widget keys."""
             locked = {g: st.session_state.get(f"bm_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
-            # Use a temp CurveDesignerState for the redistribution logic
             temp = CurveDesignerState()
             current = st.session_state["bm_alpha"].get(strata, {}).get(bracket, {})
             temp.set_strata_shares(strata, current)
-            updated = temp.apply_delta_with_locks(strata, g_name, new_val, locked)
+            updated = temp.apply_delta_with_locks(strata, g_name, new_alpha, locked)
             st.session_state["bm_alpha"][strata][bracket] = updated
-            for _g, _v in updated.items():
-                st.session_state[f"bm_share_{strata}_{bracket}_{_g}"] = float(_v)
+            for _g, _a in updated.items():
+                _a = float(_a)
+                _p = _P(_g, strata)
+                st.session_state[f"bm_share_{strata}_{bracket}_{_g}"] = _a
+                st.session_state[f"bm_fine_{strata}_{bracket}_{_g}"]  = _a
+                st.session_state[f"bm_b_{strata}_{bracket}_{_g}"]     = _a / _p if _p > 0 else 0.0
+
+        def _bm_on_alpha_change(g_name: str, strata: str, bracket: int) -> None:
+            _bm_apply(g_name, strata, bracket,
+                      float(st.session_state[f"bm_share_{strata}_{bracket}_{g_name}"]))
+
+        def _bm_on_fine_change(g_name: str, strata: str, bracket: int) -> None:
+            _bm_apply(g_name, strata, bracket,
+                      float(st.session_state[f"bm_fine_{strata}_{bracket}_{g_name}"]))
+
+        def _bm_on_b_change(g_name: str, strata: str, bracket: int) -> None:
+            new_b = float(st.session_state[f"bm_b_{strata}_{bracket}_{g_name}"])
+            p = _P(g_name, strata)
+            _bm_apply(g_name, strata, bracket, new_b * p if p > 0 else 0.0)
 
         bm_share_cols = st.columns(2)
         for idx, g_name in enumerate(luxury_sorted_groups()):
@@ -1504,26 +1545,63 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
                 color_hex = GROUP_COLORS.get(g_name, "#888")
                 badge_col, lock_col = st.columns([0.85, 0.15])
                 with badge_col:
+                    goods_list = ", ".join(GROUP_GOODS.get(g_name, []))
                     st.markdown(
                         f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
-                        f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span>",
+                        f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span> "
+                        f"<small style='color:#555'>{goods_list}</small>",
                         unsafe_allow_html=True,
                     )
                 with lock_col:
                     st.checkbox("🔒", key=f"bm_lock_{g_name}", label_visibility="collapsed")
 
                 cur_alpha = bm_alpha.get(bm_strata, {}).get(bm_bracket, {}).get(g_name, 0.0)
-                st.caption(f"α = {cur_alpha:.5f}")
-                st.slider(
-                    f"bm_α_{g_name}",
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.001,
-                    key=f"bm_share_{bm_strata}_{bm_bracket}_{g_name}",
-                    on_change=_bm_on_alpha_change,
-                    args=(g_name, bm_strata, bm_bracket),
-                    label_visibility="collapsed",
-                )
+                group_obj = cd.groups.get(g_name)
+                P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+                b_g_s = (cur_alpha / P_g_s) if P_g_s > 0 else 0.0
+                bm_info1, bm_info2, bm_info3 = st.columns(3)
+                with bm_info1:
+                    st.caption(f"α = {cur_alpha:.5f}")
+                with bm_info2:
+                    st.caption(f"P_g_s = {P_g_s:.4f}")
+                with bm_info3:
+                    st.caption(f"b = {b_g_s:.6f}")
+                slider_col, fine_col, b_col = st.columns([3, 1, 1])
+                with slider_col:
+                    st.slider(
+                        f"bm_α_{g_name}",
+                        min_value=0.0,
+                        max_value=1.0,
+                        step=0.001,
+                        key=f"bm_share_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_alpha_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="collapsed",
+                    )
+                with fine_col:
+                    st.number_input(
+                        "α精调",
+                        min_value=0.0,
+                        max_value=1.0,
+                        step=0.0001,
+                        format="%.5f",
+                        key=f"bm_fine_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_fine_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="visible",
+                    )
+                with b_col:
+                    st.number_input(
+                        "b精调",
+                        min_value=0.0,
+                        max_value=1000.0,
+                        step=0.000001,
+                        format="%.6f",
+                        key=f"bm_b_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_b_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="visible",
+                    )
 
         bm_cur_shares = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
         bm_total = sum(bm_cur_shares.values())
@@ -1571,18 +1649,25 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
 
         # ---- Piecewise Engel demand curve ----
         st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
-        st.caption("d_g_s(y) = (α_g_s(y) / P_g_s) × y。斜率在分档阈值处跳变。")
+        st.caption(
+            "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
+            "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
+        )
         fig_bm_engel = go.Figure()
         for g_name in luxury_sorted_groups():
             color = GROUP_COLORS.get(g_name, "#888")
             demand_vals = np.zeros_like(income_pts)
             group_obj = cd.groups.get(g_name)
             P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+            alpha_brackets = [
+                bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+                for k in range(n_brackets)
+            ]
+            c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
             for i, y in enumerate(income_pts):
                 k = sum(1 for t in bm_s_thresholds if t <= y) - 1
                 k = max(0, min(k, n_brackets - 1))
-                alpha = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
-                demand_vals[i] = (alpha / P_g_s * y) if P_g_s > 0 else 0.0
+                demand_vals[i] = (alpha_brackets[k] / P_g_s * y + c_vals[k]) if P_g_s > 0 else 0.0
             fig_bm_engel.add_trace(go.Scatter(
                 x=income_pts, y=demand_vals,
                 name=g_name.title(),
@@ -1635,12 +1720,32 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
                     st.error(e)
                 st.error("存在约束违反，请修复后再导出。")
             else:
-                # Save to CSV first, then export
+                # Save CSV, then export all three script_value files
                 save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+
+                # 1. Budget shares α(y)
                 warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
                 for w in warns:
                     st.warning(w)
+
+                # 2. Demand offsets c(y)  — needs P_g_s per strata
+                P_values = {
+                    s: {
+                        g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
+                        for g in SUBSTITUTE_GROUPS
+                    }
+                    for s in STRATA
+                }
+                warns2 = export_demand_offsets(bm_alpha, bm_thresholds, P_values, DEMAND_OFFSETS_FILE)
+                for w in warns2:
+                    st.warning(w)
+
+                # 3. Demand scale formula (inline multiply with offset)
+                export_demand_scales_with_offset(DEMAND_SCALES_FILE)
+
                 st.success(
-                    f"分档预算份额已写入 "
-                    f"`{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`"
+                    f"已写入:\n"
+                    f"- `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`\n"
+                    f"- `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`\n"
+                    f"- `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`"
                 )

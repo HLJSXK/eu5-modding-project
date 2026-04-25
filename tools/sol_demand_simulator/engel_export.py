@@ -1,21 +1,37 @@
 """
 EU5 SOL Demand Simulator — Piecewise Engel Curve Exporter
 
-Reads data/alpha_bracket_table.csv and generates
-z_SOL_group_budget_shares.txt with per-bracket if blocks.
+Generates three EU5 script_value files from data/alpha_bracket_table.csv:
 
-EU5 script_values support if/else_if/else (confirmed in _script_values.info).
-We use the cumulative-jump encoding:
+  z_SOL_group_budget_shares.txt  — piecewise α(y) (slope parameter)
+  z_SOL_group_demand_offsets.txt — piecewise c(y) (continuity offset)
+  z_SOL_group_demand_scales_location.txt — combined demand formula
 
-    local_{strata}_{group}_budget_share = {
-        value = α₀
-        if = { limit = { <income_var> >= y₁ } add = +Δα₁ }
-        if = { limit = { <income_var> >= y₂ } add = +Δα₂ }
-        ...
-    }
+## Piecewise-linear demand with continuity
 
-Budget constraint: Σ_g Δα_g,k = 0 for all k (jumps are zero-sum across groups),
-which holds automatically when each bracket row sums to 1.
+Demand for group g at strata s:
+    d_g_s(y) = b_g_s(y) * y + c_g_s(y)
+    where b_g_s(y) = α_g_s(y) / P_g_s
+
+Continuity conditions:
+    c_0 = 0                      (segment 0 always passes through origin)
+    c_k = c_{k-1} + (b_{k-1} - b_k) * y_k   (d continuous at threshold y_k)
+
+Budget constraint (Σ spending = income at savings equilibrium):
+    Σ_g (b_g * y + c_g) * P_g = y
+    Satisfied automatically when Σ_g α_g,k = 1 at each bracket k,
+    because Σ_g c_g * P_g = 0 follows from the continuity recurrence.
+
+## EU5 encoding
+
+α(y) is exported as cumulative-jump script_value:
+    local_{s}_{g}_budget_share = { value=α₀  if>=y₁ add=Δα₁  ... }
+
+c(y) is exported similarly:
+    local_{s}_{g}_demand_offset = { value=0  if>=y₁ add=Δc₁  ... }
+
+demand_scale uses an inline sub-expression:
+    demand_scale = (sp+1) * { y * α/P + c }
 """
 from __future__ import annotations
 
@@ -55,6 +71,32 @@ DEFAULT_THRESHOLDS: Dict[str, List[float]] = {
     "burghers":  [0.0, 3.0, 10.0, 30.0],
     "commoners": [0.0, 0.5,  1.5,  4.0],
     "tribesmen": [0.0, 0.5,  1.5,  4.0],
+}
+
+DEMAND_OFFSETS_FILE = (
+    REPO_ROOT
+    / "src/stable/in_game/common/script_values/z_SOL_group_demand_offsets.txt"
+)
+DEMAND_SCALES_FILE = (
+    REPO_ROOT
+    / "src/stable/in_game/common/script_values/z_SOL_group_demand_scales_location.txt"
+)
+
+# EU5 variable name mappings for demand scale generation.
+# savings_pressure and gdp_per_capita follow inconsistent naming conventions in the base mod.
+_SP_VAR: Dict[str, str] = {
+    "nobles":    "local_nobles_savings_pressure",
+    "clergy":    "local_clergy_savings_pressure",
+    "burghers":  "local_burghers_savings_pressure",
+    "commoners": "local_commoner_savings_pressure",
+    "tribesmen": "local_tribesmen_savings_pressure",
+}
+_GDP_VAR: Dict[str, str | None] = {
+    "nobles":    "local_noble_gdp_per_capita_display",
+    "clergy":    "local_clergy_gdp_per_capita_display",
+    "burghers":  "local_burghers_gdp_per_capita_display",
+    "commoners": "local_commoner_gdp_per_capita_display",
+    "tribesmen": None,
 }
 
 
@@ -252,6 +294,165 @@ def export_bracket_budget_shares(
 
     output_path.write_text("".join(lines), encoding="utf-8")
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Offset computation
+# ---------------------------------------------------------------------------
+
+def compute_piecewise_offsets(
+    alpha_brackets: List[float],
+    thresholds: List[float],
+    P: float,
+) -> List[float]:
+    """
+    Compute per-bracket demand offset c_k for continuity.
+
+    d(y) = b(y)*y + c(y),   b(y) = alpha(y)/P
+
+    c_0 = 0  (segment 0 passes through origin)
+    c_k = c_{k-1} + (alpha_{k-1} - alpha_k) / P * y_k   for k >= 1
+
+    Ensures d_k(y_k) = d_{k-1}(y_k) at every threshold y_k.
+    """
+    n = len(thresholds)
+    if P <= 0 or n <= 1:
+        return [0.0] * n
+    c = [0.0]
+    for k in range(1, n):
+        delta = (alpha_brackets[k - 1] - alpha_brackets[k]) / P * thresholds[k]
+        c.append(c[-1] + delta)
+    return c
+
+
+def export_demand_offsets(
+    alphas: Dict[str, Dict[int, Dict[str, float]]],
+    thresholds: Dict[str, List[float]],
+    P_values: Dict[str, Dict[str, float]],
+    output_path: Path = DEMAND_OFFSETS_FILE,
+    tolerance: float = 1e-9,
+) -> List[str]:
+    """
+    Generate z_SOL_group_demand_offsets.txt.
+
+    Each c(y) is a piecewise script_value derived from the alpha brackets and P_g_s.
+    Tribesmen and degenerate (all-same-alpha) cases emit { value = 0 }.
+
+    Args:
+        alphas:      {strata: {bracket: {group: alpha}}}
+        thresholds:  {strata: [y_0, y_1, ...]}  (y_0 must be 0)
+        P_values:    {strata: {group: P_g_s}}
+        output_path: destination file
+        tolerance:   minimum |Δc| to emit an if block
+
+    Returns list of warning strings (empty = clean).
+    """
+    warnings: List[str] = []
+    lines: List[str] = []
+    lines.append("# Demand continuity offsets c(y) — piecewise values\n")
+    lines.append("# Generated by engel_export.py — DO NOT EDIT MANUALLY\n")
+    lines.append("# d(y) = b(y)*y + c(y),  b = alpha/P_g_s\n")
+    lines.append("# c_0=0; c_k = c_{k-1} + (alpha_{k-1}-alpha_k)/P * y_k\n\n")
+
+    for strata in _STRATA_KEYS:
+        lines.append(f"# {strata}\n")
+        income_var = _INCOME_VAR.get(strata)
+        s_thresholds = thresholds.get(strata, DEFAULT_THRESHOLDS.get(strata, [0.0]))
+        s_alphas = alphas.get(strata, {})
+        s_P = P_values.get(strata, {})
+        n = len(s_thresholds)
+
+        for group in _GROUPS:
+            P = s_P.get(group, 0.0)
+            a_vals = [s_alphas.get(k, {}).get(group, 0.0) for k in range(n)]
+            c_vals = compute_piecewise_offsets(a_vals, s_thresholds, P)
+
+            if income_var is None or all(abs(cv) <= tolerance for cv in c_vals):
+                lines.append(f"local_{strata}_{group}_demand_offset = {{ value = 0 }}\n")
+                continue
+
+            lines.append(f"local_{strata}_{group}_demand_offset = {{\n")
+            lines.append(f"\tvalue = 0\n")
+            for k in range(1, n):
+                delta = c_vals[k] - c_vals[k - 1]
+                if abs(delta) <= tolerance:
+                    continue
+                lines.append(
+                    f"\tif = {{ limit = {{ {income_var} >= {s_thresholds[k]} }}"
+                    f" add = {delta:+.8f} }}\n"
+                )
+            lines.append("}\n")
+
+        lines.append("\n")
+
+    output_path.write_text("".join(lines), encoding="utf-8")
+    return warnings
+
+
+def export_demand_scales_with_offset(
+    output_path: Path = DEMAND_SCALES_FILE,
+) -> None:
+    """
+    (Re)generate z_SOL_group_demand_scales_location.txt.
+
+    Non-tribesmen formula uses an inline sub-expression so that
+    savings_pressure multiplies the entire (b*y + c) term:
+        demand_scale = (sp + 1) * { y * alpha/P + demand_offset }
+
+    Tribesmen formula is unchanged: sp + 1.
+    """
+    lines: List[str] = [
+        "# Location-scope demand scale values — one entry per (strata, group) pair.\n",
+        "# Formula (non-tribesmen):\n",
+        "#   demand_scale = (sp + 1) * { gdp * alpha/P + demand_offset }\n",
+        "# demand_offset provides piecewise-linear continuity at bracket thresholds.\n",
+        "# Tribesmen use a simplified form: sp + 1 (no income term).\n",
+        "#\n",
+        "# Generated by engel_export.py — DO NOT EDIT MANUALLY\n",
+        "#   nobles   : local_nobles_savings_pressure / local_noble_gdp_per_capita_display\n",
+        "#   clergy   : local_clergy_savings_pressure / local_clergy_gdp_per_capita_display\n",
+        "#   burghers : local_burghers_savings_pressure / local_burghers_gdp_per_capita_display\n",
+        "#   commoners: local_commoner_savings_pressure / local_commoner_gdp_per_capita_display\n",
+        "#   tribesmen: local_tribesmen_savings_pressure\n",
+        "\n",
+    ]
+
+    for group in _GROUPS:
+        lines.append(f"# {'─' * 62}\n")
+        lines.append(f"#  GROUP: {group}\n")
+        lines.append(f"# {'─' * 62}\n")
+
+        for strata in _STRATA_KEYS:
+            sp_var  = _SP_VAR[strata]
+            gdp_var = _GDP_VAR[strata]
+            var     = f"local_{strata}_{group}_demand_scale"
+
+            if gdp_var is None:
+                # tribesmen — no income term, no offset
+                lines += [
+                    f"{var} = {{\n",
+                    f"\tvalue = {sp_var}\n",
+                    f"\tadd = 1\n",
+                    f"\tmin = 0\n",
+                    f"}}\n",
+                ]
+            else:
+                lines += [
+                    f"{var} = {{\n",
+                    f"\tvalue = {sp_var}\n",
+                    f"\tadd = 1\n",
+                    f"\tmultiply = {{\n",
+                    f"\t\tvalue = {gdp_var}\n",
+                    f"\t\tmultiply = local_{strata}_{group}_budget_share\n",
+                    f"\t\tdivide = local_{strata}_{group}_P\n",
+                    f"\t\tadd = local_{strata}_{group}_demand_offset\n",
+                    f"\t}}\n",
+                    f"\tmin = 0\n",
+                    f"}}\n",
+                ]
+        lines.append("\n")
+
+    output_path.write_text("".join(lines), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
