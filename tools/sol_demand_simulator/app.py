@@ -413,6 +413,7 @@ with st.sidebar:
         if st.button("Reload files", use_container_width=True,
                      help="Re-parse mod files (use after editing demand values)"):
             st.cache_data.clear()
+            st.session_state.pop("curve_designer", None)  # force P_g_s re-init from fresh matrix
             st.rerun()
 
 # ---------------------------------------------------------------------------
