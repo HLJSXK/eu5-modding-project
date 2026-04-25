@@ -258,7 +258,7 @@ def check_group_prices_consistency() -> None:
         if not GROUP_PRICES_FILE.exists():
             issues.append(
                 f"[PRICES] {GROUP_PRICES_FILE.relative_to(REPO_ROOT)} missing — "
-                "run: python scripts/gen_group_prices.py"
+                "run: python tools/sol_demand_simulator/engel_export.py"
             )
             return
 
@@ -279,7 +279,7 @@ def check_group_prices_consistency() -> None:
         if stale:
             issues.append(
                 f"[PRICES] z_SOL_group_prices.txt is stale ({len(stale)} value(s)). "
-                "Run: python scripts/gen_group_prices.py"
+                "Run: python tools/sol_demand_simulator/engel_export.py"
             )
     except ImportError as e:
         issues.append(f"[PRICES] Could not import parser for consistency check: {e}")

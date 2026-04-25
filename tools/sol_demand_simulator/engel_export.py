@@ -504,24 +504,48 @@ def export_demand_scales_with_offset(
 
 
 # ---------------------------------------------------------------------------
+# Group prices export (wraps parser._auto_group_prices)
+# ---------------------------------------------------------------------------
+
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def export_group_prices(output_path: Path | None = None) -> Path:
+    """Compute P_g_s from the current demand matrix and write z_SOL_group_prices.txt.
+
+    Returns the path written.
+    """
+    from parser import (  # type: ignore
+        _auto_group_prices,
+        GROUP_PRICES_FILE,
+        export_group_prices_jomini,
+    )
+    path = output_path or GROUP_PRICES_FILE
+    prices = _auto_group_prices()
+    text = export_group_prices_jomini(prices)
+    path.write_bytes(_UTF8_BOM + text.encode("utf-8") + b"\n")
+    return path
+
+
+# ---------------------------------------------------------------------------
 # CLI convenience
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Export piecewise budget shares from alpha_bracket_table.csv"
+    ap = argparse.ArgumentParser(
+        description="Export all SOL mod files from alpha_bracket_table.csv"
     )
-    parser.add_argument(
+    ap.add_argument(
         "--init", action="store_true",
         help="Bootstrap alpha_bracket_table.csv from alpha_table.csv (run once)",
     )
-    parser.add_argument(
+    ap.add_argument(
         "--validate", action="store_true",
         help="Validate bracket constraints without exporting",
     )
-    args = parser.parse_args()
+    args = ap.parse_args()
 
     if args.init:
         if BRACKET_TABLE.exists():
@@ -543,17 +567,33 @@ def main() -> None:
             print(f"ERROR: {e}")
         if not args.validate:
             print("Aborting export due to constraint violations.")
-            return
         return
 
     if args.validate:
         print("All bracket constraints satisfied.")
         return
 
+    from parser import _auto_group_prices  # type: ignore
+    P_values = _auto_group_prices()
+
+    out = export_group_prices()
+    print(f"Exported → {out.relative_to(REPO_ROOT)}")
+
     warnings = export_bracket_budget_shares(bracket_alphas, bracket_thresholds)
     for w in warnings:
         print(f"WARNING: {w}")
-    print(f"Exported → {BUDGET_SHARES_FILE}")
+    print(f"Exported → {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}")
+
+    warnings2 = export_demand_offsets(bracket_alphas, bracket_thresholds, P_values)
+    for w in warnings2:
+        print(f"WARNING: {w}")
+    print(f"Exported → {DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}")
+
+    export_demand_base()
+    print(f"Exported → {DEMAND_BASE_FILE.relative_to(REPO_ROOT)}")
+
+    export_demand_scales_with_offset()
+    print(f"Exported → {DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":

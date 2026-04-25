@@ -62,6 +62,7 @@ from engel_export import (
     save_bracket_table,
     validate_all_bracket_constraints,
     export_bracket_budget_shares,
+    export_group_prices,
     init_bracket_table_from_alpha_table,
     compute_piecewise_offsets,
     export_demand_offsets,
@@ -963,50 +964,12 @@ with tab4:
         st.session_state["curve_designer"] = cd
     cd: CurveDesignerState = st.session_state["curve_designer"]
 
-    # ---- Action Buttons ----
-    btn_col1, btn_col2 = st.columns([1, 1])
-    with btn_col1:
-        gen_prices_clicked = st.button("生成组价格", use_container_width=True,
-                                       help="重新计算并写入 z_SOL_group_prices.txt")
-    with btn_col2:
-        export_shares_clicked = st.button("导出预算份额", use_container_width=True,
-                                          help="从 alpha_bracket_table.csv 生成 z_SOL_group_budget_shares.txt")
-
-    if gen_prices_clicked:
-        try:
-            _scripts_dir = REPO_ROOT / "scripts"
-            import sys as _sys
-            _sys.path.insert(0, str(_scripts_dir))
-            from gen_group_prices import compute_group_prices, write_group_prices  # type: ignore
-            _prices = compute_group_prices()
-            write_group_prices(_prices)
-            st.success("组价格已写入 z_SOL_group_prices.txt")
-        except Exception as e:
-            st.error(f"生成失败: {e}")
-
-    if export_shares_clicked:
-        try:
-            bk_alpha = load_bracket_table(BRACKET_TABLE)
-            bk_thresholds = load_bracket_thresholds(BRACKET_TABLE)
-            errs = validate_all_bracket_constraints(bk_alpha)
-            if errs:
-                for e in errs:
-                    st.warning(e)
-            warns = export_bracket_budget_shares(bk_alpha, bk_thresholds, ENGEL_BUDGET_SHARES_FILE)
-            for w in warns:
-                st.warning(w)
-            st.success("预算份额（分档）已写入 z_SOL_group_budget_shares.txt")
-        except Exception as e:
-            st.error(f"导出失败: {e}")
-
-    st.divider()
-
     # ===========================================================================
     # 分档 Engel 曲线设计器（非线性需求）
     # ===========================================================================
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
-        "设计完成后点击「导出分档预算份额」，生成含 `if` 分支的 EU5 script_values 文件。"
+        "设计完成后点击「写入 mod 文件」，一次性生成所有 EU5 script_values 文件。"
     )
 
     bm_init_col, bm_init_info_col = st.columns([1, 3])
@@ -1299,71 +1262,44 @@ with tab4:
 
     st.divider()
 
-    # ---- Save + Export buttons ----
-    bm_btn1, bm_btn2 = st.columns(2)
-    with bm_btn1:
-        bm_save_clicked = st.button(
-            "保存分档Alpha表格",
-            type="primary",
-            use_container_width=True,
-            key="bm_save_btn",
-            help="写入 data/alpha_bracket_table.csv",
-        )
-    with bm_btn2:
-        bm_export_clicked = st.button(
-            "导出分档预算份额",
-            use_container_width=True,
-            key="bm_export_btn",
-            help="生成含 if 分支的 z_SOL_group_budget_shares.txt",
-        )
-
-    if bm_save_clicked:
+    # ---- Write to mod ----
+    if st.button("写入 mod 文件", type="primary", use_container_width=True, key="bm_write_btn",
+                 help="保存 CSV → 写入 group_prices + budget_shares + demand_offsets + demand_base + demand_scales"):
         errs = validate_all_bracket_constraints(bm_alpha)
         if errs:
             for e in errs:
                 st.error(e)
+            st.error("存在约束违反，请修复后再写入。")
         else:
-            save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
-            st.success(f"已保存 → {BRACKET_TABLE.relative_to(REPO_ROOT)}")
+            try:
+                save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
 
-    if bm_export_clicked:
-        # Reload from in-memory state (may differ from disk)
-        errs = validate_all_bracket_constraints(bm_alpha)
-        if errs:
-            for e in errs:
-                st.error(e)
-            st.error("存在约束违反，请修复后再导出。")
-        else:
-            # Save CSV, then export all three script_value files
-            save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+                out_prices = export_group_prices()
+                st.write(f"✓ `{out_prices.relative_to(REPO_ROOT)}`")
 
-            # 1. Budget shares α(y)
-            warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
-            for w in warns:
-                st.warning(w)
+                warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
+                for w in warns:
+                    st.warning(w)
+                st.write(f"✓ `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`")
 
-            # 2. Demand offsets c(y)  — needs P_g_s per strata
-            P_values = {
-                s: {
-                    g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
-                    for g in SUBSTITUTE_GROUPS
+                P_values = {
+                    s: {
+                        g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
+                        for g in SUBSTITUTE_GROUPS
+                    }
+                    for s in STRATA
                 }
-                for s in STRATA
-            }
-            warns2 = export_demand_offsets(bm_alpha, bm_thresholds, P_values, DEMAND_OFFSETS_FILE)
-            for w in warns2:
-                st.warning(w)
+                warns2 = export_demand_offsets(bm_alpha, bm_thresholds, P_values, DEMAND_OFFSETS_FILE)
+                for w in warns2:
+                    st.warning(w)
+                st.write(f"✓ `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`")
 
-            # 3. Demand base: gdp * alpha/P + offset (named intermediate)
-            export_demand_base(DEMAND_BASE_FILE)
+                export_demand_base(DEMAND_BASE_FILE)
+                st.write(f"✓ `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`")
 
-            # 4. Demand scale: (sp + 1) * demand_base  (precise formula)
-            export_demand_scales_with_offset(DEMAND_SCALES_FILE)
+                export_demand_scales_with_offset(DEMAND_SCALES_FILE)
+                st.write(f"✓ `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`")
 
-            st.success(
-                f"已写入:\n"
-                f"- `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`\n"
-                f"- `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`\n"
-                f"- `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`\n"
-                f"- `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`"
-            )
+                st.success("全部写入完成")
+            except Exception as e:
+                st.error(f"写入失败: {e}")
