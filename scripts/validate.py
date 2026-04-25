@@ -364,6 +364,77 @@ def check_loc_coverage() -> None:
             )
 
 
+def check_sol_economy_dash_cells() -> None:
+    """Cross-check SOL_economy_local.gui demand rows against z_SOL_group_prices.txt.
+
+    Every (strata, group) cell where P = 0 must show raw_text = "-".
+    Every (strata, group) cell where P > 0 must reference the demand_scale_offset sv.
+    Catches stale GUI after price values are updated.
+    """
+    prices_file = REPO_ROOT / "src/stable/in_game/common/script_values/z_SOL_group_prices.txt"
+    gui_file    = REPO_ROOT / "src/stable/in_game/gui/SOL_economy_local.gui"
+
+    if not prices_file.exists() or not gui_file.exists():
+        return
+
+    # ── 1. Parse P values ────────────────────────────────────────────────────
+    prices_text = prices_file.read_text(encoding="utf-8-sig")
+    p_zero:    set[tuple[str, str]] = set()
+    p_nonzero: set[tuple[str, str]] = set()
+    for m in re.finditer(
+        r"local_(\w+?)_(\w+?)_P\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", prices_text
+    ):
+        strata, group, val = m.group(1), m.group(2), float(m.group(3))
+        if strata in _STRATA_KEYS and group in _GROUPS:
+            (p_zero if val == 0.0 else p_nonzero).add((strata, group))
+
+    # ── 2. Parse GUI demand rows ─────────────────────────────────────────────
+    STRATA_ORDER = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
+    TITLE_TO_GROUP = {f"SOL_TT_{g.upper()}_TITLE": g for g in _GROUPS}
+    DATA_CELL = re.compile(r'min_width\s*=\s*68.*?raw_text\s*=\s*"([^"]*)"')
+
+    gui_lines = gui_file.read_text(encoding="utf-8-sig").splitlines()
+    dash_in_gui:  set[tuple[str, str]] = set()
+    value_in_gui: set[tuple[str, str]] = set()
+
+    i = 0
+    while i < len(gui_lines):
+        line = gui_lines[i]
+        m = re.search(r'text\s*=\s*"(SOL_TT_\w+_TITLE)"', line)
+        if m and m.group(1) in TITLE_TO_GROUP:
+            group = TITLE_TO_GROUP[m.group(1)]
+            cells_found = 0
+            j = i + 1
+            while j < len(gui_lines) and cells_found < 5:
+                dm = DATA_CELL.search(gui_lines[j])
+                if dm:
+                    strata = STRATA_ORDER[cells_found]
+                    raw = dm.group(1)
+                    if raw == "-":
+                        dash_in_gui.add((strata, group))
+                    elif "demand_scale_offset" in raw:
+                        value_in_gui.add((strata, group))
+                    cells_found += 1
+                j += 1
+        i += 1
+
+    # ── 3. Report mismatches ─────────────────────────────────────────────────
+    errors = []
+    for pair in sorted(p_zero):
+        if pair in value_in_gui:
+            errors.append(f"  {pair[0]}_{pair[1]}: P=0 but shows value → change to '-'")
+    for pair in sorted(dash_in_gui):
+        if pair in p_nonzero:
+            errors.append(f"  {pair[0]}_{pair[1]}: P>0 but shows '-' → restore demand_scale_offset ref")
+
+    if errors:
+        issues.append(
+            f"[SOL_GUI] SOL_economy_local.gui dash-cell mismatch "
+            f"({len(errors)} cell(s)); update GUI or re-run engel_export.py:\n"
+            + "\n".join(errors)
+        )
+
+
 def main():
     anti_patterns = load_yaml(KNOWLEDGE_DIR / "anti_patterns.yaml") or []
     enum_data = load_yaml(KNOWLEDGE_DIR / "valid_enums.yaml") or {}
@@ -413,6 +484,7 @@ def main():
     check_group_prices_consistency()
     check_budget_shares_consistency()
     check_loc_coverage()
+    check_sol_economy_dash_cells()
 
     if issues:
         print(f"[FAIL] {len(issues)} issue(s) found:\n")
