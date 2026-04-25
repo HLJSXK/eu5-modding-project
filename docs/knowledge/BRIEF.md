@@ -19,6 +19,7 @@
 | scope | location | has_province_modifier (EU4 trigger) | has_location_modifier | EU4 province scope triggers do not exist in EU5 |
 | scope | any | Hardcoded redistribution coefficients for substitute goods (multiply = 0.4 on scarce good + add = X on every other good) | Weight-normalization: demand_i = (weight_i / total_weight) × N × scale; each good starts at weight 1; scarcity subtracts 0.5; total_weight uses min = 0.001 guard; redistribution is automatic | Hardcoded coefficients require O(N²) recalculation when adding a new good; weight-normalization requires only one new weight value and one add line in the group total |
 | encoding | any | multiply = { value = X  multiply = local_var  divide = local_var  add = local_var } inside a script_value | Flatten to top-level sequence: multiply = local_var  (no braces); each op on its own line | Inline sub-expression example in .info only shows scalar literals; variable refs (local_*, named sv) inside multiply={} blocks are unconfirmed and likely silently broken |
+| precision | any | float literal with 6+ decimal places (e.g. value = 0.123456789) | Round to at most 5 decimal places: value = 0.12346; EU5 engine reads no further | EU5 engine truncates all float literals at 5 decimal places; digits beyond the 5th are silently ignored |
 | scope | location | Referencing pop-scoped weight values (SOL_<good>_weight) from location-scope indicator script_values | In location-scope indicators, compute scarcity-only base weights inline via market variable list checks; do not reference pop-scope weight values which include religion/culture modifiers unavailable at location scope | Location-scope script_values cannot access pop attributes; sol_demand_share_* replicate only the scarcity adjustment, not religion/culture multipliers |
 
 ## Valid Enum Values
@@ -34,3 +35,4 @@
 - **Verification format**: output `**Verification** — Step [2/3], Reference: file:line, Quote: "exact text"` before any code
 - **Bug fix rule**: Replace syntax with verified form; do NOT remove the feature
 - **Pre-test**: Run `python scripts/validate.py --changed` before launching game
+- **Float precision**: EU5 truncates all floats at 5 decimal places; never emit 6+ dp in mod files

@@ -25,7 +25,6 @@ except ImportError:
 REPO_ROOT = Path(__file__).parent.parent
 SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
 DATA_DIR      = REPO_ROOT / "data"
-ALPHA_CSV     = DATA_DIR / "alpha_table.csv"
 BRACKET_CSV   = DATA_DIR / "alpha_bracket_table.csv"
 
 _GROUPS     = ["alcohol", "textiles", "knowledge", "precious", "ritual",
@@ -247,28 +246,6 @@ def check_bracket_table_sum() -> None:
         issues.append(f"[BRACKET] Could not read alpha_bracket_table.csv: {e}")
 
 
-def check_alpha_table_sum() -> None:
-    """Validate that each strata row in alpha_table.csv sums to 1.0."""
-    if not ALPHA_CSV.exists():
-        issues.append(f"[ALPHA] {ALPHA_CSV.relative_to(REPO_ROOT)} not found — run: python scripts/gen_budget_shares.py")
-        return
-    try:
-        with ALPHA_CSV.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                strata = row.get("strata", "?")
-                try:
-                    total = sum(float(row[g]) for g in _GROUPS if g in row)
-                except ValueError:
-                    issues.append(f"[ALPHA] alpha_table.csv — strata '{strata}' has non-numeric values")
-                    continue
-                if abs(total - 1.0) > 1e-3:
-                    issues.append(
-                        f"[ALPHA] alpha_table.csv — strata '{strata}' sums to {total:.6f}, expected 1.0"
-                    )
-    except Exception as e:
-        issues.append(f"[ALPHA] Could not read alpha_table.csv: {e}")
-
 
 def check_group_prices_consistency() -> None:
     """Verify z_SOL_group_prices.txt matches values computed from demand matrix."""
@@ -311,12 +288,10 @@ def check_group_prices_consistency() -> None:
 
 
 def check_budget_shares_consistency() -> None:
-    """
-    Verify z_SOL_group_budget_shares.txt matches the source alpha data.
+    """Verify z_SOL_group_budget_shares.txt matches bracket-0 values from alpha_bracket_table.csv."""
+    if not BRACKET_CSV.exists():
+        return  # already reported by check_bracket_table_sum
 
-    When alpha_bracket_table.csv exists, compare against bracket-0 base values
-    (the piecewise pipeline is in use).  Otherwise fall back to alpha_table.csv.
-    """
     try:
         sys.path.insert(0, str(SIMULATOR_DIR))
         from parser import BUDGET_SHARES_FILE, _read  # type: ignore
@@ -329,28 +304,14 @@ def check_budget_shares_consistency() -> None:
             )
             return
 
-        # Choose reference: bracket-0 values take priority when bracket table exists.
         alpha: Dict[str, Dict[str, float]] = {}
-        if BRACKET_CSV.exists():
-            with BRACKET_CSV.open(encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if int(row["bracket"]) != 0:
-                        continue
-                    s = row["strata"]
-                    alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
-            source_label = "alpha_bracket_table.csv (bracket 0)"
-            regen_cmd = "python tools/sol_demand_simulator/engel_export.py"
-        elif ALPHA_CSV.exists():
-            with ALPHA_CSV.open(encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    s = row["strata"]
-                    alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
-            source_label = "alpha_table.csv"
-            regen_cmd = "python scripts/gen_budget_shares.py"
-        else:
-            return  # both missing; already reported elsewhere
+        with BRACKET_CSV.open(encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if int(row["bracket"]) != 0:
+                    continue
+                s = row["strata"]
+                alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
 
         text = _read(BUDGET_SHARES_FILE)
         actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
@@ -370,8 +331,8 @@ def check_budget_shares_consistency() -> None:
                     stale.append(f"{s}_{g}")
         if stale:
             issues.append(
-                f"[SHARES] z_SOL_group_budget_shares.txt is stale vs {source_label} "
-                f"({len(stale)} value(s)). Run: {regen_cmd}"
+                f"[SHARES] z_SOL_group_budget_shares.txt is stale vs alpha_bracket_table.csv (bracket 0) "
+                f"({len(stale)} value(s)). Run: python tools/sol_demand_simulator/engel_export.py"
             )
     except ImportError as e:
         issues.append(f"[SHARES] Could not import parser for consistency check: {e}")
@@ -448,7 +409,6 @@ def main():
         check_inject_demand_multiply(path, content)
 
     # File-independent checks
-    check_alpha_table_sum()
     check_bracket_table_sum()
     check_group_prices_consistency()
     check_budget_shares_consistency()

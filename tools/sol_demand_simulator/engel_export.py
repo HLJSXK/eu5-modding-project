@@ -215,8 +215,8 @@ def validate_all_bracket_constraints(
             total = sum(group_alphas.values())
             if abs(total - 1.0) > tolerance:
                 errors.append(
-                    f"[{strata} bracket {k}] Σα = {total:.6f} (expected 1.0, "
-                    f"gap = {total - 1.0:+.6f})"
+                    f"[{strata} bracket {k}] Σα = {total:.5f} (expected 1.0, "
+                    f"gap = {total - 1.0:+.5f})"
                 )
     return errors
 
@@ -268,7 +268,7 @@ def export_bracket_budget_shares(
             if income_var is None:
                 # tribesmen: constant — no piecewise needed
                 lines.append(
-                    f"local_{strata}_{group}_budget_share = {{ value = {alpha_0:.6f} }}\n"
+                    f"local_{strata}_{group}_budget_share = {{ value = {alpha_0:.5f} }}\n"
                 )
                 continue
 
@@ -279,18 +279,18 @@ def export_bracket_budget_shares(
             if not has_any_jump:
                 # No non-linearity for this (strata, group) — emit compact form
                 lines.append(
-                    f"local_{strata}_{group}_budget_share = {{ value = {alpha_0:.6f} }}\n"
+                    f"local_{strata}_{group}_budget_share = {{ value = {alpha_0:.5f} }}\n"
                 )
                 continue
 
             lines.append(f"local_{strata}_{group}_budget_share = {{\n")
-            lines.append(f"\tvalue = {alpha_0:.6f}\n")
+            lines.append(f"\tvalue = {alpha_0:.5f}\n")
             for k, jump in enumerate(jumps, start=1):
                 if abs(jump) <= tolerance:
                     continue
                 thresh = strata_thresholds[k]
                 lines.append(
-                    f"\tif = {{ limit = {{ {income_var} >= {thresh} }} add = {jump:+.6f} }}\n"
+                    f"\tif = {{ limit = {{ {income_var} >= {thresh} }} add = {jump:.5f} }}\n"
                 )
             lines.append("}\n")
 
@@ -383,7 +383,7 @@ def export_demand_offsets(
                     continue
                 lines.append(
                     f"\tif = {{ limit = {{ {income_var} >= {s_thresholds[k]} }}"
-                    f" add = {delta:+.8f} }}\n"
+                    f" add = {delta:.5f} }}\n"
                 )
             lines.append("}\n")
 

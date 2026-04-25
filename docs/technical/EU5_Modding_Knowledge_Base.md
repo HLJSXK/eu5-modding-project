@@ -203,6 +203,7 @@ Flags in EU5 are generated dynamically through a scripted coat of arms system, a
 
 ## 8. Best Practices and Resources
 
+*   **Float precision limit**: The EU5 engine reads float literals to a maximum of **5 decimal places**. Any digits beyond the 5th are silently truncated. Always round generated or hand-written values to ≤5 dp (e.g. `0.08477` not `0.084771`). This is particularly relevant for generated script_values such as budget shares and demand scales.
 *   **Use a proper IDE**: Tools like VS Code with the CwTools extension can catch errors and improve readability.
 *   **Avoid Overwriting Vanilla Files**: Create your own files and use the `replace_paths` feature or specific load orders to override game content. This improves mod compatibility.
 *   **Use Version Control**: Git is an invaluable tool for tracking changes and collaborating with others.

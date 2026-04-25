@@ -86,6 +86,7 @@ def main():
     lines.append("- **Verification format**: output `**Verification** — Step [2/3], Reference: file:line, Quote: \"exact text\"` before any code")
     lines.append("- **Bug fix rule**: Replace syntax with verified form; do NOT remove the feature")
     lines.append("- **Pre-test**: Run `python scripts/validate.py --changed` before launching game")
+    lines.append("- **Float precision**: EU5 truncates all floats at 5 decimal places; never emit 6+ dp in mod files")
     lines.append("")
 
     OUTPUT.write_text("\n".join(lines), encoding="utf-8")
