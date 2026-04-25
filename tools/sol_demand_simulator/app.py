@@ -1294,7 +1294,7 @@ with tab4:
                     st.warning(w)
                 st.write(f"✓ `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`")
 
-                export_demand_base(DEMAND_BASE_FILE)
+                export_demand_base(P_values, DEMAND_BASE_FILE)
                 st.write(f"✓ `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`")
 
                 export_demand_scales_with_offset(DEMAND_SCALES_FILE)
