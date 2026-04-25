@@ -311,29 +311,46 @@ def check_group_prices_consistency() -> None:
 
 
 def check_budget_shares_consistency() -> None:
-    """Verify z_SOL_group_budget_shares.txt matches data/alpha_table.csv."""
-    if not ALPHA_CSV.exists():
-        return  # already reported by check_alpha_table_sum
+    """
+    Verify z_SOL_group_budget_shares.txt matches the source alpha data.
 
+    When alpha_bracket_table.csv exists, compare against bracket-0 base values
+    (the piecewise pipeline is in use).  Otherwise fall back to alpha_table.csv.
+    """
     try:
         sys.path.insert(0, str(SIMULATOR_DIR))
         from parser import BUDGET_SHARES_FILE, _read  # type: ignore
         import re as _re
 
-        # Load alpha table
-        alpha: Dict[str, Dict[str, float]] = {}
-        with ALPHA_CSV.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                s = row["strata"]
-                alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
-
         if not BUDGET_SHARES_FILE.exists():
             issues.append(
                 f"[SHARES] {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)} missing — "
-                "run: python scripts/gen_budget_shares.py"
+                "run: python tools/sol_demand_simulator/engel_export.py"
             )
             return
+
+        # Choose reference: bracket-0 values take priority when bracket table exists.
+        alpha: Dict[str, Dict[str, float]] = {}
+        if BRACKET_CSV.exists():
+            with BRACKET_CSV.open(encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if int(row["bracket"]) != 0:
+                        continue
+                    s = row["strata"]
+                    alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
+            source_label = "alpha_bracket_table.csv (bracket 0)"
+            regen_cmd = "python tools/sol_demand_simulator/engel_export.py"
+        elif ALPHA_CSV.exists():
+            with ALPHA_CSV.open(encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    s = row["strata"]
+                    alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
+            source_label = "alpha_table.csv"
+            regen_cmd = "python scripts/gen_budget_shares.py"
+        else:
+            return  # both missing; already reported elsewhere
 
         text = _read(BUDGET_SHARES_FILE)
         actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
@@ -353,8 +370,8 @@ def check_budget_shares_consistency() -> None:
                     stale.append(f"{s}_{g}")
         if stale:
             issues.append(
-                f"[SHARES] z_SOL_group_budget_shares.txt is stale ({len(stale)} value(s)). "
-                "Run: python scripts/gen_budget_shares.py"
+                f"[SHARES] z_SOL_group_budget_shares.txt is stale vs {source_label} "
+                f"({len(stale)} value(s)). Run: {regen_cmd}"
             )
     except ImportError as e:
         issues.append(f"[SHARES] Could not import parser for consistency check: {e}")

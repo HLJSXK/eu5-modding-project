@@ -66,11 +66,11 @@ _INCOME_VAR: Dict[str, str | None] = {
 # Default bracket thresholds per strata (income in gold/month/pop-unit).
 # Bracket 0 always starts at 0 (threshold not emitted as if-block).
 DEFAULT_THRESHOLDS: Dict[str, List[float]] = {
-    "nobles":    [0.0, 5.0, 15.0, 40.0],
-    "clergy":    [0.0, 3.0, 10.0, 30.0],
-    "burghers":  [0.0, 3.0, 10.0, 30.0],
-    "commoners": [0.0, 0.5,  1.5,  4.0],
-    "tribesmen": [0.0, 0.5,  1.5,  4.0],
+    "nobles":    [0.0,  3.0,  8.0, 25.0],
+    "clergy":    [0.0,  1.0,  3.0, 10.0],
+    "burghers":  [0.0,  1.0,  3.0, 10.0],
+    "commoners": [0.0, 0.05, 0.20,  0.80],
+    "tribesmen": [0.0, 0.05, 0.20,  0.80],
 }
 
 DEMAND_OFFSETS_FILE = (
