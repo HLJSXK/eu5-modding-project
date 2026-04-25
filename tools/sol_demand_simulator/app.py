@@ -76,9 +76,11 @@ from engel_export import (
     init_bracket_table_from_alpha_table,
     compute_piecewise_offsets,
     export_demand_offsets,
+    export_demand_base,
     export_demand_scales_with_offset,
     BUDGET_SHARES_FILE as ENGEL_BUDGET_SHARES_FILE,
     DEMAND_OFFSETS_FILE,
+    DEMAND_BASE_FILE,
     DEMAND_SCALES_FILE,
 )
 
@@ -1740,12 +1742,16 @@ monthly_spending[s] = Σ_g [ spend_g_s(income_s) × pop_count[s] ]
                 for w in warns2:
                     st.warning(w)
 
-                # 3. Demand scale formula (inline multiply with offset)
+                # 3. Demand base: gdp * alpha/P + offset (named intermediate)
+                export_demand_base(DEMAND_BASE_FILE)
+
+                # 4. Demand scale: (sp + 1) * demand_base  (precise formula)
                 export_demand_scales_with_offset(DEMAND_SCALES_FILE)
 
                 st.success(
                     f"已写入:\n"
                     f"- `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`\n"
                     f"- `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`\n"
+                    f"- `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`\n"
                     f"- `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`"
                 )
