@@ -95,7 +95,7 @@ def _reweight_commoners(dm: dict, pop_lab: float, pop_peas: float, pop_sold: flo
 
 
 # Fixed default pop split for commoner reweighting
-demand_matrix_w = _reweight_commoners(demand_matrix, 400.0, 500.0, 100.0)
+demand_matrix_w = _reweight_commoners(demand_matrix, 500.0, 500.0, 0.0)
 
 STRATA_LABELS = {
     "nobles":    "贵族 Nobles",

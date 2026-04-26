@@ -34,7 +34,7 @@ SUBSTITUTE_GROUPS: List[str] = [
 # Group -> goods mapping
 GROUP_GOODS: Dict[str, List[str]] = {
     "alcohol":    ["wine", "liquor", "beer"],
-    "textiles":   ["fur", "cloth", "fine_cloth"],
+    "textiles":   ["fur", "cloth", "fine_cloth", "leather"],
     "knowledge":  ["beeswax", "paper", "books"],
     "precious":   ["goods_gold", "silver", "pearls", "amber", "gems", "ivory", "jewelry"],
     "ritual":     ["incense", "medicaments", "mercury"],
