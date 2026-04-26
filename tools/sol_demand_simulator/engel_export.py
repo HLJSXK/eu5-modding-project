@@ -49,8 +49,10 @@ BUDGET_SHARES_FILE = (
 
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
-    "alcohol", "textiles", "knowledge", "precious", "ritual",
-    "stimulants", "spices", "staple", "protein", "military", "household",
+    "basic_clothing", "crude_goods", "staple", "condiments", "heating",
+    "household", "standard_clothing", "intoxicants", "luxury_drinks",
+    "luxury_food", "luxury_goods", "protein", "spices", "precious",
+    "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
 ]
 
 # Maps strata → EU5 script_value name for GDP per capita in location scope.
@@ -626,7 +628,7 @@ def main() -> None:
         print(f"WARNING: {w}")
     print(f"Exported → {DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}")
 
-    export_demand_base()
+    export_demand_base(P_values)
     print(f"Exported → {DEMAND_BASE_FILE.relative_to(REPO_ROOT)}")
 
     export_demand_scales_with_offset()

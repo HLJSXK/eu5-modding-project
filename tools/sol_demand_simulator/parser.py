@@ -388,8 +388,10 @@ BUDGET_SHARES_FILE  = MOD_ROOT / "src/stable/in_game/common/script_values/z_SOL_
 
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
-    "alcohol", "textiles", "knowledge", "precious", "ritual",
-    "stimulants", "spices", "staple", "protein", "military", "household",
+    "basic_clothing", "crude_goods", "staple", "condiments", "heating",
+    "household", "standard_clothing", "intoxicants", "luxury_drinks",
+    "luxury_food", "luxury_goods", "protein", "spices", "precious",
+    "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
 ]
 
 

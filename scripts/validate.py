@@ -27,8 +27,12 @@ SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
 DATA_DIR      = REPO_ROOT / "data"
 BRACKET_CSV   = DATA_DIR / "alpha_bracket_table.csv"
 
-_GROUPS     = ["alcohol", "textiles", "knowledge", "precious", "ritual",
-               "stimulants", "spices", "staple", "protein", "military", "household"]
+_GROUPS     = [
+    "basic_clothing", "crude_goods", "staple", "condiments", "heating",
+    "household", "standard_clothing", "intoxicants", "luxury_drinks",
+    "luxury_food", "luxury_goods", "protein", "spices", "precious",
+    "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
+]
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 MODIFIER_TYPES_FILE = (

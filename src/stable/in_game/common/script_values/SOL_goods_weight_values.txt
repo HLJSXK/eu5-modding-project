@@ -1,14 +1,649 @@
-﻿##############################################################
+##############################################################
 # SOL goods weight script values
 # Scope: pop
-# Each good gets a weight starting at 1. Two sources modify it:
-#   Part 1 — Substitution: self-scarcity subtracts 0.5 from weight
-#   Part 2 — Religion / culture / location: multiplicative modifiers
-# Final demand = (weight / group_total_weight) × N × demand_scale
+# Part 1 — Substitution: scarcity multiplies weight by 0.5 (50% reduction)
+# Part 2 — Religion / culture / location: multiplicative modifiers
+# Final demand (single-group good) = (weight / group_total_weight) × N × demand_scale
+# Final demand (multi-group good)  = Σ_g (group_weight_g / group_total_g) × N_g × scale_g
 ##############################################################
 
 ###############################################################
-# ALCOHOL group (N=3): wine, liquor, beer
+# GROUP 1: BASIC_CLOTHING (N=2): cloth, leather
+#   cloth also participates in standard_clothing at k=0.8
+###############################################################
+
+SOL_cloth_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	location = {
+		if = {
+			limit = { location_max_winter_level = none }
+			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = mild }
+			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = normal }
+			multiply = { value = 1.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = severe }
+			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+	}
+}
+
+SOL_leather_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_leather_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+# cloth participates in standard_clothing at k=0.8
+SOL_cloth_standard_weight = {
+	value = SOL_cloth_weight
+	multiply = 0.8
+}
+
+SOL_basic_clothing_total_weight = {
+	value = 0
+	add = SOL_cloth_weight
+	add = SOL_leather_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 2: CRUDE_GOODS (N=4): lumber, masonry, tools, pottery
+#   lumber also participates in heating at k=1.0
+#   pottery also participates in household at k=1.0
+###############################################################
+
+SOL_lumber_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	location = {
+		if = {
+			limit = { location_max_winter_level = none }
+			multiply = { value = 0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = mild }
+			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = normal }
+			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = severe }
+			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+	}
+	if = {
+		limit = { location = { topography = mountains } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_TOPOGRAPHY_MOUNTAINS" }
+	}
+}
+
+SOL_masonry_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_tools_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_pottery_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+# pottery participates in crude_goods at k=0.6 (full weight used in household)
+SOL_pottery_crude_weight = {
+	value = SOL_pottery_weight
+	multiply = 0.6
+}
+
+SOL_crude_goods_total_weight = {
+	value = 0
+	add = SOL_lumber_weight        # k=1.0
+	add = SOL_masonry_weight
+	add = SOL_tools_weight
+	add = SOL_pottery_crude_weight # k=0.6
+	min = 0.001
+}
+
+###############################################################
+# GROUP 3: STAPLE (N=7): wheat, rice, millet, maize, potato, legumes, fish
+#   fish also participates in protein at k=1.0
+###############################################################
+
+SOL_wheat_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.continent = continent:europe }
+		multiply = { value = 2.0 desc = "POP_DEMAND_EUROPE" }
+	}
+	if = {
+		limit = {
+			location.continent = continent:asia
+			OR = {
+				location = { climate = subtropical }
+				location = { climate = tropical }
+			}
+		}
+		multiply = { value = 0.5 desc = "POP_DEMAND_ASIA" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 1.5 desc = "POP_DEMAND_EGYPT" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 0.8 desc = "POP_DEMAND_MAGHREBI" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:baltic_group } }
+		multiply = { value = 0.8 desc = "POP_DEMAND_BALTIC" }
+	}
+}
+
+SOL_rice_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			location.continent = continent:asia
+			OR = {
+				location = { climate = subtropical }
+				location = { climate = tropical }
+			}
+		}
+		multiply = { value = 2 desc = "POP_DEMAND_ASIA" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		add = { value = 0.002 desc = "POP_DEMAND_EGYPT" }
+	}
+}
+
+SOL_millet_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.sub_continent = sub_continent:south_asia }
+		multiply = { value = 2 desc = "POP_DEMAND_INDIA" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 0.1 desc = "POP_DEMAND_EGYPT" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 1.5 desc = "POP_DEMAND_MAGHREBI" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:baltic_group } }
+		multiply = { value = 2.0 desc = "POP_DEMAND_BALTIC" }
+	}
+}
+
+SOL_maize_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.continent != continent:america }
+		multiply = { value = 0 desc = "POP_DEMAND_NOT_AMERICA" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0.25 }
+	}
+}
+
+SOL_potato_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { value = 4.0 desc = "POP_DEMAND_ANDES" }
+	}
+	if = {
+		limit = { religion = religion:jain }
+		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
+	}
+}
+
+SOL_legumes_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			OR = {
+				culture = culture:turkish_culture
+				culture = culture:turkoman_culture
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_TURKISH" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 2 desc = "POP_DEMAND_EGYPT" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:baltic_group } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_BALTIC" }
+	}
+}
+
+SOL_fish_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { religion = religion:catholic }
+		multiply = { value = 1.25 desc = "POP_DEMAND_CATHOLIC" }
+	}
+	if = {
+		limit = { religion = religion:jain }
+		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 0.5 desc = "POP_DEMAND_EGYPT" }
+	}
+}
+
+SOL_staple_total_weight = {
+	value = 0
+	add = SOL_wheat_weight
+	add = SOL_rice_weight
+	add = SOL_millet_weight
+	add = SOL_maize_weight
+	add = SOL_potato_weight
+	add = SOL_legumes_weight
+	add = SOL_fish_weight      # k=1.0, also in protein
+	min = 0.001
+}
+
+###############################################################
+# GROUP 4: CONDIMENTS (N=3): sugar, salt, olives
+###############################################################
+
+SOL_sugar_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_salt_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	location = {
+		if = {
+			limit = { location_max_winter_level = none }
+			multiply = { value = 0.75 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = mild }
+			multiply = { value = 1 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = normal }
+			multiply = { value = 1.2 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = severe }
+			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+	}
+}
+
+SOL_olives_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			OR = {
+				culture = culture:turkish_culture
+				culture = culture:turkoman_culture
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_TURKISH" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:languedocien
+				culture = culture:provencal
+				culture = culture:albanian
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
+	}
+	if = {
+		limit = {
+			OR = {
+				culture = { has_culture_group = culture_group:iberian_group }
+				culture = { has_culture_group = culture_group:italian_group }
+				culture = { has_culture_group = culture_group:greek_group }
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
+	}
+}
+
+SOL_condiments_total_weight = {
+	value = 0
+	add = SOL_sugar_weight
+	add = SOL_salt_weight
+	add = SOL_olives_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 5: HEATING (N=3): lumber, coal, beeswax
+#   lumber at k=1.0 (defined in GROUP 2)
+#   beeswax at k=0.8 (also participates in household at k=0.7)
+###############################################################
+
+SOL_coal_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	location = {
+		if = {
+			limit = { location_max_winter_level = none }
+			multiply = { value = 0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = mild }
+			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = normal }
+			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = severe }
+			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+	}
+	if = {
+		limit = { location = { topography = mountains } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_TOPOGRAPHY_MOUNTAINS" }
+	}
+}
+
+SOL_beeswax_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	location = {
+		if = {
+			limit = {
+				OR = {
+					location_max_winter_level = none
+					location_max_winter_level = mild
+				}
+			}
+			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = normal }
+			multiply = { value = 1.2 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+		else_if = {
+			limit = { location_max_winter_level = severe }
+			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+		}
+	}
+}
+
+# beeswax in heating at k=0.8
+SOL_beeswax_heating_weight = {
+	value = SOL_beeswax_weight
+	multiply = 0.8
+}
+
+SOL_heating_total_weight = {
+	value = 0
+	add = SOL_lumber_weight          # k=1.0, defined in GROUP 2
+	add = SOL_coal_weight
+	add = SOL_beeswax_heating_weight # k=0.8
+	min = 0.001
+}
+
+###############################################################
+# GROUP 6: HOUSEHOLD (N=5): furniture, pottery, glass, paper, beeswax
+#   pottery at k=1.0 (defined in GROUP 2)
+#   beeswax at k=0.7 (defined in GROUP 5)
+#   glass also participates in luxury_goods at k=0.6
+#   paper also participates in knowledge at k=1.0
+###############################################################
+
+SOL_furniture_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_glass_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_glass_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_paper_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			location.owner ?= {
+				has_variable = por_printing_ordinances
+				has_reform = government_reform:por_ordinances
+			}
+		}
+		multiply = 2
+	}
+	multiply = {
+		value = pop_literacy
+		divide = 100
+		desc = "POP_DEMAND_LITERACY"
+	}
+}
+
+# beeswax in household at k=0.7
+SOL_beeswax_household_weight = {
+	value = SOL_beeswax_weight
+	multiply = 0.7
+}
+
+# glass in household at k=0.8
+SOL_glass_household_weight = {
+	value = SOL_glass_weight
+	multiply = 0.8
+}
+
+# paper in household at k=0.7
+SOL_paper_household_weight = {
+	value = SOL_paper_weight
+	multiply = 0.7
+}
+
+SOL_household_total_weight = {
+	value = 0
+	add = SOL_furniture_weight
+	add = SOL_pottery_weight         # k=1.0, defined in GROUP 2
+	add = SOL_glass_household_weight # k=0.8
+	add = SOL_paper_household_weight # k=0.7
+	add = SOL_beeswax_household_weight # k=0.7
+	min = 0.001
+}
+
+###############################################################
+# GROUP 7: STANDARD_CLOTHING (N=2): cloth, fine_cloth
+#   cloth at k=0.8 (SOL_cloth_standard_weight, defined in GROUP 1)
+#   fine_cloth also participates in luxury_goods at k=1.0
+###############################################################
+
+SOL_fine_cloth_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			pop_type = pop_type:clergy
+			religion = religion:anglican
+			location.owner ?= { has_variable = anglican_vestments }
+		}
+		multiply = { value = 2 desc = "POP_DEMAND_CLERGY" }
+	}
+}
+
+SOL_standard_clothing_total_weight = {
+	value = 0
+	add = SOL_cloth_standard_weight  # k=0.8, defined in GROUP 1
+	add = SOL_fine_cloth_weight      # k=1.0
+	min = 0.001
+}
+
+###############################################################
+# GROUP 8: INTOXICANTS (N=4): wine, beer, liquor, tobacco
+#   wine also participates in luxury_drinks at k=0.7
 ###############################################################
 
 SOL_wine_weight = {
@@ -16,7 +651,7 @@ SOL_wine_weight = {
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_wine_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
@@ -78,12 +713,58 @@ SOL_wine_weight = {
 	}
 }
 
+SOL_beer_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			religion = {
+				OR = {
+					this = religion:jain
+					this = religion:sikhism
+					group = religion_group:muslim
+				}
+			}
+		}
+		multiply = { value = 0 desc = "POP_DEMAND_RELIGION_FORBIDS" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 2 }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:japanese_group } }
+		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0 }
+	}
+	if = {
+		limit = {
+			location.region = {
+				OR = {
+					this = region:iberia_region
+					this = region:italy_region
+					this = region:balkan_region
+				}
+			}
+		}
+		multiply = { value = 0.5 desc = "POP_DEMAND_MEDITERRANEAN" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:baltic_group } }
+		multiply = { value = 0.8 desc = "POP_DEMAND_BALTIC" }
+	}
+}
+
 SOL_liquor_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_liquor_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
@@ -136,62 +817,211 @@ SOL_liquor_weight = {
 	}
 }
 
-SOL_beer_weight = {
+SOL_tobacco_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_beer_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0.1 }
+	}
+}
+
+# wine in luxury_drinks at k=0.7
+SOL_wine_luxury_drinks_weight = {
+	value = SOL_wine_weight
+	multiply = 0.7
+}
+
+SOL_intoxicants_total_weight = {
+	value = 0
+	add = SOL_wine_weight    # k=1.0 in intoxicants
+	add = SOL_beer_weight
+	add = SOL_liquor_weight
+	add = SOL_tobacco_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 9: LUXURY_DRINKS (N=4): tea, coffee, wine, cocoa
+#   wine at k=0.7 (SOL_wine_luxury_drinks_weight, defined in GROUP 8)
+###############################################################
+
+SOL_tea_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
 		limit = {
-			religion = {
-				OR = {
-					this = religion:jain
-					this = religion:sikhism
-					group = religion_group:muslim
-				}
+			OR = {
+				culture = culture:turkish_culture
+				culture = culture:turkoman_culture
 			}
 		}
-		multiply = { value = 0 desc = "POP_DEMAND_RELIGION_FORBIDS" }
+		multiply = { value = 2 desc = "POP_DEMAND_TURKISH" }
 	}
+	if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 1.5 desc = "POP_DEMAND_EGYPT" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 2 desc = "POP_DEMAND_MAGHREBI" }
+	}
+}
+
+SOL_coffee_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_cocoa_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_luxury_drinks_total_weight = {
+	value = 0
+	add = SOL_tea_weight
+	add = SOL_coffee_weight
+	add = SOL_wine_luxury_drinks_weight  # k=0.7, defined in GROUP 8
+	add = SOL_cocoa_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 10: LUXURY_FOOD (N=3): wild_game, victuals, fruit
+#   wild_game at k=0.6, also participates in protein at k=1.0
+###############################################################
+
+SOL_wild_game_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
 	if = {
 		limit = { culture = { has_culture_group = culture_group:andean_group } }
 		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 2 }
 	}
 	if = {
-		limit = { culture = { has_culture_group = culture_group:japanese_group } }
-		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0 }
-	}
-	if = {
 		limit = {
-			location.region = {
-				OR = {
-					this = region:iberia_region
-					this = region:italy_region
-					this = region:balkan_region
-				}
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
 			}
 		}
-		multiply = { value = 0.5 desc = "POP_DEMAND_MEDITERRANEAN" }
+		multiply = { value = 0.25 desc = "POP_DEMAND_EGYPT" }
 	}
 	if = {
 		limit = { culture = { has_culture_group = culture_group:baltic_group } }
-		multiply = { value = 0.8 desc = "POP_DEMAND_BALTIC" }
+		multiply = { value = 1.2 desc = "POP_DEMAND_BALTIC" }
+	}
+	if = {
+		limit = { religion = religion:jain }
+		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
 	}
 }
 
-SOL_alcohol_total_weight = {
+SOL_victuals_weight = {
 	value = 0
-	add = SOL_wine_weight
-	add = SOL_liquor_weight
-	add = SOL_beer_weight
+	if = {
+		limit = { sol_pp_victuals_compat_is_on = yes }
+		add = 1
+		# Part 1 — Substitution (only meaningful when compat is on)
+		if = {
+			limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } }
+			multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+		}
+		# Part 2 — Religion / culture / location
+		location = {
+			if = {
+				limit = { location_max_winter_level = severe }
+				multiply = { value = 1.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+			}
+			else_if = {
+				limit = { location_max_winter_level = normal }
+				multiply = { value = 1.3 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+			}
+			else_if = {
+				limit = { location_max_winter_level = mild }
+				multiply = { value = 1.15 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+			}
+		}
+	}
+}
+
+SOL_fruit_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location = { climate = arctic } }
+		multiply = { value = 0 desc = "POP_DEMAND_ARCTIC" }
+	}
+	if = {
+		limit = { location = { climate = cold_arid } }
+		multiply = { value = 0.5 desc = "POP_DEMAND_COLD_ARID" }
+	}
+	if = {
+		limit = { location = { climate = tropical } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_TROPICAL" }
+	}
+	if = {
+		limit = { location = { climate = mediterranean } }
+		multiply = { value = 1.4 desc = "POP_DEMAND_TEMPERATE" }
+	}
+	if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 1.1 desc = "POP_DEMAND_MAGHREBI" }
+	}
+}
+
+# wild_game in luxury_food at k=0.6
+SOL_wild_game_luxury_food_weight = {
+	value = SOL_wild_game_weight
+	multiply = 0.6
+}
+
+SOL_luxury_food_total_weight = {
+	value = 0
+	add = SOL_wild_game_luxury_food_weight  # k=0.6
+	add = SOL_victuals_weight
+	add = SOL_fruit_weight
 	min = 0.001
 }
 
 ###############################################################
-# TEXTILES group (N=4): fur, cloth, fine_cloth, leather
+# GROUP 11: LUXURY_GOODS (N=6): fine_cloth, fur, porcelain, lacquerware, marble, glass
+#   fine_cloth at k=1.0 (defined in GROUP 7)
+#   glass at k=0.6 (SOL_glass_luxury_weight)
 ###############################################################
 
 SOL_fur_weight = {
@@ -199,7 +1029,7 @@ SOL_fur_weight = {
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fur_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	location = {
@@ -230,868 +1060,62 @@ SOL_fur_weight = {
 	}
 }
 
-SOL_cloth_weight = {
+SOL_porcelain_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cloth_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	location = {
-		if = {
-			limit = { location_max_winter_level = none }
-			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = mild }
-			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = normal }
-			multiply = { value = 1.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = severe }
-			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 }
 
-SOL_fine_cloth_weight = {
+SOL_lacquerware_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fine_cloth_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			pop_type = pop_type:clergy
-			religion = religion:anglican
-			location.owner ?= { has_variable = anglican_vestments }
-		}
-		multiply = { value = 2 desc = "POP_DEMAND_CLERGY" }
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 }
 
-SOL_leather_weight = {
+SOL_marble_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_leather_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 }
 
-SOL_textiles_total_weight = {
+# glass in luxury_goods at k=0.6
+SOL_glass_luxury_weight = {
+	value = SOL_glass_weight
+	multiply = 0.6
+}
+
+SOL_luxury_goods_total_weight = {
 	value = 0
+	add = SOL_fine_cloth_weight   # k=1.0, defined in GROUP 7
 	add = SOL_fur_weight
-	add = SOL_cloth_weight
-	add = SOL_fine_cloth_weight
-	add = SOL_leather_weight
+	add = SOL_porcelain_weight
+	add = SOL_lacquerware_weight
+	add = SOL_marble_weight
+	add = SOL_glass_luxury_weight # k=0.6
 	min = 0.001
 }
 
 ###############################################################
-# KNOWLEDGE group (N=3): beeswax, paper, books
+# GROUP 12: PROTEIN (N=3): fish, wild_game, livestock
+#   fish at k=1.0 (defined in GROUP 3)
+#   wild_game at k=1.0 (defined in GROUP 10)
 ###############################################################
-
-SOL_beeswax_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_beeswax_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	location = {
-		if = {
-			limit = {
-				OR = {
-					location_max_winter_level = none
-					location_max_winter_level = mild
-				}
-			}
-			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = normal }
-			multiply = { value = 1.2 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = severe }
-			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-	}
-}
-
-SOL_paper_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_paper_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			location.owner ?= {
-				has_variable = por_printing_ordinances
-				has_reform = government_reform:por_ordinances
-			}
-		}
-		multiply = 2
-	}
-	multiply = {
-		value = pop_literacy
-		divide = 100
-		desc = "POP_DEMAND_LITERACY"
-	}
-}
-
-SOL_books_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			location.owner ?= {
-				has_embraced_institution = institution:printing_press
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_PRINTING_PRESS" }
-	}
-	multiply = {
-		value = pop_literacy
-		divide = 100
-		desc = "POP_DEMAND_LITERACY"
-	}
-}
-
-SOL_knowledge_total_weight = {
-	value = 0
-	add = SOL_beeswax_weight
-	add = SOL_paper_weight
-	add = SOL_books_weight
-	min = 0.001
-}
-
-###############################################################
-# PRECIOUS group (N=7): goods_gold, silver, pearls, amber, gems, ivory, jewelry
-###############################################################
-
-SOL_jewelry_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for jewelry
-}
-
-SOL_goods_gold_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 2 }
-	}
-}
-
-SOL_silver_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { exists = owner }
-		multiply = {
-			value = 1
-			add = owner.modifier:global_pop_silver_demand
-		}
-	}
-}
-
-SOL_pearls_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.sub_continent = sub_continent:south_asia }
-		multiply = { value = 2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
-	}
-}
-
-SOL_amber_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.market ?= { produced_in_market:amber <= 0 } }
-		multiply = { value = 0.5 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
-	}
-	if = {
-		limit = {
-			location.region = {
-				OR = {
-					this = region:scandinavian_region
-					this = region:north_german_region
-					this = region:baltic_region
-				}
-			}
-		}
-		multiply = { value = 1.5 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
-	}
-}
-
-SOL_gems_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for gems
-}
-
-SOL_ivory_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			pop_type = pop_type:nobles
-			location.sub_continent = sub_continent:south_asia
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_NOBLES_INDIAN" }
-	}
-	if = {
-		limit = { religion = religion:jain }
-		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
-	}
-}
-
-SOL_precious_total_weight = {
-	value = 0
-	add = SOL_jewelry_weight
-	add = SOL_goods_gold_weight
-	add = SOL_silver_weight
-	add = SOL_pearls_weight
-	add = SOL_amber_weight
-	add = SOL_gems_weight
-	add = SOL_ivory_weight
-	min = 0.001
-}
-
-###############################################################
-# RITUAL group (N=3): incense, medicaments, mercury
-###############################################################
-
-SOL_incense_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			pop_type = pop_type:clergy
-			OR = {
-				religion = religion:miaphysite
-				religion = religion:orthodox
-				religion = religion:catholic
-			}
-		}
-		multiply = { value = 2 desc = "POP_DEMAND_CLERGY" }
-	}
-}
-
-SOL_medicaments_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { value = 4 desc = "POP_DEMAND_ANDEAN_COCA_LEAF" }
-	}
-	if = {
-		limit = {
-			religion.group = religion_group:folk_peruvian_group
-			pop_type = pop_type:clergy
-		}
-		multiply = { desc = "POP_DEMAND_ANDEAN_COCA_LEAF_CLERGY" value = 2.0 }
-	}
-	if = {
-		limit = { location = { has_any_disease_present = yes } }
-		multiply = { desc = "POP_DEMAND_DISEASE" value = 2 }
-	}
-}
-
-SOL_mercury_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for mercury
-}
-
-SOL_ritual_total_weight = {
-	value = 0
-	add = SOL_incense_weight
-	add = SOL_medicaments_weight
-	add = SOL_mercury_weight
-	min = 0.001
-}
-
-###############################################################
-# STIMULANTS group (N=5): sugar, tobacco, tea, cocoa, coffee
-###############################################################
-
-SOL_sugar_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_sugar_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for sugar
-}
-
-SOL_tobacco_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tobacco_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0.1 }
-	}
-}
-
-SOL_tea_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tea_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			OR = {
-				culture = culture:turkish_culture
-				culture = culture:turkoman_culture
-			}
-		}
-		multiply = { value = 2 desc = "POP_DEMAND_TURKISH" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 1.5 desc = "POP_DEMAND_EGYPT" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 2 desc = "POP_DEMAND_MAGHREBI" }
-	}
-}
-
-SOL_cocoa_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cocoa_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for cocoa
-}
-
-SOL_coffee_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_coffee_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for coffee
-}
-
-SOL_stimulants_total_weight = {
-	value = 0
-	add = SOL_sugar_weight
-	add = SOL_tobacco_weight
-	add = SOL_tea_weight
-	add = SOL_cocoa_weight
-	add = SOL_coffee_weight
-	min = 0.001
-}
-
-###############################################################
-# SPICES group (N=4): saffron, pepper, cloves, chili
-###############################################################
-
-SOL_saffron_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			OR = {
-				culture = culture:turkish_culture
-				culture = culture:turkoman_culture
-			}
-		}
-		multiply = { value = 1.5 desc = "POP_DEMAND_TURKISH" }
-	}
-	else_if = {
-		limit = {
-			culture = {
-				OR = {
-					has_culture_group = culture_group:hibernian_group
-					language = language:gaelic_language
-				}
-			}
-			owner = {
-				NOT = { modifier:country_bans_saffron_shirts = yes }
-			}
-		}
-		multiply = { value = 4.0 desc = "POP_DEMAND_GAELIC_SAFFRON" }
-	}
-	else_if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_EGYPT" }
-	}
-	else_if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
-	}
-}
-
-SOL_pepper_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.sub_continent = sub_continent:south_asia }
-		multiply = { value = 1.5 desc = "POP_DEMAND_INDIA" }
-	}
-}
-
-SOL_cloves_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for cloves
-}
-
-SOL_chili_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for chili
-}
-
-SOL_spices_total_weight = {
-	value = 0
-	add = SOL_saffron_weight
-	add = SOL_pepper_weight
-	add = SOL_cloves_weight
-	add = SOL_chili_weight
-	min = 0.001
-}
-
-###############################################################
-# STAPLE group (N=8): wheat, rice, millet, maize, potato, legumes, olives, fruit
-###############################################################
-
-SOL_wheat_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_wheat_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.continent = continent:europe }
-		multiply = { value = 2.0 desc = "POP_DEMAND_EUROPE" }
-	}
-	if = {
-		limit = {
-			location.continent = continent:asia
-			OR = {
-				location = { climate = subtropical }
-				location = { climate = tropical }
-			}
-		}
-		multiply = { value = 0.5 desc = "POP_DEMAND_ASIA" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 1.5 desc = "POP_DEMAND_EGYPT" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 0.8 desc = "POP_DEMAND_MAGHREBI" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:baltic_group } }
-		multiply = { value = 0.8 desc = "POP_DEMAND_BALTIC" }
-	}
-}
-
-SOL_rice_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_rice_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			location.continent = continent:asia
-			OR = {
-				location = { climate = subtropical }
-				location = { climate = tropical }
-			}
-		}
-		multiply = { value = 2 desc = "POP_DEMAND_ASIA" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		add = { value = 0.002 desc = "POP_DEMAND_EGYPT" }
-	}
-}
-
-SOL_millet_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_millet_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.sub_continent = sub_continent:south_asia }
-		multiply = { value = 2 desc = "POP_DEMAND_INDIA" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 0.1 desc = "POP_DEMAND_EGYPT" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 1.5 desc = "POP_DEMAND_MAGHREBI" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:baltic_group } }
-		multiply = { value = 2.0 desc = "POP_DEMAND_BALTIC" }
-	}
-}
-
-SOL_maize_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_maize_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location.continent != continent:america }
-		multiply = { value = 0 desc = "POP_DEMAND_NOT_AMERICA" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 0.25 }
-	}
-}
-
-SOL_potato_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_potato_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { value = 4.0 desc = "POP_DEMAND_ANDES" }
-	}
-	if = {
-		limit = { religion = religion:jain }
-		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
-	}
-}
-
-SOL_legumes_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_legumes_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			OR = {
-				culture = culture:turkish_culture
-				culture = culture:turkoman_culture
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_TURKISH" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 2 desc = "POP_DEMAND_EGYPT" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:baltic_group } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_BALTIC" }
-	}
-}
-
-SOL_olives_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_olives_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = {
-			OR = {
-				culture = culture:turkish_culture
-				culture = culture:turkoman_culture
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_TURKISH" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:languedocien
-				culture = culture:provencal
-				culture = culture:albanian
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = { has_culture_group = culture_group:iberian_group }
-				culture = { has_culture_group = culture_group:italian_group }
-				culture = { has_culture_group = culture_group:greek_group }
-			}
-		}
-		multiply = { value = 1.2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
-	}
-}
-
-SOL_fruit_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fruit_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { location = { climate = arctic } }
-		multiply = { value = 0 desc = "POP_DEMAND_ARCTIC" }
-	}
-	if = {
-		limit = { location = { climate = cold_arid } }
-		multiply = { value = 0.5 desc = "POP_DEMAND_COLD_ARID" }
-	}
-	if = {
-		limit = { location = { climate = tropical } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_TROPICAL" }
-	}
-	if = {
-		limit = { location = { climate = mediterranean } }
-		multiply = { value = 1.4 desc = "POP_DEMAND_TEMPERATE" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
-		multiply = { value = 1.1 desc = "POP_DEMAND_MAGHREBI" }
-	}
-}
-
-SOL_staple_total_weight = {
-	value = 0
-	add = SOL_wheat_weight
-	add = SOL_rice_weight
-	add = SOL_millet_weight
-	add = SOL_maize_weight
-	add = SOL_potato_weight
-	add = SOL_legumes_weight
-	add = SOL_olives_weight
-	add = SOL_fruit_weight
-	min = 0.001
-}
-
-###############################################################
-# PROTEIN group (N=3): fish, wild_game, livestock
-###############################################################
-
-SOL_fish_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_fish_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { religion = religion:catholic }
-		multiply = { value = 1.25 desc = "POP_DEMAND_CATHOLIC" }
-	}
-	if = {
-		limit = { religion = religion:jain }
-		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 0.5 desc = "POP_DEMAND_EGYPT" }
-	}
-}
-
-SOL_wild_game_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_wild_game_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	if = {
-		limit = { culture = { has_culture_group = culture_group:andean_group } }
-		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 2 }
-	}
-	if = {
-		limit = {
-			OR = {
-				culture = culture:lower_egyptian_culture
-				culture = culture:upper_egyptian_culture
-			}
-		}
-		multiply = { value = 0.25 desc = "POP_DEMAND_EGYPT" }
-	}
-	if = {
-		limit = { culture = { has_culture_group = culture_group:baltic_group } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_BALTIC" }
-	}
-	if = {
-		limit = { religion = religion:jain }
-		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
-	}
-}
 
 SOL_livestock_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_livestock_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
@@ -1151,49 +1175,333 @@ SOL_livestock_weight = {
 
 SOL_protein_total_weight = {
 	value = 0
-	add = SOL_fish_weight
-	add = SOL_wild_game_weight
+	add = SOL_fish_weight        # k=1.0, defined in GROUP 3
+	add = SOL_wild_game_weight   # k=1.0, defined in GROUP 10
 	add = SOL_livestock_weight
 	min = 0.001
 }
 
 ###############################################################
-# MILITARY group (N=7): horses, elephants, weaponry, firearms, coal, salt, victuals
+# GROUP 13: SPICES (N=4): saffron, pepper, cloves, chili
 ###############################################################
 
-SOL_horses_weight = {
+SOL_saffron_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for horses
-}
-
-SOL_elephants_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_saffron_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
 		limit = {
-			location.sub_continent != sub_continent:south_asia
-			location.region != region:indochina_region
+			OR = {
+				culture = culture:turkish_culture
+				culture = culture:turkoman_culture
+			}
 		}
-		multiply = { value = 0 desc = "POP_DEMAND_NOBLES_NOT_HERE" }
+		multiply = { value = 1.5 desc = "POP_DEMAND_TURKISH" }
+	}
+	else_if = {
+		limit = {
+			culture = {
+				OR = {
+					has_culture_group = culture_group:hibernian_group
+					language = language:gaelic_language
+				}
+			}
+			owner = {
+				NOT = { modifier:country_bans_saffron_shirts = yes }
+			}
+		}
+		multiply = { value = 4.0 desc = "POP_DEMAND_GAELIC_SAFFRON" }
+	}
+	else_if = {
+		limit = {
+			OR = {
+				culture = culture:lower_egyptian_culture
+				culture = culture:upper_egyptian_culture
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_EGYPT" }
+	}
+	else_if = {
+		limit = { culture = { has_culture_group = culture_group:maghrebi_group } }
+		multiply = { value = 1.2 desc = "POP_DEMAND_MAGHREBI" }
 	}
 }
+
+SOL_pepper_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pepper_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.sub_continent = sub_continent:south_asia }
+		multiply = { value = 1.5 desc = "POP_DEMAND_INDIA" }
+	}
+}
+
+SOL_cloves_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_cloves_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_chili_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_chili_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_spices_total_weight = {
+	value = 0
+	add = SOL_saffron_weight
+	add = SOL_pepper_weight
+	add = SOL_cloves_weight
+	add = SOL_chili_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 14: PRECIOUS (N=3): goods_gold, silver, jewelry
+###############################################################
+
+SOL_goods_gold_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_goods_gold_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { desc = "POP_DEMAND_CULTURAL_PREFERENCES" value = 2 }
+	}
+}
+
+SOL_silver_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_silver_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { exists = owner }
+		multiply = {
+			value = 1
+			add = owner.modifier:global_pop_silver_demand
+		}
+	}
+}
+
+SOL_jewelry_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_jewelry_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_precious_total_weight = {
+	value = 0
+	add = SOL_goods_gold_weight
+	add = SOL_silver_weight
+	add = SOL_jewelry_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 15: TREASURES (N=4): amber, gems, ivory, pearls
+###############################################################
+
+SOL_amber_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_amber_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.market ?= { produced_in_market:amber <= 0 } }
+		multiply = { value = 0.5 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
+	}
+	if = {
+		limit = {
+			location.region = {
+				OR = {
+					this = region:scandinavian_region
+					this = region:north_german_region
+					this = region:baltic_region
+				}
+			}
+		}
+		multiply = { value = 1.5 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
+	}
+}
+
+SOL_gems_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_gems_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_ivory_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_ivory_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			pop_type = pop_type:nobles
+			location.sub_continent = sub_continent:south_asia
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_NOBLES_INDIAN" }
+	}
+	if = {
+		limit = { religion = religion:jain }
+		multiply = { value = 0 desc = "POP_DEMAND_JAIN" }
+	}
+}
+
+SOL_pearls_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pearls_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { location.sub_continent = sub_continent:south_asia }
+		multiply = { value = 2 desc = "POP_DEMAND_CULTURAL_PREFERENCES" }
+	}
+}
+
+SOL_treasures_total_weight = {
+	value = 0
+	add = SOL_amber_weight
+	add = SOL_gems_weight
+	add = SOL_ivory_weight
+	add = SOL_pearls_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 16: MEDICINE (N=2): medicaments, mercury
+#   mercury also participates in ritual at k=0.5
+###############################################################
+
+SOL_medicaments_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_medicaments_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = { culture = { has_culture_group = culture_group:andean_group } }
+		multiply = { value = 4 desc = "POP_DEMAND_ANDEAN_COCA_LEAF" }
+	}
+	if = {
+		limit = {
+			religion.group = religion_group:folk_peruvian_group
+			pop_type = pop_type:clergy
+		}
+		multiply = { desc = "POP_DEMAND_ANDEAN_COCA_LEAF_CLERGY" value = 2.0 }
+	}
+	if = {
+		limit = { location = { has_any_disease_present = yes } }
+		multiply = { desc = "POP_DEMAND_DISEASE" value = 2 }
+	}
+}
+
+SOL_mercury_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_mercury_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+# mercury in ritual at k=0.5
+SOL_mercury_ritual_weight = {
+	value = SOL_mercury_weight
+	multiply = 0.5
+}
+
+SOL_medicine_total_weight = {
+	value = 0
+	add = SOL_medicaments_weight
+	add = SOL_mercury_weight      # k=1.0 in medicine
+	min = 0.001
+}
+
+###############################################################
+# GROUP 17: RITUAL (N=2): incense, mercury
+#   mercury at k=0.5 (SOL_mercury_ritual_weight, defined in GROUP 16)
+###############################################################
+
+SOL_incense_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_incense_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			pop_type = pop_type:clergy
+			OR = {
+				religion = religion:miaphysite
+				religion = religion:orthodox
+				religion = religion:catholic
+			}
+		}
+		multiply = { value = 2 desc = "POP_DEMAND_CLERGY" }
+	}
+}
+
+SOL_ritual_total_weight = {
+	value = 0
+	add = SOL_incense_weight
+	add = SOL_mercury_ritual_weight  # k=0.5, defined in GROUP 16
+	min = 0.001
+}
+
+###############################################################
+# GROUP 18: WEAPONS (N=2): weaponry, firearms
+###############################################################
 
 SOL_weaponry_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_weaponry_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
 	if = {
@@ -1220,226 +1528,85 @@ SOL_firearms_weight = {
 	# Part 1 — Substitution
 	if = {
 		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_firearms_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for firearms
-}
-
-SOL_coal_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_coal_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	location = {
-		if = {
-			limit = { location_max_winter_level = none }
-			multiply = { value = 0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = mild }
-			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = normal }
-			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = severe }
-			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-	}
-	if = {
-		limit = { location = { topography = mountains } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_TOPOGRAPHY_MOUNTAINS" }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 }
 
-SOL_salt_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_salt_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — Religion / culture / location
-	location = {
-		if = {
-			limit = { location_max_winter_level = none }
-			multiply = { value = 0.75 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = mild }
-			multiply = { value = 1 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = normal }
-			multiply = { value = 1.2 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = severe }
-			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-	}
-}
-
-SOL_victuals_weight = {
+SOL_weapons_total_weight = {
 	value = 0
-	if = {
-		limit = { sol_pp_victuals_compat_is_on = yes }
-		add = 1
-		# Part 1 — Substitution (only meaningful when compat is on)
-		if = {
-			limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_victuals_scarce_markets target = this } } }
-			add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-		}
-		# Part 2 — Religion / culture / location
-		location = {
-			if = {
-				limit = { location_max_winter_level = severe }
-				multiply = { value = 1.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-			}
-			else_if = {
-				limit = { location_max_winter_level = normal }
-				multiply = { value = 1.3 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-			}
-			else_if = {
-				limit = { location_max_winter_level = mild }
-				multiply = { value = 1.15 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-			}
-		}
-	}
-}
-
-SOL_military_total_weight = {
-	value = 0
-	add = SOL_horses_weight
-	add = SOL_elephants_weight
 	add = SOL_weaponry_weight
 	add = SOL_firearms_weight
-	add = SOL_coal_weight
-	add = SOL_salt_weight
-	add = SOL_victuals_weight
 	min = 0.001
 }
 
 ###############################################################
-# HOUSEHOLD group (N=8): lumber, masonry, tools, pottery, furniture, porcelain, lacquerware, marble
+# GROUP 19: MOUNTS (N=2): horses, elephants
 ###############################################################
 
-SOL_lumber_weight = {
+SOL_horses_weight = {
 	value = 1
 	# Part 1 — Substitution
 	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_lumber_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_horses_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+}
+
+SOL_elephants_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_elephants_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
 	}
 	# Part 2 — Religion / culture / location
-	location = {
-		if = {
-			limit = { location_max_winter_level = none }
-			multiply = { value = 0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
+	if = {
+		limit = {
+			location.sub_continent != sub_continent:south_asia
+			location.region != region:indochina_region
 		}
-		else_if = {
-			limit = { location_max_winter_level = mild }
-			multiply = { value = 0.5 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = normal }
-			multiply = { value = 1.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-		else_if = {
-			limit = { location_max_winter_level = severe }
-			multiply = { value = 2.0 desc = "POP_DEMAND_CLIMATE_MAX_WINTER_LEVEL" }
-		}
-	}
-	if = {
-		limit = { location = { topography = mountains } }
-		multiply = { value = 1.2 desc = "POP_DEMAND_TOPOGRAPHY_MOUNTAINS" }
+		multiply = { value = 0 desc = "POP_DEMAND_NOBLES_NOT_HERE" }
 	}
 }
 
-SOL_masonry_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_masonry_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for masonry
-}
-
-SOL_tools_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_tools_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for tools
-}
-
-SOL_pottery_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_pottery_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for pottery
-}
-
-SOL_furniture_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_furniture_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for furniture
-}
-
-SOL_porcelain_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_porcelain_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for porcelain
-}
-
-SOL_lacquerware_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_lacquerware_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for lacquerware
-}
-
-SOL_marble_weight = {
-	value = 1
-	# Part 1 — Substitution
-	if = {
-		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_marble_scarce_markets target = this } } }
-		add = { value = -0.5 desc = "SOL_WEIGHT_SCARCE" }
-	}
-	# Part 2 — no religion/culture/location modifiers for marble
-}
-
-SOL_household_total_weight = {
+SOL_mounts_total_weight = {
 	value = 0
-	add = SOL_lumber_weight
-	add = SOL_masonry_weight
-	add = SOL_tools_weight
-	add = SOL_pottery_weight
-	add = SOL_furniture_weight
-	add = SOL_porcelain_weight
-	add = SOL_lacquerware_weight
-	add = SOL_marble_weight
+	add = SOL_horses_weight
+	add = SOL_elephants_weight
+	min = 0.001
+}
+
+###############################################################
+# GROUP 20: KNOWLEDGE (N=2): paper, books
+#   paper at k=1.0 (defined in GROUP 6)
+###############################################################
+
+SOL_books_weight = {
+	value = 1
+	# Part 1 — Substitution
+	if = {
+		limit = { location.market ?= { is_target_in_global_variable_list = { name = SOL_books_scarce_markets target = this } } }
+		multiply = { value = 0.5 desc = "SOL_WEIGHT_SCARCE" }
+	}
+	# Part 2 — Religion / culture / location
+	if = {
+		limit = {
+			location.owner ?= {
+				has_embraced_institution = institution:printing_press
+			}
+		}
+		multiply = { value = 1.2 desc = "POP_DEMAND_PRINTING_PRESS" }
+	}
+	multiply = {
+		value = pop_literacy
+		divide = 100
+		desc = "POP_DEMAND_LITERACY"
+	}
+}
+
+SOL_knowledge_total_weight = {
+	value = 0
+	add = SOL_paper_weight    # k=1.0, defined in GROUP 6
+	add = SOL_books_weight
 	min = 0.001
 }

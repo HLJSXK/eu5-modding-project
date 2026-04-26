@@ -25,54 +25,83 @@ REPO_ROOT    = Path(__file__).resolve().parent.parent.parent
 ALPHA_TABLE  = REPO_ROOT / "data" / "alpha_table.csv"
 
 
-# 11 substitute groups (10 from SOL_substitute_good_indicators.txt + household from SOL_substitute_effects.txt)
+# 20 substitute groups
 SUBSTITUTE_GROUPS: List[str] = [
-    "alcohol", "textiles", "knowledge", "precious", "ritual",
-    "stimulants", "spices", "staple", "protein", "military", "household",
+    "basic_clothing", "crude_goods", "staple", "condiments", "heating",
+    "household", "standard_clothing", "intoxicants", "luxury_drinks",
+    "luxury_food", "luxury_goods", "protein", "spices", "precious",
+    "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
 ]
 
-# Group -> goods mapping
+# Group -> goods mapping (multi-group goods appear in each group they participate in)
 GROUP_GOODS: Dict[str, List[str]] = {
-    "alcohol":    ["wine", "liquor", "beer"],
-    "textiles":   ["fur", "cloth", "fine_cloth", "leather"],
-    "knowledge":  ["beeswax", "paper", "books"],
-    "precious":   ["goods_gold", "silver", "pearls", "amber", "gems", "ivory", "jewelry"],
-    "ritual":     ["incense", "medicaments", "mercury"],
-    "stimulants": ["sugar", "tobacco", "tea", "cocoa", "coffee"],
-    "spices":     ["saffron", "pepper", "cloves", "chili"],
-    "staple":     ["wheat", "rice", "millet", "maize", "potato", "legumes", "olives", "fruit"],
-    "protein":    ["fish", "wild_game", "livestock"],
-    "military":   ["horses", "elephants", "weaponry", "firearms", "coal", "salt", "victuals"],
-    "household":  ["lumber", "masonry", "tools", "pottery", "furniture", "porcelain", "lacquerware", "marble"],
+    "basic_clothing":   ["cloth", "leather"],
+    "crude_goods":      ["lumber", "masonry", "tools", "pottery"],
+    "staple":           ["wheat", "rice", "millet", "maize", "potato", "legumes", "fish"],
+    "condiments":       ["sugar", "salt", "olives"],
+    "heating":          ["lumber", "coal", "beeswax"],
+    "household":        ["furniture", "pottery", "glass", "paper", "beeswax"],
+    "standard_clothing": ["cloth", "fine_cloth"],
+    "intoxicants":      ["wine", "beer", "liquor", "tobacco"],
+    "luxury_drinks":    ["tea", "coffee", "wine", "cocoa"],
+    "luxury_food":      ["wild_game", "victuals", "fruit"],
+    "luxury_goods":     ["fine_cloth", "fur", "porcelain", "lacquerware", "marble", "glass"],
+    "protein":          ["fish", "wild_game", "livestock"],
+    "spices":           ["saffron", "pepper", "cloves", "chili"],
+    "precious":         ["goods_gold", "silver", "jewelry"],
+    "treasures":        ["amber", "gems", "ivory", "pearls"],
+    "medicine":         ["medicaments", "mercury"],
+    "ritual":           ["incense", "mercury"],
+    "weapons":          ["weaponry", "firearms"],
+    "mounts":           ["horses", "elephants"],
+    "knowledge":        ["paper", "books"],
 }
 
 GROUP_COLORS: Dict[str, str] = {
-    "alcohol":    "#e74c3c",
-    "textiles":   "#9b59b6",
-    "knowledge":  "#3498db",
-    "precious":   "#f39c12",
-    "ritual":     "#e67e22",
-    "stimulants": "#1abc9c",
-    "spices":     "#c0392b",
-    "staple":     "#27ae60",
-    "protein":    "#2980b9",
-    "military":   "#7f8c8d",
-    "household":  "#795548",
+    "basic_clothing":   "#c0392b",
+    "crude_goods":      "#795548",
+    "staple":           "#27ae60",
+    "condiments":       "#f39c12",
+    "heating":          "#e67e22",
+    "household":        "#8d6e63",
+    "standard_clothing": "#9b59b6",
+    "intoxicants":      "#e74c3c",
+    "luxury_drinks":    "#1abc9c",
+    "luxury_food":      "#2ecc71",
+    "luxury_goods":     "#8e44ad",
+    "protein":          "#2980b9",
+    "spices":           "#d35400",
+    "precious":         "#f1c40f",
+    "treasures":        "#e74c3c",
+    "medicine":         "#16a085",
+    "ritual":           "#7f8c8d",
+    "weapons":          "#2c3e50",
+    "mounts":           "#6d4c41",
+    "knowledge":        "#3498db",
 }
 
 # Groups ranked by "luxury" level (higher = more elastic should be)
 LUXURY_RANK: Dict[str, int] = {
-    "staple":     1,   #必需品，弹性低
-    "protein":    2,
-    "household":  3,
-    "alcohol":    4,
-    "military":   5,
-    "spices":     6,
-    "stimulants": 7,
-    "textiles":   8,
-    "knowledge":  9,
-    "ritual":     10,
-    "precious":   11,  # 奢侈品，弹性高
+    "staple":           1,   # 必需品，弹性低
+    "crude_goods":      2,
+    "condiments":       3,
+    "heating":          4,
+    "basic_clothing":   5,
+    "protein":          6,
+    "household":        7,
+    "intoxicants":      8,
+    "standard_clothing": 9,
+    "weapons":          10,
+    "mounts":           11,
+    "spices":           12,
+    "medicine":         13,
+    "luxury_drinks":    14,
+    "luxury_food":      15,
+    "luxury_goods":     16,
+    "precious":         17,
+    "knowledge":        18,
+    "ritual":           19,
+    "treasures":        20,  # 奢侈品，弹性高
 }
 
 
