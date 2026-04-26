@@ -1,5 +1,9 @@
 """
-EU5 SOL Demand Simulator — Streamlit UI
+EU5 SOL Demand Simulator — Streamlit UI (v2)
+
+Two tabs:
+  Tab 1 — Alpha Adjustment: piecewise Engel curve / budget share designer
+  Tab 2 — Savings Dynamics: simplified single-variable savings pressure simulator
 
 Run:
     cd tools/sol_demand_simulator
@@ -8,44 +12,25 @@ Run:
 """
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import replace as dc_replace
 from pathlib import Path
 
-# Ensure local imports resolve when launched from any CWD
 sys.path.insert(0, str(Path(__file__).parent))
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
 from simulator import (
     PRESSURE_MODES,
-    STRATA_PARAMS,
-    ScenarioParams,
-    StrataState,
-    compute_base_demand_index,
-    compute_demand_scale,
-    compute_monthly_income_from_gdp,
-    compute_savings_targets,
-    compute_engel_demand_scale,
-    fn1_gdp_per_capita,
-    fn2_gdp_nonlinear,
-    fn3_savings_pressure,
     savings_pressure_curve_np,
-    simulate,
-    _build_engel_P_strata,
-    _build_engel_alpha,
 )
 from parser import (
-    EU5_POP_TYPES, STRATA, STRATA_TO_POP_TYPES, load_demand_matrix, load_goods_prices,
-    GROUP_PRICES_FILE, BUDGET_SHARES_FILE,
-    _GROUPS as ENGEL_GROUPS, _STRATA_KEYS as ENGEL_STRATA_KEYS,
+    STRATA,
+    load_demand_matrix,
 )
-
 from curve_designer import (
     SUBSTITUTE_GROUPS,
     GROUP_GOODS,
@@ -84,33 +69,19 @@ st.set_page_config(
 )
 
 st.title("SOL Pop Demand Simulator")
-st.caption(
-    "Offline visualizer for the Standard of Living (SOL) mod demand system. "
-    "Reads live mod files — no hardcoded values."
-)
 
 # ---------------------------------------------------------------------------
 # Data loading (cached)
 # ---------------------------------------------------------------------------
 
-@st.cache_data(show_spinner="Loading goods prices…")
-def _load_prices():
-    return load_goods_prices()
-
 @st.cache_data(show_spinner="Parsing demand file…")
 def _load_matrix():
     return load_demand_matrix()
 
-prices        = _load_prices()
 demand_matrix = _load_matrix()
 
 
 def _reweight_commoners(dm: dict, pop_lab: float, pop_peas: float, pop_sold: float) -> dict:
-    """
-    Return a copy of the demand matrix where strata_demand["commoners"] is
-    recomputed as a population-weighted average of laborers / peasants / soldiers
-    demands instead of the default arithmetic mean.
-    """
     total = max(1e-9, pop_lab + pop_peas + pop_sold)
     w = {"laborers": pop_lab / total, "peasants": pop_peas / total, "soldiers": pop_sold / total}
     result = {}
@@ -122,352 +93,10 @@ def _reweight_commoners(dm: dict, pop_lab: float, pop_peas: float, pop_sold: flo
         )
     return result
 
-# ---------------------------------------------------------------------------
-# User preset persistence
-# ---------------------------------------------------------------------------
 
-PRESETS_FILE = Path(__file__).parent / "user_presets.json"
+# Fixed default pop split for commoner reweighting
+demand_matrix_w = _reweight_commoners(demand_matrix, 400.0, 500.0, 100.0)
 
-
-def load_user_presets() -> dict:
-    if not PRESETS_FILE.exists():
-        return {}
-    try:
-        return json.loads(PRESETS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def save_user_presets(presets: dict) -> None:
-    PRESETS_FILE.write_text(json.dumps(presets, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def dict_to_params(d: dict) -> ScenarioParams:
-    comm_total = d["strata"].get("commoners", {}).get("pop_count", 0.0)
-    each = comm_total / 2.0
-    return ScenarioParams(
-        monthly_income          = d["monthly_income"],
-        num_institutions        = d["num_institutions"],
-        tax_base                = d["tax_base"],
-        effective_control       = d["effective_control"],
-        peasant_enfranchisement = d["peasant_enfranchisement"],
-        pop_laborers            = d.get("pop_laborers", each),
-        pop_peasants            = d.get("pop_peasants", each),
-        pop_soldiers            = d.get("pop_soldiers", 0.0),
-        update_interval_years   = d["update_interval_years"],
-        sim_years               = d["sim_years"],
-        ema_alpha               = d.get("ema_alpha", 1.0),
-        pressure_mode           = d.get("pressure_mode",           "linear"),
-        pressure_linear_slope   = d.get("pressure_linear_slope",   0.50),
-        pressure_tanh_k         = d.get("pressure_tanh_k",         1.0),
-        pressure_quadratic_norm = d.get("pressure_quadratic_norm", 2.0),
-        pressure_deadband_delta = d.get("pressure_deadband_delta", 0.15),
-        pressure_deadband_slope = d.get("pressure_deadband_slope", 0.50),
-        strata = {
-            s: StrataState(v["pop_count"], v["tax_rate"], v["savings"])
-            for s, v in d["strata"].items()
-        },
-    )
-
-# ---------------------------------------------------------------------------
-# Sidebar — Scenario configuration
-# ---------------------------------------------------------------------------
-
-with st.sidebar:
-    st.header("Scenario Setup")
-
-    # ---- Preset management ----
-    user_presets = load_user_presets()
-    user_names   = list(user_presets.keys())
-
-    all_options  = ["(custom)"] + [f"★ {n}" for n in user_names]
-    selected_opt = st.selectbox("Presets", all_options, key="preset_select")
-
-    is_custom   = selected_opt == "(custom)"
-    is_user     = selected_opt.startswith("★ ")
-    actual_name = selected_opt[2:] if is_user else selected_opt
-
-    col_load, col_del = st.columns([3, 2])
-    with col_load:
-        load_clicked = st.button("Load", disabled=is_custom, use_container_width=True)
-    with col_del:
-        del_clicked  = st.button("Delete", disabled=not is_user, use_container_width=True)
-
-    if load_clicked:
-        p = dict_to_params(user_presets[actual_name])
-        st.session_state["_preset"] = p
-        # Push preset values directly into widget session state so Streamlit
-        # honours them even when the widgets have already been interacted with.
-        comm = p.strata.get("commoners")
-        st.session_state.update({
-            "w_monthly_income":            float(p.monthly_income),
-            "w_num_institutions":          int(p.num_institutions),
-            "w_tax_base":                  float(p.tax_base),
-            "w_effective_control":         int(round(p.effective_control * 100)),
-            "w_enfranchisement":           float(p.peasant_enfranchisement),
-            "w_pop_nobles":                float(p.strata["nobles"].pop_count),
-            "w_pop_clergy":                float(p.strata["clergy"].pop_count),
-            "w_pop_burghers":              float(p.strata["burghers"].pop_count),
-            "w_pop_laborers":              float(p.pop_laborers),
-            "w_pop_peasants":              float(p.pop_peasants),
-            "w_pop_soldiers":              float(p.pop_soldiers),
-            "w_pop_tribesmen":             float(p.strata["tribesmen"].pop_count),
-            "w_tr_nobles":                 int(round(p.strata["nobles"].tax_rate    * 100)),
-            "w_tr_clergy":                 int(round(p.strata["clergy"].tax_rate    * 100)),
-            "w_tr_burghers":               int(round(p.strata["burghers"].tax_rate  * 100)),
-            "w_tr_commoners":              int(round((comm.tax_rate if comm else 0.05) * 100)),
-            "w_tr_tribesmen":              int(round(p.strata["tribesmen"].tax_rate * 100)),
-            "w_sv_nobles":                 float(p.strata["nobles"].savings),
-            "w_sv_clergy":                 float(p.strata["clergy"].savings),
-            "w_sv_burghers":               float(p.strata["burghers"].savings),
-            "w_sv_commoners":              float(comm.savings if comm else 0.0),
-            "w_sv_tribesmen":              float(p.strata["tribesmen"].savings),
-            "w_update_interval":           p.update_interval_years,
-            "w_sim_years":                 min([10,25,50,100], key=lambda x: abs(x - p.sim_years)),
-            "w_ema_alpha":                 float(p.ema_alpha),
-            "w_pressure_mode":             p.pressure_mode,
-            "w_pressure_linear_slope":     float(p.pressure_linear_slope),
-            "w_pressure_tanh_k":           float(p.pressure_tanh_k),
-            "w_pressure_quadratic_norm":   float(p.pressure_quadratic_norm),
-            "w_pressure_deadband_delta":   float(p.pressure_deadband_delta),
-            "w_pressure_deadband_slope":   float(p.pressure_deadband_slope),
-        })
-        st.rerun()
-
-    if del_clicked:
-        ups = load_user_presets()
-        ups.pop(actual_name, None)
-        save_user_presets(ups)
-        st.session_state.pop("_preset", None)
-        st.rerun()
-
-    preset: ScenarioParams | None = st.session_state.get("_preset")
-
-    def _pv(key, default):
-        """Get preset value or default."""
-        if preset is None:
-            return default
-        return getattr(preset, key, default)
-
-    def _sv(strata_key, attr, default):
-        """Get preset strata value or default."""
-        if preset is None or preset.strata.get(strata_key) is None:
-            return default
-        return getattr(preset.strata[strata_key], attr, default)
-
-    st.subheader("Country")
-    monthly_income   = st.number_input("Monthly income (gold/month)",
-                                       min_value=0.0,
-                                       value=float(_pv("monthly_income", 30)),
-                                       step=5.0, key="w_monthly_income",
-                                       help="owner.monthly_income_trade_and_tax — drives savings targets")
-    num_institutions = st.slider("Embraced institutions", 0, 10,
-                                 int(_pv("num_institutions", 2)),
-                                 key="w_num_institutions",
-                                 help="+5% demand per institution")
-
-    st.subheader("Location")
-    tax_base          = st.number_input("Tax base (gold/month)",
-                                        min_value=0.0,
-                                        value=float(_pv("tax_base", 8)),
-                                        step=1.0, key="w_tax_base",
-                                        help="location_tax_base")
-    effective_control = st.slider("Effective control (%)", 1, 100,
-                                  int(_pv("effective_control", 0.75) * 100),
-                                  key="w_effective_control",
-                                  help="local_effective_control") / 100.0
-    enfranchisement   = st.slider("Peasant enfranchisement", 0.1, 1.0,
-                                  float(_pv("peasant_enfranchisement", 0.5)),
-                                  step=0.05, key="w_enfranchisement",
-                                  help="1.0 = full freedom; 0.1 = maximum serfdom (commoner wealth → nobles)")
-
-    st.subheader("Pop Counts (per strata)")
-    pop_nobles    = st.number_input("Nobles",    min_value=0.0, value=float(_sv("nobles",    "pop_count", 0.2)),  step=0.05, key="w_pop_nobles")
-    pop_clergy    = st.number_input("Clergy",    min_value=0.0, value=float(_sv("clergy",    "pop_count", 0.15)), step=0.05, key="w_pop_clergy")
-    pop_burghers  = st.number_input("Burghers",  min_value=0.0, value=float(_sv("burghers",  "pop_count", 0.15)), step=0.05, key="w_pop_burghers")
-    _comm_total = float(_sv("commoners", "pop_count", 2.0))
-    _comm_each  = round(_comm_total / 2, 4)
-    pop_laborers  = st.number_input("  Laborers",  min_value=0.0, value=float(_pv("pop_laborers",  _comm_each)), step=0.05, key="w_pop_laborers")
-    pop_peasants  = st.number_input("  Peasants",  min_value=0.0, value=float(_pv("pop_peasants",  _comm_each)), step=0.05, key="w_pop_peasants")
-    pop_soldiers  = st.number_input("  Soldiers",  min_value=0.0, value=float(_pv("pop_soldiers",  0.0)),        step=0.05, key="w_pop_soldiers")
-    pop_commoners = pop_laborers + pop_peasants + pop_soldiers
-    st.caption(f"Commoners total: {pop_commoners:.3f}")
-    pop_tribesmen = st.number_input("Tribesmen", min_value=0.0, value=float(_sv("tribesmen", "pop_count", 0.0)),  step=0.05, key="w_pop_tribesmen")
-
-    st.subheader("Tax Rates (% of income to crown)")
-    tr_nobles    = st.slider("Nobles tax",    0, 100, int(_sv("nobles",    "tax_rate", 0.15) * 100), key="w_tr_nobles")    / 100
-    tr_clergy    = st.slider("Clergy tax",    0, 100, int(_sv("clergy",    "tax_rate", 0.10) * 100), key="w_tr_clergy")    / 100
-    tr_burghers  = st.slider("Burghers tax",  0, 100, int(_sv("burghers",  "tax_rate", 0.10) * 100), key="w_tr_burghers")  / 100
-    tr_commoners = st.slider("Commoners tax", 0, 100, int(_sv("commoners", "tax_rate", 0.05) * 100), key="w_tr_commoners") / 100
-    tr_tribesmen = st.slider("Tribesmen tax", 0, 100, int(_sv("tribesmen", "tax_rate", 0.00) * 100), key="w_tr_tribesmen") / 100
-
-    st.subheader("Initial Savings (estate gold)")
-    sv_nobles    = st.number_input("Nobles savings",    min_value=0.0, value=float(_sv("nobles",    "savings", 0)), step=50.0, key="w_sv_nobles")
-    sv_clergy    = st.number_input("Clergy savings",    min_value=0.0, value=float(_sv("clergy",    "savings", 0)), step=50.0, key="w_sv_clergy")
-    sv_burghers  = st.number_input("Burghers savings",  min_value=0.0, value=float(_sv("burghers",  "savings", 0)), step=50.0, key="w_sv_burghers")
-    sv_commoners = st.number_input("Commoners savings", min_value=0.0, value=float(_sv("commoners", "savings", 0)), step=50.0, key="w_sv_commoners")
-    sv_tribesmen = st.number_input("Tribesmen savings", min_value=0.0, value=float(_sv("tribesmen", "savings", 0)), step=50.0, key="w_sv_tribesmen")
-
-    st.subheader("Simulation Settings")
-    update_interval  = st.radio("Demand update interval (years)", [1, 2, 3],
-                                index=int(_pv("update_interval_years", 2)) - 1,
-                                horizontal=True, key="w_update_interval")
-    _sim_opts = [10, 25, 50, 100]
-    _sim_raw  = int(_pv("sim_years", 25))
-    _sim_val  = min(_sim_opts, key=lambda x: abs(x - _sim_raw))  # snap to nearest valid
-    sim_years = st.select_slider("Simulation duration (years)", _sim_opts, value=_sim_val, key="w_sim_years")
-    ema_alpha = st.slider(
-        "EMA smoothing α",
-        min_value=0.05, max_value=1.0,
-        value=float(_pv("ema_alpha", 1.0)),
-        step=0.05, key="w_ema_alpha",
-        help="d_new = α × d_computed + (1−α) × d_old  |  1.0 = no smoothing (vanilla); lower values damp oscillation",
-    )
-    _pm_keys = list(PRESSURE_MODES.keys())
-    pressure_mode = st.selectbox(
-        "Savings pressure function",
-        options=_pm_keys,
-        format_func=lambda k: PRESSURE_MODES[k],
-        index=_pm_keys.index(_pv("pressure_mode", "linear")),
-        key="w_pressure_mode",
-        help="Shape of the savings→demand feedback curve (fn3). See Tab 2 for the curves.",
-    )
-
-    # Initialize all params from preset/defaults
-    pressure_linear_slope   = float(_pv("pressure_linear_slope",   0.50))
-    pressure_tanh_k         = float(_pv("pressure_tanh_k",         1.0))
-    pressure_quadratic_norm = float(_pv("pressure_quadratic_norm", 2.0))
-    pressure_deadband_delta = float(_pv("pressure_deadband_delta", 0.15))
-    pressure_deadband_slope = float(_pv("pressure_deadband_slope", 0.50))
-
-    # Show sliders only for the active mode
-    if pressure_mode == "linear":
-        pressure_linear_slope   = st.slider("Slope", 0.05, 2.0, pressure_linear_slope, 0.05,
-                                            key="w_pressure_linear_slope",
-                                            help="Multiplier on (r−1). Vanilla = 0.5")
-    elif pressure_mode == "tanh":
-        pressure_tanh_k         = st.slider("k (steepness)", 0.1, 5.0, pressure_tanh_k, 0.1,
-                                            key="w_pressure_tanh_k",
-                                            help="tanh(k·(r−1)). Higher k = faster saturation.")
-    elif pressure_mode == "quadratic":
-        pressure_quadratic_norm = st.slider("Norm", 0.5, 5.0, pressure_quadratic_norm, 0.25,
-                                            key="w_pressure_quadratic_norm",
-                                            help="|r−1| = norm → pressure reaches pmax.")
-    elif pressure_mode == "deadband":
-        pressure_deadband_delta = st.slider("δ (dead-zone half-width)", 0.02, 0.50,
-                                            pressure_deadband_delta, 0.02,
-                                            key="w_pressure_deadband_delta",
-                                            help="No response when |r−1| < δ.")
-        pressure_deadband_slope = st.slider("Slope (outside dead zone)", 0.05, 2.0,
-                                            pressure_deadband_slope, 0.05,
-                                            key="w_pressure_deadband_slope")
-
-    # ---- Save / overwrite user preset ----
-    st.divider()
-    st.markdown("**Save current scenario as preset**")
-    _default_name   = actual_name if is_user else ""
-    save_name_input = st.text_input("Name", value=_default_name,
-                                    placeholder="Preset name…",
-                                    label_visibility="collapsed")
-    _name     = save_name_input.strip()
-    _btn_label = "Overwrite" if _name in user_presets else "Save"
-
-    if st.button(_btn_label, disabled=not _name, use_container_width=True, type="primary"):
-        ups = load_user_presets()
-        ups[_name] = {
-            "monthly_income":        monthly_income,
-            "num_institutions":      num_institutions,
-            "tax_base":              tax_base,
-            "effective_control":     effective_control,
-            "peasant_enfranchisement": enfranchisement,
-            "update_interval_years": int(update_interval),
-            "sim_years":             int(sim_years),
-            "ema_alpha":             float(ema_alpha),
-            "pressure_mode":           pressure_mode,
-            "pressure_linear_slope":   pressure_linear_slope,
-            "pressure_tanh_k":         pressure_tanh_k,
-            "pressure_quadratic_norm": pressure_quadratic_norm,
-            "pressure_deadband_delta": pressure_deadband_delta,
-            "pressure_deadband_slope": pressure_deadband_slope,
-            "pop_laborers":            pop_laborers,
-            "pop_peasants":          pop_peasants,
-            "pop_soldiers":          pop_soldiers,
-            "strata": {
-                "nobles":    {"pop_count": pop_nobles,    "tax_rate": tr_nobles,    "savings": sv_nobles},
-                "clergy":    {"pop_count": pop_clergy,    "tax_rate": tr_clergy,    "savings": sv_clergy},
-                "burghers":  {"pop_count": pop_burghers,  "tax_rate": tr_burghers,  "savings": sv_burghers},
-                "commoners": {"pop_count": pop_commoners, "tax_rate": tr_commoners, "savings": sv_commoners},
-                "tribesmen": {"pop_count": pop_tribesmen, "tax_rate": tr_tribesmen, "savings": sv_tribesmen},
-            },
-        }
-        save_user_presets(ups)
-        st.success(f"Saved '{_name}'")
-        st.rerun()
-
-    col_clr, col_rel = st.columns(2)
-    with col_clr:
-        if st.button("Clear / Reset", use_container_width=True):
-            st.session_state.pop("_preset", None)
-            st.rerun()
-    with col_rel:
-        if st.button("Reload files", use_container_width=True,
-                     help="Re-parse mod files (use after editing demand values)"):
-            st.cache_data.clear()
-            st.session_state.pop("curve_designer", None)  # force P_g_s re-init from fresh matrix
-            st.rerun()
-
-# ---------------------------------------------------------------------------
-# Build scenario from sidebar
-# ---------------------------------------------------------------------------
-
-params = ScenarioParams(
-    monthly_income          = monthly_income,
-    num_institutions        = num_institutions,
-    tax_base                = tax_base,
-    effective_control       = effective_control,
-    peasant_enfranchisement = enfranchisement,
-    pop_laborers            = pop_laborers,
-    pop_peasants            = pop_peasants,
-    pop_soldiers            = pop_soldiers,
-    strata = {
-        "nobles":    StrataState(pop_nobles,    tr_nobles,    sv_nobles),
-        "clergy":    StrataState(pop_clergy,    tr_clergy,    sv_clergy),
-        "burghers":  StrataState(pop_burghers,  tr_burghers,  sv_burghers),
-        "commoners": StrataState(pop_commoners, tr_commoners, sv_commoners),
-        "tribesmen": StrataState(pop_tribesmen, tr_tribesmen, sv_tribesmen),
-    },
-    update_interval_years = int(update_interval),
-    sim_years             = int(sim_years),
-    ema_alpha             = float(ema_alpha),
-    pressure_mode           = pressure_mode,
-    pressure_linear_slope   = pressure_linear_slope,
-    pressure_tanh_k         = pressure_tanh_k,
-    pressure_quadratic_norm = pressure_quadratic_norm,
-    pressure_deadband_delta = pressure_deadband_delta,
-    pressure_deadband_slope = pressure_deadband_slope,
-)
-
-# ---------------------------------------------------------------------------
-# Reweight commoners demand by actual sub-pop counts, then compute state
-# ---------------------------------------------------------------------------
-
-demand_matrix_w = _reweight_commoners(demand_matrix, pop_laborers, pop_peasants, pop_soldiers)
-
-gdp_pc       = fn1_gdp_per_capita(params)
-nl           = fn2_gdp_nonlinear(gdp_pc)
-sp_pressure  = fn3_savings_pressure(params, {s: params.strata[s].savings for s in STRATA})
-d_scale      = compute_demand_scale(params)
-sav_targets  = compute_savings_targets(params)
-income_est   = compute_monthly_income_from_gdp(params)
-base_idx     = compute_base_demand_index(demand_matrix_w)
-
-STRATA_COLORS = {
-    "nobles":    "#e8b84b",
-    "clergy":    "#8e7ab5",
-    "burghers":  "#4e9af1",
-    "commoners": "#6ab04c",
-    "tribesmen": "#c0392b",
-}
 STRATA_LABELS = {
     "nobles":    "贵族 Nobles",
     "clergy":    "教士 Clergy",
@@ -477,487 +106,18 @@ STRATA_LABELS = {
 }
 
 # ---------------------------------------------------------------------------
-# Global strata filter
-# ---------------------------------------------------------------------------
-
-active_strata = st.multiselect(
-    "Display strata",
-    options=STRATA,
-    default=STRATA,
-    format_func=lambda s: STRATA_LABELS[s],
-    key="active_strata_filter",
-)
-if not active_strata:
-    active_strata = list(STRATA)
-
-# EU5 pop types that belong to the selected strata (for Tab 1 detail table)
-active_pop_types = [pt for s in active_strata for pt in STRATA_TO_POP_TYPES[s]]
-
-# ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "Tab 1 — Base Goods Demand",
-    "Tab 2 — Scaling Functions",
-    "Tab 3 — Time Simulation",
-    "Tab 4 — Substitute Group Curves",
+tab1, tab2 = st.tabs([
+    "Tab 1 — Alpha Adjustment",
+    "Tab 2 — Savings Dynamics",
 ])
 
 # ===========================================================================
-# TAB 1: Base Goods Demand Table
+# TAB 1: Alpha Adjustment (piecewise Engel curve / budget share designer)
 # ===========================================================================
 with tab1:
-    st.subheader("Base goods demand per 1000 pops (vanilla + inject, before SOL scaling)")
-    st.caption(
-        "Formula: **(vanilla_demand_add × vanilla_demand_multiply + inject_demand_add) × inject_demand_multiply**  |  "
-        "Values = units consumed per 1000 pops per month at demand_scale = 1.  "
-        "Price-weighted spend = demand × price."
-    )
-
-    # ---- Per-pop-type detail table ----
-    st.markdown("#### By EU5 pop type (full breakdown)")
-    rows_pt = []
-    for good, entry in demand_matrix_w.items():
-        row: dict = {"Good": good, "Price": entry.price, "Category": entry.category}
-        total_spend = 0.0
-        for pt in EU5_POP_TYPES:
-            d = entry.demand_per_pop_type.get(pt, 0.0)
-            row[pt]              = round(d, 6)
-            row[f"spend_{pt}"]   = round(d * entry.price, 6)
-            total_spend += d * entry.price
-        row["Spend/pop avg"] = round(total_spend / len(EU5_POP_TYPES), 6)
-        rows_pt.append(row)
-
-    df_pt = pd.DataFrame(rows_pt).sort_values("Spend/pop avg", ascending=False)
-
-    # Only show demand columns for pop types belonging to selected strata
-    pt_display_cols = ["Good", "Category", "Price"] + active_pop_types + ["Spend/pop avg"]
-    st.dataframe(
-        df_pt[pt_display_cols].reset_index(drop=True),
-        use_container_width=True,
-        height=420,
-        column_config={
-            "Price":         st.column_config.NumberColumn(format="%.2f"),
-            "Spend/pop avg": st.column_config.ProgressColumn(
-                min_value=0, max_value=df_pt["Spend/pop avg"].max() * 1.05,
-                format="%.5f",
-            ),
-        },
-    )
-
-    st.divider()
-
-    # ---- Aggregated strata table with current demand_scale applied ----
-    st.markdown("#### By simulator strata (aggregated), with current demand_scale")
-    st.caption(
-        "Base = (vanilla × mult + inject) × inject_mult per strata aggregate  |  "
-        "Scaled = Base × sol_gdp_per_capita_scale at current scenario state"
-    )
-
-    # Summary metrics row
-    col_headers = st.columns(len(active_strata) + 1)
-    col_headers[0].metric("Goods with demand", len(demand_matrix))
-    for i, s in enumerate(active_strata):
-        base_annual = base_idx[s]
-        scaled      = base_annual * d_scale[s]
-        col_headers[i + 1].metric(
-            label=STRATA_LABELS[s],
-            value=f"{scaled:.4f}",
-            delta=f"×{d_scale[s]:.2f} scale",
-            help=f"Σ(demand × price) at scale=1: {base_annual:.5f}",
-        )
-
-    rows_strata = []
-    for good, entry in demand_matrix_w.items():
-        row = {"Good": good, "Price": entry.price, "Category": entry.category}
-        spend_sum = 0.0
-        for s in STRATA:
-            base_d   = entry.strata_demand[s]
-            scaled_d = base_d * d_scale[s]
-            spend_sum += scaled_d * entry.price
-            row[f"Base ({s[:3].title()})"]   = round(base_d,   6)
-            row[f"Scaled ({s[:3].title()})"] = round(scaled_d, 6)
-        row["Scaled spend sum"] = round(spend_sum, 5)
-        rows_strata.append(row)
-
-    df_strata = pd.DataFrame(rows_strata).sort_values("Scaled spend sum", ascending=False)
-    display_cols = ["Good", "Category", "Price"]
-    for s in active_strata:
-        display_cols.append(f"Base ({s[:3].title()})")
-    display_cols.append("Scaled spend sum")
-
-    st.dataframe(
-        df_strata[display_cols].reset_index(drop=True),
-        use_container_width=True,
-        height=420,
-        column_config={
-            "Price":            st.column_config.NumberColumn(format="%.2f"),
-            "Scaled spend sum": st.column_config.ProgressColumn(
-                min_value=0, max_value=df_strata["Scaled spend sum"].max() * 1.05,
-                format="%.4f",
-            ),
-        },
-    )
-
-    st.subheader("Current demand scale (at scenario state)")
-    ds_df = pd.DataFrame({
-        "Strata":           [STRATA_LABELS[s] for s in active_strata],
-        "GDP/cap":          [round(gdp_pc[s], 3)    for s in active_strata],
-        "GDP nonlinear":    [round(nl[s], 3)         for s in active_strata],
-        "Savings pressure": [round(sp_pressure[s], 3) for s in active_strata],
-        "Demand scale":     [round(d_scale[s], 3)    for s in active_strata],
-        "Savings":          [round(params.strata[s].savings, 1) for s in active_strata],
-        "Savings target":   [round(sav_targets[s], 1) for s in active_strata],
-        "Savings ratio":    [round(params.strata[s].savings / max(1e-9, sav_targets[s]), 2) for s in active_strata],
-    })
-    st.dataframe(ds_df, use_container_width=True, hide_index=True)
-
-
-# ===========================================================================
-# TAB 2: Scaling Function Explorer
-# ===========================================================================
-with tab2:
-    st.subheader("Scaling function curves")
-    st.caption(
-        "These charts show the three mathematical functions from **SOL_pop_values.txt** "
-        "across the full input range. The vertical marker shows the current scenario value."
-    )
-
-    x_ratio = np.linspace(0, 8, 400)
-    x_gdp   = np.linspace(0, 15, 400)
-
-    # ---- Chart 1: Combined demand scale vs savings ratio (primary output) ----
-    st.markdown("#### `sol_gdp_per_capita_scale` vs savings/target ratio")
-    st.caption(
-        "`scale = 1 + institutions×0.05 + gdp_nonlinear + savings_pressure`  "
-        "— gdp_nonlinear fixed at current GDP; diamond = current scenario state."
-    )
-
-    fig3 = go.Figure()
-    for s in active_strata:
-        _, _, pmin, pmax = STRATA_PARAMS[s]
-        inst_bon = num_institutions * 0.05
-        y_sp = savings_pressure_curve_np(
-            x_ratio, pmin, pmax, pressure_mode,
-            slope=pressure_linear_slope,
-            k=pressure_tanh_k,
-            norm=pressure_quadratic_norm,
-            delta=pressure_deadband_delta,
-        )
-        y_sc = 1.0 + inst_bon + nl[s] + y_sp
-        fig3.add_trace(go.Scatter(
-            x=x_ratio, y=y_sc,
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        current_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
-        current_scale = d_scale[s]
-        fig3.add_trace(go.Scatter(
-            x=[current_ratio], y=[current_scale],
-            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
-            showlegend=False,
-        ))
-
-    fig3.add_hline(y=1.0, line_dash="dot", line_color="gray", annotation_text="scale=1 baseline")
-    fig3.update_layout(
-        xaxis_title="Savings / Savings Target ratio",
-        yaxis_title="sol_gdp_per_capita_scale",
-        legend_title="Strata",
-        height=400,
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # ---- Chart 2: Savings pressure vs savings/target ratio ----
-    st.markdown("#### Savings pressure component  `local_*_savings_pressure`")
-    st.caption(
-        f"Current mode: **{PRESSURE_MODES[pressure_mode]}**  |  "
-        "`pmin = −0.50` for all strata; `pmax` varies."
-    )
-
-    fig2 = go.Figure()
-    for s in active_strata:
-        _, _, pmin, pmax = STRATA_PARAMS[s]
-        y_sp = savings_pressure_curve_np(
-            x_ratio, pmin, pmax, pressure_mode,
-            slope=pressure_linear_slope,
-            k=pressure_tanh_k,
-            norm=pressure_quadratic_norm,
-            delta=pressure_deadband_delta,
-        )
-        fig2.add_trace(go.Scatter(
-            x=x_ratio, y=y_sp,
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        current_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
-        current_sp    = sp_pressure[s]
-        fig2.add_trace(go.Scatter(
-            x=[current_ratio], y=[current_sp],
-            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
-            showlegend=False,
-        ))
-
-    fig2.add_hline(y=0, line_dash="dot", line_color="gray")
-    fig2.update_layout(
-        xaxis_title="Savings / Savings Target ratio",
-        yaxis_title="Savings pressure",
-        legend_title="Strata",
-        height=360,
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-
-    # ---- Chart 3: GDP nonlinear component vs GDP per capita ----
-    st.markdown("#### GDP nonlinear component  `local_*_gdp_nonlinear_component`")
-    st.caption(
-        "`sol_pressure = gdp_per_cap × sensitivity − threshold`  →  "
-        "`nonlinear = sol_pressure / (1 + sol_pressure × 0.45)`"
-    )
-
-    fig1 = go.Figure()
-    for s in active_strata:
-        sens, thresh, _, _ = STRATA_PARAMS[s]
-        sp    = x_gdp * sens - thresh
-        denom = np.maximum(0.05, 1.0 + sp * 0.45)
-        y_nl  = sp / denom
-        fig1.add_trace(go.Scatter(
-            x=x_gdp, y=y_nl,
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        fig1.add_trace(go.Scatter(
-            x=[gdp_pc[s]], y=[nl[s]],
-            mode="markers", marker=dict(size=10, color=STRATA_COLORS[s], symbol="diamond"),
-            showlegend=False, name=f"{s} (current)",
-        ))
-
-    fig1.add_hline(y=0, line_dash="dot", line_color="gray")
-    fig1.update_layout(
-        xaxis_title="GDP per capita (gold/month per pop-unit)",
-        yaxis_title="GDP nonlinear component",
-        legend_title="Strata",
-        height=360,
-    )
-    st.plotly_chart(fig1, use_container_width=True)
-
-    # Summary table
-    st.subheader("Current scenario breakdown")
-    summary = []
-    for s in active_strata:
-        sav_ratio = params.strata[s].savings / max(1e-9, sav_targets[s])
-        summary.append({
-            "Strata":            STRATA_LABELS[s],
-            "GDP/cap":           round(gdp_pc[s], 3),
-            "sol_pressure":      round(gdp_pc[s] * STRATA_PARAMS[s][0] - STRATA_PARAMS[s][1], 3),
-            "GDP nonlinear":     round(nl[s], 3),
-            "Savings ratio":     round(sav_ratio, 3),
-            "Savings pressure":  round(sp_pressure[s], 3),
-            "Inst bonus":        round(num_institutions * 0.05, 3),
-            "Demand scale":      round(d_scale[s], 3),
-        })
-    st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
-
-
-# ===========================================================================
-# TAB 3: Time Simulation
-# ===========================================================================
-with tab3:
-    st.subheader("Month-by-month simulation")
-    st.caption(
-        f"Update interval: **{update_interval} year(s)**  |  "
-        f"Duration: **{sim_years} years**  |  "
-        f"Demand scale is **frozen** between update ticks (step function)."
-    )
-
-    sim_mode = st.radio(
-        "Demand mode",
-        options=["unified_scale", "engel_curve"],
-        format_func=lambda m: "Unified scale (current)" if m == "unified_scale" else "Engel curves (per-group)",
-        horizontal=True,
-        key="t3_sim_mode",
-        help=(
-            "**Unified scale**: all goods share one sol_gdp_per_capita_scale (old system).\n\n"
-            "**Engel curves**: each substitute group gets its own linear demand scale driven "
-            "by income × budget share (new system). Spending = income × Σα_g at equilibrium."
-        ),
-    )
-
-    engel_P_sim = _build_engel_P_strata(demand_matrix_w) if sim_mode == "engel_curve" else None
-    cd_state_for_sim = st.session_state.get("curve_designer")
-    engel_alpha_sim: dict | None = None
-    if sim_mode == "engel_curve" and cd_state_for_sim is not None:
-        engel_alpha_sim = {
-            s: cd_state_for_sim.get_strata_shares(s)
-            for s in STRATA
-        }
-    elif sim_mode == "engel_curve":
-        engel_alpha_sim = _build_engel_alpha(engel_P_sim)
-
-    with st.spinner("Running simulation…"):
-        df_sim = simulate(
-            params, demand_matrix_w,
-            mode=sim_mode,
-            engel_alpha=engel_alpha_sim,
-            engel_P=engel_P_sim,
-        )
-
-    update_tick_years = df_sim[df_sim["update_tick"]]["year"].tolist()
-
-    # ---- Savings over time ----
-    st.markdown("#### Savings over time (estate gold)")
-    fig_sav = go.Figure()
-    for s in active_strata:
-        df_s = df_sim[df_sim["strata"] == s]
-        if df_s.empty:
-            continue
-        fig_sav.add_trace(go.Scatter(
-            x=df_s["year"], y=df_s["savings"],
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-        # Savings target line (dashed)
-        fig_sav.add_trace(go.Scatter(
-            x=[df_s["year"].iloc[0], df_s["year"].iloc[-1]],
-            y=[sav_targets[s], sav_targets[s]],
-            name=f"Target ({s[:3].title()})",
-            line=dict(color=STRATA_COLORS[s], width=1, dash="dot"),
-            showlegend=False,
-        ))
-
-    # Update tick markers
-    for yt in update_tick_years:
-        fig_sav.add_vline(x=yt, line_color="rgba(200,200,200,0.5)", line_dash="dash")
-
-    fig_sav.update_layout(
-        xaxis_title="Year", yaxis_title="Estate gold",
-        legend_title="Strata", height=380,
-    )
-    st.plotly_chart(fig_sav, use_container_width=True)
-
-    # ---- Savings ratio over time ----
-    st.markdown("#### Savings ratio (savings / savings_target)")
-    fig_ratio = go.Figure()
-    for s in active_strata:
-        df_s = df_sim[df_sim["strata"] == s]
-        if df_s.empty:
-            continue
-        fig_ratio.add_trace(go.Scatter(
-            x=df_s["year"], y=df_s["savings_ratio"],
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2),
-        ))
-
-    fig_ratio.add_hline(y=1.0, line_dash="dot", line_color="gray",
-                        annotation_text="target ratio=1")
-    for yt in update_tick_years:
-        fig_ratio.add_vline(x=yt, line_color="rgba(200,200,200,0.5)", line_dash="dash")
-
-    fig_ratio.update_layout(
-        xaxis_title="Year", yaxis_title="Savings ratio (s/target)",
-        legend_title="Strata", height=350,
-    )
-    st.plotly_chart(fig_ratio, use_container_width=True)
-
-    # ---- Demand scale over time (step function) ----
-    st.markdown("#### Demand scale over time  `sol_gdp_per_capita_scale`")
-    st.caption("Step function — only updates at the vertical tick marks (SOL situation pulse).")
-    fig_ds = go.Figure()
-    for s in active_strata:
-        df_s = df_sim[df_sim["strata"] == s]
-        if df_s.empty:
-            continue
-        fig_ds.add_trace(go.Scatter(
-            x=df_s["year"], y=df_s["demand_scale"],
-            name=STRATA_LABELS[s],
-            line=dict(color=STRATA_COLORS[s], width=2, shape="hv"),  # step
-        ))
-
-    fig_ds.add_hline(y=1.0, line_dash="dot", line_color="gray")
-    for yt in update_tick_years:
-        fig_ds.add_vline(x=yt, line_color="rgba(200,200,200,0.5)", line_dash="dash")
-
-    fig_ds.update_layout(
-        xaxis_title="Year", yaxis_title="Demand scale",
-        legend_title="Strata", height=350,
-    )
-    st.plotly_chart(fig_ds, use_container_width=True)
-
-    # ---- Monthly income vs spending ----
-    st.markdown("#### Monthly income vs spending (end state)")
-    last_month = df_sim[df_sim["month"] == df_sim["month"].max()]
-    bar_data = []
-    for s in active_strata:
-        row = last_month[last_month["strata"] == s]
-        if row.empty:
-            continue
-        bar_data.append({
-            "Strata":     STRATA_LABELS[s],
-            "Income":     row["monthly_income"].values[0],
-            "Spending":   row["monthly_spending"].values[0],
-            "Net flow":   row["net_flow"].values[0],
-        })
-    df_bar = pd.DataFrame(bar_data)
-    if not df_bar.empty:
-        fig_bar = go.Figure()
-        fig_bar.add_bar(x=df_bar["Strata"], y=df_bar["Income"],   name="Income",   marker_color="#2ecc71")
-        fig_bar.add_bar(x=df_bar["Strata"], y=df_bar["Spending"], name="Spending", marker_color="#e74c3c")
-        fig_bar.update_layout(
-            barmode="group", xaxis_title="Strata", yaxis_title="Gold / month",
-            legend_title="", height=320,
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # ---- Summary statistics ----
-    st.subheader("End-state summary")
-    end_state = df_sim[df_sim["month"] == df_sim["month"].max()].copy()
-    summary_rows = []
-    for s in active_strata:
-        row = end_state[end_state["strata"] == s]
-        if row.empty:
-            continue
-        m_income  = row["monthly_income"].values[0]
-        m_spend   = row["monthly_spending"].values[0]
-        spend_pct = (m_spend / m_income * 100) if m_income > 1e-9 else 0.0
-        summary_rows.append({
-            "Strata":              STRATA_LABELS[s],
-            "Final savings":       round(row["savings"].values[0], 1),
-            "Target savings":      round(sav_targets[s], 1),
-            "Savings ratio":       round(row["savings_ratio"].values[0], 3),
-            "Final demand scale":  round(row["demand_scale"].values[0], 3),
-            "Monthly income":      round(m_income, 3),
-            "Monthly spending":    round(m_spend, 3),
-            "Spend % of income":   round(spend_pct, 1),
-            "Net flow (gold/mo)":  round(row["net_flow"].values[0], 4),
-        })
-    if summary_rows:
-        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
-
-    # Interpretation note
-    with st.expander("How to read the simulation"):
-        st.markdown("""
-**Spending model** (direct):
-```
-monthly_spending[s] = base_demand_index[s] × pop_count[s] × demand_scale[s]
-```
-`base_demand_index[s]` = Σ(good_demand × price) per pop-unit per month at scale=1, derived from the actual mod files.
-
-**Spend % of income** shows what fraction of strata income goes to goods — this is a balance measurement, not a parameter. Values > 100% mean the strata runs a deficit and will eventually deplete savings.
-
-**Equilibrium**: Reached when net_flow ≈ 0 (spending = income). This happens when `savings_pressure` converges to the value that makes demand_scale produce exact income-matching spend.
-
-**Update interval effect**: Demand scale is frozen between SOL pulse ticks. Longer intervals create more "sawtooth" oscillation in the spending curve.
-
-**What the curves mean**:
-- Savings below target (ratio < 1) → savings_pressure < 0 → demand_scale depressed → pops buy less
-- Savings above target (ratio > 1) → savings_pressure > 0 → demand_scale elevated → pops buy more
-- This feedback drives savings toward target over time
-        """)
-
-
-# ===========================================================================
-# TAB 4: 分档 Engel 曲线设计器
-# ===========================================================================
-with tab4:
     # Silent init — needed for P_g_s access in bracket charts
     if "curve_designer" not in st.session_state:
         cd = CurveDesignerState()
@@ -965,9 +125,6 @@ with tab4:
         st.session_state["curve_designer"] = cd
     cd: CurveDesignerState = st.session_state["curve_designer"]
 
-    # ===========================================================================
-    # 分档 Engel 曲线设计器（非线性需求）
-    # ===========================================================================
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
         "设计完成后点击「写入 mod 文件」，一次性生成所有 EU5 script_values 文件。"
@@ -991,317 +148,423 @@ with tab4:
         else:
             st.info("尚未生成分档数据。请点击左侧按钮初始化。")
 
-    if not BRACKET_TABLE.exists():
-        st.stop()
+    if BRACKET_TABLE.exists():
+        # ---- Load / cache bracket state ----
+        if "bm_initialized" not in st.session_state:
+            st.session_state["bm_thresholds"] = load_bracket_thresholds(BRACKET_TABLE)
+            st.session_state["bm_alpha"]      = load_bracket_table(BRACKET_TABLE)
+            st.session_state["bm_initialized"] = True
 
-    # ---- Load / cache bracket state ----
-    if "bm_initialized" not in st.session_state:
-        st.session_state["bm_thresholds"] = load_bracket_thresholds(BRACKET_TABLE)
-        st.session_state["bm_alpha"]      = load_bracket_table(BRACKET_TABLE)
-        st.session_state["bm_initialized"] = True
+        bm_thresholds: dict = st.session_state["bm_thresholds"]
+        bm_alpha: dict      = st.session_state["bm_alpha"]
 
-    bm_thresholds: dict = st.session_state["bm_thresholds"]
-    bm_alpha: dict      = st.session_state["bm_alpha"]
-
-    # ---- Strata + bracket selectors ----
-    bm_sel_col1, bm_sel_col2 = st.columns([1, 2])
-    with bm_sel_col1:
-        bm_strata = st.selectbox(
-            "阶层",
-            options=STRATA,
-            format_func=lambda s: f"{s} ({STRATA_LABELS[s]})",
-            key="bm_strata",
-        )
-    with bm_sel_col2:
-        bm_s_thresholds = list(bm_thresholds.get(bm_strata, DEFAULT_THRESHOLDS.get(bm_strata, [0.0])))
-        n_brackets = len(bm_s_thresholds)
-        def _bracket_label(k: int) -> str:
-            lo = bm_s_thresholds[k]
-            hi = bm_s_thresholds[k + 1] if k + 1 < n_brackets else "∞"
-            return f"bracket {k}: [{lo}, {hi})"
-        bm_bracket = st.selectbox(
-            "当前编辑分档",
-            options=list(range(n_brackets)),
-            format_func=_bracket_label,
-            key="bm_bracket",
-        )
-
-    # ---- Threshold editor ----
-    st.markdown(f"**{bm_strata} 分档阈值（income gold/月/pop-unit，bracket 0 固定为 0）**")
-    thresh_cols = st.columns(n_brackets)
-    new_thresholds = list(bm_s_thresholds)
-    for k in range(n_brackets):
-        with thresh_cols[k]:
-            new_thresholds[k] = st.number_input(
-                f"b{k}",
-                value=float(bm_s_thresholds[k]),
-                min_value=0.0,
-                max_value=1000.0,
-                step=0.5,
-                key=f"bm_thresh_{bm_strata}_{k}",
-                disabled=(k == 0),
+        # ---- Strata + bracket selectors ----
+        bm_sel_col1, bm_sel_col2 = st.columns([1, 2])
+        with bm_sel_col1:
+            bm_strata = st.selectbox(
+                "阶层",
+                options=STRATA,
+                format_func=lambda s: f"{s} ({STRATA_LABELS[s]})",
+                key="bm_strata",
             )
-    if new_thresholds != bm_s_thresholds:
-        st.session_state["bm_thresholds"][bm_strata] = new_thresholds
-        bm_s_thresholds = new_thresholds
+        with bm_sel_col2:
+            bm_s_thresholds = list(bm_thresholds.get(bm_strata, DEFAULT_THRESHOLDS.get(bm_strata, [0.0])))
+            n_brackets = len(bm_s_thresholds)
+            def _bracket_label(k: int) -> str:
+                lo = bm_s_thresholds[k]
+                hi = bm_s_thresholds[k + 1] if k + 1 < n_brackets else "∞"
+                return f"bracket {k}: [{lo}, {hi})"
+            bm_bracket = st.selectbox(
+                "当前编辑分档",
+                options=list(range(n_brackets)),
+                format_func=_bracket_label,
+                key="bm_bracket",
+            )
 
-    st.divider()
-
-    # ---- Bracket α overview table ----
-    st.markdown(f"**全分档 α 概览 — {bm_strata}**")
-    overview_rows = []
-    for k in range(n_brackets):
-        ka = bm_alpha.get(bm_strata, {}).get(k, {})
-        row = {"bracket": _bracket_label(k)}
-        row.update({g: round(ka.get(g, 0.0), 5) for g in luxury_sorted_groups()})
-        row["Σα"] = round(sum(ka.get(g, 0.0) for g in SUBSTITUTE_GROUPS), 5)
-        overview_rows.append(row)
-    ov_df = pd.DataFrame(overview_rows)
-    st.dataframe(
-        ov_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={"Σα": st.column_config.NumberColumn(format="%.5f")},
-    )
-
-    st.divider()
-
-    # ---- Per-bracket α sliders ----
-    st.markdown(f"#### 分档 α 编辑器 — {bm_strata} / {_bracket_label(bm_bracket)}")
-    st.caption("调整后其他未锁定组自动再分配，确保每档 Σα = 1。")
-
-    def _P(g: str, strata: str) -> float:
-        """P_g_s for group g at strata."""
-        obj = cd.groups.get(g)
-        return obj.base_price_sum_per_strata.get(strata, 0.0) if obj else 0.0
-
-    # Sync slider + fine-α + fine-b keys when strata or bracket changes
-    _bm_last = st.session_state.get("_bm_last_context", "")
-    _bm_cur  = f"{bm_strata}_{bm_bracket}"
-    if _bm_last != _bm_cur:
-        bracket_init = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
-        for _g in SUBSTITUTE_GROUPS:
-            _a = float(bracket_init.get(_g, 0.0))
-            _p = _P(_g, bm_strata)
-            _b = _a / _p if _p > 0 else 0.0
-            st.session_state[f"bm_share_{bm_strata}_{bm_bracket}_{_g}"] = _a
-            st.session_state[f"bm_fine_{bm_strata}_{bm_bracket}_{_g}"]  = _a
-            st.session_state[f"bm_b_{bm_strata}_{bm_bracket}_{_g}"]     = _b
-        st.session_state["_bm_last_context"] = _bm_cur
-
-    def _bm_apply(g_name: str, strata: str, bracket: int, new_alpha: float) -> None:
-        """Core redistribution — updates bm_alpha and syncs all three widget keys."""
-        locked = {g: st.session_state.get(f"bm_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
-        P_gs = {g: _P(g, strata) for g in SUBSTITUTE_GROUPS}
-        temp = CurveDesignerState()
-        current = st.session_state["bm_alpha"].get(strata, {}).get(bracket, {})
-        temp.set_strata_shares(strata, current)
-        updated = temp.apply_delta_with_locks(strata, g_name, new_alpha, locked, P_gs=P_gs)
-        st.session_state["bm_alpha"][strata][bracket] = updated
-        for _g, _a in updated.items():
-            _a = float(_a)
-            _p = _P(_g, strata)
-            st.session_state[f"bm_share_{strata}_{bracket}_{_g}"] = _a
-            st.session_state[f"bm_fine_{strata}_{bracket}_{_g}"]  = _a
-            st.session_state[f"bm_b_{strata}_{bracket}_{_g}"]     = _a / _p if _p > 0 else 0.0
-
-    def _bm_on_alpha_change(g_name: str, strata: str, bracket: int) -> None:
-        _bm_apply(g_name, strata, bracket,
-                  float(st.session_state[f"bm_share_{strata}_{bracket}_{g_name}"]))
-
-    def _bm_on_fine_change(g_name: str, strata: str, bracket: int) -> None:
-        _bm_apply(g_name, strata, bracket,
-                  float(st.session_state[f"bm_fine_{strata}_{bracket}_{g_name}"]))
-
-    def _bm_on_b_change(g_name: str, strata: str, bracket: int) -> None:
-        new_b = float(st.session_state[f"bm_b_{strata}_{bracket}_{g_name}"])
-        p = _P(g_name, strata)
-        _bm_apply(g_name, strata, bracket, new_b * p if p > 0 else 0.0)
-
-    bm_share_cols = st.columns(2)
-    for idx, g_name in enumerate(luxury_sorted_groups()):
-        with bm_share_cols[idx % 2]:
-            color_hex = GROUP_COLORS.get(g_name, "#888")
-            badge_col, lock_col = st.columns([0.85, 0.15])
-            with badge_col:
-                goods_list = ", ".join(GROUP_GOODS.get(g_name, []))
-                st.markdown(
-                    f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
-                    f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span> "
-                    f"<small style='color:#555'>{goods_list}</small>",
-                    unsafe_allow_html=True,
-                )
-            with lock_col:
-                st.checkbox("🔒", key=f"bm_lock_{g_name}", label_visibility="collapsed")
-
-            cur_alpha = bm_alpha.get(bm_strata, {}).get(bm_bracket, {}).get(g_name, 0.0)
-            group_obj = cd.groups.get(g_name)
-            P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
-            b_g_s = (cur_alpha / P_g_s) if P_g_s > 0 else 0.0
-            bm_info1, bm_info2, bm_info3 = st.columns(3)
-            with bm_info1:
-                st.caption(f"α = {cur_alpha:.5f}")
-            with bm_info2:
-                st.caption(f"P_g_s = {P_g_s:.4f}")
-            with bm_info3:
-                st.caption(f"b = {b_g_s:.6f}")
-            slider_col, fine_col, b_col = st.columns([3, 1, 1])
-            with slider_col:
-                st.slider(
-                    f"bm_α_{g_name}",
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.001,
-                    key=f"bm_share_{bm_strata}_{bm_bracket}_{g_name}",
-                    on_change=_bm_on_alpha_change,
-                    args=(g_name, bm_strata, bm_bracket),
-                    label_visibility="collapsed",
-                )
-            with fine_col:
-                st.number_input(
-                    "α精调",
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.0001,
-                    format="%.5f",
-                    key=f"bm_fine_{bm_strata}_{bm_bracket}_{g_name}",
-                    on_change=_bm_on_fine_change,
-                    args=(g_name, bm_strata, bm_bracket),
-                    label_visibility="visible",
-                )
-            with b_col:
-                st.number_input(
-                    "b精调",
+        # ---- Threshold editor ----
+        st.markdown(f"**{bm_strata} 分档阈值（income gold/月/pop-unit，bracket 0 固定为 0）**")
+        thresh_cols = st.columns(n_brackets)
+        new_thresholds = list(bm_s_thresholds)
+        for k in range(n_brackets):
+            with thresh_cols[k]:
+                new_thresholds[k] = st.number_input(
+                    f"b{k}",
+                    value=float(bm_s_thresholds[k]),
                     min_value=0.0,
                     max_value=1000.0,
-                    step=0.000001,
-                    format="%.6f",
-                    key=f"bm_b_{bm_strata}_{bm_bracket}_{g_name}",
-                    on_change=_bm_on_b_change,
-                    args=(g_name, bm_strata, bm_bracket),
-                    label_visibility="visible",
+                    step=0.5,
+                    key=f"bm_thresh_{bm_strata}_{k}",
+                    disabled=(k == 0),
                 )
+        if new_thresholds != bm_s_thresholds:
+            st.session_state["bm_thresholds"][bm_strata] = new_thresholds
+            bm_s_thresholds = new_thresholds
 
-    bm_cur_shares = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
-    bm_total = sum(bm_cur_shares.values())
-    bm_valid = abs(bm_total - 1.0) < 1e-5
-    st.markdown(
-        f"**约束状态:** Σα = **{bm_total:.6f}** "
-        f"{'✓ 满足' if bm_valid else '✗ 不满足（需重新分配）'}"
-    )
+        st.divider()
 
-    st.divider()
+        # ---- Bracket α overview table ----
+        st.markdown(f"**全分档 α 概览 — {bm_strata}**")
+        overview_rows = []
+        for k in range(n_brackets):
+            ka = bm_alpha.get(bm_strata, {}).get(k, {})
+            row = {"bracket": _bracket_label(k)}
+            row.update({g: round(ka.get(g, 0.0), 5) for g in luxury_sorted_groups()})
+            row["Σα"] = round(sum(ka.get(g, 0.0) for g in SUBSTITUTE_GROUPS), 5)
+            overview_rows.append(row)
+        ov_df = pd.DataFrame(overview_rows)
+        st.dataframe(
+            ov_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Σα": st.column_config.NumberColumn(format="%.5f")},
+        )
 
-    # ---- α(y) staircase chart ----
-    st.markdown(f"#### α(y) 阶跃曲线 — {bm_strata}")
-    st.caption(
-        "横轴：收入；纵轴：预算份额 α_g_s。"
-        "斜率跳变位置 = 分档阈值。必需品下降，奢侈品上升。"
-    )
-    income_max = max(bm_s_thresholds[-1] * 2.5, 20.0)
-    income_pts = np.linspace(0, income_max, 500)
-    fig_alpha = go.Figure()
-    for g_name in luxury_sorted_groups():
-        color = GROUP_COLORS.get(g_name, "#888")
-        alpha_vals = np.zeros_like(income_pts)
-        for i, y in enumerate(income_pts):
-            # Find bracket for income y
-            k = sum(1 for t in bm_s_thresholds if t <= y) - 1
-            k = max(0, min(k, n_brackets - 1))
-            alpha_vals[i] = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
-        fig_alpha.add_trace(go.Scatter(
-            x=income_pts, y=alpha_vals,
-            name=g_name.title(),
-            line=dict(color=color, width=2),
-            mode="lines",
-        ))
-    # Vertical lines at bracket boundaries
-    for thresh in bm_s_thresholds[1:]:
-        fig_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
-    fig_alpha.update_layout(
-        xaxis_title="Income (gold/月/pop-unit)",
-        yaxis_title="预算份额 α_g_s",
-        legend_title="Group",
-        height=380,
-    )
-    st.plotly_chart(fig_alpha, use_container_width=True)
+        st.divider()
 
-    # ---- Piecewise Engel demand curve ----
-    st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
-    st.caption(
-        "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
-        "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
-    )
-    fig_bm_engel = go.Figure()
-    for g_name in luxury_sorted_groups():
-        color = GROUP_COLORS.get(g_name, "#888")
-        demand_vals = np.zeros_like(income_pts)
-        group_obj = cd.groups.get(g_name)
-        P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
-        alpha_brackets = [
-            bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
-            for k in range(n_brackets)
-        ]
-        c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
-        for i, y in enumerate(income_pts):
-            k = sum(1 for t in bm_s_thresholds if t <= y) - 1
-            k = max(0, min(k, n_brackets - 1))
-            demand_vals[i] = (alpha_brackets[k] / P_g_s * y + c_vals[k]) if P_g_s > 0 else 0.0
-        fig_bm_engel.add_trace(go.Scatter(
-            x=income_pts, y=demand_vals,
-            name=g_name.title(),
-            line=dict(color=color, width=2),
-        ))
-    for thresh in bm_s_thresholds[1:]:
-        fig_bm_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
-    fig_bm_engel.update_layout(
-        xaxis_title="Income (gold/月/pop-unit)",
-        yaxis_title=f"Group Demand ({bm_strata})",
-        legend_title="Group",
-        height=380,
-    )
-    st.plotly_chart(fig_bm_engel, use_container_width=True)
+        # ---- Per-bracket α sliders ----
+        st.markdown(f"#### 分档 α 编辑器 — {bm_strata} / {_bracket_label(bm_bracket)}")
+        st.caption("调整后其他未锁定组自动再分配，确保每档 Σα = 1。")
 
-    st.divider()
+        def _P(g: str, strata: str) -> float:
+            obj = cd.groups.get(g)
+            return obj.base_price_sum_per_strata.get(strata, 0.0) if obj else 0.0
 
-    # ---- Write to mod ----
-    if st.button("写入 mod 文件", type="primary", use_container_width=True, key="bm_write_btn",
-                 help="保存 CSV → 写入 group_prices + budget_shares + demand_offsets + demand_base + demand_scales"):
-        errs = validate_all_bracket_constraints(bm_alpha)
-        if errs:
-            for e in errs:
-                st.error(e)
-            st.error("存在约束违反，请修复后再写入。")
-        else:
-            try:
-                save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+        # Sync slider + fine-α + fine-b keys when strata or bracket changes
+        _bm_last = st.session_state.get("_bm_last_context", "")
+        _bm_cur  = f"{bm_strata}_{bm_bracket}"
+        if _bm_last != _bm_cur:
+            bracket_init = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
+            for _g in SUBSTITUTE_GROUPS:
+                _a = float(bracket_init.get(_g, 0.0))
+                _p = _P(_g, bm_strata)
+                _b = _a / _p if _p > 0 else 0.0
+                st.session_state[f"bm_share_{bm_strata}_{bm_bracket}_{_g}"] = _a
+                st.session_state[f"bm_fine_{bm_strata}_{bm_bracket}_{_g}"]  = _a
+                st.session_state[f"bm_b_{bm_strata}_{bm_bracket}_{_g}"]     = _b
+            st.session_state["_bm_last_context"] = _bm_cur
 
-                out_prices = export_group_prices()
-                st.write(f"✓ `{out_prices.relative_to(REPO_ROOT)}`")
+        def _bm_apply(g_name: str, strata: str, bracket: int, new_alpha: float) -> None:
+            locked = {g: st.session_state.get(f"bm_lock_{g}", False) for g in SUBSTITUTE_GROUPS}
+            P_gs = {g: _P(g, strata) for g in SUBSTITUTE_GROUPS}
+            temp = CurveDesignerState()
+            current = st.session_state["bm_alpha"].get(strata, {}).get(bracket, {})
+            temp.set_strata_shares(strata, current)
+            updated = temp.apply_delta_with_locks(strata, g_name, new_alpha, locked, P_gs=P_gs)
+            st.session_state["bm_alpha"][strata][bracket] = updated
+            for _g, _a in updated.items():
+                _a = float(_a)
+                _p = _P(_g, strata)
+                st.session_state[f"bm_share_{strata}_{bracket}_{_g}"] = _a
+                st.session_state[f"bm_fine_{strata}_{bracket}_{_g}"]  = _a
+                st.session_state[f"bm_b_{strata}_{bracket}_{_g}"]     = _a / _p if _p > 0 else 0.0
 
-                warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
-                for w in warns:
-                    st.warning(w)
-                st.write(f"✓ `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`")
+        def _bm_on_alpha_change(g_name: str, strata: str, bracket: int) -> None:
+            _bm_apply(g_name, strata, bracket,
+                      float(st.session_state[f"bm_share_{strata}_{bracket}_{g_name}"]))
 
-                P_values = {
-                    s: {
-                        g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
-                        for g in SUBSTITUTE_GROUPS
+        def _bm_on_fine_change(g_name: str, strata: str, bracket: int) -> None:
+            _bm_apply(g_name, strata, bracket,
+                      float(st.session_state[f"bm_fine_{strata}_{bracket}_{g_name}"]))
+
+        def _bm_on_b_change(g_name: str, strata: str, bracket: int) -> None:
+            new_b = float(st.session_state[f"bm_b_{strata}_{bracket}_{g_name}"])
+            p = _P(g_name, strata)
+            _bm_apply(g_name, strata, bracket, new_b * p if p > 0 else 0.0)
+
+        bm_share_cols = st.columns(2)
+        for idx, g_name in enumerate(luxury_sorted_groups()):
+            with bm_share_cols[idx % 2]:
+                color_hex = GROUP_COLORS.get(g_name, "#888")
+                badge_col, lock_col = st.columns([0.85, 0.15])
+                with badge_col:
+                    goods_list = ", ".join(GROUP_GOODS.get(g_name, []))
+                    st.markdown(
+                        f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
+                        f"border-radius:4px;font-weight:bold'>{g_name.upper()}</span> "
+                        f"<small style='color:#555'>{goods_list}</small>",
+                        unsafe_allow_html=True,
+                    )
+                with lock_col:
+                    st.checkbox("🔒", key=f"bm_lock_{g_name}", label_visibility="collapsed")
+
+                cur_alpha = bm_alpha.get(bm_strata, {}).get(bm_bracket, {}).get(g_name, 0.0)
+                group_obj = cd.groups.get(g_name)
+                P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+                b_g_s = (cur_alpha / P_g_s) if P_g_s > 0 else 0.0
+                bm_info1, bm_info2, bm_info3 = st.columns(3)
+                with bm_info1:
+                    st.caption(f"α = {cur_alpha:.5f}")
+                with bm_info2:
+                    st.caption(f"P_g_s = {P_g_s:.4f}")
+                with bm_info3:
+                    st.caption(f"b = {b_g_s:.6f}")
+                slider_col, fine_col, b_col = st.columns([3, 1, 1])
+                with slider_col:
+                    st.slider(
+                        f"bm_α_{g_name}",
+                        min_value=0.0,
+                        max_value=1.0,
+                        step=0.001,
+                        key=f"bm_share_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_alpha_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="collapsed",
+                    )
+                with fine_col:
+                    st.number_input(
+                        "α精调",
+                        min_value=0.0,
+                        max_value=1.0,
+                        step=0.0001,
+                        format="%.5f",
+                        key=f"bm_fine_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_fine_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="visible",
+                    )
+                with b_col:
+                    st.number_input(
+                        "b精调",
+                        min_value=0.0,
+                        max_value=1000.0,
+                        step=0.000001,
+                        format="%.6f",
+                        key=f"bm_b_{bm_strata}_{bm_bracket}_{g_name}",
+                        on_change=_bm_on_b_change,
+                        args=(g_name, bm_strata, bm_bracket),
+                        label_visibility="visible",
+                    )
+
+        bm_cur_shares = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
+        bm_total = sum(bm_cur_shares.values())
+        bm_valid = abs(bm_total - 1.0) < 1e-5
+        st.markdown(
+            f"**约束状态:** Σα = **{bm_total:.6f}** "
+            f"{'✓ 满足' if bm_valid else '✗ 不满足（需重新分配）'}"
+        )
+
+        st.divider()
+
+        # ---- α(y) staircase chart ----
+        st.markdown(f"#### α(y) 阶跃曲线 — {bm_strata}")
+        st.caption(
+            "横轴：收入；纵轴：预算份额 α_g_s。"
+            "斜率跳变位置 = 分档阈值。必需品下降，奢侈品上升。"
+        )
+        income_max = max(bm_s_thresholds[-1] * 2.5, 20.0)
+        income_pts = np.linspace(0, income_max, 500)
+        fig_alpha = go.Figure()
+        for g_name in luxury_sorted_groups():
+            color = GROUP_COLORS.get(g_name, "#888")
+            alpha_vals = np.zeros_like(income_pts)
+            for i, y in enumerate(income_pts):
+                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                k = max(0, min(k, n_brackets - 1))
+                alpha_vals[i] = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+            fig_alpha.add_trace(go.Scatter(
+                x=income_pts, y=alpha_vals,
+                name=g_name.title(),
+                line=dict(color=color, width=2),
+                mode="lines",
+            ))
+        for thresh in bm_s_thresholds[1:]:
+            fig_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+        fig_alpha.update_layout(
+            xaxis_title="Income (gold/月/pop-unit)",
+            yaxis_title="预算份额 α_g_s",
+            legend_title="Group",
+            height=380,
+        )
+        st.plotly_chart(fig_alpha, use_container_width=True)
+
+        # ---- Piecewise Engel demand curve ----
+        st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
+        st.caption(
+            "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
+            "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
+        )
+        fig_bm_engel = go.Figure()
+        for g_name in luxury_sorted_groups():
+            color = GROUP_COLORS.get(g_name, "#888")
+            demand_vals = np.zeros_like(income_pts)
+            group_obj = cd.groups.get(g_name)
+            P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+            alpha_brackets = [
+                bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+                for k in range(n_brackets)
+            ]
+            c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
+            for i, y in enumerate(income_pts):
+                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                k = max(0, min(k, n_brackets - 1))
+                demand_vals[i] = (alpha_brackets[k] / P_g_s * y + c_vals[k]) if P_g_s > 0 else 0.0
+            fig_bm_engel.add_trace(go.Scatter(
+                x=income_pts, y=demand_vals,
+                name=g_name.title(),
+                line=dict(color=color, width=2),
+            ))
+        for thresh in bm_s_thresholds[1:]:
+            fig_bm_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+        fig_bm_engel.update_layout(
+            xaxis_title="Income (gold/月/pop-unit)",
+            yaxis_title=f"Group Demand ({bm_strata})",
+            legend_title="Group",
+            height=380,
+        )
+        st.plotly_chart(fig_bm_engel, use_container_width=True)
+
+        st.divider()
+
+        # ---- Write to mod ----
+        if st.button("写入 mod 文件", type="primary", use_container_width=True, key="bm_write_btn",
+                     help="保存 CSV → 写入 group_prices + budget_shares + demand_offsets + demand_base + demand_scales"):
+            errs = validate_all_bracket_constraints(bm_alpha)
+            if errs:
+                for e in errs:
+                    st.error(e)
+                st.error("存在约束违反，请修复后再写入。")
+            else:
+                try:
+                    save_bracket_table(bm_alpha, bm_thresholds, BRACKET_TABLE)
+
+                    out_prices = export_group_prices()
+                    st.write(f"✓ `{out_prices.relative_to(REPO_ROOT)}`")
+
+                    warns = export_bracket_budget_shares(bm_alpha, bm_thresholds, ENGEL_BUDGET_SHARES_FILE)
+                    for w in warns:
+                        st.warning(w)
+                    st.write(f"✓ `{ENGEL_BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}`")
+
+                    P_values = {
+                        s: {
+                            g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
+                            for g in SUBSTITUTE_GROUPS
+                        }
+                        for s in STRATA
                     }
-                    for s in STRATA
-                }
-                warns2 = export_demand_offsets(bm_alpha, bm_thresholds, P_values, DEMAND_OFFSETS_FILE)
-                for w in warns2:
-                    st.warning(w)
-                st.write(f"✓ `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`")
+                    warns2 = export_demand_offsets(bm_alpha, bm_thresholds, P_values, DEMAND_OFFSETS_FILE)
+                    for w in warns2:
+                        st.warning(w)
+                    st.write(f"✓ `{DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}`")
 
-                export_demand_base(P_values, DEMAND_BASE_FILE)
-                st.write(f"✓ `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`")
+                    export_demand_base(P_values, DEMAND_BASE_FILE)
+                    st.write(f"✓ `{DEMAND_BASE_FILE.relative_to(REPO_ROOT)}`")
 
-                export_demand_scales_with_offset(DEMAND_SCALES_FILE)
-                st.write(f"✓ `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`")
+                    export_demand_scales_with_offset(DEMAND_SCALES_FILE)
+                    st.write(f"✓ `{DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}`")
 
-                st.success("全部写入完成")
-            except Exception as e:
-                st.error(f"写入失败: {e}")
+                    st.success("全部写入完成")
+                except Exception as e:
+                    st.error(f"写入失败: {e}")
+
+# ===========================================================================
+# TAB 2: Savings Dynamics — simplified single-variable model
+# ===========================================================================
+with tab2:
+    st.subheader("Savings pressure dynamics — simplified single-variable model")
+    st.caption(
+        "Model: Δsavings = −income × saving_pressure(savings / target − 1). "
+        "Saving pressure recalculates every N months (update frequency); held constant between updates."
+    )
+
+    ctrl_col, mode_col = st.columns([1, 1])
+
+    with ctrl_col:
+        st.markdown("**Simulation Parameters**")
+        sd_income  = st.number_input("Income (per month)", value=10.0, min_value=0.01, step=1.0, key="sd_income")
+        sd_target  = st.number_input("Savings target",     value=100.0, min_value=1.0, step=10.0, key="sd_target")
+        sd_initial = st.number_input("Initial savings",    value=0.0, step=10.0, key="sd_initial")
+        sd_months  = st.slider("Duration (months)", min_value=12, max_value=480, value=120, step=12, key="sd_months")
+        sd_freq    = st.slider("Update frequency (months)", min_value=1, max_value=60, value=12, key="sd_freq")
+
+    with mode_col:
+        st.markdown("**Pressure Function**")
+        sd_mode = st.selectbox(
+            "Mode", options=list(PRESSURE_MODES.keys()),
+            format_func=lambda k: PRESSURE_MODES[k], key="sd_mode",
+        )
+        sd_pmin = st.number_input("pmin", value=-0.50, min_value=-5.0, max_value=0.0,
+                                   step=0.1, format="%.2f", key="sd_pmin")
+        sd_pmax = st.number_input("pmax", value=2.00, min_value=0.01, max_value=10.0,
+                                   step=0.1, format="%.2f", key="sd_pmax")
+        sd_slope = sd_k = sd_norm = sd_delta = 0.0
+        if sd_mode == "linear":
+            sd_slope = st.number_input("Slope", value=0.50, min_value=0.0, max_value=10.0,
+                                        step=0.1, key="sd_slope_linear")
+        elif sd_mode == "tanh":
+            sd_k = st.number_input("Steepness k", value=1.0, min_value=0.01, max_value=20.0,
+                                    step=0.1, key="sd_k")
+        elif sd_mode == "quadratic":
+            sd_norm = st.number_input("Norm", value=2.0, min_value=0.1, max_value=20.0,
+                                       step=0.1, key="sd_norm")
+        else:  # deadband
+            sd_delta = st.number_input("Deadband δ", value=0.15, min_value=0.0, max_value=1.0,
+                                        step=0.01, format="%.2f", key="sd_delta")
+            sd_slope = st.number_input("Slope (outside band)", value=0.50, min_value=0.0,
+                                        max_value=10.0, step=0.1, key="sd_slope_deadband")
+
+    # --- Simulation ---
+    def _run_savings_sim(income, target, initial, n_months, freq, mode, pmin, pmax, slope, k, norm, delta):
+        rows, savings, sp = [], float(initial), 0.0
+        for t in range(int(n_months)):
+            if t % max(1, int(freq)) == 0:
+                ratio = savings / max(1e-9, float(target))
+                sp = float(savings_pressure_curve_np(
+                    np.array([ratio]), pmin, pmax, mode, slope, k, norm, delta
+                )[0])
+            rows.append({"month": t + 1, "savings": savings, "saving_pressure": sp})
+            savings += -float(income) * sp
+        return pd.DataFrame(rows)
+
+    df_sd = _run_savings_sim(
+        sd_income, sd_target, sd_initial, sd_months, sd_freq,
+        sd_mode, sd_pmin, sd_pmax, sd_slope, sd_k, sd_norm, sd_delta,
+    )
+
+    # --- Chart 1: Savings over time ---
+    fig_sav = go.Figure()
+    fig_sav.add_trace(go.Scatter(
+        x=df_sd["month"], y=df_sd["savings"],
+        name="Savings", line=dict(color="#4e9af1", width=2),
+    ))
+    fig_sav.add_hline(y=sd_target, line_dash="dash", line_color="gray",
+                       annotation_text="Target", annotation_position="right")
+    fig_sav.update_layout(
+        xaxis_title="Month", yaxis_title="Savings",
+        title="Savings over time", height=320,
+    )
+    st.plotly_chart(fig_sav, use_container_width=True)
+
+    # --- Chart 2: Saving pressure over time ---
+    fig_sp = go.Figure()
+    fig_sp.add_trace(go.Scatter(
+        x=df_sd["month"], y=df_sd["saving_pressure"],
+        name="Saving pressure", line=dict(color="#e8b84b", width=2, shape="hv"),
+    ))
+    fig_sp.add_hline(y=0, line_dash="dash", line_color="gray")
+    fig_sp.update_layout(
+        xaxis_title="Month", yaxis_title="Saving pressure",
+        title="Saving pressure over time (staircase = update interval)", height=250,
+    )
+    st.plotly_chart(fig_sp, use_container_width=True)
+
+    # --- Chart 3: Pressure curve preview ---
+    x_ratio = np.linspace(0.0, 3.0, 500)
+    y_curve = savings_pressure_curve_np(x_ratio, sd_pmin, sd_pmax, sd_mode, sd_slope, sd_k, sd_norm, sd_delta)
+    final_ratio = float(df_sd["savings"].iloc[-1]) / max(1e-9, sd_target)
+    fig_curve = go.Figure()
+    fig_curve.add_trace(go.Scatter(
+        x=x_ratio, y=y_curve,
+        name="Pressure curve", line=dict(color="#6ab04c", width=2),
+    ))
+    fig_curve.add_vline(x=final_ratio, line_dash="dot", line_color="#c0392b",
+                         annotation_text=f"Final ratio={final_ratio:.2f}",
+                         annotation_position="top right")
+    fig_curve.add_hline(y=0, line_dash="dash", line_color="gray")
+    fig_curve.update_layout(
+        xaxis_title="savings / target",
+        yaxis_title="saving_pressure",
+        title="Pressure curve (marker = final state)",
+        height=280,
+    )
+    st.plotly_chart(fig_curve, use_container_width=True)
