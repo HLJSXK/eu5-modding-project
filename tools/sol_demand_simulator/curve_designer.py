@@ -23,6 +23,7 @@ import numpy as np
 
 REPO_ROOT    = Path(__file__).resolve().parent.parent.parent
 ALPHA_TABLE  = REPO_ROOT / "data" / "alpha_table.csv"
+GOODS_WEIGHTS_FILE = REPO_ROOT / "data" / "goods_weights.csv"
 
 
 # 20 substitute groups
@@ -79,6 +80,96 @@ GROUP_COLORS: Dict[str, str] = {
     "mounts":           "#6d4c41",
     "knowledge":        "#3498db",
 }
+
+# ---- Derived: goods → groups index (multi-group goods have len>1) ----
+from collections import defaultdict as _defaultdict
+_good_groups: Dict[str, List[str]] = _defaultdict(list)
+for _g_name, _g_goods in GROUP_GOODS.items():
+    for _good in _g_goods:
+        _good_groups[_good].append(_g_name)
+MULTI_GROUP_GOODS: Dict[str, List[str]] = {
+    good: groups for good, groups in _good_groups.items() if len(groups) > 1
+}
+
+# ---- Derived: all unique goods across all groups ----
+ALL_GOODS: List[str] = sorted(set(
+    good for goods in GROUP_GOODS.values() for good in goods
+))
+
+
+def groups_for_good(good: str) -> List[str]:
+    """Return list of groups a good participates in."""
+    return _good_groups.get(good, [])
+
+
+@dataclass
+class GoodsWeightStore:
+    """Manages per-good-per-group k-factors and derived shares.
+
+    Key: (good, group) tuple.
+    share_i_g = k_i_g / Σ_j k_j_g  (for j in group g).
+    """
+    entries: Dict[tuple, float] = field(default_factory=dict)  # (good, group) -> k_factor
+
+    def init_defaults(self, default_k: float = 1.0) -> None:
+        """Populate all (good, group) pairs with the given default k-factor."""
+        self.entries.clear()
+        for group, goods in GROUP_GOODS.items():
+            for good in goods:
+                self.entries[(good, group)] = default_k
+
+    def get_k(self, good: str, group: str) -> float:
+        return self.entries.get((good, group), 0.0)
+
+    def set_k(self, good: str, group: str, k: float) -> None:
+        if (good, group) in self.entries:
+            self.entries[(good, group)] = max(0.0, k)
+
+    def group_total_weight(self, group: str) -> float:
+        total = sum(k for (g, grp), k in self.entries.items() if grp == group)
+        return total if total > 1e-9 else 0.001
+
+    def good_share_in_group(self, good: str, group: str) -> float:
+        total = self.group_total_weight(group)
+        return self.get_k(good, group) / total
+
+    def load_csv(self, path: Path = GOODS_WEIGHTS_FILE) -> bool:
+        if not path.exists():
+            return False
+        try:
+            with path.open(encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    good, group, k = row["good"], row["group"], float(row["k_factor"])
+                    if (good, group) in self.entries:
+                        self.entries[(good, group)] = k
+            return True
+        except Exception:
+            return False
+
+    def save_csv(self, path: Path = GOODS_WEIGHTS_FILE) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["good", "group", "k_factor"])
+            for (good, group), k in sorted(self.entries.items()):
+                writer.writerow([good, group, round(k, 4)])
+
+    def all_groups_summary(self) -> List[dict]:
+        """Return compact summary rows: one dict per group."""
+        rows = []
+        for g_name in SUBSTITUTE_GROUPS:
+            goods = GROUP_GOODS.get(g_name, [])
+            total_k = self.group_total_weight(g_name)
+            multi = [good for good in goods if len(groups_for_good(good)) > 1]
+            rows.append({
+                "group": g_name,
+                "n_goods": len(goods),
+                "total_k": round(total_k, 4),
+                "multi_goods": ", ".join(multi) if multi else "",
+            })
+        return rows
+
 
 # Groups ranked by "luxury" level (higher = more elastic should be)
 LUXURY_RANK: Dict[str, int] = {
@@ -163,6 +254,8 @@ class CurveDesignerState:
     groups: Dict[str, SubstituteGroup] = field(default_factory=dict)
     # Per-strata alpha store: {strata: {group: alpha_g_s}} — primary source of truth
     budget_shares_per_strata: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    # Per-good k-factor weights
+    goods_weight_store: GoodsWeightStore = field(default_factory=GoodsWeightStore)
 
     @property
     def budget_shares(self) -> Dict[str, float]:
@@ -346,6 +439,82 @@ class CurveDesignerState:
         if not self.load_from_alpha_table():
             auto_shares = self.auto_calibrate_budget_shares()
             self.set_budget_shares_per_strata(auto_shares)
+        # Initialize weight store
+        self.goods_weight_store.init_defaults()
+        self.goods_weight_store.load_csv()
+
+
+    # ---- Per-good demand computation ----
+
+    def compute_per_good_demand(
+        self, strata: str, income: float,
+        bracket_alphas: Dict[str, float] | None = None,
+    ) -> Dict[str, float]:
+        """
+        d_i_s(y) = Σ_g share_i_g × (α_g_s / P_g_s) × y
+
+        bracket_alphas: optional per-group alpha overrides (for piecewise bracket mode).
+        Returns {good_name: total_demand}.
+        """
+        alphas = bracket_alphas or self.get_strata_shares(strata)
+        result: Dict[str, float] = {}
+        for good in ALL_GOODS:
+            total_d = 0.0
+            for group in groups_for_good(good):
+                P = self.groups[group].base_price_sum_per_strata.get(strata, 0.0)
+                if P <= 0:
+                    continue
+                alpha = alphas.get(group, 0.0)
+                share = self.goods_weight_store.good_share_in_group(good, group)
+                total_d += share * (alpha / P) * income
+            result[good] = total_d
+        return result
+
+    def compute_per_good_curve_points(
+        self, strata: str, income_range: np.ndarray,
+        alphas_per_bracket: List[Dict[str, float]] | None = None,
+        thresholds: List[float] | None = None,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Per-good Engel curves over income_range.
+
+        For piecewise mode (alphas_per_bracket + thresholds given):
+        uses bracket-specific alpha with continuity offsets.
+
+        Returns {good_name: demand_array}.
+        """
+        n_pts = len(income_range)
+        per_good: Dict[str, np.ndarray] = {good: np.zeros(n_pts) for good in ALL_GOODS}
+
+        if alphas_per_bracket and thresholds and len(alphas_per_bracket) > 0:
+            n_brackets = len(thresholds)
+            for g_name in SUBSTITUTE_GROUPS:
+                group_obj = self.groups.get(g_name)
+                if group_obj is None:
+                    continue
+                P = group_obj.base_price_sum_per_strata.get(strata, 0.0)
+                if P <= 0:
+                    continue
+                alpha_brackets = [
+                    alphas_per_bracket[k].get(g_name, 0.0)
+                    for k in range(n_brackets)
+                ]
+                from engel_export import compute_piecewise_offsets
+                c_vals = compute_piecewise_offsets(alpha_brackets, thresholds, P)
+                for i, y in enumerate(income_range):
+                    k = sum(1 for t in thresholds if t <= y) - 1
+                    k = max(0, min(k, n_brackets - 1))
+                    demand_g = (alpha_brackets[k] / P) * y + c_vals[k]
+                    for good in GROUP_GOODS.get(g_name, []):
+                        share = self.goods_weight_store.good_share_in_group(good, g_name)
+                        per_good[good][i] += share * demand_g
+        else:
+            for i, y in enumerate(income_range):
+                d = self.compute_per_good_demand(strata, y)
+                for good, val in d.items():
+                    per_good[good][i] = val
+
+        return per_good
 
 
 # ---------------------------------------------------------------------------

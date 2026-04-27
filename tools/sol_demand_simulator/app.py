@@ -1,7 +1,8 @@
 """
-EU5 SOL Demand Simulator — Streamlit UI (v2)
+EU5 SOL Demand Simulator — Streamlit UI (v3)
 
-Two tabs:
+Three tabs:
+  Tab 0 — Substitute Group Manager: per-group k-factor weight editor
   Tab 1 — Alpha Adjustment: piecewise Engel curve / budget share designer
   Tab 2 — Savings Dynamics: simplified single-variable savings pressure simulator
 
@@ -35,8 +36,12 @@ from curve_designer import (
     SUBSTITUTE_GROUPS,
     GROUP_GOODS,
     GROUP_COLORS,
+    ALL_GOODS,
+    MULTI_GROUP_GOODS,
+    GoodsWeightStore,
     CurveDesignerState,
     luxury_sorted_groups,
+    groups_for_good,
 )
 from engel_export import (
     REPO_ROOT,
@@ -106,24 +111,127 @@ STRATA_LABELS = {
 }
 
 # ---------------------------------------------------------------------------
+# Lazy init (runs once, before tabs)
+# ---------------------------------------------------------------------------
+if "curve_designer" not in st.session_state:
+    cd = CurveDesignerState()
+    cd.init_from_demand_matrix(demand_matrix_w)
+    st.session_state["curve_designer"] = cd
+cd: CurveDesignerState = st.session_state["curve_designer"]
+
+# ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab1, tab2 = st.tabs([
+tab0, tab1, tab2 = st.tabs([
+    "Tab 0 — Substitute Group Manager",
     "Tab 1 — Alpha Adjustment",
     "Tab 2 — Savings Dynamics",
 ])
 
 # ===========================================================================
+# TAB 0: Substitute Group Manager
+# ===========================================================================
+with tab0:
+    st.caption(
+        "管理各替代组内商品的 k 因子权重。"
+        "商品在组内的需求份额 = k_i / Σk_j，调整后自动存储在 data/goods_weights.csv。"
+    )
+
+    wstore: GoodsWeightStore = cd.goods_weight_store
+
+    # ---- Group selector ----
+    gw_col1, gw_col2 = st.columns([1, 2])
+    with gw_col1:
+        selected_group = st.selectbox(
+            "选择替代组",
+            options=luxury_sorted_groups(),
+            format_func=lambda g: f"{g.replace('_', ' ').title()} ({len(GROUP_GOODS.get(g, []))} goods)",
+            key="gw_selected_group",
+        )
+    with gw_col2:
+        total_k = wstore.group_total_weight(selected_group)
+        st.caption(f"Σk = **{total_k:.4f}**  |  λ (N_g for multi-group scaling) is not applied here; it is a constant in the mod formula.")
+
+    # ---- Per-good weight table for selected group ----
+    st.markdown(f"#### {selected_group.replace('_', ' ').title()} — 商品权重")
+    goods_in_group = GROUP_GOODS.get(selected_group, [])
+    if goods_in_group:
+        header_cols = st.columns([2, 1.5, 2, 1])
+        with header_cols[0]:
+            st.markdown("**商品**")
+        with header_cols[1]:
+            st.markdown("**k 因子**")
+        with header_cols[2]:
+            st.markdown("**组内份额**")
+        with header_cols[3]:
+            st.markdown("**跨组**")
+
+        for good in goods_in_group:
+            color_hex = GROUP_COLORS.get(selected_group, "#888")
+            cur_k = wstore.get_k(good, selected_group)
+            share = wstore.good_share_in_group(good, selected_group)
+            multi_groups = [g for g in groups_for_good(good) if g != selected_group]
+
+            g_col1, g_col2, g_col3, g_col4 = st.columns([2, 1.5, 2, 1])
+            with g_col1:
+                st.markdown(
+                    f"<span style='background-color:{color_hex};color:white;padding:1px 6px;"
+                    f"border-radius:3px;font-size:0.85em;font-weight:bold'>{good}</span>",
+                    unsafe_allow_html=True,
+                )
+            with g_col2:
+                new_k = st.number_input(
+                    f"k_{good}_{selected_group}",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=float(cur_k),
+                    step=0.1,
+                    format="%.2f",
+                    key=f"gw_k_{selected_group}_{good}",
+                    label_visibility="collapsed",
+                )
+                if abs(new_k - cur_k) > 1e-9:
+                    wstore.set_k(good, selected_group, new_k)
+            with g_col3:
+                st.progress(min(float(share), 1.0), text=f"{share*100:.1f}%")
+            with g_col4:
+                if multi_groups:
+                    st.caption(", ".join(multi_groups))
+                else:
+                    st.caption("—")
+
+    # ---- All-groups summary table ----
+    st.markdown("#### 全组摘要")
+    summary_rows = wstore.all_groups_summary()
+    st.dataframe(
+        pd.DataFrame(summary_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "group": st.column_config.TextColumn("替代组"),
+            "n_goods": st.column_config.NumberColumn("商品数"),
+            "total_k": st.column_config.NumberColumn("Σk", format="%.4f"),
+            "multi_goods": st.column_config.TextColumn("跨组商品"),
+        },
+    )
+
+    # ---- Save / Reset ----
+    gw_btn1, gw_btn2, gw_btn3 = st.columns([1, 1, 2])
+    with gw_btn1:
+        if st.button("保存权重", type="primary", key="gw_save_btn",
+                     help="保存到 data/goods_weights.csv"):
+            wstore.save_csv()
+            st.success("已保存到 data/goods_weights.csv")
+    with gw_btn2:
+        if st.button("重置全为 1.0", key="gw_reset_btn"):
+            wstore.init_defaults()
+            st.rerun()
+
+# ===========================================================================
 # TAB 1: Alpha Adjustment (piecewise Engel curve / budget share designer)
 # ===========================================================================
 with tab1:
-    # Silent init — needed for P_g_s access in bracket charts
-    if "curve_designer" not in st.session_state:
-        cd = CurveDesignerState()
-        cd.init_from_demand_matrix(demand_matrix_w)
-        st.session_state["curve_designer"] = cd
-    cd: CurveDesignerState = st.session_state["curve_designer"]
 
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
@@ -345,73 +453,184 @@ with tab1:
 
         st.divider()
 
-        # ---- α(y) staircase chart ----
-        st.markdown(f"#### α(y) 阶跃曲线 — {bm_strata}")
-        st.caption(
-            "横轴：收入；纵轴：预算份额 α_g_s。"
-            "斜率跳变位置 = 分档阈值。必需品下降，奢侈品上升。"
+        # ---- View mode toggle ----
+        bm_view_mode = st.radio(
+            "View Mode",
+            options=["per_group", "per_good"],
+            format_func=lambda v: "按组 Engel 曲线 (Per-Group)" if v == "per_group" else "按商品曲线 (Per-Good)",
+            horizontal=True,
+            key="bm_view_mode",
         )
+
         income_max = max(bm_s_thresholds[-1] * 2.5, 20.0)
         income_pts = np.linspace(0, income_max, 500)
-        fig_alpha = go.Figure()
-        for g_name in luxury_sorted_groups():
-            color = GROUP_COLORS.get(g_name, "#888")
-            alpha_vals = np.zeros_like(income_pts)
-            for i, y in enumerate(income_pts):
-                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
-                k = max(0, min(k, n_brackets - 1))
-                alpha_vals[i] = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
-            fig_alpha.add_trace(go.Scatter(
-                x=income_pts, y=alpha_vals,
-                name=g_name.title(),
-                line=dict(color=color, width=2),
-                mode="lines",
-            ))
-        for thresh in bm_s_thresholds[1:]:
-            fig_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
-        fig_alpha.update_layout(
-            xaxis_title="Income (gold/月/pop-unit)",
-            yaxis_title="预算份额 α_g_s",
-            legend_title="Group",
-            height=380,
-        )
-        st.plotly_chart(fig_alpha, use_container_width=True)
 
-        # ---- Piecewise Engel demand curve ----
-        st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
-        st.caption(
-            "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
-            "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
-        )
-        fig_bm_engel = go.Figure()
-        for g_name in luxury_sorted_groups():
-            color = GROUP_COLORS.get(g_name, "#888")
-            demand_vals = np.zeros_like(income_pts)
-            group_obj = cd.groups.get(g_name)
-            P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
-            alpha_brackets = [
-                bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+        if bm_view_mode == "per_group":
+            # ===================================================================
+            # PER-GROUP charts (existing behavior)
+            # ===================================================================
+
+            # ---- α(y) staircase chart ----
+            st.markdown(f"#### α(y) 阶跃曲线 — {bm_strata}")
+            st.caption(
+                "横轴：收入；纵轴：预算份额 α_g_s。"
+                "斜率跳变位置 = 分档阈值。必需品下降，奢侈品上升。"
+            )
+            fig_alpha = go.Figure()
+            for g_name in luxury_sorted_groups():
+                color = GROUP_COLORS.get(g_name, "#888")
+                alpha_vals = np.zeros_like(income_pts)
+                for i, y in enumerate(income_pts):
+                    k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                    k = max(0, min(k, n_brackets - 1))
+                    alpha_vals[i] = bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+                fig_alpha.add_trace(go.Scatter(
+                    x=income_pts, y=alpha_vals,
+                    name=g_name.title(),
+                    line=dict(color=color, width=2),
+                    mode="lines",
+                ))
+            for thresh in bm_s_thresholds[1:]:
+                fig_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+            fig_alpha.update_layout(
+                xaxis_title="Income (gold/月/pop-unit)",
+                yaxis_title="预算份额 α_g_s",
+                legend_title="Group",
+                height=380,
+            )
+            st.plotly_chart(fig_alpha, use_container_width=True)
+
+            # ---- Piecewise Engel demand curve ----
+            st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
+            st.caption(
+                "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
+                "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
+            )
+            fig_bm_engel = go.Figure()
+            for g_name in luxury_sorted_groups():
+                color = GROUP_COLORS.get(g_name, "#888")
+                demand_vals = np.zeros_like(income_pts)
+                group_obj = cd.groups.get(g_name)
+                P_g_s = group_obj.base_price_sum_per_strata.get(bm_strata, 0.0) if group_obj else 0.0
+                alpha_brackets = [
+                    bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
+                    for k in range(n_brackets)
+                ]
+                c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
+                for i, y in enumerate(income_pts):
+                    k = sum(1 for t in bm_s_thresholds if t <= y) - 1
+                    k = max(0, min(k, n_brackets - 1))
+                    demand_vals[i] = (alpha_brackets[k] / P_g_s * y + c_vals[k]) if P_g_s > 0 else 0.0
+                fig_bm_engel.add_trace(go.Scatter(
+                    x=income_pts, y=demand_vals,
+                    name=g_name.title(),
+                    line=dict(color=color, width=2),
+                ))
+            for thresh in bm_s_thresholds[1:]:
+                fig_bm_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+            fig_bm_engel.update_layout(
+                xaxis_title="Income (gold/月/pop-unit)",
+                yaxis_title=f"Group Demand ({bm_strata})",
+                legend_title="Group",
+                height=380,
+            )
+            st.plotly_chart(fig_bm_engel, use_container_width=True)
+
+        else:
+            # ===================================================================
+            # PER-GOOD charts (new)
+            # ===================================================================
+
+            # ---- Per-good demand share bar chart ----
+            st.markdown(f"#### 商品需求份额 — {bm_strata} / {_bracket_label(bm_bracket)}")
+            st.caption("每组的 budget share (α_g_s) 按 k-factor 权重分配到组内各商品。")
+
+            bracket_alphas = bm_alpha.get(bm_strata, {}).get(bm_bracket, {})
+            fig_share = go.Figure()
+            for g_name in luxury_sorted_groups():
+                alpha_g = bracket_alphas.get(g_name, 0.0)
+                if alpha_g <= 0:
+                    continue
+                group_goods = GROUP_GOODS.get(g_name, [])
+                color = GROUP_COLORS.get(g_name, "#888")
+                for good in group_goods:
+                    share = cd.goods_weight_store.good_share_in_group(good, g_name)
+                    goods_label = f"{good} ({g_name})" if len(groups_for_good(good)) > 1 else good
+                    fig_share.add_trace(go.Bar(
+                        name=goods_label,
+                        y=[g_name.replace("_", " ").title()],
+                        x=[share * alpha_g],
+                        orientation="h",
+                        marker=dict(color=color, opacity=0.7 + 0.3 * share),
+                        text=f"{good} {share*100:.0f}%",
+                        textposition="inside",
+                        insidetextanchor="middle",
+                        legendgroup=g_name,
+                        showlegend=False,
+                    ))
+            if len(fig_share.data) == 0:
+                st.info("当前分档无有效 alpha 值。")
+            else:
+                fig_share.update_layout(
+                    barmode="stack",
+                    xaxis_title="Demand Share (share × α_g_s)",
+                    height=420,
+                    showlegend=False,
+                    margin=dict(l=20, r=20, t=20, b=40),
+                )
+                st.plotly_chart(fig_share, use_container_width=True)
+
+            # ---- Per-good Engel demand curves ----
+            st.markdown(f"#### 分档商品 Engel 需求曲线 — {bm_strata}")
+            st.caption(
+                "d_i(y) = Σ_g share_i_g × (α_g_s(y) / P_g_s × y + c_g_s(y))。"
+                "跨组商品（如 cloth, wine 等）自动汇总所有所在组的贡献。"
+            )
+
+            alpha_brackets_list = [
+                bm_alpha.get(bm_strata, {}).get(k, {})
                 for k in range(n_brackets)
             ]
-            c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
-            for i, y in enumerate(income_pts):
-                k = sum(1 for t in bm_s_thresholds if t <= y) - 1
-                k = max(0, min(k, n_brackets - 1))
-                demand_vals[i] = (alpha_brackets[k] / P_g_s * y + c_vals[k]) if P_g_s > 0 else 0.0
-            fig_bm_engel.add_trace(go.Scatter(
-                x=income_pts, y=demand_vals,
-                name=g_name.title(),
-                line=dict(color=color, width=2),
-            ))
-        for thresh in bm_s_thresholds[1:]:
-            fig_bm_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
-        fig_bm_engel.update_layout(
-            xaxis_title="Income (gold/月/pop-unit)",
-            yaxis_title=f"Group Demand ({bm_strata})",
-            legend_title="Group",
-            height=380,
-        )
-        st.plotly_chart(fig_bm_engel, use_container_width=True)
+
+            per_good_curves = cd.compute_per_good_curve_points(
+                bm_strata, income_pts, alpha_brackets_list, list(bm_s_thresholds),
+            )
+
+            # Prepare per-good curves; sort by max demand (for filter)
+            good_demand_at_max = sorted(
+                [(good, float(curve[-1])) for good, curve in per_good_curves.items()],
+                key=lambda x: -x[1],
+            )
+            top_n = 15
+            top_goods = [g for g, _ in good_demand_at_max[:top_n] if good_demand_at_max[0][1] > 0]
+            selected_goods = st.multiselect(
+                "显示商品（默认按需求排序前15）",
+                options=[g for g, _ in good_demand_at_max],
+                default=top_goods,
+                key="bm_goods_filter",
+            )
+
+            fig_good_engel = go.Figure()
+            # Color palette for per-good: use the first group's color for each good
+            for good in selected_goods:
+                primary_group = groups_for_good(good)[0] if groups_for_good(good) else ""
+                color = GROUP_COLORS.get(primary_group, "#888")
+                curve = per_good_curves[good]
+                label = f"{good}" + ("†" if len(groups_for_good(good)) > 1 else "")
+                fig_good_engel.add_trace(go.Scatter(
+                    x=income_pts, y=curve,
+                    name=label,
+                    line=dict(color=color, width=2 if len(groups_for_good(good)) > 1 else 1.5),
+                ))
+            for thresh in bm_s_thresholds[1:]:
+                fig_good_engel.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+            fig_good_engel.update_layout(
+                xaxis_title="Income (gold/月/pop-unit)",
+                yaxis_title=f"Good Demand ({bm_strata})",
+                legend_title="Good († = multi-group)",
+                height=420,
+            )
+            st.plotly_chart(fig_good_engel, use_container_width=True)
 
         st.divider()
 
