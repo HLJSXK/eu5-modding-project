@@ -13,6 +13,7 @@ Run:
 """
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import replace as dc_replace
 from pathlib import Path
@@ -126,20 +127,99 @@ if "curve_designer" not in st.session_state:
 cd: CurveDesignerState = st.session_state["curve_designer"]
 
 # ---------------------------------------------------------------------------
-# Tab layout
+# Alpha generator helpers
 # ---------------------------------------------------------------------------
 
-tab0, tab1, tab2, tab3 = st.tabs([
-    "Tab 0 — Substitute Group Manager",
-    "Tab 1 — Alpha Generator",
-    "Tab 2 — Alpha Adjustment",
-    "Tab 3 — Savings Dynamics",
-])
+ALPHA_GENERATOR_SETTINGS_FILE = REPO_ROOT / "data" / "alpha_generator_settings.json"
+
+
+def _default_group_order() -> dict[str, int]:
+    ordered = luxury_sorted_groups()[::-1]
+    return {group: idx + 1 for idx, group in enumerate(ordered)}
+
+
+def _normalize_group_order(order_map: dict[str, int]) -> dict[str, int]:
+    decorated = []
+    fallback = _default_group_order()
+    for idx, group in enumerate(luxury_sorted_groups()):
+        raw = order_map.get(group, fallback.get(group, idx + 1))
+        try:
+            val = int(raw)
+        except (TypeError, ValueError):
+            val = fallback.get(group, idx + 1)
+        decorated.append((val, idx, group))
+    decorated.sort(key=lambda x: (x[0], x[1]))
+    return {group: pos + 1 for pos, (_, _, group) in enumerate(decorated)}
+
+
+def load_alpha_generator_settings() -> dict:
+    defaults = {
+        "low_rank_exp": -0.35,
+        "high_rank_exp": 0.35,
+        "group_order": _default_group_order(),
+    }
+    if not ALPHA_GENERATOR_SETTINGS_FILE.exists():
+        return defaults
+    try:
+        raw = json.loads(ALPHA_GENERATOR_SETTINGS_FILE.read_text(encoding="utf-8"))
+        return {
+            "low_rank_exp": float(raw.get("low_rank_exp", defaults["low_rank_exp"])),
+            "high_rank_exp": float(raw.get("high_rank_exp", defaults["high_rank_exp"])),
+            "group_order": _normalize_group_order(raw.get("group_order", defaults["group_order"])),
+        }
+    except Exception:
+        return defaults
+
+
+def save_alpha_generator_settings(settings: dict) -> None:
+    payload = {
+        "low_rank_exp": float(settings.get("low_rank_exp", -0.35)),
+        "high_rank_exp": float(settings.get("high_rank_exp", 0.35)),
+        "group_order": _normalize_group_order(settings.get("group_order", _default_group_order())),
+    }
+    ALPHA_GENERATOR_SETTINGS_FILE.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def _derive_exponents_from_order(order_map: dict[str, int], high_exp: float, low_exp: float) -> dict[str, float]:
+    normalized = _normalize_group_order(order_map)
+    ordered_groups = [g for g, _ in sorted(normalized.items(), key=lambda item: item[1])]
+    n = len(ordered_groups)
+    if n <= 1:
+        mid = (float(high_exp) + float(low_exp)) * 0.5
+        return {ordered_groups[0]: mid} if ordered_groups else {}
+
+    result: dict[str, float] = {}
+    for pos, group in enumerate(ordered_groups):
+        t = pos / (n - 1)
+        result[group] = float(high_exp) + (float(low_exp) - float(high_exp)) * t
+    return result
+
+
+if "ui_active_tab" not in st.session_state:
+    st.session_state["ui_active_tab"] = "tab0"
+
+active_tab = st.segmented_control(
+    "Navigation",
+    options=["tab0", "tab1", "tab2", "tab3"],
+    format_func=lambda t: {
+        "tab0": "Tab 0 — Substitute Group Manager",
+        "tab1": "Tab 1 — Alpha Generator",
+        "tab2": "Tab 2 — Alpha Adjustment",
+        "tab3": "Tab 3 — Savings Dynamics",
+    }[t],
+    selection_mode="single",
+    default=st.session_state["ui_active_tab"],
+    key="ui_active_tab_control",
+)
+st.session_state["ui_active_tab"] = active_tab
 
 # ===========================================================================
 # TAB 0: Substitute Group Manager
 # ===========================================================================
-with tab0:
+if active_tab == "tab0":
     st.caption(
         "管理各替代组内商品的 k 因子权重。"
         "商品在组内的需求份额 = k_i / Σk_j，调整后自动存储在 data/goods_weights.csv。"
@@ -238,11 +318,18 @@ with tab0:
 # ===========================================================================
 # TAB 1: Alpha Generator
 # ===========================================================================
-with tab1:
+if active_tab == "tab1":
     st.caption(
         "按替代组幂次批量生成初始分档 α。"
         "核心假设：所有组的 b(y)=α/P 在 bracket1~2 临界点共同相交，再由各组幂次决定偏离方式。"
     )
+
+    if "ag_settings_initialized" not in st.session_state:
+        ag_settings = load_alpha_generator_settings()
+        st.session_state["ag_low_rank_exp"] = ag_settings["low_rank_exp"]
+        st.session_state["ag_high_rank_exp"] = ag_settings["high_rank_exp"]
+        st.session_state["ag_group_order"] = ag_settings["group_order"]
+        st.session_state["ag_settings_initialized"] = True
 
     if "bm_thresholds" not in st.session_state:
         if BRACKET_TABLE.exists():
@@ -257,6 +344,9 @@ with tab1:
         else:
             st.session_state["bm_alpha"] = {}
 
+    if "ag_group_order" not in st.session_state:
+        st.session_state["ag_group_order"] = _default_group_order()
+
     ag_target = st.selectbox(
         "生成范围",
         options=["all"] + list(STRATA),
@@ -267,7 +357,7 @@ with tab1:
     ag_fill_col1, ag_fill_col2, ag_fill_col3 = st.columns([1, 1, 2])
     with ag_fill_col1:
         low_rank_exp = st.number_input(
-            "低奢侈组幂次",
+            "低端幂次",
             value=-0.35,
             step=0.05,
             format="%.2f",
@@ -275,46 +365,62 @@ with tab1:
         )
     with ag_fill_col2:
         high_rank_exp = st.number_input(
-            "高奢侈组幂次",
+            "高端幂次",
             value=0.35,
             step=0.05,
             format="%.2f",
             key="ag_high_rank_exp",
         )
     with ag_fill_col3:
-        st.caption("交点高度由 Σα=1 与各组 P_g_s 自动决定；你只需要给每组 exponent。")
-        if st.button("按奢侈品等级填充幂次", key="ag_fill_by_rank"):
-            sorted_groups = luxury_sorted_groups()
-            min_rank = min(LUXURY_RANK.get(g, 1) for g in sorted_groups)
-            max_rank = max(LUXURY_RANK.get(g, 1) for g in sorted_groups)
-            rank_span = max(max_rank - min_rank, 1)
-            for group in sorted_groups:
-                rank = LUXURY_RANK.get(group, min_rank)
-                t = (rank - min_rank) / rank_span
-                st.session_state[f"ag_exp_{group}"] = low_rank_exp + (high_rank_exp - low_rank_exp) * t
+        st.caption("系统会按当前顺序自动把 exponent 从高到低映射到上下限之间；交点高度仍由 Σα=1 与 P_g_s 自动决定。")
+        ag_cfg_btn1, ag_cfg_btn2 = st.columns(2)
+        with ag_cfg_btn1:
+            if st.button("保存为默认生成参数", key="ag_save_defaults", use_container_width=True):
+                save_alpha_generator_settings({
+                    "low_rank_exp": low_rank_exp,
+                    "high_rank_exp": high_rank_exp,
+                    "group_order": st.session_state["ag_group_order"],
+                })
+                st.success("已保存 Tab 1 默认参数。")
+        with ag_cfg_btn2:
+            if st.button("重置为默认顺序", key="ag_reset_default_order", use_container_width=True):
+                st.session_state["ag_group_order"] = _default_group_order()
+                st.rerun()
 
-    st.markdown("#### 每组幂次设定")
-    ag_cols = st.columns(2)
-    for idx, group in enumerate(luxury_sorted_groups()):
-        with ag_cols[idx % 2]:
+    normalized_order = _normalize_group_order(st.session_state["ag_group_order"])
+    exponents = _derive_exponents_from_order(normalized_order, high_rank_exp, low_rank_exp)
+
+    st.markdown("#### 组顺序与派生 exponent")
+    ordered_groups = [g for g in sorted(normalized_order, key=lambda g: normalized_order[g])]
+    for idx, group in enumerate(ordered_groups):
+        row_cols = st.columns([0.5, 1.5, 4.5, 1.2, 0.7, 0.7])
+        with row_cols[0]:
+            st.markdown(f"**{idx + 1}**")
+        with row_cols[1]:
             color_hex = GROUP_COLORS.get(group, "#888")
-            goods_list = ", ".join(GROUP_GOODS.get(group, []))
             st.markdown(
                 f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
-                f"border-radius:4px;font-weight:bold'>{group.upper()}</span> "
-                f"<small style='color:#555'>{goods_list}</small>",
+                f"border-radius:4px;font-weight:bold'>{group.upper()}</span>",
                 unsafe_allow_html=True,
             )
-            st.number_input(
-                f"exp_{group}",
-                value=float(st.session_state.get(f"ag_exp_{group}", 0.0)),
-                step=0.05,
-                format="%.2f",
-                key=f"ag_exp_{group}",
-                label_visibility="collapsed",
-            )
-
-    exponents = {g: float(st.session_state.get(f"ag_exp_{g}", 0.0)) for g in SUBSTITUTE_GROUPS}
+        with row_cols[2]:
+            st.caption(", ".join(GROUP_GOODS.get(group, [])))
+        with row_cols[3]:
+            st.caption(f"exp = {exponents.get(group, 0.0):.4f}")
+        with row_cols[4]:
+            up_disabled = idx == 0
+            if st.button("↑", key=f"ag_up_{group}", disabled=up_disabled, use_container_width=True):
+                swapped = ordered_groups.copy()
+                swapped[idx - 1], swapped[idx] = swapped[idx], swapped[idx - 1]
+                st.session_state["ag_group_order"] = {g: pos + 1 for pos, g in enumerate(swapped)}
+                st.rerun()
+        with row_cols[5]:
+            down_disabled = idx == len(ordered_groups) - 1
+            if st.button("↓", key=f"ag_down_{group}", disabled=down_disabled, use_container_width=True):
+                swapped = ordered_groups.copy()
+                swapped[idx + 1], swapped[idx] = swapped[idx], swapped[idx + 1]
+                st.session_state["ag_group_order"] = {g: pos + 1 for pos, g in enumerate(swapped)}
+                st.rerun()
 
     thresholds_by_strata = {
         s: list(st.session_state["bm_thresholds"].get(s, DEFAULT_THRESHOLDS.get(s, [0.0])))
@@ -348,7 +454,7 @@ with tab1:
     )
 
     fig_ag_b = go.Figure()
-    for group in luxury_sorted_groups():
+    for group in sorted(normalized_order, key=lambda g: normalized_order[g]):
         b_vals = generate_power_b_profile(
             preview_intersection_b,
             exponents.get(group, 0.0),
@@ -358,7 +464,7 @@ with tab1:
         fig_ag_b.add_trace(go.Scatter(
             x=preview_income_pts,
             y=b_vals,
-            name=group.title(),
+            name=f"{normalized_order[group]}. {group.title()}",
             line=dict(color=GROUP_COLORS.get(group, "#888"), width=2),
         ))
     fig_ag_b.add_vline(x=preview_ref_income, line_dash="dot", line_color="gray", opacity=0.7)
@@ -372,7 +478,7 @@ with tab1:
 
     fig_ag_alpha = go.Figure()
     n_preview_brackets = len(preview_thresholds)
-    for group in luxury_sorted_groups():
+    for group in sorted(normalized_order, key=lambda g: normalized_order[g]):
         alpha_vals = np.zeros_like(preview_income_pts)
         for i, y in enumerate(preview_income_pts):
             k = sum(1 for t in preview_thresholds if t <= y) - 1
@@ -416,21 +522,22 @@ with tab1:
                 del st.session_state[key]
         if save_to_csv:
             save_bracket_table(st.session_state["bm_alpha"], st.session_state["bm_thresholds"], BRACKET_TABLE)
+        st.session_state["ui_active_tab"] = "tab2"
 
     ag_btn1, ag_btn2 = st.columns(2)
     with ag_btn1:
-        if st.button("生成到当前 session", key="ag_apply_session", type="primary", use_container_width=True):
+        if st.button("传递到 Tab 2（仅本次）", key="ag_apply_session", type="primary", use_container_width=True):
             _apply_generated_alpha(save_to_csv=False)
-            st.success("已生成到当前 session，可切到 Tab 2 继续微调。")
+            st.rerun()
     with ag_btn2:
-        if st.button("生成并保存到 alpha_bracket_table.csv", key="ag_apply_csv", use_container_width=True):
+        if st.button("保存并传递到 Tab 2", key="ag_apply_csv", use_container_width=True):
             _apply_generated_alpha(save_to_csv=True)
-            st.success("已生成并保存到 data/alpha_bracket_table.csv。")
+            st.rerun()
 
 # ===========================================================================
 # TAB 2: Alpha Adjustment (piecewise Engel curve / budget share designer)
 # ===========================================================================
-with tab2:
+if active_tab == "tab2":
 
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
@@ -878,7 +985,7 @@ with tab2:
 # ===========================================================================
 # TAB 3: Savings Dynamics — simplified single-variable model
 # ===========================================================================
-with tab3:
+if active_tab == "tab3":
     st.subheader("Savings pressure dynamics — simplified single-variable model")
     st.caption(
         "Model: Δsavings = −income × saving_pressure(savings / target − 1). "
