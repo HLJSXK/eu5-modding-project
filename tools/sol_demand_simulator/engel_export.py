@@ -199,6 +199,122 @@ def init_bracket_table_from_alpha_table(
 
 
 # ---------------------------------------------------------------------------
+# Power-based alpha generation
+# ---------------------------------------------------------------------------
+
+
+def compute_reference_income(thresholds: List[float]) -> float:
+    """Pick the bracket1~2 boundary as the default power-curve anchor."""
+    if len(thresholds) >= 3:
+        return float(thresholds[2])
+    if len(thresholds) >= 2:
+        return float(thresholds[-1])
+    return 1.0
+
+
+def pick_bracket_sample_incomes(thresholds: List[float], y_ref: float) -> List[float]:
+    """Pick one representative income sample per bracket."""
+    n = len(thresholds)
+    if n == 0:
+        return []
+    if n == 1:
+        return [max(float(y_ref), 1e-6)]
+
+    incomes: List[float] = []
+    for k in range(n):
+        lo = float(thresholds[k])
+        if k + 1 < n:
+            hi = float(thresholds[k + 1])
+            incomes.append(max((lo + hi) * 0.5, 1e-6))
+        else:
+            prev = float(thresholds[k - 1]) if k > 0 else 0.0
+            width = max(lo - prev, max(float(y_ref), 1.0) * 0.5, 1e-6)
+            incomes.append(max(lo + 0.5 * width, 1e-6))
+    return incomes
+
+
+def compute_intersection_b(P_gs: Dict[str, float]) -> float:
+    """Compute the shared b-value implied by Σ alpha = 1 at the reference income."""
+    total_P = sum(max(float(P_gs.get(group, 0.0)), 0.0) for group in _GROUPS)
+    if total_P <= 0:
+        return 0.0
+    return 1.0 / total_P
+
+
+def generate_power_b_profile(
+    intersection_b: float,
+    exponent: float,
+    incomes: List[float],
+    y_ref: float,
+) -> List[float]:
+    """Generate a power-law b(y) profile from the shared intersection anchor."""
+    if intersection_b <= 0:
+        return [0.0 for _ in incomes]
+    ref = max(float(y_ref), 1e-6)
+    return [
+        float(intersection_b) * (max(float(y), 1e-6) / ref) ** float(exponent)
+        for y in incomes
+    ]
+
+
+def generate_power_alpha_brackets_for_strata(
+    P_gs: Dict[str, float],
+    thresholds: List[float],
+    exponents: Dict[str, float],
+) -> Dict[int, Dict[str, float]]:
+    """Generate per-bracket alpha values for one strata from shared-intersection power-law b(y) curves."""
+    y_ref = compute_reference_income(thresholds)
+    sample_incomes = pick_bracket_sample_incomes(thresholds, y_ref)
+    n = len(sample_incomes)
+    raw_by_bracket: Dict[int, Dict[str, float]] = {k: {} for k in range(n)}
+    intersection_b = compute_intersection_b(P_gs)
+
+    for group in _GROUPS:
+        P = float(P_gs.get(group, 0.0))
+        if P <= 0:
+            for k in range(n):
+                raw_by_bracket[k][group] = 0.0
+            continue
+        b_vals = generate_power_b_profile(intersection_b, exponents.get(group, 0.0), sample_incomes, y_ref)
+        for k, b_val in enumerate(b_vals):
+            raw_by_bracket[k][group] = max(b_val * P, 0.0)
+
+    normalized: Dict[int, Dict[str, float]] = {}
+    fallback_total_P = sum(max(float(P_gs.get(g, 0.0)), 0.0) for g in _GROUPS)
+    if fallback_total_P > 0:
+        fallback = {g: max(float(P_gs.get(g, 0.0)), 0.0) / fallback_total_P for g in _GROUPS}
+    else:
+        fallback = {g: 1.0 / len(_GROUPS) for g in _GROUPS}
+
+    for k in range(n):
+        raw = raw_by_bracket[k]
+        total = sum(raw.values())
+        if total <= 0:
+            normalized[k] = fallback.copy()
+        else:
+            normalized[k] = {g: raw.get(g, 0.0) / total for g in _GROUPS}
+    return normalized
+
+
+def generate_power_alpha_bracket_table(
+    thresholds_by_strata: Dict[str, List[float]],
+    P_values_by_strata: Dict[str, Dict[str, float]],
+    exponents_by_group: Dict[str, float],
+) -> Dict[str, Dict[int, Dict[str, float]]]:
+    """Generate a full alpha_bracket_table structure from shared group exponents."""
+    result: Dict[str, Dict[int, Dict[str, float]]] = {}
+    for strata in _STRATA_KEYS:
+        thresholds = thresholds_by_strata.get(strata, DEFAULT_THRESHOLDS.get(strata, [0.0]))
+        P_values = P_values_by_strata.get(strata, {})
+        result[strata] = generate_power_alpha_brackets_for_strata(
+            P_values,
+            thresholds,
+            exponents_by_group,
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 

@@ -38,6 +38,7 @@ from curve_designer import (
     GROUP_COLORS,
     ALL_GOODS,
     MULTI_GROUP_GOODS,
+    LUXURY_RANK,
     GoodsWeightStore,
     CurveDesignerState,
     luxury_sorted_groups,
@@ -55,6 +56,11 @@ from engel_export import (
     export_group_prices,
     init_bracket_table_from_alpha_table,
     compute_piecewise_offsets,
+    compute_reference_income,
+    compute_intersection_b,
+    generate_power_alpha_bracket_table,
+    generate_power_b_profile,
+    pick_bracket_sample_incomes,
     export_demand_offsets,
     export_demand_base,
     export_demand_scales_with_offset,
@@ -123,10 +129,11 @@ cd: CurveDesignerState = st.session_state["curve_designer"]
 # Tab layout
 # ---------------------------------------------------------------------------
 
-tab0, tab1, tab2 = st.tabs([
+tab0, tab1, tab2, tab3 = st.tabs([
     "Tab 0 — Substitute Group Manager",
-    "Tab 1 — Alpha Adjustment",
-    "Tab 2 — Savings Dynamics",
+    "Tab 1 — Alpha Generator",
+    "Tab 2 — Alpha Adjustment",
+    "Tab 3 — Savings Dynamics",
 ])
 
 # ===========================================================================
@@ -229,9 +236,201 @@ with tab0:
             st.rerun()
 
 # ===========================================================================
-# TAB 1: Alpha Adjustment (piecewise Engel curve / budget share designer)
+# TAB 1: Alpha Generator
 # ===========================================================================
 with tab1:
+    st.caption(
+        "按替代组幂次批量生成初始分档 α。"
+        "核心假设：所有组的 b(y)=α/P 在 bracket1~2 临界点共同相交，再由各组幂次决定偏离方式。"
+    )
+
+    if "bm_thresholds" not in st.session_state:
+        if BRACKET_TABLE.exists():
+            st.session_state["bm_thresholds"] = load_bracket_thresholds(BRACKET_TABLE)
+        else:
+            st.session_state["bm_thresholds"] = DEFAULT_THRESHOLDS.copy()
+
+    if "bm_alpha" not in st.session_state:
+        if BRACKET_TABLE.exists():
+            st.session_state["bm_alpha"] = load_bracket_table(BRACKET_TABLE)
+            st.session_state["bm_initialized"] = True
+        else:
+            st.session_state["bm_alpha"] = {}
+
+    ag_target = st.selectbox(
+        "生成范围",
+        options=["all"] + list(STRATA),
+        format_func=lambda s: "all strata（全部阶层）" if s == "all" else f"{s} ({STRATA_LABELS[s]})",
+        key="ag_target_strata",
+    )
+
+    ag_fill_col1, ag_fill_col2, ag_fill_col3 = st.columns([1, 1, 2])
+    with ag_fill_col1:
+        low_rank_exp = st.number_input(
+            "低奢侈组幂次",
+            value=-0.35,
+            step=0.05,
+            format="%.2f",
+            key="ag_low_rank_exp",
+        )
+    with ag_fill_col2:
+        high_rank_exp = st.number_input(
+            "高奢侈组幂次",
+            value=0.35,
+            step=0.05,
+            format="%.2f",
+            key="ag_high_rank_exp",
+        )
+    with ag_fill_col3:
+        st.caption("交点高度由 Σα=1 与各组 P_g_s 自动决定；你只需要给每组 exponent。")
+        if st.button("按奢侈品等级填充幂次", key="ag_fill_by_rank"):
+            sorted_groups = luxury_sorted_groups()
+            min_rank = min(LUXURY_RANK.get(g, 1) for g in sorted_groups)
+            max_rank = max(LUXURY_RANK.get(g, 1) for g in sorted_groups)
+            rank_span = max(max_rank - min_rank, 1)
+            for group in sorted_groups:
+                rank = LUXURY_RANK.get(group, min_rank)
+                t = (rank - min_rank) / rank_span
+                st.session_state[f"ag_exp_{group}"] = low_rank_exp + (high_rank_exp - low_rank_exp) * t
+
+    st.markdown("#### 每组幂次设定")
+    ag_cols = st.columns(2)
+    for idx, group in enumerate(luxury_sorted_groups()):
+        with ag_cols[idx % 2]:
+            color_hex = GROUP_COLORS.get(group, "#888")
+            goods_list = ", ".join(GROUP_GOODS.get(group, []))
+            st.markdown(
+                f"<span style='background-color:{color_hex};color:white;padding:2px 8px;"
+                f"border-radius:4px;font-weight:bold'>{group.upper()}</span> "
+                f"<small style='color:#555'>{goods_list}</small>",
+                unsafe_allow_html=True,
+            )
+            st.number_input(
+                f"exp_{group}",
+                value=float(st.session_state.get(f"ag_exp_{group}", 0.0)),
+                step=0.05,
+                format="%.2f",
+                key=f"ag_exp_{group}",
+                label_visibility="collapsed",
+            )
+
+    exponents = {g: float(st.session_state.get(f"ag_exp_{g}", 0.0)) for g in SUBSTITUTE_GROUPS}
+
+    thresholds_by_strata = {
+        s: list(st.session_state["bm_thresholds"].get(s, DEFAULT_THRESHOLDS.get(s, [0.0])))
+        for s in STRATA
+    }
+    P_values = {
+        s: {
+            g: (cd.groups[g].base_price_sum_per_strata.get(s, 0.0) if cd.groups.get(g) else 0.0)
+            for g in SUBSTITUTE_GROUPS
+        }
+        for s in STRATA
+    }
+
+    generated_all = generate_power_alpha_bracket_table(
+        thresholds_by_strata,
+        P_values,
+        exponents,
+    )
+
+    preview_strata = ag_target if ag_target != "all" else STRATA[0]
+    preview_thresholds = thresholds_by_strata.get(preview_strata, DEFAULT_THRESHOLDS.get(preview_strata, [0.0]))
+    preview_ref_income = compute_reference_income(preview_thresholds)
+    preview_incomes = pick_bracket_sample_incomes(preview_thresholds, preview_ref_income)
+    preview_income_max = max(preview_thresholds[-1] * 2.5, preview_ref_income * 2.0, 1.0)
+    preview_income_pts = np.linspace(max(preview_incomes[0] * 0.25, 1e-6), preview_income_max, 400)
+    preview_intersection_b = compute_intersection_b(P_values.get(preview_strata, {}))
+
+    st.markdown(f"#### 预览 — {preview_strata} ({STRATA_LABELS[preview_strata]})")
+    st.caption(
+        f"共同锚点收入 y_ref = {preview_ref_income:.4f}，共同交点 b_ref = {preview_intersection_b:.6f}。"
+    )
+
+    fig_ag_b = go.Figure()
+    for group in luxury_sorted_groups():
+        b_vals = generate_power_b_profile(
+            preview_intersection_b,
+            exponents.get(group, 0.0),
+            list(preview_income_pts),
+            preview_ref_income,
+        )
+        fig_ag_b.add_trace(go.Scatter(
+            x=preview_income_pts,
+            y=b_vals,
+            name=group.title(),
+            line=dict(color=GROUP_COLORS.get(group, "#888"), width=2),
+        ))
+    fig_ag_b.add_vline(x=preview_ref_income, line_dash="dot", line_color="gray", opacity=0.7)
+    fig_ag_b.update_layout(
+        xaxis_title="Income (gold/月/pop-unit)",
+        yaxis_title="b(y) = α / P_g_s",
+        legend_title="Group",
+        height=360,
+    )
+    st.plotly_chart(fig_ag_b, use_container_width=True)
+
+    fig_ag_alpha = go.Figure()
+    n_preview_brackets = len(preview_thresholds)
+    for group in luxury_sorted_groups():
+        alpha_vals = np.zeros_like(preview_income_pts)
+        for i, y in enumerate(preview_income_pts):
+            k = sum(1 for t in preview_thresholds if t <= y) - 1
+            k = max(0, min(k, n_preview_brackets - 1))
+            alpha_vals[i] = generated_all.get(preview_strata, {}).get(k, {}).get(group, 0.0)
+        fig_ag_alpha.add_trace(go.Scatter(
+            x=preview_income_pts,
+            y=alpha_vals,
+            name=group.title(),
+            line=dict(color=GROUP_COLORS.get(group, "#888"), width=2),
+            showlegend=False,
+        ))
+    for thresh in preview_thresholds[1:]:
+        fig_ag_alpha.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+    fig_ag_alpha.add_vline(x=preview_ref_income, line_dash="dash", line_color="#666", opacity=0.7)
+    fig_ag_alpha.update_layout(
+        xaxis_title="Income (gold/月/pop-unit)",
+        yaxis_title="预算份额 α_g_s",
+        height=360,
+    )
+    st.plotly_chart(fig_ag_alpha, use_container_width=True)
+
+    ag_summary_rows = []
+    for k in range(len(preview_thresholds)):
+        row = {"bracket": k, "threshold": preview_thresholds[k]}
+        row["Σα"] = round(sum(generated_all.get(preview_strata, {}).get(k, {}).values()), 6)
+        ag_summary_rows.append(row)
+    st.dataframe(pd.DataFrame(ag_summary_rows), use_container_width=True, hide_index=True)
+
+    def _apply_generated_alpha(save_to_csv: bool) -> None:
+        if ag_target == "all":
+            merged = generated_all
+        else:
+            merged = dict(st.session_state.get("bm_alpha", {}))
+            merged[ag_target] = generated_all.get(ag_target, {})
+        st.session_state["bm_alpha"] = merged
+        st.session_state["bm_thresholds"] = thresholds_by_strata
+        st.session_state["bm_initialized"] = True
+        for key in list(st.session_state.keys()):
+            if key == "_bm_last_context" or key.startswith("bm_share_") or key.startswith("bm_fine_") or key.startswith("bm_b_"):
+                del st.session_state[key]
+        if save_to_csv:
+            save_bracket_table(st.session_state["bm_alpha"], st.session_state["bm_thresholds"], BRACKET_TABLE)
+
+    ag_btn1, ag_btn2 = st.columns(2)
+    with ag_btn1:
+        if st.button("生成到当前 session", key="ag_apply_session", type="primary", use_container_width=True):
+            _apply_generated_alpha(save_to_csv=False)
+            st.success("已生成到当前 session，可切到 Tab 2 继续微调。")
+    with ag_btn2:
+        if st.button("生成并保存到 alpha_bracket_table.csv", key="ag_apply_csv", use_container_width=True):
+            _apply_generated_alpha(save_to_csv=True)
+            st.success("已生成并保存到 data/alpha_bracket_table.csv。")
+
+# ===========================================================================
+# TAB 2: Alpha Adjustment (piecewise Engel curve / budget share designer)
+# ===========================================================================
+with tab2:
 
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
@@ -677,9 +876,9 @@ with tab1:
                     st.error(f"写入失败: {e}")
 
 # ===========================================================================
-# TAB 2: Savings Dynamics — simplified single-variable model
+# TAB 3: Savings Dynamics — simplified single-variable model
 # ===========================================================================
-with tab2:
+with tab3:
     st.subheader("Savings pressure dynamics — simplified single-variable model")
     st.caption(
         "Model: Δsavings = −income × saving_pressure(savings / target − 1). "
