@@ -198,28 +198,17 @@ def _derive_exponents_from_order(order_map: dict[str, int], high_exp: float, low
     return result
 
 
-if "ui_active_tab" not in st.session_state:
-    st.session_state["ui_active_tab"] = "tab0"
-
-active_tab = st.segmented_control(
-    "Navigation",
-    options=["tab0", "tab1", "tab2", "tab3"],
-    format_func=lambda t: {
-        "tab0": "Tab 0 — Substitute Group Manager",
-        "tab1": "Tab 1 — Alpha Generator",
-        "tab2": "Tab 2 — Alpha Adjustment",
-        "tab3": "Tab 3 — Savings Dynamics",
-    }[t],
-    selection_mode="single",
-    default=st.session_state["ui_active_tab"],
-    key="ui_active_tab_control",
-)
-st.session_state["ui_active_tab"] = active_tab
+tab0, tab1, tab2, tab3 = st.tabs([
+    "Tab 0 — Substitute Group Manager",
+    "Tab 1 — Alpha Generator",
+    "Tab 2 — Alpha Adjustment",
+    "Tab 3 — Savings Dynamics",
+])
 
 # ===========================================================================
 # TAB 0: Substitute Group Manager
 # ===========================================================================
-if active_tab == "tab0":
+with tab0:
     st.caption(
         "管理各替代组内商品的 k 因子权重。"
         "商品在组内的需求份额 = k_i / Σk_j，调整后自动存储在 data/goods_weights.csv。"
@@ -318,7 +307,7 @@ if active_tab == "tab0":
 # ===========================================================================
 # TAB 1: Alpha Generator
 # ===========================================================================
-if active_tab == "tab1":
+with tab1:
     st.caption(
         "按替代组幂次批量生成初始分档 α。"
         "核心假设：所有组的 b(y)=α/P 在 bracket1~2 临界点共同相交，再由各组幂次决定偏离方式。"
@@ -330,6 +319,12 @@ if active_tab == "tab1":
         st.session_state["ag_high_rank_exp"] = ag_settings["high_rank_exp"]
         st.session_state["ag_group_order"] = ag_settings["group_order"]
         st.session_state["ag_settings_initialized"] = True
+
+    if st.session_state.pop("ag_reset_to_saved_defaults", False):
+        ag_settings = load_alpha_generator_settings()
+        st.session_state["ag_low_rank_exp"] = ag_settings["low_rank_exp"]
+        st.session_state["ag_high_rank_exp"] = ag_settings["high_rank_exp"]
+        st.session_state["ag_group_order"] = ag_settings["group_order"]
 
     if "bm_thresholds" not in st.session_state:
         if BRACKET_TABLE.exists():
@@ -358,7 +353,7 @@ if active_tab == "tab1":
     with ag_fill_col1:
         low_rank_exp = st.number_input(
             "低端幂次",
-            value=-0.35,
+            value=float(st.session_state.get("ag_low_rank_exp", -0.35)),
             step=0.05,
             format="%.2f",
             key="ag_low_rank_exp",
@@ -366,7 +361,7 @@ if active_tab == "tab1":
     with ag_fill_col2:
         high_rank_exp = st.number_input(
             "高端幂次",
-            value=0.35,
+            value=float(st.session_state.get("ag_high_rank_exp", 0.35)),
             step=0.05,
             format="%.2f",
             key="ag_high_rank_exp",
@@ -384,7 +379,7 @@ if active_tab == "tab1":
                 st.success("已保存 Tab 1 默认参数。")
         with ag_cfg_btn2:
             if st.button("重置为默认顺序", key="ag_reset_default_order", use_container_width=True):
-                st.session_state["ag_group_order"] = _default_group_order()
+                st.session_state["ag_reset_to_saved_defaults"] = True
                 st.rerun()
 
     normalized_order = _normalize_group_order(st.session_state["ag_group_order"])
@@ -522,22 +517,21 @@ if active_tab == "tab1":
                 del st.session_state[key]
         if save_to_csv:
             save_bracket_table(st.session_state["bm_alpha"], st.session_state["bm_thresholds"], BRACKET_TABLE)
-        st.session_state["ui_active_tab"] = "tab2"
 
     ag_btn1, ag_btn2 = st.columns(2)
     with ag_btn1:
         if st.button("传递到 Tab 2（仅本次）", key="ag_apply_session", type="primary", use_container_width=True):
             _apply_generated_alpha(save_to_csv=False)
-            st.rerun()
+            st.success("已传递到 Tab 2，请切换过去继续微调。")
     with ag_btn2:
         if st.button("保存并传递到 Tab 2", key="ag_apply_csv", use_container_width=True):
             _apply_generated_alpha(save_to_csv=True)
-            st.rerun()
+            st.success("已保存并传递到 Tab 2，请切换过去继续微调。")
 
 # ===========================================================================
 # TAB 2: Alpha Adjustment (piecewise Engel curve / budget share designer)
 # ===========================================================================
-if active_tab == "tab2":
+with tab2:
 
     st.caption(
         "为每个收入分档分别设定 α_g_s 值，使消费结构随财富变化（恩格尔定律）。"
@@ -985,7 +979,7 @@ if active_tab == "tab2":
 # ===========================================================================
 # TAB 3: Savings Dynamics — simplified single-variable model
 # ===========================================================================
-if active_tab == "tab3":
+with tab3:
     st.subheader("Savings pressure dynamics — simplified single-variable model")
     st.caption(
         "Model: Δsavings = −income × saving_pressure(savings / target − 1). "
