@@ -488,6 +488,13 @@ class CurveDesignerState:
 
         if alphas_per_bracket and thresholds and len(alphas_per_bracket) > 0:
             n_brackets = len(thresholds)
+            from engel_export import compute_piecewise_offsets, compute_intersection_b, compute_reference_income
+            _P_vals = {
+                g: (self.groups[g].base_price_sum_per_strata.get(strata, 0.0) if self.groups.get(g) else 0.0)
+                for g in SUBSTITUTE_GROUPS
+            }
+            _y_ref = compute_reference_income(thresholds)
+            _d_ref = compute_intersection_b(_P_vals) * _y_ref
             for g_name in SUBSTITUTE_GROUPS:
                 group_obj = self.groups.get(g_name)
                 if group_obj is None:
@@ -499,8 +506,7 @@ class CurveDesignerState:
                     alphas_per_bracket[k].get(g_name, 0.0)
                     for k in range(n_brackets)
                 ]
-                from engel_export import compute_piecewise_offsets
-                c_vals = compute_piecewise_offsets(alpha_brackets, thresholds, P)
+                c_vals = compute_piecewise_offsets(alpha_brackets, thresholds, P, d_ref=_d_ref)
                 for i, y in enumerate(income_range):
                     k = sum(1 for t in thresholds if t <= y) - 1
                     k = max(0, min(k, n_brackets - 1))

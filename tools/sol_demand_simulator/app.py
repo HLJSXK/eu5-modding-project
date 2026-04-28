@@ -152,7 +152,16 @@ def _normalize_group_order(order_map: dict[str, int]) -> dict[str, int]:
     return {group: pos + 1 for pos, (_, _, group) in enumerate(decorated)}
 
 
-def load_alpha_generator_settings() -> dict:
+def _parse_ag_section(section: dict, defaults: dict) -> dict:
+    return {
+        "low_rank_exp": float(section.get("low_rank_exp", defaults["low_rank_exp"])),
+        "high_rank_exp": float(section.get("high_rank_exp", defaults["high_rank_exp"])),
+        "group_order": _normalize_group_order(section.get("group_order", defaults["group_order"])),
+    }
+
+
+def load_alpha_generator_settings(strata_key: str = "all") -> dict:
+    """Load alpha-generator settings for the given strata key (or "all")."""
     defaults = {
         "low_rank_exp": -0.35,
         "high_rank_exp": 0.35,
@@ -162,23 +171,40 @@ def load_alpha_generator_settings() -> dict:
         return defaults
     try:
         raw = json.loads(ALPHA_GENERATOR_SETTINGS_FILE.read_text(encoding="utf-8"))
-        return {
-            "low_rank_exp": float(raw.get("low_rank_exp", defaults["low_rank_exp"])),
-            "high_rank_exp": float(raw.get("high_rank_exp", defaults["high_rank_exp"])),
-            "group_order": _normalize_group_order(raw.get("group_order", defaults["group_order"])),
-        }
+        # Backwards compat: old flat format has "low_rank_exp" at top level
+        if "low_rank_exp" in raw:
+            return _parse_ag_section(raw, defaults) if strata_key == "all" else defaults
+        # New per-strata format: try requested key, fall back to "all", then defaults
+        section = raw.get(strata_key) or raw.get("all") or {}
+        return _parse_ag_section(section, defaults)
     except Exception:
         return defaults
 
 
-def save_alpha_generator_settings(settings: dict) -> None:
-    payload = {
+def save_alpha_generator_settings(settings: dict, strata_key: str = "all") -> None:
+    """Save alpha-generator settings for the given strata key into the JSON file."""
+    existing: dict = {}
+    if ALPHA_GENERATOR_SETTINGS_FILE.exists():
+        try:
+            raw = json.loads(ALPHA_GENERATOR_SETTINGS_FILE.read_text(encoding="utf-8"))
+            if "low_rank_exp" in raw:
+                # Migrate old flat format → put under "all"
+                existing["all"] = {
+                    "low_rank_exp": float(raw.get("low_rank_exp", -0.35)),
+                    "high_rank_exp": float(raw.get("high_rank_exp", 0.35)),
+                    "group_order": _normalize_group_order(raw.get("group_order", _default_group_order())),
+                }
+            else:
+                existing = {k: v for k, v in raw.items() if isinstance(v, dict)}
+        except Exception:
+            pass
+    existing[strata_key] = {
         "low_rank_exp": float(settings.get("low_rank_exp", -0.35)),
         "high_rank_exp": float(settings.get("high_rank_exp", 0.35)),
         "group_order": _normalize_group_order(settings.get("group_order", _default_group_order())),
     }
     ALPHA_GENERATOR_SETTINGS_FILE.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
+        json.dumps(existing, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 
@@ -313,15 +339,21 @@ with tab1:
         "核心假设：所有组的 b(y)=α/P 在 bracket1~2 临界点共同相交，再由各组幂次决定偏离方式。"
     )
 
-    if "ag_settings_initialized" not in st.session_state:
-        ag_settings = load_alpha_generator_settings()
+    # Read the currently selected target before the widget renders (available from session state)
+    _ag_cur_target = st.session_state.get("ag_target_strata", "all")
+
+    # Load settings when first entering Tab 1 or when the target strata changes
+    if (st.session_state.get("_ag_loaded_for_target") != _ag_cur_target
+            or "ag_settings_initialized" not in st.session_state):
+        ag_settings = load_alpha_generator_settings(_ag_cur_target)
         st.session_state["ag_low_rank_exp"] = ag_settings["low_rank_exp"]
         st.session_state["ag_high_rank_exp"] = ag_settings["high_rank_exp"]
         st.session_state["ag_group_order"] = ag_settings["group_order"]
         st.session_state["ag_settings_initialized"] = True
+        st.session_state["_ag_loaded_for_target"] = _ag_cur_target
 
     if st.session_state.pop("ag_reset_to_saved_defaults", False):
-        ag_settings = load_alpha_generator_settings()
+        ag_settings = load_alpha_generator_settings(_ag_cur_target)
         st.session_state["ag_low_rank_exp"] = ag_settings["low_rank_exp"]
         st.session_state["ag_high_rank_exp"] = ag_settings["high_rank_exp"]
         st.session_state["ag_group_order"] = ag_settings["group_order"]
@@ -375,8 +407,9 @@ with tab1:
                     "low_rank_exp": low_rank_exp,
                     "high_rank_exp": high_rank_exp,
                     "group_order": st.session_state["ag_group_order"],
-                })
-                st.success("已保存 Tab 1 默认参数。")
+                }, strata_key=ag_target)
+                label = "全部阶层" if ag_target == "all" else f"{ag_target} ({STRATA_LABELS.get(ag_target, ag_target)})"
+                st.success(f"已保存 [{label}] 默认参数。")
         with ag_cfg_btn2:
             if st.button("重置为默认顺序", key="ag_reset_default_order", use_container_width=True):
                 st.session_state["ag_reset_to_saved_defaults"] = True
@@ -807,6 +840,12 @@ with tab2:
                 "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
             )
             fig_bm_engel = go.Figure()
+            _bm_P_vals = {
+                g: (cd.groups[g].base_price_sum_per_strata.get(bm_strata, 0.0) if cd.groups.get(g) else 0.0)
+                for g in SUBSTITUTE_GROUPS
+            }
+            _bm_y_ref = compute_reference_income(bm_s_thresholds)
+            _bm_d_ref = compute_intersection_b(_bm_P_vals) * _bm_y_ref
             for g_name in luxury_sorted_groups():
                 color = GROUP_COLORS.get(g_name, "#888")
                 demand_vals = np.zeros_like(income_pts)
@@ -816,7 +855,7 @@ with tab2:
                     bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
                     for k in range(n_brackets)
                 ]
-                c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s)
+                c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s, d_ref=_bm_d_ref)
                 for i, y in enumerate(income_pts):
                     k = sum(1 for t in bm_s_thresholds if t <= y) - 1
                     k = max(0, min(k, n_brackets - 1))
