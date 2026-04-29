@@ -61,6 +61,7 @@ from engel_export import (
     compute_intersection_b,
     generate_power_alpha_bracket_table,
     generate_power_b_profile,
+    generate_power_d_boundary_slopes,
     pick_bracket_sample_incomes,
     export_demand_offsets,
     export_demand_base,
@@ -503,6 +504,44 @@ with tab1:
         height=360,
     )
     st.plotly_chart(fig_ag_b, use_container_width=True)
+
+    # D-curve preview — shows the continuous power-law target d_g(y) = d_ref*(y/y_ref)^(1+exp_g)
+    # All groups converge to the shared anchor (y_ref, d_ref): the (1,1) point in normalized space.
+    preview_d_ref = preview_intersection_b * preview_ref_income
+    st.markdown(f"#### 目标 D 曲线预览（(1,1) 锚点验证）— {preview_strata}")
+    st.caption(
+        f"d_g(y) = d_ref × (y/y_ref)^(1+exp_g)，锚点 (y_ref={preview_ref_income:.4f}, d_ref={preview_d_ref:.6f})。"
+        "归一化坐标 (y/y_ref, d/d_ref) 下所有组过 (0,0) 和 (1,1)，幂次控制形状。"
+    )
+    fig_ag_d = go.Figure()
+    for group in sorted(normalized_order, key=lambda g: normalized_order[g]):
+        exp_g = exponents.get(group, 0.0)
+        d_vals = (
+            preview_d_ref * (np.maximum(preview_income_pts, 1e-9) / preview_ref_income) ** (1.0 + exp_g)
+        )
+        fig_ag_d.add_trace(go.Scatter(
+            x=preview_income_pts / preview_ref_income,
+            y=d_vals / preview_d_ref if preview_d_ref > 0 else d_vals,
+            name=f"{normalized_order[group]}. {group.title()} (exp={exp_g:+.3f})",
+            line=dict(color=GROUP_COLORS.get(group, "#888"), width=2),
+        ))
+    # Mark the (1,1) anchor
+    fig_ag_d.add_scatter(
+        x=[1.0], y=[1.0],
+        mode="markers",
+        marker=dict(symbol="x", size=12, color="black"),
+        name="锚点 (1,1)",
+        showlegend=True,
+    )
+    fig_ag_d.add_vline(x=1.0, line_dash="dot", line_color="gray", opacity=0.7)
+    fig_ag_d.add_hline(y=1.0, line_dash="dot", line_color="gray", opacity=0.5)
+    fig_ag_d.update_layout(
+        xaxis_title="y / y_ref（归一化收入）",
+        yaxis_title="d / d_ref（归一化需求）",
+        legend_title="Group",
+        height=360,
+    )
+    st.plotly_chart(fig_ag_d, use_container_width=True)
 
     fig_ag_alpha = go.Figure()
     n_preview_brackets = len(preview_thresholds)

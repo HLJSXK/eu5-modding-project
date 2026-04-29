@@ -257,15 +257,59 @@ def generate_power_b_profile(
     ]
 
 
+def generate_power_d_boundary_slopes(
+    intersection_b: float,
+    exponent: float,
+    thresholds: List[float],
+    y_ref: float,
+) -> List[float]:
+    """
+    Compute per-bracket average slope of d_g(y) = d_ref*(y/y_ref)^(1+exponent).
+
+    d_ref = intersection_b * y_ref (= y_ref / ΣP_g).
+
+    Bracket k (thresholds[k] to thresholds[k+1]):
+        slope = (d_g(y_{k+1}) - d_g(y_k)) / (y_{k+1} - y_k)
+    Last bracket: instantaneous derivative at thresholds[-1].
+
+    Before normalization this enforces d_g(0)=0 (c_0=0) and d_g(y_ref)=d_ref
+    simultaneously, so the (1,1) anchor holds and slopes near 0 depend only on
+    the exponent, not on P_g.
+    """
+    if intersection_b <= 0:
+        return [0.0] * len(thresholds)
+    d_ref = float(intersection_b) * max(float(y_ref), 1e-6)
+    ref = max(float(y_ref), 1e-6)
+    exp = float(exponent)
+
+    def _d(y: float) -> float:
+        if y <= 0:
+            return 0.0
+        return d_ref * (y / ref) ** (1.0 + exp)
+
+    slopes: List[float] = []
+    n = len(thresholds)
+    for k in range(n):
+        y_lo = float(thresholds[k])
+        if k + 1 < n:
+            y_hi = float(thresholds[k + 1])
+            width = y_hi - y_lo
+            slope = (_d(y_hi) - _d(y_lo)) / width if width > 1e-12 else 0.0
+        else:
+            # Last bracket: derivative d'(y_lo) = d_ref*(1+exp)/y_ref*(y_lo/y_ref)^exp
+            slope = d_ref * (1.0 + exp) / ref * (y_lo / ref) ** exp if y_lo > 0 else 0.0
+        slopes.append(max(slope, 0.0))
+    return slopes
+
+
 def generate_power_alpha_brackets_for_strata(
     P_gs: Dict[str, float],
     thresholds: List[float],
     exponents: Dict[str, float],
 ) -> Dict[int, Dict[str, float]]:
-    """Generate per-bracket alpha values for one strata from shared-intersection power-law b(y) curves."""
+    """Generate per-bracket alpha values for one strata from shared-intersection power-law d(y) curves."""
     y_ref = compute_reference_income(thresholds)
-    sample_incomes = pick_bracket_sample_incomes(thresholds, y_ref)
-    n = len(sample_incomes)
+    n = len(thresholds)
     raw_by_bracket: Dict[int, Dict[str, float]] = {k: {} for k in range(n)}
     intersection_b = compute_intersection_b(P_gs)
 
@@ -275,9 +319,9 @@ def generate_power_alpha_brackets_for_strata(
             for k in range(n):
                 raw_by_bracket[k][group] = 0.0
             continue
-        b_vals = generate_power_b_profile(intersection_b, exponents.get(group, 0.0), sample_incomes, y_ref)
-        for k, b_val in enumerate(b_vals):
-            raw_by_bracket[k][group] = max(b_val * P, 0.0)
+        d_slopes = generate_power_d_boundary_slopes(intersection_b, exponents.get(group, 0.0), thresholds, y_ref)
+        for k, slope in enumerate(d_slopes):
+            raw_by_bracket[k][group] = max(slope * P, 0.0)
 
     normalized: Dict[int, Dict[str, float]] = {}
     fallback_total_P = sum(max(float(P_gs.get(g, 0.0)), 0.0) for g in _GROUPS)
