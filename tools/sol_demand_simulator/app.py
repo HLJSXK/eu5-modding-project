@@ -837,15 +837,13 @@ with tab2:
             st.markdown(f"#### 分档 Engel 需求曲线 — {bm_strata}")
             st.caption(
                 "d_g_s(y) = (α_g_s(y) / P_g_s) × y + c_g_s(y)。"
-                "连续分段线性：c 保证各分档在阈值处等值（c_0 = 0）。"
+                "d(0)=0；连续分段线性：c 保证各分档在阈值处等值，所有组需求曲线在 income=0 处共同经过 (0, 0)。"
             )
             fig_bm_engel = go.Figure()
             _bm_P_vals = {
                 g: (cd.groups[g].base_price_sum_per_strata.get(bm_strata, 0.0) if cd.groups.get(g) else 0.0)
                 for g in SUBSTITUTE_GROUPS
             }
-            _bm_y_ref = compute_reference_income(bm_s_thresholds)
-            _bm_d_ref = compute_intersection_b(_bm_P_vals) * _bm_y_ref
             for g_name in luxury_sorted_groups():
                 color = GROUP_COLORS.get(g_name, "#888")
                 demand_vals = np.zeros_like(income_pts)
@@ -855,7 +853,7 @@ with tab2:
                     bm_alpha.get(bm_strata, {}).get(k, {}).get(g_name, 0.0)
                     for k in range(n_brackets)
                 ]
-                c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s, d_ref=_bm_d_ref)
+                c_vals = compute_piecewise_offsets(alpha_brackets, bm_s_thresholds, P_g_s, d_ref=None)
                 for i, y in enumerate(income_pts):
                     k = sum(1 for t in bm_s_thresholds if t <= y) - 1
                     k = max(0, min(k, n_brackets - 1))

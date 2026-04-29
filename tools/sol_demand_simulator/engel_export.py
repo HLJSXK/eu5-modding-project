@@ -13,11 +13,9 @@ Demand for group g at strata s:
     d_g_s(y) = b_g_s(y) * y + c_g_s(y)
     where b_g_s(y) = α_g_s(y) / P_g_s
 
-Continuity conditions (anchor at bracket-1/2 boundary y_ref):
-    c[k_ref] = d_ref - b[k_ref] * y_ref   (anchor: all groups through (y_ref, d_ref))
-    c[k]     = c[k-1] + (b[k-1] - b[k]) * y_k   (forward, k > k_ref)
-    c[k]     = c[k+1] + (b[k+1] - b[k]) * y_{k+1}  (backward, k < k_ref)
-    d_ref = intersection_b * y_ref = y_ref / Σ_g P_g_s
+Continuity conditions (anchor at origin, y=0):
+    c[0] = 0   (all groups through (0, 0))
+    c[k] = c[k-1] + (b[k-1] - b[k]) * y_k   (forward propagation only)
 
 Budget constraint (Σ spending = income at savings equilibrium):
     Σ_g (b_g * y + c_g) * P_g = y
@@ -505,13 +503,10 @@ def export_demand_offsets(
         s_P = P_values.get(strata, {})
         n = len(s_thresholds)
 
-        s_y_ref = compute_reference_income(s_thresholds)
-        s_d_ref = compute_intersection_b(s_P) * s_y_ref
-
         for group in _GROUPS:
             P = s_P.get(group, 0.0)
             a_vals = [s_alphas.get(k, {}).get(group, 0.0) for k in range(n)]
-            c_vals = compute_piecewise_offsets(a_vals, s_thresholds, P, d_ref=s_d_ref)
+            c_vals = compute_piecewise_offsets(a_vals, s_thresholds, P, d_ref=None)
 
             if income_var is None or all(abs(cv) <= tolerance for cv in c_vals):
                 lines.append(f"local_{strata}_{group}_demand_offset = {{ value = 0 }}\n")
