@@ -78,6 +78,76 @@ COMPAT_GOODS = frozenset(["victuals"])
 GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
 ALL_GOODS = [g for _, goods in INDICATOR_GROUPS for g in goods]
 
+# ── Good-group tooltip: display names and group names ──────────────────────────────────────────
+
+GOOD_NAMES_ZH: dict = {
+    "wine": "葡萄酒", "liquor": "烈酒", "beer": "啤酒",
+    "fur": "毛皮", "cloth": "布匹", "fine_cloth": "精纺品", "leather": "皮革",
+    "beeswax": "蜂蜡", "paper": "纸张", "books": "书籍",
+    "goods_gold": "黄金", "silver": "白银", "jewelry": "珠宝",
+    "amber": "琥珀", "gems": "宝石", "ivory": "象牙", "pearls": "珍珠",
+    "incense": "熏香", "medicaments": "草药", "mercury": "汞",
+    "sugar": "糖", "tobacco": "烟草", "tea": "茶叶", "cocoa": "可可", "coffee": "咖啡",
+    "saffron": "藏红花", "pepper": "胡椒", "cloves": "丁香", "chili": "辣椒",
+    "wheat": "小麦", "rice": "大米", "millet": "杂谷", "maize": "玉米",
+    "potato": "土豆", "legumes": "豆类", "olives": "橄榄", "fruit": "水果",
+    "fish": "鱼类", "wild_game": "野味", "livestock": "牲畜",
+    "horses": "马匹", "elephants": "大象", "weaponry": "武器", "firearms": "火器",
+    "coal": "煤炭", "salt": "盐", "victuals": "口粮",
+    "lumber": "木材", "masonry": "砖石", "tools": "工具", "pottery": "陶器",
+    "furniture": "家具", "porcelain": "瓷器", "lacquerware": "漆器",
+    "marble": "大理石", "glass": "玻璃",
+}
+
+GOOD_NAMES_EN: dict = {
+    "wine": "Wine", "liquor": "Liquor", "beer": "Beer",
+    "fur": "Fur", "cloth": "Cloth", "fine_cloth": "Fine Cloth", "leather": "Leather",
+    "beeswax": "Beeswax", "paper": "Paper", "books": "Books",
+    "goods_gold": "Gold", "silver": "Silver", "jewelry": "Jewelry",
+    "amber": "Amber", "gems": "Gems", "ivory": "Ivory", "pearls": "Pearls",
+    "incense": "Incense", "medicaments": "Medicaments", "mercury": "Mercury",
+    "sugar": "Sugar", "tobacco": "Tobacco", "tea": "Tea", "cocoa": "Cocoa", "coffee": "Coffee",
+    "saffron": "Saffron", "pepper": "Pepper", "cloves": "Cloves", "chili": "Chili",
+    "wheat": "Wheat", "rice": "Rice", "millet": "Millet", "maize": "Maize",
+    "potato": "Potato", "legumes": "Legumes", "olives": "Olives", "fruit": "Fruit",
+    "fish": "Fish", "wild_game": "Wild Game", "livestock": "Livestock",
+    "horses": "Horses", "elephants": "Elephants", "weaponry": "Weaponry", "firearms": "Firearms",
+    "coal": "Coal", "salt": "Salt", "victuals": "Victuals",
+    "lumber": "Lumber", "masonry": "Masonry", "tools": "Tools", "pottery": "Pottery",
+    "furniture": "Furniture", "porcelain": "Porcelain", "lacquerware": "Lacquerware",
+    "marble": "Marble", "glass": "Glass",
+}
+
+GROUP_NAMES_ZH: dict = {
+    "alcohol":    "酒类",
+    "textiles":   "纺织品",
+    "knowledge":  "知识用品",
+    "precious":   "贵重品",
+    "treasures":  "珍宝",
+    "ritual":     "祭祀物品",
+    "stimulants": "嗜好品",
+    "spices":     "香料",
+    "staple":     "主食",
+    "protein":    "蛋白食物",
+    "military":   "军需品",
+    "household":  "家居用品",
+}
+
+GROUP_NAMES_EN: dict = {
+    "alcohol":    "Alcoholic Drinks",
+    "textiles":   "Textiles",
+    "knowledge":  "Knowledge Goods",
+    "precious":   "Precious Goods",
+    "treasures":  "Treasures",
+    "ritual":     "Ritual Goods",
+    "stimulants": "Stimulants",
+    "spices":     "Spices",
+    "staple":     "Staple Food",
+    "protein":    "Protein Food",
+    "military":   "Military Goods",
+    "household":  "Household Goods",
+}
+
 # ── File paths ──────────────────────────────────────────────────────────────────────────────
 
 EFFECTS_FILE          = ROOT / "src/stable/in_game/common/scripted_effects/SOL_substitute_effects.txt"
@@ -86,6 +156,8 @@ INDICATORS_FILE       = ROOT / "src/stable/in_game/common/script_values/SOL_subs
 GROUP_INDICATORS_FILE = ROOT / "src/stable/in_game/common/script_values/SOL_substitute_group_indicators.txt"
 LOCALIZATION_FILE     = ROOT / "src/stable/main_menu/localization/english/SOL_substitute_goods_l_english.yml"
 LOCALIZATION_FILE_ZH  = ROOT / "src/stable/main_menu/localization/simp_chinese/SOL_substitute_goods_l_simp_chinese.yml"
+GOODS_DIR             = ROOT / "reference_game_files/game/in_game/common/goods"
+GUI_OVERRIDE_FILE     = ROOT / "src/stable/in_game/gui/z_SOL_goods_tooltip_override.gui"
 
 # ── Effects file generator ─────────────────────────────────────────────────────────────────────────
 
@@ -622,6 +694,195 @@ def _write(path: Path, content: str, dry_run: bool, encoding: str = "utf-8") -> 
         print(f"Written  {path.name}")
 
 
+# ── Good-group GUI info generators ───────────────────────────────────────────────────────────────
+
+def _parse_goods_prices() -> dict:
+    """Parse default_market_price from goods definition files."""
+    prices: dict = {}
+    for fname in sorted(GOODS_DIR.glob("*.txt")):
+        if fname.name == "readme.txt":
+            continue
+        text = fname.read_text(encoding="utf-8")
+        current_good = None
+        depth = 0
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            opens = line.count("{")
+            closes = line.count("}")
+            if depth == 0 and opens > 0:
+                m = re.match(r'^(\w+)\s*=\s*\{', stripped)
+                if m:
+                    current_good = m.group(1)
+                    prices.setdefault(current_good, 1.0)
+            elif current_good and depth == 1:
+                m = re.match(r'default_market_price\s*=\s*([\d.]+)', stripped)
+                if m:
+                    prices[current_good] = float(m.group(1))
+            depth += opens - closes
+            if depth <= 0:
+                depth = 0
+                current_good = None
+    return prices
+
+
+def _fmt_ratio(r: float) -> str:
+    rounded = round(r, 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    s = f"{rounded:.2f}".rstrip("0")
+    return s
+
+
+def _fmt_price(p: float) -> str:
+    return str(int(p)) if p == int(p) else f"{p:.1f}"
+
+
+def gen_goods_group_loca_keys(prices: dict) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+    """Return (en_pairs, zh_pairs) of (loca_key, loca_value) for per-good group tooltip."""
+    en_pairs: List[Tuple[str, str]] = []
+    zh_pairs: List[Tuple[str, str]] = []
+    for grp, members in INDICATOR_GROUPS:
+        grp_zh = GROUP_NAMES_ZH.get(grp, grp)
+        grp_en = GROUP_NAMES_EN.get(grp, grp)
+        for good in members:
+            pa = prices.get(good, 1.0)
+            gn_zh = GOOD_NAMES_ZH.get(good, good)
+            gn_en = GOOD_NAMES_EN.get(good, good)
+            pa_s = _fmt_price(pa)
+
+            subs_zh = []
+            subs_en = []
+            for other in members:
+                if other == good:
+                    continue
+                pb = prices.get(other, 1.0)
+                ratio = pa / pb
+                on_zh = GOOD_NAMES_ZH.get(other, other)
+                on_en = GOOD_NAMES_EN.get(other, other)
+                subs_zh.append(f"1份{gn_zh}可替代{_fmt_ratio(ratio)}份{on_zh}")
+                subs_en.append(f"1 {gn_en} ≈ {_fmt_ratio(ratio)} {on_en}")
+
+            if subs_zh:
+                val_zh = f"该商品属于 #B{grp_zh}#! 替代组：{'；'.join(subs_zh)}。"
+                val_en = f"Belongs to #B{grp_en}#! substitute group: {'; '.join(subs_en)}."
+            else:
+                val_zh = f"该商品属于 #B{grp_zh}#! 替代组（组内唯一商品）。"
+                val_en = f"Belongs to #B{grp_en}#! substitute group (sole member)."
+
+            key = f"SOL_good_subst_group_{good}"
+            zh_pairs.append((key, val_zh))
+            en_pairs.append((key, val_en))
+
+    return en_pairs, zh_pairs
+
+
+def _replace_gen_section(text: str, tag: str, new_body: str) -> str:
+    """Replace content between # @GEN_BEGIN:<tag> and # @GEN_END:<tag>."""
+    begin = f"# @GEN_BEGIN:{tag}"
+    end = f"# @GEN_END:{tag}"
+    if begin in text and end in text:
+        pre = text[:text.index(begin)]
+        post = text[text.index(end) + len(end):]
+        return pre + begin + "\n" + new_body + end + post
+    return text + "\n" + begin + "\n" + new_body + end + "\n"
+
+
+GUI_STATIC_HEADER = """\
+# ============================================================
+# z_SOL_goods_tooltip_override.gui
+# Overrides vanilla Goods_tooltip to inject substitute group info.
+#
+# - Replicates ALL vanilla blockoverrides unchanged.
+# - Adds blockoverride "extra_tooltip_content" → SOL_goods_substitute_group_block
+# - SOL_goods_substitute_group_block: per-good visible sections (auto-generated).
+#
+# AUTO-GENERATED (scaffold + body) by scripts/gen_scarcity.py — do not edit by hand.
+# ============================================================
+
+template Goods_tooltip {
+\tContextualTooltipType = {
+\t\tblockoverride "title_icon" {
+\t\t\tbutton = {
+\t\t\t\tusing = tooltip_title_icon_size
+\t\t\t\ttexture = "[GetGoodsIcon(Goods.Self)]"
+\t\t\t\tonclick = "[ShowGoods(Goods.Self)]"
+\t\t\t\ttooltipwidget = {
+\t\t\t\t\tLeftClickButtonTooltip = {
+\t\t\t\t\t\tblockoverride "onclick_text" { text = "OPEN_GOOD_PANEL" }
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\tblockoverride "title_text" {
+\t\t\ttext = "[Goods.GetNameWithNoTooltip]"
+\t\t}
+
+\t\tblockoverride "concept_link" {
+\t\t\ttext = [goods|e]
+\t\t}
+
+\t\tblockoverride "title_button" {
+\t\t\tcustom_map_mode_button = {
+\t\t\t\tdatacontext = "[GetMapMode('reactive_trade_good')]"
+
+\t\t\t\tblockoverride "on_action" {
+\t\t\t\t\ton_action = "[ShowGoodsReactive(Goods.Self)]"
+\t\t\t\t}
+
+\t\t\t\tblockoverride "icon" {
+\t\t\t\t\ttexture = "[GetGoodsIcon(Goods.Self)]"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\tblockoverride "tooltip_content" {
+\t\t\tusing = goods_details
+
+\t\t\tTooltipFlavorTextBlock = {
+\t\t\t\tblockoverride "text" {
+\t\t\t\t\ttext = "[Goods.GetFlavorText]"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\t# ── Substitute group info ─────────────────────────────────────
+\t\tblockoverride "extra_tooltip_content" {
+\t\t\tusing = SOL_goods_substitute_group_block
+\t\t}
+\t}
+}
+
+template SOL_goods_substitute_group_block {
+\t# One widget per good — exactly one visible at a time.
+\t# Visibility check: EqualTo_string(Goods.GetKey, 'X')
+\t# Pattern confirmed from battle_lateralview.gui:609 (EqualTo_string(CombatModifier.GetKey, 'dice'))
+\t# AUTO-GENERATED — do not edit by hand.
+"""
+
+GUI_STATIC_FOOTER = """\
+}
+"""
+
+
+def gen_goods_gui_override_file(prices: dict) -> str:
+    """Generate the full content of z_SOL_goods_tooltip_override.gui."""
+    lines: List[str] = []
+    for grp, members in INDICATOR_GROUPS:
+        lines.append(f"\t# --- {GROUP_NAMES_EN.get(grp, grp)} ---")
+        for good in members:
+            key = f"SOL_good_subst_group_{good}"
+            lines.append(f"\tTooltipTextBlock = {{")
+            lines.append(f"\t\tvisible = \"[EqualTo_string(Goods.GetKey, '{good}')]\"")
+            lines.append(f"\t\tblockoverride \"text\" {{ text = \"{key}\" }}")
+            lines.append(f"\t}}")
+        lines.append("")
+    body = "\n".join(lines)
+    return GUI_STATIC_HEADER + body + GUI_STATIC_FOOTER
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -652,6 +913,20 @@ def main() -> None:
         loc_text = loc_file.read_text(encoding="utf-8-sig")
         loc_new  = upsert_localization(loc_text, keys)
         _write(loc_file, loc_new, dry, encoding="utf-8-sig")
+
+    # 6. Per-good group tooltip localization keys (upsert)
+    prices = _parse_goods_prices()
+    en_pairs, zh_pairs = gen_goods_group_loca_keys(prices)
+    for loc_file, pairs in [
+        (LOCALIZATION_FILE,    en_pairs),
+        (LOCALIZATION_FILE_ZH, zh_pairs),
+    ]:
+        loc_text = loc_file.read_text(encoding="utf-8-sig")
+        loc_new  = upsert_localization(loc_text, pairs)
+        _write(loc_file, loc_new, dry, encoding="utf-8-sig")
+
+    # 7. GUI override file (full regen)
+    _write(GUI_OVERRIDE_FILE, gen_goods_gui_override_file(prices), dry, encoding="utf-8")
 
     if not dry:
         print("\nDone. Run next:")
