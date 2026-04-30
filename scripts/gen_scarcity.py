@@ -1027,12 +1027,8 @@ def gen_goods_gui_override_file(prices: dict) -> str:
                 f"\t\t\tspacing = 3",
                 f"\t\t\tmargin = {{ 4 4 }}",
                 f"\t\t\tusing = bg_listbase_template",
-                # Group subtitle: name+icon tight (no spacing), icon sits right after text
-                f"\t\t\thbox = {{",
-                f"\t\t\t\tlayoutpolicy_horizontal = expanding",
-                f'\t\t\t\ttext_single = {{ raw_text = "{grp_zh}" }}',
-                f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{grp_icon}" }}',
-                f"\t\t\t}}",
+                # Group subtitle: name only (no icon)
+                f'\t\t\ttext_single = {{ layoutpolicy_horizontal = expanding raw_text = "{grp_zh}" }}',
             ]
             for other in members:
                 if other == good:
