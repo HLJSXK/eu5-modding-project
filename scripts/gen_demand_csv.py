@@ -31,15 +31,10 @@ from parser import (
     _read,
     load_demand_matrix,
 )
-from curve_designer import GROUP_GOODS
+from curve_designer import groups_for_good
 
 DATA_DIR = REPO_ROOT / "data"
 OUTPUT_CSV = DATA_DIR / "demand_price_table.csv"
-
-# Reverse map: good → group name
-GOOD_TO_GROUP: Dict[str, str] = {
-    good: group for group, goods in GROUP_GOODS.items() for good in goods
-}
 
 # Raw EU5 pop types — commoners are NOT pre-aggregated here
 POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen"]
@@ -50,18 +45,23 @@ POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasan
 # ---------------------------------------------------------------------------
 
 def compute_demand_table() -> List[Dict]:
-    """Return rows ready for CSV output."""
+    """Return rows ready for CSV output.
+
+    Multi-group goods (e.g. fish in luxury_food + protein) produce one row per
+    group so every group membership is visible in the table.
+    """
     dm = load_demand_matrix()
     rows = []
     for good, entry in sorted(dm.items()):
-        row: Dict = {
-            "good":  good,
-            "group": GOOD_TO_GROUP.get(good, ""),
-            "price": entry.price,
-        }
-        for pt in POP_TYPE_ORDER:
-            row[pt] = entry.demand_per_pop_type.get(pt, 0.0)
-        rows.append(row)
+        demand_cols = {pt: entry.demand_per_pop_type.get(pt, 0.0) for pt in POP_TYPE_ORDER}
+        for group in groups_for_good(good):
+            row: Dict = {
+                "good":  good,
+                "group": group,
+                "price": entry.price,
+            }
+            row.update(demand_cols)
+            rows.append(row)
     return rows
 
 
