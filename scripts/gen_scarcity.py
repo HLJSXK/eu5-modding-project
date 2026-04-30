@@ -86,6 +86,7 @@ INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
 COMPAT_GOODS = frozenset(["victuals"])
 
 GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
+IND_GROUP_SIZE    = {grp: len(goods) for grp, goods in INDICATOR_GROUPS}
 ALL_GOODS = [g for _, goods in INDICATOR_GROUPS for g in goods]
 
 # ── Good-group tooltip: display names and group names ──────────────────────────────────────────
@@ -522,6 +523,7 @@ def _gen_good_indicators(good: str) -> List[str]:
 
     # — demand share (0–100) —
     grp_weight = f"sol_{ind_grp}_base_total_weight"
+    n = IND_GROUP_SIZE[ind_grp]
     if is_compat:
         lines += [
             f"sol_demand_share_{good} = {{",
@@ -548,6 +550,50 @@ def _gen_good_indicators(good: str) -> List[str]:
         lines.append(f"    divide = {grp_weight}")
         lines.append(f"    multiply = 100")
         lines.append("}")
+
+    # — demand share offset (% deviation from equal normal share) —
+    # Formula: (weight_indicator × n / base_total_weight − 1) × 100
+    # Normal state: 1 × n / n − 1 = 0  →  0%
+    # Scarce:  weight<1  →  negative %     Surplus: weight>1  →  positive %
+    if is_compat:
+        # Helper flag = 1 when compat on, 0 when compat off.
+        # Multiplied at end so compat-off evaluates to 0% instead of -100%.
+        lines += [
+            f"sol_demand_share_offset_{good}_compat = {{",
+            f"    value = 0",
+            f"    if = {{ limit = {{ sol_pp_victuals_compat_is_on = yes }} value = 1 }}",
+            f"}}",
+            f"sol_demand_share_offset_{good} = {{",
+            f"    value = 0",
+            f"    if = {{",
+            f"        limit = {{ sol_pp_victuals_compat_is_on = yes }}",
+            f"        add = 1",
+        ]
+        first_adj = True
+        for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
+            kw = "if" if first_adj else "else_if"
+            first_adj = False
+            delta = weight - 1.0
+            lines.append(f"        {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
+        lines += [
+            f"    }}",
+            f"    multiply = {n}",
+            f"    divide = {grp_weight}",
+            f"    add = -1",
+            f"    multiply = 100",
+            f"    multiply = sol_demand_share_offset_{good}_compat",
+            f"}}",
+        ]
+    else:
+        lines += [
+            f"sol_demand_share_offset_{good} = {{",
+            f"    value = sol_weight_indicator_{good}",
+            f"    multiply = {n}",
+            f"    divide = {grp_weight}",
+            f"    add = -1",
+            f"    multiply = 100",
+            f"}}",
+        ]
 
     return lines
 

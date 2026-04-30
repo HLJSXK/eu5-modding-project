@@ -207,7 +207,7 @@ def _good_row(good: str) -> List[str]:
     sc = f"sol_good_{good}_scarcity_tier"   # 0-3
     su = f"sol_good_{good}_surplus_tier"    # 0-3
     wt = f"sol_weight_indicator_{good}"
-    ds = f"sol_demand_share_{good}"
+    ds = f"sol_demand_share_offset_{good}"
     loc_suffix = _GOOD_LOC_SUFFIX.get(good, good.upper())
 
     def _gt(sv: str, n: int) -> str:
