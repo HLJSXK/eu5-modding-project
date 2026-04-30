@@ -195,19 +195,25 @@ def _demand_sv(poptype: str, group: str) -> str:
         return f"local_commoners_{group}_demand_scale_offset"
     return f"local_{poptype}_{group}_demand_scale_offset"
 
+# goods_gold's localization key is SOL_TT_GOODS_GOLD (not SOL_TT_GOODS_GOODS_GOLD)
+_GOOD_LOC_SUFFIX: Dict[str, str] = {
+    "goods_gold": "GOLD",
+}
+
 def _good_row(good: str) -> List[str]:
     s = f"sol_good_{good}_scarce"
     scarce  = f"GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('{s}'), '(CFixedPoint)0')"
     ok      = f"Not(GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('{s}'), '(CFixedPoint)0'))"
     wt = f"sol_weight_indicator_{good}"
     ds = f"sol_demand_share_{good}"
+    loc_suffix = _GOOD_LOC_SUFFIX.get(good, good.upper())
     return [
         f"                    # Row: {good}",
         f"                    hbox = {{",
         f"                        layoutpolicy_horizontal = expanding",
         f"                        spacing = 4",
         f"                        icon = {{ size = {{ 20 20 }} texture = \"gfx/interface/icons/trade_goods/icon_goods_{good}.dds\" }}",
-        f"                        text_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_GOODS_{good.upper()}\" }}",
+        f"                        text_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_GOODS_{loc_suffix}\" }}",
         f"                        text_single = {{ min_width = 55 align = hcenter",
         f"                            visible = \"[{scarce}]\"",
         f"                            text = \"SOL_TT_STATUS_SCARCE\" }}",
