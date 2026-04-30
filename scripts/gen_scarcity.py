@@ -552,12 +552,13 @@ def _gen_good_indicators(good: str) -> List[str]:
         lines.append("}")
 
     # — demand share offset (% deviation from equal normal share) —
-    # Formula: (weight_indicator × n / base_total_weight − 1) × 100
-    # Normal state: 1 × n / n − 1 = 0  →  0%
-    # Scarce:  weight<1  →  negative %     Surplus: weight>1  →  positive %
+    # Formula: weight_indicator × n / base_total_weight − 1
+    # Normal state: 1 × n / n − 1 = 0  →  |+=0%] displays "0%"
+    # Scarce: weight<1 → negative decimal  Surplus: weight>1 → positive decimal
+    # |+=0%] in GUI multiplies by 100 for display; do NOT multiply by 100 here.
     if is_compat:
         # Helper flag = 1 when compat on, 0 when compat off.
-        # Multiplied at end so compat-off evaluates to 0% instead of -100%.
+        # Multiplied at end so compat-off evaluates to 0 instead of -1.
         lines += [
             f"sol_demand_share_offset_{good}_compat = {{",
             f"    value = 0",
@@ -580,7 +581,6 @@ def _gen_good_indicators(good: str) -> List[str]:
             f"    multiply = {n}",
             f"    divide = {grp_weight}",
             f"    add = -1",
-            f"    multiply = 100",
             f"    multiply = sol_demand_share_offset_{good}_compat",
             f"}}",
         ]
@@ -591,7 +591,6 @@ def _gen_good_indicators(good: str) -> List[str]:
             f"    multiply = {n}",
             f"    divide = {grp_weight}",
             f"    add = -1",
-            f"    multiply = 100",
             f"}}",
         ]
 
