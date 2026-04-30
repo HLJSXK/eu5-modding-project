@@ -347,26 +347,7 @@ def gen_substitute_tooltips() -> str:
             lines.extend(_good_row(good))
         lines += [
             f"                }}",
-            f"                # ── Income & Demand Correction ─────────────────────────────────",
-            f"                TooltipTextBlock = {{",
-            f"                    blockoverride \"text\" {{ text = \"SOL_TT_SOL_HEADER\" }}",
-            f"                }}",
-            f"                vbox = {{",
-            f"                    layoutpolicy_horizontal = expanding",
-            f"                    margin = {{ 10 4 }}",
-            f"                    spacing = 2",
-            f"                    hbox = {{",
-            f"                        layoutpolicy_horizontal = expanding",
-            f"                        text_single = {{ layoutpolicy_horizontal = expanding raw_text = \" \" }}",
-            f"                        text_single = {{ min_width = 68 align = hcenter text = \"GLS_TT_ROW_GDP_PC\" }}",
-            f"                        text_single = {{ min_width = 68 align = hcenter text = \"GLS_TT_ROW_SAV_DEMAND\" }}",
-            f"                        text_single = {{ min_width = 68 align = hcenter text = \"SOL_TT_ROW_DEMAND_CORRECTION\" }}",
-            f"                    }}",
-        ]
-        for poptype in ("nobles", "clergy", "burghers", "laborers", "peasants"):
-            lines.extend(_correction_row(poptype, group))
-        lines += [
-            f"                }}",
+            f"                using = SOL_subst_ratios_{group}",
             f"            }}",
             f"        }}",
             f"    }}",
@@ -444,6 +425,42 @@ def gen_economy_local_demand_rows() -> str:
             lines.append(f"")
     return "\n".join(lines)
 
+# ── Generator: global_living_standard.gui scarcity icon row ─────────────────
+
+def gen_gls_scarcity_icons() -> str:
+    T = "\t\t\t\t\t"  # indentation inside the card vbox
+    lines: List[str] = []
+    lines.append(f"{T}widget = {{")
+    lines.append(f"{T}\tdatacontext = \"[Player.GetCapital]\"")
+    lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
+    for tier_key, tier_groups in TIERS:
+        lines.append(f"{T}\thbox = {{")
+        lines.append(f"{T}\t\tlayoutpolicy_horizontal = expanding")
+        lines.append(f"{T}\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"{tier_key}\" }}")
+        for group in tier_groups:
+            icon_tex = GROUP_ICONS[group]
+            lines += [
+                f"{T}\t\twidget = {{",
+                f"{T}\t\t\tsize = {{ 32 32 }}",
+                f"{T}\t\t\ticon = {{",
+                f"{T}\t\t\t\tsize = {{ 32 32 }}",
+                f"{T}\t\t\t\ttexture = \"gfx/interface/icons/trade_goods/{icon_tex}\"",
+                f"{T}\t\t\t\ttooltipwidget = {{ using = SOL_{group}_scarce_tooltip }}",
+                f"{T}\t\t\t}}",
+                f"{T}\t\t\ticon = {{",
+                f"{T}\t\t\t\tparentanchor = bottom|right",
+                f"{T}\t\t\t\tposition = {{ 2 2 }}",
+                f"{T}\t\t\t\tsize = {{ 10 10 }}",
+                f"{T}\t\t\t\ttexture = \"gfx/interface/component_tiles/bookmark_white.dds\"",
+                f"{T}\t\t\t\ttintcolor = {{ 1.0 0.2 0.2 1.0 }}",
+                f"{T}\t\t\t\tvisible = \"[GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('sol_grp_{group}_scarce'), '(CFixedPoint)0')]\"",
+                f"{T}\t\t\t}}",
+                f"{T}\t\t}}",
+            ]
+        lines.append(f"{T}\t}}")
+    lines.append(f"{T}}}")
+    return "\n".join(lines) + "\n"
+
 # ── Generator: A_SOL_economy_effects.txt phases ──────────────────────────────
 
 def gen_effects_phase_g_guard() -> str:
@@ -508,6 +525,9 @@ def run_tooltips(dry_run: bool) -> None:
 def run_gls(dry_run: bool) -> None:
     replace_section(GLS_FILE, "demand_rows", gen_gls_demand_rows(), dry_run)
 
+def run_scarcity_icons(dry_run: bool) -> None:
+    replace_section(GLS_FILE, "scarcity_icons", gen_gls_scarcity_icons(), dry_run)
+
 def run_effects(dry_run: bool) -> None:
     replace_section(EFFECTS_FILE, "phase_g_guard",      gen_effects_phase_g_guard(),     dry_run)
     replace_section(EFFECTS_FILE, "phase_d_scales",     gen_effects_phase_d(),          dry_run)
@@ -524,11 +544,12 @@ def run_economy_local(dry_run: bool) -> None:
     replace_section(ECONOMY_LOCAL_FILE, "demand_rows", gen_economy_local_demand_rows(), dry_run)
 
 TARGETS = {
-    "location":      run_location,
-    "tooltips":      run_tooltips,
-    "gls":           run_gls,
-    "effects":       run_effects,
-    "economy_local": run_economy_local,
+    "location":        run_location,
+    "tooltips":        run_tooltips,
+    "gls":             run_gls,
+    "scarcity_icons":  run_scarcity_icons,
+    "effects":         run_effects,
+    "economy_local":   run_economy_local,
 }
 
 def main() -> None:
