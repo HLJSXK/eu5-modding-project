@@ -792,11 +792,17 @@ def _replace_gen_section(text: str, tag: str, new_body: str) -> str:
 GUI_STATIC_HEADER = """\
 # ============================================================
 # z_SOL_goods_tooltip_override.gui
-# Overrides vanilla Goods_tooltip to inject substitute group info.
+# Overrides 4 vanilla goods tooltip templates to inject substitute group info.
 #
-# - Replicates ALL vanilla blockoverrides unchanged.
-# - Adds blockoverride "extra_tooltip_content" → SOL_goods_substitute_group_block
-# - SOL_goods_substitute_group_block: per-good visible sections (auto-generated).
+# Templates overridden:
+#   Goods_tooltip                — generic goods tooltip (Goods scope)
+#   SpecificGoodsMarket_tooltip  — market-context goods tooltip (Goods scope)
+#   goods_market_price_tooltip   — market price chart tooltip (GoodsMarketEntry scope)
+#   GoodsPriceOnMarket_tooltip   — price-on-market tooltip (GoodsPriceOnMarketWrap scope)
+#
+# All vanilla blockoverrides are replicated unchanged.
+# Adds blockoverride "extra_tooltip_content" → SOL_goods_substitute_group_block
+# Non-Goods scopes use widget { datacontext = "[X.GetGoods]" } to switch to Goods scope.
 #
 # AUTO-GENERATED (scaffold + body) by scripts/gen_scarcity.py — do not edit by hand.
 # ============================================================
@@ -863,6 +869,141 @@ template SOL_goods_substitute_group_block {
 """
 
 GUI_STATIC_FOOTER = """\
+}
+
+template SpecificGoodsMarket_tooltip {
+\tContextualTooltipType = {
+
+\t\tblockoverride "title_icon" {
+\t\t\tbutton = {
+\t\t\t\tusing = tooltip_title_icon_size
+\t\t\t\ttexture = "[GetGoodsIcon(Goods.Self)]"
+\t\t\t\ttooltipwidget = {
+\t\t\t\t\tusing = Goods_tooltip
+\t\t\t\t}
+\t\t\t\taction_tooltip = {
+\t\t\t\t\tclick_type = left
+\t\t\t\t\tclick_mode = single
+\t\t\t\t\ttitle = "OPEN_GOOD_PANEL"
+\t\t\t\t\ton_action = "[ShowGoods(Goods.Self)]"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\tblockoverride "title_text" {
+\t\t\ttext = "[Goods.GetNameWithNoTooltip]"
+\t\t}
+
+\t\tblockoverride "concept_link" {
+\t\t\ttext = [goods|E]
+\t\t}
+
+\t\tblockoverride "title_button" {
+\t\t\tcustom_map_mode_button = {
+\t\t\t\tdatacontext = "[GetMapMode('reactive_trade_good')]"
+
+\t\t\t\tblockoverride "on_action" {
+\t\t\t\t\ton_action = "[ShowGoodsReactive(Goods.Self)]"
+\t\t\t\t}
+
+\t\t\t\tblockoverride "icon" {
+\t\t\t\t\ttexture = "[GetGoodsIcon(Goods.Self)]"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\tblockoverride "tooltip_content" {
+\t\t\tusing = goods_details
+\t\t\tdatacontext = "[Market.GetMarketEntry(Goods.Self)]"
+
+\t\t\tusing = SpecificGoodsFromMarketContent
+\t\t\tblockoverride "data_from" {
+\t\t\t\tdatacontext = "[Market]"
+\t\t\t}
+
+\t\t\tblock "good_details_extra_info" {}
+
+\t\t\tTooltipFlavorTextBlock = {
+\t\t\t\ttextcontext = "[Goods.GetFlavorText]"
+\t\t\t}
+\t\t}
+
+\t\t# ── Substitute group info ─────────────────────────────────────
+\t\tblockoverride "extra_tooltip_content" {
+\t\t\tusing = SOL_goods_substitute_group_block
+\t\t}
+\t}
+}
+
+template goods_market_price_tooltip {
+\tContextualTooltipType = {
+\t\tblockoverride "title_icon" {
+\t\t\tbutton = {
+\t\t\t\tdatacontext = "[GoodsMarketEntry.GetGoods]"
+\t\t\t\tusing = tooltip_title_icon_size
+\t\t\t\ttexture = "[GetGoodsIcon(GoodsMarketEntry.GetGoods)]"
+\t\t\t\ttooltipwidget = {
+\t\t\t\t\tusing = Goods_tooltip
+\t\t\t\t}
+\t\t\t\taction_tooltip = {
+\t\t\t\t\tclick_type = left
+\t\t\t\t\tclick_mode = single
+\t\t\t\t\ttitle = "OPEN_GOOD_PANEL"
+\t\t\t\t\ton_action = "[ShowGoods(GoodsMarketEntry.GetGoods)]"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+
+\t\tblockoverride "title_text" {
+\t\t\ttext = "GOODS_MARKET_ENTRY_TITLE"
+\t\t}
+
+\t\tblockoverride "concept_link" {
+\t\t\ttext = "[market_price|e]"
+\t\t}
+
+\t\tblockoverride "tooltip_content" {
+\t\t\tusing = goods_market_details
+\t\t}
+
+\t\t# ── Substitute group info (GoodsMarketEntry scope → Goods via datacontext) ────
+\t\tblockoverride "extra_tooltip_content" {
+\t\t\twidget = {
+\t\t\t\tdatacontext = "[GoodsMarketEntry.GetGoods]"
+\t\t\t\tusing = SOL_goods_substitute_group_block
+\t\t\t}
+\t\t}
+\t}
+}
+
+template GoodsPriceOnMarket_tooltip {
+\tContextualTooltipType = {
+\t\tblockoverride "title_icon_texture" {
+\t\t\ttexture = "[GetGoodsIcon(GoodsPriceOnMarketWrap.GetGoods)]"
+\t\t}
+
+\t\tblockoverride "title_text" {
+\t\t\ttext = "[GoodsPriceOnMarketWrap.GetName]"
+\t\t}
+
+\t\tblockoverride "concept_link" {
+\t\t\ttext = "[market_price|e]"
+\t\t}
+
+\t\tblockoverride "tooltip_content" {
+\t\t\tdatacontext = "[GoodsPriceOnMarketWrap.GetGoodsMarketEntry]"
+\t\t\tdatacontext = "[GoodsPriceOnMarketWrap.GetMarket]"
+\t\t\tusing = goods_market_details
+\t\t}
+
+\t\t# ── Substitute group info (GoodsPriceOnMarketWrap scope → Goods via datacontext) ────
+\t\tblockoverride "extra_tooltip_content" {
+\t\t\twidget = {
+\t\t\t\tdatacontext = "[GoodsPriceOnMarketWrap.GetGoods]"
+\t\t\t\tusing = SOL_goods_substitute_group_block
+\t\t\t}
+\t\t}
+\t}
 }
 """
 
