@@ -429,38 +429,37 @@ def gen_economy_local_demand_rows() -> str:
 def gen_gls_scarcity_icons() -> str:
     T = "\t\t\t\t\t"  # indentation inside the card vbox
     lines: List[str] = []
-    lines.append(f"{T}widget = {{")
+    # vbox carries the datacontext to establish Location scope for child expressions;
+    # using vbox (not widget) so it auto-sizes to content and the card frame fills correctly.
+    lines.append(f"{T}vbox = {{")
     lines.append(f"{T}\tdatacontext = \"[Player.GetCapital]\"")
     lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
-    lines.append(f"{T}\tvbox = {{")                                  # vbox stacks tier rows vertically
-    lines.append(f"{T}\t\tlayoutpolicy_horizontal = expanding")
-    lines.append(f"{T}\t\tspacing = 4")
+    lines.append(f"{T}\tspacing = 4")
     for tier_key, tier_groups in TIERS:
-        lines.append(f"{T}\t\thbox = {{")
-        lines.append(f"{T}\t\t\tlayoutpolicy_horizontal = expanding")
-        lines.append(f"{T}\t\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"{tier_key}\" }}")
+        lines.append(f"{T}\thbox = {{")
+        lines.append(f"{T}\t\tlayoutpolicy_horizontal = expanding")
+        lines.append(f"{T}\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"{tier_key}\" }}")
         for group in tier_groups:
             icon_tex = GROUP_ICONS[group]
             lines += [
-                f"{T}\t\t\twidget = {{",
+                f"{T}\t\twidget = {{",
+                f"{T}\t\t\tsize = {{ 32 32 }}",
+                f"{T}\t\t\ticon = {{",
                 f"{T}\t\t\t\tsize = {{ 32 32 }}",
-                f"{T}\t\t\t\ticon = {{",
-                f"{T}\t\t\t\t\tsize = {{ 32 32 }}",
-                f"{T}\t\t\t\t\ttexture = \"gfx/interface/icons/trade_goods/{icon_tex}\"",
-                f"{T}\t\t\t\t\ttooltipwidget = {{ using = SOL_{group}_scarce_tooltip }}",
-                f"{T}\t\t\t\t}}",
-                f"{T}\t\t\t\ticon = {{",
-                f"{T}\t\t\t\t\tparentanchor = bottom|right",
-                f"{T}\t\t\t\t\tposition = {{ 2 2 }}",
-                f"{T}\t\t\t\t\tsize = {{ 10 10 }}",
-                f"{T}\t\t\t\t\ttexture = \"gfx/interface/component_tiles/bookmark_white.dds\"",
-                f"{T}\t\t\t\t\ttintcolor = {{ 1.0 0.2 0.2 1.0 }}",
-                f"{T}\t\t\t\t\tvisible = \"[GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('sol_grp_{group}_scarce'), '(CFixedPoint)0')]\"",
-                f"{T}\t\t\t\t}}",
+                f"{T}\t\t\t\ttexture = \"gfx/interface/icons/trade_goods/{icon_tex}\"",
+                f"{T}\t\t\t\ttooltipwidget = {{ using = SOL_{group}_scarce_tooltip }}",
                 f"{T}\t\t\t}}",
+                f"{T}\t\t\ticon = {{",
+                f"{T}\t\t\t\tparentanchor = bottom|right",
+                f"{T}\t\t\t\tposition = {{ 2 2 }}",
+                f"{T}\t\t\t\tsize = {{ 10 10 }}",
+                f"{T}\t\t\t\ttexture = \"gfx/interface/component_tiles/bookmark_white.dds\"",
+                f"{T}\t\t\t\ttintcolor = {{ 1.0 0.2 0.2 1.0 }}",
+                f"{T}\t\t\t\tvisible = \"[GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('sol_grp_{group}_scarce'), '(CFixedPoint)0')]\"",
+                f"{T}\t\t\t}}",
+                f"{T}\t\t}}",
             ]
-        lines.append(f"{T}\t\t}}")
-    lines.append(f"{T}\t}}")
+        lines.append(f"{T}\t}}")
     lines.append(f"{T}}}")
     return "\n".join(lines) + "\n"
 
