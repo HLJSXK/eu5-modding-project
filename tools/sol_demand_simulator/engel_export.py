@@ -36,8 +36,12 @@ demand_scale uses an inline sub-expression:
 from __future__ import annotations
 
 import csv
+import sys
 from pathlib import Path
 from typing import Dict, List
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ALPHA_TABLE = REPO_ROOT / "data" / "alpha_table.csv"
@@ -71,7 +75,7 @@ _GROUPS = [
     "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
 ]
 
-# Maps strata → EU5 script_value name for GDP per capita in location scope.
+# Maps strata -> EU5 script_value name for GDP per capita in location scope.
 # tribesmen: None means keep constant α (uniform placeholder, no Engel curve).
 _INCOME_VAR: Dict[str, str | None] = {
     "nobles":    "local_noble_gdp_per_capita_display",
@@ -629,7 +633,7 @@ def export_demand_base(
 
             if gdp_var is None or P <= zero_threshold:
                 # tribesmen (no income term) or zero-price group:
-                # base = 1 → demand_scale = sp+1, neutral demand, no Engel curve
+                # base = 1 -> demand_scale = sp+1, neutral demand, no Engel curve
                 reason = "tribesmen: no income term" if gdp_var is None else f"P_g_s = {P:.6g} ≈ 0"
                 lines.append(f"# {reason} — hardcoded neutral\n")
                 lines.append(f"{var} = {{ value = 1 }}\n")
@@ -720,7 +724,7 @@ def export_demand_scales_with_offset(
             ]
         lines.append("\n")
 
-    # Consumption rate = sp + 1 (GUI "Liquid Funds" row, |+=0% format → shows as %)
+    # Consumption rate = sp + 1 (GUI "Liquid Funds" row, |+=0% format -> shows as %)
     # Variable name derived from _SP_VAR to match the inconsistent commoner/commoners naming.
     lines.append("# ── Consumption rate = 1 + savings_pressure (GUI Liquid Funds row) ──\n")
     for strata in _STRATA_KEYS:
@@ -811,23 +815,23 @@ def main() -> None:
     P_values = _auto_group_prices()
 
     out = export_group_prices()
-    print(f"Exported → {out.relative_to(REPO_ROOT)}")
+    print(f"Exported -> {out.relative_to(REPO_ROOT)}")
 
     warnings = export_bracket_budget_shares(bracket_alphas, bracket_thresholds)
     for w in warnings:
         print(f"WARNING: {w}")
-    print(f"Exported → {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}")
+    print(f"Exported -> {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)}")
 
     warnings2 = export_demand_offsets(bracket_alphas, bracket_thresholds, P_values)
     for w in warnings2:
         print(f"WARNING: {w}")
-    print(f"Exported → {DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}")
+    print(f"Exported -> {DEMAND_OFFSETS_FILE.relative_to(REPO_ROOT)}")
 
     export_demand_base(P_values)
-    print(f"Exported → {DEMAND_BASE_FILE.relative_to(REPO_ROOT)}")
+    print(f"Exported -> {DEMAND_BASE_FILE.relative_to(REPO_ROOT)}")
 
     export_demand_scales_with_offset()
-    print(f"Exported → {DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}")
+    print(f"Exported -> {DEMAND_SCALES_FILE.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":

@@ -135,8 +135,8 @@ def check_anti_patterns(path: Path, content: str, patterns: list[dict]):
                 line_num = content[: m.start()].count("\n") + 1
                 issues.append(
                     f"[{entry.get('category', 'pattern').upper()}] "
-                    f"{path.relative_to(REPO_ROOT)}:{line_num} — "
-                    f"Bad: \"{entry['bad']}\" → {entry['correction']}"
+                    f"{path.relative_to(REPO_ROOT)}:{line_num} -- "
+                    f"Bad: \"{entry['bad']}\" -> {entry['correction']}"
                 )
         except re.error:
             pass
@@ -153,7 +153,7 @@ def check_enums(path: Path, content: str, enums: dict):
             if val not in valid_values:
                 line_num = content[: m.start()].count("\n") + 1
                 issues.append(
-                    f"[ENUM] {path.relative_to(REPO_ROOT)}:{line_num} — "
+                    f"[ENUM] {path.relative_to(REPO_ROOT)}:{line_num} -- "
                     f"Invalid {enum_name}:{val}. Valid: {', '.join(sorted(valid_values))}"
                 )
 
@@ -182,7 +182,7 @@ def check_modifier_names(path: Path, content: str, whitelist: set[str]):
             name = m.group(1)
             if name not in structural and name not in whitelist:
                 issues.append(
-                    f"[MODIFIER] {path.relative_to(REPO_ROOT)}:{i} — "
+                    f"[MODIFIER] {path.relative_to(REPO_ROOT)}:{i} -- "
                     f"Unknown modifier name '{name}'; verify in 00_modifier_types.txt"
                 )
 
@@ -215,7 +215,7 @@ def check_inject_demand_multiply(path: Path, content: str) -> None:
                     if re.search(r"\bdemand_multiply\b", inner_no_comments):
                         line_num = content[:m.start()].count("\n") + 1
                         issues.append(
-                            f"[GOODS] {path.relative_to(REPO_ROOT)}:{line_num} — "
+                            f"[GOODS] {path.relative_to(REPO_ROOT)}:{line_num} -- "
                             f"demand_multiply forbidden inside INJECT block '{good}'"
                         )
                     break
@@ -226,7 +226,7 @@ def check_bracket_table_sum() -> None:
     """Validate that each (strata, bracket) row in alpha_bracket_table.csv sums to 1.0."""
     if not BRACKET_CSV.exists():
         issues.append(
-            f"[BRACKET] {BRACKET_CSV.relative_to(REPO_ROOT)} not found — "
+            f"[BRACKET] {BRACKET_CSV.relative_to(REPO_ROOT)} not found -- "
             "run: python tools/sol_demand_simulator/engel_export.py --init"
         )
         return
@@ -240,13 +240,13 @@ def check_bracket_table_sum() -> None:
                     total = sum(float(row[g]) for g in _GROUPS if g in row)
                 except ValueError:
                     issues.append(
-                        f"[BRACKET] alpha_bracket_table.csv — "
+                        f"[BRACKET] alpha_bracket_table.csv -- "
                         f"strata '{strata}' bracket {bracket} has non-numeric values"
                     )
                     continue
                 if abs(total - 1.0) > 1e-3:
                     issues.append(
-                        f"[BRACKET] alpha_bracket_table.csv — "
+                        f"[BRACKET] alpha_bracket_table.csv -- "
                         f"strata '{strata}' bracket {bracket} sums to {total:.6f}, expected 1.0"
                     )
     except Exception as e:
@@ -264,7 +264,7 @@ def check_group_prices_consistency() -> None:
         expected = _auto_group_prices()
         if not GROUP_PRICES_FILE.exists():
             issues.append(
-                f"[PRICES] {GROUP_PRICES_FILE.relative_to(REPO_ROOT)} missing — "
+                f"[PRICES] {GROUP_PRICES_FILE.relative_to(REPO_ROOT)} missing -- "
                 "run: python tools/sol_demand_simulator/engel_export.py"
             )
             return
@@ -302,11 +302,12 @@ def check_budget_shares_consistency() -> None:
     try:
         sys.path.insert(0, str(SIMULATOR_DIR))
         from parser import BUDGET_SHARES_FILE, _read  # type: ignore
+        from engel_export import EXPORT_ALPHA_MULTIPLIER  # type: ignore
         import re as _re
 
         if not BUDGET_SHARES_FILE.exists():
             issues.append(
-                f"[SHARES] {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)} missing — "
+                f"[SHARES] {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)} missing -- "
                 "run: python tools/sol_demand_simulator/engel_export.py"
             )
             return
@@ -332,7 +333,7 @@ def check_budget_shares_consistency() -> None:
         stale = []
         for s in _STRATA_KEYS:
             for g in _GROUPS:
-                exp = alpha.get(s, {}).get(g, 0.0)
+                exp = alpha.get(s, {}).get(g, 0.0) * EXPORT_ALPHA_MULTIPLIER
                 act = actual.get(s, {}).get(g, 0.0)
                 if abs(exp - act) > 1e-3:
                     stale.append(f"{s}_{g}")
@@ -429,10 +430,10 @@ def check_sol_economy_dash_cells() -> None:
     errors = []
     for pair in sorted(p_zero):
         if pair in value_in_gui:
-            errors.append(f"  {pair[0]}_{pair[1]}: P=0 but shows value → change to '-'")
+            errors.append(f"  {pair[0]}_{pair[1]}: P=0 but shows value -> change to '-'")
     for pair in sorted(dash_in_gui):
         if pair in p_nonzero:
-            errors.append(f"  {pair[0]}_{pair[1]}: P>0 but shows '-' → restore demand_scale_offset ref")
+            errors.append(f"  {pair[0]}_{pair[1]}: P>0 but shows '-' -> restore demand_scale_offset ref")
 
     if errors:
         issues.append(
@@ -499,7 +500,7 @@ def main():
             print(f"  {issue}")
         sys.exit(1)
     else:
-        print(f"[OK] Validated {len(files)} file(s) — no issues found.")
+        print(f"[OK] Validated {len(files)} file(s) -- no issues found.")
         sys.exit(0)
 
 
