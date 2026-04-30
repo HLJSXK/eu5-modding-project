@@ -106,6 +106,10 @@ def groups_for_good(good: str) -> List[str]:
 class GoodsWeightStore:
     """Manages per-good-per-group k-factors and derived shares.
 
+    All k-factors are 1.0 (equal weight within each group).
+    Demand redistribution within groups is handled solely by the scarcity
+    mechanism in the game scripts (weight ×0.5 when a good is unavailable).
+
     Key: (good, group) tuple.
     share_i_g = k_i_g / Σ_j k_j_g  (for j in group g).
     """
