@@ -20,7 +20,7 @@ This repository keeps only mod-related content and documentation.
 
 1. Clone repository
 2. Use `src/stable/` as baseline for practical balance mods
-3. Use `src/develop/` for active Dynamic Missions development
+3. Use `src/develop/` as reference for the Dynamic Missions system (development paused)
 4. Read technical docs in `docs/technical/`
 
 ## Build / Deploy (Stable)
@@ -70,7 +70,7 @@ If write permission is denied, run terminal as Administrator.
 - `docs/guides/AI_Tool_Workflow_Prompt.md` - AI tool prompt and EU5 syntax verification workflow
 - `docs/technical/EU5_Modding_Knowledge_Base.md`
 - `docs/technical/EU5_Mod_Framework_Guide.md`
-- `docs/design/Dynamic_Missions_Design.md`
+- `docs/archive/dynamic_missions/Dynamic_Missions_Design.md` (paused)
 - `src/README.md`
 
 ## License

@@ -22,7 +22,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from parser import STRATA
+from parser import STRATA, _GROUPS as ENGEL_GROUPS, _STRATA_KEYS as ENGEL_STRATA_KEYS
 
 # ---------------------------------------------------------------------------
 # Per-strata constants (directly from SOL_pop_values.txt)
@@ -312,6 +312,61 @@ def compute_demand_scale(
 
 
 # ---------------------------------------------------------------------------
+# Engel curve demand scale (per-group, per-strata)
+# ---------------------------------------------------------------------------
+
+def compute_engel_demand_scale(
+    income: float,
+    savings_pressure: float,
+    alpha: Dict[str, float],
+    P: Dict[str, float],
+) -> Dict[str, float]:
+    """
+    Return per-group demand scales for one strata.
+
+    income_eff = income * (1 + savings_pressure)
+    group_scale[g] = alpha[g] * income_eff / P[g]
+
+    Requires sum(alpha.values()) == 1.0.
+    Groups with P[g] == 0 return scale 0.
+    """
+    income_eff = income * (1.0 + savings_pressure)
+    result: Dict[str, float] = {}
+    for g in alpha:
+        p_g = P.get(g, 0.0)
+        if p_g > 0:
+            result[g] = alpha[g] * income_eff / p_g
+        else:
+            result[g] = 0.0
+    return result
+
+
+def compute_engel_base_index_by_group(
+    demand_matrix: dict,
+) -> Dict[str, Dict[str, float]]:
+    """
+    For each group g and strata s, compute Σ_i∈g (strata_demand_i × price_i).
+    Returns {group: {strata: P_g_s}}.
+    """
+    from curve_designer import GROUP_GOODS
+    result: Dict[str, Dict[str, float]] = {g: {s: 0.0 for s in STRATA} for g in ENGEL_GROUPS}
+    for group, goods in GROUP_GOODS.items():
+        if group not in result:
+            continue
+        for good in goods:
+            entry = demand_matrix.get(good)
+            if entry is None:
+                continue
+            for s in STRATA:
+                result[group][s] += entry.strata_demand.get(s, 0.0) * entry.price
+    return result
+
+
+# Map simulator strata names to Engel strata key names (they match here, but kept explicit)
+_STRATA_TO_ENGEL = {s: s for s in STRATA}
+
+
+# ---------------------------------------------------------------------------
 # Spending / income helpers
 # ---------------------------------------------------------------------------
 
@@ -353,6 +408,9 @@ def simulate(
     p: ScenarioParams,
     demand_matrix: dict,
     income_override: Dict[str, float] | None = None,
+    mode: str = "unified_scale",
+    engel_alpha: Dict[str, Dict[str, float]] | None = None,
+    engel_P: Dict[str, Dict[str, float]] | None = None,
 ) -> pd.DataFrame:
     """
     Run a month-by-month simulation.
@@ -361,10 +419,13 @@ def simulate(
       - If income_override is given, use those fixed gold/month values.
       - Otherwise derive from the GDP formula.
 
-    Spending model (direct):
-      - base_index[s] = Σ(demand × price) at scale=1, per pop-unit, per month
-      - monthly_spending[s] = base_index[s] × pop_count[s] × demand_scale[s]
-      - spending/income ratio is a balance measurement, not a parameter
+    Spending model:
+      mode="unified_scale" (default):
+        monthly_spending[s] = base_index[s] × pop_count[s] × demand_scale[s]
+      mode="engel_curve":
+        monthly_spending[s] = Σ_g [ P_g_s × group_scale_g_s ] × pop_count[s]
+                            = income_eff[s] × pop_count[s]  (when Σ_g α_g = 1)
+        Requires engel_alpha and engel_P dicts {strata: {group: value}}.
 
     Returns a DataFrame with columns:
         month, year, strata, savings, savings_ratio, savings_target,
@@ -391,6 +452,16 @@ def simulate(
     demand_scale = compute_demand_scale(p, savings=savings, gdp_per_cap=gdp_per_cap)
     savings_targets = compute_savings_targets(p)
 
+    # Engel mode: pre-compute P_g_s from demand matrix if not supplied
+    _engel_P: Dict[str, Dict[str, float]] = {}
+    _engel_alpha: Dict[str, Dict[str, float]] = {}
+    if mode == "engel_curve":
+        _engel_P = engel_P if engel_P else {
+            s: {g: v for g, v in P_by_group.items()}
+            for s, P_by_group in _build_engel_P_strata(demand_matrix).items()
+        }
+        _engel_alpha = engel_alpha if engel_alpha else _build_engel_alpha(_engel_P)
+
     records = []
     total_months = p.sim_years * 12
     update_interval_months = p.update_interval_years * 12
@@ -402,7 +473,25 @@ def simulate(
         is_tick     = (months_since_update == 0 and month > 0)
 
         for s in STRATA:
-            m_spend  = base_idx[s] * pop_counts[s] * demand_scale[s]
+            if mode == "engel_curve":
+                # spending = Σ_g (P_g_s × group_scale_g_s) × pop_count
+                #          = income_eff × pop_count  when Σα = 1
+                group_scales = compute_engel_demand_scale(
+                    income=gdp_per_cap[s],
+                    savings_pressure=sp_pressure[s],
+                    alpha=_engel_alpha.get(s, {}),
+                    P=_engel_P.get(s, {}),
+                )
+                m_spend = sum(
+                    group_scales.get(g, 0.0) * _engel_P.get(s, {}).get(g, 0.0)
+                    for g in ENGEL_GROUPS
+                ) * pop_counts[s]
+                # unified demand_scale equivalent (for display)
+                eff_scale = m_spend / max(1e-12, base_idx[s] * pop_counts[s])
+            else:
+                m_spend   = base_idx[s] * pop_counts[s] * demand_scale[s]
+                eff_scale = demand_scale[s]
+
             net_flow = income[s] - m_spend
             records.append({
                 "month":            month,
@@ -411,7 +500,7 @@ def simulate(
                 "savings":          savings[s],
                 "savings_target":   savings_targets[s],
                 "savings_ratio":    savings[s] / max(1e-9, savings_targets[s]),
-                "demand_scale":     demand_scale[s],
+                "demand_scale":     eff_scale,
                 "gdp_nonlinear":    nl[s],
                 "savings_pressure": sp_pressure[s],
                 "monthly_income":   income[s],
@@ -425,7 +514,19 @@ def simulate(
 
         # Apply monthly delta
         for s in STRATA:
-            m_spend    = base_idx[s] * pop_counts[s] * demand_scale[s]
+            if mode == "engel_curve":
+                group_scales = compute_engel_demand_scale(
+                    income=gdp_per_cap[s],
+                    savings_pressure=fn3_savings_pressure(p, savings)[s],
+                    alpha=_engel_alpha.get(s, {}),
+                    P=_engel_P.get(s, {}),
+                )
+                m_spend = sum(
+                    group_scales.get(g, 0.0) * _engel_P.get(s, {}).get(g, 0.0)
+                    for g in ENGEL_GROUPS
+                ) * pop_counts[s]
+            else:
+                m_spend = base_idx[s] * pop_counts[s] * demand_scale[s]
             savings[s] = max(0.0, savings[s] + income[s] - m_spend)
 
         # Update demand scale on pulse tick (with optional EMA smoothing)
@@ -437,5 +538,27 @@ def simulate(
             demand_scale = {s: α * computed[s] + (1 - α) * demand_scale[s] for s in STRATA}
 
     return pd.DataFrame(records)
+
+
+def _build_engel_P_strata(demand_matrix: dict) -> Dict[str, Dict[str, float]]:
+    """Build {strata: {group: P_g_s}} from the current demand matrix."""
+    by_group = compute_engel_base_index_by_group(demand_matrix)  # {group: {strata: P}}
+    result: Dict[str, Dict[str, float]] = {s: {} for s in STRATA}
+    for g, strata_map in by_group.items():
+        for s, val in strata_map.items():
+            result[s][g] = val
+    return result
+
+
+def _build_engel_alpha(P_by_strata: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    """Compute proportional budget shares: alpha_g_s = P_g_s / Σ_h P_h_s."""
+    result: Dict[str, Dict[str, float]] = {}
+    for s, gp in P_by_strata.items():
+        total = sum(gp.values())
+        if total <= 0:
+            result[s] = {g: 1.0 / len(ENGEL_GROUPS) for g in ENGEL_GROUPS}
+        else:
+            result[s] = {g: v / total for g, v in gp.items()}
+    return result
 
 

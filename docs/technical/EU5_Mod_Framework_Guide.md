@@ -3,6 +3,8 @@
 **Author:** Manus AI
 **Date:** Jan 22, 2026
 
+> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `reference_official_defines/` and `reference_game_files/` to verify.
+
 ## 1. Introduction
 
 This guide provides a practical framework for creating mods in European Universalis 5, based on an analysis of 16 community mods from the Steam Workshop and official documentation. It serves as a companion to the **EU5 Modding Knowledge Base**, offering concrete examples and actionable patterns for mod development.
