@@ -355,6 +355,13 @@ def gen_gls_demand_rows() -> str:
 
 # ── Generator: A_SOL_economy_effects.txt phases ──────────────────────────────
 
+def gen_effects_phase_g_guard() -> str:
+    lines: List[str] = []
+    for estate, groups in ESTATE_GROUPS.items():
+        for group in groups:
+            lines.append(f"\t\t\t\thas_variable = gls_{estate}_{group}_offset")
+    return "\n".join(lines)
+
 def gen_effects_phase_d() -> str:
     lines: List[str] = []
     for estate, groups in ESTATE_GROUPS.items():
@@ -411,6 +418,7 @@ def run_gls(dry_run: bool) -> None:
     replace_section(GLS_FILE, "demand_rows", gen_gls_demand_rows(), dry_run)
 
 def run_effects(dry_run: bool) -> None:
+    replace_section(EFFECTS_FILE, "phase_g_guard",      gen_effects_phase_g_guard(),     dry_run)
     replace_section(EFFECTS_FILE, "phase_d_scales",     gen_effects_phase_d(),          dry_run)
     replace_section(EFFECTS_FILE, "phase_b_nobles",     gen_effects_phase_b("nobles"),   dry_run)
     replace_section(EFFECTS_FILE, "phase_b_clergy",     gen_effects_phase_b("clergy"),   dry_run)
