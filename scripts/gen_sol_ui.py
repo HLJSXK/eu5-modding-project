@@ -201,12 +201,35 @@ _GOOD_LOC_SUFFIX: Dict[str, str] = {
 }
 
 def _good_row(good: str) -> List[str]:
-    s = f"sol_good_{good}_scarce"
-    scarce  = f"GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('{s}'), '(CFixedPoint)0')"
-    ok      = f"Not(GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('{s}'), '(CFixedPoint)0'))"
+    sc = f"sol_good_{good}_scarcity_tier"   # 0-3
+    su = f"sol_good_{good}_surplus_tier"    # 0-3
     wt = f"sol_weight_indicator_{good}"
     ds = f"sol_demand_share_{good}"
     loc_suffix = _GOOD_LOC_SUFFIX.get(good, good.upper())
+
+    def _gt(sv: str, n: int) -> str:
+        return f"GreaterThan_CFixedPoint(Location.MakeScope.ScriptValue('{sv}'), '(CFixedPoint){n}')"
+
+    def _not(expr: str) -> str:
+        return f"Not({expr})"
+
+    def _and(a: str, b: str) -> str:
+        return f"And({a}, {b})"
+
+    sc_any    = _gt(sc, 0)                          # any scarcity
+    sc_gt1    = _gt(sc, 1)                          # moderate or severe
+    sc_gt2    = _gt(sc, 2)                          # severe only
+    su_any    = _gt(su, 0)                          # any surplus
+    su_gt1    = _gt(su, 1)                          # cheap or vcheap
+    su_gt2    = _gt(su, 2)                          # vcheap only
+    v_severe   = sc_gt2
+    v_moderate = _and(sc_gt1, _not(sc_gt2))
+    v_mild     = _and(sc_any, _not(sc_gt1))
+    v_normal   = _and(_not(sc_any), _not(su_any))
+    v_afford   = _and(su_any, _not(su_gt1))
+    v_cheap    = _and(su_gt1, _not(su_gt2))
+    v_vcheap   = su_gt2
+
     return [
         f"                    # Row: {good}",
         f"                    hbox = {{",
@@ -214,24 +237,34 @@ def _good_row(good: str) -> List[str]:
         f"                        spacing = 4",
         f"                        icon = {{ size = {{ 20 20 }} texture = \"gfx/interface/icons/trade_goods/icon_goods_{good}.dds\" }}",
         f"                        text_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_GOODS_{loc_suffix}\" }}",
-        f"                        text_single = {{ min_width = 55 align = hcenter",
-        f"                            visible = \"[{scarce}]\"",
-        f"                            text = \"SOL_TT_STATUS_SCARCE\" }}",
-        f"                        text_single = {{ min_width = 55 align = hcenter",
-        f"                            visible = \"[{ok}]\"",
-        f"                            text = \"SOL_TT_STATUS_OK\" }}",
+        # Status column (7 states)
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_severe}]\"   text = \"SOL_TT_STATUS_SEVERE\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_moderate}]\" text = \"SOL_TT_STATUS_MODERATE\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_mild}]\"     text = \"SOL_TT_STATUS_MILD\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_normal}]\"   text = \"SOL_TT_STATUS_OK\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_afford}]\"   text = \"SOL_TT_STATUS_AFFORDABLE\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_cheap}]\"    text = \"SOL_TT_STATUS_CHEAP\" }}",
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_vcheap}]\"   text = \"SOL_TT_STATUS_VCHEAP\" }}",
+        # Weight column (3 color states: scarce=red, normal=plain, surplus=green)
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{scarce}]\"",
-        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{wt}')|1]#!\" }}",
+        f"                            visible = \"[{sc_any}]\"",
+        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{wt}')|2]#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{ok}]\"",
-        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{wt}')|1]\" }}",
+        f"                            visible = \"[{v_normal}]\"",
+        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{wt}')|2]\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{scarce}]\"",
+        f"                            visible = \"[{su_any}]\"",
+        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{wt}')|2]#!\" }}",
+        # Demand share column (same 3 color states)
+        f"                        text_single = {{ min_width = 50 align = hcenter",
+        f"                            visible = \"[{sc_any}]\"",
         f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|0]%#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{ok}]\"",
+        f"                            visible = \"[{v_normal}]\"",
         f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|0]%\" }}",
+        f"                        text_single = {{ min_width = 50 align = hcenter",
+        f"                            visible = \"[{su_any}]\"",
+        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{ds}')|0]%#!\" }}",
         f"                    }}",
     ]
 
