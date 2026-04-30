@@ -65,7 +65,7 @@ BUDGET_SHARES_FILE = (
 # The source data (Σ = 1) and the simulator remain correct; only the emitted .txt change.
 #
 # To update: change EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py.
-EXPORT_ALPHA_MULTIPLIER: float = 2.5
+EXPORT_ALPHA_MULTIPLIER: float = 2.0
 
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
