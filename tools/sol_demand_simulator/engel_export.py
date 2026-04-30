@@ -569,7 +569,7 @@ def export_demand_offsets(
 
         for group in _GROUPS:
             P = s_P.get(group, 0.0)
-            a_vals = [s_alphas.get(k, {}).get(group, 0.0) for k in range(n)]
+            a_vals = [s_alphas.get(k, {}).get(group, 0.0) * EXPORT_ALPHA_MULTIPLIER for k in range(n)]
             c_vals = compute_piecewise_offsets(a_vals, s_thresholds, P, d_ref=None)
 
             if income_var is None or all(abs(cv) <= tolerance for cv in c_vals):
