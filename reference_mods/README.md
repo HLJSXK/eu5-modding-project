@@ -1,6 +1,6 @@
 # Community Mod References
 
-This directory contains 12 community mods from Steam Workshop, serving as reference materials for learning EU5 modding patterns, structures, and vanilla game variables.
+This directory contains community mods from Steam Workshop (26 as of last count), serving as reference materials for learning EU5 modding patterns, structures, and vanilla game variables. The 12 mods documented in detail below represent the original curated set.
 
 ## 📚 Purpose
 
@@ -179,7 +179,8 @@ mod_directory/
 | Gameplay | 4 | 18.5M | 4.6M |
 | UI/Interface | 3 | 19.8M | 6.6M |
 | Mechanics | 2 | 1.0M | 500K |
-| **Total** | **12** | **~47M** | **3.9M** |
+| **Documented above** | **12** | **~47M** | **3.9M** |
+| **Total in directory** | **26** | — | — |
 
 ## ⚠️ Important Notes
 
@@ -208,7 +209,7 @@ These mods are created by community members and are included here for **educatio
 
 - [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding guide
 - [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical framework
-- [Mod Structure Analysis](../docs/technical/Mod_Structure_Analysis.txt) - Analysis of these mods
+- [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical framework (includes mod structure analysis)
 - [Stable Mod Base](../src/stable/) - Active multiplayer balance baseline
 - [Develop Mod Branch](../src/develop/) - Dynamic missions and advanced scripting examples
 
@@ -257,7 +258,6 @@ If you find useful patterns or insights from these mods, consider:
 
 ---
 
-**Last Updated:** January 28, 2026  
-**Total Mods:** 12  
-**Total Size:** ~47MB  
+**Last Updated:** April 21, 2026  
+**Documented Mods:** 12 (26 total in directory)  
 **Source:** Steam Workshop

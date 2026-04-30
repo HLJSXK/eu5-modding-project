@@ -133,8 +133,8 @@ Core text files (`.txt`, `.yml`, `.gui`) and small graphics are included.
 ## Related Documentation
 
 - [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md)
-- [Dynamic Missions Design](../docs/design/Dynamic_Missions_Design.md)
-- [Modifier Fixes Documentation](../docs/task_summaries/Task_Summary_Fix_Dynamic_Missions_Errors.md)
+- [Dynamic Missions Design](../docs/archive/dynamic_missions/Dynamic_Missions_Design.md) (archived — development paused)
+- [Modifier Fixes Documentation](../docs/archive/task_summaries/Task_Summary_Fix_Dynamic_Missions_Errors.md)
 
 ## License
 

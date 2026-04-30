@@ -3,6 +3,8 @@
 **Author:** Manus AI
 **Date:** Jan 22, 2026
 
+> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `reference_official_defines/` and `reference_game_files/` to verify.
+
 ## 1. Introduction
 
 European Universalis 5 (EU5), released in November 2025, is a grand strategy game developed by Paradox Development Studio. Built upon an updated version of the Clausewitz Engine and featuring the Jomini scripting layer, EU5 offers a powerful and flexible platform for modding. This document provides a comprehensive overview of the EU5 modding landscape, covering everything from fundamental concepts to advanced techniques, to serve as a foundational knowledge base for your modding projects.
@@ -122,6 +124,31 @@ A **scope** refers to the specific game object (e.g., a country, a character, a 
 
 Script values are used for mathematical calculations and creating dynamic numerical values. They can be defined as reusable named values in the `common/script_values/` folder or created inline within other scripts. They support a wide range of arithmetic and logical operators. [6]
 
+#### Scope Navigation in Script Values — `location.` prefix rule
+
+Script values always execute in the scope they are *called from*, not from the scope implied by their name prefix. The `location.` prefix is a **scope navigation link** that transitions from an outer scope (pop, character, market, etc.) *to* a location. This means:
+
+- **Correct — pop-scope value calling a location-scope value:**
+  ```
+  sol_alcohol_demand_scale = {   # runs in pop scope
+      add = location.local_nobles_alcohol_demand_scale   # navigate to location
+  }
+  ```
+- **Correct — location-scope value referencing other location variables:**
+  ```
+  local_nobles_alcohol_demand_scale = {   # runs in location scope
+      value = local_nobles_savings_pressure   # already in location scope — no prefix
+      multiply = local_noble_gdp_per_capita_display
+  }
+  ```
+- **WRONG — using `location.` inside a location-scope value:**
+  ```
+  local_nobles_alcohol_demand_scale = {
+      value = location.local_nobles_savings_pressure   # ERROR: already in location scope
+  }
+  ```
+  Engine error: `Event target link 'location' did not get a matching scope type. Expected 'character, pop, …', but got 'location'`
+
 ## 6. Game Content Modding
 
 This section covers the modding of specific game content types.
@@ -176,6 +203,7 @@ Flags in EU5 are generated dynamically through a scripted coat of arms system, a
 
 ## 8. Best Practices and Resources
 
+*   **Float precision limit**: The EU5 engine reads float literals to a maximum of **5 decimal places**. Any digits beyond the 5th are silently truncated. Always round generated or hand-written values to ≤5 dp (e.g. `0.08477` not `0.084771`). This is particularly relevant for generated script_values such as budget shares and demand scales.
 *   **Use a proper IDE**: Tools like VS Code with the CwTools extension can catch errors and improve readability.
 *   **Avoid Overwriting Vanilla Files**: Create your own files and use the `replace_paths` feature or specific load orders to override game content. This improves mod compatibility.
 *   **Use Version Control**: Git is an invaluable tool for tracking changes and collaborating with others.

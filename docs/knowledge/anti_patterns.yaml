@@ -1,0 +1,172 @@
+# EU5 Known Anti-Patterns
+# ========================
+# Machine-readable knowledge store. Feed into:
+#   - scripts/validate.py  (static pre-flight checks)
+#   - scripts/gen_brief.py (generates docs/knowledge/BRIEF.md)
+#
+# Fields:
+#   id        : unique slug (no spaces)
+#   pattern   : Python regex to detect the bad form in source files
+#   bad       : human-readable description of the bad form
+#   correction: what to do instead
+#   category  : modifier | enum | encoding | gui | scope | event | localization
+#   scope     : country | location | character | global | any
+#   source    : reference file that verifies the correction (path:line if known)
+#   notes     : one-line explanation of why the bad form fails
+#
+# To add a new entry: append a YAML dict with all fields, then run:
+#   python scripts/gen_brief.py
+
+- id: location_auto_modifier_nonfunctional
+  pattern: 'category\s*=\s*location'
+  only_in_paths: ['auto_modifiers']
+  bad: "auto_modifier with category = location (inside auto_modifiers/ file)"
+  correction: "TRY_REPLACE entry in main_menu/common/static_modifiers/ with game_data.category = location"
+  category: modifier
+  scope: location
+  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
+  notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
+
+- id: location_rank_invalid_village
+  pattern: 'location_rank\s*[=?]=\s*location_rank:village'
+  bad: "location_rank:village"
+  correction: "location_rank:rural_settlement"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: location_rank_invalid_hamlet
+  pattern: 'location_rank\s*[=?]=\s*location_rank:hamlet'
+  bad: "location_rank:hamlet"
+  correction: "location_rank:rural_settlement"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: location_rank_invalid_metropolis
+  pattern: 'location_rank\s*[=?]=\s*location_rank:metropolis'
+  bad: "location_rank:metropolis"
+  correction: "location_rank:city"
+  category: enum
+  scope: location
+  source: "reference_game_files/game/in_game/common/building_types/unique_buildings.txt"
+  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
+
+- id: custom_tooltip_do_not_remove
+  pattern: ''
+  bad: "Removing custom_tooltip from event options (wrong fix for dotted key confusion)"
+  correction: "Keep custom_tooltip; verify key format via Step 2/3 — dotted suffix IS valid in event options"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/common/character_interactions/ali_qushji_settles.txt"
+  notes: "AI wrongly removed custom_tooltip thinking dotted key format was invalid. Never remove; only verify format."
+
+- id: blockoverride_widget_child_invalid
+  pattern: 'blockoverride\s+"common_header_text"\s*\{[^}]*text_single'
+  bad: "text_single widget inside blockoverride \"common_header_text\""
+  correction: "blockoverride overrides a 'text' property value, not a widget container; do not add child widgets"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/common/cards.gui:1084"
+  notes: "Guessing block structure causes silent failures; always read cards.gui before using blockoverride"
+
+- id: yaml_localization_non_ascii_quotes
+  pattern: '[“”‘’]'
+  bad: "Smart/curly quotes (“”‘’) in localization YAML"
+  correction: "Use straight ASCII double-quotes (\") only; escape with \\\" inside values"
+  category: localization
+  scope: any
+  source: "reference_official_defines/docs/data_types_gui.txt"
+  notes: "PDX parser rejects non-ASCII quote characters; the failure is silent"
+
+- id: eu4_province_modifier_scope
+  pattern: 'add_province_modifier'
+  bad: "add_province_modifier (EU4 effect)"
+  correction: "add_location_modifier or add_static_modifier with location scope"
+  category: scope
+  scope: location
+  source: "reference_game_files/game/in_game/common/"
+  notes: "EU4 province scope effects do not exist in EU5; use location-scoped equivalents"
+
+- id: eu4_has_province_modifier
+  pattern: 'has_province_modifier'
+  bad: "has_province_modifier (EU4 trigger)"
+  correction: "has_location_modifier"
+  category: scope
+  scope: location
+  source: "reference_game_files/game/in_game/common/"
+  notes: "EU4 province scope triggers do not exist in EU5"
+
+- id: demand_hardcoded_redistribution
+  pattern: ''
+  bad: "Hardcoded redistribution coefficients for substitute goods (multiply = 0.4 on scarce good + add = X on every other good)"
+  correction: "Weight-normalization: demand_i = (weight_i / total_weight) × N × scale; each good starts at weight 1; scarcity subtracts 0.5; total_weight uses min = 0.001 guard; redistribution is automatic"
+  category: scope
+  scope: any
+  source: "src/stable/in_game/common/script_values/SOL_goods_weight_values.txt"
+  notes: "Hardcoded coefficients require O(N²) recalculation when adding a new good; weight-normalization requires only one new weight value and one add line in the group total"
+
+- id: script_value_inline_subexpr_variable_refs
+  pattern: 'multiply\s*=\s*\{[^}]*(?:multiply|divide)\s*=\s*local_'
+  bad: "multiply = { value = X  multiply = local_var  divide = local_var  add = local_var } inside a script_value"
+  correction: "Flatten to top-level sequence: multiply = local_var  (no braces); each op on its own line"
+  category: encoding
+  scope: any
+  source: "reference_game_files/game/in_game/common/script_values/_script_values.info:77-82"
+  notes: "Inline sub-expression example in .info only shows scalar literals; variable refs (local_*, named sv) inside multiply={} blocks are unconfirmed and likely silently broken"
+
+- id: float_precision_exceeds_5dp
+  pattern: '\d\.\d{6,}'
+  bad: "float literal with 6+ decimal places (e.g. value = 0.123456789)"
+  correction: "Round to at most 5 decimal places: value = 0.12346; EU5 engine reads no further"
+  category: precision
+  scope: any
+  source: "user-reported engine behavior (2026-04)"
+  notes: "EU5 engine truncates all float literals at 5 decimal places; digits beyond the 5th are silently ignored"
+
+- id: demand_share_pop_scope_in_location_indicator
+  pattern: ''
+  bad: "Referencing pop-scoped weight values (SOL_<good>_weight) from location-scope indicator script_values"
+  correction: "In location-scope indicators, compute scarcity-only base weights inline via market variable list checks; do not reference pop-scope weight values which include religion/culture modifiers unavailable at location scope"
+  category: scope
+  scope: location
+  source: "src/stable/in_game/common/script_values/SOL_substitute_good_indicators.txt"
+  notes: "Location-scope script_values cannot access pop attributes; sol_demand_share_* replicate only the scarcity adjustment, not religion/culture multipliers"
+
+- id: gui_no_getgoods_from_string
+  pattern: "GetGoods\\('|GetGoodsFromKey|MakeGoods\\("
+  bad: "GetGoods('key'), GetGoodsFromKey, or MakeGoods('key') in GUI expressions to construct a Goods object from a string literal"
+  correction: "Goods datacontext must come from a data model accessor chain (e.g. GoodsMarketEntry.GetGoods, Trade.GetGoods, GoodsItem.GetGoods in a foreach); there is no string-to-Goods lookup function in EU5 GUI"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/shared/market_tooltips.gui:435"
+  notes: "Exhaustive search of all reference_game_files *.gui files found zero occurrences of any string-to-Goods constructor; all goods access is typed accessor chains only"
+
+- id: gui_goodsview_inaccessible_in_tooltip
+  pattern: 'GoodsView\.GetGoods'
+  bad: "datamodel = \"[GoodsView.GetGoods]\" inside a ContextualTooltipType or tooltipwidget template to iterate all goods and filter by key"
+  correction: "GoodsView is a view-model object only available in goods_overview.gui panel scope; it is not accessible from tooltip/ContextualTooltipType contexts. No equivalent all-goods datamodel exists for tooltip scope."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/goods_overview.gui:77"
+  notes: "Exhaustive search of reference_game_files found GoodsView only in the goods_overview panel; tooltip templates have no equivalent all-goods iteration datamodel"
+
+- id: dev_scaling_demand_cancellation
+  pattern: ''
+  bad: "Emitting SOL goods demand values without pre-dividing by (development/10), causing demand to scale with location development level; or using only 'divide = location.development' without 'multiply = 10', which produces 1/10 of target instead of cancelling"
+  correction: "Add 'divide = { value = location.development  min = 1 }' AND 'multiply = 10' to every single-group demand block in SOL_goods_demand_values.txt. The min=1 guard prevents div/0 at development=0 (engine also multiplies by 0 there, so demand is 0 either way). Together they divide by (development/10); the EU5 engine then multiplies by (development/10), cancelling to net factor 1."
+  category: scope
+  scope: pop
+  source: "reference_game_files/game/in_game/common/death_reason/02_life_expectancy.txt:191"
+  notes: "Intentional hidden shim. Net math: scale × (10/development) × (development/10) = scale. CRITICAL: 'divide = location.development' alone gives net 1/10 (not 1), silently reducing all demands to 10% of target. Always pair with 'multiply = 10'. Multi-group aggregates inherit the cancellation from sub-values; no additional ops needed there. Display values in z_SOL_group_demand_scales_location.txt must remain undivided."
+
+- id: alpha_export_multiplier_cheapest_good
+  pattern: ''
+  bad: "Exporting alpha (budget-share) values directly from simulator without adjustment, causing in-game spending to fall below simulated income"
+  correction: "Apply EXPORT_ALPHA_MULTIPLIER = 2.0 in engel_export.py when building bracket_values before alpha_0 and jumps are computed. The simulator's internal Engel curves and alpha_bracket_table.csv must stay at Σα = 1; only the emitted .txt files use Σα = 2."
+  category: encoding
+  scope: any
+  source: "tools/sol_demand_simulator/engel_export.py"
+  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these halve actual spending vs. simulator prediction. The ×2 multiplier restores balance. To recalibrate, update EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py."

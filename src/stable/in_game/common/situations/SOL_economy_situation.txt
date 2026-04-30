@@ -14,45 +14,56 @@
 		sol_sol_is_on = yes
 	}
 
-	on_start = {
-		gls_recalculate_global_living_standard = yes
-	}
-
 	on_monthly = {
 		if = {
 			limit = { sol_sol_is_on = yes }
-			# Pass A：地图依赖，所有国家（AI + 人类），每年一次
-			# 更新 savings_pressure（地图着色依赖）和地点变量。
-			every_country = {
-				if = {
-					limit = {
-						total_population > 0
-						OR = {
-							current_month = 1
-							NOT = { has_variable = gls_map_cache_initialized }
-						}
-					}
-					gls_compute_savings_pressure = yes
-					gls_update_location_map = yes
-				}
+			# ── Pass 0：全球市场稀缺性扫描 ──────────────────────────────────────────
+			# 频率：每年（月1）| 范围：全市场 → 54 商品/市场 | 操作：列表增删，无 set_variable
+			# 开销估算：O(市场数 × 54)，市场数随游戏进程增长
+			if = {
+				limit = { current_month = 1 }
+				SOL_update_substitute_scarcity = yes
 			}
-			# Pass B：面板，仅人类玩家国家，每月
+
+			# ── Pass A+B：单次 every_country 遍历 ───────────────────────────────────
+			# 依赖顺序：savings_pressure → update_location_map → compute_panel_display → accumulate_panel_stats
 			every_country = {
 				if = {
-					limit = {
-						total_population > 0
-						is_human = yes
-					}
+					limit = { total_population > 0 }
+
+					# 频率：所有国家每月 | 范围：单国，无循环 | 操作：6 × set_variable
+					# 开销估算：O(1)·轻量，无条件调用比条件分支更简洁
 					gls_compute_savings_pressure = yes
-					gls_compute_panel_display = yes
+
+					# 频率：每年+首次 | 范围：每陆地地点 | 操作：2 × set_variable / 地点
+					# 开销估算：O(省份数)·年度，大国（100+ 省）需关注
 					if = {
 						limit = {
 							OR = {
 								current_month = 1
-								NOT = { has_variable = gls_country_sol_all }
+								NOT = { has_variable = gls_map_cache_initialized }
 							}
 						}
-						gls_accumulate_panel_stats = yes
+						gls_update_location_map = yes
+					}
+
+					if = {
+						limit = { is_human = yes }
+						# 频率：人类每月 | 范围：单国，无循环 | 操作：~17 × set_variable
+						# 开销估算：O(1)·轻量，仅人类触发
+						gls_compute_panel_display = yes
+
+						# 频率：人类每年+首次 | 范围：每陆地地点 × owner scope | 操作：最多 12 cv/地点 + 后处理 ~30 次赋值
+						# 开销估算：O(省份数)·最重，省份多时显著；每地点最多 6 次 scope 切换
+						if = {
+							limit = {
+								OR = {
+									current_month = 1
+									NOT = { has_variable = gls_country_sol_all }
+								}
+							}
+							gls_accumulate_panel_stats = yes
+						}
 					}
 				}
 			}

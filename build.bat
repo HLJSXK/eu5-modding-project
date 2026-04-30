@@ -88,6 +88,13 @@ if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRETKEY%"=="" set "COS_SECRET_
 if "%COS_SECRET_ID%"=="" if not "%TENCENTCLOUD_SECRET_ID%"=="" set "COS_SECRET_ID=%TENCENTCLOUD_SECRET_ID%"
 if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRET_KEY%"=="" set "COS_SECRET_KEY=%TENCENTCLOUD_SECRET_KEY%"
 
+echo [INFO] Running static validator on changed files...
+python "%REPO_ROOT%scripts\validate.py" --changed
+if errorlevel 1 (
+    echo [ERROR] Validation failed. Fix the issues above before deploying.
+    exit /b 1
+)
+
 echo [INFO] Ensuring UTF-8 BOM on all .yml and .txt files under src...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%scripts\ensure-utf8bom.ps1" -Path "%REPO_ROOT%src"
 if errorlevel 1 (
