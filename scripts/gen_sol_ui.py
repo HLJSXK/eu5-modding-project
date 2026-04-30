@@ -18,6 +18,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "tools" / "sol_demand_simulator"))
 from curve_designer import GROUP_GOODS  # noqa: E402  # type: ignore[import]

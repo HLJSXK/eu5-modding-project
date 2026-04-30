@@ -16,6 +16,9 @@ import subprocess
 from pathlib import Path
 from typing import Dict
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 try:
     import yaml
 except ImportError:

@@ -27,6 +27,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
 sys.path.insert(0, str(SIMULATOR_DIR))
