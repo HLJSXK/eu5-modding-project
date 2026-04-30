@@ -1006,26 +1006,33 @@ def gen_goods_gui_override_file(prices: dict) -> str:
         pa = prices.get(good, 1.0)
 
         lines += [
-            # Use vbox (not widget) so sizing propagates to TooltipContentSection
+            # Outer card: vbox with bg_listbase_template (dark-tinted frame, same as tooltip list sections)
             f"\tvbox = {{",
             f'\t\tvisible = "[EqualTo_string(Goods.GetKey, \'{good}\')]"',
             f"\t\tlayoutpolicy_horizontal = expanding",
-            f"\t\tspacing = 4",
-            # Section title — loca key because #B...#! is invalid in GUI raw_text
+            f"\t\tspacing = 6",
+            f"\t\tmargin = {{ 4 4 }}",
+            f"\t\tusing = bg_listbase_template",
+            # Section title
             f'\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = "SOL_SUBST_SECTION_TITLE" }}',
         ]
 
         for grp, members in groups:
             grp_zh = DEMAND_GROUP_NAMES_ZH.get(grp, grp)
             grp_icon = _good_icon(members[0])
+            # Inner card per demand group
             lines += [
-                # Group subtitle: demand group name + representative icon
-                f"\t\thbox = {{",
+                f"\t\tvbox = {{",
                 f"\t\t\tlayoutpolicy_horizontal = expanding",
-                f"\t\t\tspacing = 4",
-                f'\t\t\ttext_single = {{ layoutpolicy_horizontal = expanding raw_text = "{grp_zh}" }}',
-                f'\t\t\ticon = {{ size = {{ 20 20 }} texture = "{grp_icon}" }}',
-                f"\t\t}}",
+                f"\t\t\tspacing = 3",
+                f"\t\t\tmargin = {{ 4 4 }}",
+                f"\t\t\tusing = bg_listbase_template",
+                # Group subtitle: name+icon tight (no spacing), icon sits right after text
+                f"\t\t\thbox = {{",
+                f"\t\t\t\tlayoutpolicy_horizontal = expanding",
+                f'\t\t\t\ttext_single = {{ raw_text = "{grp_zh}" }}',
+                f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{grp_icon}" }}',
+                f"\t\t\t}}",
             ]
             for other in members:
                 if other == good:
@@ -1034,17 +1041,22 @@ def gen_goods_gui_override_file(prices: dict) -> str:
                 ratio_str = _fmt_ratio(pa / pb)
                 on_zh = GOOD_NAMES_ZH.get(other, other)
                 other_icon = _good_icon(other)
+                # Peer row: two tight inner hboxes (text+icon each), separated by spacing=6
                 lines += [
-                    # hbox must be expanding so the middle text_single gets space
-                    f"\t\thbox = {{",
-                    f"\t\t\tlayoutpolicy_horizontal = expanding",
-                    f"\t\t\tspacing = 4",
-                    f'\t\t\ttext_single = {{ raw_text = "1单位{gn_zh}" }}',
-                    f'\t\t\ticon = {{ size = {{ 20 20 }} texture = "{good_icon}" }}',
-                    f'\t\t\ttext_single = {{ layoutpolicy_horizontal = expanding raw_text = "可替代 {ratio_str}单位{on_zh}" }}',
-                    f'\t\t\ticon = {{ size = {{ 20 20 }} texture = "{other_icon}" }}',
-                    f"\t\t}}",
+                    f"\t\t\thbox = {{",
+                    f"\t\t\t\tlayoutpolicy_horizontal = expanding",
+                    f"\t\t\t\tspacing = 6",
+                    f"\t\t\t\thbox = {{",
+                    f'\t\t\t\t\ttext_single = {{ raw_text = "1单位{gn_zh}" }}',
+                    f'\t\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{good_icon}" }}',
+                    f"\t\t\t\t}}",
+                    f"\t\t\t\thbox = {{",
+                    f'\t\t\t\t\ttext_single = {{ raw_text = "可替代 {ratio_str}单位{on_zh}" }}',
+                    f'\t\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{other_icon}" }}',
+                    f"\t\t\t\t}}",
+                    f"\t\t\t}}",
                 ]
+            lines += [f"\t\t}}"]
 
         lines += [f"\t}}", ""]
 
