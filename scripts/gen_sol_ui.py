@@ -94,7 +94,7 @@ GLS_PART: Dict[str, Dict[str, bool]] = {
     "intoxicants":       {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": True},
     "luxury_drinks":     {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": True},
     "luxury_food":       {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": True},
-    "luxury_goods":      {"nobles": True,  "clergy": False, "burghers": True,  "commoners": False},
+    "luxury_goods":      {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": False},
     "protein":           {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": True},
     "spices":            {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": False},
     "precious":          {"nobles": True,  "clergy": False, "burghers": True,  "commoners": False},
@@ -279,13 +279,13 @@ def _good_row(good: str) -> List[str]:
         # Demand share offset column (signed %, scarce=red, normal=plain, surplus=green)
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{sc_any}]\"",
-        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|+0]%#!\" }}",
+        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|+=0%]#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{v_normal}]\"",
-        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|+0]%\" }}",
+        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|+=0%]\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{su_any}]\"",
-        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{ds}')|+0]%#!\" }}",
+        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{ds}')|+=0%]#!\" }}",
         f"                    }}",
     ]
 
