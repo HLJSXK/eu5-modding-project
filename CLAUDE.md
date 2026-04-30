@@ -53,6 +53,19 @@ Then stop. Do not guess.
 
 When a script/GUI pattern causes a bug: verify and replace with correct syntax. Do NOT remove the feature. Removal is only allowed if Steps 2 and 3 both fail to find any reference, and the user is explicitly told.
 
+## Python Script Requirements
+
+Every new Python script in `scripts/` **must** include the following block immediately after the stdlib imports, before any module-level code:
+
+```python
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+```
+
+`import sys` must also be present (add it if not already there). This is mandatory because Claude's Bash tool and Stop hooks run scripts via a non-TTY pipe; Python then falls back to the system locale encoding (GBK on Chinese Windows), causing `UnicodeEncodeError` for any non-ASCII output.
+
+Also, always run scripts via `conda run -n eu5 python scripts/...` — never bare `python`.
+
 ## Path Mapping
 
 - `docs/` — project docs; full workflow guide at `docs/guides/AI_Tool_Workflow_Prompt.md`
