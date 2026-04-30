@@ -152,3 +152,21 @@
   scope: any
   source: "reference_game_files/game/in_game/gui/goods_overview.gui:77"
   notes: "Exhaustive search of reference_game_files found GoodsView only in the goods_overview panel; tooltip templates have no equivalent all-goods iteration datamodel"
+
+- id: dev_scaling_demand_cancellation
+  pattern: ''
+  bad: "Emitting SOL goods demand values without dividing by development, causing demand to scale with location development level"
+  correction: "Add 'divide = location.development' to every single-group demand block in SOL_goods_demand_values.txt. The EU5 engine multiplies ALL pop demands by (development/10); pre-dividing cancels it to a constant factor of 1/10. The displayed demand scale in z_SOL_group_demand_scales*.txt must NOT be divided — it is UI-only."
+  category: scope
+  scope: pop
+  source: "reference_game_files/game/in_game/common/death_reason/02_life_expectancy.txt:191"
+  notes: "Intentional hidden shim: net in-game demand = simulator_scale × (1/development) × (development/10) = scale/10 (development-neutral). Multi-group aggregates inherit the division from their sub-values; do not add a second divide there. Display values in z_SOL_group_demand_scales_location.txt are the true economic scale and must remain undivided."
+
+- id: alpha_export_multiplier_cheapest_good
+  pattern: ''
+  bad: "Exporting alpha (budget-share) values directly from simulator without adjustment, causing in-game spending to fall below simulated income"
+  correction: "Apply EXPORT_ALPHA_MULTIPLIER = 2.0 in engel_export.py when building bracket_values before alpha_0 and jumps are computed. The simulator's internal Engel curves and alpha_bracket_table.csv must stay at Σα = 1; only the emitted .txt files use Σα = 2."
+  category: encoding
+  scope: any
+  source: "tools/sol_demand_simulator/engel_export.py"
+  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these halve actual spending vs. simulator prediction. The ×2 multiplier restores balance. To recalibrate, update EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py."

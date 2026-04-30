@@ -47,6 +47,22 @@ BUDGET_SHARES_FILE = (
     / "src/stable/in_game/common/script_values/z_SOL_group_budget_shares.txt"
 )
 
+# EXPORT_ALPHA_MULTIPLIER — applied to all emitted budget-share (alpha) values.
+#
+# The simulator calibrates alpha so that Σ_g alpha_g = 1, i.e. pops spend exactly
+# their income. In-game, two effects cut actual spending below this baseline:
+#   1. Substitute groups: pops always choose the cheapest available good in the group,
+#      not the group's average-price good that the simulator assumes.
+#   2. Conditional unlocks: some goods require technology/institutions and are simply
+#      unavailable in early game, removing an entire demand slot.
+# Together these reduce actual spending to roughly half the simulated value.
+# Doubling the exported alpha values restores the balance without changing the
+# simulator's internal Engel curves or the source alpha_bracket_table.csv.
+# The source data (Σ = 1) and the simulator remain correct; only the emitted .txt change.
+#
+# To update: change EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py.
+EXPORT_ALPHA_MULTIPLIER: float = 2.0
+
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
     "basic_clothing", "crude_goods", "staple", "condiments", "heating",
@@ -422,7 +438,7 @@ def export_bracket_budget_shares(
 
         for group in _GROUPS:
             bracket_values = [
-                strata_alphas.get(k, {}).get(group, 0.0)
+                strata_alphas.get(k, {}).get(group, 0.0) * EXPORT_ALPHA_MULTIPLIER
                 for k in range(n_brackets)
             ]
             alpha_0 = bracket_values[0]
