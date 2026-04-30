@@ -106,7 +106,24 @@ GLS_PART: Dict[str, Dict[str, bool]] = {
     "knowledge":         {"nobles": True,  "clergy": True,  "burghers": True,  "commoners": False},
 }
 
-SUBSTITUTE_GROUPS: List[str] = list(GLS_PART.keys())
+LUXURY_RANK: Dict[str, int] = {
+    "staple": 1, "crude_goods": 2, "condiments": 3, "heating": 4, "basic_clothing": 5,
+    "protein": 6, "household": 7, "intoxicants": 8, "standard_clothing": 9, "weapons": 10,
+    "mounts": 11, "spices": 12, "medicine": 13, "luxury_drinks": 14, "luxury_food": 15,
+    "luxury_goods": 16, "precious": 17, "knowledge": 18, "ritual": 19, "treasures": 20,
+}
+
+# Canonical display order: expensive → cheap (descending luxury rank).
+DISPLAY_ORDER: List[str] = sorted(GLS_PART.keys(), key=lambda g: LUXURY_RANK[g], reverse=True)
+
+# Three visual tiers: top 7, mid 7, bottom 6 by luxury rank.
+TIERS: List[tuple] = [
+    ("SOL_TIER_PRECIOUS", DISPLAY_ORDER[0:7]),
+    ("SOL_TIER_COMMON",   DISPLAY_ORDER[7:14]),
+    ("SOL_TIER_CRUDE",    DISPLAY_ORDER[14:20]),
+]
+
+SUBSTITUTE_GROUPS: List[str] = DISPLAY_ORDER
 
 # Groups each estate participates in (derived from GLS_PART)
 ESTATE_GROUPS: Dict[str, List[str]] = {
@@ -116,10 +133,11 @@ ESTATE_GROUPS: Dict[str, List[str]] = {
 
 # ── File paths ────────────────────────────────────────────────────────────────
 
-LOCATION_WINDOW = ROOT / "src/stable/in_game/gui/location_window.gui"
-TOOLTIP_FILE    = ROOT / "src/stable/in_game/gui/SOL_substitute_tooltip.gui"
-GLS_FILE        = ROOT / "src/stable/in_game/gui/panels/situation/global_living_standard.gui"
-EFFECTS_FILE    = ROOT / "src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt"
+LOCATION_WINDOW    = ROOT / "src/stable/in_game/gui/location_window.gui"
+TOOLTIP_FILE       = ROOT / "src/stable/in_game/gui/SOL_substitute_tooltip.gui"
+GLS_FILE           = ROOT / "src/stable/in_game/gui/panels/situation/global_living_standard.gui"
+EFFECTS_FILE       = ROOT / "src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt"
+ECONOMY_LOCAL_FILE = ROOT / "src/stable/in_game/gui/SOL_economy_local.gui"
 
 # ── Replacement helper ────────────────────────────────────────────────────────
 
@@ -258,16 +276,16 @@ def _good_row(good: str) -> List[str]:
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{su_any}]\"",
         f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{wt}')|2]#!\" }}",
-        # Demand share column (same 3 color states)
+        # Demand share offset column (signed %, scarce=red, normal=plain, surplus=green)
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{sc_any}]\"",
-        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|0]%#!\" }}",
+        f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|+0]%#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{v_normal}]\"",
-        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|0]%\" }}",
+        f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|+0]%\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{su_any}]\"",
-        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{ds}')|0]%#!\" }}",
+        f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{ds}')|+0]%#!\" }}",
         f"                    }}",
     ]
 
@@ -372,21 +390,58 @@ GLS_ESTATES = [
 def gen_gls_demand_rows() -> str:
     T = "\t\t\t\t\t\t"  # indentation matching the existing hbox rows
     lines: List[str] = []
-    for group in SUBSTITUTE_GROUPS:
-        part = GLS_PART[group]
-        lines.append(f"{T}# {group}")
+    for tier_key, tier_groups in TIERS:
         lines.append(f"{T}hbox = {{")
         lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
-        lines.append(f"{T}\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_{group.upper()}_TITLE\" }}")
-        for estate_key, estate_form in GLS_ESTATES:
-            vis = f"[Player.GetGovernment.GetEstateFromKey('{estate_form}').ExistsForCountry]"
-            if estate_key == "tribesmen" or not part.get(estate_key, False):
-                lines.append(f"{T}\ttext_single = {{ min_width = 72 align = hcenter visible = \"{vis}\"   raw_text = \"-\" }}")
-            else:
-                var = f"gls_{estate_key}_{group}_offset"
-                lines.append(f"{T}\ttext_single = {{ min_width = 72 align = hcenter visible = \"{vis}\"   text = \"[Player.MakeScope.GetVariable('{var}').GetValue|+=0%]\" }}")
+        lines.append(f"{T}\ttext_single = {{ layoutpolicy_horizontal = expanding align = hcenter text = \"{tier_key}\" }}")
         lines.append(f"{T}}}")
         lines.append(f"")
+        for group in tier_groups:
+            part = GLS_PART[group]
+            lines.append(f"{T}# {group}")
+            lines.append(f"{T}hbox = {{")
+            lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
+            lines.append(f"{T}\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_{group.upper()}_TITLE\" }}")
+            for estate_key, estate_form in GLS_ESTATES:
+                vis = f"[Player.GetGovernment.GetEstateFromKey('{estate_form}').ExistsForCountry]"
+                if estate_key == "tribesmen" or not part.get(estate_key, False):
+                    lines.append(f"{T}\ttext_single = {{ min_width = 72 align = hcenter visible = \"{vis}\"   raw_text = \"-\" }}")
+                else:
+                    var = f"gls_{estate_key}_{group}_offset"
+                    lines.append(f"{T}\ttext_single = {{ min_width = 72 align = hcenter visible = \"{vis}\"   text = \"[Player.MakeScope.GetVariable('{var}').GetValue|+=0%]\" }}")
+            lines.append(f"{T}}}")
+            lines.append(f"")
+    return "\n".join(lines)
+
+# ── Generator: SOL_economy_local.gui demand rows ─────────────────────────────
+
+# Estate columns for local tooltip: nobles/clergy/burghers/commoners then tribesmen placeholder.
+_LOCAL_ESTATES = ["nobles", "clergy", "burghers", "commoners"]
+
+def gen_economy_local_demand_rows() -> str:
+    T = "\t\t\t\t\t"  # indentation matching the existing hbox rows in SOL_economy_local.gui
+    lines: List[str] = []
+    for tier_key, tier_groups in TIERS:
+        lines.append(f"{T}hbox = {{")
+        lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
+        lines.append(f"{T}\ttext_single = {{ layoutpolicy_horizontal = expanding align = hcenter text = \"{tier_key}\" }}")
+        lines.append(f"{T}}}")
+        lines.append(f"")
+        for group in tier_groups:
+            part = GLS_PART[group]
+            lines.append(f"{T}# {group}")
+            lines.append(f"{T}hbox = {{")
+            lines.append(f"{T}\tlayoutpolicy_horizontal = expanding")
+            lines.append(f"{T}\ttext_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_{group.upper()}_TITLE\" }}")
+            for estate in _LOCAL_ESTATES:
+                if part.get(estate, False):
+                    sv = f"local_{estate}_{group}_demand_scale_offset"
+                    lines.append(f"{T}\ttext_single = {{ min_width = 68 align = hcenter raw_text = \"[Location.MakeScope.ScriptValue('{sv}')|+=0%]\" }}")
+                else:
+                    lines.append(f"{T}\ttext_single = {{ min_width = 68 align = hcenter raw_text = \"-\" }}")
+            lines.append(f"{T}\ttext_single = {{ min_width = 68 align = hcenter raw_text = \"-\" }}")  # tribesmen
+            lines.append(f"{T}}}")
+            lines.append(f"")
     return "\n".join(lines)
 
 # ── Generator: A_SOL_economy_effects.txt phases ──────────────────────────────
@@ -465,11 +520,15 @@ def run_effects(dry_run: bool) -> None:
     replace_section(EFFECTS_FILE, "phase_g_burghers",   gen_effects_phase_g("burghers"), dry_run)
     replace_section(EFFECTS_FILE, "phase_g_commoners",  gen_effects_phase_g("commoners"),dry_run)
 
+def run_economy_local(dry_run: bool) -> None:
+    replace_section(ECONOMY_LOCAL_FILE, "demand_rows", gen_economy_local_demand_rows(), dry_run)
+
 TARGETS = {
-    "location": run_location,
-    "tooltips": run_tooltips,
-    "gls":      run_gls,
-    "effects":  run_effects,
+    "location":      run_location,
+    "tooltips":      run_tooltips,
+    "gls":           run_gls,
+    "effects":       run_effects,
+    "economy_local": run_economy_local,
 }
 
 def main() -> None:
