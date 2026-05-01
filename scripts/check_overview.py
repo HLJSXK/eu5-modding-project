@@ -10,6 +10,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 print(
     "[PROJECT_OVERVIEW] Read docs/knowledge/PROJECT_OVERVIEW.md and decide "
-    "if project features or directory structure changed this session. "
-    "If yes: update the file and run gen_brief.py. If no: no action needed."
+    "if project features or directory structure actually changed this session. "
+    "If yes: update the file and run gen_brief.py. "
+    "If no: no action needed. "
+    "Notice: the file is not aimed at this single task, but for the entire project."
 )
