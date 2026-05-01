@@ -89,6 +89,12 @@ GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
 IND_GROUP_SIZE    = {grp: len(goods) for grp, goods in INDICATOR_GROUPS}
 ALL_GOODS = [g for _, goods in INDICATOR_GROUPS for g in goods]
 
+# Extra goods to include in sol_<grp>_base_total_weight but NOT generate per-good indicators for.
+# Used for dual-group goods: they appear in multiple demand groups but show indicators under one primary group.
+GROUP_BASE_WEIGHT_EXTRAS: dict = {
+    "luxury_food": ["fish"],  # fish is in LUXURY_FOOD demand (N=4) but shows indicators under protein
+}
+
 # ── Good-group tooltip: display names and group names ──────────────────────────────────────────
 
 GOOD_NAMES_ZH: dict = {
@@ -644,13 +650,15 @@ def gen_indicators_file(prices: dict) -> str:
     for grp, goods in INDICATOR_GROUPS:
         out.append("")
         out.append(f"###############################################################")
-        out.append(f"# {grp.upper()} group: {', '.join(goods)}")
+        extras = GROUP_BASE_WEIGHT_EXTRAS.get(grp, [])
+        comment_parts = list(goods) + [f"{g} (dual)" for g in extras]
+        out.append(f"# {grp.upper()} group: {', '.join(comment_parts)}")
         out.append(f"###############################################################")
         out.append("")
-        # base total weight first
-        out.extend(_gen_group_base_total_weight(grp, goods, prices))
+        # base total weight: primary goods + dual-group extras
+        out.extend(_gen_group_base_total_weight(grp, list(goods) + extras, prices))
         out.append("")
-        # per-good indicators
+        # per-good indicators: primary goods only (extras keep their own group's indicators)
         for good in goods:
             out.extend(_gen_good_indicators(good))
             out.append("")
