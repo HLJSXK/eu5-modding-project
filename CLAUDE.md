@@ -107,3 +107,34 @@ When triggered, do ALL of:
 For minor discoveries (single modifier name, single typo fix), steps 1 and 4 only.
 
 **Do not wait for the user to ask.** Knowledge capture must happen in the same response as the fix, before the task is marked complete.
+
+## Project Overview Update Protocol
+
+After completing any task you MUST read `docs/knowledge/PROJECT_OVERVIEW.md` and decide whether an update is needed.
+
+### When to update
+
+Update when any of the following are true for this session:
+- A new gameplay system, feature, or mechanic was added or significantly changed in `src/`
+- A directory was created, renamed, or deleted anywhere in `src/`
+- A new Python script was added to `scripts/`, or an existing script's purpose or output changed
+- A new tool was added to `tools/`
+
+### When NOT to update
+
+Do NOT update for:
+- Changes confined to `docs/`, `reference_*/`, or other non-mod support files
+- Localization text edits (wording changes, not feature existence)
+- Bug fixes that correct behavior without adding or removing features
+- Style or formatting changes with no functional effect
+
+### What to write
+
+`PROJECT_OVERVIEW.md` describes the **complete current project state**, not the changes made this session.
+- Describe what features EXIST NOW — add new ones, update changed ones, remove deleted ones.
+- Keep descriptions concise (1–2 sentences per feature, one-line per directory entry).
+- Update the "Last updated" date at the top of the file.
+
+### After updating
+
+Run `conda run -n eu5 python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
