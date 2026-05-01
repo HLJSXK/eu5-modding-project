@@ -27,6 +27,7 @@ You MUST go directly to Step 2 or Step 3 before writing or modifying any code:
 | Any `scripted_trigger` or `scripted_effect` not defined in this mod | Vanilla names change between patches |
 | Localization key format rules (YAML encoding, quote characters) | PDX parser rejects non-ASCII quotes; encoding errors cascade silently |
 | GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.) | Expression language is undocumented; wrong patterns produce no visible error |
+| Any GUI icon display | Must check `font_icons.gui` for `@xxx!` inline texticon before using widget or custom approach |
 
 ### Declarative Verification Requirement
 
@@ -62,6 +63,18 @@ Then stop and ask the user for guidance. Do NOT guess.
 - Removal or fallback simplification is only allowed when:
   - the syntax cannot be verified in `reference_official_defines/`, `reference_game_files/` and `reference_mods/`, and
   - the tool explicitly reports this uncertainty to the user.
+
+## GUI Icon Display Priority
+
+When displaying an icon in any UI context, AI tools MUST follow this priority and stop at the first applicable tier:
+
+| Tier | Method | When to use |
+|---|---|---|
+| 1 | `@icon_name!` inline syntax | Icon exists in `font_icons.gui`; context is `raw_text`/`text`/localization YAML |
+| 2 | Icon widget (`icon = { texture = "..." }`) | Standalone widget needed, or icon absent from `font_icons.gui` |
+| 3 | From scratch (new `texticon` / new sprite) | Tiers 1 and 2 both inapplicable; must justify explicitly |
+
+Authoritative icon list: `reference_game_files/game/main_menu/gui/shared/font_icons.gui` (180+ entries)
 
 ## Documented Violations (Learning Record)
 

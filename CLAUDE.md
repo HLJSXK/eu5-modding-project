@@ -28,6 +28,8 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - Any `scripted_trigger` or `scripted_effect` not defined in this mod
 - Localization YAML encoding and quote character rules
 - GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.)
+- Any GUI icon display — check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
+  for `@xxx!` inline syntax **before** using icon widgets or custom solutions
 
 ## Critical EU5 Gotchas
 
@@ -36,6 +38,20 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - **Localization YAML** — must be UTF-8 BOM (not plain UTF-8); only straight ASCII double-quotes `"` are valid
 - **`custom_tooltip`** — never remove it; dotted suffix format IS valid in event options; verify key format before changing
 - **Pre-test validation** — run `python scripts/validate.py --changed` before launching the game
+
+## GUI Icon Display Rule
+
+When displaying an icon in the UI, follow this exact priority order and stop at the first tier that works:
+
+1. **`@icon_name!` inline syntax** — Check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
+   for the icon name. Use in `raw_text` / `text` GUI fields and localization YAML values.
+   Requires zero new code and no widget overhead.
+2. **Icon widget** — Use `icon = { texture = "..." }` or equivalent widget when the display context
+   cannot use inline text (e.g. standalone widget placement), or when the icon is not in `font_icons.gui`.
+3. **From scratch** — Only if tiers 1 and 2 both fail: define a new `texticon` block in a `.gui` file
+   or create a new sprite. This is the most expensive option and requires explicit justification.
+
+Before using tier 2 or 3, you MUST output a verification line confirming the icon is absent from `font_icons.gui`.
 
 ## Declarative Verification Requirement
 
