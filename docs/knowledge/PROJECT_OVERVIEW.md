@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-01
+> Last updated: 2026-05-01 (AI coding efficiency scripts added)
 
 ## Project Identity
 
@@ -88,8 +88,12 @@ eu5-modding-project/
 | `gen_sol_ui.py` | After UI layout changes | `location_window.gui`, `SOL_substitute_tooltip.gui`, `global_living_standard.gui`, effects anchors |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `z_SOL_pop_goods.txt` (pop goods demand injections) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
-| `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` |
-| `validate.py` | Before launching game (`--changed` flag) | Console validation report; exit code indicates pass/fail |
+| `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
+| `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |
+| `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
+| `validate.py` | Before launching game (`--changed` flag); `--ai-report` for JSON output | Console validation report; exit code indicates pass/fail |
+
+Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scarcity/` (effects_gen, weights_gen, indicators_gen, loc_gen, gui_gen). The top-level script remains the single entry point.
 
 ## Data Files
 
