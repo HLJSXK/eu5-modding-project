@@ -639,11 +639,32 @@ def _gen_group_base_total_weight(grp: str, goods: List[str], prices: dict) -> Li
     return lines
 
 
+def _gen_secondary_offset(good: str, secondary_grp: str) -> List[str]:
+    """Generate sol_demand_share_offset_{good}_in_{secondary_grp} for guest goods.
+
+    A guest good appears in a DEMAND_GROUP but its primary group (INDICATOR_GROUPS)
+    is different. Its primary sol_demand_share_offset uses the primary group's
+    denominator; this secondary variant uses the host group's denominator so the
+    UI tooltip for that group shows the contextually correct percentage.
+    """
+    n = DEMAND_GROUP_SIZE[secondary_grp]
+    grp_weight = f"sol_{secondary_grp}_base_total_weight"
+    return [
+        f"sol_demand_share_offset_{good}_in_{secondary_grp} = {{",
+        f"    value = sol_weight_indicator_{good}",
+        f"    multiply = {n}",
+        f"    divide = {grp_weight}",
+        f"    add = -1",
+        f"}}",
+    ]
+
+
 def gen_indicators_file(prices: dict) -> str:
     demand_dict = {grp: members for grp, members in DEMAND_GROUPS}
     out: List[str] = [INDICATORS_HEADER.rstrip()]
     for grp, goods in INDICATOR_GROUPS:
         demand_members = demand_dict.get(grp, list(goods))
+        goods_set = set(goods)
         out.append("")
         out.append(f"###############################################################")
         out.append(f"# {grp.upper()} group: {', '.join(demand_members)}")
@@ -653,6 +674,10 @@ def gen_indicators_file(prices: dict) -> str:
         out.append("")
         for good in goods:
             out.extend(_gen_good_indicators(good))
+            out.append("")
+        guests = [g for g in demand_members if g not in goods_set]
+        for guest in guests:
+            out.extend(_gen_secondary_offset(guest, grp))
             out.append("")
     return "\n".join(out) + "\n"
 

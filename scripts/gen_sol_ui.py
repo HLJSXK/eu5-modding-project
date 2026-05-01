@@ -81,6 +81,35 @@ GROUP_DISPLAY: Dict[str, str] = {
     "knowledge":         "Knowledge",
 }
 
+# Primary indicator group for each good — must mirror INDICATOR_GROUPS in gen_scarcity.py.
+# Used to detect guest goods (goods whose primary group differs from the display group).
+GOOD_TO_PRIMARY_GROUP: Dict[str, str] = {
+    g: grp
+    for grp, members in [
+        ("basic_clothing",    ["cloth", "leather"]),
+        ("standard_clothing", ["fine_cloth"]),
+        ("luxury_goods",      ["fur", "porcelain", "lacquerware", "marble", "glass"]),
+        ("crude_goods",       ["lumber", "masonry", "tools", "pottery"]),
+        ("heating",           ["beeswax", "coal"]),
+        ("household",         ["furniture"]),
+        ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
+        ("condiments",        ["sugar", "salt", "olives"]),
+        ("luxury_food",       ["wild_game", "victuals", "fruit"]),
+        ("protein",           ["fish", "livestock"]),
+        ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
+        ("luxury_drinks",     ["tea", "coffee", "cocoa"]),
+        ("spices",            ["saffron", "pepper", "cloves", "chili"]),
+        ("precious",          ["goods_gold", "silver", "jewelry"]),
+        ("treasures",         ["amber", "gems", "ivory", "pearls"]),
+        ("medicine",          ["medicaments", "mercury"]),
+        ("ritual",            ["incense"]),
+        ("weapons",           ["weaponry", "firearms"]),
+        ("mounts",            ["horses", "elephants"]),
+        ("knowledge",         ["paper", "books"]),
+    ]
+    for g in members
+}
+
 # Which GLS estates participate in each group.
 # commoners = laborers + peasants + soldiers (combined in demand scale calculation).
 GLS_PART: Dict[str, Dict[str, bool]] = {
@@ -221,11 +250,15 @@ _GOOD_LOC_SUFFIX: Dict[str, str] = {
     "goods_gold": "GOLD",
 }
 
-def _good_row(good: str) -> List[str]:
+def _good_row(good: str, group: str = None) -> List[str]:
     sc = f"sol_good_{good}_scarcity_tier"   # 0-3
     su = f"sol_good_{good}_surplus_tier"    # 0-3
     wt = f"sol_weight_indicator_{good}"
-    ds = f"sol_demand_share_offset_{good}"
+    primary = GOOD_TO_PRIMARY_GROUP.get(good)
+    if group is not None and primary != group:
+        ds = f"sol_demand_share_offset_{good}_in_{group}"
+    else:
+        ds = f"sol_demand_share_offset_{good}"
     loc_suffix = _GOOD_LOC_SUFFIX.get(good, good.upper())
 
     def _gt(sv: str, n: int) -> str:
@@ -344,7 +377,7 @@ def gen_substitute_tooltips() -> str:
             f"                    }}",
         ]
         for good in goods:
-            lines.extend(_good_row(good))
+            lines.extend(_good_row(good, group=group))
         lines += [
             f"                }}",
             f"            }}",
