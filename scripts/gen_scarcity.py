@@ -89,12 +89,6 @@ GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
 IND_GROUP_SIZE    = {grp: len(goods) for grp, goods in INDICATOR_GROUPS}
 ALL_GOODS = [g for _, goods in INDICATOR_GROUPS for g in goods]
 
-# Extra goods to include in sol_<grp>_base_total_weight but NOT generate per-good indicators for.
-# Used for dual-group goods: they appear in multiple demand groups but show indicators under one primary group.
-GROUP_BASE_WEIGHT_EXTRAS: dict = {
-    "luxury_food": ["fish"],  # fish is in LUXURY_FOOD demand (N=4) but shows indicators under protein
-}
-
 # ── Good-group tooltip: display names and group names ──────────────────────────────────────────
 
 GOOD_NAMES_ZH: dict = {
@@ -529,7 +523,7 @@ def _gen_good_indicators(good: str) -> List[str]:
 
     # — demand share (0–100) —
     grp_weight = f"sol_{ind_grp}_base_total_weight"
-    n = IND_GROUP_SIZE[ind_grp]
+    n = DEMAND_GROUP_SIZE.get(ind_grp, IND_GROUP_SIZE[ind_grp])
     if is_compat:
         lines += [
             f"sol_demand_share_{good} = {{",
@@ -646,19 +640,17 @@ def _gen_group_base_total_weight(grp: str, goods: List[str], prices: dict) -> Li
 
 
 def gen_indicators_file(prices: dict) -> str:
+    demand_dict = {grp: members for grp, members in DEMAND_GROUPS}
     out: List[str] = [INDICATORS_HEADER.rstrip()]
     for grp, goods in INDICATOR_GROUPS:
+        demand_members = demand_dict.get(grp, list(goods))
         out.append("")
         out.append(f"###############################################################")
-        extras = GROUP_BASE_WEIGHT_EXTRAS.get(grp, [])
-        comment_parts = list(goods) + [f"{g} (dual)" for g in extras]
-        out.append(f"# {grp.upper()} group: {', '.join(comment_parts)}")
+        out.append(f"# {grp.upper()} group: {', '.join(demand_members)}")
         out.append(f"###############################################################")
         out.append("")
-        # base total weight: primary goods + dual-group extras
-        out.extend(_gen_group_base_total_weight(grp, list(goods) + extras, prices))
+        out.extend(_gen_group_base_total_weight(grp, demand_members, prices))
         out.append("")
-        # per-good indicators: primary goods only (extras keep their own group's indicators)
         for good in goods:
             out.extend(_gen_good_indicators(good))
             out.append("")
@@ -672,14 +664,14 @@ def gen_indicators_file(prices: dict) -> str:
 DEMAND_GROUPS: List[Tuple[str, List[str]]] = [
     ("basic_clothing",    ["cloth", "leather"]),
     ("crude_goods",       ["lumber", "masonry", "tools", "pottery"]),
-    ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes", "fish"]),
+    ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
     ("condiments",        ["sugar", "salt", "olives"]),
     ("heating",           ["lumber", "coal", "beeswax"]),
     ("household",         ["furniture", "pottery", "glass", "paper", "beeswax"]),
     ("standard_clothing", ["cloth", "fine_cloth"]),
     ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
     ("luxury_drinks",     ["tea", "coffee", "wine", "cocoa"]),
-    ("luxury_food",       ["wild_game", "victuals", "fruit"]),
+    ("luxury_food",       ["wild_game", "victuals", "fruit", "fish"]),
     ("luxury_goods",      ["fine_cloth", "fur", "porcelain", "lacquerware", "marble", "glass"]),
     ("protein",           ["fish", "wild_game", "livestock"]),
     ("spices",            ["saffron", "pepper", "cloves", "chili"]),
@@ -691,6 +683,8 @@ DEMAND_GROUPS: List[Tuple[str, List[str]]] = [
     ("mounts",            ["horses", "elephants"]),
     ("knowledge",         ["paper", "books"]),
 ]
+
+DEMAND_GROUP_SIZE = {grp: len(members) for grp, members in DEMAND_GROUPS}
 
 GROUP_INDICATORS_HEADER = """\
 ### ============================================================
@@ -779,6 +773,49 @@ def upsert_localization(text: str, keys: List[Tuple[str, str]]) -> str:
         else:
             text = text.rstrip("\n") + "\n" + line + "\n"
     return text
+
+
+def gen_subst_group_loc_keys(prices: dict) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+    """Generate SOL_good_subst_group_* localization entries from DEMAND_GROUPS and prices.
+
+    Each good gets one entry showing its primary indicator group name and substitution
+    ratios with the other members of that demand group.  Multi-group goods (e.g. wine in
+    intoxicants + luxury_drinks) use GOOD_TO_IND_GROUP to pick the primary group.
+    """
+    demand_groups_dict = {grp: members for grp, members in DEMAND_GROUPS}
+    en_entries: List[Tuple[str, str]] = []
+    zh_entries: List[Tuple[str, str]] = []
+
+    for good in ALL_GOODS:
+        ind_grp = GOOD_TO_IND_GROUP.get(good)
+        if not ind_grp:
+            continue
+        members = demand_groups_dict.get(ind_grp, [])
+        grp_name_en = DEMAND_GROUP_NAMES_EN.get(ind_grp, ind_grp)
+        grp_name_zh = DEMAND_GROUP_NAMES_ZH.get(ind_grp, ind_grp)
+        good_name_en = GOOD_NAMES_EN.get(good, good)
+        good_name_zh = GOOD_NAMES_ZH.get(good, good)
+        pa = prices.get(good, 1.0)
+
+        en_parts: List[str] = []
+        zh_parts: List[str] = []
+        for other in members:
+            if other == good:
+                continue
+            pb = prices.get(other, 1.0)
+            ratio = _fmt_ratio(pa / pb)
+            en_parts.append(f"1 {good_name_en} ≈ {ratio} {GOOD_NAMES_EN.get(other, other)}")
+            zh_parts.append(f"1份{good_name_zh}可替代{ratio}份{GOOD_NAMES_ZH.get(other, other)}")
+
+        key = f"SOL_good_subst_group_{good}"
+        if en_parts:
+            en_entries.append((key, f"Belongs to #B{grp_name_en}#! substitute group: {'; '.join(en_parts)}."))
+            zh_entries.append((key, f"该商品属于 #B{grp_name_zh}#! 替代组：{'；'.join(zh_parts)}。"))
+        else:
+            en_entries.append((key, f"Belongs to #B{grp_name_en}#! substitute group (sole member)."))
+            zh_entries.append((key, f"该商品属于 #B{grp_name_zh}#! 替代组（唯一成员）。"))
+
+    return en_entries, zh_entries
 
 
 # ── Write helpers ─────────────────────────────────────────────────────────────────────────────
@@ -1186,9 +1223,10 @@ def main() -> None:
     _write(GROUP_INDICATORS_FILE, gen_group_indicators_file(), dry)
 
     # 5. Localization (upsert new keys; EU5 YAML requires UTF-8 BOM)
+    subst_en, subst_zh = gen_subst_group_loc_keys(prices)
     for loc_file, keys in [
-        (LOCALIZATION_FILE,    NEW_LOC_KEYS_EN),
-        (LOCALIZATION_FILE_ZH, NEW_LOC_KEYS_ZH),
+        (LOCALIZATION_FILE,    NEW_LOC_KEYS_EN + subst_en),
+        (LOCALIZATION_FILE_ZH, NEW_LOC_KEYS_ZH + subst_zh),
     ]:
         loc_text = loc_file.read_text(encoding="utf-8-sig")
         loc_new  = upsert_localization(loc_text, keys)
