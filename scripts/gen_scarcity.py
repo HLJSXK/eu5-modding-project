@@ -843,6 +843,45 @@ def gen_subst_group_loc_keys(prices: dict) -> Tuple[List[Tuple[str, str]], List[
     return en_entries, zh_entries
 
 
+def gen_subst_ratio_loc_keys(prices: dict) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+    """Generate SOL_SUBST_FROM_{good} and SOL_SUBST_RATIO_{a}_{b} localization keys.
+
+    SOL_SUBST_FROM_{good}   — "1 Cloth" / "1单位布匹"
+    SOL_SUBST_RATIO_{a}_{b} — "= 1 Leather" / "可替代 1单位皮革"
+
+    Keys are deduplicated across groups so each unique good/pair appears once.
+    """
+    en_keys: List[Tuple[str, str]] = []
+    zh_keys: List[Tuple[str, str]] = []
+    seen_from: set = set()
+    seen_pair: set = set()
+
+    for _grp, members in DEMAND_GROUPS:
+        for a in members:
+            a_en = GOOD_NAMES_EN.get(a, a)
+            a_zh = GOOD_NAMES_ZH.get(a, a)
+            pa = prices.get(a, 1.0)
+            if a not in seen_from:
+                seen_from.add(a)
+                en_keys.append((f"SOL_SUBST_FROM_{a}", f"1 {a_en}"))
+                zh_keys.append((f"SOL_SUBST_FROM_{a}", f"1单位{a_zh}"))
+            for b in members:
+                if b == a:
+                    continue
+                pair = (a, b)
+                if pair in seen_pair:
+                    continue
+                seen_pair.add(pair)
+                pb = prices.get(b, 1.0)
+                ratio_str = _fmt_ratio(pa / pb)
+                b_en = GOOD_NAMES_EN.get(b, b)
+                b_zh = GOOD_NAMES_ZH.get(b, b)
+                en_keys.append((f"SOL_SUBST_RATIO_{a}_{b}", f"= {ratio_str} {b_en}"))
+                zh_keys.append((f"SOL_SUBST_RATIO_{a}_{b}", f"可替代 {ratio_str}单位{b_zh}"))
+
+    return en_keys, zh_keys
+
+
 # ── Write helpers ─────────────────────────────────────────────────────────────────────────────
 
 def _write(path: Path, content: str, dry_run: bool, encoding: str = "utf-8") -> None:
@@ -915,10 +954,8 @@ def gen_group_ratio_templates(prices: dict) -> str:
         "",
     ]
     for grp, members in DEMAND_GROUPS:
-        grp_zh = DEMAND_GROUP_NAMES_ZH.get(grp, grp)
+        grp_title_key = f"SOL_TT_{grp.upper()}_TITLE"
         for a in members:
-            pa = prices.get(a, 1.0)
-            a_zh = GOOD_NAMES_ZH.get(a, a)
             a_icon = _good_icon(a)
             lines += [
                 f"template SOL_subst_ratios_{a} {{",
@@ -927,25 +964,22 @@ def gen_group_ratio_templates(prices: dict) -> str:
                 f"\t\tspacing = 3",
                 f"\t\tmargin = {{ 4 4 }}",
                 f"\t\tusing = bg_listbase_template",
-                f'\t\ttext_single = {{ layoutpolicy_horizontal = expanding raw_text = "{grp_zh}" }}',
+                f'\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = "{grp_title_key}" }}',
             ]
             for b in members:
                 if b == a:
                     continue
-                pb = prices.get(b, 1.0)
-                ratio_str = _fmt_ratio(pa / pb)
-                b_zh = GOOD_NAMES_ZH.get(b, b)
                 b_icon = _good_icon(b)
                 lines += [
                     f"\t\thbox = {{",
                     f"\t\t\tlayoutpolicy_horizontal = expanding",
                     f"\t\t\tspacing = 6",
                     f"\t\t\thbox = {{",
-                    f'\t\t\t\ttext_single = {{ raw_text = "1单位{a_zh}" }}',
+                    f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_FROM_{a}" }}',
                     f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{a_icon}" }}',
                     f"\t\t\t}}",
                     f"\t\t\thbox = {{",
-                    f'\t\t\t\ttext_single = {{ raw_text = "可替代 {ratio_str}单位{b_zh}" }}',
+                    f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_RATIO_{a}_{b}" }}',
                     f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{b_icon}" }}',
                     f"\t\t\t}}",
                     f"\t\t}}",
@@ -1198,7 +1232,6 @@ def gen_goods_gui_override_file(prices: dict) -> str:
         if good not in good_to_groups:
             continue
         groups = good_to_groups[good]
-        gn_zh = GOOD_NAMES_ZH.get(good, good)
         good_icon = _good_icon(good)
         pa = prices.get(good, 1.0)
 
@@ -1249,9 +1282,10 @@ def main() -> None:
 
     # 5. Localization (upsert new keys; EU5 YAML requires UTF-8 BOM)
     subst_en, subst_zh = gen_subst_group_loc_keys(prices)
+    ratio_en, ratio_zh = gen_subst_ratio_loc_keys(prices)
     for loc_file, keys in [
-        (LOCALIZATION_FILE,    NEW_LOC_KEYS_EN + subst_en),
-        (LOCALIZATION_FILE_ZH, NEW_LOC_KEYS_ZH + subst_zh),
+        (LOCALIZATION_FILE,    NEW_LOC_KEYS_EN + subst_en + ratio_en),
+        (LOCALIZATION_FILE_ZH, NEW_LOC_KEYS_ZH + subst_zh + ratio_zh),
     ]:
         loc_text = loc_file.read_text(encoding="utf-8-sig")
         loc_new  = upsert_localization(loc_text, keys)
