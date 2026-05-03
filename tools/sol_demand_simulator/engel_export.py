@@ -51,21 +51,31 @@ BUDGET_SHARES_FILE = (
     / "src/stable/in_game/common/script_values/z_SOL_group_budget_shares.txt"
 )
 
-# EXPORT_ALPHA_MULTIPLIER — applied to all emitted budget-share (alpha) values.
+# EXPORT_ALPHA_MULTIPLIER — scaling applied to all emitted budget-share (alpha) values.
 #
-# The simulator calibrates alpha so that Σ_g alpha_g = 1, i.e. pops spend exactly
-# their income. In-game, two effects cut actual spending below this baseline:
-#   1. Substitute groups: pops always choose the cheapest available good in the group,
-#      not the group's average-price good that the simulator assumes.
-#   2. Conditional unlocks: some goods require technology/institutions and are simply
-#      unavailable in early game, removing an entire demand slot.
-# Together these reduce actual spending to roughly half the simulated value.
-# Doubling the exported alpha values restores the balance without changing the
-# simulator's internal Engel curves or the source alpha_bracket_table.csv.
-# The source data (Σ = 1) and the simulator remain correct; only the emitted .txt change.
+# The simulator calibrates alpha so that Σ_g alpha_g = 1 (pops spend exactly their income).
+# Two structural gaps cause actual in-game spending to fall below this baseline:
 #
-# To update: change EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py.
-EXPORT_ALPHA_MULTIPLIER: float = 2.0
+#   GAP 1 — Progressive goods unlock (→ sol_era_coeff in-game):
+#     Some goods require technology or institutions that are unavailable in early game.
+#     The simulator assumes the full goods catalogue exists at all times; missing slots
+#     reduce effective demand.  As eras advance, more goods unlock and the gap narrows.
+#     In-game correction: global_var:sol_era_coeff, initialised to 2.0, decays ×0.95/era.
+#
+#   GAP 2 — Market price fluctuations (→ sol_market_scarcity_adj in-game):
+#     Substitute groups force pops to buy the cheapest available good rather than the
+#     group average the simulator assumes.  When goods are scarce (high prices), actual
+#     spending falls; when cheap, it rises.
+#     In-game correction: variable:sol_market_scarcity_adj, cached yearly per location,
+#     range [0.80, 1.20] based on a 5-good market basket.
+#
+# Both in-game corrections are injected as multiply lines in the demand-scale blocks
+# (z_SOL_group_demand_scales_location.txt).  This keeps the Python source at Σα = 1
+# and makes both corrections visible and tunable without re-running the exporter.
+#
+# EXPORT_ALPHA_MULTIPLIER itself stays at 1.0 — do not restore the old 2.0 here.
+# To adjust the base multiplier: edit sol_init_export_adj in A_SOL_economy_effects.txt.
+EXPORT_ALPHA_MULTIPLIER: float = 1.0
 
 _STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 _GROUPS = [
@@ -657,19 +667,32 @@ def export_demand_scales_with_offset(
     """
     (Re)generate z_SOL_group_demand_scales_location.txt.
 
-    Precise formula: demand_scale = (sp + 1) * demand_base
-    where demand_base = gdp * alpha/P + offset (defined in z_SOL_group_demand_base_location.txt).
-    top-level multiply = named_sv is confirmed valid; avoids nested sub-expressions.
+    Full formula (non-tribesmen):
+        demand_scale = (sp + 1) * demand_base * sol_era_coeff * sol_market_scarcity_adj
 
-    Tribesmen formula is unchanged: sp + 1 (demand_base = 1 for tribesmen).
+    where:
+        demand_base            = gdp * alpha/P + offset  (z_SOL_group_demand_base_location.txt)
+        sol_era_coeff          = global_var; corrects for progressive goods unlock across eras
+        sol_market_scarcity_adj = location variable; corrects for market price fluctuations
+
+    Tribesmen formula: (sp + 1) * sol_era_coeff * sol_market_scarcity_adj  (no income term).
+    top-level multiply = named_sv is confirmed valid; avoids nested sub-expressions.
     """
     lines: List[str] = [
         "# Location-scope demand scale values — one entry per (strata, group) pair.\n",
-        "# Precise formula (non-tribesmen):\n",
-        "#   demand_scale = (sp + 1) * demand_base\n",
-        "#   demand_base  = gdp * alpha/P + demand_offset  (z_SOL_group_demand_base_location.txt)\n",
-        "# Using named intermediate avoids nested multiply={} sub-expressions with variable refs.\n",
-        "# Tribesmen use a simplified form: sp + 1 (no income term).\n",
+        "# Full formula (non-tribesmen):\n",
+        "#   demand_scale = (sp + 1) * demand_base * sol_era_coeff * sol_market_scarcity_adj\n",
+        "#\n",
+        "#   demand_base             = gdp * alpha/P + offset  (z_SOL_group_demand_base_location.txt)\n",
+        "#   sol_era_coeff           = global_var:sol_era_coeff\n",
+        "#                             Corrects for progressive goods unlock: simulator assumes the\n",
+        "#                             full goods catalogue; early-game missing slots reduce spending.\n",
+        "#                             Starts at 2.0, decays ×0.95 per era as more goods unlock.\n",
+        "#   sol_market_scarcity_adj = variable:sol_market_scarcity_adj on each location\n",
+        "#                             Corrects for market price fluctuations: scarce goods push\n",
+        "#                             pops to cheaper substitutes, reducing effective spending.\n",
+        "#                             Cached yearly per location; range [0.80, 1.20].\n",
+        "# Tribesmen use: (sp + 1) * sol_era_coeff * sol_market_scarcity_adj  (no income term).\n",
         "#\n",
         "# Generated by engel_export.py — DO NOT EDIT MANUALLY\n",
         "#   nobles   : local_nobles_savings_pressure / local_noble_gdp_per_capita_display\n",
@@ -691,21 +714,25 @@ def export_demand_scales_with_offset(
             var    = f"local_{strata}_{group}_demand_scale"
 
             if gdp_var is None:
-                # tribesmen: sp + 1 (demand_base = 1, so result = sp + 1)
+                # tribesmen: (sp + 1) * era_coeff * scarcity_adj
                 lines += [
                     f"{var} = {{\n",
                     f"\tvalue = {sp_var}\n",
                     f"\tadd = 1\n",
+                    f"\tmultiply = global_var:sol_era_coeff\n",
+                    f"\tmultiply = local_sol_scarcity_adj\n",
                     f"\tmin = 0\n",
                     f"}}\n",
                 ]
             else:
-                # (sp + 1) * demand_base — multiply = named_sv at top level is confirmed valid
+                # (sp + 1) * demand_base * era_coeff * scarcity_adj
                 lines += [
                     f"{var} = {{\n",
                     f"\tvalue = {sp_var}\n",
                     f"\tadd = 1\n",
                     f"\tmultiply = local_{strata}_{group}_demand_base\n",
+                    f"\tmultiply = global_var:sol_era_coeff\n",
+                    f"\tmultiply = local_sol_scarcity_adj\n",
                     f"\tmin = 0\n",
                     f"}}\n",
                 ]

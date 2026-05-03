@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-01 (AI coding efficiency scripts added)
+> Last updated: 2026-05-03 (Dynamic export alpha coefficient via sol_era_coeff + local_sol_scarcity_adj)
 
 ## Project Identity
 
@@ -112,4 +112,5 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 - **Engel Curves** — income-dependent consumption patterns per pop stratum, parameterised in `tools/sol_demand_simulator/`.
 - **Location-level caching** — monthly wealth + yearly location averages stored as script values for performance.
 - **Country-level aggregation** — savings pressure per pop stratum, SOL per stratum, feeds the situation panel.
-- **Hidden shims** in `SOL_goods_demand_values.txt`: dev-scaling cancellation (`×10 ÷ location.development`) and alpha export multiplier (×2) — intentional, do not remove.
+- **Hidden shim** in `SOL_goods_demand_values.txt`: dev-scaling cancellation (`×10 ÷ location.development`) — intentional, do not remove.
+- **Dynamic export alpha coefficient** — `global_var:sol_era_coeff` (init 2.0, decays ×0.95/era via `sol_update_export_adj_era`) and `local_sol_scarcity_adj` script_value (±20% per-market basket correction) are injected into every demand-scale block in `z_SOL_group_demand_scales_location.txt`. Replaces the former baked-in EXPORT_ALPHA_MULTIPLIER = 2.0 in `engel_export.py`.

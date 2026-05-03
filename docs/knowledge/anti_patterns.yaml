@@ -165,11 +165,20 @@
 - id: alpha_export_multiplier_cheapest_good
   pattern: ''
   bad: "Exporting alpha (budget-share) values directly from simulator without adjustment, causing in-game spending to fall below simulated income"
-  correction: "Apply EXPORT_ALPHA_MULTIPLIER = 2.0 in engel_export.py when building bracket_values before alpha_0 and jumps are computed. The simulator's internal Engel curves and alpha_bracket_table.csv must stay at Σα = 1; only the emitted .txt files use Σα = 2."
+  correction: "EXPORT_ALPHA_MULTIPLIER = 1.0 in engel_export.py (Σα = 1 preserved). The compensating ×2 now lives in-game as global_var:sol_era_coeff (initialised to 2.0, decays ×0.95/era). Both multipliers are injected in z_SOL_group_demand_scales_location.txt via 'multiply = global_var:sol_era_coeff' and 'multiply = local_sol_scarcity_adj'. To recalibrate the base: edit sol_init_export_adj in A_SOL_economy_effects.txt."
   category: encoding
   scope: any
-  source: "tools/sol_demand_simulator/engel_export.py"
-  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these halve actual spending vs. simulator prediction. The ×2 multiplier restores balance. To recalibrate, update EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py."
+  source: "tools/sol_demand_simulator/engel_export.py:68 / src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt"
+  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these halve actual spending vs. simulator prediction. The ×2 multiplier restores balance and is now dynamic: era decay (×0.95/era) + per-market scarcity correction (±20% via local_sol_scarcity_adj script_value)."
+
+- id: multiply_global_variable_nonexistent
+  pattern: 'multiply_global_variable'
+  bad: "multiply_global_variable = { name = X  value = 0.95 } to scale a global variable in-place"
+  correction: "Use set_global_variable with hardcoded per-case values: set_global_variable = { name = X  value = computed_literal }. For era-decay patterns, hardcode the result per age (idempotent, no dedup guard needed). If truly dynamic, compute in a local_variable then use set_global_variable = { name = X  value = local_var:tmp }."
+  category: scope
+  scope: any
+  source: "reference_game_files/game/in_game/common/scripted_effects/global_effects.txt"
+  notes: "Exhaustive search of reference_game_files/ and reference_mods/ found no multiply_global_variable effect. Only set_global_variable and change_global_variable exist for global-scope numeric variables."
 
 - id: icon_widget_before_texticon_check
   pattern: ''
