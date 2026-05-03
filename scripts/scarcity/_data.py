@@ -23,7 +23,13 @@ SURPLUS_TIERS: List[Tuple[str, float, float, str]] = [
 
 ALL_TIER_SUFFIXES = [t[0] for t in SHORTAGE_TIERS + SURPLUS_TIERS]
 
-# ── Indicator groups ──────────────────────────────────────────────────────────
+# ── Indicator groups (PRIMARY GROUP) ─────────────────────────────────────────
+# Each good appears in exactly one indicator group — its PRIMARY GROUP.
+# This is the canonical authority for:
+#   - substitute weight redistribution  (SOL_update_substitute_scarcity)
+#   - all-goods scarcity score          (SOL_compute_scarcity_score)
+#   - ALL_GOODS / GOOD_TO_IND_GROUP lookups
+# Never add a good to more than one indicator group.
 
 INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
     ("basic_clothing",    ["cloth", "leather"]),
@@ -34,18 +40,18 @@ INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
     ("household",         ["furniture"]),
     ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
     ("condiments",        ["sugar", "salt", "olives"]),
-    ("luxury_food",       ["wild_game", "victuals", "fruit"]),
-    ("protein",           ["fish", "livestock"]),
+    ("luxury_food",       ["wild_game", "victuals", "fruit"]),  # wild_game primary here; secondary in DEMAND_GROUPS protein
+    ("protein",           ["fish", "livestock"]),               # fish primary here; secondary in DEMAND_GROUPS luxury_food
     ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
     ("luxury_drinks",     ["tea", "coffee", "cocoa"]),
     ("spices",            ["saffron", "pepper", "cloves", "chili"]),
     ("precious",          ["goods_gold", "silver", "jewelry"]),
     ("treasures",         ["amber", "gems", "ivory", "pearls"]),
-    ("medicine",          ["medicaments", "mercury"]),
+    ("medicine",          ["medicaments", "mercury"]),          # mercury primary here; secondary in DEMAND_GROUPS ritual
     ("ritual",            ["incense"]),
     ("weapons",           ["weaponry", "firearms"]),
     ("mounts",            ["horses", "elephants"]),
-    ("knowledge",         ["paper", "books"]),
+    ("knowledge",         ["paper", "books"]),                  # paper primary here; secondary in DEMAND_GROUPS household
 ]
 
 COMPAT_GOODS = frozenset(["victuals"])
@@ -54,26 +60,46 @@ GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
 IND_GROUP_SIZE    = {grp: len(goods) for grp, goods in INDICATOR_GROUPS}
 ALL_GOODS = [g for _, goods in INDICATOR_GROUPS for g in goods]
 
-# ── Demand groups (GUI icon dots — may differ from INDICATOR_GROUPS) ──────────
+# ── Demand groups (DISPLAY GROUPING — goods may appear in multiple groups) ────
+# Used for GUI icon dots only. A good may appear as a secondary member in groups
+# other than its primary group (see INDICATOR_GROUPS above).
+# Secondary members are annotated with "# secondary (primary: <group>)".
+# This list does NOT drive substitution weights or the scarcity score.
 
 DEMAND_GROUPS: List[Tuple[str, List[str]]] = [
     ("basic_clothing",    ["cloth", "leather"]),
     ("crude_goods",       ["lumber", "masonry", "tools", "pottery"]),
     ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
     ("condiments",        ["sugar", "salt", "olives"]),
-    ("heating",           ["lumber", "coal", "beeswax"]),
-    ("household",         ["furniture", "pottery", "glass", "paper", "beeswax"]),
-    ("standard_clothing", ["cloth", "fine_cloth"]),
+    ("heating",           ["lumber",   # secondary (primary: crude_goods)
+                           "coal", "beeswax"]),
+    ("household",         ["furniture",
+                           "pottery",  # secondary (primary: crude_goods)
+                           "glass",    # secondary (primary: luxury_goods)
+                           "paper",    # secondary (primary: knowledge)
+                           "beeswax"   # secondary (primary: heating)
+                           ]),
+    ("standard_clothing", ["cloth",    # secondary (primary: basic_clothing)
+                           "fine_cloth"]),
     ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
-    ("luxury_drinks",     ["tea", "coffee", "wine", "cocoa"]),
-    ("luxury_food",       ["wild_game", "victuals", "fruit", "fish"]),
-    ("luxury_goods",      ["fine_cloth", "fur", "porcelain", "lacquerware", "marble", "glass"]),
-    ("protein",           ["fish", "wild_game", "livestock"]),
+    ("luxury_drinks",     ["tea", "coffee",
+                           "wine",     # secondary (primary: intoxicants)
+                           "cocoa"]),
+    ("luxury_food",       ["wild_game", "victuals", "fruit",
+                           "fish"      # secondary (primary: protein)
+                           ]),
+    ("luxury_goods",      ["fine_cloth",  # secondary (primary: standard_clothing)
+                           "fur", "porcelain", "lacquerware", "marble", "glass"]),
+    ("protein",           ["fish", "livestock",
+                           "wild_game"  # secondary (primary: luxury_food)
+                           ]),
     ("spices",            ["saffron", "pepper", "cloves", "chili"]),
     ("precious",          ["goods_gold", "silver", "jewelry"]),
     ("treasures",         ["amber", "gems", "ivory", "pearls"]),
     ("medicine",          ["medicaments", "mercury"]),
-    ("ritual",            ["incense", "mercury"]),
+    ("ritual",            ["incense",
+                           "mercury"   # secondary (primary: medicine)
+                           ]),
     ("weapons",           ["weaponry", "firearms"]),
     ("mounts",            ["horses", "elephants"]),
     ("knowledge",         ["paper", "books"]),
@@ -170,6 +196,7 @@ DEMAND_GROUP_NAMES_EN: dict = {
 # ── File paths ────────────────────────────────────────────────────────────────
 
 EFFECTS_FILE          = ROOT / "src/stable/in_game/common/scripted_effects/SOL_substitute_effects.txt"
+SCARCITY_SCORE_FILE   = ROOT / "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt"
 WEIGHTS_FILE          = ROOT / "src/stable/in_game/common/script_values/SOL_goods_weight_values.txt"
 INDICATORS_FILE       = ROOT / "src/stable/in_game/common/script_values/SOL_substitute_good_indicators.txt"
 GROUP_INDICATORS_FILE = ROOT / "src/stable/in_game/common/script_values/SOL_substitute_group_indicators.txt"
@@ -177,6 +204,12 @@ LOCALIZATION_FILE     = ROOT / "src/stable/main_menu/localization/english/SOL_su
 LOCALIZATION_FILE_ZH  = ROOT / "src/stable/main_menu/localization/simp_chinese/SOL_substitute_goods_l_simp_chinese.yml"
 GOODS_DIR             = ROOT / "reference_game_files/game/in_game/common/goods"
 GUI_OVERRIDE_FILE     = ROOT / "src/stable/in_game/gui/z_SOL_goods_tooltip_override.gui"
+
+# ── Scarcity score ────────────────────────────────────────────────────────────
+
+# Design knob: maximum single-direction shift for sol_market_scarcity_adj.
+# Generator derives per-good tier deltas as MAX_OFFSET / (N_goods × 0.04).
+SCARCITY_SCORE_MAX_OFFSET: float = 0.20
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 

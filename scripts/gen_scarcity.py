@@ -43,9 +43,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from scarcity._data import (
     EFFECTS_FILE, WEIGHTS_FILE, INDICATORS_FILE, GROUP_INDICATORS_FILE,
     LOCALIZATION_FILE, LOCALIZATION_FILE_ZH, GUI_OVERRIDE_FILE,
+    SCARCITY_SCORE_FILE,
     _write,
 )
-from scarcity.effects_gen import gen_effects_file
+from scarcity.effects_gen import gen_effects_file, gen_scarcity_score_file
 from scarcity.weights_gen import patch_weights_file
 from scarcity.indicators_gen import gen_indicators_file, gen_group_indicators_file
 from scarcity.loc_gen import (
@@ -91,6 +92,9 @@ def main() -> None:
 
     # 6. GUI override file (full regen)
     _write(GUI_OVERRIDE_FILE, gen_goods_gui_override_file(prices), dry, encoding="utf-8")
+
+    # 7. All-goods scarcity-score scripted effect (separate auto-generated file)
+    _write(SCARCITY_SCORE_FILE, gen_scarcity_score_file(), dry)
 
     if not dry:
         print("\nDone. Run next:")
