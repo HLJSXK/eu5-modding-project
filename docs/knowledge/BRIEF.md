@@ -9,7 +9,7 @@
 - Mod name: **Standard of Living (SOL)**
 - Mod ID: `hades.sol` | Version: `1.1.0` | Target: EU5 `1.*.*`
 - Requires Community Mod Framework v2.*
-- Two active branches: `stable` (release) and `beta` (active development)
+- Single active mod; branches: `stable` (release) and `beta` (active development)
 
 ## Core Features
 
@@ -30,46 +30,45 @@
 ```
 eu5-modding-project/
 ├── src/
-│   ├── stable/                  — active mod source (released)
-│   │   ├── .metadata/           — metadata.json (mod ID, version, dependencies)
-│   │   ├── in_game/
-│   │   │   ├── common/
-│   │   │   │   ├── age/         — age-scaling building/prosperity modifiers
-│   │   │   │   ├── auto_modifiers/   — war exhaustion, tax efficiency penalties
-│   │   │   │   ├── cabinet_actions/  — war exhaustion reduction, institution spread
-│   │   │   │   ├── diplomatic_costs/ — rebalanced diplomatic action costs
-│   │   │   │   ├── generic_actions/  — colonial charter restrictions
-│   │   │   │   ├── goods/            — good definitions (fish as food category)
-│   │   │   │   ├── goods_demand/     — pop goods demand injections (SOL system)
-│   │   │   │   ├── on_action/        — trigger hooks
-│   │   │   │   ├── prices/           — price adjustments (roads, diplomacy)
-│   │   │   │   ├── resolutions/      — resolution definitions
-│   │   │   │   ├── scripted_effects/ — country gold effects
-│   │   │   │   ├── scripted_guis/    — custom GUI logic
-│   │   │   │   ├── scripted_triggers/— custom trigger definitions
-│   │   │   │   ├── script_values/    — SOL computation values (46+ files)
-│   │   │   │   ├── situations/       — Standard of Living situation definition
-│   │   │   │   └── trigger_localization/ — custom trigger text
-│   │   │   ├── events/          — event definitions
-│   │   │   ├── gui/
-│   │   │   │   ├── panels/      — situation panels (global_living_standard.gui)
-│   │   │   │   └── scripted_widgets/ — custom GUI widgets
-│   │   │   └── loading_screen/common/defines/ — harsher combat defines
-│   │   └── main_menu/
-│   │       ├── common/
-│   │       │   ├── script_values/    — tax efficiency bonus values
-│   │       │   └── static_modifiers/ — country, location, province modifiers
-│   │       └── localization/
-│   │           ├── english/          — English UI strings
-│   │           └── simp_chinese/     — Simplified Chinese UI strings
-│   └── develop/                 — paused development branch (Dynamic Missions)
+│   └── stable/                  — active mod source (released)
+│       ├── .metadata/           — metadata.json (mod ID, version, dependencies)
+│       ├── in_game/
+│       │   ├── common/
+│       │   │   ├── age/         — age-scaling building/prosperity modifiers
+│       │   │   ├── auto_modifiers/   — war exhaustion, tax efficiency penalties
+│       │   │   ├── cabinet_actions/  — war exhaustion reduction, institution spread
+│       │   │   ├── diplomatic_costs/ — rebalanced diplomatic action costs
+│       │   │   ├── generic_actions/  — colonial charter restrictions
+│       │   │   ├── goods/            — good definitions (fish as food category)
+│       │   │   ├── goods_demand/     — pop goods demand injections (SOL system)
+│       │   │   ├── on_action/        — trigger hooks
+│       │   │   ├── prices/           — price adjustments (roads, diplomacy)
+│       │   │   ├── resolutions/      — resolution definitions
+│       │   │   ├── scripted_effects/ — country gold effects
+│       │   │   ├── scripted_guis/    — custom GUI logic
+│       │   │   ├── scripted_triggers/— custom trigger definitions
+│       │   │   ├── script_values/    — SOL computation values (46+ files)
+│       │   │   ├── situations/       — Standard of Living situation definition
+│       │   │   └── trigger_localization/ — custom trigger text
+│       │   ├── events/          — event definitions
+│       │   ├── gui/
+│       │   │   ├── panels/      — situation panels (global_living_standard.gui)
+│       │   │   └── scripted_widgets/ — custom GUI widgets
+│       │   └── loading_screen/common/defines/ — harsher combat defines
+│       └── main_menu/
+│           ├── common/
+│           │   ├── script_values/    — tax efficiency bonus values
+│           │   └── static_modifiers/ — country, location, province modifiers
+│           └── localization/
+│               ├── english/          — English UI strings
+│               └── simp_chinese/     — Simplified Chinese UI strings
 ├── docs/
 │   ├── knowledge/               — BRIEF.md, anti_patterns.yaml, valid_enums.yaml, PROJECT_OVERVIEW.md
 │   ├── design/                  — SOL rebuild design doc, other active feature designs
 │   ├── guides/                  — AI_Tool_Workflow_Prompt.md
 │   ├── technical/               — EU5_Modding_Knowledge_Base.md, mod framework guide
 │   ├── simulator/               — SOL simulator data and configs
-│   └── archive/                 — archived design docs (paused features)
+│   └── archive/                 — archived design docs
 ├── scripts/                     — Python codegen + validation (see Script Reference)
 ├── tools/
 │   └── sol_demand_simulator/    — Engel curve designer + exporter (web UI via app.py)
@@ -164,8 +163,8 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 | Category | Count | Index file | Notes |
 | --- | --- | --- | --- |
 | GUI Icons (`@xxx!`) | 321 | `data/index/icons.txt` | Use `@name!` in raw_text/text fields and YAML values |
-| Scripted Triggers | 467 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
-| Scripted Effects | 460 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
+| Scripted Triggers | 462 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
+| Scripted Effects | 452 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2089 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
 | English Loc Keys | 613 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 

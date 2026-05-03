@@ -38,15 +38,12 @@ VANILLA_TRIGGERS_DIR = REPO_ROOT / "reference_game_files" / "game" / "in_game" /
 VANILLA_EFFECTS_DIR  = REPO_ROOT / "reference_game_files" / "game" / "in_game" / "common" / "scripted_effects"
 MOD_TRIGGERS_DIRS = [
     REPO_ROOT / "src" / "stable" / "in_game" / "common" / "scripted_triggers",
-    REPO_ROOT / "src" / "develop" / "in_game" / "common" / "scripted_triggers",
 ]
 MOD_EFFECTS_DIRS = [
     REPO_ROOT / "src" / "stable" / "in_game" / "common" / "scripted_effects",
-    REPO_ROOT / "src" / "develop" / "in_game" / "common" / "scripted_effects",
 ]
 LOC_EN_DIRS = [
     REPO_ROOT / "src" / "stable" / "main_menu" / "localization" / "english",
-    REPO_ROOT / "src" / "develop" / "main_menu" / "localization" / "english",
 ]
 
 
