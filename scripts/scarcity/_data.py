@@ -207,9 +207,24 @@ GUI_OVERRIDE_FILE     = ROOT / "src/stable/in_game/gui/z_SOL_goods_tooltip_overr
 
 # ── Scarcity score ────────────────────────────────────────────────────────────
 
-# Design knob: maximum single-direction shift for sol_market_scarcity_adj.
-# Generator derives per-good tier deltas as MAX_OFFSET / (N_goods × 0.04).
-SCARCITY_SCORE_MAX_OFFSET: float = 0.20
+# Price threshold for each tier (× default price).
+# Used to derive exact correction factors: -(1 - 1/P_tier), matching the
+# "spending = income" target.  Natural bounds: severe all-goods → −0.565;
+# vcheap all-goods → +1.50.  No hard cap needed; demand scales have min = 0.
+TIER_PRICE_THRESHOLDS: dict[str, float] = {
+    "severe":      2.30,
+    "moderate":    1.70,
+    "mild":        1.30,
+    "affordable":  0.85,
+    "cheap":       0.65,
+    "vcheap":      0.40,
+}
+
+# Exact correction factor per unit of budget share for each tier.
+# Formula: -(1 - 1/P_tier)  →  positive for surplus tiers (P < 1), negative for shortage.
+TIER_EXACT_FACTORS: dict[str, float] = {
+    k: -(1.0 - 1.0 / v) for k, v in TIER_PRICE_THRESHOLDS.items()
+}
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 

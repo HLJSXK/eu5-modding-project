@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-03 (Extract Dynamic Missions to standalone repo; SOL remains sole active mod)
+> Last updated: 2026-05-04 (Per-stratum budget-share-weighted scarcity corrections)
 
 ## Project Identity
 
@@ -22,7 +22,7 @@
 
 5. **Colonial Restrictions** — AI requires a tax base of 1000 (vs. vanilla 100) to colonize. Colonial nations restricted to capital-region colonization. Historical colonizers (Portugal, Spain, England, etc.) are exempt.
 
-6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 6-tier price-scarcity system, and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
+6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 6-tier price-scarcity system, and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Market price corrections are per-stratum and budget-share-weighted: commoner demand reacts strongly to staple food prices; noble demand reacts to luxury goods prices. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
 
 ## Directory Structure
 
@@ -112,4 +112,5 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 - **Location-level caching** — monthly wealth + yearly location averages stored as script values for performance.
 - **Country-level aggregation** — savings pressure per pop stratum, SOL per stratum, feeds the situation panel.
 - **Hidden shim** in `SOL_goods_demand_values.txt`: dev-scaling cancellation (`×10 ÷ location.development`) — intentional, do not remove.
-- **Dynamic export alpha coefficient** — `global_var:sol_era_coeff` (init 2.0, decays ×0.95/era via `sol_update_export_adj_era`) and `local_sol_scarcity_adj` script_value (±20% per-market basket correction) are injected into every demand-scale block in `z_SOL_group_demand_scales_location.txt`. Replaces the former baked-in EXPORT_ALPHA_MULTIPLIER = 2.0 in `engel_export.py`.
+- **Dynamic export alpha coefficient** — `global_var:sol_era_coeff` (init 2.0, decays ×0.95/era via `sol_update_export_adj_era`) and five per-stratum `local_sol_scarcity_adj_<strata>` script_values (budget-share-weighted market price correction) are injected into every demand-scale block in `z_SOL_group_demand_scales_location.txt`. Replaces the former baked-in EXPORT_ALPHA_MULTIPLIER = 2.0 in `engel_export.py`.
+- **Per-stratum scarcity corrections** — Each stratum gets its own `sol_market_scarcity_adj_<strata>` location variable, computed yearly by `SOL_compute_scarcity_score_<strata>` in `z_SOL_scarcity_score.txt`. Deltas are weighted by that stratum's average budget share per indicator group; delta formula: `-(1 − 1/P_tier) × α_{strata,grp} / n_grp`. Natural max: severe shortage → adj ≥ 0.435; vcheap surplus → adj ≤ 2.5. No hard cap; `min = 0` in demand scales is the safety floor.
