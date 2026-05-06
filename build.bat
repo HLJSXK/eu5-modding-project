@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Build/deploy script for stable/develop mods with optional COS upload.
+REM Build/deploy script for stable mod with optional COS upload.
 REM Default deploy target:
 REM   C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod
 REM
@@ -19,10 +19,8 @@ REM   2) TENCENT_SECRET_ID / TENCENT_SECRET_KEY environment variables
 
 set "REPO_ROOT=%~dp0"
 set "SOURCE_DIR=%REPO_ROOT%src\stable"
-set "SOURCE_DIR_DEVELOP=%REPO_ROOT%src\develop"
 set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
 set "TARGET_DIR=%TARGET_ROOT%\stable"
-set "TARGET_DIR_DEVELOP=%TARGET_ROOT%\develop"
 set "BUILD_DIR=%REPO_ROOT%build"
 set "ZIP_PATH=%BUILD_DIR%\stable.zip"
 
@@ -107,11 +105,6 @@ if not exist "%SOURCE_DIR%" (
     exit /b 1
 )
 
-if not exist "%SOURCE_DIR_DEVELOP%" (
-    echo [ERROR] Source directory not found: "%SOURCE_DIR_DEVELOP%"
-    exit /b 1
-)
-
 if not exist "%TARGET_ROOT%" (
     echo [INFO] Target root not found. Creating: "%TARGET_ROOT%"
     mkdir "%TARGET_ROOT%"
@@ -140,23 +133,6 @@ if errorlevel 8 (
 )
 cmd /c "exit /b 0"
 
-if exist "%TARGET_DIR_DEVELOP%" (
-    echo [INFO] Removing previous deployment: "%TARGET_DIR_DEVELOP%"
-    rmdir /s /q "%TARGET_DIR_DEVELOP%"
-    if errorlevel 1 (
-        echo [ERROR] Failed to remove old develop target directory. Close EU5/Steam and retry.
-        exit /b 1
-    )
-)
-
-echo [INFO] Copying "%SOURCE_DIR_DEVELOP%" to "%TARGET_DIR_DEVELOP%"
-robocopy "%SOURCE_DIR_DEVELOP%" "%TARGET_DIR_DEVELOP%" /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >nul
-
-if errorlevel 8 (
-    echo [ERROR] Develop copy failed. Robocopy exit code: %errorlevel%
-    exit /b 1
-)
-
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 if exist "%ZIP_PATH%" del /q "%ZIP_PATH%"
 
@@ -167,9 +143,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [OK] Stable and develop mods deployed successfully.
+echo [OK] Stable mod deployed successfully.
 echo [OK] Target: "%TARGET_DIR%"
-echo [OK] Target: "%TARGET_DIR_DEVELOP%"
 echo [OK] Archive: "%ZIP_PATH%"
 
 if "%UPLOAD_COS%"=="0" exit /b 0
