@@ -17,12 +17,16 @@
 	on_monthly = {
 		if = {
 			limit = { sol_sol_is_on = yes }
-			# ── Pass 0：全球市场稀缺性扫描 ──────────────────────────────────────────
-			# 频率：每年（月1）| 范围：全市场 → 54 商品/市场 | 操作：列表增删，无 set_variable
-			# 开销估算：O(市场数 × 54)，市场数随游戏进程增长
+			# ── Pass 0：全球市场稀缺性扫描 + 市场枢纽稀缺评分缓存 ────────────────
+			# 频率：每年（月1）| 范围：全市场 | 操作：列表增删 + 市场枢纽 set_variable
+			# 开销估算：O(市场数 × (672 + 5×336))，已从原先 O(地点数 × 5 × 336) 降至此值
+			# 设计依据：稀缺评分仅依赖市场价格档，全部 336 个判断都是 market ?= { ... }
+			# 形式，因此在每个市场的贸易中心位置（market.location）算一次,所有同市场
+			# 位置共享读取 var:sol_market_scarcity_adj_<strata>。
 			if = {
 				limit = { current_month = 1 }
 				SOL_update_substitute_scarcity = yes
+				SOL_update_market_scarcity_scores = yes
 			}
 
 			# ── Pass A+B：单次 every_country 遍历 ───────────────────────────────────

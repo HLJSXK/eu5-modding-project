@@ -208,13 +208,13 @@
   notes: "Engine error: 'Failed to find a valid event target link variable:NAME' / 'Cannot read [variable:NAME] as a script value'. The set_variable / change_variable / has_variable effects all use the keyword 'variable' inside their own block (name = NAME, value = X), but READING a variable elsewhere in script_values, triggers, or modifier values requires the var: prefix. Comments in source files often informally write 'variable:foo' for documentation — never copy that into actual code."
 
 - id: change_variable_value_op_invalid
-  pattern: 'change_variable\s*=\s*\{[^}]*\bvalue\s*='
+  pattern: 'change_variable\s*=\s*\{[^{}]*\bvalue\s*='
   bad: "change_variable = { name = X  value = Y } — value is not a valid operation for change_variable"
   correction: "Use change_variable = { name = X  add = Y } (or subtract / multiply / divide). Negative literals are fine for add: e.g. add = -0.00020. value = is reserved for set_variable."
   category: scripted_values
   scope: any
   source: "EU5 engine error: 'change_variable effect [ No operation specified ]'"
-  notes: "set_variable accepts 'value = X' (absolute assignment); change_variable does NOT — it requires an operation keyword (add/subtract/multiply/divide). Mixing them up emits a runtime PostValidate error and the change is silently dropped. Often introduced by codegen scripts that mirror set_variable templates without adapting the op keyword."
+  notes: "set_variable accepts 'value = X' (absolute assignment); change_variable does NOT — it requires an operation keyword (add/subtract/multiply/divide). Mixing them up emits a runtime PostValidate error and the change is silently dropped. Often introduced by codegen scripts that mirror set_variable templates without adapting the op keyword. Pattern uses [^{}]* (not [^}]*) so it does NOT cross nested-block boundaries — this prevents false positives on the legal form 'change_variable = { name = X  add = { value = Y  multiply = Z } }' where value = is the inner-block scalar literal of add's value-with-operations form."
 
 - id: global_var_unguarded_in_script_value
   pattern: 'multiply\s*=\s*global_var:|add\s*=\s*global_var:|divide\s*=\s*global_var:|subtract\s*=\s*global_var:'
@@ -224,3 +224,30 @@
   scope: global
   source: "src/stable/in_game/common/script_values/SOL_pop_values.txt (local_sol_era_coeff)"
   notes: "EU5 evaluates script_values during file-load validation BEFORE any on_action (including on_game_start) fires. An unguarded global_var read produces 'Failed to fetch variable', 'Event target link global_var returned an unset scope', and 'Got value of type none' errors that propagate up to every caller script_value. on_game_start init alone cannot fix this — the validation pass runs earlier. Wrapping with has_global_variable + safe default is the only robust approach."
+
+- id: market_scope_set_variable_unsupported
+  pattern: 'every_market_in_world\s*=\s*\{[^{}]*\bset_variable\b'
+  bad: "Direct set_variable / change_variable on market scope (e.g. every_market_in_world = { set_variable = { name = X value = Y } ... })"
+  correction: "Markets do NOT support persistent script variables. Hop to the trade-center location first: every_market_in_world = { location = { set_variable = { ... } } }. Downstream readers fetch via market.location.var:NAME (single shared cache for all locations sharing the market). For GUI, use Market.GetCenterLocation.MakeScope.GetVariable(...) — note the accessor is GetCenterLocation, NOT GetLocation."
+  category: scope
+  scope: global
+  source: "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt (SOL_update_market_scarcity_scores); reference_game_files/game/in_game/gui/context_menu.gui:940 — '[PanToLocation(Location.GetMarket.GetCenterLocation)]'; reference_game_files/game/in_game/events/economy/prices.txt:417 — 'from_market.location.sub_continent'"
+  notes: "Market is a scope but its variable system is read-only at script level — set_variable / change_variable / has_variable on a bare market scope silently fail. The market's hub location (script: market.location, GUI: Market.GetCenterLocation) IS a normal Location and supports the full variable system. Pattern works because all locations sharing a market dereference market.location to the same trade-center Location, giving a per-market shared cache without per-location duplication. GUI accessor is GetCenterLocation, not GetLocation — only GetCenterLocation appears in vanilla GUI files."
+
+- id: gui_market_getlocation_invalid
+  pattern: '\.GetMarket\.GetLocation\b'
+  bad: "Calling .GetMarket.GetLocation in GUI expressions to access a market's hub location"
+  correction: "Use .GetMarket.GetCenterLocation instead. The accessor on a Market data object is GetCenterLocation (returns the trade-center Location), not GetLocation. Example: Player.GetCapital.GetMarket.GetCenterLocation.MakeScope.GetVariable('foo')."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/context_menu.gui:940 — 'ondoubleclick = \"[PanToLocation(Location.GetMarket.GetCenterLocation)]\"'"
+  notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor. Using the wrong name silently returns a null/invalid datacontext — the GUI element renders empty without an error tooltip."
+
+- id: yearly_january_pulse_spike
+  pattern: ''
+  bad: "Gating heavy per-country / per-location work behind 'limit = { current_month = 1 }' inside a situation's on_monthly block — fires on every January 1 for every country at once"
+  correction: "Use vanilla 'yearly_country_pulse' on_action instead — it fires once per country per year on each country's own anniversary date, naturally distributing load across the whole year. For globally-scoped yearly work (e.g. every_market_in_world scans), keep the situation-month-1 gate but split the work into market-hub-cached or quarterly passes. Anything that iterates every_owned_location per country per year MUST go through yearly_country_pulse, not the global situation."
+  category: scope
+  scope: global
+  source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:23-71; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:6-10"
+  notes: "Documentation-only (no regex lint). The situation's on_monthly with current_month=1 gate causes ALL countries to recompute simultaneously on Jan 1, producing a yearly frame-time spike. Vanilla yearly_country_pulse staggers per-country work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07) traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations."
