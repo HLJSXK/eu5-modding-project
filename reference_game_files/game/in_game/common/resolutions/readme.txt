@@ -79,6 +79,7 @@
 # - vote_effect <effect>: what happens when a country votes in the resolution; scope:actor = the voter country, scope:proposer is the proposer country, scope:active_resolution is the resolution, scope:vote is the vote, scope:recipient, scope:target, scope:target_1, scope:target_2... etc
 # - abstain_effect <effect>: what happens when a country removes its vote in the resolution; scope:actor = the voter country, scope:proposer is the proposer country, scope:active_resolution is the resolution, scope:recipient, scope:target, scope:target_1, scope:target_2... etc
 # - cooldown = { type = <any tag> days/weeks/months/years = <integer> } adds a cooldown for the action during which time it cannot be performed again
+# - show_target_in_tooltip = <yes/no>. Set to <yes> to display target of the resolution in UI elements that support it. By default, <no>
 #
 # To use the action in GUI script, use this sort of thing:
 #

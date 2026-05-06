@@ -24,14 +24,37 @@
 			scope:target ?= {
 				this = root.international_organization_target
 			}
+			# Don't pull in fellow subjects of the target as offensive joiners — they
+			# should remain free to join as defenders, avoiding the Always/Always
+			# conflict that leaves the target without any defenders and causes instant
+			# 100% war score (e.g. Hanseatic members fighting each other).
+			NOT = {
+				scope:recipient = {
+					is_subject_of = scope:target
+				}
+			}
+			trigger_if = {
+				limit = {
+					exists = scope:casus_belli
+				}
+				scope:casus_belli = casus_belli:cb_independence_war
+			}
 		}
 	}
 	
 	join_defensive_wars_always = {
-		custom_tooltip = {
-			text = independence_movement_join_war_def_always_tt
-			scope:target ?= {
-				this = root.international_organization_target
+		or = {
+			custom_tooltip = {
+				text = independence_movement_join_war_def_always_tt
+				scope:target ?= {
+					this = root.international_organization_target
+				}
+			}
+			custom_tooltip = {
+				text = independence_movement_join_war_def_always_tt_during
+				scope:recipient = {
+					is_at_war_with = root.international_organization_target
+				}
 			}
 		}
 	}
@@ -96,7 +119,7 @@
 		#either we can do our own diplomacy; or our overlord is the same as the leader's
 		or = {
 			has_limited_diplomacy = no
-			overlord = scope:target
+			overlord ?= scope:target
 		}
 	}
 	
@@ -297,7 +320,7 @@
 				scope:relative_strength_of_target != 0
 			}
 			add = {
-            	#get a value in range of -50..0..50
+            	#get a value in range of -50..0..25
 				desc = "RELATIVE_STRENGTH_IO"
 				value = 100
 				multiply = {
@@ -308,15 +331,17 @@
 					}
 				}
 				subtract = 50
+				max = 25
 			}
 		}
 		else = {
 			add = {
-            	#get a value in range of -50..0..50
+            	#get a value in range of -50..0..25
 				desc = "RELATIVE_STRENGTH_TO_TARGET"
 				value = 100
 				multiply = "root.relative_strength(scope:target)" #this is 0..1
 				subtract = 50
+				max = 25
 			}
 		}
 		if = {

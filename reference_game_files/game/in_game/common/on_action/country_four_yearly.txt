@@ -16,6 +16,30 @@
 	}
 
 	effect = {
+		if = {
+			limit = {
+				NOT = { has_global_variable = albanian_migration_cooldown }
+				any_owned_location = {
+					OR = {
+						area = area:albania_area
+						area = area:northern_greece_area
+						area = area:morea_area
+						area = area:apulia_area
+						area = area:basilicata_area
+					}
+				}
+				"scripted_geography:albanian_migration_source_geography.culture_population(culture:albanian)" > 10
+			}
+			set_global_variable = {
+				name = albanian_migration_cooldown
+				years = 10
+			}
+			trigger_event_silently = {
+				on_action = on_albanian_migration
+			}
+		}
+	
+
 		random = {
 			chance = 85
 			add_cooldown = {
@@ -164,6 +188,7 @@
 		50 = flavor_mei.1004
 
 		10 = flavor_ira.47
+		10 = flavor_ach.3
 
 		chance_to_happen = 50
 	}
@@ -217,12 +242,159 @@ on_four_yearly_check_for_script = {
 			if = {
 				limit = { has_variable = union_of_crowns_partner }
 				var:union_of_crowns_partner = {
-					remove_trust = {
+					remove_trust_equilibrium = {
 						modifier = trust_union_of_crowns_pact
 						target = root
 					}
 				}
 				remove_variable = union_of_crowns_partner
+			}
+		}
+	}
+}
+
+on_albanian_migration = {
+	effect = {
+		# Optimization - the chance to move further into greece depend on the albanian population in the "previous area"
+		# Otherwise, we would need to calculate the same culture percentages per each location
+		set_local_variable = {
+			name = weight_for_attica
+			value = {
+				value = "province_definition:thessaly_province.culture_percentage(culture:albanian)"
+				add = "province_definition:south_epirus_province.culture_percentage(culture:albanian)"
+				add = "province_definition:north_epirus_province.culture_percentage(culture:albanian)"
+				add = "province_definition:aetolia_province.culture_percentage(culture:albanian)"
+				divide = 4
+				max = 0.1
+				multiply = 10
+			}
+		}
+		set_local_variable = {
+			name = weight_for_morea
+			value = {
+				value = "province_definition:attica_province.culture_percentage(culture:albanian)"
+				add = "province_definition:neopatras_province.culture_percentage(culture:albanian)"
+				add = "province_definition:south_epirus_province.culture_percentage(culture:albanian)"
+				add = "province_definition:north_epirus_province.culture_percentage(culture:albanian)"
+				add = "province_definition:aetolia_province.culture_percentage(culture:albanian)"
+				divide = 5
+				max = 0.1
+				multiply = 10
+			}
+		}
+		set_local_variable = {
+			name = weight_for_italy
+			value = {
+				value = "area:morea_area.culture_percentage(culture:albanian)"
+				add = "area:northern_greece_area.culture_percentage(culture:albanian)"
+				divide = 2
+				max = 0.1
+				multiply = 10
+			}
+		}
+
+		add_to_local_variable_map = {
+			name = previous_weights
+			key = province_definition:attica_province
+			value = local_var:weight_for_attica
+		}
+		add_to_local_variable_map = {
+			name = previous_weights
+			key = province_definition:neopatras_province
+			value = local_var:weight_for_attica
+		}
+		area:basilicata_area = {
+			every_province_definition_in_area = {
+				add_to_local_variable_map = {
+					name = previous_weights
+					key = this
+					value = local_var:weight_for_italy
+				}
+			}
+		}
+		area:apulia_area = {
+			every_province_definition_in_area = {
+				add_to_local_variable_map = {
+					name = previous_weights
+					key = this
+					value = local_var:weight_for_italy
+				}
+			}
+		}
+		area:morea_area = {
+			every_province_definition_in_area = {
+				add_to_local_variable_map = {
+					name = previous_weights
+					key = this
+					value = local_var:weight_for_morea
+				}
+			}
+		}
+
+		# Try to source a location
+		scripted_geography:albanian_migration_source_geography = {
+			random_location_in_scripted_geography = {
+				limit = {
+					has_owner = yes
+				}
+				weight = {
+					factor = 0
+					modifier = {
+						add = albanian_emigration_chance
+					}
+				}
+				save_scope_as = source_location
+			}
+		}
+		
+		if = {
+			limit = {
+				exists = scope:source_location
+			}
+			scripted_geography:albanian_migration_destination_geography = {
+				random_location_in_scripted_geography = {
+					limit = {
+						has_owner = yes
+					}
+					weight = {
+						factor = 0
+						modifier = {
+							add = albanian_immigration_chance
+						}
+					}
+
+					save_scope_as = destination_location
+				}
+			}
+			if = {
+				limit = {
+					exists = scope:destination_location
+				}
+				set_local_variable = {
+					name = amount_of_migration
+					value = {
+						value = scope:source_location.population
+						multiply = { 0.01 0.05 }
+						multiply = {
+							value = 1
+							add = {
+								value = scope:source_location.albanian_immigration_chance
+								divide = 100
+							}
+						}
+					}
+				}
+
+				scope:source_location.owner = {
+					trigger_event_non_silently = {
+						id = flavor_byz.58
+					}
+				}
+				scope:destination_location.owner = {
+					trigger_event_non_silently = {
+						id = flavor_byz.59
+					}
+				}
 			}
 		}
 	}

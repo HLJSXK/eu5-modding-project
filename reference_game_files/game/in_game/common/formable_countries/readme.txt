@@ -2,6 +2,7 @@
 #	level = 3 							# What level is this country? Players can only form countries of higher level. AI can only form of higher level.
 #	required_locations_fraction = 1.0 	# What percentage of locations do you require to be able to form this country? Default = 1.0 (100%)
 #	capital_required = yes 				# Must the list of required locations/regions etc contain your current capital for the formable? default is no
+#	potential_requires_own = yes 		# Must you own a location in the required locations/regions to see this in the list? default = yes
 #	rule = historical/plausible/fantasy # Limits sillier ones vs historical ones. Select how silly you want it in the game rules. Default is historical
 #	potential = {
 #		# Can you even see the button?

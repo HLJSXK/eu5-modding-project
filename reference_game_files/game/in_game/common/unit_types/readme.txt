@@ -2,7 +2,6 @@
 # 
 # age: determines in which age this unis is enabled
 # build_time:
-# light = yes/no is it a light or heavy unit
 # upgrades_to = <another unit type> preferred upgrade path if available (optional)
 # buildable = yes / no
 # levy = yes / no (can be used for levy)

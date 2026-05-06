@@ -74,13 +74,30 @@ template BuildingType_tooltip {
 		}
 
 		blockoverride "title_button" {
-			icon =  {
+			widget = { #estate building
+				visible = "[BuildingType.OnlyEstatesCanBuild]"
 				using = tooltip_title_icon_size
-				texture = "[GetAgeIcon(BuildingType.GetAge)]"
-				# size = { 32 32 }
-				datacontext = "[BuildingType.GetAge]"
-				tooltipwidget = {
-					using = Age_tooltip
+				icon =  {
+					using = tooltip_title_icon_size
+					texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
+					datacontext = "[BuildingType.GetEligibleEstate]"
+					tooltipwidget = {
+						using = Estate_building_Tooltip
+					}
+				}
+			}
+
+			widget = { #non estate building
+				using = tooltip_title_icon_size
+				visible = "[Not(BuildingType.OnlyEstatesCanBuild)]"
+				icon =  {
+					visible = "[Or(Not(BuildingType.IsSpecialBuilding), BuildingType.NeedsAdvance)]"
+					using = tooltip_title_icon_size
+					texture = "[GetAgeIcon(BuildingType.GetAge)]"
+					datacontext = "[BuildingType.GetAge]"
+					tooltipwidget = {
+						using = Age_tooltip
+					}
 				}
 			}
 		}
@@ -122,8 +139,7 @@ template BuildingType_tooltip {
 						visible = yes
 						blockoverride "item_content" {
 							icon = {
-								# parentanchor = vcenter
-								size = {22 31}
+								size = {31 31}
 								texture = "[GetBuildingCategoryIcon(BuildingType.GetCategory)]"
 							}
 						}
@@ -216,11 +232,16 @@ template BuildingType_tooltip {
 										tooltipwidget = {
 											using = AdvanceDefinition_tooltip
 										}
-										icon = {
+										button = {
 											parentanchor = center
 											size = { 31 31 }
-											# position = { 0 -2 }
 											texture = "[GetAdvanceIcon(AdvanceDefinition.Self)]"
+
+											action_tooltip = {
+												visible = "[Not(IsLobbyOpen)]"
+												title = "OPEN_TECHNOLOGY_VIEW_AND_PAN_TO_ADVANCE"
+												on_action = "[OpenTechnologyViewAndPanToAdvanceDefinition(AdvanceDefinition.Self)]"
+											}
 										}
 									}
 								}
@@ -228,29 +249,31 @@ template BuildingType_tooltip {
 						}
 					}	
 
-					TooltipStatBarItem = { # ESTATE BUILDING
-						visible = "[BuildingType.OnlyEstatesCanBuild]"
-						blockoverride "item_content" {
-							# parentanchor = vcenter
-							size = { 31 31 }
-							texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
-						}
-						tooltipwidget = {
-							SimpleContextualTooltipType = {
-								blockoverride "title_icon" {
-									icon = {
-										using = tooltip_title_icon_size
-										texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
-									}
-								}
-								blockoverride "concept_link" {
-									text = "[estate|e]"
-								}
+					# TooltipStatBarItem = { # ESTATE BUILDING
+					# 	visible = "[BuildingType.OnlyEstatesCanBuild]"
+					# 	blockoverride "item_content" {
+					# 		icon =  {
+					# 			size = { 31 31 }
+					# 			texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
+					# 			datacontext = "[BuildingType.GetEligibleEstate]"	
+					# 		}
+					# 	}
+					# 	tooltipwidget = {
+					# 		SimpleContextualTooltipType = {
+					# 			blockoverride "title_icon" {
+					# 				icon = {
+					# 					using = tooltip_title_icon_size
+					# 					texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
+					# 				}
+					# 			}
+					# 			blockoverride "concept_link" {
+					# 				text = "[estate|e]"
+					# 			}
 
-								textcontext = "BUILDING_TYPE_ONLY_ESTATE"
-							}
-						}	
-					}
+					# 			textcontext = "BUILDING_TYPE_ONLY_ESTATE"
+					# 		}
+					# 	}	
+					# }
 				}
 			}
 
@@ -488,9 +511,10 @@ template BuildingType_tooltip {
 				hbox = {
 					margin_bottom = 5
 					hbox = {
-						datamodel = "[BuildingType.GetMakesObsoleteChain]"					
+						datamodel = "[BuildingType.GetMakesObsoleteEntireTree]"					
 						item = {
-							hbox = {			
+							hbox = {
+								visible = "[BuildingType.ShowForPlayer]"
 								hbox = {
 									spacing = 5
 									icon = {
@@ -606,10 +630,10 @@ template BuildingType_tooltip {
 					}	
 					
 					hbox = {
-						datamodel = "[BuildingType.GetReplacedByChain]"
+						datamodel = "[BuildingType.GetReplacedByEntireTree]"
 						item = {
 							hbox = {
-								
+								visible = "[BuildingType.ShowForPlayer]"
 								widget = {
 									size = { 30 20 }
 									icon = {
@@ -708,7 +732,7 @@ template BuildingType_production_tooltip {
 	}
 	blockoverride "building_type_tooltip_extra"{
 		TooltipContentSection = {
-			visible = "[ConstructScoreRanking.HasInvalidItems]"
+			visible = "[And(ConstructScoreRanking.HasInvalidItems, Not(ConstructScoreRanking.HasScoreItems))]"
 
 			TooltipRowList = {
 				datacontext = "[ConstructScoreRanking.GetInvalidFirstItem]"
@@ -807,6 +831,12 @@ template BuildingType_production_tooltip {
 }
 
 template building_tooltip_detail {
+	TooltipDebugTextBlock = {
+		blockoverride "text" {
+			debug_text = "[Building.GetDebugText]"
+		}
+	}
+
 	hbox = {
 		layoutpolicy_horizontal = expanding
 		spacing = 10
@@ -926,7 +956,7 @@ template building_tooltip_detail {
 								}
 								expand = {}
 								text_single = {
-									raw_text = "[Building.GetBuildingProductionEfficiency(ActiveProductionMethod.GetMethod)|+=2%]"
+									text = "BUILDING_PROD_EFFICIENCY"
 									default_format = "@bold!"
 								}
 								tooltipwidget = {
@@ -937,8 +967,8 @@ template building_tooltip_detail {
 					}
 				}
 				
-				  TooltipManualTableField = {
-					visible = "[Not(Building.IsProducing)]"
+				TooltipManualTableField = {
+					visible = "[And(Not(Building.IsProducing), Not(Building.GetType.OnlyEstatesCanBuild))]"
                     blockoverride "field_content" {
                         text_single = {
                             text = "BUILDING_UPKEEP"
@@ -960,11 +990,32 @@ template building_tooltip_detail {
 						}
                     }
                 }
+
+				TooltipManualTableField = {
+					visible = "[Building.GetType.OnlyEstatesCanBuild]"
+                    blockoverride "field_content" {
+                        text_single = {
+                            text = "BUILDING_UPKEEP"
+							default_format = "#W"
+                        }
+                        expand = {}
+						icon = {
+							size = { 24 24 }
+							texture = "[GetEstateIcon(Building.GetType.GetEligibleEstate)]"
+						}
+						text_single = {
+							text = "ESTATE_BUILDING_UPKEEP"
+						}
+						tooltip = "[estate_building]"
+						tagtooltip_enabled = yes
+                    }
+                }
             }
         }
 	}
 
 	TooltipContentSection = {
+		visible = "[Not(Building.GetType.OnlyEstatesCanBuild)]"
 		datamodel = "[Building.GetProductionMethods]"
 		item = {
 			vbox = {
@@ -1048,6 +1099,7 @@ template building_tooltip_detail {
 	}
 
 	TooltipListBase = {
+		visible = "[Not(Building.GetType.OnlyEstatesCanBuild)]"
 		TooltipStringPairList = {
 			textcontext = "[Building.GetMarketInfo]"
 		}
@@ -1131,13 +1183,31 @@ template Building_tooltip {
 		}
 
 		blockoverride "title_button" {
-			icon =  {
+			datacontext = "[Building.GetType]"
+			widget = { #estate building
+				visible = "[BuildingType.OnlyEstatesCanBuild]"
 				using = tooltip_title_icon_size
-				texture = "[GetAgeIcon(Building.GetType.GetAge)]"
-				# size = { 32 32 }
-				datacontext = "[Building.GetType.GetAge]"
-				tooltipwidget = {
-					using = Age_tooltip
+				icon =  {
+					using = tooltip_title_icon_size
+					texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
+					datacontext = "[BuildingType.GetEligibleEstate]"
+					tooltipwidget = {
+						using = Estate_building_Tooltip
+					}		
+				}
+			}
+
+			widget = { #non estate building
+				using = tooltip_title_icon_size
+				visible = "[Not(BuildingType.OnlyEstatesCanBuild)]"
+				icon =  {
+					visible = "[Or(Not(BuildingType.IsSpecialBuilding), BuildingType.NeedsAdvance)]"
+					using = tooltip_title_icon_size
+					texture = "[GetAgeIcon(BuildingType.GetAge)]"
+					datacontext = "[BuildingType.GetAge]"
+					tooltipwidget = {
+						using = Age_tooltip
+					}
 				}
 			}
 		}
@@ -1716,11 +1786,9 @@ template construct_building_in_location_tt {
 				}
 			}
 
-			TooltipTextBlock = {
+			TooltipStringPairList = {
 				visible = "[BuildingType.IsProducing]"
-				blockoverride "text" {
-					text = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"
-				}
+				textcontext = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"				
 			}
 			
 			TooltipContentSection = {
@@ -1851,10 +1919,8 @@ template BuildingProfit_Tooltip {
 									}
 								
 									blockoverride "tooltip_content" {
-										TooltipTextBlock = {
-											blockoverride "text" {
-												text = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"
-											}
+										TooltipStringPairList = {
+											textcontext = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"											
 										}
 									}
 								}
@@ -2035,10 +2101,8 @@ template BuildingTypeProfit_Tooltip {
 									}
 								
 									blockoverride "tooltip_content" {
-										TooltipTextBlock = {
-											blockoverride "text" {
-												text = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"
-											}
+										TooltipStringPairList = {											
+											textcontext = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)]"											
 										}
 									}
 								}
@@ -2064,10 +2128,8 @@ template BuildingTypeProfit_Tooltip {
 				}
 			}
 
-			TooltipTextBlock = {
-				blockoverride "text" {
-					text = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)|+=2]"
-				}
+			TooltipStringPairList = {
+				textcontext = "[GetBuildingTypeProfitInLocationInfo(BuildingType.Self, Location.Self)|+=2]"				
 			}
 
 			TooltipTextBlock = {
@@ -2226,4 +2288,44 @@ template UpgradeNextBuildingType_Tooltip {
 			}
 		}				
 	}	
+}
+
+template BuildingMaxLevel_Tooltip {
+	SimpleContextualStringPairTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "gfx/interface/icons/outliner/categories/buildings.dds"
+			}
+		}
+		blockoverride "tooltip_title" {
+			ContextualTooltipHeader = {}
+			TooltipLockProgress = {}
+
+			blockoverride "title_text" {
+				datacontext = "[Building.GetLocation]"
+				text = "BUILDING_LEVEL_MAX_SCRIPT_TITLE"
+			}
+		}
+		blockoverride "concept_link" {
+			text = "[building|e]"
+		}
+		lowpriotextcontext = "[Building.GetType.GetMaxLevelInformation(Building.GetLocation)]"
+	}
+}
+
+template Estate_building_Tooltip {
+	SimpleContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetEstateIcon(BuildingType.GetEligibleEstate)]"
+			}
+		}
+		blockoverride "concept_link" {
+			text = "[estate_building|e]"
+		}
+
+		lowpriotextcontext = "BUILDING_TYPE_ONLY_ESTATE"
+	}
 }

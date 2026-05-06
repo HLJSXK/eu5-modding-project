@@ -1,11 +1,340 @@
 @topbar_decoration_width = 50
 @topbar_inner_vertical_margin = 3
-@mapselector_width = 585
+@mapselector_width = 670
 @mapselector_height = 85
 @pinnedmapselector_width = 470
 @pinnedmapselector_height = 48
 
-# TODO: Use proper art
+template mapmode_slot_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" { 
+			texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+			modify_texture = {
+				using = color_white_texture
+				alpha = 0.6
+			}
+
+			icon = {
+				visible = "[DataModelHasItems(MapModeSlot.GetMapModes)]"
+				datacontext = "[ActiveMapModeForSlot(MapModeSlot.GetSlotIndex)]"
+				size = { 75% 75% }
+				parentanchor = center
+				texture = "[MapMode.GetIcon]"
+			}
+		}
+
+		blockoverride "title_button" {
+			icon = {
+				size = { 40 40 }
+                texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+				modify_texture = {
+					using = color_white_texture
+					alpha = 0.6
+				}
+
+				text_single = {
+					parentanchor = center
+					using = Font_Size_Big
+					text = "[MapModeSlot.GetSlotNum]"
+				}
+            }
+        }
+
+		blockoverride "title_text" {
+			block "title_text" {
+				datacontext = "[ActiveMapModeForSlot(MapModeSlot.GetSlotIndex)]"
+				text = "[Select_CString(DataModelHasItems(MapModeSlot.GetMapModes), MapMode.GetName, Localize('MAPMODE_SLOT_EMPTY_TITLE'))]"
+			}
+		}
+
+		blockoverride "concept_link" {
+			text = "[map_mode_slot|e]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipListBase = {
+				visible = "[DataModelHasItems(MapModeSlot.GetMapModes)]"
+				datacontext = "[ActiveMapModeForSlot(MapModeSlot.GetSlotIndex)]"
+				lowpriotextcontext = "[MapMode.GetTooltip]"
+				ontextcontextchanged = "[SetTitleDescTooltipFromTextContext(PdxGuiWidget.AccessSelf)]"
+				
+				TooltipListScrollArea = {
+					blockoverride "scrollarea_content" {
+						hbox = {
+							set_parent_dimension_to_minimum = height
+							layoutpolicy_horizontal = expanding
+							margin = { 10 5 }
+							spacing = 10
+
+							# icon = {
+							# 	size = { 40 40 }
+							# 	texture = "[MapMode.GetIcon]"
+							# }
+
+							textbox = {
+								using = tooltip_text_block_template
+
+								block "text" {
+									text = "[CString.GetString]"
+								}
+							}
+						}
+					}
+				}
+
+				blockoverride "text" {
+					text = "[TitleDescTooltip.GetDesc]"
+				}
+			}
+
+			TooltipListBase = {
+				visible = "[DataModelHasItems(MapModeSlot.GetMapModes)]"
+				blockoverride "block_title" {
+					text = "MAPMODE_SLOT_DESC"
+				}
+
+				flowcontainer = {
+					margin = { 10 10 }
+					spacing = 10
+					wrap_count = 12
+					datamodel = "[MapModeSlot.GetMapModes]"
+					item = {
+						button_mapmode = {}
+					}
+				}
+			}
+
+			TooltipTextBlock = {
+				visible = "[IsDataModelEmpty(MapModeSlot.GetMapModes)]"
+				blockoverride "text" {
+					text = "MAPMODE_SLOT_EMPTY"
+				}
+			}
+		}
+	}
+}
+
+template mapmode_slot_pick_menu {
+	ContextMenuBase = {
+		blockoverride "contextmenu_content" {
+			ContextMenuSectionSet = {
+				ContextMenuSection = {
+					blockoverride "title_icon" {
+							icon = {
+								size = { 32 32 }
+								texture = "[MapMode.GetIcon]"
+							}
+						}
+						
+						blockoverride "title_bg_color" {
+							using = mapmode_color
+						}
+						
+						blockoverride "title_text" {
+							raw_text = "[MapMode.GetName]"
+						}
+
+						blockoverride "contextmenu_entries" {
+						flowcontainer = {
+							wrap_count = 6
+							margin = { 0 10 }
+							spacing = 10
+							righttoleft = yes
+
+							button = {
+								size = { 40 40 }
+								using = paper_card_texture
+
+								modify_texture = {
+									using = color_brown_leather_texture
+									alpha = 0.3
+								}
+
+								modify_texture = {
+									using = color_raw_paper_texture
+									alpha = 0.2
+								}
+
+								action_tooltip = {
+									title = "MAPMODE_SLOT_EDIT_ADD"
+									on_action = "[MapMode.AddInNewSlot]"
+								}
+
+								icon = {
+									size = { 100% 100% }
+									texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+
+									modify_texture = {
+										using = color_white_texture
+										alpha = 0.6
+									}
+								}
+
+								text_single = {
+									parentanchor = center
+									using = Font_Size_Big
+									raw_text = "+"
+								}
+							}
+
+							datamodel = "[DataModelRepeatedItem(GetDataModelSize(GetMapModesSlots))]"
+							item = {
+								button = {
+									size = { 40 40 }
+									datacontext_from_model = { 
+										datamodel = "[GetMapModesSlots]" 
+										index = "[Subtract_int32(GetDataModelSize(GetMapModesSlots), Subtract_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)-1'))]"
+									}
+									
+									using = paper_card_texture
+									onmousehierarchyenter = "[MapModeSelectorVars.Set('slot_highlight', ToString_int32(MapModeSlot.GetSlotIndex))]"
+									onmousehierarchyleave = "[MapModeSelectorVars.Clear('slot_highlight')]"
+
+									modify_texture = {
+										using = color_brown_leather_texture
+										alpha = 0.3
+									}
+
+									modify_texture = {
+										using = color_raw_paper_texture
+										alpha = 0.2
+									}
+
+									modify_texture = {
+										visible = "[MapMode.IsInSlot(MapModeSlot.GetSlotIndex)]"
+										using = color_light_green_texture
+										alpha = 0.6
+									}
+
+									action_tooltip = {
+										title = "[SelectLocalization(MapMode.IsInSlot(MapModeSlot.GetSlotIndex), 'MAPMODE_SLOT_EDIT_REMOVE', 'MAPMODE_SLOT_EDIT_ADD')]"
+										on_action = "[MapMode.ToggleInSlot(MapModeSlot.GetSlotIndex)]"
+									}
+
+									icon = {
+										size = { 100% 100% }
+										texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+
+										modify_texture = {
+											using = color_white_texture
+											alpha = 0.6
+										}
+									}
+
+									text_single = {
+										parentanchor = center
+										using = Font_Size_Big
+										text = "[MapModeSlot.GetSlotNum]"
+									}
+
+									tooltipwidget = {
+										using = mapmode_slot_tooltip
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template mapmode_slot_edit_menu {
+	ContextMenuBase = {
+		blockoverride "contextmenu_content" {
+			ContextMenuSectionSet = {
+				ContextMenuSection = {
+					blockoverride "title_icon" {
+						margin = { 10 0 }
+						icon = {
+							size = { 32 32 }
+							texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+							modify_texture = {
+								using = color_white_texture
+								alpha = 0.6
+							}
+
+							text_single = {
+								parentanchor = center
+								text = "[MapModeSlot.GetSlotNum]"
+							}
+						}
+					}
+						
+					blockoverride "title_text" {
+						raw_text = "MAPMODE_SLOT_TITLE"
+					}
+
+					blockoverride "contextmenu_entries" {
+						datamodel = "[MapModeSlot.GetMapModes]"
+						item = {
+							hbox = {
+								layoutpolicy_horizontal = expanding
+								spacing = 5
+								text_single = {
+									margin = { 5 0 }
+									raw_text = "[Add_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, '(int32)1')]"
+								}
+								vbox = {
+									bottomtotop = yes
+									button_square_plus = {
+										size = { 20 20 }
+										action_tooltip = {
+											title = "MAPMODE_SLOT_EDIT_UP"
+											on_action = "[MapMode.MoveUpOnSlot(MapModeSlot.GetSlotIndex)]"
+										}
+										
+										blockoverride "plusminus_icon" {
+											texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+										}
+
+										tooltipwidget = { BasicFunctionalTooltip = {} }
+									}
+
+									button_square_plus = {
+										size = { 20 20 }
+										action_tooltip = {
+											title = "MAPMODE_SLOT_EDIT_DOWN"
+											on_action = "[MapMode.MoveDownOnSlot(MapModeSlot.GetSlotIndex)]"
+										}
+
+										blockoverride "plusminus_icon" {
+											texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+											mirror = vertical
+										}
+
+										tooltipwidget = { BasicFunctionalTooltip = {} }
+									}
+								}
+								button_mapmode_category = {
+									blockoverride "button_mapmode_actions_extra" {}
+									blockoverride "button_mapmode_right" {
+										button_square_plus = {
+											size = { 20 20 }
+											action_tooltip = {
+												click_mode = confirm
+												title = "MAPMODE_SLOT_EDIT_REMOVE"
+												on_action = "[MapMode.ToggleInSlot(MapModeSlot.GetSlotIndex)]"
+											}
+
+											blockoverride "plusminus_icon" {
+												texture = "gfx/interface/buttons/flats/clean_text.dds"
+											}
+
+											tooltipwidget = { BasicFunctionalTooltip = {} }
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 template left_decoration_icon {
 	texture = "[GetGraphicalCultureTexture('map_modes_corner_flavor')]"
 	texture_density = 2
@@ -440,7 +769,6 @@ types BottomTypes
 				spacing = 20
 				margin = { 10 20 }
 
-				datacontext = "[Pin('map_modes')]"
 				block "datamodel_item" {}
 			}
 		}
@@ -562,78 +890,6 @@ types BottomTypes
 		}
 	}
 
-	# type button_mapmode_old = button {
-	# 	size = { 60 85 }
-
-	# 	using = button_mapmode_actions
-	# 	using = paper_card_texture
-
-	# 	action_tooltip = {
-	# 		click_mode = confirm
-	# 		click_type = right
-	# 		on_action = "[PinCollection.ToggleWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault )]"
-	# 		title = "UNPIN_ACTION"
-	# 	}
-
-	# 	modify_texture = {
-	# 		using = color_brown_leather_texture
-	# 		alpha = 0.3
-	# 	}
-
-	# 	modify_texture = {
-	# 		using = color_raw_paper_texture
-	# 		alpha = 0.1
-	# 	}
-
-	# 	modify_texture = { using = color_paper_texture }
-	# 	modify_texture = { using = overlay_paper_03 }
-	# 	glow = {
-	# 		name = "drop_shadow"
-	# 		glow_radius = 7
-	# 		color = {0.0 0.0 0.0 1.0}
-	# 		alpha = 1
-	# 	}
-
-	# 	icon = {
-	# 		size = { 60 85 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_texture.dds"
-	# 		texture_density = 2
-	# 		alpha = 0.3
-	# 		modify_texture = {
-	# 			using = color_paper_texture
-	# 			blend_mode = overlay
-	# 			alpha = 1
-	# 		}
-	# 	}
-
-	# 	icon = {
-	# 		size = { 60 85 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_texture_category.dds"
-	# 		texture_density = 2
-	# 		alpha = 0.7
-	# 		using = mapmode_color
-	# 	}
-
-	# 	icon = {
-	# 		size = { 60 85 }
-	# 		position = { 0 -3 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_pin.dds"
-	# 		texture_density = 2
-	# 	}
-
-	# 	icon = {
-	# 		size = { 34 34 }
-	# 		parentanchor = center
-	# 		texture = "[MapMode.GetIcon]"
-	# 		glow = {
-	# 			name = "drop_shadow"
-	# 			glow_radius = 2
-	# 			color = {0.0 0.0 0.0 1.0}
-	# 			alpha = 0.5
-	# 		}
-	# 	}
-	# }
-
 	type button_icon_map_square = icon {
 		size = { 100% 100% }
 		texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
@@ -643,12 +899,9 @@ types BottomTypes
 	type button_mapmode = button {
 		size = { 40 40 }
 
-		using = button_mapmode_actions
-		action_tooltip = {
-			click_mode = confirm
-			click_type = right
-			on_action = "[PinCollection.ToggleWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault )]"
-			title = "UNPIN_ACTION"
+		block "button_mapmode_actions"
+		{
+			using = button_mapmode_actions
 		}
 
 		tooltipmeta = {
@@ -691,84 +944,11 @@ types BottomTypes
 		}
 	}
 
-	# type button_pinned_mapmode = button {
-	# 	size = { 30 30 }
-
-	# 	using = button_mapmode_actions
-	# 	using = paper_card_texture
-
-	# 	action_tooltip = {
-	# 		click_mode = confirm
-	# 		click_type = right
-	# 		on_action = "[PinCollection.ToggleWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault )]"
-	# 		title = "UNPIN_ACTION"
-	# 	}
-
-	# 	modify_texture = {
-	# 		using = color_brown_leather_texture
-	# 		alpha = 0.3
-	# 	}
-
-	# 	modify_texture = {
-	# 		using = color_raw_paper_texture
-	# 		alpha = 0.1
-	# 	}
-
-	# 	modify_texture = { using = color_paper_texture }
-	# 	modify_texture = { using = overlay_paper_03 }
-	# 	glow = {
-	# 		name = "drop_shadow"
-	# 		glow_radius = 7
-	# 		color = {0.0 0.0 0.0 1.0}
-	# 		alpha = 1
-	# 	}
-
-	# 	icon = {
-	# 		size = { 30 30 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_texture.dds"
-	# 		texture_density = 2
-	# 		alpha = 0.3
-	# 		modify_texture = {
-	# 			using = color_paper_texture
-	# 			blend_mode = overlay
-	# 			alpha = 1
-	# 		}
-	# 	}
-
-	# 	icon = {
-	# 		size = { 30 30 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_texture_category.dds"
-	# 		texture_density = 2
-	# 		alpha = 0.7
-	# 		using = mapmode_color
-	# 	}
-
-	# 	icon = {
-	# 		size = { 30 30 }
-	# 		position = { 0 -3 }
-	# 		texture = "gfx/interface/buttons/map_modes/map_pin.dds"
-	# 		texture_density = 2
-	# 	}
-
-	# 	icon = {
-	# 		size = { 17 17 }
-	# 		parentanchor = center
-	# 		texture = "[MapMode.GetIcon]"
-	# 		glow = {
-	# 			name = "drop_shadow"
-	# 			glow_radius = 2
-	# 			color = {0.0 0.0 0.0 1.0}
-	# 			alpha = 0.5
-	# 		}
-	# 	}
-	# }
-
 	type mapmode_category_group = vbox {
 		layoutpolicy_horizontal = expanding
 		spacing = 2
 		margin = { 5 0 }
 
-		datacontext = "[Pin('map_modes')]"
 		item = {
 			button_mapmode_category = {}
 		}
@@ -791,6 +971,18 @@ types BottomTypes
 				parentanchor = center
 
 				using = button_mapmode_actions
+				block "button_mapmode_actions_extra" {
+					action_tooltip = {
+						click_type = right
+						on_action = "[PdxGuiWidget.ToggleContextMenu]"
+						title = "MAPMODE_SLOT_MENU"
+					}
+
+					contextmenu_widget = {
+						using = mapmode_slot_pick_menu
+					}
+				}
+				
 				texture = "gfx/interface/buttons/map_modes/banner.dds"
 				texture_density = 2
 				spriteType = Corneredstretched
@@ -854,19 +1046,7 @@ types BottomTypes
 
 		expand = {}
 
-		button_pin = {
-			size = { 25 25 }
-
-			onclick = "[PinCollection.ToggleWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault )]"
-			checked = "[PinCollection.IsPinnedWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault )]"
-			tooltipwidget = {
-				LeftClickButtonTooltip = {
-					blockoverride "onclick_text" {
-						text = "[SelectLocalization(PinCollection.IsPinnedWithDefaultValue( MapMode.GetKey, MapMode.IsMapModePinnedByDefault ), 'UNPIN_ACTION', 'PIN_ACTION')]"
-					}
-				}
-			}
-		}
+		block "button_mapmode_right" {}
 	}
 
 	type mapmode_current_button = widget {
@@ -1079,7 +1259,7 @@ types BottomTypes
 			position = { 140 0 }
 			parentanchor = hcenter|top
 			widgetanchor = hcenter|bottom
-			visible = "[And(Not(TutorialHasVar('intro_hide_ui_1')), Not(Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), MapModeSelectorVars.IsVisible)))]"
+			visible = "[And3(Not(IsPauseMenuShown), Not(TutorialHasVar('intro_hide_ui_1')), Not(Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), IsMapModeMenuPinned)))]"
 		}
 
 		icon = {
@@ -1204,7 +1384,7 @@ types BottomTypes
 			
 			block "button_ledger_map_marker_position_visible" {
 				position = { -140 0 }
-				visible = "[And(Not(TutorialHasVar('intro_hide_ui_1')), Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), MapModeSelectorVars.IsVisible))]"
+				visible = "[And3(Not(IsPauseMenuShown), Not(TutorialHasVar('intro_hide_ui_1')), Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), IsMapModeMenuPinned))]"
 			}
 		}
 
@@ -1246,6 +1426,9 @@ types BottomTypes
 	}
 
 	type mapmodes_color_ledger_item = widget {
+		alwaystransparent = no
+		onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLedger(MapColorLedger.Self)]"
+
 		background = {
 			visible = "[IsEven_int32(PdxGuiWidget.GetIndexInDataModel)]"
 			using = color_whiteish_texture
@@ -1390,7 +1573,7 @@ types BottomTypes
 		alwaystransparent = no
 
 		visible_at_creation = no
-		visible = "[Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), MapModeSelectorVars.IsVisible)]"
+		visible = "[And(Not(IsPauseMenuShown), Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), IsMapModeMenuPinned))]"
 		size = { @mapselector_width @mapselector_height }
 		allow_outside = yes
 
@@ -1416,13 +1599,13 @@ types BottomTypes
 			using = bg_mapmode_menu
 			ui_direction_button = {
 				size = { 20 20 }
-				down = "[MapModeSelectorVars.IsVisible]"
+				down = "[IsMapModeMenuPinned]"
 				tooltipwidget = { BasicFunctionalTooltip = {}}
 				action_tooltip = {
 					click_type = left
 					click_mode = single
-					title = "[MapModeSelectorVars.GetPinTooltip]"
-					on_action = "[MapModeSelectorVars.SetIsVisible]"
+					title = "[GetMapModeMenuPinTooltip]"
+					on_action = "[ToggleMapModeMenuPin]"
 				}
 
 				icon = {
@@ -1455,7 +1638,7 @@ types BottomTypes
 					texture = "gfx/interface/icons/pin.dds"
 					using = button_panel_tab_icon_effect
 
-					blockoverride "icon_effect_visible" {visible = "[MapModeSelectorVars.IsVisible]"}
+					blockoverride "icon_effect_visible" {visible = "[IsMapModeMenuPinned]"}
 					glow = {
 						blockoverride "icon_effect_visible" {}
 						glow_radius = 0
@@ -1474,9 +1657,95 @@ types BottomTypes
 					spacing = 5
 					ignoreinvisible = yes
 
-					datacontext = "[Pin('map_modes')]"
-					datamodel = "[GetPinnedMapModes(PinCollection.Self)]"
-					item = { button_mapmode = {} }
+					datamodel = "[GetMapModesSlots]"
+					item = {
+						widget = {
+							size = { 40 40 }
+							datacontext = "[ActiveMapModeForSlot(PdxGuiWidget.GetIndexInDataModel)]"
+							onmousehierarchyenter = "[MapModeSelectorVars.Clear('slot_highlight')]"
+
+							background = {
+								visible = "[MapModeSelectorVars.HasValue('slot_highlight', ToString_int32(MapModeSlot.GetSlotIndex))]"
+								using = color_white_texture
+								alpha = 0.3
+							}
+
+							icon = {
+								size = { 100% 100% }
+								visible = "[IsDataModelEmpty(MapModeSlot.GetMapModes)]"
+								texture = "gfx/interface/buttons/map_modes/map_texture_square.dds"
+								
+								modify_texture = {
+									using = color_white_texture
+									alpha = 0.6
+								}
+
+								text_single = {
+									parentanchor = center
+									using = Font_Size_Big
+									text = "[SlotFromIndex(PdxGuiWidget.GetIndexInDataModel)]"
+								}
+
+								tooltip_type = widget
+								tooltip_parentanchor = top|hcenter
+								tooltip_widgetanchor = bottom|hcenter
+
+								tooltipwidget = {
+									using = mapmode_slot_tooltip
+								}
+							}
+	
+							button_mapmode = {
+								size = { 100% 100% }
+								visible = "[DataModelHasItems(MapModeSlot.GetMapModes)]"
+
+								blockoverride "button_mapmode_actions"
+								{
+									visible = "[CanChangeMapMode]"
+									input_action = "[MapModeSlot.GetInputAction]"
+									use_global_input_instance = yes
+								
+									action_tooltip = {
+										click_type = left
+										click_mode = single
+										title = "MAPMODE_SLOT_CYCLE"
+										on_action = "[CycleSlot(PdxGuiWidget.GetIndexInDataModel)]"
+										block "button_mapmode_actions_left" {}
+									}
+								
+									modify_texture = {
+										visible = "[MapMode.IsSet]"
+										using = color_white_texture
+										alpha = 0.2
+									}
+
+									modify_texture = {
+										visible = "[MapModeSelectorVars.HasValue('slot_highlight', ToString_int32(MapModeSlot.GetSlotIndex))]"
+										using = color_red_texture
+										alpha = 0.7
+									}
+
+									action_tooltip = {
+										click_type = right
+										on_action = "[PdxGuiWidget.ToggleContextMenu]"
+										title = "MAPMODE_SLOT_EDIT_MENU"
+									}
+
+									tooltip_type = widget
+									tooltip_parentanchor = top|hcenter
+									tooltip_widgetanchor = bottom|hcenter
+
+									tooltipwidget = {
+										using = mapmode_slot_tooltip
+									}
+
+									contextmenu_widget = {
+										using = mapmode_slot_edit_menu
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -1891,7 +2160,7 @@ types BottomTypes
 		alwaystransparent = no
 
 		visible_at_creation = no
-		visible = "[Not(Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), MapModeSelectorVars.IsVisible))]"
+		visible = "[And(Not(IsPauseMenuShown), Not(Or3(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action'), IsMapModeMenuPinned)))]"
 		parentanchor = hcenter|bottom
 
 		hbox = {
@@ -1962,103 +2231,3 @@ types BottomTypes
 		}
 	}
 }
-
-# bottomview = {
-# 	name = "hud_bot"
-# 	layer = bottom_focused
-# 	using = Animation_Show_Hide_UI
-
-# 	blockoverride "panel_setup" {
-# 		visible = "[Not(Or(IsLateralViewFullScreen, IsLateralViewMenuFullScreen))]"
-# 	}
-
-# 	blockoverride "pre_panel" {
-# 		mapmodes_collapsed_window = {
-# 			name = "mapmodes_collapsed_window"
-# 			visible = "[Not(TutorialHasVar('intro_hide_ui_1'))]"
-# 			allow_outside = yes
-# 		}
-
-# 		mapmodes_pinned_window = {
-# 			allow_outside = yes
-# 		}
-
-# 		mapmodes_color_ledger = {
-# 			visible = "[And3(HasMapColorLedger, Not(IsDefaultMapModeSet), And(MapModeSelectorVars.Exists('color_ledger'),
-# 				Not(Or(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action')))))]"
-# 			parentanchor = hcenter|top
-# 			widgetanchor = hcenter|bottom
-# 			position = { 245 -60 }
-# 		}
-
-# 		mapmodes_color_ledger = {
-# 			visible = "[And3(HasMapColorLedger, IsDefaultMapModeSet, And(MapModeSelectorVars.Exists('color_ledger'),
-# 				Not(Or(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action')))))]"
-# 			parentanchor = hcenter|top
-# 			widgetanchor = hcenter|bottom
-# 			position = { 125 -45 }
-# 		}
-
-# 		widget = {
-# 			parentanchor = hcenter|top
-# 			widgetanchor = hcenter|bottom
-# 			position = { 0 -60 }
-
-# 			vbox = {
-# 				set_parent_size_to_minimum = yes
-
-# 				control_groups = {
-# 					visible = "[Not(TutorialHasVar('intro_hide_ui_7'))]"
-					
-# 					widget = {
-# 						widgetid = intro_has_added_control_group
-# 						datacontext = "[InGameTopbar.AccessControlGroups.AccessGroup('(int32)0')]"
-# 						visible = "[Or(GroupItem.IsCountry, GroupItem.IsLocation)]"
-# 					}
-
-# 					# using = Animation_Show_Hide_UI
-# 					# blockoverride "on_hide_ui" {
-# 					# 	position_y = 0
-# 					# 	alpha = 0
-# 					# }
-
-# 					# blockoverride "on_show_ui" {
-# 					# 	position_y = @control_groups_y
-# 					# 	alpha = 1
-# 					# }
-# 				}
-
-# 				mapmode_current_button = {
-# 					visible = "[Not(Or(MapModeSelectorVars.Exists('hover'), MapModeSelectorVars.Exists('action')))]"
-# 				}
-# 			}
-# 		}
-
-# 		mapmodes_button_color_ledger = {}
-# 	}
-
-# 	blockoverride "panel_content" {
-# 		mapmodes_window = {
-# 			allow_outside = yes
-# 			name = "mapmodes_window"
-# 			widgetid = "mapmodes_window"
-
-# 			blockoverride "mapmodes_window_extra" {
-# 				mapmodes_color_ledger = {
-# 					visible = "[And3(HasMapColorLedger, Not(IsDefaultMapModeSet), And(MapModeSelectorVars.Exists('color_ledger'),
-# 						Not(MapModeSelectorVars.Exists('action'))))]"
-# 					parentanchor = hcenter|top
-# 					widgetanchor = hcenter|bottom
-# 					position = { 245 -20 }
-# 				}
-
-# 				mapmode_current_button = {
-# 					visible = "[Not(MapModeSelectorVars.Exists('tab'))]"
-# 					parentanchor = hcenter|top
-# 					widgetanchor = hcenter|bottom
-# 					position = { 0 -20 }
-# 				}
-# 			}
-# 		}
-# 	}
-# }

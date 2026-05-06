@@ -17,7 +17,7 @@ template DiplomaticCapacity_tooltip {
 		
 		blockoverride "tooltip_content" {
 			tooltipmeta = {
-				title = "DIPLOMATIC_COST_BREAKDOWN"
+				#title = "DIPLOMATIC_CAPACITY_HEADER"
 				texture = "[GetConceptTexture('diplomatic_capacity')]"
 				game_concept = "[diplomatic_capacity|e]"
 			}
@@ -177,6 +177,28 @@ template SubjectLoyalty_tooltip {
 	}
 }
 
+template SubjectConnectivity_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "CONNECTIVITY_HEADER"
+		}
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "gfx/interface/icons/modifier_types/subject_connectivity.dds"
+			}
+		}
+		blockoverride "concept_link" {
+			text = [subject_territory_connectivity|E]
+		}
+		blockoverride "tooltip_content" {
+			TooltipStringPairList = {
+				textcontext = "[SubjectItem.GetConnectivityTooltip]"
+			}
+		}
+	}
+}
+
 template SubjectTypeDetail_tooltip {
 	ContextualTooltipType = {
 		blockoverride "title_text" {
@@ -195,7 +217,7 @@ template SubjectTypeDetail_tooltip {
 			text = [subject_loyalty|E]
 		}
 		blockoverride "tooltip_content" {
-			TooltipRowList = {
+			TooltipBlockList = {
 				visible = "[Country.GetDiplomacy.IsDisloyalSubject]"
 				textcontext = "SubjectTypeDetail_DESC_NOT"
 				tooltipwidget = {
@@ -203,7 +225,7 @@ template SubjectTypeDetail_tooltip {
 				}
 			}
 
-			TooltipRowList = {
+			TooltipBlockList = {
 				visible = "[Not(Country.GetDiplomacy.IsDisloyalSubject)]"
 				textcontext = "SubjectTypeDetail_DESC"
 				tooltipwidget = {
@@ -211,15 +233,9 @@ template SubjectTypeDetail_tooltip {
 				}
 			}
 
-			TooltipStringPairList = {
+			TooltipBlockList = {
+				visible = "[Not(StringIsEmpty(Country.GetDiplomacy.GetSubjectLoyaltyInfo))]"
 				textcontext = "[Country.GetDiplomacy.GetSubjectLoyaltyInfo]"
-			}
-			# using = action_tooltip_inner_content
-		}
-	
-		blockoverride "tooltip_ui_action_block" {
-			TooltipUIActionBlockOld = {
-				visible = "[And(PdxGuiWidget.HasUIAction, Country.GetDiplomacy.GetOverlord.IsPlayer)]"
 			}
 		}
 	}
@@ -357,7 +373,7 @@ template great_power_info_tooltip {
 					text = "[Country.GetLosingGreatPowerScoreInfo]"
 				}
 			}
-			TooltipTextBlock = { 
+			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[GetRankComparisonForCountryInfo(Country.Self)]"
 				}
@@ -403,9 +419,16 @@ template non_great_power_info_tooltip {
 				}
 				textcontext = "[Country.GetGreatPowerScoreInfo]"
 			}
-			TooltipTextBlock = { 
+			TooltipTextBlock = {
+				visible = "[Not(Country.IsGainingGreatPowerStatus)]"
 				blockoverride "text" {
 					text = "[GetRankComparisonForCountryInfo(Country.Self)]"
+				}
+			}
+			TooltipTextBlock = {
+				visible = "[Country.IsGainingGreatPowerStatus]"
+				blockoverride "text" {
+					text = "[Country.GetGainingGreatPowerScoreInfo]"
 				}
 			}
 		}
@@ -646,7 +669,7 @@ template active_hegemon_tooltip {
 					text = "[ActiveHegemon.GetActiveHegemonInfo]"
 				}
 			}
-			
+
 			widget = {
 				datacontext = "[ActiveHegemon.GetCurrent]"
 				visible = "[Country.IsValid]"
@@ -681,11 +704,33 @@ template active_hegemon_tooltip {
 				visible = "[ActiveHegemon.IsActive]"
 				textcontext = "[ActiveHegemon.GetBaseInfo]"
 			}
-
-			TooltipRequirementsList = {
-				textcontext = "[ActiveHegemon.GetConditions]"
+			TooltipTextBlock = {
+				visible = "[ActiveHegemon.IsActive]"
+				blockoverride "text" {
+					text = "[ActiveHegemon.GetToLoseTitle]"
+				}
 			}
-			
+			TooltipRequirementsList = {
+				visible = "[ActiveHegemon.IsActive]"
+				textcontext = "[ActiveHegemon.GetToLoseConditions]"
+			}
+			TooltipTextBlock = {
+				visible = "[ActiveHegemon.IsContested]"
+				blockoverride "text" {
+					text = "[ActiveHegemon.GetContestedTitle]"
+				}
+			}
+			TooltipTextBlock = {
+				visible = "[Not(ActiveHegemon.CurrentIsPlayer)]"
+				blockoverride "text" {
+					text = "[ActiveHegemon.GetToGainTitle]"
+				}
+			}
+			TooltipRequirementsList = {
+				visible = "[Not(ActiveHegemon.CurrentIsPlayer)]"
+				textcontext = "[ActiveHegemon.GetToGainConditions]"
+			}
+
 			TooltipStringPairList = {
 				textcontext = "[ActiveHegemon.GetGreatPowerStatistic]"
 			}
@@ -720,8 +765,8 @@ template AntagonismBombSpec_tooltip {
 		blockoverride "tooltip_content" {
 			TooltipStringPairList = { 
 				visible = "[AntagonismBombSpecWrap.GivesAntagonism]"
-				textcontext = "[AntagonismBombSpecWrap.GetDesc][Localize('NEWLINE_BREAK')][AntagonismBombSpecWrap.GetBreakdownPerBomb]"
-			}
+				textcontext = "[AntagonismBombSpecWrap.GetDesc][Localize('NEWLINE_BREAK')][AntagonismBombSpecWrap.GetBreakdownPerBomb]"				
+			}			
 			TooltipTextBlock = {
 				visible = "[Not(AntagonismBombSpecWrap.GivesAntagonism)]"
 				blockoverride "text" { text = "ANTAGONISM_TT_NONE_CAUSED" }

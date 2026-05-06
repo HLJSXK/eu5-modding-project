@@ -21,17 +21,7 @@ move_nw_good_to_new_location = {
 	allow = {
 		scope:actor ?= {
 			any_market_present_in_country = {
-				save_temporary_scope_as = temp_market
-				any_in_global_list = {
-					variable = new_world_goods
-					save_temporary_scope_as = temp_goods
-					scope:temp_market = {
-						OR = {
-							is_produced_in_market = scope:temp_goods
-							is_traded_in_market = scope:temp_goods
-						}
-					}
-				}
+				has_new_world_goods_in_market = yes
 			}
 		}
 	}
@@ -55,16 +45,18 @@ move_nw_good_to_new_location = {
 		looking_for_a = goods
 		target_flag = target_good
 		ai_interaction_source_list = {# Has a market that demands the good
-			every_in_global_list = {
-				variable = new_world_goods
-				save_temporary_scope_as = temp_goods
+			every_goods = {
+				limit = {
+					has_origin_in_new_world = yes
+				}
+				save_temporary_scope_as = temp_good
 
 				scope:actor = { 
 					random_market_present_in_country = {
 						limit = {
-							"goods_demand_in_market(scope:temp_goods)" > "goods_supply_in_market(scope:temp_goods)"
+							"goods_demand_in_market(scope:temp_good)" > "goods_supply_in_market(scope:temp_good)"
 						}
-						scope:temp_goods = { add_to_list = source }
+						scope:temp_good = { add_to_list = source }
 					}
 				}
 			}
@@ -73,7 +65,7 @@ move_nw_good_to_new_location = {
 		none_available_msg_key = "move_nw_good_to_new_location_no_available_good"
 		column = { data = name }
 		visible = {
-			has_tag = new_world_goods
+			has_origin_in_new_world = yes
 			scope:actor ?= {
 				any_market_present_in_country = {
 					OR = {
@@ -359,7 +351,7 @@ move_nw_good_to_new_location = {
 				#If there is surplus is less valuable
 				if = {
 					limit = {
-						is_in_surplus_in_market = { market = scope:target_location.market country = root value > 0 }
+						is_in_surplus_in_market = { market = scope:target_location.market country = scope:actor value > 0 }
 					}
 					subtract = 	100
 				}
@@ -386,6 +378,7 @@ move_nw_good_to_new_location = {
 #Plant rice
 #Plant sugar
 #Release horses
+#Release bees
 #Release pigs/ Raise Cattle
 move_ow_good_to_new_location = {
 	type = situation
@@ -404,17 +397,7 @@ move_ow_good_to_new_location = {
 	allow = {
 		scope:actor ?= {
 			any_market_present_in_country = {
-				save_temporary_scope_as = temp_market
-				any_in_global_list = {
-					variable = old_world_goods
-					save_temporary_scope_as = temp_goods
-					scope:temp_market = {
-						OR = {
-							is_produced_in_market = scope:temp_goods
-							is_traded_in_market = scope:temp_goods
-						}
-					}
-				}
+				has_old_world_goods_in_market = yes
 			}
 		}
 	}
@@ -437,24 +420,26 @@ move_ow_good_to_new_location = {
 		looking_for_a = goods
 		target_flag = target_good
 		ai_interaction_source_list = {# Has a market that demands the good
-			every_in_global_list = {
-				variable = old_world_goods
-				save_temporary_scope_as = temp_goods
+			every_goods = {
+				limit = {
+					has_origin_in_old_world = yes
+				}
+				save_temporary_scope_as = temp_good
 				scope:actor = { 
 					random_market_present_in_country = {
 						limit = {
-							"goods_demand_in_market(scope:temp_goods)" > "goods_supply_in_market(scope:temp_goods)"
+							"goods_demand_in_market(scope:temp_good)" > "goods_supply_in_market(scope:temp_good)"
 						}
-						scope:temp_goods = { add_to_list = source }
+						scope:temp_good = { add_to_list = source }
 					}
 				}
 			}
 		}
 		name = "spread_select_goods"
-		none_available_msg_key = "move_nw_good_to_new_location_no_available_good"
+		none_available_msg_key = "move_ow_good_to_new_location_no_available_good"
 		column = { data = name }
 		visible = {
-			has_tag = old_world_goods
+			has_origin_in_old_world = yes
 			scope:actor ?= {
 				any_market_present_in_country = {
 					OR = {
@@ -480,14 +465,8 @@ move_ow_good_to_new_location = {
 				continent = continent:oceania
 				this = region:macaronesia_region
 			}
-			any_area_in_region = {
-				scope:actor = { has_discovered_area = prev }
-				any_location_in_area = {
-					OR = {
-						owner ?= scope:actor
-						top_owner ?= scope:actor
-					}
-				}
+			scope:actor = {
+				owns_or_has_subject_in = prev
 			}
 		}
 	}
@@ -508,7 +487,7 @@ move_ow_good_to_new_location = {
 							scope:actor = { owns_or_has_subject_in = prev }
 							#Maximum of 2 of the same resource per Province
 							"raw_material_amount(scope:target_good)" < 2
-						}					
+						}
 						every_ownable_location_in_province_definition = {
 							limit = {
 								owner ?= {
@@ -829,6 +808,19 @@ move_ow_good_to_new_location = {
 				}
 				climate = tropical
 			}
+			#Beeswax
+			trigger_if = {
+				limit = {
+					scope:target_good = goods:beeswax
+				}
+				NOT = { raw_material ?= goods:beeswax }
+				NOR = {
+					vegetation = desert
+				}
+				NOR = {
+					climate = arctic
+				}
+			}
 		}
 	}
 
@@ -947,7 +939,7 @@ learn_from_foreigners = {
 						value = research_progress_weak_bonus
 					}
 				}
-				add_trust = {
+				add_trust_equilibrium = {
 					modifier = trust_learn_from_foreigners
 					target = scope:target
 				}
@@ -1079,7 +1071,7 @@ absorb_institutions = {
 						}
 					}
 				}
-				add_trust = {
+				add_trust_equilibrium = {
 					modifier = trust_absorb_institutions
 					target = scope:target
 				}

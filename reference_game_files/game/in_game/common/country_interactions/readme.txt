@@ -22,8 +22,8 @@
 #						target_flag = what you want to call this target in the scope (e.g. target, target_1, target_province etc.) Then later you'll use this name to reference what was selected here. If left out it will default to target, target_1, target_2, target_3 etc
 #						source = actor/recipient/target/target_1/target_2/target_3/target_4/world/knowncountries/inrange/rivals/subjects/atwar
 #						source_ai_override = actor/recipient/target/target_1/target_2/target_3/target_4 (ai only)
-#                       source_flags = options to improve game performance by narrowing down the choice (neighbor/possible_colonial_charters/include_dead/include_any_present/possible_exploration_areas/adjacent_locations/vacant_adjacent_locations/adjacent_provinces/border/border_or_recipients_capital_area/provinces_ai_wants_to_give_away/only_actual_locations/same_international_organization)
-#                       source_flags_ai_override = options to improve game performance by narrowing down the choice for Ai countries (neighbor/possible_colonial_charters/include_dead/include_any_present/possible_exploration_areas/adjacent_locations/vacant_adjacent_locations/adjacent_provinces/border/border_or_recipients_capital_area/provinces_ai_wants_to_give_away/only_actual_locations/same_international_organization)
+#                       source_flags = options to improve game performance by narrowing down the choice (neighbor/possible_colonial_charters/include_dead/include_any_present/possible_exploration_areas/adjacent_locations/vacant_adjacent_locations/adjacent_provinces/border/border_or_recipients_capital_area/provinces_ai_wants_to_give_away/only_actual_locations/same_international_organization/wants_military_access_in)
+#                       source_flags_ai_override = options to improve game performance by narrowing down the choice for Ai countries (neighbor/possible_colonial_charters/include_dead/include_any_present/possible_exploration_areas/adjacent_locations/vacant_adjacent_locations/adjacent_provinces/border/border_or_recipients_capital_area/provinces_ai_wants_to_give_away/only_actual_locations/same_international_organization/wants_military_access_in)
 #		                source_global_list = <name of global variable list with the list of candidates in> if you have a pre calculated global list of who you want in the select_trigger, use this
 # 						interaction_source_list = <effect> gives us a list of possible candidates to look at. scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc. Fill the list with add_to_list = source on the scope object
 # 						ai_interaction_source_list = { #Same as above but it is only applied to Ai countries
@@ -210,12 +210,9 @@
 # using_favors
 # unbalanced_favors
 # trust_in_actor
+# positive_trust_in_actor
+# negative_trust_in_actor
 # trust_in_recipient
-# not_1_trust
-# not_5_trust
-# not_10_trust
-# not_15_trust
-# not_20_trust
 # same_government_type
 # different_government_type
 # estates_like

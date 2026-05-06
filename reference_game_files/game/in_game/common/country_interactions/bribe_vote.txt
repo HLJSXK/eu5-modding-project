@@ -8,7 +8,10 @@
 		monthly_balance > 5
 		num_loans < 1
 		prestige > 10
-		
+		# Fast-exit: skip potential evaluation entirely for AI if no IO has an active policy vote
+		any_international_organizations_member_of = {
+			resolution_is_active = resolution:policy_vote
+		}
 		trigger_if = {
 			limit = {
 				prestige < 20
@@ -25,8 +28,6 @@
 			scope:actor = {
 				any_international_organizations_member_of = {
 					resolution_is_active = resolution:policy_vote
-					has_variable = io_law_proposer
-					var:io_law_proposer ?= scope:actor
 				}
 			}
 		}
@@ -34,7 +35,7 @@
 
 	allow = {
 		scope:actor = {
-			monthly_balance > 1
+			prestige >= 10
 		}
 	}
 	
@@ -49,6 +50,11 @@
 		target_flag = recipient
 		name = "bribe_voter_for_policy_select_country"
 		none_available_msg_key = "bribe_voter_for_policy_no_countries"
+		pre_evaluation_sort_value = { #prioritise financially-weak targets; avoids full ai_will_do eval (with its every_international_organization_member loop) for every org member
+			if = { limit = { is_during_bankruptcy = yes } add = 100 }
+			if = { limit = { monthly_balance < 0 } add = 20 }
+		}
+		pre_evaluation_number_to_evaluate_fully = 3
 		column = {
 			data = name
 		}
@@ -74,8 +80,7 @@
 		}
 		visible = {
 			resolution_is_active = resolution:policy_vote
-			has_variable = io_law_proposer
-			var:io_law_proposer ?= scope:actor
+			has_member = scope:actor
 		}
 		enabled = {
 			not = {
@@ -142,6 +147,10 @@
 			value = scope:recipient.monthly_income_total
 			multiply = 6
 		}
+		ai_override_value = { #avoids 6x parameter sampling that multiplies the every_international_organization_member loop cost
+			value = scope:recipient.monthly_income_total
+			multiply = 6
+		}
 	}
 	
 	effect = {
@@ -195,29 +204,35 @@
 		add = {
 			desc = "BRIBE_BIAS_PROXIMITY_TO_GOAL"
 			value = 10
-            save_temporary_value_as = end_vote_counter
-			scope:organization = { 
+			scope:organization = {
 				every_international_organization_member = {
+					limit = { NOT = { this = scope:recipient } } #exclude recipient: their current vote is about to change
 					if = {
 						limit = {
 							"resolution_vote(this|scope:recipient|resolution:policy_vote)" ?= scope:policy
 						}
-						subtract = {
-							value = scope:end_vote_counter
-							value = 1
-						}
+						add = 11 # +10 base +1 per yes-voter
 					}
 					else = {
-						add = {
-							value = scope:end_vote_counter
-							value = 1
-						}
+						subtract = 9 # -10 base +1 penalty per no-voter
 					}
 				}
 			}
-			if = {
-				limit = { scope:end_vote_counter != 0 }
-				divide = scope:end_vote_counter
+			divide = 10
+		}
+		#don't bribe against our own proposal
+		if = {
+			limit = {
+				scope:organization = {
+					has_variable = io_law_proposer
+					var:io_law_proposer = scope:actor
+					has_variable = ai_io_law_target
+					NOT = { var:ai_io_law_target = scope:policy }
+				}
+			}
+			subtract = {
+				desc = "BRIBE_AGAINST_OWN_PROPOSAL"
+				value = 1000
 			}
 		}
 		if = {
@@ -232,7 +247,7 @@
 					divide = 4
 					subtract = {
 						value = scope:recipient.monthly_income_total
-						multiply = 12
+						multiply = 3
 					}
 				}
 			}

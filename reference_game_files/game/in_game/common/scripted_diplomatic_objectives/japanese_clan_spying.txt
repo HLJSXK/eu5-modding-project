@@ -15,22 +15,20 @@
         }
         "scope:actor.relative_military_strength(scope:recipient)" > 0.5
 
-        or = {
-            and = {
-                scope:actor = {
-                     has_variable = supports_northern_court
-                }
-                scope:recipient = {
-                     has_variable = supports_southern_court
-                }
+        # Target any clan on a different side — mirrors the NAND pattern in cb_nanbokuchou
+        custom_tooltip = {
+            text = not_same_side_in_nanbokucho_tt
+            NAND = {
+                scope:actor = { has_variable = supports_northern_court }
+                scope:recipient = { has_variable = supports_northern_court }
             }
-            and = {
-                scope:actor = {
-                     has_variable = supports_southern_court
-                }
-                scope:recipient = {
-                     has_variable = supports_northern_court
-                }
+            NAND = {
+                scope:actor = { has_variable = supports_southern_court }
+                scope:recipient = { has_variable = supports_southern_court }
+            }
+            NAND = {
+                scope:actor = { has_variable = supports_new_imperial_line }
+                scope:recipient = { has_variable = supports_new_imperial_line }
             }
         }
     }
@@ -62,6 +60,68 @@
     destroy = yes
     spy_network_target = 70
     fabricate_cb = "cb_nanbokuchou"
+
+    max_allowed = 2
+}
+
+jap_clan_nanbokucho_alliance = {
+    days_between_checks = 365
+
+    actor_trigger = {
+        exists = situation:nanbokuchou
+        is_member_of_international_organization = international_organization:japanese_shogunate
+        OR = {
+            has_variable = supports_northern_court
+            has_variable = supports_southern_court
+        }
+        num_country_that_can_be_called_offensively < 3
+    }
+
+    recipient_trigger = {
+        scope:recipient = {
+            is_member_of_international_organization = international_organization:japanese_shogunate
+            NOT = { is_allied_with = { target = scope:actor } }
+            NOT = { is_at_war_with = scope:actor }
+            NOT = { is_enemy_of = scope:actor }
+        }
+        # Same side only
+        OR = {
+            AND = {
+                scope:actor = { has_variable = supports_northern_court }
+                scope:recipient = { has_variable = supports_northern_court }
+            }
+            AND = {
+                scope:actor = { has_variable = supports_southern_court }
+                scope:recipient = { has_variable = supports_southern_court }
+            }
+        }
+        "scope:actor.opinion(scope:recipient)" > 0
+    }
+
+    recipient_priority = {
+        add = {
+            value = "scope:recipient.relative_military_strength(scope:actor)"
+            multiply = 50
+        }
+    }
+
+    pause_trigger = {
+        always = no
+    }
+
+    cancel_trigger = {
+        OR = {
+            NOT = { exists = situation:nanbokuchou }
+            scope:actor = { is_allied_with = { target = scope:recipient } }
+        }
+    }
+
+    improve_relation = yes
+    improve_relation_limit = 100
+
+    country_relations = {
+        alliance = yes
+    }
 
     max_allowed = 2
 }

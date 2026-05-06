@@ -1,4 +1,4 @@
-@tooltip_title_wide = 420
+﻿@tooltip_title_wide = 420
 @tooltip_title_high = 20
 @tooltip_inner_margin = 10
 @tooltip_inner_wide =  @[tooltip_title_wide - tooltip_inner_margin * 2]
@@ -12,6 +12,14 @@ template tooltip_max_width_title_wide { max_width = @tooltip_title_wide }
 template tooltip_table_field_texture {
 	using = text_mask_container_texture
 	alpha = 0.2
+	modify_texture = {
+		using = color_turquoise_texture
+	}
+}
+
+template click_modifier_bg_texture {
+	using = text_mask_container_texture
+	alpha = 0.5
 	modify_texture = {
 		using = color_turquoise_texture
 	}
@@ -748,14 +756,15 @@ types ContextualTooltipTypes
 			layoutpolicy_horizontal = expanding
 
 			margin = { 2 0 }
-			spacing = 4
+			spacing = 2
 
 			hbox = {
-				margin = { 2 0 }
+				visible = "[UIAction.HasClickModifierAvailable('shift')]"
+				minimumsize = { -1 26 }
+				margin = { 4 0 }
 				spacing = 4
 
 				widget = {
-					visible = "[UIAction.HasClickModifierAvailable('shift')]"
 					size = { 40 15 }
 
 					icon = {
@@ -771,17 +780,37 @@ types ContextualTooltipTypes
 					}
 				}
 
-				block "shift_left_extra" {}
+				text_single = {
+					visible = "[UIAction.HasClickModifierDescription('shift')]"
+					text = "[UIAction.GetClickModifierDescription('shift')]"
+					using = Font_Size_Very_Small
+					minimumsize = { -1 26 }
+					default_format = "#Color_Yellow"
+					margin_right = 3
+					margin_left = 2
+				}
+
+				background = {
+					visible = "[UIAction.HasClickModifierDescription('shift')]"
+					using = click_modifier_bg_texture
+
+					modify_texture = {
+						visible = "[UIAction.IsClickModifierEnabled('shift')]"
+						using = color_white_texture
+						alpha = 0.2
+					}
+				}
 			}
 
 			hbox = {
-				margin = { 2 0 }
+				visible = "[UIAction.HasClickModifierAvailable('ctrl')]"
+
+				minimumsize = { -1 26 }
+				margin = { 4 0 }
 				spacing = 4
 
 				widget = {
-					visible = "[UIAction.HasClickModifierAvailable('ctrl')]"
 					size = { 40 15 }
-
 					icon = {
 						texture = "gfx/interface/icons/text_icons/ctrl.dds"
 						parentanchor = center
@@ -794,14 +823,37 @@ types ContextualTooltipTypes
 						}
 					}
 				}
+
+				text_single = {
+					visible = "[UIAction.HasClickModifierDescription('ctrl')]"
+					text = "[UIAction.GetClickModifierDescription('ctrl')]"
+					using = Font_Size_Very_Small
+					minimumsize = { -1 26 }
+					default_format = "#Color_Yellow"
+					margin_right = 3
+					margin_left = 2
+				}
+
+				background = {
+					visible = "[UIAction.HasClickModifierDescription('ctrl')]"
+					using = click_modifier_bg_texture
+
+					modify_texture = {
+						visible = "[UIAction.IsClickModifierEnabled('ctrl')]"
+						using = color_white_texture
+						alpha = 0.2
+					}
+				}
 			}
 
 			hbox = {
-				margin = { 2 0 }
+				visible = "[UIAction.HasClickModifierAvailable('alt')]"
+
+				minimumsize = { -1 26 }
+				margin = { 4 0 }
 				spacing = 4
 
 				widget = {
-					visible = "[UIAction.HasClickModifierAvailable('alt')]"
 					size = { 40 15 }
 
 					icon = {
@@ -814,6 +866,27 @@ types ContextualTooltipTypes
 							using = color_white_texture
 							alpha = 0.2
 						}
+					}
+				}
+
+				text_single = {
+					visible = "[UIAction.HasClickModifierDescription('alt')]"
+					text = "[UIAction.GetClickModifierDescription('alt')]"
+					using = Font_Size_Very_Small
+					minimumsize = { -1 26 }
+					default_format = "#Color_Yellow"
+					margin_right = 3
+					margin_left = 2
+				}
+
+				background = {
+					visible = "[UIAction.HasClickModifierDescription('alt')]"
+					using = click_modifier_bg_texture
+
+					modify_texture = {
+						visible = "[UIAction.IsClickModifierEnabled('alt')]"
+						using = color_white_texture
+						alpha = 0.2
 					}
 				}
 			}
@@ -1646,10 +1719,12 @@ types ContextualTooltipTypes
 	}
 
 	type TooltipColumnListContent = TooltipListColumnContent {
-		# block "columnlist_datamodel" {
-		datamodel = "[TableColumnList.GetColumns]"
-		ignoreinvisible = yes
-		# }
+		block "columnlist_datamodel" {
+			datamodel = "[TableColumnList.GetColumns]"
+			ignoreinvisible = yes
+		}
+
+		block "columnlist_content_extra" {}
 
 		item = {
 			TooltipTableColumn = {
@@ -1661,7 +1736,7 @@ types ContextualTooltipTypes
 				}
 
 				blockoverride "column_title" {
-					visible = "[TableColumnList.HasTitleRow]"
+					visible = "[TableColumn.HasTitle]"
 				}
 
 				blockoverride "column_title_text" {
@@ -1684,7 +1759,7 @@ types ContextualTooltipTypes
 
 				blockoverride "field_text" {
 					autoresize = yes
-					text = "[CString.GetString]"
+					text = "[CPdxStringView.GetStringView]"
 					align = "[TableColumn.GetTextAlignment]"
 				}
 
@@ -1882,12 +1957,12 @@ types ContextualTooltipTypes
 			TooltipConditionList = {
 				using = tooltip_left_click_conditions_template
 
-				visible = "[And3(UIAction.IsLeftClickVisible, Not(UIAction.IsLeftClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickTooltip).GetOutput)))]"
+				visible = "[And3(UIAction.IsLeftClickVisible, Not(UIAction.IsLeftClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickConditions).GetOutput)))]"
 				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetLeftClickTooltip]"
+				tooltip = "[UIAction.GetLeftClickConditions]"
 
 				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetLeftClickTooltip]"
+				textcontext = "[UIAction.GetLeftClickConditions]"
 			}
 
 			# Single click
@@ -1910,12 +1985,12 @@ types ContextualTooltipTypes
 				using = tooltip_right_click_conditions_template
 				blockoverride "conditionlist_item_setup" { righttoleft = yes }
 
-				visible = "[And3(UIAction.IsRightClickVisible, Not(UIAction.IsRightClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickTooltip).GetOutput)))]"
+				visible = "[And3(UIAction.IsRightClickVisible, Not(UIAction.IsRightClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickConditions).GetOutput)))]"
 				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetRightClickTooltip]"
+				tooltip = "[UIAction.GetRightClickConditions]"
 
 				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetRightClickTooltip]"
+				textcontext = "[UIAction.GetRightClickConditions]"
 			}
 
 			blockoverride "action_left" {
@@ -1976,12 +2051,12 @@ types ContextualTooltipTypes
 			TooltipConditionList = {
 				using = tooltip_left_click_conditions_template
 
-				visible = "[And3(UIAction.IsLeftClickAndConfirmVisible, Not(UIAction.IsLeftClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetLeftClickAndConfirmTooltip).GetOutput)))]"
+				visible = "[And3(UIAction.IsLeftClickAndConfirmVisible, Not(UIAction.IsLeftClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickAndConfirmConditions).GetOutput)))]"
 				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetLeftClickAndConfirmTooltip]"
+				tooltip = "[UIAction.GetLeftClickAndConfirmConditions]"
 
 				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetLeftClickAndConfirmTooltip]"
+				textcontext = "[UIAction.GetLeftClickAndConfirmConditions]"
 			}
 
 			# Confirm click
@@ -2004,12 +2079,12 @@ types ContextualTooltipTypes
 				using = tooltip_right_click_conditions_template
 				blockoverride "conditionlist_item_setup" { righttoleft = yes }
 
-				visible = "[And3(UIAction.IsRightClickAndConfirmVisible, Not(UIAction.IsRightClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetRightClickAndConfirmTooltip).GetOutput)))]"
+				visible = "[And3(UIAction.IsRightClickAndConfirmVisible, Not(UIAction.IsRightClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickAndConfirmConditions).GetOutput)))]"
 				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetRightClickAndConfirmTooltip]"
+				tooltip = "[UIAction.GetRightClickAndConfirmConditions]"
 
 				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetRightClickAndConfirmTooltip]"
+				textcontext = "[UIAction.GetRightClickAndConfirmConditions]"
 			}
 
 			blockoverride "action_left" {
@@ -2481,9 +2556,9 @@ types ContextualTooltipTypes
 		}
 
 		TooltipListScrollArea = {
-			block "stringpair_datamodel_has_items" {
+			# block "stringpair_datamodel_has_items" {
 				visible = "[DataModelHasItems(RequirementsList.GetLines)]"
-			}
+			# }
 
 			blockoverride "scrollarea_content" {
 				TooltipRequirementsListContent = {
@@ -2516,9 +2591,9 @@ types ContextualTooltipTypes
 		}
 
 		TooltipListScrollArea = {
-			block "stringpair_datamodel_has_items" {
+			# block "stringpair_datamodel_has_items" {
 				visible = "[DataModelHasItems(ConditionList.GetLines)]"
-			}
+			# }
 
 			blockoverride "scrollarea_content" {
 				TooltipConditionListContent = {

@@ -222,8 +222,7 @@
 							is_ai = yes
 						}
 					}
-					custom_tooltip = {
-						text = law_debate_cooldowns_tt
+					NOT = {
 						is_target_in_variable_list = {
 							name = law_debate_cooldowns
 							target = root
@@ -234,7 +233,10 @@
 
 			scope:recipient = {
 				not = { law_is_locked_in_international_organization = root }
-				law_enabled_to_international_organization = root
+				trigger_if = {
+					limit = { NOT = { resolution_is_active = resolution:policy_vote } }
+					law_enabled_to_international_organization = root
+				}
 			}
 			
 			trigger_if = {
@@ -310,18 +312,6 @@
 					}
 				}
 			}
-			custom_tooltip = {
-				text = policy_vote_select_policy_bt
-				trigger_if = {
-					limit = {
-						exists = scope:actor
-						exists = scope:proposer
-						scope:actor = scope:proposer
-						exists = price
-					}
-					scope:proposer ?= { can_pay_price = root.price }
-				}
-			}
 		}
 		selected = {
 			scope:recipient = {
@@ -382,10 +372,6 @@
 						}
 					}
 				}
-			}
-			if = {
-				limit = { scope:vote ?= { exists = price } }
-				scope:proposer = { pay_price = scope:vote.price }
 			}
 			if = {
 				limit = {
@@ -472,17 +458,26 @@
 				}
 				#Catholic Church vote
 				council_of_trent_pass_effect = yes
-				#Special ai cooldown so they don't spam it
-				scope:recipient = {
-					add_cooldown = {
-						type = ai_policy_vote_cooldown
-						years = 5
-					}
-				}
 			}
 		}
 		else = {
 			custom_tooltip = policy_vote_tt
+		}
+		#Special ai cooldown so they don't spam it
+		if = {
+			limit = {
+				exists = scope:recipient
+				exists = scope:target
+			}
+			hidden_effect = {
+				scope:recipient = {
+					add_to_variable_list = {
+						name = ai_law_vote_cooldowns
+						target = scope:target
+						years = 20
+					}
+				}
+			}
 		}
 	}
 	reject_effect = {
@@ -517,13 +512,19 @@
 			}
 			#Catholic Church vote
 			council_of_trent_reject_effect = yes
-			if = {
-				limit = { exists = scope:recipient }
-				#Special ai cooldown so they don't spam it
+		}
+		#Special ai cooldown so they don't spam it
+		if = {
+			limit = {
+				exists = scope:recipient
+				exists = scope:target
+			}
+			hidden_effect = {
 				scope:recipient = {
-					add_cooldown = {
-						type = ai_policy_vote_cooldown
-						years = 5
+					add_to_variable_list = {
+						name = ai_law_vote_cooldowns
+						target = scope:target
+						years = 20
 					}
 				}
 			}
@@ -687,8 +688,12 @@
 			limit = {
 				exists = scope:vote
 				exists = scope:recipient
+				exists = scope:target
 				scope:recipient = {
-					NOT = { has_cooldown = ai_policy_vote_cooldown }
+					OR = {
+						NOT = { has_variable_list = ai_law_vote_cooldowns }
+						NOT = { is_target_in_variable_list = { name = ai_law_vote_cooldowns target = scope:target } }
+					}
 				}
 			}
 			#add on voting bias from the policy itself
@@ -709,7 +714,11 @@
 		if = {
 			limit = {
 				exists = scope:recipient
-				scope:recipient = { has_cooldown = ai_policy_vote_cooldown }
+				exists = scope:target
+				scope:recipient = {
+					has_variable_list = ai_law_vote_cooldowns
+					is_target_in_variable_list = { name = ai_law_vote_cooldowns target = scope:target }
+				}
 			}
 			subtract = {
 				desc = "INERTIA"

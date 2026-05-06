@@ -672,7 +672,11 @@ betray_our_allegiance = {	#Betray our Allegiance
 						}
 					}
 				}
-				war_length > 6
+				trigger_if = {
+					limit = { exists = this }
+					war_length > 12
+				}
+				trigger_else = { custom_tooltip = war_going_on_longer_than_year_tt }
 			}
 			trigger_if = {
 				limit = { is_subject = yes }
@@ -808,16 +812,16 @@ betray_our_allegiance = {	#Betray our Allegiance
 		}
 		else = {
 			add = {
-				value = "scope:actor.opinion(c:ENG)"
-				subtract = "scope:actor.opinion(c:FRA)"
-				desc = "our opinion of England minus opinion of france"
+				value = "scope:actor.opinion(c:FRA)"
+				subtract = "scope:actor.opinion(c:ENG)"
+				desc = "our opinion of France minus opinion of England"
 				multiply = 0.25
 			}
 
 			add = {
-				value = c:ENG.modifier:diplomatic_reputation
-				subtract = c:FRA.modifier:diplomatic_reputation
-				desc = "ENG dip rep minus FRA dip rep"
+				value = c:FRA.modifier:diplomatic_reputation
+				subtract = c:ENG.modifier:diplomatic_reputation
+				desc = "FRA dip rep minus ENG dip rep"
 				multiply = 5
 			}
 		}
@@ -1458,3 +1462,210 @@ hyw_defect_action = {	#Betray our Allegiance
 		}
 	}
 }
+
+crown_new_ruler = {	#Crown a New Ruler
+	type = situation
+	show_message = no
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = 4
+
+	potential = {
+		scope:actor = {
+			OR = {
+				AND = {
+					this = c:FRA
+					in_union_with = c:ENG
+				}
+				AND = {
+					this = c:ENG
+					in_union_with = c:FRA
+				}
+			}
+			NOT = {
+				any_union_partner = {
+					union = { 
+						country_has_special_status = {
+							type = special_status:senior_partner
+							country = prev
+						}
+					}
+				}
+			}
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			government_type = government_type:monarchy
+			at_war = no
+			is_during_bankruptcy = no
+			any_character = {
+				is_adult = yes
+				is_eligible_heir = prev
+				NOR = {
+					is_ruler_of = prev
+					is_heir_of = prev
+					is_regent_of = prev
+				}
+			}
+			
+
+			trigger_if = {
+				limit = { this = c:FRA }
+				NOT = { has_truce_with = c:ENG }
+				ruler_or_regent = { 
+					culture = { 
+						NOT = { has_culture_group = culture_group:french_group }
+					}
+				}
+			}
+
+			trigger_else = {
+				NOT = { has_truce_with = c:FRA }
+				ruler_or_regent = { 
+					culture = { 
+						NOT = { has_culture_group = culture_group:british_group }
+					}
+				}
+			}
+		}
+	}
+
+	price = price:hyw_main_actions_price
+	price_modifier = {
+		add = {
+			value = 2
+			desc = BASE_VALUE
+		}
+		if = {
+			limit = { scope:actor = c:FRA }
+			multiply = {
+				value = "scope:actor.relative_military_strength(c:ENG)"
+				desc = "[military_strength|e]"
+			}
+		}
+		else = {
+			multiply = {
+				value = "scope:actor.relative_military_strength(c:FRA)"
+				desc = "[military_strength|e]"
+			}
+		}
+	}
+
+	cooldown = {
+		type = crown_new_ruler
+		years = 30
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:hundred_years_war = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:hundred_years_war = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		interaction_source_list = {
+			scope:actor = {
+				ordered_character = {
+					limit = { 
+						is_female = no 
+						is_adult = yes
+						is_eligible_heir = prev
+						NOR = {
+							is_ruler_of = prev
+							is_heir_of = prev
+							is_regent_of = prev
+						}
+					}
+					max = 5
+					order_by = total_abilities
+					check_range_bounds = no
+					add_to_list = source
+				}
+				ordered_character = {
+					limit = { 
+						is_female = yes 
+						is_adult = yes
+						is_eligible_heir = prev
+						NOR = {
+							is_ruler_of = prev
+							is_heir_of = prev
+							is_regent_of = prev
+						}
+					}
+					max = 5
+					order_by = total_abilities
+					check_range_bounds = no
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target_character
+		name = "choose_character"
+		column = { data = name }
+		column = { data = character_info }
+	}
+
+	effect = { 
+		if = {
+			limit = { exists = scope:target_character }
+
+			scope:actor = { set_new_ruler = scope:target_character }
+			if = {
+				limit = { scope:actor = c:FRA }
+				c:ENG = { trigger_event_non_silently = hundred_years_war.240 }
+			}
+			else = { 
+				c:FRA = { trigger_event_non_silently = hundred_years_war.240 }
+			}
+		}
+		else = { custom_tooltip = selected_character_takes_actor_crown_tt }
+	}
+
+	ai_will_do = {
+		add = {
+			value = 25
+			desc = BASE_VALUE
+		}
+
+		if = {
+			limit = { scope:actor = c:FRA }
+			subtract = {
+				value = "scope:actor.opinion(c:ENG)"
+				desc = "our opinion of England"
+			}
+		}
+		else = {
+			subtract = {
+				value = "scope:actor.opinion(c:FRA)"
+				desc = "our opinion of France"
+			}
+		}
+
+		
+		if = {
+			limit = { exists = scope:target_character }
+			add = {
+				value = scope:target_character.total_abilities
+				subtract = scope:actor.ruler_or_regent.total_abilities
+				desc = "candidate abilities"
+			}
+		}
+	}
+}
+

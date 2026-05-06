@@ -27,6 +27,145 @@ types SocietyView
 		}
 	}
 
+	type PresentMovements = icon {
+		texture = "gfx/interface/component_tiles/regular_banner.dds"
+		texture_density = 2
+		size = { 44 48 }
+		visible = "[Player.HasAnyMovementPresent]"
+
+		flowcontainer = {
+			parentanchor = center
+			position = { 3 -5}
+			spacing = 2
+
+			text_single = {
+				minimumsize = { -1 26 }
+				align = nobaseline|hcenter
+				text = "[GetDataModelSize(GetAllMovements)]"
+			}
+			icon = {
+				size = { 26 26 }
+				texture = "[GetConceptTexture('movements')]"
+				texture_density = 2
+
+				glow = {
+					name = "drop_shadow"
+					glow_radius = 3
+					color = {0.0 0.0 0.0 1.0}
+					alpha = 0.3
+				}
+			}
+		}
+
+		tooltipwidget = {
+			ContextualTooltipType = {
+				blockoverride "title_icon" {
+					icon = {
+						using = tooltip_title_icon_size
+						texture = "[GetConceptTexture('movements')]"
+
+						glow = {
+							name = "drop_shadow"
+							glow_radius = 3
+							color = {0.0 0.0 0.0 1.0}
+							alpha = 0.3
+						}
+					}
+				}
+				blockoverride "title_text" {
+					raw_text = "game_concept_movements"
+				}
+				blockoverride "concept_link" {
+					text = "[movements|e]"
+				}
+					
+				blockoverride "tooltip_content" {
+					TooltipScrolledRowList = {
+						blockoverride "block_title" { visible = no }
+						blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(GetAllMovements)]"}
+						blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(GetAllMovements)]"}
+						blockoverride "rowlist_datamodel" { datamodel = "[GetAllMovements]" }
+						blockoverride "rowlist_content" {
+							hbox = {
+								visible = "[Movement.IsCountryAffected(Player.Self)]"
+								layoutpolicy_horizontal = expanding
+								spacing = 10
+								text_single = {
+									margin_left = 20
+									text = "[Movement.GetName]"
+								}
+								widget = { 
+									size = { 25 25 }
+									piechart = {
+										visible = "[Movement.IsCulture]"
+										size = { 100% 100% }
+										using = piechart_angles
+										using = bg_circle_piechart
+	
+										pieslice = {
+											texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+											value = "[FixedPointToFloat(Player.GetCulturePercentage(Movement.GetCulture))]"
+											color = { 1 1 1 1 }
+										}
+	
+										pieslice = {
+											texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+											value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetCulturePercentage(Movement.GetCulture)))]"
+											color = { 1 1 1 0 }
+										}
+
+										icon = {
+											size = {65% 65%}
+											parentanchor = center
+											using = culture_icon
+										}
+									}
+									piechart = {
+										visible = "[Movement.IsReligion]"
+										size = { 100% 100% }
+										using = piechart_angles
+										using = bg_circle_piechart
+	
+										pieslice = {
+											texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+											value = "[FixedPointToFloat(Player.GetReligionPercentage(Movement.GetReligion))]"
+											color = { 1 1 1 1 }
+										}
+	
+										pieslice = {
+											texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+											value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetReligionPercentage(Movement.GetReligion)))]"
+											color = { 1 1 1 0 }
+										}
+										icon = {
+											size = {65% 65%}
+											parentanchor = center
+											texture = "[GetReligionIcon(Movement.GetReligion)]"
+										}
+									}
+									tooltipwidget = {
+										using = movement_spread_tooltip
+									}
+								}
+
+								expand = {}
+							}
+						}
+		
+						blockoverride "block_scrollarea" {
+							maximumsize = { -1 210 }
+						}
+		
+						blockoverride "row_size" {
+							maximumsize = { -1 40 }
+							minimumsize = { -1 40 }
+						}
+					}
+				}
+			}
+		}
+	}
+
 	# type CharacterNameDefaultold = hbox {
 	# 	visible = "[Character.IsNameOrderDefault]"
 	# 	using = layoutpolicy_expanding
@@ -812,6 +951,16 @@ society_view = {
 						}
 					}
 				}
+
+				widget = {
+					parentanchor = top|hcenter
+					size = { 95 48 }
+					hbox = {
+						spacing = 4
+						# MOVEMENTS
+						PresentMovements = {}
+					}
+				}
 			}
 		}
 
@@ -841,16 +990,17 @@ society_view = {
 						using = TabPeopleRebelsTooltip
 					}
 				}
-				
+
 				button_secondary_tab_alt = {
 					using = layoutpolicy_expanding
+					visible = "[HasAnyVisibleMovementDefinitions]"
 					blockoverride "tab_text"{
-						text = "PEOPLE_LATERAL_VIEW_DYNASTIES"
+						text = "PEOPLE_LATERAL_VIEW_MOVEMENTS"
 					}
-					onclick = "[CountryPeopleLateralView.Vars.Set('subtab','dynasties')]"
-					down = "[CountryPeopleLateralView.Vars.HasValue('subtab', 'dynasties')]"
+					onclick = "[CountryPeopleLateralView.Vars.Set('subtab','movements')]"
+					down = "[CountryPeopleLateralView.Vars.HasValue('subtab','movements')]"
 					tooltipwidget = {
-						using = TabPeopleDynastiesTooltip
+						using = TabPeopleMovementsTooltip
 					}
 				}
 
@@ -864,6 +1014,18 @@ society_view = {
 					down = "[CountryPeopleLateralView.Vars.HasValue('subtab','characters')]"
 					tooltipwidget = {
 						using = TabPeopleCharactersTooltip
+					}
+				}
+
+				button_secondary_tab_alt = {
+					using = layoutpolicy_expanding
+					blockoverride "tab_text"{
+						text = "PEOPLE_LATERAL_VIEW_DYNASTIES"
+					}
+					onclick = "[CountryPeopleLateralView.Vars.Set('subtab','dynasties')]"
+					down = "[CountryPeopleLateralView.Vars.HasValue('subtab', 'dynasties')]"
+					tooltipwidget = {
+						using = TabPeopleDynastiesTooltip
 					}
 				}
 			}
@@ -1405,7 +1567,7 @@ society_view = {
 														}
 	
 														hbox = {
-															datamodel = "[DataModelFirst(PeopleDynastyItem.GetDynasty.GetCountries, '(int32)1')]"
+															datamodel = "[DataModelFirst(PeopleDynastyItem.GetDynasty.GetExistingCountries, '(int32)1')]"
 															margin_right = 5
 															item = {
 																country_flag = {
@@ -1491,14 +1653,14 @@ society_view = {
 										extra_list_vertical ={
 											parentanchor = right|vcenter
 											position = { -77 12 }
-											visible = "[GreaterThan_int32(GetDataModelSize(PeopleDynastyItem.GetDynasty.GetCountries), '(int32)1')]"
+											visible = "[GreaterThan_int32(GetDataModelSize(PeopleDynastyItem.GetDynasty.GetExistingCountries), '(int32)1')]"
 
 											blockoverride "extra_list_size"{
 												size = {27 37}
 											}
 											blockoverride "extra_list_text_content" {
 												align = center
-												raw_text = "+[Subtract_int32(GetDataModelSize(PeopleDynastyItem.GetDynasty.GetCountries), '(int32)1')]"
+												raw_text = "+[Subtract_int32(GetDataModelSize(PeopleDynastyItem.GetDynasty.GetExistingCountries), '(int32)1')]"
 												tooltipwidget = {
 													using = dynasty_country_list_tooltip
 												}
@@ -1514,6 +1676,7 @@ society_view = {
 												datacontext = "[Dynasty.GetDynastyHead]"	
 											}
 											blockoverride "portrait_position" {position = { 0 -1 }}
+											blockoverride "portrait_size" { size = { 85% 90% } }
 	
 											allow_outside = yes
 											
@@ -1536,8 +1699,28 @@ society_view = {
 											}
 	
 											blockoverride "character_ribbon" {
+												character_ribbon_1 = {
+													visible = "[Character.HasRebel]"
+													blockoverride "stretchable" {}
+													blockoverride "ribbon color" {
+														modify_texture = {
+															using = color_black_texture
+															blend_mode = overlay
+														}
+													}
+												}
 												character_ribbon_3 = {
-													visible = "[Character.IsRuler]"
+													visible = "[And(Character.IsCivilWarRuler, Not(Character.HasRebel))]"
+													blockoverride "stretchable" {}
+													blockoverride "ribbon color" {
+														modify_texture = {
+															using = color_black_texture
+															blend_mode = overlay
+														}
+													}
+												}
+												character_ribbon_3 = {
+													visible = "[And3(Character.IsRuler, Not(Character.HasRebel), Not(Character.IsCivilWarRuler))]"
 													blockoverride "stretchable" {}
 												}
 											}
@@ -1592,6 +1775,7 @@ society_view = {
 												datacontext = "[Dynasty.GetDynastyFounder]"	
 											}
 											blockoverride "portrait_position" {position = { 0 -1 }}
+											blockoverride "portrait_size" { size = { 85% 90% } }
 	
 											allow_outside = yes
 											
@@ -1614,8 +1798,28 @@ society_view = {
 											}
 	
 											blockoverride "character_ribbon" {
+												character_ribbon_1 = {
+													visible = "[Character.HasRebel]"
+													blockoverride "stretchable" {}
+													blockoverride "ribbon color" {
+														modify_texture = {
+															using = color_black_texture
+															blend_mode = overlay
+														}
+													}
+												}
 												character_ribbon_3 = {
-													visible = "[Character.IsRuler]"
+													visible = "[And(Character.IsCivilWarRuler, Not(Character.HasRebel))]"
+													blockoverride "stretchable" {}
+													blockoverride "ribbon color" {
+														modify_texture = {
+															using = color_black_texture
+															blend_mode = overlay
+														}
+													}
+												}
+												character_ribbon_3 = {
+													visible = "[And3(Character.IsRuler, Not(Character.HasRebel), Not(Character.IsCivilWarRuler))]"
 													blockoverride "stretchable" {}
 												}
 											}
@@ -1668,7 +1872,595 @@ society_view = {
 					}
 				}
 			}
+
+			# MOVEMENTS
+			vbox = {
+				visible = "[CountryPeopleLateralView.Vars.HasValue('subtab','movements')]"
+				layoutpolicy_vertical = expanding
+				layoutpolicy_horizontal = expanding
+
+				filtered_sorted_list = {
+					datacontext = "[CountryPeopleLateralView.GetMovementsSortSearch]"
+
+					using = bg_secondary_inner_image_alt
+					blockoverride "image" {
+						texture = "gfx/interface/illustrations/bg/bg_geopolitics.dds"
+					}
+
+					blockoverride "scroll_list_is_empty" {
+						visible = "[IsDataModelEmpty(CountryPeopleLateralView.GetMovements)]"
+					}
+
+					blockoverride "scroll_list_is_empty_text" {
+						text = "MOVEMENTS_LIST_EMPTY"
+					}
+
+					blockoverride "scroll_list_layout" {
+						dynamicgridbox = {
+							layoutpolicy_horizontal = expanding
+							datamodel_reuse_widgets = yes
+							resizetofit = yes
+							datamodel = "[CountryPeopleLateralView.GetMovements]"
+							item = {
+								widget = {
+									layoutpolicy_horizontal = expanding
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										set_parent_size_to_minimum = yes
+										minimumsize = { 527 -1 }
+										margin_left = 3
+										margin_bottom = 10
+
+										vbox = {
+											layoutpolicy_horizontal = expanding
+											bottomtotop = yes
+
+											using = bg_paper_card
+
+											background = {
+												texture = "gfx/interface/component_overlay/disease_stains.dds"
+												texture_density = 2
+												alpha = 0.2
+												modify_texture = {
+													using = color_dark_brown_texture
+												}
+											}
+
+											# BOTTOM CONTENT - Environmental movement when expanded
+											widget = {
+												visible = "[And(PeopleMovementItem.IsExpanded, PeopleMovementItem.IsEnvironmental)]"
+												layoutpolicy_horizontal = expanding
+												size = { -1 45 }
+												using = environmental_movement_item
+											}
+
+											# BOTTOM CONTENT - Outbreaks list when expanded
+											fixedgridbox =  {
+												visible = "[And(PeopleMovementItem.IsExpanded, Not(PeopleMovementItem.IsEnvironmental))]"
+												layoutpolicy_horizontal = expanding
+												size = { -1 -1 }
+												addcolumn = 100%
+												addrow = 100
+												datamodel_reuse_widgets = yes
+												resizetofit = yes
+												datamodel = "[PeopleMovementItem.GetOutbreaks]"
+												item = {
+													widget = {
+														size = { 100% 80 }
+														layoutpolicy_horizontal = expanding
+														datacontext = "[Movement]"
+														using = movement_entry_card
+													}
+												}
+											}
+
+											# TOP CONTENT - Clickable header
+											widget = {
+												layoutpolicy_horizontal = expanding
+												size = { -1 40 }
+
+												clickable_header_card = {
+													using = bg_card_header_01
+													blockoverride "bg_card_header_01_bg" {
+														background = {
+															using = bg_card_header_01_default
+															alpha = 0.6
+														}
+													}
+													blockoverride "header_color" {
+														using = color_society_texture
+													}
+													using = bg_movement_header
+													blockoverride "header_bg" {}
+													blockoverride "clickable_header_card_size"{
+														size = { 100% 40 }
+													}
+													blockoverride "header_size" {
+														size = {-1 40 }
+													}
+													blockoverride "header_content" {
+														enabled = "[Or(GreaterThan_int32(PeopleMovementItem.GetNumOutbreaks, '(int32)0'), And(PeopleMovementItem.IsEnvironmental, PeopleMovementItem.IsCountryAffected))]"
+														action_tooltip = {
+															title = "TOGGLE_MOVEMENT"
+															conditions = "[AddLocalizationIf(Not(Or(GreaterThan_int32(PeopleMovementItem.GetNumOutbreaks, '(int32)0'), And(PeopleMovementItem.IsEnvironmental, PeopleMovementItem.IsCountryAffected))), 'NO_MOVEMENT_OUTBREAK')]"
+															enabled = "[Or(GreaterThan_int32(PeopleMovementItem.GetNumOutbreaks, '(int32)0'), And(PeopleMovementItem.IsEnvironmental, PeopleMovementItem.IsCountryAffected))]"
+															on_action = "[PeopleMovementItem.Toggle]"
+														}
+
+														tooltipwidget = { BasicFunctionalTooltip = {} }
+
+														widget = {
+															size = {100% 100%}
+															hbox = {
+																margin_left = 1
+																margin_right = 10
+																spacing = 10
+																widget = {
+																	using = bg_movement_icon
+																	size = { 38 38 }
+																	icon = {
+																		parentanchor = center
+																		position = {0 -1}
+																		size = { 32 32}
+																		texture = "[GetMovementDefinitionIcon(PeopleMovementItem.GetMovement)]"
+
+																		background = {
+																			texture = "[GetMovementDefinitionIcon(PeopleMovementItem.GetMovement)]"
+																			texture_density = 2
+																			margin = { 2 2 }
+																			margin_bottom = 3
+																			alpha = 0.4
+																			modify_texture = {
+																				using = color_black_texture
+																				blend_mode = multiply
+																			}
+																		}
+																	}
+																}
+
+																text_single = {
+																	maximumsize = {150 20}
+																	align = left|nobaseline
+																	using = Font_Type_Headers
+																	using = Font_Size_Small
+																	alwaystransparent = no
+																	margin_left = 12
+																	text = "[PeopleMovementItem.GetName]"
+
+																	sort_by_highlight = {
+																		name = "name"
+																	}
+																}
+
+																expand = {}
+
+																text_single = {
+																	maximumsize = { 40 20 }
+																	align = center|nobaseline
+																	text = "[PeopleMovementItem.GetNumOutbreaks]"
+																	fontsize = 14
+
+																	sort_by_highlight = {
+																		name = "outbreaks_amount"
+																	}
+																}
+
+																icon = {
+																	size = { 18 18 }
+																	visible = "[Not(PeopleMovementItem.IsExpanded)]"
+																	texture = "gfx/interface/buttons/flats/button_simple_right.dds"
+																	using = button_regular_icon_color
+																}
+
+																icon = {
+																	size = { 18 18 }
+																	visible = "[PeopleMovementItem.IsExpanded]"
+																	texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+																	using = button_regular_icon_color
+																}
+															}
+														}
+													}
+													blockoverride "bottom_content" {}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
+	}
+}
+
+template movement_entry_card {
+	widget = {
+		size = { 100% 100% }
+		using = bg_paper_card
+
+		hbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 10
+			margin = { 8 6 }
+
+			widget = {
+				size = { 38 38 }
+				icon = {
+					size = { 100% 100% }
+					texture = "[GetMovementDefinitionIcon(Movement.GetMovementDefinition)]"
+					texture_density = 2
+
+					sort_by_highlight = {
+						name = "name"
+					}
+				}
+			}
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 2
+
+				text_single = {
+					layoutpolicy_horizontal = expanding
+					align = left|nobaseline
+					using = Font_Type_Headers
+					using = Font_Size_Small
+					text = "[Movement.GetName]"
+
+					sort_by_highlight = {
+						name = "name"
+					}
+				}
+
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					visible = "[Movement.IsCountryAffected(Player.Self)]"
+					spacing = 8
+
+					widget = {
+						size = { 25 25 }
+						piechart = {
+							visible = "[Movement.IsCulture]"
+							size = { 100% 100% }
+							using = piechart_angles
+							using = bg_circle_piechart
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+								value = "[FixedPointToFloat(Player.GetCulturePercentage(Movement.GetCulture))]"
+								color = { 1 1 1 1 }
+							}
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+								value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetCulturePercentage(Movement.GetCulture)))]"
+								color = { 1 1 1 0 }
+							}
+							icon = {
+								size = {65% 65%}
+								parentanchor = center
+								using = culture_icon
+							}
+						}
+						piechart = {
+							visible = "[Movement.IsReligion]"
+							size = { 100% 100% }
+							using = piechart_angles
+							using = bg_circle_piechart
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+								value = "[FixedPointToFloat(Player.GetReligionPercentage(Movement.GetReligion))]"
+								color = { 1 1 1 1 }
+							}
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+								value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetReligionPercentage(Movement.GetReligion)))]"
+								color = { 1 1 1 0 }
+							}
+							icon = {
+								size = {65% 65%}
+								parentanchor = center
+								texture = "[GetReligionIcon(Movement.GetReligion)]"
+							}
+						}
+						tooltipwidget = {
+							using = movement_spread_tooltip
+						}
+					}
+
+					text_single = {
+						visible = "[Movement.IsCountryAffected(Player.Self)]"
+						align = left|nobaseline
+						text = "MOVEMENT_SPREAD"
+						default_format = "#subtle_name"
+					}
+
+					expand = {}
+				}
+			}
+
+			expand = {}
+
+			country_flag_small = {
+				visible = "[Movement.IsCountryAffected(Player.Self)]"
+				datacontext = "[Player]"
+			}
+		}
+
+		tooltipwidget = {
+			using = movement_spread_tooltip
+		}
+	}
+}
+
+template movement_outbreaks_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetConceptTexture('movements')]"
+		}
+
+
+		blockoverride "title_text" {
+			text = "MOVEMENT_OUTBREAK_COUNTRY_AMOUNT_TITLE"
+		}
+
+		blockoverride "concept_link" {
+			text = [movement|E]
+		}
+		
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				visible = "[Not(GreaterThan_int32(GetDataModelSize(PeopleMovementItem.GetCountryOutbreaks), '(int32)0'))]"
+				blockoverride "text" {
+					text = "NO_MOVEMENT_OUTBREAK_IN_COUNTRY"
+				}
+			}
+
+			TooltipListBase = {
+				TooltipListScrollArea = {
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 400 }
+					}
+					blockoverride "scrollarea_content" {
+						fixedgridbox = {
+							addcolumn = 420
+							addrow = 80
+							setitemsizefromcell = yes
+							datamodel = "[PeopleMovementItem.GetCountryOutbreaks]"
+							item = {
+								widget = {
+									size = { 100% 80 }
+									layoutpolicy_horizontal = expanding
+									using = movement_entry_card
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template environmental_movement_item {
+	vbox = {
+		bottomtotop = yes
+		margin = {5 0}
+
+		# BOTTOM INFO
+		widget = {
+			layoutpolicy_horizontal = expanding
+			size = { -1 35 }
+
+			blockoverride "card_texture_extra" {}
+
+			hbox = {
+
+				hbox = {
+					layoutpolicy_vertical = expanding
+					visible = "[Not(GreaterThan_int32(PeopleMovementItem.GetAffectedCountryLocations, '(int32)0'))]"
+					using = disease_card_rotten_tile
+					blockoverride "disease_card_tile_color" {
+						modify_texture = {
+							using = color_geopolitics_texture
+						}
+						modify_texture = {
+							using = overlay_cloth_texture
+							blend_mode = overlay
+							alpha = 0.1
+						}
+					}
+					using = bg_square_fade_horizontal
+					blockoverride "square_fade_extra" {
+						alpha = 0.2
+					}
+					margin_left = 5
+
+					text_single = {
+						text = "NO_DISEASE_OUTBREAK_IN_COUNTRY"
+						align = left|nobaseline
+						maximumsize = {200 20}
+					}
+				}
+
+				expand = {}
+
+				hbox = {
+					visible = "[GreaterThan_int32(PeopleMovementItem.GetAffectedCountryLocations, '(int32)0')]"
+					layoutpolicy_horizontal = expanding
+					spacing = 5
+
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						layoutpolicy_vertical = expanding
+						margin_left = 8
+						using = bg_movement_spec
+
+						text_single = {
+							text = "[PeopleMovementItem.GetAffectedCountryLocationsInfo]"
+							maximumsize = {200 20}
+							align = left|nobaseline
+						}
+
+						tooltipwidget = {
+							using = movement_outbreaks_tooltip
+						}
+						expand = {}
+					}
+
+
+					widget = { 
+						size = { 25 25 }
+						datacontext = "[PeopleMovementItem.GetMovement]"
+						piechart = {
+							visible = "[MovementDefinition.IsCulture]"
+							size = { 100% 100% }
+							using = piechart_angles
+							using = bg_circle_piechart
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+								value = "[FixedPointToFloat(Player.GetCulturePercentage(MovementDefinition.GetCulture))]"
+								color = { 1 1 1 1 }
+							}
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+								value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetCulturePercentage(MovementDefinition.GetCulture)))]"
+								color = { 1 1 1 0 }
+							}
+
+							icon = {
+								size = {65% 65%}
+								parentanchor = center
+								using = culture_icon
+							}
+						}
+						piechart = {
+							visible = "[MovementDefinition.IsReligion]"
+							size = { 100% 100% }
+							using = piechart_angles
+							using = bg_circle_piechart
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+								value = "[FixedPointToFloat(Player.GetReligionPercentage(MovementDefinition.GetReligion))]"
+								color = { 1 1 1 1 }
+							}
+
+							pieslice = {
+								texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+								value = "[Subtract_float('(float)1.0', FixedPointToFloat(Player.GetReligionPercentage(MovementDefinition.GetReligion)))]"
+								color = { 1 1 1 0 }
+							}
+							icon = {
+								size = {65% 65%}
+								parentanchor = center
+								texture = "[GetReligionIcon(MovementDefinition.GetReligion)]"
+							}
+						}
+						tooltipwidget = {
+							using = movement_definition_spread_tooltip
+						}
+					}
+
+				}
+			}
+		}
+
+		# # TOP INFO
+		# widget = {
+		# 	layoutpolicy_horizontal = expanding
+		# 	size = { -1 45 }
+
+		# 	hbox = {
+		# 		ignoreinvisible = yes
+
+		# 		widget = {
+		# 			layoutpolicy_horizontal = expanding
+		# 			size = { -1 40 }
+		# 			hbox = {
+		# 				spacing = 4
+		# 				margin = { 5 0 }
+
+		# 				using = bg_square_tile
+		# 				blockoverride "container_color" {
+		# 					modify_texture = {
+		# 						using = color_super_dark_brown_texture
+		# 						blend_mode = multiply
+		# 					}
+		# 					modify_texture = {
+		# 						using = overlay_cloth_texture
+		# 						blend_mode = overlay
+		# 						alpha = 0.3
+		# 					}
+		# 				}
+
+		# 				using = bg_square_tile
+		# 				blockoverride "container_color" {
+		# 					modify_texture = {
+		# 						using = color_super_dark_brown_texture
+		# 						blend_mode = multiply
+		# 					}
+		# 					margin_bottom = 1
+		# 				}
+
+		# 				background = {
+		# 					texture = "gfx/interface/component_tiles/raw_paper_bottom.dds"
+		# 					texture_density = 2
+		# 					spriteType = corneredstretched
+		# 					spriteBorder = {0 4}
+		# 					margin = {1 1}
+		# 					margin_bottom = 2
+
+		# 					modify_texture = {
+		# 						using = color_paper_texture
+		# 					}
+		# 				}
+
+		# 				background = {
+		# 					texture = "gfx/interface/component_masks/disease_card_mask_top.dds"
+		# 					texture_density = 2
+		# 					alpha = 0.2
+		# 					mirror = vertical
+		# 					modify_texture = {
+		# 						using = color_black_texture
+		# 					}
+		# 				}
+
+		# 				icon = {
+		# 					size = { 25 25 }
+		# 					texture = "[GetMovementDefinitionIcon(PeopleMovementItem.GetMovement)]"
+		# 					texture_density = 2
+		# 				}
+
+		# 				vbox = {
+		# 					text_single = {
+		# 						size = {300 20}
+		# 						autoresize = no
+		# 						align = left|nobaseline
+		# 						text = "[PeopleMovementItem.GetName]"
+		# 					}
+		# 				}
+
+		# 				expand = {}
+		# 				hbox = {
+		# 					visible = "[Not(And(EqualTo_string(PeopleMovementItem.GetWorldDeathsInfo, '0' ), EqualTo_int32( PeopleMovementItem.GetAffectedCountries, '(int32)0' )))]"
+		# 					spacing = 4
+
+		# 					icon = {
+		# 						size = { 25 25 }
+		# 						texture = "[GetMovementDefinitionIcon(PeopleMovementItem.GetMovement)]"
+		# 						texture_density = 2
+		# 					}
+		# 				}
+		# 			}
+		# 		}
+		# 	}
+		# }
 	}
 }
 
@@ -1721,6 +2513,7 @@ template character_entry {
 						block "character_header_left_extra" {}
 						block "character_header_religion_icon" {
 							icon = {
+								visible = "[Character.IsValid]"
 								size = { 25 25 }
 								block "character_getreligion_icon" {
 									texture = "[GetReligionIcon(Character.GetReligion)]"
@@ -1735,8 +2528,12 @@ template character_entry {
 						hbox = {
 							text_single = {
 								default_format = "#yellow_titles"
-								raw_text = "[Character.GetNameToFitWithNoTooltip('(int32)30', '(bool)yes')]#Y ,#! [Character.GetAgeInYears|T]"
+
+								block "character_name_text" {
+									raw_text = "[Character.GetNameToFitWithNoTooltip('(int32)30', '(bool)yes')]#Y ,#! [Character.GetAgeInYears|T]"
+								}
 							}
+							
 							block "character_entry_name_sort_by_highlight" {
 								sort_by_highlight = {
 									ignore_layout = yes
@@ -1972,22 +2769,22 @@ template pop_entry {
 						}
 
 						progressbar = {
-							visible = "[GreaterThan_CFixedPoint(Location.GetExpectedUnEmployedValue(PopType.Self), '(CFixedPoint)0')]"
+							visible = "[GreaterThan_CFixedPoint(PeoplePopItem.GetCachedExpectedUnemployedValue, '(CFixedPoint)0')]"
 							size = { 100% 5 }
 							using = progress_bar_blue_green_alt
 							min = 0
 							max = 1
-							value = "[Subtract_float('(float)1.0', FixedPointToFloat(Location.GetUnEmployedPercentageWithConstruction(PopType.Self)))]"
+							value = "[Subtract_float('(float)1.0', FixedPointToFloat(PeoplePopItem.GetCachedUnemployedPercentageWithConstruction))]"
 							direction = horizontal
 						}
 
 						progressbar = {
-							visible = "[Not(GreaterThan_CFixedPoint(Location.GetExpectedUnEmployedValue(PopType.Self), '(CFixedPoint)0'))]"
+							visible = "[Not(GreaterThan_CFixedPoint(PeoplePopItem.GetCachedExpectedUnemployedValue, '(CFixedPoint)0'))]"
 							size = { 100% 5 }
 							using = progress_bar_blue_red_alt
 							min = 0
 							max = 1
-							value = "[Subtract_float('(float)1.0', FixedPointToFloat(Location.GetUnEmployedPercentageWithConstruction(PopType.Self)))]"
+							value = "[Subtract_float('(float)1.0', FixedPointToFloat(PeoplePopItem.GetCachedUnemployedPercentageWithConstruction))]"
 							direction = horizontal
 						}
 
@@ -2209,7 +3006,7 @@ template dynasty_country_list_tooltip {
 							addrow = 30
 							setitemsizefromcell = yes
 		
-							datamodel = "[PeopleDynastyItem.GetDynasty.GetCountries]"
+							datamodel = "[PeopleDynastyItem.GetDynasty.GetExistingCountries]"
 							
 							item = {
 								widget = {

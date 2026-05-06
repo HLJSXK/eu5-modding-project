@@ -55,10 +55,14 @@ types EconomyLateralviewTypes
 		vbox = {
 			widget = {
 				using = layoutpolicy_expanding
-				using = bg_card_header_01
+				block "adjustable_card_header_bg"{
+					using = bg_card_header_01
+				}
 				
 				block "top_widget" {}
-				using = bg_cabinet_card_frame
+				block "budget_card_frame" {
+					using = bg_cabinet_card_frame
+				}
 			}
 
 			widget = {
@@ -77,11 +81,9 @@ types EconomyLateralviewTypes
 		step = 0.01
 		wheelstep = 0.01
 
-		track = {
-			using = economy_slider_track
-			
+		block "track_type"{
+			track = { using = economy_slider_track }
 		}
-
 		track_range = { # Available progress
 			using = economy_slider_track_range
 		}
@@ -285,12 +287,50 @@ lateralview = {
 					visible = "[AutomatedSystemsItem.IsEnabled]"
 				}
 			}
-			
+
+			# Initialize satisfaction target variables (default 50%) when economy view is opened
+			overlappingitembox = {
+				visible = no
+				state = {
+					name = taxing_initial_init
+					trigger_on_create = yes
+					next = taxing_init
+					on_finish = "[PdxGuiWidget.TriggerAnimation('taxing_init')]"
+				}
+				state = {
+					name = taxing_init
+					duration = 1
+					on_start = "[PdxGuiWidget.Hide]"
+					on_finish = "[GetScriptedGui('taxing_setup').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+					next = taxing_init
+				}
+			}
 
 			widget = {
 				layoutpolicy_horizontal = expanding
 				size = { -1 45 }
 				hbox = {
+					subheader_unified_icon = {
+						name = "total_wealth"
+						datacontext = "[Player]"
+						tooltipwidget = {
+							using = TotalWealthTooltip
+						}
+
+						blockoverride "subheader_unified_icon_texture" {
+							texture = "[GetConceptTexture('wealth')]"
+						}
+						blockoverride "subheader_unified_top_text" {
+							text = "game_concept_wealth"
+							default_format = "#explanation_link"
+							align = nobaseline
+						}
+						blockoverride "subheader_unified_bottom_text" {
+							text = "[Player.GetTotalWealth|2L]"
+							align = nobaseline
+						}
+					}
+
 					subheader_unified_icon = {
 						name = "tax_base"
 						datacontext = "[Player]"
@@ -299,7 +339,7 @@ lateralview = {
 						}
 
 						blockoverride "subheader_unified_icon_texture" {
-							texture = "gfx/interface/icons/map_modes/tax_base.dds"
+							texture = "[GetConceptTexture('tax_base')]"
 						}
 						blockoverride "subheader_unified_top_text" {
 							text = "game_concept_tax_base"
@@ -552,7 +592,7 @@ lateralview = {
 							header_action_button_left = {
 								title = "game_concept_loan"
 								actor = "[GetPlayer]"
-								left_action = { action_name = "take_estate_loan" }
+								left_click_and_hold_action = { action_name = "take_estate_loan" }
 								right_action = {
 									action_name = "request_loan"
 									action_direction = "request"
@@ -964,6 +1004,19 @@ lateralview = {
 															texture = "gfx/interface/icons/flat_icons/balance/minting_coins.dds"
 															game_concept = "[minting|e]"
 														}
+														button_checkbox_auto = {
+															size = { 22 22 }
+															enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+															checked = "[Player.AutoCoinMinting]"
+															onclick = "[ToggleAutoMinting]"
+															tooltipwidget = {
+																LeftClickButtonTooltip = {
+																	blockoverride "onclick_text" {
+																		text = "[SelectLocalization( Player.AutoCoinMinting, 'AUTOMATION_MINTING_ZERO_OFF_TT', 'AUTOMATION_MINTING_ZERO_ON_TT' )]"
+																	}
+																}
+															}
+														}
 												
 														tooltipwidget = {
 															using = MintingMaitenanceTooltip
@@ -974,7 +1027,7 @@ lateralview = {
 												blockoverride "bottom_widget" {
 													hbox = {
 														margin = { 5 0 }
-														spacing = 5
+														
 
 														widget = {
 															using = layoutpolicy_expanding
@@ -986,8 +1039,8 @@ lateralview = {
 																value = "[EconomyView.GetDefaultCoinMinting]"
 																onvaluechanged = "[EconomyView.OnChangedCoinMinting]"
 																onchangefinish = "[EconomyView.PostTaxes]"
-																enabled = "[Not(IsPlayerAIEnabled('finances'))]"
-																alpha = "[TransparentIfFalse(Not(IsPlayerAIEnabled('finances')))]"
+																enabled = "[Not(Player.AutoCoinMinting)]"
+																alpha = "[TransparentIfFalse(Not(Player.AutoCoinMinting))]"
 																blockoverride "economy_slider_inc_button_config"{
 																	enabled = "[EconomyView.IsCoinMintingIncEnabled]"
 																}
@@ -1003,7 +1056,7 @@ lateralview = {
 														text_single = {
 															autoresize = no
 															align = center|nobaseline
-															size = { 110 20 }
+															size = { 105 20 }
 															raw_text = "[GetPlayer.GetFixedPointCurrencyValue('inflation')|2%] ([EconomyView.GetInflationChange|2-=%])@inflation!"
 															
 															datacontext = "[GetPlayer]"
@@ -1072,6 +1125,34 @@ lateralview = {
 																	using = warning_icon_texture
 																	visible = "[Not(TaxRateSetting.GetEstate.CanCollectTaxes)]"
 																}
+																button_checkbox_auto = {
+																	
+																	size = { 22 22 }
+																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+																	checked = "[TaxRateSetting.IsUsingAutoTaxRate]"
+																	onclick = "[TaxRateSetting.ToggleAutoTaxRate]"
+
+																	widget = {
+																		size = { 100% 100% }
+																		name = "tax_automation"
+																		visible = "[Not(TaxRateSetting.IsUsingAutoTaxRate)]"
+																	}
+
+																	tooltipwidget = {
+																		LeftClickButtonTooltip = {
+																			# blockoverride "tooltip_content" { 
+																			# 	TooltipTextBlock = {
+																			# 		blockoverride "text" {
+																			# 			text = ""
+																			# 		}
+																			# 	}
+																			#  }
+																			blockoverride "onclick_text" {
+																				text = "[SelectLocalization( TaxRateSetting.IsUsingAutoTaxRate, 'DEACTIVATE_AUTO_TAX_RATE', 'ACTIVATE_AUTO_TAX_RATE' )]"
+																			}
+																		}
+																	}
+																}
 															}
 
 															tooltipwidget = {
@@ -1089,6 +1170,8 @@ lateralview = {
 																	economy_slider = {
 																		parentanchor = left|vcenter
 																		size = { 120 10 }
+																		#set value first or setting the min/max/mincap/maxcap changes the existing value from 0 to something inside the min/max/mincap/maxcap values
+																		value = "[TaxRateSetting.GetDefault]"
 																		min = 0
 																		max = 1
 																		mincap = "[TaxRateSetting.GetMin]"
@@ -1140,7 +1223,6 @@ lateralview = {
 																			}
 																		}
 
-																		value = "[TaxRateSetting.GetDefault]"
 																		onvaluechanged = "[TaxRateSetting.OnTaxChanged]"
 																		onchangefinish = "[TaxRateSetting.Post]"
 
@@ -1156,79 +1238,166 @@ lateralview = {
 																}
 
 
-																text_single = {
-																	autoresize = no
-																	align = center|nobaseline
-																	size = { 50 20 }
-																	using = Font_Size_Very_Small
-																	visible = "[TaxRateSetting.HasImpact]"
-																	raw_text = "[TaxRateSetting.GetImpact]"
-																	
-																	datacontext = "[TaxRateSetting.GetEstate]"
-																	tooltipwidget = {
-																		using = estate_satisfaction_tooltip
+																hbox = {
+																	spacing = -2
+																	text_single = {
+																		autoresize = no
+																		align = center|nobaseline
+																		size = { 50 20 }
+																		using = Font_Size_Very_Small
+																		visible = "[TaxRateSetting.HasImpact]"
+																		raw_text = "[TaxRateSetting.GetImpact]"
+																		
+																		datacontext = "[TaxRateSetting.GetEstate]"
+																		tooltipwidget = {
+																			using = estate_satisfaction_tooltip
+																		}
 																	}
-																}
-
-																widget = {
-																	datacontext = "[TaxRateSetting.GetEstate]"
-																	tooltipwidget = {
-																		using = estate_satisfaction_tooltip
-																	}
-																	size = { 12 12 }
-
-																	icon = {
-																		name = "sad face"
-																		visible = "[LessThanOrEqualTo_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.25')]"
-
-																		size = { 100% 100% }
-																		texture = "gfx/interface/icons/flat_icons/sad.dds"
-																		texture_density = 2
-																	}
-
-																	icon = {
-																		name = "neutral face"
-																		visible = "[BetweenInclusiveOfMax_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.25', '(CFixedPoint)0.5')]"
-
-																		size = { 100% 100% }
-																		texture = "gfx/interface/icons/flat_icons/neutral.dds"
-																		texture_density = 2
-																	}
-
-																	icon = {
-																		name = "happy face"
-																		visible = "[GreaterThan_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.5')]"
-
-																		size = { 100% 100% }
-																		texture = "gfx/interface/icons/flat_icons/happy.dds"
-																		texture_density = 2
-																	}
-																}
-
-																button_checkbox_auto = {
-																	
-																	size = { 22 22 }
-																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
-																	checked = "[TaxRateSetting.IsUsingAutoTaxRate]"
-																	onclick = "[TaxRateSetting.ToggleAutoTaxRate]"
-
+	
 																	widget = {
-																		size = { 100% 100% }
-																		name = "tax_automation"
-																		visible = "[Not(TaxRateSetting.IsUsingAutoTaxRate)]"
+																		datacontext = "[TaxRateSetting.GetEstate]"
+																		tooltipwidget = {
+																			using = estate_satisfaction_tooltip
+																		}
+																		size = { 14 14 }
+	
+																		icon = {
+																			name = "sad face"
+																			visible = "[LessThanOrEqualTo_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.25')]"
+	
+																			size = { 100% 100% }
+																			texture = "gfx/interface/icons/flat_icons/sad.dds"
+																			texture_density = 2
+																		}
+	
+																		icon = {
+																			name = "neutral face"
+																			visible = "[BetweenInclusiveOfMax_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.25', '(CFixedPoint)0.5')]"
+	
+																			size = { 100% 100% }
+																			texture = "gfx/interface/icons/flat_icons/neutral.dds"
+																			texture_density = 2
+																		}
+	
+																		icon = {
+																			name = "happy face"
+																			visible = "[GreaterThan_CFixedPoint(TaxRateSetting.GetImpactValue,'(CFixedPoint)0.5')]"
+	
+																			size = { 100% 100% }
+																			texture = "gfx/interface/icons/flat_icons/happy.dds"
+																			texture_density = 2
+																		}
 																	}
+																}
+																expand = {}
+																# Satisfaction equilibrium target for automation (default 50%). Normal: 1%, Ctrl: 5%, Alt: 10%, Shift: 0% or 100%.
+																widget = {
+																	size = { 55 24 }
+																	visible = "[And(Not(TaxRateSetting.IsTaxRateSliderEnabled), Or(Not(TaxRateSetting.IsTaxRateSettingIncEnabled), Not(TaxRateSetting.IsTaxRateSettingDecEnabled)))]"
+																	hbox = {
+																		datacontext = "[TaxRateSetting.GetEstate]"
+																		datacontext = "[TaxRateSetting.GetEstate.GetCountry]"
+																		using = bg_number_container_bckg
+																		blockoverride "number_container_extra" {
+																			alpha = 0.4
+																			margin = {2 4}
+																		}
 
-																	tooltipwidget = {
-																		LeftClickButtonTooltip = {
-																			# blockoverride "tooltip_content" { 
-																			# 	TooltipTextBlock = {
-																			# 		blockoverride "text" {
-																			# 			text = ""
-																			# 		}
-																			# 	}
-																			#  }
-																			blockoverride "onclick_text" {
-																				text = "[SelectLocalization( TaxRateSetting.IsUsingAutoTaxRate, 'DEACTIVATE_AUTO_TAX_RATE', 'ACTIVATE_AUTO_TAX_RATE' )]"
+																		button_square_minus = {
+																			size = { 15 15 }
+																			enabled = yes
+																			tooltipwidget = { BasicFunctionalTooltip = {} }
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = default
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_MINUS_1"
+																				on_action = "[GetScriptedGui('subtract_one_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = alt
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_MINUS_10"
+																				on_action = "[GetScriptedGui('subtract_ten_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = shift
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_SET_ZERO"
+																				on_action = "[GetScriptedGui('set_to_zero_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = ctrl
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_MINUS_5"
+																				on_action = "[GetScriptedGui('subtract_five_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																		}
+
+																		text_single = {
+																			size = {25 20}
+																			autoresize = no
+																			using = Font_Size_Very_Small
+																			raw_text = "[GuiScope.AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).AddScope('country', TaxRateSetting.GetEstate.GetCountry.MakeScope).ScriptValue('current_target_satisfaction')|%0]"
+																			align = center
+																			tooltipwidget = {
+																				SimpleContextualTooltipType = {
+																					blockoverride "title_icon" {
+																						icon = {
+																							using = tooltip_title_icon_size
+																							texture = "gfx/interface/icons/flat_icons/happy.dds"
+																						}
+																					}
+																					blockoverride "title_text" {
+																						text = "AUTOMATION_TARGET_SATISFACTION_TITLE"
+																					}
+																					lowpriotextcontext = "AUTOMATION_TARGET_SATISFACTION_TT"
+																				}
+																			}
+																		}
+
+																		button_square_plus = {
+																			size = { 15 15 }
+																			enabled = yes
+																			tooltipwidget = { BasicFunctionalTooltip = {} }
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = default
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_PLUS_1"
+																				on_action = "[GetScriptedGui('add_one_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = alt
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_PLUS_10"
+																				on_action = "[GetScriptedGui('add_ten_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = shift
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_SET_HUNDRED"
+																				on_action = "[GetScriptedGui('set_to_one_hundred_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
+																			}
+																			action_tooltip = {
+																				click_type = left
+																				click_mode = single
+																				click_modifier = ctrl
+																				enabled = yes
+																				title = "SATISFACTION_TARGET_PLUS_5"
+																				on_action = "[GetScriptedGui('add_five_percent').Execute(GuiScope.SetRoot(TaxRateSetting.GetEstate.GetCountry.MakeScope).AddScope('estate_type', TaxRateSetting.GetEstate.GetType.MakeScope).End)]"
 																			}
 																		}
 																	}
@@ -1349,6 +1518,13 @@ lateralview = {
 														
 															TooltipStringPairList = {
 																textcontext = "[EconomyView.GetIncomeInfo('trade')]"
+															}
+
+															TooltipStringPairList = {
+																blockoverride "block_title" {
+																	text = "TRADE_CONNECTIONS_TITLE"
+																}
+																textcontext = "[Player.GetTradeConnectionsTooltip]"
 															}
 														}
 													}
@@ -1726,7 +1902,8 @@ lateralview = {
 															using = color_economy_texture
 														}
 														
-														visible = "[And3( MaintenanceSetting.ShowSlider,MaintenanceSetting.IsEnabled, Or(MaintenanceSetting.IsVisible, EconomyView.UnusedMaintenanceSettingsVisible))]"
+														visible = "[And( MaintenanceSetting.ShowSlider,Or(MaintenanceSetting.IsVisible, EconomyView.UnusedMaintenanceSettingsVisible))]"
+														enabled = "[MaintenanceSetting.IsEnabled]"
 
 														blockoverride "top_widget" {
 															hbox = {
@@ -1752,7 +1929,51 @@ lateralview = {
 																	raw_text = "[MaintenanceSetting.GetExpense|2+=]@expense!"
 																}
 																
+																button_checkbox_auto = {
+																	size = { 22 22 }
+																	visible = "[MaintenanceSetting.IsArmy]"
+																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+																	checked = "[Player.AutoRaiseMaintenanceAtWar('army')]"
+																	onclick = "[ToggleAutoMaintenance('army')]"
+																	tooltipwidget = { 
+																		LeftClickButtonTooltip = { 
+																			blockoverride "onclick_text" { 
+																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('army'), 'TOGGLE_AUTO_ARMY_MAINTENANCE_TOOLTIP_ON_TT', 'TOGGLE_AUTO_ARMY_MAINTENANCE_TOOLTIP_OFF_TT' )]"
+																			}																		
+																		}																
+																	}
+																}
 
+																button_checkbox_auto = {
+																	size = { 22 22 }
+																	visible = "[MaintenanceSetting.IsNavy]"
+																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+																	checked = "[Player.AutoRaiseMaintenanceAtWar('navy')]"
+																	onclick = "[ToggleAutoMaintenance('navy')]"
+																	tooltipwidget = { 
+																		LeftClickButtonTooltip = { 
+																			blockoverride "onclick_text" { 																																						
+																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('navy'), 'TOGGLE_AUTO_NAVY_MAINTENANCE_TOOLTIP_ON_TT', 'TOGGLE_AUTO_NAVY_MAINTENANCE_TOOLTIP_OFF_TT' )]"
+																			}																																
+																		}
+																	}
+																}
+
+																button_checkbox_auto = {
+																	size = { 22 22 }
+																	visible = "[MaintenanceSetting.IsFort]"
+																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+																	checked = "[Player.AutoRaiseMaintenanceAtWar('fort')]"
+																	onclick = "[ToggleAutoMaintenance('fort')]"
+																	tooltipwidget = { 
+																		LeftClickButtonTooltip = { 
+																			blockoverride "onclick_text" { 																																						
+																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('fort'), 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_ON', 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_OFF' )]"
+																			}
+																		}
+																	}
+																	# tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('fort'), 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_ON', 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_OFF' )]" } } }
+																}
 																
 																tooltipwidget = {
 																	using = ExpenseSettingTooltip			
@@ -1772,13 +1993,14 @@ lateralview = {
 																		size = { 120 10 }
 																		min = 0
 																		max = 1
+																		#set value first or setting the min/max/mincap/maxcap changes the existing value from 0 to something inside the min/max/mincap/maxcap values
 																		value = "[MaintenanceSetting.GetDefault]"
 																		mincap = "[MaintenanceSetting.GetMin]"
 																		maxcap = "[MaintenanceSetting.GetMax]"
 
 																		onvaluechanged = "[MaintenanceSetting.OnChanged]"
 																		onchangefinish = "[MaintenanceSetting.Post]"
-																		enabled = "[Not(IsPlayerAIEnabled('finances'))]"
+																		enabled = "[And(MaintenanceSetting.IsEnabled,Not(IsPlayerAIEnabled('finances')))]"
 																		alpha = "[TransparentIfFalse(Not(IsPlayerAIEnabled('finances')))]"
 																		blockoverride "economy_slider_inc_button_config"{
 																			enabled = "[MaintenanceSetting.IsIncEnabled]"
@@ -1791,7 +2013,7 @@ lateralview = {
 																	widget = {
 																		parentanchor = left|vcenter
 																		size = { 120 10 }
-																		visible = "[Or3(MaintenanceSetting.IsArmy, MaintenanceSetting.IsNavy, MaintenanceSetting.IsFort)]"
+																		#visible = "[Or3(MaintenanceSetting.IsArmy, MaintenanceSetting.IsNavy, MaintenanceSetting.IsFort)]"
 																		tooltipwidget = {
 																			ContextualTooltipType = {
 																				blockoverride "title_icon" {
@@ -1872,56 +2094,11 @@ lateralview = {
 																				TooltipStringPairList = {
 																					textcontext = "[MaintenanceSetting.GetExpenseBenefitTooltip]"
 																				}
+																				
+																				
 																			}
 																		}
 																	}
-																}
-																
-
-																button_checkbox_auto = {
-																	size = { 22 22 }
-																	visible = "[MaintenanceSetting.IsArmy]"
-																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
-																	checked = "[Player.AutoRaiseMaintenanceAtWar('army')]"
-																	onclick = "[ToggleAutoMaintenance('army')]"
-																	tooltipwidget = { 
-																		LeftClickButtonTooltip = { 
-																			blockoverride "onclick_text" { 
-																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('army'), 'TOGGLE_AUTO_ARMY_MAINTENANCE_TOOLTIP_ON_TT', 'TOGGLE_AUTO_ARMY_MAINTENANCE_TOOLTIP_OFF_TT' )]"
-																			}																		
-																		}																
-																	}
-																}
-
-																button_checkbox_auto = {
-																	size = { 22 22 }
-																	visible = "[MaintenanceSetting.IsNavy]"
-																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
-																	checked = "[Player.AutoRaiseMaintenanceAtWar('navy')]"
-																	onclick = "[ToggleAutoMaintenance('navy')]"
-																	tooltipwidget = { 
-																		LeftClickButtonTooltip = { 
-																			blockoverride "onclick_text" { 																																						
-																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('navy'), 'TOGGLE_AUTO_NAVY_MAINTENANCE_TOOLTIP_ON_TT', 'TOGGLE_AUTO_NAVY_MAINTENANCE_TOOLTIP_OFF_TT' )]"
-																			}																																
-																		}
-																	}
-																}
-
-																button_checkbox_auto = {
-																	size = { 22 22 }
-																	visible = "[MaintenanceSetting.IsFort]"
-																	enabled = "[Not(IsPlayerAIEnabled('finances'))]"
-																	checked = "[Player.AutoRaiseMaintenanceAtWar('fort')]"
-																	onclick = "[ToggleAutoMaintenance('fort')]"
-																	tooltipwidget = { 
-																		LeftClickButtonTooltip = { 
-																			blockoverride "onclick_text" { 																																						
-																				text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('fort'), 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_ON', 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_OFF' )]"
-																			}
-																		}
-																	}
-																	# tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "[SelectLocalization( Player.AutoRaiseMaintenanceAtWar('fort'), 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_ON', 'TOGGLE_AUTO_FORT_MAINTENANCE_TOOLTIP_IS_OFF' )]" } } }
 																}
 															}
 														}
@@ -2050,7 +2227,8 @@ lateralview = {
 													
 
 														
-														visible = "[And3( Not(MaintenanceSetting.ShowSlider), MaintenanceSetting.IsEnabled, Or(MaintenanceSetting.IsVisible, EconomyView.UnusedMaintenanceSettingsVisible))]"
+														visible = "[And( Not(MaintenanceSetting.ShowSlider), Or(MaintenanceSetting.IsVisible, EconomyView.UnusedMaintenanceSettingsVisible))]"
+														enabled = "[MaintenanceSetting.IsEnabled]"
 
 														tooltipwidget = {
 															using = ExpenseSettingTooltip			
@@ -2152,6 +2330,13 @@ lateralview = {
 														
 															TooltipStringPairList = {
 																textcontext = "[EconomyView.GetExpenseInfo('trade')]"
+															}
+
+															TooltipStringPairList = {
+																blockoverride "block_title" {
+																	text = "TRADE_CONNECTIONS_TITLE"
+																}
+																textcontext = "[Player.GetTradeConnectionsTooltip]"
 															}
 														}
 													}

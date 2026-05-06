@@ -29,6 +29,7 @@ sinicization_disaster.1 = {
 	category = disaster_event
 	title = sinicization_disaster.1.title
 	desc = sinicization_disaster.1.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -84,6 +85,7 @@ sinicization_disaster.2 = { #Cabinet Member Holds Chinese Sympathies
 	category = disaster_event
 	title = sinicization_disaster.2.title
 	desc = sinicization_disaster.2.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -178,6 +180,7 @@ sinicization_disaster.3 = { #Clergy Resist Sinicization
 	category = disaster_event
 	title = sinicization_disaster.3.title
 	desc = sinicization_disaster.3.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -247,6 +250,7 @@ sinicization_disaster.4 = { #Nobles Resist Sinicization
 	category = disaster_event
 	title = sinicization_disaster.4.title
 	desc = sinicization_disaster.4.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -316,6 +320,7 @@ sinicization_disaster.5 = { #Burghers Resist Sinicization
 	category = disaster_event
 	title = sinicization_disaster.5.title
 	desc = sinicization_disaster.5.desc
+	outcome = neutral
 	
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -385,6 +390,7 @@ sinicization_disaster.6 = { #Peasants Resist Sinicization
 	category = disaster_event
 	title = sinicization_disaster.6.title
 	desc = sinicization_disaster.6.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 	
@@ -454,6 +460,7 @@ sinicization_disaster.7 = {
 	category = disaster_event
 	title = sinicization_disaster.7.title
 	desc = sinicization_disaster.7.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -508,6 +515,7 @@ sinicization_disaster.8 = {
 	category = disaster_event
 	title = sinicization_disaster.8.title
 	desc = sinicization_disaster.8.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
 
@@ -579,17 +587,20 @@ sinicization_disaster.100 = {
 			triggered_desc = {
 				desc = sinicization_disaster.100.desc.c	#We outgrew China
 				trigger = {
-					OR = { 
-						expected_army_size > scope:target_emperor_scope.expected_army_size
-						country_total_army_levy_size >= scope:target_emperor_scope.country_total_army_levy_size
+					OR = {
+						great_power_score > {
+							value = c:CHI.great_power_score
+							multiply = 0.75
+						}
 						societal_value:sinicized_vs_unsinicized > 0
+						NOT = { country_exists = c:CHI }
 					}
 				}
 			}
 			triggered_desc = {
 				desc = sinicization_disaster.100.desc.d	#We are a subject of China
 				trigger = {
-					is_subject_of = scope:target_emperor_scope
+					is_subject_or_below_of = c:CHI
 				}
 			}
 			triggered_desc = {
@@ -600,247 +611,120 @@ sinicization_disaster.100 = {
 			}
 		}
 	}
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
+
+	major = yes
+	major_trigger = {
+		OR = {
+			this = c:CHI
+			AND = {
+				exists = scope:shafted_overlord
+				this = scope:shafted_overlord
+			}
+		}
+	}
 
 	immediate = {
 		save_scope_as = target_sinicized_country
 		chi_scopes = yes
-	}
-
-	option = { #China Influence Wins option A
-		name = sinicization_disaster.100.a
-		
-		trigger = {
-			var:china_side >= 30
-			is_subject = no
-		}
-		scope:target_emperor_scope = {
-			set_variable = { 
-				name = chi_make_trib_variable
-				value = yes
-			}
-			trigger_event_non_silently = sinicization_disaster.101
-		}
-		custom_tooltip = make_us_tributary_tt
-	}
-
-	option = { #China Influence Wins option B
-		name = sinicization_disaster.100.b
-
-		trigger = {
-			var:china_side >= 30
-			is_subject = no
-		}
 
 		if = {
 			limit = { 
-				this != scope:target_emperor_scope
-				is_allied_with = { target = scope:target_emperor_scope }
+				is_subject = yes
+				NOT = { is_subject_or_below_of = c:CHI }
 			}
-			remove_relation = {
-				type = relation_type:alliance
-				first = this
-				second = scope:target_emperor_scope
-			}
-			add_government_power = government_power_mild_penalty
+			overlord = { save_scope_as = shafted_overlord }
 		}
-		else_if = {
-			limit = { 
-				has_truce_with = scope:target_emperor_scope
-			}
-			add_government_power = government_power_mild_penalty
-		}
-		else = {
-			scope:target_emperor_scope = {
-				set_variable = { 
-					name = chi_gain_cb_variable
-					value = yes
-				}
-				trigger_event_non_silently = sinicization_disaster.101
-			}
-			custom_tooltip = this_may_lead_to_war_tt
-		}
-	}
-
-	option = { #Already a subject and east_asia side
-		name = sinicization_disaster.100.c
-
-		trigger = {
-			var:china_side >= 30
-			is_subject = yes
-			overlord = {
-				NOT = { this = scope:target_emperor_scope }
-			}
-		}
-
-		scope:target_emperor_scope = {
-			set_variable = { 
-				name = chi_cultural_bonuses_variable
-				value = yes
-			}
-			trigger_event_non_silently = sinicization_disaster.101
-		}
-		custom_tooltip = gains_cultural_bonuses_tt
-	}
-
-	option = { #Already subject and sovereign
-		name = sinicization_disaster.100.d
-
-		trigger = {
-			var:sovereign_side >= 30
-			is_subject = yes
-			overlord = {
-				NOT = { this = scope:target_emperor_scope }
-			}
-		}
-		
-		overlord = {
-			add_government_power = government_power_mild_bonus
-		}
-		add_government_power = government_power_mild_bonus
-		add_stability = stability_weak_penalty
-	}
-
-	option = { #Outgrew China
-		name = sinicization_disaster.100.e
-
-		trigger = {
-			OR = {
-				expected_army_size > scope:target_emperor_scope.expected_army_size
-				country_total_army_levy_size >= scope:target_emperor_scope.country_total_army_levy_size
-				societal_value:sinicized_vs_unsinicized > 0
-			}
-		}
-		
-		if = {
-			limit = {
-				OR = { 
-					expected_army_size > scope:target_emperor_scope.expected_army_size
-					country_total_army_levy_size >= scope:target_emperor_scope.country_total_army_levy_size
-				}
-			}
-			add_government_power = government_power_extreme_bonus
-			add_prestige = prestige_extreme_bonus
-			add_stability = stability_extreme_bonus
-		}
-		if = {
-			limit = {
-				societal_value:sinicized_vs_unsinicized > 0
-			}
-			add_stability = stability_extreme_bonus
-			culture = {
-				add_cultural_influence = cultural_influence_extreme_bonus
-				add_cultural_tradition = cultural_tradition_extreme_bonus
-			}
-		}
-	}
-
-
-	option = { #Subject of CHI
-		name = sinicization_disaster.100.f
-
-		trigger = {
-			is_subject = yes
-			overlord = { this = scope:target_emperor_scope }
-		}
-
-		scope:target_emperor_scope = {
-			set_variable = { 
-				name = chi_subject_already_bonuses_variable
-				value = yes
-			}
-			trigger_event_non_silently = sinicization_disaster.101
-		}
-		custom_tooltip = gains_cultural_bonuses_tt
 	}
 
 	option = {
-		name = sinicization_disaster.100.g
+		name = sinicization_disaster.100.a
 
-		trigger = {
-			NOT = { 
-				country_exists = c:CHI
-				OR = {
-					NOT = { exists = international_organization:middle_kingdom }
-					NOT = { exists = international_organization:middle_kingdom.leader_country }
+		trigger = { var:china_side >= 30 }
+
+		if = {
+			limit = { exists = scope:shafted_overlord }
+			scope:shafted_overlord = { cancel_subject = root }
+		}
+
+		make_subject_of = {
+			target = c:CHI
+			type = subject_type:tributary
+		}
+	}
+
+	option = {
+		name = sinicization_disaster.100.b
+
+		trigger = { var:china_side >= 30 }
+
+		c:CHI = {
+			add_casus_belli =  { 
+				target = root
+				type = casus_belli:cb_subject_broke_free	
+			}
+
+			hidden_effect = {
+				if = {
+					limit = { is_ai = yes }
+					random_list = {
+						1 = {
+							declare_war_with_cb = {
+								target = root
+								type = casus_belli:cb_subject_broke_free
+							}
+						}
+						1 = { }
+					}
 				}
 			}
 		}
-
-		add_stability = stability_mild_bonus
 	}
+
+	option = {
+		name = sinicization_disaster.100.c
+
+		trigger = {
+			OR = {
+				great_power_score > {
+					value = c:CHI.great_power_score
+					multiply = 0.75
+				}
+				societal_value:sinicized_vs_unsinicized > 0
+				NOT = { country_exists = c:CHI }
+			}
+		}
+
+		add_country_modifier = {
+			modifier = victory_over_china
+			years = modifier_duration_years_long
+			mode = replace
+		}
+
+		change_societal_value = {
+			type = sinicized_vs_unsinicized
+			value = societal_value_huge_move_to_right
+		}
+	}
+
+	option = {
+		name = sinicization_disaster.100.d
+
+		trigger = { is_subject_or_below_of = c:CHI }
+
+		c:CHI = {
+			add_stability = stability_mild_bonus
+			change_celestial_authority = { value = celestial_authority_mild_bonus }
+		}
+	}
+	
 	after = {
 		remove_variable = sovereign_side 
 		remove_variable = china_side
 		remove_variable = sinicization_attitude_event_variable
 		remove_country_modifier = struggle_against_china_modifier
 		remove_country_modifier = embracing_sinicization_modifier
-	}
-}
-
-sinicization_disaster.101 = { #News from [target_sinicized_country.GetNameWithNoTooltip]
-	type = country_event
-	category = disaster_event
-	title = sinicization_disaster.101.title
-	desc = sinicization_disaster.101.desc
-
-	image = "gfx/interface/illustrations/disaster/sinicization_disaster.dds"
-
-	option = {
-		name = sinicization_disaster.101.a
-
-		trigger = {
-			has_variable = chi_gain_cb_variable
-		}
-
-		add_casus_belli =  { 
-			target = scope:target_sinicized_country	
-			type = casus_belli:cb_subject_broke_free	
-		}
-		hidden_effect = { remove_variable = chi_gain_cb_variable }
-	}
-
-	option = { 
-		name = sinicization_disaster.101.b
-
-		trigger = {
-			has_variable = chi_make_trib_variable
-		}
-
-		scope:target_sinicized_country = {
-			make_subject_of = {
-				target = scope:target_emperor_scope
-				type = subject_type:tributary
-			}
-		}
-		hidden_effect = { remove_variable = chi_make_trib_variable }
-	}
-
-	option = { 
-		name = sinicization_disaster.101.c
-		trigger = {
-			has_variable = chi_cultural_bonuses_variable
-		}
-
-		add_prestige = prestige_weak_bonus
-		culture = {
-			add_cultural_influence = cultural_influence_weak_bonus
-		}
-		hidden_effect = { remove_variable = chi_cultural_bonuses_variable }
-	}
-
-	option = { 
-		name = sinicization_disaster.101.d
-
-		trigger = {
-			has_variable = chi_subject_already_bonuses_variable
-		}
-
-		add_government_power = government_power_weak_bonus
-		culture = {
-			add_cultural_tradition = cultural_tradition_weak_bonus
-		}
-		hidden_effect = { remove_variable = chi_subject_already_bonuses_variable }
 	}
 }

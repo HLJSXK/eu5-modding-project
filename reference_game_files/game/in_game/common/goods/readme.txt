@@ -18,5 +18,6 @@
 #		upper = <float>
 #       <pop types> = <float>
 #	}
+#	location_potential = { location trigger }           # gives error log if this is false on setup
 #   custom_tags = { <strings> }							#A list of custom strings to use to identify that good
 #}

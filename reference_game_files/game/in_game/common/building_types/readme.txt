@@ -19,14 +19,18 @@
 # - destroy_price: <price> price to destroy the building
 # - estate: <estate type> what estate can build the building
 # - max_levels: <scripted integer> maximum levels the building can be upgraded to (root = location, scope:owner = building owner, scope:builder = who's paying)
+# - international_organization_link: international organization type, determines in which international organization type this building should be available to. That also means that this building will always be owned by the IO leader if one exists, gets destroyed if the IO gets destroyed, and the IO pays for the building if it can afford it. Note that the IO must be allowed to have buildings linked to it
 # - allow: <trigger> can the building be built in the location (root = location, scope:actor = country building it) (think of this as an "enabled" check)
 # - location_potential: <trigger> can the building be built in the location (root = location) (think of this as a "visible" check)
 # - country_potential: <trigger> can the building be built by the country (root = country) (think of this as a "visible" check)
+# - international_organization_potential: <trigger> can the building be built by the international organization (root = international organization, scope:actor = country) (think of this as a ")
 # - can_destroy: <trigger> can the building be destroyed in the location (root = location, actor = destroyer, building = building)
 # - is_indestructible: <yes/no> if set to yes, the building can neither be destroyed via button press nor via the effect for it. remove_if can still delete the building tho
 # - remove_if: <trigger> will the building be auto-destroyed in the location (root = building)
 # - capital_modifier: <modifier> modifier applied to the location if built in the capital (multiplied by building level and goods access)
 # - capital_country_modifier: <modifier> modifier applied to the country if built in the capital (multiplied by building level and goods access)
+# - capital_to_overlord_modifier: <modifier> modifier applied to the overlord of the country whose capital contains the building (multiplied by building level and goods access). Only applies when the building owner is a subject; useful for foreign buildings transferred to a subject country via change_building_owner.
+# - foreign_country_modifier: <modifier> modifier applied to the country that currently owns the building (multiplied by building level and goods access). Only relevant for is_foreign = yes buildings; applies to whoever owns the building at any given time, so changes when change_building_owner is used.
 # - modifier: <modifier> modifier applied to the location (multiplied by building level and goods access)
 # - raw_modifier: <modifier> modifier applied to the location (not scaled)
 # - market_center_modifier: <modifier> modifier applied to the location if built in a market center (multiplied by building level and goods access)

@@ -56,7 +56,7 @@ template culture_groups_tooltip {
 		blockoverride "title_icon"	{
 			icon = {
 				using = tooltip_title_icon_size
-				texture = "gfx/interface/icons/location_icons/culture.dds"
+				using = culture_icon
 			}
 		}
 
@@ -215,7 +215,7 @@ template culture_in_country_tooltip { #Culture in Country Piechart
 			margin_bottom = 5
 			icon = {
 				using = tooltip_title_icon_size
-				texture = "gfx/interface/icons/location_icons/culture.dds"
+				using = culture_icon
 				modify_texture = {
 					using = overlay_stone_texture
 					blend_mode = overlay
@@ -254,7 +254,7 @@ template culture_in_country_tooltip { #Culture in Country Piechart
 				blockoverride "SliceValue" { value = "[PopCultureItem.GetPercentage]" }
 				blockoverride "SliceColor" { color = "[PopCultureItem.GetColor]" }
 				blockoverride "Icon" {
-				texture = "gfx/interface/icons/location_icons/culture.dds"
+					using = culture_icon
 					texture_density = 2
 					modify_texture = {
 						using = overlay_stone_texture
@@ -599,7 +599,7 @@ template culture_tooltip_content {
 	}
 
 	TooltipScrolledRowList = {
-		blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+		blockoverride "block_scrollarea" { maximumsize = { -1 240 }}
 		blockoverride "block_title" { text = "COUNTRIES_WITH_CULTURE" }
 		blockoverride "rowlist_datamodel_is_empty" { visible = "[Not(DataModelHasItems(Culture.GetCountriesList.GetCountries))]"}
 		blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Culture.GetCountriesList.GetCountries)]"}
@@ -921,22 +921,39 @@ template CulturalCapacity_tooltip {
 		}
 		
 		blockoverride "tooltip_content" {
-			TooltipStringPairList = {
+			TooltipBlockList = {
 				visible = "[Country.HasTooManyCultures]"
 				textcontext =  "[GetCulturesPenaltyInfo]"
 			}
-			TooltipStringPairList = {
+
+			TooltipScrolledBlockList = {
 				blockoverride "block_title" {
 					text = "CUL_CAPACITY_USED_COU"
 				}
+
+				blockoverride "set_textcontext" {
+					ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				}
+
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 450 }
+				}
+
 				textcontext = "[Country.GetAcceptedCulturesInfo]"
 			}
-			TooltipStringPairList = {
+
+			TooltipBlockList = {
 				blockoverride "block_title" {
 					text = "CUL_CAPACITY_FOR_COU"
 				}
-				datacontext = "[StringToStringPairList(Country.GetDoubleDescriptionFor('cultures_capacity','cultures_capacity_modifier'))]"
+
+				blockoverride "set_textcontext" {
+					ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				}
+
+				textcontext = "[Country.GetDoubleDescriptionFor('cultures_capacity','cultures_capacity_modifier')]"
 			}
+
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "ACCEPT_CULTURE_FLAVOR"
@@ -1079,17 +1096,13 @@ template NumArtists_tooltip {
 			}
 			TooltipScrolledRowList = {
 				blockoverride "block_title" {
-					text = "[SelectLocalization(GreaterThan_int32(Country.GetCharacterArtistsAmount, '(int32)0'), 'NUM_OF_CURR_ARTISTS', 'NO_NUMBER_OF_ARTISTS')]"
+					text = "[SelectLocalization(GreaterThan_int32(GetDataModelSize(Country.GetLivingArtistsForUI), '(int32)0'), 'NUM_OF_CURR_ARTISTS', 'NO_NUMBER_OF_ARTISTS')]"
 					default_format = "#color_white"
 				}
-				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(Country.GetLivingCharacters)]"}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Country.GetLivingCharacters)]"}
+				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(Country.GetLivingArtistsForUI)]"}
+				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Country.GetLivingArtistsForUI)]"}
 				blockoverride "rowlist_datamodel" { 
-					datamodel = "[Country.GetLivingCharacters]" 
-					ignoreinvisible = yes
-				}
-				blockoverride "visibility" {
-					visible = "[Character.IsArtist]"
+					datamodel = "[Country.GetLivingArtistsForUI]" 
 				}
 				blockoverride "rowlist_content" {
 					hbox = {
@@ -1213,18 +1226,8 @@ template WorksOfArt_tooltip {
 
 template QualityOfArt_tooltip {
 	ContextualTooltipType = {
-		blockoverride "title_icon" {
-			icon = {
-				texture = "[GetWorkOfArtQualityIcon(CountryCultureLateralViewWorkOfArtItem.GetWorkOfArt.GetQuality)]"
-				using = tooltip_title_icon_size
-				
-				glow = {
-					name = "drop_shadow"
-					glow_radius = 3
-					color = {0.0 0.0 0.0 1.0}
-					alpha = 0.3
-				}
-			}
+		blockoverride "title_icon_texture" {
+			texture = "[GetWorkOfArtQualityIcon(WorkOfArt.GetQuality)]"
 		}
 		blockoverride "title_text" {
 			datacontext = "[WorkOfArt]"
@@ -1771,94 +1774,12 @@ template PopType_tooltip {
 template HolySites_Tooltip_Item {
 	widget = {
 		layoutpolicy_horizontal = expanding
-		size = {-1 60}
-		widget = {
-			size = { 95% 50 }
-			parentanchor = center
-			
-			tooltipwidget = {
-				using = HolySite_tooltip
-			}
-			
-			hbox = {
-				using = layoutpolicy_expanding
-				using = bg_scroll_card
-				margin_left = 10
-				
-				bookmark_02 = {
-					blockoverride "bookmark_size" {
-						size = { 12 50 }
-					}
-					blockoverride "bookmark_texture" {
-						texture = "gfx/interface/component_tiles/bookmark_02.dds"
-						position = { 0 2 }
-					}
-					blockoverride "bookmark_color" {
-						# tintcolor = "[HolySite.GetColor]"
-						tintcolor = { 0.5 1.0 1.0 1.0 }
-					}
-				}
-			
-
-				hbox = {
-					maximumsize = {50 28}
-					margin_left = 15
-
-					text_single = {
-						size = { 150 20}
-						autoresize = no
-						align = left|nobaseline
-						text = "[HolySite.GetNameWithNoTooltip]"
-						fontsize = 14
-					}
-				}
-
-				expand = {}
-
-				hbox = {
-					spacing = 5
-					using = layoutpolicy_expanding
-					margin_right = 15
-
-
-					expand = {}
-
-					background = {
-						texture = "[HolySite.GetIllustration]"
-						texture_density = 2
-						alpha = 0.9
-						margin = { -9 -2 }
-						margin_bottom = -1
-
-						modify_texture = {
-							using = overlay_cloth_texture
-							blend_mode = overlay
-							alpha = 0.3
-						}
-
-						modify_texture = {
-							texture = "gfx/interface/component_masks/mask_fade_horizontal_textured.dds"
-							texture_density = 2
-							spriteType = stretched
-							spriteBorder = { 0 0 }
-							blend_mode = alphamultiply
-							alpha = 1
-							mirror = horizontal
-						}
-					}
-
-					hbox = {
-						margin = {12 6}
-						using = bg_circle_piechart
-
-						text_single = {
-							using = Font_Type_Standard
-							align = right|nobaseline
-							text = "[HolySite.GetImportance]"
-						}
-					}
-				}
-			}
+		size = {-1 80}
+		holy_sites_card = {
+			blockoverride "holy_sites_tooltip_country_highlight" {}
+			blockoverride "holy_sites_tooltip_name_highlight" {}
+			blockoverride "holy_sites_tooltip_category_highlight" {}
+			blockoverride "holy_sites_tooltip_importance_highlight" {}
 		}
 	}
 }
@@ -1898,8 +1819,8 @@ template HolySites_Tooltip {
 				}
 
 				blockoverride "row_size" {
-					maximumsize = { -1 60 }
-					minimumsize = { -1 60 }
+					maximumsize = { -1 80 }
+					minimumsize = { -1 80 }
 				}
 			}
 		}
@@ -1941,8 +1862,8 @@ template HolySitesLocation_Tooltip {
 				}
 
 				blockoverride "row_size" {
-					maximumsize = { -1 60 }
-					minimumsize = { -1 60 }
+					maximumsize = { -1 80 }
+					minimumsize = { -1 80 }
 				}
 			}
 		}
@@ -2078,19 +1999,19 @@ template Saints_Tooltip {
 			}
 		}
 		blockoverride "title_text" {
-			text = "game_concept_saints"
+			text = "[SelectLocalization(Country.GetReligion.HasSaintsConcept, Concatenate('game_concept_', Country.GetReligion.GetSaintsConcept(Country.Self)), 'game_concept_saints')]"
 		}
 		blockoverride "concept_link" {
-			text = "[saints|e]"
+			text = "[SelectGameConcept(Country.GetReligion.HasSaintsConcept, Country.GetReligion.GetSaintsConcept(Country.Self), 'saints')]"
 		}
-			
+		
 		blockoverride "tooltip_content" {
 			TooltipScrolledRowList = {
 				visible = "[DataModelHasItems(Country.GetSaints)]"
 				blockoverride "block_title" { visible = no }
 				blockoverride "rowlist_datamodel_is_empty" { visible = no}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Country.GetSaints)]"}
-				blockoverride "rowlist_datamodel" { datamodel = "[Country.GetSaints]" }
+				blockoverride "rowlist_datamodel_has_items" { block "saints_tooltip_has_items" { visible = "[DataModelHasItems(Country.GetSaints)]"}}
+				blockoverride "rowlist_datamodel" { block "saints_tooltip_datamodel" { datamodel = "[Country.GetSaints]"} }
 				blockoverride "rowlist_content" {
 					widget = {
 						layoutpolicy_horizontal = expanding

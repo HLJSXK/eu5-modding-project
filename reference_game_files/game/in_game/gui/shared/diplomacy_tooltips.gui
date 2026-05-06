@@ -193,20 +193,49 @@ template GenericAction_tooltip {
 			text = "[GenericAction.GetNameWithNoTooltip]"
 		}
 
-		blockoverride "title_icon" {
-			icon = {
-				using = tooltip_title_icon_size
-				texture = "gfx/interface/icons/modifiers/_default.dds"
-			}
+		blockoverride "title_icon_texture" {
+			texture = "[GenericAction.GetIcon]"
+		}
+
+		blockoverride "concept_link" {
+			text = [action|E]
 		}
 		
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[GenericAction.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[GenericAction.GetBasicTooltip]"
 				}
 			}
 		}		
+	}
+}
+
+template AreaPreference_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[AreaPreference.GetNameWithNoTooltip]"
+		}
+
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "gfx/interface/icons/modifiers/_default.dds"
+			}
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				blockoverride "text" {
+					text = "[AreaPreference.GetTooltip]"
+				}
+			}
+		}
 	}
 }
 
@@ -324,6 +353,11 @@ template SubjectType_tooltip {
 			text = [subject_type|E]
 		}
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[SubjectType.GetDebugText]"
+				}
+			}
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "[SubjectType.GetFlavor]"
@@ -528,8 +562,43 @@ template Annexation_tooltip {
 }
 
 template CountryTooltip_RelativePower {
+	visible = "[And3(Not(IsLobbyOpen), IsPlayerValid, Not(Country.IsPlayer))]"
+
 	TooltipListBase = {
-		visible = "[And3(Not(IsLobbyOpen), IsPlayerValid, Not(Country.IsPlayer))]"
+		#Relative Power STRONGER
+		background = {
+			visible = "[GreaterThan_CFixedPoint(GetOverallPowerRatio(Player.Self, Country.Self), '(CFixedPoint)0.60')]"
+			using = text_mask_container_texture
+			margin_bottom = 0
+			alpha = 0.5
+
+			modify_texture = {
+				using = color_light_green_texture
+			}
+		}
+		#Relative Power EQUAL
+		background = {
+			visible = "[And(LessThan_CFixedPoint(GetOverallPowerRatio(Player.Self, Country.Self), '(CFixedPoint)0.61'), GreaterThan_CFixedPoint(GetOverallPowerRatio(Player.Self, Country.Self), '(CFixedPoint)0.39'))]"
+			using = text_mask_container_texture
+			margin_bottom = 0
+			alpha = 0.5
+
+			modify_texture = {
+				using = color_yellow_texture
+			}
+		}
+		#Relative Power WEAKER
+		background = {
+			visible = "[LessThan_CFixedPoint(GetOverallPowerRatio(Player.Self, Country.Self), '(CFixedPoint)0.40')]"
+			using = text_mask_container_texture
+			margin_bottom = 1
+			alpha = 0.5
+
+			modify_texture = {
+				using = color_red_texture
+			}
+		}
+
 		hbox = {
 			layoutpolicy_horizontal = expanding
 			margin = { 10 3 }
@@ -569,8 +638,9 @@ template CountryTooltip_RelativePower {
 }
 
 template CountryTooltip_DiplomacyStatBars {
+	visible = "[And3(Not(IsLobbyOpen), IsPlayerValid, Not(Country.IsPlayer))]"
+
 	TooltipStatsBar = {
-		visible = "[And3(Not(IsLobbyOpen), IsPlayerValid, Not(Country.IsPlayer))]"
 		blockoverride "items" {
 			TooltipStatBarIconTextItem = { # THEIR OPINION
 				blockoverride "item_icon" {
@@ -661,7 +731,7 @@ template CountryTooltip_DiplomacyStatBars {
 				}
 
 				blockoverride "item_text" {
-					raw_text = "[Country.GetDiplomacy.GetTrustTowards(GetPlayer)|+=2]"
+					raw_text = "[Country.GetDiplomacy.GetTrustTowardsString(GetPlayer)]"
 					layoutpolicy_horizontal = expanding
 					size = { -1 18}
 					autoresize = no
@@ -771,7 +841,7 @@ template CountryTooltip_DiplomacyStatBars {
 	}
 }
 
-template CountryDiplomacyTooltip {
+template CountryMapModeDiplomacyTooltip {
 	ContextualTooltipType = {
         blockoverride "title_icon_texture" {
             texture = "[GetConceptTexture('diplomacy')]"
@@ -786,20 +856,190 @@ template CountryDiplomacyTooltip {
         }
 
         blockoverride "tooltip_content" {
-			TooltipContentSection = {
-				using = CountryTooltip_RelativePower
+			TooltipStatsBar = {
+				visible = "[And(Not(IsLobbyOpen), Not(EqualTo_string(Country.GetTag, GetSelectedCountryOrByLocation.GetTag)))]"
+				blockoverride "items" {
+					TooltipStatBarIconTextItem = { # THEIR OPINION
+						blockoverride "item_icon" {
+							size = { 20 20 }
+							texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+						}
+
+						blockoverride "item_text" {
+							text = "[Country.GetDiplomacy.GetOpinionOf(GetSelectedCountryOrByLocation)|+=]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 18}
+							autoresize = no
+							align = center
+						}
+
+						tooltipwidget = {
+							SimpleContextualStringPairTooltipType = {
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+									}
+								}
+
+								blockoverride "concept_link" {
+									text = "[opinion|e]"
+								}
+
+								tooltipmeta = {
+									texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+									game_concept = "[opinion|E]"
+								}
+
+								textcontext = "[Country.GetDiplomacy.GetOpinionDescription(GetSelectedCountryOrByLocation)]"
+							}
+						}
+					}
+					TooltipStatBarIconTextItem = { # SELECTED COUNTRY OPINION
+						blockoverride "item_icon_coa" {
+							datacontext = "[GetSelectedCountryOrByLocation]"
+						}
+						blockoverride "item_icon" {
+							size = { 20 20 }
+							texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+						}
+
+						blockoverride "item_text" {
+							text = "[GetSelectedCountryOrByLocation.GetDiplomacy.GetOpinionOf(Country.GetDiplomacy.GetCountry)|+=]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 18}
+							autoresize = no
+							align = center
+						}
+
+						tooltipwidget = {
+							SimpleContextualStringPairTooltipType = {
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+									}
+								}
+
+								blockoverride "concept_link" {
+									text = "[opinion|e]"
+								}
+
+								tooltipmeta = {
+									texture = "gfx/interface/icons/flat_icons/foreigncountry/opinion.dds"
+									game_concept = "[opinion|E]"
+								}
+
+								textcontext = "[GetSelectedCountryOrByLocation.GetDiplomacy.GetOpinionDescription(Country.GetDiplomacy.GetCountry)]"
+							}
+						}
+					}
+				}
 			}
 
-			TooltipContentSection = {
-				using = CountryTooltip_DiplomacyStatBars
+			TooltipStatsBar = {
+				visible = "[And(Not(IsLobbyOpen), Not(EqualTo_string(Country.GetTag, GetSelectedCountryOrByLocation.GetTag)))]"
+				blockoverride "items" {
+					TooltipStatBarIconTextItem = { # TRUST
+						blockoverride "item_icon" {
+							size = { 20 20 }
+							texture = "gfx/interface/icons/flat_icons/foreigncountry/trust.dds"
+						}
+
+						blockoverride "item_text" {
+							raw_text = "[Country.GetDiplomacy.GetTrustTowardsString(GetSelectedCountryOrByLocation)]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 18}
+							autoresize = no
+							align = center
+						}
+
+						tooltipwidget = {
+							SimpleContextualStringPairTooltipType = {
+								blockoverride "title_icon" {
+									icon = {
+										using = tooltip_title_icon_size
+										texture = "gfx/interface/icons/flat_icons/foreigncountry/trust.dds"
+									}
+								}
+
+								blockoverride "concept_link" {
+									text = "[trust|e]"
+								}
+
+								textcontext = "[Country.GetDiplomacy.GetTrustDescription(GetSelectedCountryOrByLocation)]"
+							}
+						}
+					}
+
+					TooltipStatBarIconTextItem = { # ANTAGONISM
+						blockoverride "item_icon" {
+							size = { 20 20 }
+							texture = "gfx/interface/icons/flat_icons/declare_war/antagonism.dds"
+						}
+
+						blockoverride "item_text" {
+							raw_text = "[Country.GetDiplomacy.GetAntagonismTowards(GetSelectedCountryOrByLocation)|-=0]"
+							layoutpolicy_horizontal = expanding
+							size = { -1 18}
+							autoresize = no
+							align = center
+						}
+
+						tooltipwidget = {
+							using = AntagonismTooltip
+							blockoverride "antagonism_datacontext" {
+								textcontext = "[Country.GetDiplomacy.GetAntagonismDescription(GetSelectedCountryOrByLocation)]"
+							}
+						}
+					}
+				}
 			}
 
             TooltipBlockList = {
-                textcontext = "[Country.GetPlayerDiplomacyInfo]"
+				blockoverride "set_textcontext" {
+					ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				}
+
+                textcontext = "[Country.GetSelectedCountryDiplomacyInfo]"
             }
         }
     }
 }
+
+# template CountryDiplomacyTooltip {
+# 	ContextualTooltipType = {
+#         blockoverride "title_icon_texture" {
+#             texture = "[GetConceptTexture('diplomacy')]"
+#         }
+
+#         blockoverride "title_text" {
+#             text = "DIPLOMACY_TT_TITLE"
+#         }
+
+#         blockoverride "concept_link" {
+#             text = "[diplomacy|e]"
+#         }
+
+#         blockoverride "tooltip_content" {
+# 			TooltipContentSection = {
+# 				using = CountryTooltip_RelativePower
+# 			}
+
+# 			TooltipContentSection = {
+# 				using = CountryTooltip_DiplomacyStatBars
+# 			}
+
+#             TooltipBlockList = {
+# 				blockoverride "set_textcontext" {
+# 					ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
+# 				}
+
+#                 textcontext = "[Country.GetPlayerDiplomacyInfo]"
+#             }
+#         }
+#     }
+# }
 
 template TruceTooltip {
 	ContextualTooltipType = {

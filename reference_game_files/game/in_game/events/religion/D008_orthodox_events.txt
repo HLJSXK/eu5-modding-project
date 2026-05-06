@@ -1,0 +1,521 @@
+﻿namespace = d008_orthodox_events
+d008_orthodox_events.1 = {
+	type = country_event
+	title = d008_orthodox_events.1.title
+	desc = d008_orthodox_events.1.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.1.a
+		ai_will_select = {
+			add = {
+				value = gold
+				subtract = root.var:lending_icon_price
+				divide = monthly_income_total
+			}
+			add = {
+				value = {
+					add = "opinion(scope:actor)"
+					multiply = 0.25
+				}
+			}
+			if = {
+				limit = {
+					gold < root.var:lending_icon_price
+				}
+				add = -100
+			}
+		}
+
+		add_trust_equilibrium_mutual_effect = { target = scope:actor modifier = trust_lent_icon }
+		add_opinion_mutual_effect = { target = scope:actor modifier = opinion_lent_icon }
+		add_gold = { value = root.var:lending_icon_price multiply = -1 }
+		show_as_tooltip = {
+			scope:actor = { add_gold = root.var:lending_icon_price }
+		}
+		add_to_variable_map = {
+			name = lent_icon
+			key = scope:target
+			value = scope:actor
+		}
+		save_temporary_scope_value_as = {
+			name = return_date
+			value = {
+				value = current_year
+				add = 10
+			}
+		}
+		add_to_variable_map = {
+			name = lent_icon_return_date
+			key = scope:target
+			value = scope:return_date
+		}
+		scope:target = {
+			move_art = root.capital
+		}
+		trigger_event_silently = { id = d008_orthodox_events.4 years = 10 }
+		scope:actor = { trigger_event_silently = d008_orthodox_events.2 }
+	}
+	option = {
+		name = d008_orthodox_events.1.b
+		ai_will_select = {
+			value = 10
+			if = {
+				limit = { gold < 0 }
+				add = 100
+			}
+			if = {
+				limit = { num_loans > 0 }
+				add = {
+					value = num_loans
+					multiply = 10
+				}
+			}
+		}
+		scope:actor = {
+			show_as_tooltip = {
+				add_opinion = { target = root modifier = opinion_refused_icon }
+			}
+			trigger_event_silently = d008_orthodox_events.3
+		}
+		remove_variable = lending_icon_price
+	}
+
+}
+
+d008_orthodox_events.2 = {
+	type = country_event
+	title = d008_orthodox_events.2.title
+	desc = d008_orthodox_events.2.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.2.a
+		show_as_tooltip = {
+			scope:target_country = {
+				add_trust_equilibrium_mutual_effect = { target = scope:actor modifier = trust_lent_icon }
+				add_opinion_mutual_effect = { target = scope:actor modifier = opinion_lent_icon }
+				add_gold = { value = scope:target_country.var:lending_icon_price multiply = -1 }
+			}
+			scope:target = {
+				move_art = scope:target_country.capital
+			}
+		}
+		add_gold = scope:target_country.var:lending_icon_price
+	}
+	after = {
+		scope:target_country = { remove_variable = lending_icon_price }
+	}
+
+}
+
+d008_orthodox_events.3 = {
+	type = country_event
+	title = d008_orthodox_events.3.title
+	desc = d008_orthodox_events.3.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.3.a
+		add_opinion = { target = scope:target_country modifier = opinion_refused_icon }
+	}
+}
+
+d008_orthodox_events.4 = {
+	type = country_event
+	title = d008_orthodox_events.4.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				desc = d008_orthodox_events.4.desc_no_country
+				trigger = {
+					NOT = { country_exists = "variable_map(lent_icon|scope:target_art)" }
+				}
+			}
+			desc = d008_orthodox_events.4.desc
+		}
+	}
+	outcome = neutral
+	trigger = {
+		has_variable_map = lent_icon_return_date
+		has_variable_map = lent_icon
+		any_key_in_variable_map = {
+			variable = lent_icon_return_date
+			root = { "variable_map(lent_icon_return_date|prev)" <= current_year }
+			root = { is_key_in_variable_map = { name = lent_icon target = prev } }
+		}
+	}
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_key_in_variable_map = {
+			variable = lent_icon_return_date
+			limit = {
+				root = { "variable_map(lent_icon_return_date|prev)" <= current_year }
+				root = { is_key_in_variable_map = { name = lent_icon target = prev } }
+			}
+			save_scope_as = target_art
+			root = { "variable_map(lent_icon|prev)" = { save_scope_as = origin_country } }
+		}
+		save_scope_as = target_country
+	}
+
+	option = {
+		name = d008_orthodox_events.4.a
+		trigger = {
+			country_exists = "variable_map(lent_icon|scope:target_art)"
+		}
+		scope:target_art = {
+			move_art = scope:origin_country.capital
+		}
+		add_trust_equilibrium_mutual_effect = { target = scope:origin_country modifier = trust_returned_icon }
+		add_opinion_mutual_effect = { target = scope:origin_country modifier = opinion_returned_icon }
+		scope:origin_country = {
+			trigger_event_silently = d008_orthodox_events.5
+		}
+	}
+
+	option = {
+		name = d008_orthodox_events.4.b
+		scope:target_art = {
+			set_art_owner = root
+		}
+		scope:origin_country ?= {
+			show_as_tooltip = {
+				add_opinion = { target = root modifier = opinion_refused_icon_return }
+				add_trust_equilibrium = { target = root modifier = trust_refused_icon_return }
+			}
+			trigger_event_silently = d008_orthodox_events.6
+		}
+	}
+	after = {
+		remove_from_variable_map = {
+			name = lent_icon
+			key = scope:target_art
+		}
+		remove_from_variable_map = {
+			name = lent_icon_return_date
+			key = scope:target_art
+		}
+	}
+}
+
+d008_orthodox_events.5 = {
+	type = country_event
+	title = d008_orthodox_events.5.title
+	desc = d008_orthodox_events.5.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.5.a
+		show_as_tooltip = {
+			scope:target_art = {
+				move_art = root.capital
+			}
+			add_trust_equilibrium_mutual_effect = { target = scope:target_country modifier = trust_returned_icon }
+			add_opinion_mutual_effect = { target = scope:target_country modifier = opinion_returned_icon }
+		}
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+d008_orthodox_events.6 = {
+	type = country_event
+	title = d008_orthodox_events.6.title
+	desc = d008_orthodox_events.6.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.6.a
+		add_opinion = { target = scope:target_country modifier = opinion_refused_icon_return }
+		add_trust_equilibrium = { target = scope:target_country modifier = trust_refused_icon_return }
+	}
+}
+
+d008_orthodox_events.7 = { #Gain of pentarchy seat
+	type = country_event
+	title = d008_orthodox_events.7.title
+	desc = d008_orthodox_events.7.desc
+	outcome = neutral
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.7.a
+		show_as_tooltip = {
+			add_pentarchy_modifier = { location = scope:target_pentarchy }
+		}
+		if = {
+			limit = {
+				has_all_pentarchy = yes
+				NOT = { has_variable = only_take_pentarchy_once } #Avoid multiple instances of d008_orthodox_events.7 from triggering the event if you take more than 1 seat at once
+				NOT = { has_country_modifier = pentarch_constantinople_upgraded } #Avoid triggering it also once we have already processed d008_orthodox_events.9 (in case the player clicks them one by one)
+			}
+			set_variable = only_take_pentarchy_once
+			trigger_event_silently = d008_orthodox_events.9
+		}
+	}
+}
+
+d008_orthodox_events.8 = { #Loss of pentarchy seat
+	type = country_event
+	title = d008_orthodox_events.8.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { has_variable = lost_pentarchy }
+				desc = d008_orthodox_events.8.desc_all_pentarchy
+			}
+			desc = d008_orthodox_events.8.desc
+		}
+	}
+	outcome = neutral
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.8.a
+		if = {
+			limit = { has_variable = lost_pentarchy }
+			show_as_tooltip = {
+				downgrade_pentarchy_modifier = yes
+			}
+		}
+		show_as_tooltip = {
+			remove_pentarchy_modifier = { location = scope:target_pentarchy }
+		}
+	}
+
+	after = {
+		remove_variable = lost_pentarchy
+	}
+}
+
+d008_orthodox_events.9 = { #Pentarchy united
+	type = country_event
+	title = d008_orthodox_events.9.title
+	desc = d008_orthodox_events.9.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.9.a
+		upgrade_pentarchy_modifier = yes
+		custom_tooltip = pentarchy_unlocked_abilities_tt
+		remove_variable = only_take_pentarchy_once
+	}
+}
+
+d008_orthodox_events.10 = { #Schism Mended
+	type = country_event
+	title = d008_orthodox_events.10.title
+	desc = d008_orthodox_events.10.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.10.a
+		show_as_tooltip = {
+			add_country_modifier = {
+				modifier = mended_schism
+				years = -1
+			}
+			add_prestige = prestige_extreme_bonus
+		}
+	}
+}
+
+d008_orthodox_events.11 = { #Rome primacy restored
+	type = country_event
+	title = d008_orthodox_events.11.title
+	desc = d008_orthodox_events.11.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = happy
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+		random_international_organizations_member_of = {
+			limit = {
+				international_organization_type = international_organization_type:autocephalous_patriarchate
+				exists = leader_country
+				leader_country = root
+				exists = var:seat
+				var:seat != location:rome
+			}
+			save_scope_as = target_io
+		}
+	}
+
+	option = {
+		name = d008_orthodox_events.11.a
+		if = {
+			limit = { capital != location:rome }
+			set_capital = location:rome
+		}
+		custom_tooltip = {
+			text = patriarchate_will_relocate_to_rome_tt
+			scope:target_io ?= {
+				set_variable = {
+					name = seat
+					value = location:rome
+				}
+				var:patriarch ?= { remove_variable = is_patriarch }
+				set_variable = {
+					name = patriarch
+					value = "religion:orthodox.variable_map(pentarchy|location:rome)"
+				}
+			}
+		}
+		add_prestige = prestige_extreme_bonus
+	}
+}
+
+d008_orthodox_events.12 = { #Catholic nations react to the claimed schism mending
+	type = country_event
+	title = d008_orthodox_events.12.title
+	desc = d008_orthodox_events.12.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = regular
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.12.a
+		trigger = {
+			exists = scope:actor
+			exists = c:PAP
+			"opinion(scope:actor)" > "opinion(c:PAP)"
+		}
+		change_religion = religion:orthodox
+		ruler = {
+			change_character_religion = religion:orthodox
+		}
+	}
+
+	option = {
+		name = d008_orthodox_events.12.b
+	}
+}
+
+d008_orthodox_events.13 = { #PAP informed of schism mended
+	type = country_event
+	title = d008_orthodox_events.13.title
+	desc = d008_orthodox_events.13.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.13.a
+	}
+}
+
+d008_orthodox_events.14 = { #PAP informed of Rome primacy restored
+	type = country_event
+	title = d008_orthodox_events.14.title
+	desc = d008_orthodox_events.14.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = d008_orthodox_events.14.a
+	}
+}

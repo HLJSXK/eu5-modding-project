@@ -91,6 +91,7 @@ eu5-modding-project/
 | `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
 | `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |
 | `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
+| `sync_reference.py` | After EU5 game updates to a new version | Wipes `reference_game_files/game/` and re-mirrors `<EU5>/in_game/` + `<EU5>/main_menu/` with extension whitelist + per-file/leaf-dir size caps; only `english`/`simp_chinese` loc; skips `gfx/` |
 | `validate.py` | Before launching game (`--changed` flag); `--ai-report` for JSON output | Console validation report; exit code indicates pass/fail |
 
 Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scarcity/` (effects_gen, weights_gen, indicators_gen, loc_gen, gui_gen). The top-level script remains the single entry point.
@@ -170,10 +171,10 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 
 | Category | Count | Index file | Notes |
 | --- | --- | --- | --- |
-| GUI Icons (`@xxx!`) | 321 | `data/index/icons.txt` | Use `@name!` in raw_text/text fields and YAML values |
-| Scripted Triggers | 462 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
-| Scripted Effects | 457 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
-| Static Modifiers | 2089 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
+| GUI Icons (`@xxx!`) | 351 | `data/index/icons.txt` | Use `@name!` in raw_text/text fields and YAML values |
+| Scripted Triggers | 488 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
+| Scripted Effects | 479 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
+| Static Modifiers | 2301 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
 | English Loc Keys | 615 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map

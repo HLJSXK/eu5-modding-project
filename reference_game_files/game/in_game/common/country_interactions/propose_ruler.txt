@@ -1,6 +1,8 @@
-﻿propose_ruler =  { 
+﻿propose_ruler = {
 	type = diplomacy
 	category = CATEGORY_INFLUENCE_ACTIONS
+	ai_tick = monthly
+	ai_tick_frequency = 6
 
 	potential = {
 		scope:actor = {
@@ -11,11 +13,8 @@
 	allow = {
 		scope:actor = {
 			exists = ruler_or_heir_if_regent.dynasty
-			any_character = {
-				is_ruler = no
-				has_dynasty = yes
-				dynasty = scope:actor.ruler_or_heir_if_regent.dynasty
-				religion = scope:actor.religion
+			ruler_or_heir_if_regent.dynasty = {
+				num_adult_available_dynasty_members > 0
 			}
 		}
 	}
@@ -23,6 +22,26 @@
 	select_trigger = {
 		looking_for_a = country
 		target_flag = recipient
+		ai_interaction_source_list = {
+			scope:actor = {
+				every_country_in_diplomatic_range = {
+					limit = {
+						government_type = government_type:monarchy
+						not = { is_subject_of = scope:actor }
+						not = { in_union_with = scope:actor }
+						has_regent = yes
+						has_heir = no
+					}
+					add_to_list = source
+				}
+			}
+		}
+		cache_interaction_source_list = yes
+		pre_evaluation_sort_value = {
+			add = "opinion(scope:actor)"
+			add = "trust(scope:actor)"
+		}
+		pre_evaluation_number_to_evaluate_fully = 3
 		name = "choose_country"
 		column = {
 			data = name
@@ -30,6 +49,7 @@
 		visible = {
 			government_type = government_type:monarchy
 			not = { is_subject_of = scope:actor }
+			not = { in_union_with = scope:actor }
 		}
         enabled = {
 			has_regent = yes
@@ -41,6 +61,24 @@
 		looking_for_a = character
 		source = actor
 		target_flag = target
+		ai_interaction_source_list = {
+			scope:actor = {
+				ruler_or_heir_if_regent.dynasty = {
+					every_available_dynasty_member = {
+						limit = {
+							religion = scope:actor.religion
+							modifier:blocked_from_character_interactions = no
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		cache_interaction_source_list = yes
+		pre_evaluation_sort_value = {
+			add = total_abilities
+		}
+		pre_evaluation_number_to_evaluate_fully = 4
 		name = "propose_ruler_SELECT_TITLE"
 		none_available_msg_key = "propose_ruler_no_characters"
 		column = {
@@ -79,58 +117,61 @@
 			desc = "VOTE_BASE_VALUE"
 			value = 400
 		}
-		add = {
-			desc = "THEIR_OPINION_TOOLTIP"
-			value = "scope:recipient.opinion(scope:actor)"
+		if = {
+			limit = { exists = scope:recipient }
+			add = {
+				desc = "THEIR_OPINION_TOOLTIP"
+				value = "scope:recipient.opinion(scope:actor)"
+				if = {
+					limit = {
+						scope:recipient = {
+							"opinion(scope:actor)" > 0
+						}
+					}
+					divide = 10
+				}
+				else = {
+					divide = 5
+				}
+			}
+			add = {
+				desc = "DIPLOREASON_TRUST"
+				value = "scope:recipient.trust(scope:actor)"
+				divide = 5
+			}
 			if = {
-				limit = {
-					scope:recipient = {
-						"opinion(scope:actor)" > 0
+				limit = { exists = scope:target }
+				add = {
+					desc = "DIPLOREASON_TARGET_CHARACTER_TOTAL_ABILITIES"
+					value = scope:target.total_abilities
+				}
+				if = {
+					limit = { scope:target.culture = scope:recipient.culture }
+					add = {
+						desc = "DIPLOREASON_TARGET_CHARACTER_CULTURE"
+						value = 50
 					}
 				}
-				divide = 10
-			}
-			else = {
-				divide = 5
+				if = {
+					limit = { scope:target.religion = scope:recipient.religion }
+					add = {
+						desc = "DIPLOREASON_TARGET_CHARACTER_RELIGION"
+						value = 50
+					}
+				}
+				if = {
+					limit = { scope:target = { is_heir_of = scope:actor } }
+					subtract = {
+						desc = "DIPLOREASON_WOULD_CREATE_UNION_WITH_US"
+						value = 200
+					}
+				}
 			}
 		}
 		add = {
 			desc = "[diplomatic_reputation|e]"
 			value = scope:actor.modifier:diplomatic_reputation
 			multiply = 3
-		}
-		add = {
-			desc = "DIPLOREASON_TRUST"
-			value = "scope:recipient.trust(scope:actor)"
-			divide = 5
-		}
-		if = {
-			limit = { exists = scope:target }
-			add = {
-				desc = "DIPLOREASON_TARGET_CHARACTER_TOTAL_ABILITIES"
-				value = scope:target.total_abilities
-			}
-			if = {
-				limit = { scope:target.culture = scope:recipient.culture }
-				add = {
-					desc = "DIPLOREASON_TARGET_CHARACTER_CULTURE"
-					value = 50
-				}
-			}
-			if = {
-				limit = { scope:target.religion = scope:recipient.religion }
-				add = {
-					desc = "DIPLOREASON_TARGET_CHARACTER_RELIGION"
-					value = 50
-				}
-			}
-			if = {
-				limit = { scope:target = { is_heir_of = scope:actor } }
-				subtract = {
-					desc = "DIPLOREASON_WOULD_CREATE_UNION_WITH_US"
-					value = 200
-				}
-			}
 		}
 	}
 }	

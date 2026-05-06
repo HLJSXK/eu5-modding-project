@@ -1,4 +1,4 @@
-types PossibleTrades {
+﻿types PossibleTrades {
 	type ExistingTradeProfitPerCapacityTooltip = ContextualTooltipType {
 		blockoverride "title_icon" {
 			icon = {
@@ -19,55 +19,8 @@ types PossibleTrades {
 		blockoverride "tooltip_content" {
 			datacontext = "[Trade]"
 
-			TooltipStringPairList = {
-				textcontext = "TOTAL_PROFIT_EXISTING_TRADE"
-			}
-
-			TooltipStringPairList = {
-				blockoverride "block_title" { datacontext = "[Trade]" text = "TRADE_PROFIT_BUY_LABEL" }
-				textcontext = "[Trade.GetBuyInfo]"
-			}
-				
-			TooltipStringPairList = {
-				blockoverride "block_title" { datacontext = "[Trade]" text = "TRADE_PROFIT_SELLING_LABEL" }
-				textcontext = "[Trade.GetSellInfo]"
-			}
-			
-			margin_widget = {
-				layoutpolicy_horizontal = expanding
-				margin_left = 8
-				margin_right = 8
-				size = { 420 28 }
-				using = fake_table_dark_background
-				text_single = {
-					text = "[merchant_maintenance|e]"
-				}
-				text_single = {
-					parentanchor = right
-					align = right
-					raw_text = "[Trade.GetMaintenance|-=2]@gold!"
-					datacontext = "[Trade]"
-					tooltipwidget = {
-						using = trade_maintenance_tooltip
-					
-					}
-				}
-			}			
-			margin_widget = {
-				layoutpolicy_horizontal = expanding
-				margin_left = 8
-				margin_right = 8
-				size = { 420 28 }
-				using = fake_table_light_background
-				text_single = {
-					text = "[sound_toll|e]"
-				}
-				text_single = {
-					parentanchor = right
-					align = right
-					raw_text = "[Trade.GetSoundTollFee|-=2]@gold!"
-				}
-			}
+			using = TradeProfitSummary
+			using = TradeProfitDetails
 
 			widget = {
 				visible = "[Not(Trade.HasTradeHappened)]"
@@ -256,10 +209,7 @@ types PossibleTrades {
 					}
 					
 					blockoverride "tooltip_content" {			
-						TooltipContentSection = {
-							visible = "[Trade.IsValid]"
-							using = trade_details
-						}	
+						using = trade_details
 					}
 				}
 			}
@@ -277,10 +227,11 @@ types PossibleTrades {
 					name = "country_name"
 					size = { 120% 150% }
 				}
+				#Not from Trade Order
 				checkbox_square_alt = {
 					parentanchor = center
 					margin = { 10 5 }
-					visible = "[ObjectsEqual(Trade.GetOwner, Player.Self)]"
+					visible = "[And(ObjectsEqual(Trade.GetOwner, Player.Self), Not(Trade.IsFromTradeOrder))]"
 					size = { 20 20 }
 					tooltipwidget = {
 						ContextualTooltipType = {
@@ -318,6 +269,62 @@ types PossibleTrades {
 									
 									blockoverride "action_left_text" {
 										text = "TRADE_LOCKING_TT_TOGGLE"
+									}
+								}
+							}
+						}
+					}
+					checked = "[Trade.IsLocked]"
+					onclick = "[Trade.ToggleLock]"
+				}
+				#From Trade Order
+				checkbox_square_alt = {
+					parentanchor = center
+					margin = { 10 5 }
+					visible = "[And(ObjectsEqual(Trade.GetOwner, Player.Self), Trade.IsFromTradeOrder)]"
+					size = { 20 20 }
+					blockoverride "checkbox_square_alt_color" {
+						modify_texture = {
+							using = color_progress_blue_texture
+							alpha = 0.5
+						}
+					}
+					tooltipwidget = {
+						ContextualTooltipType = {
+							blockoverride "tooltip_content" {
+								TooltipTextBlock = {
+									blockoverride "text" {
+										text = "[SelectLocalization( Trade.IsLocked, 'CURRENT_TRADE_TRADE_ORDER', 'CURRENT_TRADE_UNLOCKED' )]"
+									}
+								}
+							}
+							
+							blockoverride "title_icon" {
+								icon = {
+									visible = "[Trade.IsLocked]"
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/map_subdivisons/locked.dds"
+								}
+								icon = {
+									visible = "[Not(Trade.IsLocked)]"
+									using = tooltip_title_icon_size
+									texture = "gfx/interface/icons/map_subdivisons/unlocked.dds"
+								}
+							}
+	
+							blockoverride "concept_link" {
+								raw_text = "[trade|e]"
+							}
+							blockoverride "title_text" {
+								text = "TRADE_LOCKING_TT_TITLE"
+							}
+	
+							blockoverride "tooltip_ui_action_block" {
+								TooltipFunctionalBlock = {
+									using = tooltip_left_click_template
+									
+									blockoverride "action_left_text" {
+										text = "TRADE_LOCKING_TT_TOGGLE_TRADE_ORDER"
 									}
 								}
 							}
@@ -414,20 +421,22 @@ types PossibleTrades {
 					block "sort_by_highlight_markets" {}
 				}
 			}
-	
-			text_single = {
-				size = { 60 20 }
-				autoresize = no
-				align = center|nobaseline
-				using = Font_Size_Small
-				visible = "[Trade.HasTradeHappened]"
-				raw_text = "[Trade.GetCachedProfitPerMerchantCapacity|+=2]@gold!"
-	
-				tooltipwidget = {
-					ExistingTradeProfitPerCapacityTooltip = {}
+			
+			flowcontainer = {
+				text_single = {
+					size = { 60 20 }
+					autoresize = no
+					align = center|nobaseline
+					using = Font_Size_Small
+					visible = "[Trade.HasTradeHappened]"
+					raw_text = "[Trade.GetCachedProfitPerMerchantCapacity|+=2]@profit_trade!"
+		
+					tooltipwidget = {
+						ExistingTradeProfitPerCapacityTooltip = {}
+					}
+		
+					block "sort_by_highlight_profit" {}
 				}
-	
-				block "sort_by_highlight_profit" {}
 			}
 	
 			# GOODS MOVED
@@ -459,13 +468,13 @@ types PossibleTrades {
 					widget = {
 						size = { 15 15 }
 						icon = {
-							visible = "[And(Trade.HasTradeHappened, GreaterThan_CFixedPoint(Trade.GetDesiredGoodsShipped, Trade.GetQuantityOfGoodsActuallyMoved))]"
+							visible = "[And(Trade.HasTradeHappened, Trade.IsTradeInefficient)]"
 							size = { 15 15 }
 							using = warning_icon_texture
 							tooltipwidget = {
 								container = {
 									container = {						
-										visible = "[And(Trade.HasTradeHappened, GreaterThan_CFixedPoint(Trade.GetDesiredGoodsShipped, Trade.GetQuantityOfGoodsActuallyMoved))]"
+										visible = "[And(Trade.HasTradeHappened, Trade.IsTradeInefficient)]"
 										ContextualTooltipType = {
 											blockoverride "title_text" {
 												datacontext = "[Trade]"
@@ -744,7 +753,7 @@ types PossibleTrades {
 				autoresize = no
 				align = center|nobaseline
 				using = Font_Size_Small
-				raw_text = "[PossibleTrade.GetMerchantCapacityProfit|+=2]@gold!"				
+				raw_text = "[PossibleTrade.GetMerchantCapacityProfit|+=2]@profit_trade!"				
 	
 				tooltipwidget = {
 					ContextualTooltipType = {
@@ -766,38 +775,156 @@ types PossibleTrades {
 						}
 						blockoverride "tooltip_content" {
 							datacontext = "[PossibleTrade]"
-							TooltipStringPairList = {
-								textcontext = "TOTAL_PROFIT_POSSIBLE_TRADE"
-							}
 
-							TooltipStringPairList = {
-								blockoverride "block_title" { text = "POSSIBLE_TRADE_PROFIT_BUY_LABEL" }
-								textcontext = "[PossibleTrade.PotentialBuyInfo]"
-							}
-								
-							TooltipStringPairList = {
-								blockoverride "block_title" { text = "POSSIBLE_TRADE_PROFIT_SELLING_LABEL" }
-								textcontext = "[PossibleTrade.PotentialSellInfo]"
-							}
-							
-							margin_widget = {
-								layoutpolicy_horizontal = expanding
-								margin_left = 8
-								margin_right = 8
-								size = { 420 28 }
-								using = fake_table_dark_background
-								text_single = {
-									text = "[merchant_maintenance|e]"
-								}
-								text_single = {
-									parentanchor = right
-									align = right
-									text = "[PossibleTrade.GetMaintenance|-=2][gold_i]"
-									tooltipwidget = {
-										using = PossibleTrade_maintenance_tooltip										
+							TooltipListBase = { 
+								TooltipListRowContent = {
+									TooltipManualTableField = {
+										datacontext = "[PossibleTrade.GetFromMarket.GetMarketEntry(PossibleTrade.GetGoods)]"
+										datacontext = "[PossibleTrade.GetFromMarket]"
+										blockoverride "field_content" {
+											text_single = {
+												tooltipwidget = { using = goods_market_price_tooltip }
+												text = "POSSIBLE_TRADE_PROFIT_BUYING_SUMMARY"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "-[PossibleTrade.GetBuyCost|-2][gold_i]"
+												default_format = "#R"
+												tooltipwidget = {
+													ContextualTooltipType = {
+														blockoverride "title_text" {
+															text = "POSSIBLE_TRADE_PROFIT_BUY_LABEL"
+														}
+														blockoverride "title_icon" {
+															icon = {
+																using = tooltip_title_icon_size
+																texture = "[GetConceptTexture('trade')]"
+															}
+														}
+														blockoverride "concept_link" {
+															text = "[trade_profit|e]"
+														}
+														blockoverride "tooltip_content" { 
+															TooltipScrolledStringPairList = {
+																blockoverride "block_title" { text = "POSSIBLE_TRADE_PROFIT_BUY_LABEL" }
+																blockoverride "block_scrollarea" { maximumsize = { -1 480 } }
+																textcontext = "[PossibleTrade.PotentialBuyInfo]"
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+
+									TooltipManualTableField = {
+										blockoverride "field_content" {
+											text_single = {
+												text = "[merchant_maintenance|e]"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "-[PossibleTrade.GetMaintenance|2]@gold!"
+												default_format = "#R"
+												tooltipwidget = {
+													using = PossibleTrade_maintenance_tooltip										
+												}
+											}
+										}
+									}
+
+									# TooltipManualTableField = {
+									# 	visible = "[GreaterThan_CFixedPoint(Trade.GetSoundTollFee,'(CFixedPoint)0')]"
+									# 	blockoverride "field_content" {
+									# 		text_single = {
+									# 			text = "[sound_toll|e]"
+									# 		}
+									# 		expand = {}									
+									# 		text_single = {
+									# 			raw_text = "-[Trade.GetSoundTollFee|2]@gold!"
+									# 			default_format = "#R"
+									# 		}
+									# 	}
+									# }
+
+									TooltipManualTableField = {
+										datacontext = "[PossibleTrade.GetToMarket.GetMarketEntry(PossibleTrade.GetGoods)]"
+										datacontext = "[PossibleTrade.GetToMarket]"
+										blockoverride "field_content" {
+											text_single = {
+												tooltipwidget = { using = goods_market_price_tooltip }
+												text = "POSSIBLE_TRADE_PROFIT_SELLING_SUMMARY"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "[PossibleTrade.GetSellPrice|+=2]@gold!"
+												tooltipwidget = {
+													ContextualTooltipType = {
+														blockoverride "title_text" {
+															text = "POSSIBLE_TRADE_PROFIT_SELLING_LABEL"
+														}
+														blockoverride "title_icon" {
+															icon = {
+																using = tooltip_title_icon_size
+																texture = "[GetConceptTexture('trade')]"
+															}
+														}
+														blockoverride "concept_link" {
+															text = "[trade_profit|e]"
+														}
+														blockoverride "tooltip_content" { 
+															TooltipScrolledStringPairList = {
+																blockoverride "block_title" { text = "POSSIBLE_TRADE_PROFIT_SELLING_LABEL" }
+																blockoverride "block_scrollarea" { maximumsize = { -1 480 } }
+																textcontext = "[PossibleTrade.PotentialSellInfo]"
+															}
+														}
+													}
+												}
+											}
+										}
 									}
 								}
-							}							
+							}
+							
+							TooltipListBase = { 
+								TooltipListRowContent = {
+									TooltipManualTableField = {
+										blockoverride "field_content" {
+											text_single = {
+												text = "TOTAL_PROFIT"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "[PossibleTrade.GetProfit|+=2]@gold!"
+											}
+										}
+									}
+									TooltipManualTableField = {
+										blockoverride "field_content" {
+											text_single = {
+												text = "TRADE_CAPACITY_USED"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "[PossibleTrade.GetDesiredMerchantCapacity|2] [merchant_capacity_icon]"
+											}
+										}
+									}
+
+									TooltipManualTableField = {
+										blockoverride "field_content" {
+											text_single = {
+												text = "PROFIT_TRADE_PREFIX_TT"
+											}
+											expand = {}									
+											text_single = {
+												raw_text = "[PossibleTrade.GetMerchantCapacityProfit|+=2]@profit_trade!"
+											}
+										}
+									}
+								}
+							}
 						}
 					}
 				}
@@ -938,7 +1065,7 @@ types TradeOverview {
 	type AutomatedTradeSlider = hbox {
 		layoutpolicy_horizontal = expanding
 		widget = {					
-			size = { -1 46 }
+			size = { -1 52 }
 			layoutpolicy_horizontal = expanding
 			using = bg_market_card
 			using = bg_cabinet_card_frame
@@ -964,8 +1091,8 @@ types TradeOverview {
 				widget = {	
 					layoutpolicy_horizontal = expanding
 					vbox = {
+						margin = { 0 4 }
 						text_single = {
-							margin_top = 4
 							layoutpolicy_horizontal = expanding
 							size = { -1 13 }
 							autoresize = no
@@ -1012,14 +1139,18 @@ types TradeOverview {
 									}
 									size = { 110 10 }
 									min = 0
+									max = "[Market.GetMerchantTotalCapacity(Player.Self)]"
+									mincap = "[Market.GetTradeOrderTotalCapacity(Player.Self)]"
+									value = "[Market.GetAutomatedTradeCapacity(Player.Self)]"
 									step = 0.1
 									wheelstep = 1
-									max = "[Market.GetMerchantTotalCapacity(Player.Self)]"
-									value = "[Market.GetAutomatedTradeCapacity(Player.Self)]"
 									onvaluechanged = "[OnChangedAutomatedTradeCapacity(Market.Self)]"
 									enabled = "[IsMarketAutomated(Market.Self)]"
 									inc_button = { button = {} }
 									dec_button = { button = {} }
+									blockoverride "track_type"{
+										track = { using = trade_orders_slider_track }
+									}
 								}
 								button_square_plus = {
 									size = { 15 15 }
@@ -1259,6 +1390,72 @@ types TradeOverview {
 							
 							blockoverride "glow_visible" {
 								visible = "[TradeOverview.IsPossibleTradesSelectMarketOpened(PdxGuiWidget.FindParent('possible_trades_filtered_list').Self)]"
+							}
+						}
+					}
+				}
+
+				# TRADE DESTINATION FILTER
+				vbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 2					
+
+					# Per-market rows with search + filter bar
+					filtered_sorted_list = {
+						datacontext = "[TradeOverview.GetMarketsInRangeForDestinationSortSearch]"
+						using = layoutpolicy_expanding
+
+						blockoverride "scroll_list_vbox" {
+							using = layoutpolicy_expanding
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								autoresize = no
+								fontsize = 12
+								align = center
+								text = "TRADE_DESTINATION_MARKET_SEARCH_HINT"
+							}
+						}
+
+						blockoverride "scroll_list_layout" {
+							fixedgridbox = {
+								addcolumn = 100%
+								addrow = 36
+								datamodel = "[TradeOverview.GetMarketsInRangeForDestinationFilter]"
+
+								item = {
+									widget = {
+										size = { 100% 36 }
+										min_width = 300
+
+										# checkbutton_01_alt = {
+										# 	size = { 100% 100% }
+										# 	tooltip_enabled = no
+										# 	down = "[IsTradeDestinationFilterMarket(Market.Self)]"
+										# 	onclick = "[TradeOverview.SetTradeDestinationFilter(Market.Self)]"
+										# }
+
+										hbox = {
+											alwaystransparent = yes
+											margin_left = 10
+											margin_right = 35
+											layoutpolicy_horizontal = expanding
+											layoutpolicy_vertical = expanding
+											spacing = 6
+
+											icon = {
+												size = { 16 16 }
+												texture = "gfx/interface/icons/location_icons/market.dds"
+											}
+
+											text_single = {
+												layoutpolicy_horizontal = expanding
+												autoresize = no
+												fontsize = 14
+												text = "[Market.GetName]"
+											}
+										}
+									}
+								}
 							}
 						}
 					}

@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-07 (Market-hub scarcity score caching + sol_era_coeff start lowered 2.0 → 1.5)
+> Last updated: 2026-05-07 (Added sync_reference.py; refreshed reference_game_files to EU5 1.2)
 
 ## Project Identity
 
@@ -90,6 +90,7 @@ eu5-modding-project/
 | `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
 | `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |
 | `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
+| `sync_reference.py` | After EU5 game updates to a new version | Wipes `reference_game_files/game/` and re-mirrors `<EU5>/in_game/` + `<EU5>/main_menu/` with extension whitelist + per-file/leaf-dir size caps; only `english`/`simp_chinese` loc; skips `gfx/` |
 | `validate.py` | Before launching game (`--changed` flag); `--ai-report` for JSON output | Console validation report; exit code indicates pass/fail |
 
 Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scarcity/` (effects_gen, weights_gen, indicators_gen, loc_gen, gui_gen). The top-level script remains the single entry point.

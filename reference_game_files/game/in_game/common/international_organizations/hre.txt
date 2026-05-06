@@ -3,7 +3,7 @@
 	has_target = no
 	unique = yes
 	expel_members_who_are_targets_of_other_members = no
-	
+	has_buildings = yes
 	show_leave_message = no
 	use_laws_as_join_reason = no
 
@@ -57,23 +57,17 @@
 			hre_enabled_free_cities_protection = yes
 			exists = scope:actor
 			scope:actor = {
-				OR = {
-					has_special_status_in_international_organization = {
-						type = special_status:free_city
-						international_organization = root
-					}
-					any_subject = {
-						has_special_status_in_international_organization = {
-							type = special_status:free_city
-							international_organization = root
-						}
-					}
+				is_subject = no
+				has_special_status_in_international_organization = {
+					type = special_status:free_city
+					international_organization = root
 				}
 			}
 		}
 	}
 
 	join_defensive_wars_auto_call = {
+		exists = scope:target
 		scope:target ?= {
 			not = {
 				is_member_of_international_organization = root
@@ -94,7 +88,7 @@
 			scope:attacker = { has_casus_belli_on = scope:defender }
 		}
 		trigger_else = {
-			always = yes
+			hidden_trigger = { always = yes }
 		}
 		trigger_if = {
 			limit = {
@@ -105,7 +99,7 @@
 			scope:recipient = { modifier:enforced_internal_peace = no }
 		}
 		trigger_else = {
-			always = yes
+			hidden_trigger = { always = yes }
 		}
 	}
 
@@ -121,10 +115,19 @@
 	no_cb_price_modifier_for_fellow_member = 1
 
 	modifier = {
-		block_from_change_to_kingdom_rank = yes
 		block_from_change_to_empire_rank = yes
 		block_from_change_to_duchy_rank = yes
 		reject_subjugation_reasons = 25
+	}
+
+	modifier = {
+		potential_trigger = {
+			NOR = {
+				has_game_rule = no_rank_restriction
+				has_game_rule = rank_restriction_by_numbers
+			}
+		}
+		block_from_change_to_kingdom_rank = yes
 	}
 
 	international_organization_modifier = {
@@ -205,16 +208,19 @@
 
 			# Already Emperor: heir must be eligible (successor check)
 			AND = {
-				is_leader_of_international_organization = scope:recipient
+				OR = {
+					is_leader_of_international_organization = scope:recipient
+					scope:recipient = {
+						international_organization_has_leader = no
+						exists = last_leader_country
+						last_leader_country ?= root
+					}
+				}
 
 				custom_tooltip = {
 					text = hre_has_eligible_heir_tt
 					AND = {
 						has_heir = yes
-						OR = {
-							has_ruler = no
-							is_leader_of_international_organization = scope:recipient
-						}
 						OR = {
 							heir ?= { is_female = no }
 							scope:recipient = { modifier:hre_allow_female_emperors = yes }
@@ -255,9 +261,6 @@
 	}
 	
 	can_leave_trigger = {
-		scope:recipient = {
-			international_organization_has_policy = policy:golden_bull_policy
-		}
 		NOT = { is_leader_of_international_organization = scope:recipient }
 		trigger_if = {
 			limit = { scope:recipient = { international_organization_has_leader = yes } }
@@ -267,6 +270,10 @@
 					text = hre_leaving_tt
 					always = no
 				}
+			}
+			trigger_else = {
+				scope:recipient = { NOT = { international_organization_has_policy = policy:golden_bull_policy } }
+				current_year > 1400
 			}
 		}
 		trigger_else = {
@@ -320,11 +327,38 @@
 					add_country_to_international_organization = prev.owner
 				}
 			}
+			#purge too many electors
+			if = {
+				limit = {
+					"max_countries_with_special_status(special_status:elector)" < "num_countries_with_special_status(special_status:elector)"
+					"num_countries_with_special_status(special_status:elector)" > 0
+				}
+				ordered_country_with_special_status_of_type = {
+					type = elector
+					order_by = { value = great_power_score multiply = -1 }
+					max = 1
+					check_range_bounds = no
+					root = { international_organization_remove_special_status = { type = special_status:elector country = prev } }
+				}
+			}
+			if = {
+				limit = {
+					"max_countries_with_special_status(special_status:archbishop_elector)" < "num_countries_with_special_status(special_status:archbishop_elector)"
+					"num_countries_with_special_status(special_status:archbishop_elector)" > 0
+				}
+				ordered_country_with_special_status_of_type = {
+					type = archbishop_elector
+					order_by = { value = great_power_score multiply = -1 }
+					max = 1
+					check_range_bounds = no
+					root = { international_organization_remove_special_status = { type = special_status:archbishop_elector country = prev } }
+				}
+			}
 			#check that the kingdom titles are in the list and valid
-			hre_update_kingdom_title = { formable_country = formable_country:BOH_f }
-			hre_update_kingdom_title = { formable_country = formable_country:BGP_f }
-			hre_update_kingdom_title = { formable_country = formable_country:LOT_f }
-			hre_update_kingdom_title = { formable_country = formable_country:ITA_f }
+			hre_update_kingdom_title = { scripted_geography = scripted_geography:kingdom_of_italy_geography }
+			hre_update_kingdom_title = { scripted_geography = scripted_geography:kingdom_of_lotharingia_geography }
+			hre_update_kingdom_title = { scripted_geography = scripted_geography:kingdom_of_burgundy_geography }
+			hre_update_kingdom_title = { scripted_geography = scripted_geography:kingdom_of_bohemia_geography }
 			#in case of a deadlock, pick the most powerful candidate of the HRE and make them emperor...
 			if = {
 				limit = {
@@ -586,9 +620,9 @@
 							international_organization_has_leader = no
 						}
 						# No gains if there is a interregnum
-						multiply = {
+						subtract = {
 							desc = "IMPERIAL_REGENCY"
-							value = 0
+							value = 1
 						}
 
 						# Subtract IA if there is a long interregnum
@@ -608,10 +642,16 @@
 					}
 					else = {
 						# Dynastic Power
-						add = {
-							desc = "IA_DYNASTIC_POWER"
-							value = "leader_country.ruler_or_heir_if_regent.dynasty.dynastic_power(root)"
-							multiply = 0.005
+						leader_country = {
+							ruler_or_heir_if_regent ?= {
+								dynasty ?= {
+									add = {
+										desc = "IA_DYNASTIC_POWER"
+										value = "dynastic_power(root)"
+										multiply = 0.005
+									}
+								}
+							}
 						}
 
 						# Emperor Abilities

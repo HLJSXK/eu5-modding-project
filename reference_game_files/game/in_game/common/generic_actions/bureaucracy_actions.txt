@@ -1,0 +1,160 @@
+﻿add_bureaucracy_action = {
+	type = owncountry
+	
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			any_current_bureaucracy = { count < scope:actor.max_bureaucracy_slots }
+		}
+	}
+
+	allow = {
+	}
+
+	price = {
+		if = {
+			limit = {
+				exists = scope:target_bureaucracy
+			}
+			scope:target_bureaucracy = {
+				value = "implementation_price(scope:actor)"
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = bureaucracy_type
+		source = actor
+		target_flag = target_bureaucracy
+		name = "select_bureaucracy"
+		none_available_msg_key = "no_bureaucracies_available"
+		column = { data = name }
+		visible = {
+			scope:actor = {
+				not = { 
+					has_bureaucracy_of_type = root
+				}
+				bureaucracy_type_is_visible = root
+			}
+		}
+		enabled = {
+			scope:actor = {
+				bureaucracy_type_is_enabled = root
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target_bureaucracy }
+			scope:actor = { add_bureaucracy = scope:target_bureaucracy }
+		}
+	}
+	
+	ai_will_do = {
+		add = {
+			value = -75
+			add = scope:actor.government_power
+			desc = "our gov power right now"
+		}
+		add = {
+			value = scope:actor.monthly_balance
+			subtract = 50
+			desc = "we can surely afford this, it won't boomerang on us in 100 years, no!"
+		}
+	}
+}
+
+remove_bureaucracy_action = {
+	type = owncountry
+	
+	ai_tick = monthly
+	ai_tick_frequency = 6
+
+	potential = {
+		scope:actor = {
+			any_current_bureaucracy = { count > 0 }
+		}
+	}
+
+	price = {
+		if = {
+			limit = {
+				exists = scope:target_bureaucracy
+			}
+			scope:target_bureaucracy = {
+				value = "removal_price(scope:actor)"
+			}
+		}
+	}
+	price_modifier = {
+		add = {
+			value = 1
+			desc = BASE_VALUE
+		}
+		if = {
+			limit = { exists = scope:target_bureaucracy }
+			add = {
+				desc = "[entrenchment|e]"
+				value = scope:target_bureaucracy.entrenchment
+				multiply = 0.01
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = bureaucracy
+		interaction_source_list = {
+			scope:actor = {
+				every_current_bureaucracy = { 
+					add_to_list = source 
+				}
+			}
+		}
+		target_flag = target_bureaucracy
+		name = "select_bureaucracy"
+		none_available_msg_key = "no_bureaucracies_available"
+		column = { data = name }
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target_bureaucracy }
+			scope:actor = {
+				every_current_bureaucracy = {
+					limit = { bureaucracy_type = scope:target_bureaucracy.bureaucracy_type }
+					scope:actor = { remove_bureaucracy = prev }
+				}
+			}
+		}
+		else = { scope:actor = { add_prestige = 5 }}
+	}
+	
+	ai_will_do = {
+		add = {																#This is to safeguard bureaucracies with <25 entrenchment from being removed
+			value = -25
+			desc = BASE_VALUE
+		}
+		if = {
+			limit = { exists = scope:target_bureaucracy }
+			add = {
+				value = scope:target_bureaucracy.entrenchment				#We want to get rid of the entrenched ones
+				desc = "[target_bureaucracy.GetName] current entrenchment"
+			}
+
+			if = {
+				limit = { scope:target_bureaucracy.bureaucracy_maintenance > 0.25 }
+				add = {												
+					add = scope:actor.country_economical_base
+					multiply = scope:target_bureaucracy.bureaucracy_maintenance
+					subtract = scope:actor.monthly_balance
+					desc = "economic calculation"
+				}
+			}
+		}
+
+	}
+}
+

@@ -4,6 +4,8 @@
 
 This directory contains extracted game files from **Europa Universalis 5** (released November 2025) for modding reference purposes. These files are essential for understanding game mechanics, modifier types, and scripting patterns.
 
+The contents are produced automatically by [`scripts/sync_reference.py`](../scripts/sync_reference.py) — see *Updating* below. Do not edit `game/` by hand; it will be wiped on the next sync.
+
 ## Contents
 
 ```
@@ -15,12 +17,13 @@ reference_game_files/
     │   ├── gui/           # User interface definitions
     │   ├── map_data/      # Map-related data
     │   └── setup/         # Game setup files
-    ├── loading_screen/    # Loading screen assets
     └── main_menu/         # Main menu and global definitions
         ├── common/
         │   ├── modifier_type_definitions/  # All valid modifier types
         │   └── static_modifiers/           # Predefined modifiers
-        └── localization/  # Text localization
+        ├── gui/           # Shared GUI (font_icons.gui, etc.)
+        ├── setup/         # Initial game state (countries, pops, characters)
+        └── localization/  # Text localization (english + simp_chinese only)
 ```
 
 ## Key Files for Modding
@@ -115,19 +118,41 @@ global_life_expectancy = -10      # -10 years life expectancy (country)
 adm = 2                           # +2 administrative skill (character)
 ```
 
-## File Exclusions
+## Filter Policy
 
-The following large file types have been excluded to reduce size:
-- Music files (`.mp3`, `.ogg`)
-- Large graphics (`.dds`, `.tga` over 10MB)
-- Video files (`.bik`)
+`sync_reference.py` only mirrors `<EU5>/in_game/` and `<EU5>/main_menu/` (loading_screen / dlc / mod are skipped). On top of that:
 
-Core text files (`.txt`, `.yml`, `.gui`) and small graphics are included.
+**Directory prunes (before walking):**
+- Any directory named `gfx/` is skipped (asset descriptors, not modding scripts).
+- Inside any `localization/` directory, only `english/` and `simp_chinese/` are descended into.
+
+**File-level filters:**
+1. Extension whitelist — `.txt`, `.yml`, `.gui`, `.json`, `.info` only.
+2. Per-file size cap — default **10 MB** (`--max-file-mb`).
+3. Per-leaf-dir size cap — default **30 MB** (`--max-dir-mb`); a single directory whose post-filter, non-recursive size exceeds this is skipped entirely. This is a safety net against unexpected bloat in future game versions.
+
+Sync stats (most recent run) are appended to [`data/sync_reference.log`](../data/sync_reference.log).
+
+## Updating to a new EU5 version
+
+```bash
+# Preview what would change
+conda run -n eu5 python scripts/sync_reference.py --dry-run
+
+# Wipe game/ and re-mirror with the current filter policy
+conda run -n eu5 python scripts/sync_reference.py
+
+# Refresh derived indexes and BRIEF.md (required after sync)
+conda run -n eu5 python scripts/gen_index.py --verbose
+conda run -n eu5 python scripts/gen_brief.py
+```
+
+If the EU5 install lives at a non-default path, set `EU5_GAME_PATH` or pass `--source <path>`.
 
 ## Version Information
 
-- **Game Version**: Europa Universalis 5 1.1.10
-- **Baseline Update Date**: March 25, 2026
+- **Game Version**: Europa Universalis 5 1.2
+- **Baseline Update Date**: May 7, 2026
 - **Purpose**: Modding reference and documentation
 
 ## Related Documentation

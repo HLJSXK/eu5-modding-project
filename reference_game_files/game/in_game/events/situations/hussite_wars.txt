@@ -21,6 +21,7 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 			}
 		}
 	}
+	outcome = neutral
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	dynamic_historical_event = {
 		tag = BOH
@@ -232,6 +233,7 @@ hussite_wars.2 = { #Hussite Protests Turn Violent in [BOH.GetCountry.GetCapital.
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.2.title
 	desc = hussite_wars.2.desc
+	outcome = neutral
 
 	fire_only_once = yes
 
@@ -388,6 +390,7 @@ hussite_wars.3 = { #A Pious Call to Arms
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.3.title
 	desc = hussite_wars.3.desc
+	outcome = neutral
 
 	immediate = {
 		c:PAP = {
@@ -467,36 +470,61 @@ hussite_wars.3 = { #A Pious Call to Arms
 
 }
 
-hussite_wars.4 = { #Peace in [target_capital.GetNameWithNoTooltip]
+hussite_wars.4 = { #The [ShowSituationNameWithNoTooltip('hussite_wars')] End
 	type = country_event
 	category = situation_event
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
-	title = hussite_wars.4.title
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					c:BOH = { religion = religion:hussite }
+				}
+				desc = hussite_wars.4.title.hussite_victory
+			}
+			triggered_desc = {
+				desc = hussite_wars.4.title.catholic_victory
+			}
+		}
+	}
 	desc = {
 		first_valid = {
 			triggered_desc = {
 				trigger = {
 					religion = religion:hussite
+					c:BOH = { religion = religion:hussite }
 				}
 				desc = hussite_wars.4.a.desc #Victory for Hussitism
 			}
 			triggered_desc = {
 				trigger = {
+					tag = BOH
 					religion = religion:catholic
 				}
-				desc = hussite_wars.4.b.desc #Hussitism Destroyed
+				desc = hussite_wars.4.b.desc #Hussitism Destroyed — BOH forced to convert
 			}
 			triggered_desc = {
-				trigger = { always = yes } #Victory for Hussitism #Fallback
-				desc = hussite_wars.4.b.desc
+				trigger = {
+					religion = religion:catholic
+					NOT = { c:BOH = { religion = religion:hussite } }
+				}
+				desc = hussite_wars.4.c.desc #Catholic victory, PAP/HRE observer perspective
+			}
+			triggered_desc = {
+				trigger = { always = yes } #Hussite loss (non-BOH hussite) or fallback
+				desc = hussite_wars.4.d.desc
 			}
 		}
 	}
-	fire_only_once = yes
+	outcome = neutral
 
 	immediate = {
-		capital = {
-			save_scope_as = target_capital
+		c:BOH ?= {
+			capital = { save_scope_as = target_capital }
+		}
+		if = {
+			limit = { NOT = { exists = scope:target_capital } }
+			capital = { save_scope_as = target_capital }
 		}
 	}
 
@@ -505,6 +533,7 @@ hussite_wars.4 = { #Peace in [target_capital.GetNameWithNoTooltip]
 
 		trigger = {
 			religion = religion:hussite
+			c:BOH = { religion = religion:hussite }
 		}
 
 		add_stability = stability_extreme_bonus
@@ -512,9 +541,12 @@ hussite_wars.4 = { #Peace in [target_capital.GetNameWithNoTooltip]
 		add_religious_influence_if_valid = {
 			VALUE = 50
 		}
-		trigger_event_non_silently = {
-			id = flavor_boh.36
-			days = 15
+		if = {
+			limit = { tag = BOH }
+			trigger_event_silently = {
+				id = flavor_boh.36
+				days = { 15 45 }
+			}
 		}
 	}
 
@@ -522,20 +554,52 @@ hussite_wars.4 = { #Peace in [target_capital.GetNameWithNoTooltip]
 		name = hussite_wars.4.b
 
 		trigger = {
+			tag = BOH
 			religion = religion:catholic
 		}
 
 		add_stability = stability_extreme_penalty
 		add_government_power = government_power_ultimate_penalty
 
-		if = {
-			limit = {
-				NOT = { religion = religion:catholic }
-			}
-			change_religion = religion:catholic
-			change_religion_for_ruler_and_family = { country = ROOT religion = religion:catholic }
+		change_religion_for_ruler_and_family = { country = ROOT religion = religion:catholic }
+	}
+
+	option = {
+		name = hussite_wars.4.c
+
+		trigger = {
+			religion = religion:catholic
+			NOT = { tag = BOH }
+			NOT = { c:BOH = { religion = religion:hussite } }
 		}
 
+		add_stability = stability_mild_bonus
+		add_religious_influence_if_valid = { VALUE = 20 }
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_mild_bonus }
+	}
+
+	option = {
+		name = hussite_wars.4.d
+
+		trigger = {
+			religion = religion:catholic
+			NOT = { tag = BOH }
+			c:BOH = { religion = religion:hussite }
+		}
+
+		add_stability = stability_mild_penalty
+		add_religious_influence_if_valid = { VALUE = -15 }
+	}
+
+	option = {
+		name = hussite_wars.4.e
+
+		trigger = {
+			religion = religion:hussite
+			NOT = { c:BOH = { religion = religion:hussite } }
+		}
+
+		add_religious_influence_if_valid = { VALUE = -20 }
 	}
 
 }
@@ -546,6 +610,7 @@ hussite_wars.5 = { #The One-Eyed Žižka
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.5.title
 	desc = hussite_wars.5.desc
+	outcome = neutral
 
 	fire_only_once = yes
 
@@ -575,6 +640,7 @@ hussite_wars.5 = { #The One-Eyed Žižka
 			dip = { 60 100 }
 			mil = { 60 100 }
 			add_trait = trait:defensive_planner
+			add_trait = trait:one_eyed
 			save_scope_as = target_character
 		}
 	}
@@ -595,6 +661,7 @@ hussite_wars.6 = { #Heretics at the Gates
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.6.title
 	desc = hussite_wars.6.desc
+	outcome = neutral
 
 	immediate = {
 		c:PAP = {
@@ -670,6 +737,7 @@ hussite_wars.7 = { #The Plight of the Hussites
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.7.title
 	desc = hussite_wars.7.desc
+	outcome = neutral
 
 	immediate = {
 		c:PAP = {
@@ -753,6 +821,7 @@ hussite_wars.8 = { #A Common Enemy
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 	title = hussite_wars.8.title
 	desc = hussite_wars.8.desc
+	outcome = neutral
 
 	trigger = {
 		religion = religion:hussite
@@ -842,6 +911,7 @@ hussite_wars.9 = {
 	
 	title = hussite_wars.9.title
 	desc = hussite_wars.9.desc
+	outcome = neutral
 
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 
@@ -934,6 +1004,7 @@ hussite_wars.10 = {
 
 	title = hussite_wars.10.title
 	desc = hussite_wars.10.desc
+	outcome = neutral
 	historical_info = hussite_wars.10.historical_info
 
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"

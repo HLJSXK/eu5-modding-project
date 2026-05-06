@@ -112,7 +112,7 @@ template ScriptedPeaceTreaty_tooltip {
 		blockoverride "title_icon" {
 			icon = {
 				using = tooltip_title_icon_size
-				texture = "gfx/interface/icons/character_interactions/peace.dds"
+				texture = "gfx/interface/icons/peace_treaty/sue_for_peace.dds"
 			}
 		}
 
@@ -168,6 +168,73 @@ template EconomicalBaseTooltip {
 
 
 
+template AverageControlTooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetConceptTexture('control')]"
+			}
+		}
+
+		blockoverride "title_text" {
+			text = "AVERAGE_CONTROL_TT_TITLE"
+		}
+
+		blockoverride "title_button" {
+			mapmode_tooltip_button = {
+				datacontext = "[GetMapMode('control')]"
+			}
+		}
+
+		blockoverride "concept_link" {
+			text = [control|E]
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "AVERAGE_CONTROL_TT_TABLE"
+				}
+				textcontext = "[Country.GetAverageControlInfo]"
+			}
+		}
+	}
+}
+
+template TotalWealthTooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetConceptTexture('wealth')]"
+			}
+		}
+
+		blockoverride "title_text" {
+			datacontext = "[Country]"
+			text = "TOTAL_WEALTH_TOOLTIP_TITLE"
+		}
+
+		blockoverride "title_button" {
+			mapmode_tooltip_button = {
+				datacontext = "[GetMapMode('potential_tax_base')]"
+			}
+		}
+
+		blockoverride "concept_link" {
+			text = [wealth|E]
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipBlockList = {
+				ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "TOTAL_WEALTH_TOOLTIP_TEXT"
+			}
+		}
+	}
+}
+
 template TaxBaseTooltip {
 	ContextualTooltipType = {
 		blockoverride "title_icon" {
@@ -180,6 +247,15 @@ template TaxBaseTooltip {
 		blockoverride "title_text" {
 			datacontext = "[Country]"
 			text = "TAXBASE_TOOLTIP_TITLE"
+		}
+
+		blockoverride "title_button" {
+			mapmode_tooltip_button = {
+				datacontext = "[GetMapMode('tax_base')]"
+			}
+			mapmode_tooltip_button = {
+				datacontext = "[GetMapMode('control')]"
+			}
 		}
 
 		blockoverride "concept_link" {
@@ -232,6 +308,23 @@ template TaxBaseTooltip {
 					blockoverride "enddate" {
 						text = "[Country.GetEndDataDate]"
 					}
+					blockoverride "tooltip" {
+						marker = {
+							text_single = {
+								position = { 0 -20 }
+								autoresize = yes				
+								
+								margin_right = 4
+								margin_top = 4
+								align = left|nobaseline
+								#using = Font_Size_Small
+								using = bg_number_container_bckg
+								default_format = "#t"
+
+								text = "[Country.GetDataPointValue(PlotLine.GetSnappedIndexNearMouse)]"
+							}					
+						}				
+					}
 					blockoverride "multiitem" {}
 
 					blockoverride "extra_plotlines" {}
@@ -260,8 +353,15 @@ template CountryTooltip {
 		}
 
 		blockoverride "tooltip_content" {
-			TooltipDebugTextBlock = {
+            TooltipDebugStringPairList = {
 				textcontext = "[Country.GetDebugText]"
+			}
+
+			TooltipDebugTextBlock = {
+				visible = "[And(IsBuildDebug, Country.HasActiveAreaPreferences)]"
+				blockoverride "text" {
+					debug_text = "[Country.GetActiveAreaPreferencesInfo]"
+				}
 			}
 
 			TooltipTextBlock = {
@@ -317,6 +417,10 @@ template CountryTooltip {
 						}
 					}
 				}	
+			}
+
+			TooltipContentSection = {
+				using = CountryTooltip_DiplomacyStatBars
 			}
 
 			TooltipRowList = {
@@ -458,12 +562,12 @@ template CountryTooltip {
 						text_single = {
 							autoresize = yes
 							align = right
-							text = "[Country.GetTotalArmyStrengthAndPotentialLevies|L0]"
+							text = "[Country.GetRaisedAndPotentialLevyStrength] [levies_icon] / [Country.GetRegularArmySize|0L] [regulars_icon]"
 						}
 
 						icon = {
 							size = { 24 24 }
-							texture = "gfx/interface/icons/unit_category/total_strength.dds"
+							texture = "gfx/interface/icons/flat_icons/declare_war/army_size.dds"
 						}
 					}
 				}
@@ -510,6 +614,7 @@ template CountryTooltip {
 						}
 					}
 				}
+
 				TooltipManualTableField = { #Subjects
 					visible = "[Country.GetDiplomacy.HasSubjects]"
 					hbox = {
@@ -551,10 +656,41 @@ template CountryTooltip {
 						}
 					}
 				}
-			}
 
-			TooltipContentSection = {
-				using = CountryTooltip_DiplomacyStatBars
+				TooltipManualTableField = { # Personality and Disposition
+					hbox = {
+						spacing = 5
+						datacontext = "[Country.GetAiPersonality]"
+						tooltipwidget = { using = AiPersonality_tooltip }
+	
+						icon = {
+							size = { 20 20 }
+							texture = "[GetAiPersonalityIcon(AiPersonality.Self)]"
+						}
+						text_single = {
+							autoresize = yes
+							text = "[AiPersonality.GetName|L]"
+						}
+					}
+	
+					expand = {}
+	
+					hbox = {
+						visible = "[And(IsPlayerValid, Not(Country.IsPlayer))]"
+						spacing = 5
+						tooltipwidget = { using = AiDisposition_tooltip }
+	
+						text_single = {
+							autoresize = yes
+							text = "[Country.GetDispositionToPlayer|L]"
+						}
+
+						icon = {
+							size = { 20 20 }
+							texture = "[GetAiDispositionIcon(Country.Self)]"
+						}
+					}
+				}
 			}
 
 			TooltipTextBlock = {
@@ -660,6 +796,11 @@ template CountryInteraction_tooltip {
 			text = [country_interaction|E]
 		}
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[CountryInteraction.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[CountryInteraction.GetTooltip(Player.Self,Player.Self)]"
@@ -803,8 +944,10 @@ template FormableCountry_tooltip {
 					debug_text = "[FormableCountry.GetDebugText]"
 				}
 			}
-			using = formablecountry_info
-			
+
+			TooltipContentSection = {
+				using = formablecountry_info
+			}
 		}
 	}
 }
@@ -970,11 +1113,17 @@ template CountryModifier_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				visible = "[CountryModifierWrap.HasMinCap]"
+				blockoverride "text" {
+					text = "[CountryModifierWrap.GetMinCapDescription]"
+				}
+			}
 			blockoverride "block_title" {
 				text = "COUNTRYMODIFIERWRAP_TOOLTIP_TEXT"
 			}
 			TooltipStringPairList = {
-				datacontext = "[StringToStringPairList(CountryModifierWrap.GetTooltip)]"
+				textcontext = "[CountryModifierWrap.GetTooltip]"
 			}
 		}
 	}
@@ -1194,7 +1343,12 @@ template Country_navy_levies_tooltip {
 		blockoverride "concept_link" {
 			text = "[navy_levies|e]"
 		}
-		lowpriotextcontext = "[Country.GetPotentialNavyLevyPowerTooltip]"
+		blockoverride "tooltip_content" {
+			TooltipScrolledRowList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 } }
+				textcontext = "[Country.GetPotentialNavyLevyPowerTooltip]"
+			}
+		}
 	}
 }
 

@@ -637,14 +637,14 @@ add_opinion_mutual_effect = {
 	}
 }
 
-add_trust_mutual_effect = {
+add_trust_equilibrium_mutual_effect = {
 	if = {
 		limit = { NOT = { this = $target$ } }
-		add_trust = {
+		add_trust_equilibrium = {
 			target = $target$
 			modifier = $modifier$
 		}
-		reverse_add_trust = {
+		reverse_add_trust_equilibrium = {
 			target = $target$
 			modifier = $modifier$
 		}
@@ -701,7 +701,7 @@ remove_opinion_mutual_effect = {
 	}
 }
 
-remove_trust_mutual_effect = {
+remove_trust_equilibrium_mutual_effect = {
 	if = {
 		limit = { NOT = { this = $target$ } }
 		if = {
@@ -711,7 +711,7 @@ remove_trust_mutual_effect = {
 					modifier = $modifier$
 				}
 			}
-			remove_trust = {
+			remove_trust_equilibrium = {
 				target = $target$
 				modifier = $modifier$
 			}
@@ -726,7 +726,7 @@ remove_trust_mutual_effect = {
 				}
 			}
 			$target$ = {
-				remove_trust = {
+				remove_trust_equilibrium = {
 					target = PREV
 					modifier = $modifier$
 				}
@@ -762,59 +762,51 @@ turn_japanese_clan_into_normal_tag = {
 		change_country_type = location
 		save_temporary_scope_as = target_clan
 		every_owned_foreign_building_location = {
-			if = {
-				limit = { 
-					this != location:kyoto
-					can_clan_get_this_location_when_turning_into_normal_tag = yes
-				}
-				change_location_owner = prev
-				add_core = prev
-				change_integration_level = core
+			limit = {
+				can_clan_get_this_location_when_turning_into_normal_tag = yes
 			}
 			every_foreign_buildings_in_location = {
 				limit = { owner = scope:target_clan }
 				if = {
 					limit = {
-						location != location:kyoto
-						location = { can_clan_get_this_location_when_turning_into_normal_tag = yes }
-					}
-					if = {
-						limit = {
-							building_type = building_type:yamashiro
-							location = {
-								NOR = {
-									has_building = building_type:stockade 
-									has_building = building_type:castle
-								} 
-							}
-						}
+						building_type = building_type:yamashiro
 						location = {
-							change_building_level_in_location = {
-								building = building_type:stockade
-								value = 1
-							}
+							NOR = {
+								has_building = building_type:stockade 
+								has_building = building_type:castle
+							} 
 						}
 					}
-					if = {
-						limit = {
-							building_type = building_type:shoen
-						}
-						location = {
-							change_building_level_in_location = {
-								building = building_type:market_village
-								value = 1
-							}
-						}
+					location = {
+						set_variable = build_stockade
 					}
 				}
 				if = {
 					limit = {
-						NAND = {
-							location = location:kyoto
-							building_type = building_type:gosho
-						}
+						building_type = building_type:shoen
 					}
-					location = { destroy_building = prev }
+					location = {
+						set_variable = build_market_village
+					}
+				}
+			}
+			change_location_owner = prev
+			add_core = prev
+			change_integration_level = core
+			if = {
+				limit = { has_variable = build_stockade }
+				remove_variable = build_stockade
+				change_building_level_in_location = {
+					building = building_type:stockade
+					value = 1
+				}
+			}
+			if = {
+				limit = { has_variable = build_market_village }
+				remove_variable = build_market_village
+				change_building_level_in_location = {
+					building = building_type:market_village
+					value = 1
 				}
 			}
 		}
@@ -1439,10 +1431,14 @@ make_regent_to_ruler = {
 				}
 				custom_tooltip = regencies.1.founds_dynasty_tt
 				hidden_effect = {
-					owner.capital ?= { 
+					if = {
+						limit = { owner != root }
+						move_country = root
+					}
+					root.capital ?= {
 						create_dynasty_from_location = random
 						last_dynasty_in_location = { save_scope_as = target_dynasty }
-					}					
+					}
 					if = {
 						limit = { exists = scope:target_dynasty }
 						change_dynasty = scope:target_dynasty
@@ -2034,6 +2030,20 @@ add_character_to_random_open_cabinet = {
 	}
 }
 
+add_character_to_first_open_cabinet = {
+	ordered_cabinet = {
+		limit = {
+			NOT = { 
+				exists = cabinet_member
+			}
+		}
+		max = 1 
+		check_range_bounds = no
+
+		add_to_cabinet = $target$
+	}
+}
+
 yua_appoint_as_dictator = {
 	add_country_modifier = {
 		mode = replace
@@ -2423,6 +2433,27 @@ change_religion_for_ruler_and_family = {
 	}
 }
 
+set_to_default_heir_selection = {
+	if = {
+		limit = { government_type ?= government_type:monarchy }
+		change_heir_selection = heir_selection:cognatic_primogeniture
+	}
+	else_if = {
+		limit = { government_type ?= government_type:republic }
+		change_heir_selection = heir_selection:republic_4_year_terms
+	}
+	else_if = {
+		limit = { government_type ?= government_type:theocracy }
+		change_heir_selection = heir_selection:bishopric_elective
+	}
+	else_if = {
+		limit = { government_type ?= government_type:steppe_horde }
+		change_heir_selection = heir_selection:tribal_oldest_male
+	}
+	else = {
+		change_heir_selection = heir_selection:tribal_oldest_male
+	}
+}
 
 setup_colonial_nation = {
 	change_government_type = government_type:republic
@@ -2459,6 +2490,7 @@ cc_setup_new_town = {
 	}
 	if = {
 		limit = {
+			exists = scope:actor
 			scope:actor = {
 				is_human = yes
 			}
@@ -2537,7 +2569,6 @@ add_organization_donation_opinion_bonus = {
 				else = {
 					value = 1
 				}
-				value = $international_organization$.gold
 				min = 1
 			}
 		}
@@ -2690,6 +2721,245 @@ enforce_culture_effect = {
 					fraction = 0.16
 					culture = $actor$.culture
 				}
+			}
+		}
+	}
+}
+
+add_all_possible_pentarchies = {
+	if = {
+		limit = { owns = location:constantinople }
+		select_suitable_patriarch = { pentarchy = yes }
+		scope:target_patriarch = {
+			set_pentarch_variable = { location = location:constantinople }
+		}
+		add_pentarchy_modifier = { location = location:constantinople }
+		add_to_variable_map = {
+			name = pentarchy
+			key = location:constantinople
+			value = scope:target_patriarch
+		}
+	}
+	if = {
+		limit = { owns = location:rome }
+		select_suitable_patriarch = { pentarchy = yes }
+		scope:target_patriarch = {
+			set_pentarch_variable = { location = location:rome }
+		}
+		add_pentarchy_modifier = { location = location:rome }
+		add_to_variable_map = {
+			name = pentarchy
+			key = location:rome
+			value = scope:target_patriarch
+		}
+	}
+	if = {
+		limit = { owns = location:jerusalem }
+		select_suitable_patriarch = { pentarchy = yes }
+		scope:target_patriarch = {
+			set_pentarch_variable = { location = location:jerusalem }
+		}
+		add_pentarchy_modifier = { location = location:jerusalem }
+		add_to_variable_map = {
+			name = pentarchy
+			key = location:jerusalem
+			value = scope:target_patriarch
+		}
+	}
+	if = {
+		limit = { owns = location:antioch }
+		select_suitable_patriarch = { pentarchy = yes }
+		scope:target_patriarch = {
+			set_pentarch_variable = { location = location:antioch }
+		}
+		add_pentarchy_modifier = { location = location:antioch }
+		add_to_variable_map = {
+			name = pentarchy
+			key = location:antioch
+			value = scope:target_patriarch
+		}
+	}
+	if = {
+		limit = { owns = location:alexandria }
+		select_suitable_patriarch = { pentarchy = yes }
+		scope:target_patriarch = {
+			set_pentarch_variable = { location = location:alexandria }
+		}
+		add_pentarchy_modifier = { location = location:alexandria }
+		add_to_variable_map = {
+			name = pentarchy
+			key = location:alexandria
+			value = scope:target_patriarch
+		}
+	}
+}
+
+add_pentarchy_modifier = {
+	switch = {
+		trigger = $location$
+		location:constantinople = {
+			add_country_modifier = {
+				modifier = pentarch_constantinople
+				years = -1
+			}
+		}
+		location:rome = {
+			add_country_modifier = {
+				modifier = pentarch_rome
+				years = -1
+			}
+		}
+		location:jerusalem = {
+			add_country_modifier = {
+				modifier = pentarch_jerusalem
+				years = -1
+			}
+		}
+		location:antioch = {
+			add_country_modifier = {
+				modifier = pentarch_antioch
+				years = -1
+			}
+		}
+		location:alexandria = {
+			add_country_modifier = {
+				modifier = pentarch_alexandria
+				years = -1
+			}
+		}
+	}
+}
+
+remove_pentarchy_modifier = {
+	switch = {
+		trigger = $location$
+		location:constantinople = {
+			remove_country_modifier = pentarch_constantinople
+		}
+		location:rome = {
+			remove_country_modifier = pentarch_rome
+		}
+		location:jerusalem = {
+			remove_country_modifier = pentarch_jerusalem
+		}
+		location:antioch = {
+			remove_country_modifier = pentarch_antioch
+		}
+		location:alexandria = {
+			remove_country_modifier = pentarch_alexandria
+		}
+	}
+}
+
+remove_all_pentarchy_modifiers = {
+	remove_country_modifier = pentarch_constantinople
+	remove_country_modifier = pentarch_constantinople_upgraded
+	remove_country_modifier = pentarch_rome
+	remove_country_modifier = pentarch_rome_upgraded
+	remove_country_modifier = pentarch_jerusalem
+	remove_country_modifier = pentarch_jerusalem_upgraded
+	remove_country_modifier = pentarch_antioch
+	remove_country_modifier = pentarch_antioch_upgraded
+	remove_country_modifier = pentarch_alexandria
+	remove_country_modifier = pentarch_alexandria_upgraded
+}
+
+upgrade_pentarchy_modifier = {
+	custom_tooltip = {
+		text = upgrade_pentarchy_modifier_tt
+		remove_country_modifier = pentarch_constantinople
+		remove_country_modifier = pentarch_rome
+		remove_country_modifier = pentarch_jerusalem
+		remove_country_modifier = pentarch_antioch
+		remove_country_modifier = pentarch_alexandria
+		add_country_modifier = pentarch_constantinople_upgraded
+		add_country_modifier = pentarch_rome_upgraded
+		add_country_modifier = pentarch_jerusalem_upgraded
+		add_country_modifier = pentarch_antioch_upgraded
+		add_country_modifier = pentarch_alexandria_upgraded
+	}
+}
+
+downgrade_pentarchy_modifier = {
+	custom_tooltip = {
+		text = downgrade_pentarchy_modifier_tt
+		remove_country_modifier = pentarch_constantinople_upgraded
+		remove_country_modifier = pentarch_rome_upgraded
+		remove_country_modifier = pentarch_jerusalem_upgraded
+		remove_country_modifier = pentarch_antioch_upgraded
+		remove_country_modifier = pentarch_alexandria_upgraded
+		add_country_modifier = pentarch_constantinople
+		add_country_modifier = pentarch_rome
+		add_country_modifier = pentarch_jerusalem
+		add_country_modifier = pentarch_antioch
+		add_country_modifier = pentarch_alexandria
+	}
+
+}
+
+set_as_designated_heir_effect = {
+	set_as_designated_heir = $target$
+	save_scope_as = root_country
+	if = {
+		limit = {
+			exists = union
+			exists = scope:root_country
+			union = { country_is_senior_partner = { country = scope:root_country } }
+		}
+		union ?= {
+			every_international_organization_member = {
+				limit = { this != scope:root_country }
+				set_as_designated_heir = $target$
+				every_subject = {
+					limit = { subject_type = { has_overlords_ruler = yes } }
+					set_as_designated_heir = $target$
+				}
+			}
+		}
+	}
+	every_subject = {
+		limit = { subject_type = { has_overlords_ruler = yes } }
+		set_as_designated_heir = $target$
+	}
+}
+
+set_as_designated_heir_with_reason_effect = {
+	set_as_designated_heir = { target = $target$ reason = $reason$ }
+	save_scope_as = root_country
+	if = {
+		limit = {
+			exists = union
+			exists = scope:root_country
+			union = { country_is_senior_partner = { country = scope:root_country } }
+		}
+		union ?= {
+			every_international_organization_member = {
+				limit = { this != scope:root_country }
+				set_as_designated_heir = { target = $target$ reason = $reason$ }
+				every_subject = {
+					limit = { subject_type = { has_overlords_ruler = yes } }
+					set_as_designated_heir = { target = $target$ reason = $reason$ }
+				}
+			}
+		}
+	}
+	every_subject = {
+		limit = { subject_type = { has_overlords_ruler = yes } }
+		set_as_designated_heir = { target = $target$ reason = $reason$ }
+	}
+}
+
+ai_international_organization_diplo_action_cooldown = {
+	hidden_effect = {
+		$international_organization$ = {
+			remove_list_variable = {
+				name = ai_rejected_org_actions_$key$
+				target = $target$
+			}
+			add_to_variable_list = {
+				name = ai_rejected_org_actions_$key$
+				target = $target$
+				years = AI_MIN_YEARS_SCRIPTED_COUNTRY_INTERACTION_COOLDOWN
 			}
 		}
 	}

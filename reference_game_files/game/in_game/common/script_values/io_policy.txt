@@ -97,27 +97,13 @@ io_electors_opinion_value = {
 
 io_get_average_great_power_score = {
 	desc = "AVERAGE_GREAT_POWER_SCORE_OF_IO"
-	save_temporary_value_as = {
-		name = great_power_score_count
-		value = 0
-	}
 	#IO might not exist yet
 	scope:recipient ?= {
-		every_international_organization_member = {
-			root = { add = { value = great_power_score } }
+		if = {
+			limit = { total_members > 0 }
+			add = io_total_great_power_score
+			divide = total_members
 		}
-		save_temporary_value_as = {
-			name = great_power_score_count
-			value = {
-				value = scope:great_power_score_count
-				add = total_members
-			}
-		}
-	}
-	#take the average opinion
-	if = {
-		limit = { scope:great_power_score_count > 0 }
-		divide = scope:great_power_score_count
 	}
 }
 
@@ -137,27 +123,13 @@ io_compared_great_power_score_to_leader = {
 
 io_get_average_military_strength = {
 	desc = "AVERAGE_MILITARY_STRENGTH_OF_IO"
-	save_temporary_value_as = {
-		name = military_strength_count
-		value = 0
-	}
 	#IO might not exist yet
 	scope:recipient ?= {
-		every_international_organization_member = {
-			root = { add = { value = military_strength } }
+		if = {
+			limit = { total_members > 0 }
+			add = io_total_military_strength
+			divide = total_members
 		}
-		save_temporary_value_as = {
-			name = military_strength_count
-			value = {
-				value = scope:military_strength_count
-				add = total_members
-			}
-		}
-	}
-	#take the average opinion
-	if = {
-		limit = { scope:military_strength_count > 0 }
-		divide = scope:military_strength_count
 	}
 }
 
@@ -726,6 +698,7 @@ union_treasury_parliament_payment = {
 }
 
 union_parliament_gold_bribe_recipient = {
+	desc = "union_parliament_gold_bribe_cost"
 	if = {
 		limit = { exists = scope:recipient }
 		save_temporary_value_as = {
@@ -763,6 +736,60 @@ union_parliament_gold_bribe_actor = {
 	multiply = -1
 }
 
+union_parliament_gold_bribe_from_target = {
+    desc = "union_parliament_gold_bribe_cost"
+
+	if = {
+        limit = { exists = scope:target }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_upper_limit
+            value = { value = scope:target.monthly_income_trade_and_tax  multiply = 4 }
+        }
+        value = scope:target.monthly_income_trade_and_tax
+    }
+    else = {
+        save_temporary_value_as = {
+            name = gold_bribe_ft_upper_limit
+            value = { value = root.monthly_income_trade_and_tax  multiply = 4 }
+        }
+        value = root.monthly_income_trade_and_tax
+    }
+
+    if = {
+        limit = { exists = scope:recipient  scope:target = { has_variable = integrated_in_union } }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_cost_factor
+            value = {
+                value = scope:recipient.modifier:union_integration_level
+                subtract = scope:target.var:integrated_in_union
+            }
+        }
+    }
+    else_if = {
+        limit = { exists = scope:recipient }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_cost_factor
+            value = scope:recipient.modifier:union_integration_level
+        }
+    }
+
+	if = {
+        limit = { exists = scope:gold_bribe_ft_cost_factor }
+        multiply = scope:gold_bribe_ft_cost_factor
+    }
+
+    if = {
+        limit = { great_power_score > 0  scope:target.great_power_score > 0 }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_gp_multiplier
+            value = { value = great_power_score  divide = scope:target.great_power_score  add = 1 }
+        }
+        multiply = scope:gold_bribe_ft_gp_multiplier
+    }
+
+	max = scope:gold_bribe_ft_upper_limit
+}
+
 union_member_opinion_on_maintain = {
 	#AI is always in favor of not being anyone's puppet. We don't need some high math here as this is the default when the centralization option is rejected
 	add = {
@@ -771,6 +798,7 @@ union_member_opinion_on_maintain = {
 	}
 	if = {
 		limit = {
+			exists = scope:recipient
 			scope:recipient = {
 				country_is_senior_partner = { country = root }
 			}
@@ -796,6 +824,7 @@ union_member_opinion_on_centralization = {
 	}
 	if = {
 		limit = {
+			exists = scope:recipient
 			scope:recipient = {
 				country_is_senior_partner = { country = root }
 			}

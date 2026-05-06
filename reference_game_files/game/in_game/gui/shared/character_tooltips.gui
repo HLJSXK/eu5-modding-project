@@ -739,6 +739,28 @@ types TooltipCharacterTypes
 					size = { 85 125 }
 				}
 				blockoverride "character_ribbon" {
+					character_ribbon_1 = {
+						visible = "[Character.HasRebel]"
+						blockoverride "stretchable" {}
+						blockoverride "ribbon color" {
+							modify_texture = {
+								using = color_black_texture
+								blend_mode = overlay
+							}
+						}
+					}
+
+					character_ribbon_3 = {
+						visible = "[And(Character.IsCivilWarRuler, Not(Character.HasRebel))]"
+						blockoverride "stretchable" {}
+						blockoverride "ribbon color" {
+							modify_texture = {
+								using = color_black_texture
+								blend_mode = overlay
+							}
+						}
+					}
+
 					character_ribbon_3 = {
 						visible = "[And(Not(Character.IsAlive), Character.WasRuler)]"
 						blockoverride "ribbon color" {
@@ -752,7 +774,7 @@ types TooltipCharacterTypes
 					}
 
 					character_ribbon_3 = {
-						visible = "[And(Character.IsAlive, Character.IsRuler)]"					
+						visible = "[And4(Character.IsAlive, Character.IsRuler, Not(Character.HasRebel), Not(Character.IsCivilWarRuler))]"
 						blockoverride "stretchable" {}
 					}
 				}
@@ -1402,7 +1424,17 @@ template CharacterInteraction_tooltip {
 		blockoverride "concept_link" {
 			text = [character_interaction|E]
 		}
+
+		blockoverride "title_icon_texture" {
+			texture = "[CharacterInteraction.GetIcon]"
+		}
+
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[CharacterInteraction.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[CharacterInteraction.GetTooltip]"
@@ -1870,6 +1902,21 @@ template Trait_tooltip {
 				textcontext = "[Trait.GetAITooltip]"
 			}
 
+			TooltipStringPairList = {
+				visible = "[Trait.HasUpgradesFrom]"
+				datacontext = "[StringToStringPairList(Trait.GetUpgradesFromTooltip)]"
+			}
+
+			TooltipStringPairList = {
+				visible = "[Trait.HasUpgradesTo]"
+				datacontext = "[StringToStringPairList(Trait.GetUpgradesToTooltip)]"
+			}
+
+			TooltipStringPairList = {
+				visible = "[Trait.HasChanceTooltip]"
+				datacontext = "[StringToStringPairList(Trait.GetChanceTooltip)]"
+			}
+
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "[Trait.GetDesc]"
@@ -2014,8 +2061,28 @@ types DynastyTooltipTypes
 			}
 			
 			blockoverride "character_ribbon" {
+				character_ribbon_1 = {
+					visible = "[Character.HasRebel]"
+					blockoverride "stretchable" {}
+					blockoverride "ribbon color" {
+						modify_texture = {
+							using = color_black_texture
+							blend_mode = overlay
+						}
+					}
+				}
 				character_ribbon_3 = {
-					visible = "[Character.IsRuler]"
+					visible = "[And(Character.IsCivilWarRuler, Not(Character.HasRebel))]"
+					blockoverride "stretchable" {}
+					blockoverride "ribbon color" {
+						modify_texture = {
+							using = color_black_texture
+							blend_mode = overlay
+						}
+					}
+				}
+				character_ribbon_3 = {
+					visible = "[And3(Character.IsRuler, Not(Character.HasRebel), Not(Character.IsCivilWarRuler))]"
 					blockoverride "stretchable" {}
 				}
 			}
@@ -2183,7 +2250,7 @@ template Dynasty_tooltip {
 			TooltipDynastyHeader = {}
 
 			TooltipListBase = {
-				visible = "[Dynasty.HasDynastyHead]"
+				visible = "[And(Dynasty.HasDynastyHead, Not(IsDataModelEmpty(Dynasty.GetCurrentRuledCountries)))]"
 				
 				blockoverride "block_title" {
 					text = "DYNASTY_TT_LIST_COUNTRIES"
@@ -2193,7 +2260,7 @@ template Dynasty_tooltip {
 					layoutpolicy_horizontal = expanding
 					margin = { 10 10 }
 					hbox = {
-						datamodel = "[DataModelFirst(Dynasty.GetCountries, '(int32)10')]"
+						datamodel = "[DataModelFirst(Dynasty.GetCurrentRuledCountries, '(int32)10')]"
 						item = {
 							country_flag_small = {}
 						}
@@ -2202,8 +2269,8 @@ template Dynasty_tooltip {
 					expand = {}
 
 					text_single = {
-						visible = "[GreaterThan_int32(GetDataModelSize(Dynasty.GetCountries), '(int32)10')]"
-						raw_text = "#L +[GetDataModelSize(Dynasty.GetCountries)]#!"
+						visible = "[GreaterThan_int32(GetDataModelSize(Dynasty.GetCurrentRuledCountries), '(int32)10')]"
+						raw_text = "#L +[GetDataModelSize(Dynasty.GetCurrentRuledCountries)]#!"
 
 						tooltipwidget = {
 							SimpleContextualRowTooltipType = {
@@ -2221,7 +2288,54 @@ template Dynasty_tooltip {
 								}
 								blockoverride "tooltip_content" {
 									TooltipListOfCountries = {
-										blockoverride "datamodel" { datamodel = "[Dynasty.GetCountries]" }
+										blockoverride "datamodel" { datamodel = "[Dynasty.GetCurrentRuledCountries]" }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			TooltipListBase = {
+				visible = "[Dynasty.HasDynastyHead]"
+				
+				blockoverride "block_title" {
+					text = "DYNASTY_TT_PRESSENCE_LIST_COUNTRIES"
+				}
+
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					margin = { 10 10 }
+					hbox = {
+						datamodel = "[DataModelFirst(Dynasty.GetExistingCountries, '(int32)10')]"
+						item = {
+							country_flag_small = {}
+						}
+					}
+
+					expand = {}
+
+					text_single = {
+						visible = "[GreaterThan_int32(GetDataModelSize(Dynasty.GetExistingCountries), '(int32)10')]"
+						raw_text = "#L +[GetDataModelSize(Dynasty.GetExistingCountries)]#!"
+
+						tooltipwidget = {
+							SimpleContextualRowTooltipType = {
+								blockoverride "title_icon" {
+									dynasty_shield_mid = {
+										blockoverride "show_as_button" { visible = no }
+										blockoverride "show_as_icon" { visible = yes }
+									}
+								}
+								blockoverride "title_text" {
+									text = "[Dynasty.GetNameWithNoTooltip|U]"
+								}
+								blockoverride "concept_link" {
+									text = [dynasty|E]
+								}
+								blockoverride "tooltip_content" {
+									TooltipListOfCountries = {
+										blockoverride "datamodel" { datamodel = "[Dynasty.GetExistingCountries]" }
 									}
 								}
 							}
@@ -2379,37 +2493,3 @@ template ColonialCharter_tooltip {
 		}
 	}
 }
-
-template ruling_history_tooltip {
-	ContextualTooltipType = {
-		blockoverride "title_icon" {
-			dynasty_shield_mid = {
-				blockoverride "show_as_button" {
-					visible = no
-				}
-
-				blockoverride "show_as_icon" {
-					visible = yes
-				}
-
-				# block "dynasty_tooltip" {}
-			}
-		}
-
-		blockoverride "title_text" {
-			text = "RULING_HISTORY"
-		}
-
-		blockoverride "concept_link" {
-			text = [dynasty|E]
-		}
-
-		blockoverride "tooltip_content" {
-			TooltipScrolledRowList = {
-				blockoverride "block_scrollarea" { maximumsize = { -1 210 }}
-				textcontext = "[Dynasty.GetRulerHistoryInfo]"
-			}
-		}
-	}
-}
-

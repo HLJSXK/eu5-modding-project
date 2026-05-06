@@ -33,6 +33,141 @@
 	}
 	
 	variables = {
+		papal_authority = {
+			format = "PAPAL_AUTHORITY_DISPLAY"
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			min = 0
+			max = 100
+			start = 60
+			monthly_change = {
+				# Reform desire drain - main feedback loop
+				subtract = {
+					desc = "PA_REFORM_DESIRE"
+					value = {
+						value = religion:catholic.reform_desire
+						multiply = 0.2
+					}
+				}
+
+				# Internal peace bonus
+				add = {
+					desc = "INTERNAL_PEACE"
+					if = {
+						limit = { international_organization_has_internal_peace = no }
+						value = 0
+					}
+					else = {
+						value = 0.03
+					}
+				}
+
+				# Doctrine: Ultramontanism
+				if = {
+					limit = { international_organization_has_policy = policy:ultramontanism }
+					add = {
+						desc = "PA_ULTRAMONTANISM"
+						value = 0.02
+					}
+				}
+
+				# Doctrine: Gallicanism
+				if = {
+					limit = { international_organization_has_policy = policy:gallicanism }
+					subtract = {
+						desc = "PA_GALLICANISM"
+						value = 0.01
+					}
+				}
+
+				# Doctrine: Conciliarism
+				if = {
+					limit = { international_organization_has_policy = policy:conciliarism }
+					subtract = {
+						desc = "PA_CONCILIARISM"
+						value = 0.025
+					}
+				}
+
+				# Doctrine: Invisible Church
+				if = {
+					limit = { international_organization_has_policy = policy:invisible_church }
+					subtract = {
+						desc = "PA_INVISIBLE_CHURCH"
+						value = 0.05
+					}
+				}
+
+				# PAP controls Rome
+				if = {
+					limit = {
+						exists = leader_country
+						leader_country = { owns = location:rome }
+					}
+					add = {
+						desc = "PA_CONTROLS_ROME"
+						value = 0.02
+					}
+				}
+
+				# Cardinals across Catholic nations
+				add = {
+					desc = "PA_CARDINALS"
+					value = 0
+					every_international_organization_member = {
+						add = {
+							value = num_cardinals
+							multiply = 0.002
+						}
+					}
+				}
+
+				# Excommunicated rulers still on throne
+				subtract = {
+					desc = "PA_EXCOMMUNICATED_RULERS"
+					value = 0
+					every_international_organization_member = {
+						limit = { is_excommunicated = yes }
+						add = 0.02
+					}
+				}
+
+				# Members who can ignore papal bulls
+				subtract = {
+					desc = "PA_CAN_IGNORE_BULLS"
+					value = 0
+					every_international_organization_member = {
+						limit = { modifier:can_ignore_papal_bulls = yes }
+						add = 0.01
+					}
+				}
+
+				# Interregnum - no Pope
+				if = {
+					limit = { international_organization_has_leader = no }
+					subtract = {
+						desc = "PA_INTERREGNUM"
+						value = 0.5
+					}
+				}
+
+				# Pope's monthly_papal_authority modifier (scaled by papal_authority_modifier)
+				if = {
+					limit = {
+						international_organization_has_leader = yes
+						NOT = { leader_country = { modifier:monthly_papal_authority = 0 } }
+					}
+					add = {
+						desc = "FROM_MODIFIERS"
+						value = leader_country.modifier:monthly_papal_authority
+						multiply = {
+							value = leader_country.modifier:papal_authority_modifier
+							add = 1
+						}
+					}
+				}
+			}
+		}
+
 		#keep this as a var so it gets auto-added to the religion
 		religion = {
 			format = "RELIGION_FORMAT"
@@ -152,7 +287,7 @@
 			value = -1
 		}
 		
-		#The Pope wants reforms only if desire is high
+		#The Pope wants reforms only if desire is meaningfully present
 		add = {
 			desc = "POLICY_BIAS_REFORM_DESIRE"
 			if = {
@@ -161,11 +296,11 @@
 						leader_country = scope:actor
 					}
 				}
-				#this should end up with 20 for high reform desire and -20 for low reform desire
+				#this should end up with 10 for high reform desire and -10 for low reform desire
 				if = {
 					limit = {
 						religion:catholic = {
-							reform_desire >= 0.7
+							reform_desire >= 0.5
 						}
 					}
 					value = 1
@@ -173,10 +308,10 @@
 				else = {
 					value = -1
 				}
-				multiply = 20
+				multiply = 10
 			}
 		}
-		
+
 		#Member Vote
 		add = {
 			desc = "POLICY_BIAS_REFORM_DESIRE"
@@ -199,12 +334,14 @@
 				}
 			}
 		}
-		#Pope modifiers
+		#Papal Authority - high PA means members align with the Pope, low PA means they resist
 		add = {
-			desc = "MODIFIER_TYPE_NAME_reasons_to_vote"
+			desc = "PAPAL_AUTHORITY"
 			if = {
 				limit = { not = { scope:actor = scope:recipient.leader_country } }
-				value = scope:recipient.leader_country.modifier:reasons_to_vote
+				value = scope:recipient.var:papal_authority
+				subtract = 50
+				multiply = 0.3
 			}
 		}
 	}

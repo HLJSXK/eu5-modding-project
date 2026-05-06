@@ -7,6 +7,7 @@
 	}
 	has_leader_country = yes
 	expel_members_who_target_the_leader = yes
+	expel_members_who_are_targets_of_other_members = no
 	leader_type = country
 	leader_change_trigger_type = none
 	create_visible_trigger = {
@@ -19,6 +20,47 @@
 		if = {
 			limit = { exists = scope:actor }
 			set_leader_country = scope:actor
+			set_up_patriarch_for_io = yes
+			if = {
+				limit = {
+					has_dlc = "d008_fate_of_the_phoenix"
+				}
+				if = {
+					limit = {
+						var:seat ?= {
+							is_pentarchy_seat = yes
+						}
+					}
+					var:seat = { save_scope_as = target_pentarchy }
+					if = {
+						limit = {
+							scope:target_patriarch = { has_variable = is_pentarch }
+						}
+						scope:actor = { select_suitable_patriarch = { pentarchy = yes } }
+					}
+					religion:orthodox = {
+						if = {
+							limit = {
+								is_key_in_variable_map = { name = pentarchy target = scope:target_pentarchy }
+							}
+							"variable_map(pentarchy|scope:target_pentarchy)" ?= {
+								remove_variable = is_pentarch
+							}
+						}
+						add_to_variable_map = {
+							name = pentarchy
+							key = scope:target_pentarchy
+							value = scope:target_patriarch
+						}
+					}
+					scope:target_patriarch = {
+						set_pentarch_variable = { location = scope:target_pentarchy}
+					}
+					scope:actor = {
+						add_pentarchy_modifier = { location = scope:target_pentarchy }
+					}
+				}
+			}
 		}
 	}
 
@@ -26,6 +68,7 @@
 		scale = {
 			if = {
 				limit = {
+					exists = scope:recipient
 					exists = scope:recipient.leader_country
 					not = {
 						scope:recipient.leader_country = this
@@ -41,7 +84,7 @@
 				multiply = -0.75
 				if = {
 					limit = {
-						exists = scope:recipient.leader_country
+						scope:recipient = { international_organization_has_leader = yes }
 						scope:recipient.leader_country.total_population > 0
 						scope:recipient.leader_country.total_population > root.total_population
 					}
@@ -63,6 +106,7 @@
 		scale = {
 			if = {
 				limit = {
+					exists = scope:recipient
 					not = {
 						scope:recipient.leader_country ?= this
 					}
@@ -79,13 +123,14 @@
 				value = 0
 			}
 		}
-		monthly_rite_power = 0.05
+		monthly_religious_influence = 0.05
 	}
 
 	modifier = {
 		scale = {
 			if = {
 				limit = {
+					exists = scope:recipient
 					scope:recipient ?= {
 						var:seat ?= {
 							owner ?= {
@@ -177,11 +222,9 @@
 	auto_disband_trigger = {
 		trigger_if = {
 			limit = {
-				leader_country ?= {
-					custom_tooltip = {
-						text = formed_union_of_brest
-						has_variable = union_of_brest_flag
-					}
+				custom_tooltip = {
+					text = formed_union_of_brest
+					has_variable = catholic_patriarchate
 				}
 			}
 			leader_country = {
@@ -361,10 +404,14 @@
 			else = {
 				create_international_organization = {
 					type = international_organization_type:autocephalous_patriarchate
+					creator = scope:country_to_add
 					add_country_to_international_organization = prev
 					set_leader_country = prev
 				}
 			}
+		}
+		var:patriarch ?= {
+			remove_variable = is_patriarch
 		}
 	}
 	

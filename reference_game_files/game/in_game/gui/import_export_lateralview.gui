@@ -1,4 +1,4 @@
-template imports_exports_entry {
+﻿template imports_exports_entry {
 	background = {
 		using = paper_card_texture
 		margin = { 1 1 }
@@ -386,13 +386,14 @@ template imports_exports_entry {
 					ranged_slider = {
 						size = { 58 12 }
 						direction = horizontal
+						#set value first or setting the min/max/mincap/maxcap changes the existing value from 0 to something inside the min/max/mincap/maxcap values
+						value = "[PossibleItem.GetDesiredMerchantCapacity]"
 						min = 0
 						max = "[PossibleItem.GetMaxMerchantCapacity]"
 						mincap = 0
 						maxcap = "[PossibleItem.GetMaxMerchantCapacity]"
 						step = "[PossibleItem.GetStep]"
 						wheelstep = 1
-						value = "[PossibleItem.GetDesiredMerchantCapacity]"
 						onvaluechanged = "[PossibleItem.OnChanged]"
 
 						tooltipwidget = {
@@ -968,10 +969,219 @@ lateralview = {
 				import_export_summary = {}
 			}
 
+			widget = {
+				layoutpolicy_horizontal = expanding
+				using = bg_paper_card
+				using = bg_cabinet_card_frame
+				size = { -1 45 }
+				TradeOrderCard = {
+					blockoverride "trade_order_card_main_tooltip" {
+						tooltipwidget = {
+							SimpleContextualTooltipType = {
+								blockoverride "title_icon" {
+									icon = {
+										size = { 50 50 }
+										visible = "[ImportExportLateralView.IsExport]"
+										texture = "gfx/interface/icons/flat_icons/trade_market/export.dds"
+									}
+									icon = {
+										size = { 50 50 }
+										visible = "[Not(ImportExportLateralView.IsExport)]"
+										texture = "gfx/interface/icons/flat_icons/trade_market/import.dds"
+									}
+								}
+
+								blockoverride "title_text" {
+									text = "[ImportExportLateralView.GetTradeOrderCardTitle]"
+								}
+
+								blockoverride "concept_link" {
+									text = "[trade_order|E]"
+								}
+
+								blockoverride "tooltip_content" {
+									TooltipTextBlock = {
+										blockoverride "text" {
+											text = "TRADE_ORDER_PRIORITY_INFO"
+										}
+									}
+									TooltipScrolledStringPairList = {
+										tooltipmeta = {
+											game_concept = "[trade_profit|e]"
+											title = "[trade_profit]"
+										}
+										blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+										textcontext = "[ImportExportLateralView.GetTradeOrderTooltip]"
+									}
+								}
+							}
+						}
+					}
+
+					blockoverride "trade_order_card_inner_margin" {
+						margin = { 7 5 }
+						margin_right = 10
+					}
+
+					blockoverride "trade_order_card_actions" {
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "[SelectLocalization( ImportExportLateralView.IsExport, 'TRADE_ORDER_CREATE_IE_TT_EXPORT', 'TRADE_ORDER_CREATE_IE_TT_IMPORT')]"
+							enabled = "[And(Not(ImportExportLateralView.HasTradeOrder), ImportExportLateralView.CanIncreaseTradeOrder)]"
+							conditions = "[ImportExportLateralView.GetTradeOrderNotPossibleInfo]"
+							on_action = "[ImportExportLateralView.IncreaseTradeOrder('(float)1')]"
+						}
+
+						action_tooltip = {
+							click_type = right
+							click_mode = single
+							title = "TRADE_ORDER_CANCEL_TT"
+							enabled = "[ImportExportLateralView.HasTradeOrder]"
+							on_action = "[ImportExportLateralView.CancelTradeOrder]"
+						}
+					}
+
+					blockoverride "trade_order_card_goods_icon" {
+						icon = {
+							size = { 28 28 }
+							texture = "[GetGoodsIcon(ImportExportLateralView.GetGoods)]"
+							icon = {
+								visible = "[Not(ImportExportLateralView.IsExport)]"
+								parentanchor = bottom|right
+								size = { 12 12 }
+								texture = "gfx/interface/icons/flat_icons/trade_market/import.dds"
+							}
+							icon = {
+								visible = "[ImportExportLateralView.IsExport]"
+								parentanchor = bottom|right
+								size = { 12 12 }
+								texture = "gfx/interface/icons/flat_icons/trade_market/export.dds"
+							}
+						}
+					}
+
+					blockoverride "trade_order_card_good_name" {
+						text_single = {
+							size = { 110 -1 }
+							align = left|nobaseline
+							text = "[ImportExportLateralView.GetTradeOrderCardTitle]"
+						}
+					}
+
+					blockoverride "trade_order_card_ie_label" {}
+
+					blockoverride "trade_order_card_capacity_row" {
+						hbox = {
+							visible = "[ImportExportLateralView.HasTradeOrder]"
+							spacing = 4
+							using = bg_number_container_bckg
+							blockoverride "number_container_extra" {
+								alpha = 0.4
+								margin = {2 4}
+							}
+
+							button_square_minus = {
+								size = { 18 18 }
+								enabled = "[ImportExportLateralView.CanDecreaseTradeOrder]"
+								tooltipwidget = { BasicFunctionalTooltip = {} }
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									title = "POSSIBLE_TRADE_CAPACITY_DECREASE"
+									enabled = "[ImportExportLateralView.CanDecreaseTradeOrder]"
+									on_action = "[ImportExportLateralView.DecreaseTradeOrder('(float)1')]"
+								}
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									click_modifier = shift
+									title = "POSSIBLE_TRADE_CAPACITY_DECREASE_10"
+									enabled = "[ImportExportLateralView.CanDecreaseTradeOrder]"
+									on_action = "[ImportExportLateralView.DecreaseTradeOrder('(float)10')]"
+								}
+							}
+
+							text_single = {
+								minimumsize = { 40 -1 }
+								maximumsize = { 40 -1 }
+								align = center|nobaseline
+								using = Font_Size_Small
+								raw_text = "[ImportExportLateralView.GetTradeOrderCapacity|<2]@trade_capacity!"
+								tooltipwidget = {
+									SimpleContextualTooltipType = {
+										blockoverride "title_icon" {
+											icon = {
+												using = tooltip_title_icon_size
+												texture = "gfx/interface/icons/flat_icons/trade_capacity.dds"
+											}
+										}
+
+										blockoverride "title_text" {
+											text = "TRADE_ORDER_CAPACITY_TOOLTIP_TITLE"
+										}
+
+										blockoverride "concept_link" {
+											text = "[merchant_capacity|e]"
+										}
+
+										blockoverride "tooltip_content" {
+											TooltipTextBlock = {
+												blockoverride "text" {
+													text = "TRADE_ORDER_IE_CAPACITY_TOOLTIP_SUMMARY"
+												}
+											}
+											TooltipScrolledStringPairList = {
+												tooltipmeta = {
+													game_concept = "[trade_profit|e]"
+													title = "[trade_profit]"
+												}
+												blockoverride "block_scrollarea" {
+													maximumsize = { -1 200 }
+												}
+												textcontext = "[ImportExportLateralView.GetTradeOrderTooltip]"
+											}
+										}
+									}
+								}
+							}
+
+							button_square_plus = {
+								size = { 18 18 }
+								enabled = "[ImportExportLateralView.CanIncreaseTradeOrder]"
+								tooltipwidget = { BasicFunctionalTooltip = {} }
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									title = "POSSIBLE_TRADE_CAPACITY_INCREASE"
+									enabled = "[ImportExportLateralView.CanIncreaseTradeOrder]"
+									on_action = "[ImportExportLateralView.IncreaseTradeOrder('(float)1')]"
+								}
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									click_modifier = shift
+									title = "POSSIBLE_TRADE_CAPACITY_INCREASE_10"
+									enabled = "[ImportExportLateralView.CanIncreaseTradeOrder]"
+									on_action = "[ImportExportLateralView.IncreaseTradeOrder('(float)10')]"
+								}
+							}
+						}
+					}
+
+					blockoverride "trade_order_card_reorder_column" {
+						widget = {
+							size = { 0 0 }
+							visible = no
+						}
+					}
+				}
+			}
+
 			vbox = {
 				using = layoutpolicy_expanding
 				datacontext = "[ImportExportLateralView.GetMarket]"
-				AutomatedTradeSlider = { 
+				AutomatedTradeSlider = {
 					margin_top = 4
 					margin_bottom = 4
 				}

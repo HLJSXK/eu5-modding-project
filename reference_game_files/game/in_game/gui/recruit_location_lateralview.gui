@@ -146,8 +146,9 @@ template recruit_location_entry {
 					tooltipwidget = {
 						using = location_army_levy_per_location_tt
 					}
+					minimumsize = { 50 -1 }
+					maximumsize = { 50 -1 }
 					text_single = {
-						autoresize = yes
 						resizeparent = yes
 						raw_text = "[LocationToRecruitItem.GetMaxStrength|0]@army_strength!"
 
@@ -760,6 +761,41 @@ template recruit_location_entry {
 	}
 }
 
+template levy_possible_category_tt {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[SubUnitCategory.GetNameWithNoTooltip]"
+		}
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+			}
+		}
+		
+		blockoverride "concept_link" {
+			text = "[levies|e]"
+		}
+							
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				blockoverride "text" {
+					raw_text = "[RecruitInLocationLateralView.GetLevyCategoryStrengthForUI(SubUnitCategory.Self)]"
+				}
+			}
+			TooltipRowList = {
+				blockoverride "block_title" { text = "LEVY_POSSIBLE_LEVIES_FOR_CATEGORY_TT" }
+				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(RecruitInLocationLateralView.GetValidLeviesForCategory(SubUnitCategory.Self))]" }
+				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(RecruitInLocationLateralView.GetValidLeviesForCategory(SubUnitCategory.Self))]" }
+				blockoverride "rowlist_datamodel" { datamodel = "[RecruitInLocationLateralView.GetValidLeviesForCategory(SubUnitCategory.Self)]" }
+				blockoverride "rowlist_item" {
+					raw_text = "[GetLevySetupLabel(LevySetup.Self)]: [RecruitInLocationLateralView.GetLevySetupStrengthForUI(LevySetup.Self)]"
+				}
+			}
+		}
+	}
+}
+
 lateralview = {
 	name = "recruit_location_lateralview"
 
@@ -1041,7 +1077,7 @@ lateralview = {
 							click_type = left
 							click_mode = confirm
 							title = "RAISE_ALL_LEVIES_CAPITAL"
-							on_action = "[RecruitInLocationLateralView.RaiseAllLevies]"
+							on_action = "[RecruitInLocationLateralView.RaiseAllArmyLevies]"
 							description = "[RecruitInLocationLateralView.CanRaiseAllLeviesInfo]"
 							enabled = "[RecruitInLocationLateralView.CanRaiseAllLevies]"
 						}
@@ -1426,7 +1462,7 @@ lateralview = {
 							click_type = left
 							click_mode = confirm
 							title = "[SelectLocalization( Player.GetCapital.IsCoastal, 'RAISE_ALL_LEVIES_CAPITAL', 'RAISE_ALL_LEVIES_COAST_CAPITAL')]"
-							on_action = "[RecruitInLocationLateralView.RaiseAllLevies]"
+							on_action = "[RecruitInLocationLateralView.RaiseAllNavyLevies]"
 							description = "[RecruitInLocationLateralView.CanRaiseAllLeviesInfo]"
 							enabled = "[RecruitInLocationLateralView.CanRaiseAllLevies]"
 						}
@@ -1626,6 +1662,72 @@ lateralview = {
 			# 	blendable_channel = "r"
 			# }
 
+			# Levy category icons — shows all levy unit categories this country can raise, with available strength
+			hbox = {
+				visible = "[RecruitInLocationLateralView.IsLevy]"
+				layoutpolicy_horizontal = expanding
+				margin = { 8 4 }
+
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 6
+					margin = { 8 6 }
+
+					using = bg_paper_card
+					using = bg_cabinet_card_frame
+
+					text_single = {
+						autoresize = yes
+						using = Font_Size_Medium
+						text = "LEVY_POSSIBLE_UNIT_TYPES"
+					}
+
+					expand = {}
+
+					# Army levy categories
+					flowcontainer = {
+						visible = "[RecruitInLocationLateralView.IsArmy]"
+						spacing = 4
+						datamodel = "[RecruitInLocationLateralView.GetValidArmyLevyCategories]"
+						item = {
+							widget = {
+								size = { 28 28 }
+								using = bg_text_mask_container_brown
+								icon = {
+									parentanchor = center
+									size = { 22 22 }
+									texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+									tooltipwidget = {
+										using = levy_possible_category_tt
+									}
+								}
+							}
+						}
+					}
+
+					# Navy levy categories
+					flowcontainer = {
+						visible = "[RecruitInLocationLateralView.IsNavy]"
+						spacing = 4
+						datamodel = "[RecruitInLocationLateralView.GetValidNavyLevyCategories]"
+						item = {
+							widget = {
+								size = { 28 28 }
+								using = bg_text_mask_container_brown
+								icon = {
+									parentanchor = center
+									size = { 22 22 }
+									texture = "[GetSubUnitCategoryIcon(SubUnitCategory.Self)]"
+									tooltipwidget = {
+										using = levy_possible_category_tt
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			vbox = {
 				using = layoutpolicy_expanding
 
@@ -1642,7 +1744,7 @@ lateralview = {
 						sort_by_key_button = {
 							visible = "[Not(RecruitInLocationLateralView.IsUnitTemplate)]"
 							name = "strength"
-							size = { 70 -1 }
+							size = { 100 -1 }
 							layoutpolicy_vertical = expanding
 						}
 

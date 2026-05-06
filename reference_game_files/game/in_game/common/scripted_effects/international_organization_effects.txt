@@ -232,6 +232,9 @@ call_parliament_for_law_change = {
 				uses_parliament_for_law_votes_trigger = yes
 			}
 		}
+		scope:proposer = {
+			call_io_parliament = { international_organization = scope:recipient }
+		}
 		scope:recipient = {
 			#Setup parliament location
 			if = {
@@ -532,11 +535,15 @@ propose_parliament_issue = {
 		}
 	}
 	set_participated_in_parliament = { international_organization = $international_organization$ vote = yes }
+	call_io_parliament = { international_organization = $international_organization$ }
+}
+
+call_io_parliament = {
 	hidden_effect = {
 		add_to_variable_list = {
 			name = io_parliaments_called_list
 			target = $international_organization$
-			days = 366
+			days = 365
 		}
 	}
 }
@@ -662,6 +669,16 @@ change_union_integration_level = {
 				else = {
 					change_variable = { name = integrated_in_union add = $value$ }
 				}
+				# Clamp to 0: members who joined after a centralizing policy was enacted
+				# start without integrated_in_union set (treated as 0), so a deactivation
+				# decrement must not push them negative.
+				if = {
+					limit = {
+						has_variable = integrated_in_union
+						var:integrated_in_union < 0
+					}
+					set_variable = { name = integrated_in_union value = 0 }
+				}
 			}
 		}
 	}
@@ -746,6 +763,7 @@ apply_same_inheritance_policy_effect = {
 			order_by = great_power_score
 			check_range_bounds = no
 			max = 1
+			save_scope_as = senior_partner_country
 			if = {
 				limit = {
 					succession_law = {
@@ -768,25 +786,31 @@ apply_same_inheritance_policy_effect = {
 			}
 		}
 	}
-	custom_tooltip = {
-		text = union_codified_inheritance_policy_at
-		if = {
-			limit = { exists = scope:target_heir_selection }
-			every_international_organization_member = {
-				limit = {
-					government_type = government_type:monarchy
-					succession_law = { NOT = { is_locked_for = prev } }
-					NOT = {
-						has_special_status_in_international_organization = {
-							type = special_status:senior_partner
-							international_organization = prev
+	if = {
+		limit = { exists = scope:target_heir_selection }
+		custom_tooltip = {
+			text = union_codified_inheritance_policy_at
+				every_international_organization_member = {
+					limit = {
+						government_type = government_type:monarchy
+						succession_law = {
+							NOT = { is_locked_for = prev }
+							NOT = { has_tag = cannot_be_transferred }
 						}
+						NOT = {
+							has_special_status_in_international_organization = {
+								type = special_status:senior_partner
+								international_organization = prev
+							}
+						}
+						has_union_integration_level_as_union = yes
 					}
-					has_union_integration_level_as_union = yes
+					change_heir_selection = scope:target_heir_selection
 				}
-				change_heir_selection = scope:target_heir_selection
-			}
 		}
+	}
+	else = {
+		custom_tooltip = union_codified_inheritance_policy_dt
 	}
 	custom_tooltip = {
 		text = union_codified_inheritance_policy_ct
@@ -1556,9 +1580,60 @@ change_celestial_authority = {
 	}
 }
 
+##############################################
+# Catholic Church International Organization #
+##############################################
+change_papal_authority = {
+	international_organization:catholic_church ?= {
+		custom_description = {
+			text = change_papal_authority_text
+			value = $value$
+			change_variable = {
+				name = papal_authority
+				add = $value$
+			}
+			if = {
+				limit = { has_variable = papal_authority }
+				if = {
+					limit = { var:papal_authority > 100 }
+					set_variable = { name = papal_authority value = 100 }
+				}
+				if = {
+					limit = { var:papal_authority < 0 }
+					set_variable = { name = papal_authority value = 0 }
+				}
+			}
+		}
+	}
+}
+
+subtract_papal_authority = {
+	international_organization:catholic_church ?= {
+		custom_description = {
+			text = change_papal_authority_text
+			value = $value$
+			change_variable = {
+				name = papal_authority
+				subtract = $value$
+			}
+			if = {
+				limit = { has_variable = papal_authority }
+				if = {
+					limit = { var:papal_authority > 100 }
+					set_variable = { name = papal_authority value = 100 }
+				}
+				if = {
+					limit = { var:papal_authority < 0 }
+					set_variable = { name = papal_authority value = 0 }
+				}
+			}
+		}
+	}
+}
+
 set_up_proper_china_for_middle_kingdom = { # If changed, apply changes too to the definition of the IO at start
 	international_organization:middle_kingdom ?= {
-		set_variable = { name = num_of_celestial_governors value = 0 }
+		set_variable = { name = num_of_celestial_governors value = 1 }
 		set_variable = { name = celestial_authority value = 70 }
 	}
 	region:north_china_region = {
@@ -1698,22 +1773,17 @@ destroy_all_italian_leagues = {
 }
 
 hre_update_kingdom_title = {
+	$scripted_geography$ = { save_scope_as = temp_geography }
 	if = {
 		limit = {
-			$formable_country$ = {
-				has_been_formed = yes
-				NOT = { is_target_in_global_variable_list = { name = hre_kingdoms_list target = $formable_country$ } }
+			has_global_variable_map = hre_kingdoms_map
+			OR = {
+				"global_variable_map(hre_kingdoms_map|scope:temp_geography)" = {
+					NOT = { is_member_of_international_organization = international_organization:hre }
+				}
+				NOT = { country_exists = "global_variable_map(hre_kingdoms_map|scope:temp_geography)" }
 			}
 		}
-		add_to_global_variable_list = { name = hre_kingdoms_list target = $formable_country$ }
-	}
-	else_if = {
-		limit = {
-			$formable_country$ = {
-				has_been_formed = no
-				is_target_in_global_variable_list = { name = hre_kingdoms_list target = $formable_country$ }
-			}
-		}
-		remove_list_global_variable = { name = hre_kingdoms_list target = $formable_country$ }
+		remove_from_global_variable_map = { name = hre_kingdoms_map key = scope:temp_geography }
 	}
 }

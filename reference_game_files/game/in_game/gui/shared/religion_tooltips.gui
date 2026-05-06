@@ -14,7 +14,7 @@ template religion_tooltip {
 		
 		blockoverride "tooltip_content" {
 		
-			TooltipScrolledStringPairList = {
+			TooltipScrolledBlockList = {
 				blockoverride "block_scrollarea" { maximumsize = { -1 450 } }
 				textcontext = "[Religion.GetTooltip]"
 			}
@@ -95,12 +95,12 @@ template religion_group_tooltip {
 		
 		blockoverride "title_icon" {
 			icon = {
-				visible = "[Not(EqualTo_string(ReligionGroup.GetKey, 'christianity'))]"
+				visible = "[Not(EqualTo_string(ReligionGroup.GetNameWithNoTooltip, 'Christianity'))]"
 				using = tooltip_title_icon_size
 				texture = "gfx/interface/icons/location_icons/main_religion.dds"
 			}
 			icon = {
-				visible = "[EqualTo_string(ReligionGroup.GetKey, 'christianity')]"
+				visible = "[EqualTo_string(ReligionGroup.GetNameWithNoTooltip, 'Christianity')]"
 				using = tooltip_title_icon_size
 				texture = "gfx/interface/icons/international_organizations/christianity.dds"
 			}
@@ -776,6 +776,22 @@ template honor_tooltip {
 				}
 				textcontext = "[Localize(ShowAutoModifierEffectForCountry(Country.Self, 'honor'))]"
 			}
+			TooltipScrolledStringPairList = {
+				visible = "[LessThan_CFixedPoint(Country.GetFixedPointCurrencyValue('honor'), '(CFixedPoint)75.001')]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 300 } minimumsize = { -1 30 } }
+				blockoverride "block_title" {
+					text = "HONOR_TT_IF_HIGH_T"
+				}
+				textcontext = "[Localize(GetAutoModifier('high_honor').GetDesc)][Localize('SCALING_WITH_OUR')][Localize('honor')]"
+			}
+			TooltipScrolledStringPairList = {
+				visible = "[GreaterThan_CFixedPoint(Country.GetFixedPointCurrencyValue('honor'), '(CFixedPoint)25.001')]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 300 } minimumsize = { -1 30 } }
+				blockoverride "block_title" {
+					text = "HONOR_TT_IF_LOW_T"
+				}
+				textcontext = "[Localize(GetAutoModifier('low_honor').GetDesc)][Localize('SCALING_WITH_OUR')][Localize('honor')]"
+			}
 		}
 	}
 }
@@ -928,6 +944,11 @@ template ReligiousAspect_tooltip {
 		}
 		
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[ReligiousAspect.GetDebugText]"
+				}
+			}
 			TooltipStringPairList = {
 				textcontext = "[ReligiousAspect.GetEffect]"
 			}
@@ -954,11 +975,35 @@ template God_tooltip {
 		}
 
 		blockoverride "concept_link" {
-			text = [god|E]
+			text = "[God.GetGodOrGoddess]"
 		}
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[God.GetDebugText]"
+				}
+			}
+
+			TooltipTextBlock = {
+				visible = "[God.HasMonarchPower]"
+				blockoverride "text" {
+					text = "[God.GetMonarchPowerTooltip]"
+				}
+			}
+
 			TooltipStringPairList = {
-				textcontext = "[God.GetEffects]"
+				visible = "[God.HasOmens]"
+				textcontext = "[God.GetOmensTooltip]"
+			}
+
+			TooltipStringPairList = {
+				visible = "[Not(StringIsEmpty(God.GetActiveEffects))]"
+				textcontext = "[God.GetActiveEffects]"
+			}
+
+			TooltipStringPairList = {
+				visible = "[God.HasInactiveConditionalEffects]"
+				textcontext = "[God.GetInactiveConditionalEffects]"
 			}
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
@@ -987,8 +1032,17 @@ template GodWithReligion_tooltip {
 		}
 		
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[GodWithReligionWrap.GetGod.GetDebugText]"
+				}
+			}
 			TooltipStringPairList = {
-				textcontext = "[GodWithReligionWrap.GetGod.GetEffects]"
+				textcontext = "[GodWithReligionWrap.GetGod.GetActiveEffects]"
+			}
+			TooltipStringPairList = {
+				visible = "[GodWithReligionWrap.GetGod.HasInactiveConditionalEffects]"
+				textcontext = "[GodWithReligionWrap.GetGod.GetInactiveConditionalEffects]"
 			}
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
@@ -1023,6 +1077,317 @@ template Avatar_tooltip {
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "[Avatar.GetDesc]"
+				}
+			}
+		}
+	}
+}
+
+template Omen_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[Omen.GetNameWithNoTooltip]"
+		}
+
+		blockoverride "concept_link" {
+			text = [omen|E]
+		}
+		
+		blockoverride "title_icon_texture" {
+			texture = "[GetOmenIcon(Omen.Self)]"
+		}
+		
+		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[Omen.GetDebugText]"
+				}
+			}
+			TooltipTextBlock = {
+				visible = "[Not(StringIsEmpty(Player.GetOmenTimeLeft(Omen.Self)))]"
+				blockoverride "text" {
+					text = "[Player.GetOmenTimeLeft(Omen.Self)]"
+				}
+			}
+			TooltipStringPairList = {
+				textcontext = "[Omen.GetEffects]"
+			}
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[Omen.GetDesc]"
+				}
+			}
+		}
+	}
+}
+
+# template Offered_omens_tooltip {
+# 	ContextualTooltipType = {
+# 		blockoverride "title_text" {
+# 			text = "OFFERED_OMENS"
+# 		}
+
+# 		blockoverride "concept_link" {
+# 			text = [omen|E]
+# 		}
+		
+# 		blockoverride "title_icon" {
+# 			icon = {
+# 				using = tooltip_title_icon_size
+# 				texture = "[GetConceptTexture('omen')]"
+# 			}
+# 		}
+		
+# 		blockoverride "tooltip_content" {
+# 			TooltipTextBlock = {
+# 				blockoverride "text" {
+# 					text = "OFFERED_OMENS_DESC"
+# 				}
+# 			}
+
+# 			TooltipListBase = {
+# 				blockoverride "block_title" {
+# 					text = "OFFERED_OMENS"
+# 				}
+
+# 				TooltipListScrollArea = {
+# 					visible = "[DataModelHasItems(Player.GetActiveOmens)]"
+# 					blockoverride "block_scrollarea" {
+# 						maximumsize = { -1 210 }
+# 					}
+# 					blockoverride "scrollarea_content" {
+# 						fixedgridbox = {
+# 							addcolumn = 230
+# 							addrow = 30
+
+# 							datamodel = "[Player.GetActiveOmens]"
+# 							item = {
+# 								widget = {
+# 									size = { 100% 30 }
+# 									background = {
+# 										visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+# 										using = tooltip_table_field_texture
+# 									}
+
+# 									hbox = {
+# 										using = layoutpolicy_expanding
+# 										margin = { 10 0 }
+# 										spacing = 5
+# 										icon = {
+# 											size = { 20 20 }
+# 											texture = "[GetOmenIcon(Omen.Self)]"
+# 										}
+# 										text_single = {
+# 											layoutpolicy_horizontal = expanding
+# 											autoresize = no
+# 											align = left
+# 											text = "[Omen.GetName]"
+# 										}
+# 									}
+# 								}
+# 							}
+# 						}
+# 					}
+# 				}
+		
+# 				TooltipListEmptyContent = {
+# 					visible = "[IsDataModelEmpty(Player.GetActiveOmens)]"
+# 				}
+# 			}
+# 		}
+# 	}
+# }
+
+template Available_omens_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "AVAILABLE_OMENS"
+		}
+
+		blockoverride "concept_link" {
+			text = [omen|E]
+		}
+		
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetConceptTexture('omen')]"
+			}
+		}
+		
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				blockoverride "text" {
+					text = "AVAILABLE_OMENS_DESC"
+				}
+			}
+
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					raw_text = "[Localize('MODIFIER_TYPE_NAME_omens_offered')] [Country.GetModifierValueNoFormat('omens_offered')]"
+				}
+				textcontext = "[Country.GetDescriptionFor('omens_offered')]"
+			}
+
+			TooltipListBase = {
+				blockoverride "block_title" {
+					text = "OFFERED_OMENS"
+				}
+
+				TooltipListScrollArea = {
+					visible = "[DataModelHasItems(Player.GetActiveOmens)]"
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 210 }
+					}
+					blockoverride "scrollarea_content" {
+						fixedgridbox = {
+							addcolumn = 230
+							addrow = 30
+
+							datamodel = "[Player.GetActiveOmens]"
+							item = {
+								widget = {
+									size = { 100% 30 }
+									background = {
+										visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+										using = tooltip_table_field_texture
+									}
+
+									hbox = {
+										using = layoutpolicy_expanding
+										margin = { 10 0 }
+										spacing = 5
+										icon = {
+											size = { 20 20 }
+											texture = "[GetOmenIcon(Omen.Self)]"
+										}
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											autoresize = no
+											align = left
+											text = "[Omen.GetName]"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+		
+				TooltipListEmptyContent = {
+					visible = "[IsDataModelEmpty(Player.GetActiveOmens)]"
+				}
+			}
+
+			TooltipListBase = {
+				blockoverride "block_title" {
+					text = "AVAILABLE_OMENS"
+				}
+
+				TooltipListScrollArea = {
+					visible = "[DataModelHasItems(CountryReligionLateralView.GetActiveGods)]"
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 310 }
+					}
+					blockoverride "scrollarea_content" {
+						vbox = {
+							layoutpolicy_horizontal = expanding
+							set_parent_dimension_to_minimum = height
+							datamodel = "[CountryReligionLateralView.GetActiveGods]"
+							item = {
+								fixedgridbox = {
+									addcolumn = 100%
+									addrow = 30
+									datamodel = "[God.GetOmens]"
+									item = {
+										widget = {
+											size = { 100% 30 }
+											background = {
+												visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+												using = tooltip_table_field_texture
+											}
+		
+											hbox = {
+												using = layoutpolicy_expanding
+												margin = { 10 0 }
+												spacing = 5
+												icon = {
+													size = { 20 20 }
+													texture = "[GetOmenIcon(Omen.Self)]"
+												}
+												text_single = {
+													layoutpolicy_horizontal = expanding
+													autoresize = no
+													align = left
+													text = "[Omen.GetName]"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+		
+				TooltipListEmptyContent = {
+					visible = "[IsDataModelEmpty(CountryReligionLateralView.GetActiveGods)]"
+				}
+			}
+		}
+	}
+}
+
+template BureaucracyType_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[BureaucracyType.GetNameWithNoTooltip]"
+		}
+
+		blockoverride "concept_link" {
+			text = [bureaucracy|E]
+		}
+		
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetBureaucracyIcon(BureaucracyType.Self)]"
+			}
+		}
+		
+		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[BureaucracyType.GetDebugText]"
+				}
+			}
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "positive_modifier_effects_TT"
+				}
+				textcontext = "[BureaucracyType.GetPositiveEffects]"
+			}
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "neutral_modifier_effects_TT"
+				}
+				textcontext = "[BureaucracyType.GetNeutralEffects]"
+			}
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "negative_modifier_effects_TT"
+				}
+				textcontext = "[BureaucracyType.GetNegativeEffects]"
+			}
+			TooltipStringPairList = {
+				textcontext = "[BureaucracyType.GetEstatesThatLikeTooltip]"
+			}
+			TooltipStringPairList = {
+				textcontext = "[BureaucracyType.GetEstatesThatDislikeTooltip]"
+			}
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[BureaucracyType.GetDesc]"
 				}
 			}
 		}
@@ -1194,6 +1559,7 @@ template religion_actions_tooltip {
 		blockoverride "concept_link_obj" {}
 		blockoverride "tooltip_content" {
 			using = action_tooltip_inner_content
+			blockoverride "conditions_list" {}
 		}
 
 		blockoverride "tooltip_ui_action_block" {

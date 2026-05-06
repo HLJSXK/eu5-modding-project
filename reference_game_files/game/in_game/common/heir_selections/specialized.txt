@@ -301,9 +301,13 @@ matrilineal_non_exclusive = {
 	
 	use_mothers_dynasty = yes
 	traverse_family_tree = yes
+	depth_first = yes
 
 	allowed_estates = { nobles_estate clergy_estate burghers_estate}
 	heir_is_allowed = {
+		scope:target.ruler_or_heir_if_regent ?= {
+			dynasty ?= root.dynasty
+		}
 	}
 	locked = {
 	}
@@ -328,18 +332,26 @@ matrilineal_non_exclusive = {
 				desc = "HEIR_SELECTION_MIL_DESC"
 				value = root.mil
 			}
-			add = {
-				desc = "HEIR_SELECTION_SAME_DYNASTY_AS_CURRENT_RULER"
-				value = 100
+			if = {
+				limit = {
+					has_dynasty = yes
+					scope:target.ruler_or_regent ?= {
+						dynasty = prev.dynasty 
+					}
+				}
+				add = {
+					desc = "HEIR_SELECTION_SAME_DYNASTY_AS_CURRENT_RULER"
+					value = 100
+				}
 			}
 			if = {
-				limit = { 
+				limit = {
 					OR = {
-						exists = root.father 
+						exists = root.father
 						exists = root.mother
-					} 
+					}
 				}
-				
+
 				if = {
 					limit = {
 						any_parent = {
@@ -353,7 +365,7 @@ matrilineal_non_exclusive = {
 				}
 			}
 			if = {
-				limit = { 
+				limit = {
 					OR = {
 						is_general = yes
 						is_admiral = yes
@@ -366,14 +378,41 @@ matrilineal_non_exclusive = {
 			}
 			if = {
 				limit = {
-					has_traits_of_type = { type = military }
+					OR = {
+						has_trait_category = general
+						has_trait_category = admiral
+					}
 				}
 				add = {
 					desc = "HEIR_SELECTION_MILITARY_TRAITS"
 					value = 50
 				}
 			}
-			
+			if = {
+				limit = {
+					is_female = yes
+					mother ?= scope:target.last_valid_ruler
+				}
+				add = {
+					desc = "HEIR_SELECTION_MOTHER_IS_RULER_DESC"
+					value = 500
+				}
+			}
+			if = {
+				limit = {
+					is_female = yes
+					exists = mother
+					mother.mother ?= scope:target.last_valid_ruler
+				}
+				add = {
+					desc = "HEIR_SELECTION_GRANDMOTHER_IS_RULER_DESC"
+					value = 250
+				}
+			}
+			add = {
+				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
+				value = character_age
+			}
 			add = {
 				desc = "HEIR_SELECTION_IS_UNSUITED_TO_RULE_DESC"
 				if = { limit = { modifier:blocked_from_being_ruler = yes } value = -1000 }
@@ -409,69 +448,21 @@ matrilineal_non_exclusive = {
 				desc = "HEIR_SELECTION_MILITARY_TRAITS"
 				value = 50
 			}
-			
-		}
-	}
-
-	calc = {
-		add = {
-			desc = "HEIR_SELECTION_MOTHER_IS_RULER_DESC"
-			if = {
-				limit = {
-					is_female = yes
-					OR = {
-						not = { exists = root }
-						mother ?= scope:target.last_valid_ruler 
-					}
-				}
+			add = {
+				desc = "HEIR_SELECTION_MOTHER_IS_RULER_DESC"
 				value = 500
 			}
-		}
-
-		add = {
-			desc = "HEIR_SELECTION_GRANDMOTHER_IS_RULER_DESC"
-			if = {
-				limit = {
-					is_female = yes
-					OR = {
-						not = { exists = root }
-						and = {
-							exists = mother
-							mother.mother ?= scope:target.last_valid_ruler
-						}
-					}	
-				}
-				value = 250
-			}
-		}
-
-		if = {
-			limit = {
-				exists = root
-			}
 			add = {
-				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
-				value = character_age
-			}
-			if = { 
-				limit = { modifier:blocked_from_being_ruler = yes }
-				add = {
-					desc = "HEIR_SELECTION_IS_UNSUITED_TO_RULE_DESC"
-					value = -1000 
-				}
-			}
-		}
-
-		# Here it goes the description for explaining a heir gets +1 points per year.
-		if = {
-			limit = {
-				not = { exists = root }
-				is_female = yes
+				desc = "HEIR_SELECTION_GRANDMOTHER_IS_RULER_DESC"
+				value = 250
 			}
 			add = {
 				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
 				value = 1
 			}
 		}
+	}
+
+	calc = {
 	}
 }

@@ -10,7 +10,6 @@ on_character_death = {
 		#Remove favored heirs from supported_heirs
 		if = {
 			limit = {
-				has_variable_list = supported_heirs
 				scope:target = {
 					has_variable = home_country
 				}
@@ -27,16 +26,25 @@ on_character_death = {
 					second = scope:target.var:home_country
 				}
 			}
-			remove_list_variable = {
-				name = supported_heirs
-				target = scope:target
-			}
-			if = {
-				limit = {
-					has_variable = favored_heir
-					var:favored_heir = scope:target
+		}
+		if = {
+			limit = {
+				scope:target = {
+					has_variable = favored_in_country
 				}
-				remove_variable = favored_heir
+			}
+			scope:target.var:favored_in_country ?= {
+				remove_list_variable = {
+					name = supported_heirs
+					target = scope:target
+				}
+				if = {
+					limit = {
+						has_variable = favored_heir
+						var:favored_heir = scope:target
+					}
+					remove_variable = favored_heir
+				}
 			}
 		}
 		if = {
@@ -83,7 +91,7 @@ on_character_death = {
 						limit = {
 							has_trust = { modifier = trust_offered_hostage target = root }
 						}
-						remove_trust = { modifier = trust_offered_hostage target = root }
+						remove_trust_equilibrium = { modifier = trust_offered_hostage target = root }
 					}
 					if = {
 						limit = {
@@ -98,7 +106,7 @@ on_character_death = {
 					limit = {
 						has_trust = { modifier = trust_offered_hostage target = scope:origin_country }
 					}
-					remove_trust = { modifier = trust_offered_hostage target = scope:origin_country }
+					remove_trust_equilibrium = { modifier = trust_offered_hostage target = scope:origin_country }
 				}
 				if = {
 					limit = {
@@ -149,6 +157,68 @@ on_character_death = {
 				id = flavor_maj.18
 			}
 		}
+		if = {
+			limit = {
+				scope:target ?= { has_variable = searching_for_greek_fire }
+			}
+			trigger_event_non_silently = d008_flavor_byz.4
+		}
+		if = {
+			limit = {
+				scope:target = {
+					has_variable = is_patriarch
+					var:is_patriarch = { 
+						exists = leader_country
+						var:patriarch ?= { this = scope:target }
+					}
+				}
+			}
+			scope:target = {
+				var:is_patriarch = {
+					set_up_patriarch_for_io = yes
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:target = { has_variable = is_pentarch }
+			}
+			religion:orthodox = {
+				every_key_in_variable_map = {
+					variable = pentarchy
+					limit = {
+						religion:orthodox = {
+							"variable_map(pentarchy|prev)" = scope:target
+						}
+					}
+					save_scope_as = target_pentarchy_seat
+					if = {
+						limit = {
+							OR = {
+								NOT = { exists = scope:target_patriarch }
+								scope:target_patriarch = { has_variable = is_pentarch }
+							}
+							scope:target_pentarchy_seat.owner ?= { religion = religion:orthodox }
+						}
+						scope:target_pentarchy_seat.owner = { select_suitable_patriarch = { pentarchy = yes } }
+					}
+					scope:target_patriarch ?= {
+						set_pentarch_variable = { location = scope:target_pentarchy_seat }
+					}
+					religion:orthodox = {
+						remove_from_variable_map = {
+							name = pentarchy
+							key = scope:target_pentarchy_seat
+						}
+						add_to_variable_map = {
+							name = pentarchy
+							key = scope:target_pentarchy_seat
+							value = scope:target_patriarch
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -167,7 +237,7 @@ on_cabinet_death = {
 on_horde_pretender_death = {
 	trigger = {
 		scope:target = {
-			has_variable = scope_horde_pretender_var
+			exists = var:scope_horde_pretender_var
 			var:scope_horde_pretender_var = {
 				NOT = { has_variable = horde_civil_war_can_end }
 			}

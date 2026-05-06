@@ -1,6 +1,6 @@
 ﻿make_unit_available_for_hire = {
 	type = owncountry
-	
+
 	potential = {
 		scope:actor = {
 			at_war = no
@@ -9,6 +9,11 @@
 	}
 
 	allow = {
+	}
+
+	ai_prerequisite = {
+		at_war = no
+		regular_army_size > 2
 	}
 
 	ai_tick = daily
@@ -23,6 +28,12 @@
 		target_flag = target
 		name = "make_unit_available_for_hire_select_unit"
 		none_available_msg_key = "make_unit_available_for_hire_no_units"
+		pre_evaluation_sort_value = {
+			#use fixed AI override values (multiplier=2, duration=24) to cheaply rank units
+			#before committing to a full ai_will_do evaluation; mirrors the scoring in ai_will_do
+			value = "hire_price(2|24)"
+		}
+		pre_evaluation_number_to_evaluate_fully = 5
 		column = {
 			data = name
 		}
@@ -96,8 +107,13 @@
 		#base
 		value = -500
 
-		#utility of the cash
-		add = "scope:actor.currency_utility(gold|scope:total_hire_price)"
+		#fraction of hire price as a proxy for gold value
+		#note: currency_utility(gold) is intentionally avoided here - gold is non-cacheable and
+		#evaluating it per-unit caused O(N) full gold utility walks for countries with many units
+		add = {
+			value = scope:total_hire_price
+			divide = 50
+		}
 
 		#longer duration is more sensible
 		add = {
@@ -109,19 +125,28 @@
 
 delist_unit = {
 	type = owncountry
-	
+
 	potential = {
+		scope:actor = {
+			any_rented_out_mercenary = {
+				has_customer = no
+			}
+		}
 	}
 
 	allow = {
 	}
 
 	ai_tick = daily
-	ai_tick_frequency = 20
+	ai_tick_frequency = 90
+
+	ai_prerequisite = {
+		at_war = yes
+	}
 
 	automation_tick = daily
 	automation_tick_frequency = 20
-	
+
 	#area in scope:target
 	select_trigger = {
 		looking_for_a = mercenary

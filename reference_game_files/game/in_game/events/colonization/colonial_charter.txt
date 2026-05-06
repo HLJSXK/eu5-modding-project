@@ -6,6 +6,7 @@ colonial_charter.1 = {
 
 	title = colonial_charter.1.title
 	desc = colonial_charter.1.desc
+	outcome = neutral
 	
 	
 	
@@ -92,6 +93,7 @@ colonial_charter.3 = {
 	type = country_event
 	title = colonial_charter.3.title
 	desc = colonial_charter.3.desc
+	outcome = neutral
 
 	
 		
@@ -156,6 +158,7 @@ colonial_charter.4 = {
 	type = country_event
 	title = colonial_charter.4.title
 	desc = colonial_charter.4.desc
+	outcome = neutral
 	
 	trigger = {
 		scope:target ?= {
@@ -169,7 +172,7 @@ colonial_charter.4 = {
 					}
 				}
 			}
-		 }
+		}
 	}
 
 	illustration_tags = {
@@ -234,6 +237,7 @@ colonial_charter.5 = {
 	type = country_event
 	title = colonial_charter.5.title
 	desc = colonial_charter.5.desc
+	outcome = neutral
 	trigger = {
 		has_policy = native_trade
 		
@@ -247,7 +251,7 @@ colonial_charter.5 = {
 					}
 				}
 			}
-		 }
+		}
 	}
 	
 	illustration_tags = {
@@ -293,6 +297,7 @@ colonial_charter.6 = {
 	type = country_event
 	title = colonial_charter.6.title
 	desc = colonial_charter.6.desc
+	outcome = neutral
 
 	trigger = {
 		any_province = {
@@ -327,6 +332,7 @@ colonial_charter.6 = {
 			type = pop_type:peasants
 			amount = 0.025
 			months = 120
+			keep_nationality = yes
 		}
 	}
 }
@@ -335,6 +341,7 @@ colonial_charter.7 = {
 	type = country_event
 	title = colonial_charter.7.title
 	desc = colonial_charter.7.desc
+	outcome = neutral
 	trigger = {
 		has_policy = settled_colonies
 		
@@ -369,6 +376,7 @@ colonial_charter.8 = {
 	type = country_event
 	title = colonial_charter.8.title
 	desc = colonial_charter.8.desc
+	outcome = neutral
 	trigger = {
 		has_policy = settled_colonies
 		scope:target.province_definition = {
@@ -415,6 +423,7 @@ colonial_charter.9 = {
 	type = country_event
 	title = colonial_charter.9.title
 	desc = colonial_charter.9.desc
+	outcome = neutral
 	trigger = {
 		any_colonial_charter = {
 			count > 5
@@ -452,6 +461,7 @@ colonial_charter.10 = {
 	type = country_event
 	title = colonial_charter.10.title
 	desc = colonial_charter.10.desc
+	outcome = neutral
 
 	trigger = {
 		scope:target.province_definition ?= {
@@ -515,16 +525,36 @@ colonial_charter.10 = {
 # The special finished event!
 #################################
 
+scripted_trigger is_in_13_colonies = { #root can be location/province/province_definition
+	OR = {
+		area = area:georgia_us_area
+		area = area:south_carolina_area
+		area = area:north_carolina_area
+		area = area:virginia_area
+		area = area:maryland_area
+		area = area:pennsylvania_area
+		area = area:new_jersey_area
+		area = area:hudson_area
+		area = area:maine_area
+		area = area:new_hampshire_area
+		area = area:vermont_area
+		area = area:southern_new_england_area
+		area = area:massachusetts_area
+	}
+}
 
-
+#scope:target is the Province of the charter
 colonial_charter.100 = {
 	hide_portraits = yes
 	type = country_event	
 
 	title = colonial_charter.100.title
 	desc = colonial_charter.100.desc
+	outcome = neutral
 
 	immediate = {
+		save_scope_as = actor
+		#Select the best location for a capital
 		if = {
 			limit = {
 				scope:target = {
@@ -544,115 +574,159 @@ colonial_charter.100 = {
 			}
 			
 		}
-	
+		#If already there is a colony on our area, save it
 		ordered_subject = {
 			limit = {
 				is_subject_type = colonial_nation
 				capital = {
-					region = scope:target.region
+					area = scope:target.area
 				}
+			}
+
+			order_by = total_population
+			max = 1
+			save_scope_as = scope_area_subject
+		}
+		#If already there is a colony on our area or an adjacent one, save it
+		ordered_subject = {
+			limit = {
+				is_subject_type = colonial_nation
+				capital = {
+					OR = {
+						area = scope:target.area
+						area = {
+							any_neighbor_area = {
+								this = scope:target.area
+							}
+						}
+					}
+				}
+				NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+			}
+
+			order_by = total_population
+			max = 1
+			save_scope_as = scope_adjacent_area_subject
+		}
+
+
+		#Get a colonial nation vassal neighboring the target province
+		if = {
+			limit = {
+				scope:target = {
+					any_location_in_province = {
+						any_coast_border_location = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+							}
+						}
+					}
+				}
+			}
+			scope:target = {
+				random_location_in_province = {
+					limit = {
+						any_coast_border_location = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+							}
+						}
+					}
+					random_coast_border_location = {
+						limit = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+							}
+						}
+						owner = { save_scope_as = first_neighboring_country }
+					}
+				}
+			}
+		}
+
+		#Get a second colonial nation vassal neighboring the target province, different from first_neighboring_country
+		if = {
+			limit = {
+				scope:target = {
+					any_location_in_province = {
+						any_coast_border_location = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+								NAND = { exists = scope:first_neighboring_country	this = scope:first_neighboring_country }
+							}
+						}
+					}
+				}
+			}
+			scope:target = {
+				random_location_in_province = {
+					limit = {
+						any_coast_border_location = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+								NAND = { exists = scope:first_neighboring_country	this = scope:first_neighboring_country }
+							}
+						}
+					}
+					random_coast_border_location = {
+						limit = {
+							has_owner = yes
+							owner = {
+								is_subject_of = ROOT
+								is_subject_type = colonial_nation
+								NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+								NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+								NAND = { exists = scope:first_neighboring_country	this = scope:first_neighboring_country }
+							}
+						}
+						owner = { save_scope_as = second_neighboring_country }
+					}
+				}
+			}
+		}
+
+		#Get the most populous colonial nation vassal with capital in the same region, different from first and second neighboring
+		ordered_subject = {
+			limit = {
+				is_subject_type = colonial_nation
+				capital = { region = scope:target.region }
+				NAND = { exists = scope:scope_area_subject	this = scope:scope_area_subject }
+				NAND = { exists = scope:scope_adjacent_area_subject	this = scope:scope_adjacent_area_subject }
+				NAND = { exists = scope:first_neighboring_country	this = scope:first_neighboring_country }
+				NAND = { exists = scope:second_neighboring_country	this = scope:second_neighboring_country }
 			}
 			order_by = total_population
 			max = 1
-
-			save_scope_as = potential_join_big_regional_subject
-		}
-	
-	
-		if = {
-			limit = {
-				scope:target = {
-					any_location_in_province = {
-						any_coast_border_location = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-							}
-						}
-					}
-				}
-			}
-			scope:target = {
-				random_location_in_province = {
-					limit = {
-						any_coast_border_location = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-							}
-						}
-					}
-					random_coast_border_location = {
-						limit = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation 
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-							}
-						}
-						owner = { save_scope_as = potential_join_1 }
-		
-					}
-				}
-			}
+			save_scope_as = regional_subject
 		}
 
-		if = {
-			limit = {
-				scope:target = {
-					any_location_in_province = {
-						any_coast_border_location = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation 
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-								NAND = { exists = scope:potential_join_1	this = scope:potential_join_1 }
-							}
-						}
-					}
-				}
-			}
-			scope:target = {
-				random_location_in_province = {
-					limit = {
-						any_coast_border_location = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-							}
-						}
-					}
-					random_coast_border_location = {
-						limit = {
-							has_owner = yes
-							owner = { 
-								is_subject_of = ROOT 
-								is_subject_type = colonial_nation 
-								NAND = { exists = scope:potential_join_big_regional_subject	this = scope:potential_join_big_regional_subject }
-								NAND = { exists = scope:potential_join_1	this = scope:potential_join_1 }
-							}
-						}
-						owner = { save_scope_as = potential_join_2 }
-		
-					}
-				}
-			}
-		}
-
+		#Save the Province Capital for the event image
 		scope:target = {
 			capital = { save_scope_as = target_location }
 		}
 	}
-		
-	option = {
+	
+	option = { #Form a new Colonial Subject
 		name = colonial_charter.100.a
 		trigger = {
 			scope:target = { is_overseas_for_owner = yes  }
@@ -677,9 +751,314 @@ colonial_charter.100 = {
 				}
 			}
 		}
+		
+		ai_will_select = {
+			value = 0
+			if = { #13 colonies exception
+				limit = {
+					scope:target = {
+						is_in_13_colonies = yes
+					}
+				}
+				if = {#If there is already a colony in the area, never create a new one
+					limit = {
+						exists = scope:scope_area_subject
+					}
+					add = -1000
+				}
+				else = {
+					#If we are part of the 13 colonies and no other colony exist in our area, we stop caring about anything, we make our area colony
+					add = 10000
+				}
+			
+			}
+			if = { #If any neighboring or regional colonial nation exists, never create a new one
+				limit = {
+					exists = scope:scope_adjacent_area_subject
+				}
+				add = -1000
+			}
+			else = { #No existing colonial nation to join, forming a new one is preferred
+				add = 1000
+			}
+		}
 	}
 	
-	option = {
+	option = { #Join it to scope_area_subject
+		name = colonial_charter.100.h
+		trigger = {
+			exists = scope:scope_area_subject
+		}
+
+		if = {
+			limit = {
+				exists = scope:new_town
+			}
+			scope:new_town = {
+				change_location_rank = location_rank:town
+				cc_setup_new_town = yes
+			}
+		}
+
+		scope:target = {
+			change_province_owner = scope:scope_area_subject
+		}
+
+		ai_will_select = {
+			value = 3000
+		}
+	}
+	
+	option = { #Join it to scope_adjacent_area_subject
+		name = colonial_charter.100.g
+		trigger = {
+			exists = scope:scope_adjacent_area_subject
+		}
+
+		if = {
+			limit = {
+				exists = scope:new_town
+			}
+			scope:new_town = {
+				change_location_rank = location_rank:town
+				cc_setup_new_town = yes
+			}
+		}
+
+		scope:target = {
+			change_province_owner = scope:scope_adjacent_area_subject 
+		}
+
+		ai_will_select = {
+			value = 2000
+			if = { #13 colonies exception
+				limit = {
+					scope:target = {
+						is_in_13_colonies = yes
+					}
+				}
+				if = {#If there is already a colony in the area, join it
+					limit = {
+						scope:scope_adjacent_area_subject = {
+							capital.area = scope:target.area
+						}
+					}
+					value = 2000
+				}
+				else = {
+					#If we are part of the 13 colonies and scope_adjacent_area_subject does not have its capital in our area we don't join
+					value = -2000
+				}
+			
+			}
+			else_if = {#Secondary 13 colonies exception
+				limit = { # If scope_adjacent_area_subject is a 13 colonies colony we won't join to it either
+					scope:scope_adjacent_area_subject.capital = {
+						is_in_13_colonies = yes
+					}
+				}
+				value = -2000
+			}
+		}
+	}
+
+	option = { #Join it to first_neighboring_country
+		name = colonial_charter.100.b
+		trigger = {
+			exists = scope:first_neighboring_country
+		}
+
+		if = {
+			limit = {
+				exists = scope:new_town
+			}
+			scope:new_town = {
+				change_location_rank = location_rank:town
+				cc_setup_new_town = yes
+			}
+		}
+
+		scope:target = {
+			change_province_owner = scope:first_neighboring_country
+		}
+
+		ai_will_select = {
+			if = { #13 colonies exception
+				limit = {
+					scope:target = {
+						is_in_13_colonies = yes
+					}
+				}
+				if = {#If first_neighboring_country is already a colony in the area, join it
+					limit = {						
+						scope:first_neighboring_country = {
+							capital.area = scope:target.area
+						}
+					}
+					value = 3000
+				}
+				else = {
+					#If we are part of the 13 colonies and first_neighboring_country does not have its capital in our area we don't join
+					value = -1000
+				}
+			
+			}
+			else_if = {#Secondary 13 colonies exception
+				limit = { # If first_neighboring_country is a 13 colonies colony we won't join to it either
+					scope:first_neighboring_country.capital = {
+						is_in_13_colonies = yes
+					}
+				}
+				value = -1000
+			}
+			#If the first_neighboring_country has its capital in the same Area (or neighboring ones) we prioritize joining to this one
+			else_if = {
+				limit = {
+					scope:first_neighboring_country = {
+						capital = {
+							area = {
+								OR = {
+									this = scope:target.area
+									any_neighbor_area = {
+										this = scope:target.area
+									}
+								}
+							}
+						}
+					}
+				}
+				value = 3000
+			}
+			else = {
+				value = -1000
+			}
+		}
+	}
+
+	option = { #Join it to second_neighboring_country
+		name = colonial_charter.100.c
+		trigger = {
+			exists = scope:second_neighboring_country
+		}
+
+		if = {
+			limit = {
+				exists = scope:new_town
+			}
+			scope:new_town = {
+				change_location_rank = location_rank:town
+				cc_setup_new_town = yes
+			}
+		}
+
+		scope:target = {
+			change_province_owner = scope:second_neighboring_country
+		}
+
+		ai_will_select = {
+			if = { #13 colonies exception
+				limit = {
+					scope:target = {
+						is_in_13_colonies = yes
+					}
+				}
+				if = {#If second_neighboring_country is already a colony in the area, join it
+					limit = {						
+						scope:second_neighboring_country = {
+							capital.area = scope:target.area
+						}
+					}
+					value = 2500
+				}
+				else = {
+					#If we are part of the 13 colonies and second_neighboring_country does not have its capital in our area we don't join
+					value = -500
+				}
+			
+			}
+			else_if = {#Secondary 13 colonies exception
+				limit = { # If second_neighboring_country is a 13 colonies colony we won't join to it either
+					scope:second_neighboring_country.capital = {
+						is_in_13_colonies = yes
+					}
+				}
+				value = -500
+			}
+			#If the second_neighboring_country has its capital in the same Area (or neighboring ones) we prioritize joining to this one
+			else_if = {
+				limit = {
+					scope:second_neighboring_country = {
+						capital = {
+							OR = {
+								area = scope:target.area
+								area = {
+									any_neighbor_area = {
+										this = scope:target.area
+									}
+								}
+							}
+						}
+					}
+				}
+				value = 2500
+			}
+			else = {
+				value = -500
+			}
+		}
+	}
+
+	option = { #Join it to regional_subject
+		name = colonial_charter.100.f
+
+		trigger = {
+			exists = scope:regional_subject
+		}
+
+		if = {
+			limit = {
+				exists = scope:new_town
+			}
+			scope:new_town = {
+				change_location_rank = location_rank:town
+				cc_setup_new_town = yes
+			}
+		}
+
+		scope:target = {
+			change_province_owner = scope:regional_subject
+		}
+
+		ai_will_select = {
+			value = -250
+		}
+	}
+
+	option = { #Keep it as part of the Metropolis
+		name = colonial_charter.100.d
+		
+		scope:target = { 
+			every_location_in_province = {
+				limit = {
+					integration_level = colonized
+				}
+				change_integration_level = integrated
+			}
+		}
+		
+
+		ai_chance = {
+			factor = 1
+			modifier = {
+				trigger = {
+					scope:target = { is_overseas_for_owner = yes }
+				}
+				factor = -1
+			}
+		}
+	}
+
+	option = { #Play as the Colony
 		name = colonial_charter.100.e
 		high_risk_option = yes
 		trigger = {
@@ -692,7 +1071,6 @@ colonial_charter.100 = {
 			}
 			scope:new_town = {
 				change_location_rank = location_rank:town
-				cc_setup_new_town = yes
 			}
 		}
 		scope:target = { 
@@ -715,99 +1093,6 @@ colonial_charter.100 = {
 		}
 	}
 
-	option = {
-		name = colonial_charter.100.b
-		trigger = { 
-			 exists = scope:potential_join_1
-		}
-		
-		if = {
-			limit = {
-				exists = scope:new_town
-			}
-			scope:new_town = {
-				change_location_rank = location_rank:town
-				cc_setup_new_town = yes
-			}
-		}
-		
-		scope:target = { 
-			change_province_owner = scope:potential_join_1
-		}
-	}
-	
-	option = {
-		name = colonial_charter.100.c
-		trigger = { 
-			 exists = scope:potential_join_2
-		}
-		
-		if = {
-			limit = {
-				exists = scope:new_town
-			}
-			scope:new_town = {
-				change_location_rank = location_rank:town
-				cc_setup_new_town = yes
-			}
-		}
-		
-		scope:target = { 
-			change_province_owner = scope:potential_join_2
-		}
-	}
-	
-	option = {
-		name = colonial_charter.100.f
-		ai_chance = {
-			factor = 1000 #make the AI join shit together
-		}
-
-		trigger = { 
-			 exists = scope:potential_join_big_regional_subject
-		}
-		
-		if = {
-			limit = {
-				exists = scope:new_town
-			}
-			scope:new_town = {
-				change_location_rank = location_rank:town
-				cc_setup_new_town = yes
-			}
-		}
-
-		scope:target = { 
-			change_province_owner = scope:potential_join_big_regional_subject
-		}
-	}
-
-	option = {
-		name = colonial_charter.100.d
-
-		ai_chance = {
-			factor = 1
-			modifier = {
-				trigger = {
-					scope:target = { is_overseas_for_owner = yes }
-				}
-				factor = -1
-			}
-		}
-
-		scope:target = { 
-			every_location_in_province = {
-				limit = {
-					NOR = {
-						integration_level = core
-						integration_level = integrated
-					}
-				}
-				change_integration_level = integrated
-			}
-		}
-	}
-
 	after = {
 		trigger_event_silently = treaty_of_tordesillas.1
 	}
@@ -820,6 +1105,7 @@ colonial_charter.200 = {
 	type = country_event
 	title = colonial_charter.200.title
 	desc = colonial_charter.200.desc
+	outcome = neutral
 
 	immediate = {
 		scope:target = {
@@ -834,3 +1120,4 @@ colonial_charter.200 = {
 		add_prestige = prestige_weak_penalty	#you are already punished hard enough by losing that colonial charter, no reason to add more penalties
 	}
 }
+

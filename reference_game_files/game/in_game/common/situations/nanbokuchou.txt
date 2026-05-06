@@ -121,26 +121,10 @@
 				if = {
 					limit = { has_variable = supports_northern_court }
 					add_to_global_variable_list = { name = nanbokuchou_northern_supporters target = this }
-					situation:nanbokuchou = {
-						set_vote = {
-							voter = prev
-							resolution = resolution:nanbokuchou_resolution
-							vote = c:STC
-							locked = yes
-						}
-					}
 				}
 				if = {
 					limit = { has_variable = supports_southern_court }
 					add_to_global_variable_list = { name = nanbokuchou_southern_supporters target = this }
-					situation:nanbokuchou = {
-						set_vote = {
-							voter = prev
-							resolution = resolution:nanbokuchou_resolution
-							vote = c:STC
-							locked = yes
-						}
-					}
 				}
 				if = {
 					limit = {
@@ -148,13 +132,26 @@
 						NOT = { has_variable = supports_southern_court }
 					}
 					add_to_global_variable_list = { name = nanbokuchou_neutral_countries target = this }
-					situation:nanbokuchou = {
-						set_vote = {
-							voter = prev
-							resolution = resolution:nanbokuchou_resolution
-							locked = yes
-						}
-					}
+				}
+			}
+		}
+
+		# Cache per-country CB/war target flags to avoid O(N²) checks inside random_list
+		international_organization:japanese_shogunate = {
+			every_international_organization_member = {
+				if = {
+					limit = { is_valid_nanbokuchou_cb_target = yes }
+					set_variable = nanbokuchou_has_valid_cb_target
+				}
+				else = {
+					remove_variable = nanbokuchou_has_valid_cb_target
+				}
+				if = {
+					limit = { is_valid_nanbokuchou_war_target = yes }
+					set_variable = nanbokuchou_has_valid_war_target
+				}
+				else = {
+					remove_variable = nanbokuchou_has_valid_war_target
 				}
 			}
 		}
@@ -220,6 +217,7 @@
 										opinion = {	target = c:NTC value <= -50 }
 									}
 									opinion = { target = c:STC value >= 0 }
+									c:STC ?= { has_ruler = yes }
 								}
 								AND = {
 									has_variable = supports_southern_court
@@ -234,6 +232,7 @@
 										}
 										opinion = {	target = c:NTC value >= 0 }
 									}
+									c:NTC ?= { has_ruler = yes }
 								}
 							}
 						}
@@ -264,13 +263,13 @@
 				trigger = {
 					international_organization:japanese_shogunate = {
 						any_international_organization_member = {
-							is_valid_nanbokuchou_cb_target = yes
+							has_variable = nanbokuchou_has_valid_cb_target
 						}
 					}
 				}
 				international_organization:japanese_shogunate = {
 					random_international_organization_member = {
-						limit = { is_valid_nanbokuchou_cb_target = yes }
+						limit = { has_variable = nanbokuchou_has_valid_cb_target }
 						trigger_event_non_silently = nanbokuchou.6
 					}
 				}
@@ -280,14 +279,13 @@
 				trigger = {
 					international_organization:japanese_shogunate = {
 						any_international_organization_member = {
-							is_subject = no
-							is_valid_nanbokuchou_war_target = yes
+							has_variable = nanbokuchou_has_valid_war_target
 						}
 					}
 				}
 				international_organization:japanese_shogunate = {
 					random_international_organization_member = {
-						limit = { is_valid_nanbokuchou_war_target = yes }
+						limit = { has_variable = nanbokuchou_has_valid_war_target }
 						trigger_event_non_silently = nanbokuchou.7
 					}
 				}
@@ -306,7 +304,14 @@
 					}
 				}
 				international_organization:japanese_shogunate = {
-					every_international_organization_member = {
+					random_international_organization_member = {
+						limit = {
+							NOT = { tag = NTC }
+							NOT = { tag = STC }
+							has_ruler = yes
+							has_regent = no
+							ruler.dynasty ?= dynasty:yamato_dynasty
+						}
 						trigger_event_non_silently = nanbokuchou.8
 					}
 				}
@@ -337,6 +342,16 @@
 
 	on_ended = {
 		international_organization:japanese_shogunate = {
+			random_international_organization_member = {
+				limit = {
+					has_special_status_in_international_organization = {
+						type = special_status:japanese_emperor
+						international_organization = international_organization:japanese_shogunate
+					}
+				}
+				save_scope_as = target_emperor
+				ruler_or_heir_if_regent = { save_scope_as = target_character }
+			}
 			every_international_organization_member = { 
 				if = {
 					limit = { has_country_modifier = jap_nanbokuchou }

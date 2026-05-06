@@ -12,7 +12,18 @@
 	automation_tick = monthly
 	automation_tick_frequency = 6
 	player_automated_category = estates
-	
+
+	ai_prerequisite = {
+		any_estate = {
+			satisfaction < 0.3
+			monthly_satisfaction_change < {
+				value = target_satisfaction
+				subtract = satisfaction
+				divide = 12
+			}
+			estate_tax_base > 0.01
+		}
+	}
 
 	select_trigger = {
 		looking_for_a = estate
@@ -84,10 +95,12 @@
 				}
 			}
 
-			# Add negative score based on the cost
-			add = {
+			# Add negative score based on the cost relative to treasury
+			subtract = {
 				desc = "Gold Cost"
-				value = "scope:actor.currency_utility(gold|scope:cost)"
+				value = scope:target.estate_tax_base
+				divide = scope:actor.gold
+				multiply = 30
 			}
 
 			#Calculation on the basis of Estate Power 0 - 100
@@ -130,6 +143,101 @@
 				multiply = 20
 			}
 		}
+	}
+}
+
+
+
+perform_reduction = {
+	type = owncountry
+	#sound = BRIBE_ESTATE
+	potential = {
+	}
+
+	allow = {
+	}
+
+	ai_tick = never
+	ai_tick_frequency = 180
+	automation_tick = never
+	automation_tick_frequency = 6
+	player_automated_category = estates
+	
+
+	select_trigger = {
+		looking_for_a = estate
+		source = actor
+		target_flag = target
+		name = "mission_select_estate"
+		column = {
+			data = name
+		}
+		enabled = {
+			
+			num_buildings_owned_by_estate > 0
+			power < 0.9
+			satisfaction > 0.5
+		}
+	}
+
+
+	effect = {
+	
+	
+	
+		scope:actor = {
+	
+			add_gold = {
+				value = scope:target.estate_tax_base
+				multiply = 2
+			}
+
+			add_gold_to_estate = {
+				estate_type = scope:target.estate_type
+				value = {
+					value = scope:target.estate_tax_base
+					multiply = -2
+				}
+			}
+
+
+			add_estate_satisfaction = { 
+				type = scope:target.estate_type
+				value = {
+					value = estate_satisfaction_radical_penalty
+					multiply = {
+						value = 1
+						add = scope:actor.modifier:estate_building_destruction_satisfaction_impact
+					}
+					max = 0
+				}
+			}
+		}
+		scope:target = {
+			ordered_building_owned_by_estate = {
+				order_by = location.local_control
+				check_range_bounds = no
+				max = {
+					add = 2
+					add = {
+						value = scope:actor.num_locations
+						divide = 20
+					}
+					max = 20
+				}
+					
+				limit = {
+					building_type != building_type:cathedral
+				}
+			
+			
+				location = { destroy_building = prev }
+			}
+		}
+	}
+	
+	ai_will_do = {
+		add = -1000
 	}
 }
 
