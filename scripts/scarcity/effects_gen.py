@@ -225,7 +225,7 @@ def gen_scarcity_score_file() -> str:
                 lines.append(
                     f"{ind}if = {{ limit = {{ market ?= {{ is_target_in_global_variable_list = "
                     f"{{ name = {lst:<52} target = this }} }} }} "
-                    f"change_variable = {{ name = {score_var}  value = {delta:.5f} }} }}"
+                    f"change_variable = {{ name = {score_var}  add = {delta:.5f} }} }}"
                 )
 
         lines.append(

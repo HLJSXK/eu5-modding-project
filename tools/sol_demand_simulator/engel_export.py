@@ -66,7 +66,7 @@ BUDGET_SHARES_FILE = (
 #     Substitute groups force pops to buy the cheapest available good rather than the
 #     group average the simulator assumes.  When goods are scarce (high prices), actual
 #     spending falls; when cheap, it rises.
-#     In-game correction: variable:sol_market_scarcity_adj, cached yearly per location,
+#     In-game correction: var:sol_market_scarcity_adj_<strata>, cached yearly per location,
 #     range [0.80, 1.20] based on a 5-good market basket.
 #
 # Both in-game corrections are injected as multiply lines in the demand-scale blocks
@@ -688,7 +688,7 @@ def export_demand_scales_with_offset(
         "#                             Corrects for progressive goods unlock: simulator assumes the\n",
         "#                             full goods catalogue; early-game missing slots reduce spending.\n",
         "#                             Starts at 2.0, decays ×0.95 per era as more goods unlock.\n",
-        "#   sol_market_scarcity_adj_<strata> = variable:sol_market_scarcity_adj_<strata> on each location\n",
+        "#   sol_market_scarcity_adj_<strata> = var:sol_market_scarcity_adj_<strata> on each location\n",
         "#                             Per-stratum market price correction weighted by budget shares.\n",
         "#                             Cached yearly per location by SOL_compute_scarcity_score_<strata>.\n",
         "#                             Natural range varies by stratum spending pattern (no hard cap).\n",

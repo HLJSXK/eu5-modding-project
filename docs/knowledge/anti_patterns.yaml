@@ -197,3 +197,30 @@
   scope: any
   source: "reference_game_files/game/main_menu/gui/shared/font_icons.gui"
   notes: "EU5 has 180+ pre-defined inline icons via the @xxx! texticon system; skipping this check causes unnecessary widget complexity and misses the preferred engine-native approach"
+
+- id: variable_prefix_must_be_var
+  pattern: '\bvariable:[a-zA-Z_]'
+  bad: "variable:NAME as an event-target / value reference (e.g. value = variable:foo, multiply = variable:foo, add = variable:foo)"
+  correction: "Use the short form: var:NAME (e.g. value = var:foo). EU5/Jomini's event-target link prefix for scope variables is 'var', not 'variable'. The long form does not resolve."
+  category: scripted_values
+  scope: any
+  source: "reference_game_files/game/in_game/common/attribute_columns/06_country.txt:149"
+  notes: "Engine error: 'Failed to find a valid event target link variable:NAME' / 'Cannot read [variable:NAME] as a script value'. The set_variable / change_variable / has_variable effects all use the keyword 'variable' inside their own block (name = NAME, value = X), but READING a variable elsewhere in script_values, triggers, or modifier values requires the var: prefix. Comments in source files often informally write 'variable:foo' for documentation — never copy that into actual code."
+
+- id: change_variable_value_op_invalid
+  pattern: 'change_variable\s*=\s*\{[^}]*\bvalue\s*='
+  bad: "change_variable = { name = X  value = Y } — value is not a valid operation for change_variable"
+  correction: "Use change_variable = { name = X  add = Y } (or subtract / multiply / divide). Negative literals are fine for add: e.g. add = -0.00020. value = is reserved for set_variable."
+  category: scripted_values
+  scope: any
+  source: "EU5 engine error: 'change_variable effect [ No operation specified ]'"
+  notes: "set_variable accepts 'value = X' (absolute assignment); change_variable does NOT — it requires an operation keyword (add/subtract/multiply/divide). Mixing them up emits a runtime PostValidate error and the change is silently dropped. Often introduced by codegen scripts that mirror set_variable templates without adapting the op keyword."
+
+- id: global_var_init_lobby_only
+  pattern: ''
+  bad: "Initialising a global_variable referenced by script_values exclusively from a post-lobby on_action (e.g. gls_init_after_lobby), with no on_game_start fallback"
+  correction: "Also register the same init effect under on_game_start so the global is set before any script_value referencing 'global_var:NAME' is first evaluated; lobby-time init alone leaves a brief window during new-game start where pop/market script_value evaluation emits 'Failed to fetch variable for NAME due to not being set' and 'Got value of type none' warnings, propagating to caller script_values"
+  category: scope
+  scope: global
+  source: "src/stable/in_game/common/on_action/SOL_economy_on_actions.txt (sol_economy_game_start)"
+  notes: "EU5 evaluates pop demand script_values during the early game-start window before custom post-lobby on_actions fire. global_var lookups inside multiply/add ops produce loud error.log spam if unset. Fix: hook the same init effect to on_game_start as a sibling on_action handler — idempotent, safe to run twice."
