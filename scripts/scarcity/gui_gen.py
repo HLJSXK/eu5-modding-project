@@ -203,42 +203,52 @@ def gen_group_ratio_templates(prices: dict) -> str:
         "# ============================================================",
         "",
     ]
+
+    # Build reverse map: good → [(grp, members), ...] preserving DEMAND_GROUPS order
+    good_to_groups: dict = {}
     for grp, members in DEMAND_GROUPS:
-        grp_title_key = f"SOL_TT_{grp.upper()}_TITLE"
+        for good in members:
+            good_to_groups.setdefault(good, []).append((grp, members))
+
+    # Emit exactly one template per unique good; goods in multiple groups get one vbox per group
+    seen: set = set()
+    for _grp, members in DEMAND_GROUPS:
         for a in members:
+            if a in seen:
+                continue
+            seen.add(a)
             a_icon = _good_icon(a)
-            lines += [
-                f"template SOL_subst_ratios_{a} {{",
-                f"\tvbox = {{",
-                f"\t\tlayoutpolicy_horizontal = expanding",
-                f"\t\tspacing = 3",
-                f"\t\tmargin = {{ 4 4 }}",
-                f"\t\tusing = bg_listbase_template",
-                f'\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = "{grp_title_key}" }}',
-            ]
-            for b in members:
-                if b == a:
-                    continue
-                b_icon = _good_icon(b)
+            lines.append(f"template SOL_subst_ratios_{a} {{")
+            for grp_key, grp_members in good_to_groups[a]:
+                grp_title_key = f"SOL_TT_{grp_key.upper()}_TITLE"
                 lines += [
-                    f"\t\thbox = {{",
-                    f"\t\t\tlayoutpolicy_horizontal = expanding",
-                    f"\t\t\tspacing = 6",
-                    f"\t\t\thbox = {{",
-                    f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_FROM_{a}" }}',
-                    f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{a_icon}" }}',
-                    f"\t\t\t}}",
-                    f"\t\t\thbox = {{",
-                    f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_RATIO_{a}_{b}" }}',
-                    f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{b_icon}" }}',
-                    f"\t\t\t}}",
-                    f"\t\t}}",
+                    f"\tvbox = {{",
+                    f"\t\tlayoutpolicy_horizontal = expanding",
+                    f"\t\tspacing = 3",
+                    f"\t\tmargin = {{ 4 4 }}",
+                    f"\t\tusing = bg_listbase_template",
+                    f'\t\ttext_single = {{ layoutpolicy_horizontal = expanding text = "{grp_title_key}" }}',
                 ]
-            lines += [
-                f"\t}}",
-                f"}}",
-                f"",
-            ]
+                for b in grp_members:
+                    if b == a:
+                        continue
+                    b_icon = _good_icon(b)
+                    lines += [
+                        f"\t\thbox = {{",
+                        f"\t\t\tlayoutpolicy_horizontal = expanding",
+                        f"\t\t\tspacing = 6",
+                        f"\t\t\thbox = {{",
+                        f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_FROM_{a}" }}',
+                        f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{a_icon}" }}',
+                        f"\t\t\t}}",
+                        f"\t\t\thbox = {{",
+                        f'\t\t\t\ttext_single = {{ text = "SOL_SUBST_RATIO_{a}_{b}" }}',
+                        f'\t\t\t\ticon = {{ size = {{ 20 20 }} texture = "{b_icon}" }}',
+                        f"\t\t\t}}",
+                        f"\t\t}}",
+                    ]
+                lines.append(f"\t}}")
+            lines += [f"}}", f""]
     return "\n".join(lines) + "\n"
 
 
