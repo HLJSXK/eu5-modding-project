@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-07 (Market-hub-location scarcity score caching to fix Jan-1 frame spike)
+> Last updated: 2026-05-07 (Market-hub scarcity score caching + sol_era_coeff start lowered 2.0 → 1.5)
 
 ## Project Identity
 
@@ -113,5 +113,5 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 - **Market-hub caching for scarcity scores** — `sol_market_scarcity_adj_<strata>` is stored on each market's trade-center location (`market.location`) and shared by every owned location in that market. Computed once per market per year by `SOL_update_market_scarcity_scores` (in `z_SOL_scarcity_score.txt`), wrapping the 5 stratum effects in `every_market_in_world = { location = { ... } }`. Readers in `SOL_pop_values.txt` fetch via `market.location.var:sol_market_scarcity_adj_<strata>`; the SOL panel GUI reads via `Player.GetCapital.GetMarket.GetCenterLocation.MakeScope.GetVariable(...)`. Replaces the former per-owned-location computation that ran the 5 stratum effects on every land location each January, eliminating the Jan-1 frame spike.
 - **Country-level aggregation** — savings pressure per pop stratum, SOL per stratum, feeds the situation panel.
 - **Hidden shim** in `SOL_goods_demand_values.txt`: dev-scaling cancellation (`×10 ÷ location.development`) — intentional, do not remove.
-- **Dynamic export alpha coefficient** — `global_var:sol_era_coeff` (init 2.0, decays ×0.95/era via `sol_update_export_adj_era`) and five per-stratum `local_sol_scarcity_adj_<strata>` script_values (budget-share-weighted market price correction) are injected into every demand-scale block in `z_SOL_group_demand_scales_location.txt`. Replaces the former baked-in EXPORT_ALPHA_MULTIPLIER = 2.0 in `engel_export.py`.
+- **Dynamic export alpha coefficient** — `global_var:sol_era_coeff` (init 1.5 at Age 1, decays ×0.95/era to 1.16067 by Age 6 via `sol_update_export_adj_era`) and five per-stratum `local_sol_scarcity_adj_<strata>` script_values (budget-share-weighted market price correction) are injected into every demand-scale block in `z_SOL_group_demand_scales_location.txt`. Replaces the former baked-in EXPORT_ALPHA_MULTIPLIER = 2.0 in `engel_export.py`. Starting value tuned down from 2.0 to 1.5 (2026-05-07) to address early-game over-compensation.
 - **Per-stratum scarcity corrections** — Each stratum gets its own `sol_market_scarcity_adj_<strata>` market-hub-location variable (see Market-hub caching above), computed yearly by `SOL_compute_scarcity_score_<strata>` in `z_SOL_scarcity_score.txt`. Deltas are weighted by that stratum's average budget share per indicator group; delta formula: `-(1 − 1/P_tier) × α_{strata,grp} / n_grp`. Natural max: severe shortage → adj ≥ 0.435; vcheap surplus → adj ≤ 2.5. No hard cap; `min = 0` in demand scales is the safety floor.
