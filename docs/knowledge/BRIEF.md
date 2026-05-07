@@ -23,7 +23,7 @@
 
 5. **Colonial Restrictions** — AI requires a tax base of 1000 (vs. vanilla 100) to colonize. Colonial nations restricted to capital-region colonization. Historical colonizers (Portugal, Spain, England, etc.) are exempt.
 
-6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 6-tier price-scarcity system, and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Market price corrections are per-stratum and budget-share-weighted: commoner demand reacts strongly to staple food prices; noble demand reacts to luxury goods prices. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
+6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 7-tier price-scarcity system (3 shortage + 3 surplus + 1 absent), and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Goods completely absent from a market (neither produced nor traded) are flagged via `sol_good_<good>_absent` and receive a vcheap-equivalent correction in the income=spending scarcity adj, while their substitution weight remains 1.0 (pops don't seek substitutes for goods they've never encountered). Market price corrections are per-stratum and budget-share-weighted: commoner demand reacts strongly to staple food prices; noble demand reacts to luxury goods prices. UI shows "Unknown/未知" instead of "Normal" for absent goods. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
 
 ## Directory Structure
 
@@ -176,7 +176,7 @@ Also: `gen_scarcity.py` is now split into focused submodules under `scripts/scar
 | Scripted Triggers | 488 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
 | Scripted Effects | 479 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2301 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 615 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 616 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 

@@ -21,7 +21,9 @@ SURPLUS_TIERS: List[Tuple[str, float, float, str]] = [
     ("affordable",0.85, 1.25, "SOL_WEIGHT_CHEAP_1"),
 ]
 
-ALL_TIER_SUFFIXES = [t[0] for t in SHORTAGE_TIERS + SURPLUS_TIERS]
+ABSENT_SUFFIX = "absent"
+
+ALL_TIER_SUFFIXES = [t[0] for t in SHORTAGE_TIERS + SURPLUS_TIERS] + [ABSENT_SUFFIX]
 
 # ── Indicator groups (PRIMARY GROUP) ─────────────────────────────────────────
 # Each good appears in exactly one indicator group — its PRIMARY GROUP.
@@ -225,6 +227,11 @@ TIER_PRICE_THRESHOLDS: dict[str, float] = {
 TIER_EXACT_FACTORS: dict[str, float] = {
     k: -(1.0 - 1.0 / v) for k, v in TIER_PRICE_THRESHOLDS.items()
 }
+
+# Absent goods (not produced AND not traded in market) use vcheap-equivalent factor.
+# P → 0 makes the formula diverge; treating absent = vcheap is a practical cap that
+# ensures the freed budget share is absorbed by other goods via the adj multiplier.
+ABSENT_FACTOR: float = TIER_EXACT_FACTORS["vcheap"]  # 1.5
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 

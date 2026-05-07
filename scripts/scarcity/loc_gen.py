@@ -26,6 +26,7 @@ NEW_LOC_KEYS_EN = [
     ("SOL_TT_STATUS_AFFORDABLE", '#G Affordable#!'),
     ("SOL_TT_STATUS_CHEAP",      '#G Cheap#!'),
     ("SOL_TT_STATUS_VCHEAP",     '#G Very Cheap#!'),
+    ("SOL_TT_STATUS_ABSENT",     'Unknown'),
     ("SOL_PANEL_SCARCITY_TITLE", "Substitute Groups — Capital Market"),
 ]
 
@@ -44,6 +45,7 @@ NEW_LOC_KEYS_ZH = [
     ("SOL_TT_STATUS_AFFORDABLE", '#G 低廉#!'),
     ("SOL_TT_STATUS_CHEAP",      '#G 便宜#!'),
     ("SOL_TT_STATUS_VCHEAP",     '#G 极度便宜#!'),
+    ("SOL_TT_STATUS_ABSENT",     '未知'),
     ("SOL_PANEL_SCARCITY_TITLE", "替代商品组——首都市场"),
 ]
 

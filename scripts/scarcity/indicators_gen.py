@@ -7,6 +7,7 @@ from ._data import (
     SHORTAGE_TIERS, SURPLUS_TIERS,
     INDICATOR_GROUPS, COMPAT_GOODS, GOOD_TO_IND_GROUP, IND_GROUP_SIZE,
     DEMAND_GROUPS, DEMAND_GROUP_SIZE,
+    ABSENT_SUFFIX,
     _good_list_name,
 )
 
@@ -15,12 +16,13 @@ INDICATORS_HEADER = """\
 ### ============================================================
 ### SECTION: Per-Good Scarcity Tier Indicators (GUI tooltip helpers)
 ### ============================================================
-# Per good, this file emits five script values (all evaluated at location scope
+# Per good, this file emits six script values (all evaluated at location scope
 # via Location.MakeScope.ScriptValue):
 #
 #   sol_good_<good>_scarcity_tier  — int 0–3: 0=normal, 1=mild, 2=moderate, 3=severe
 #   sol_good_<good>_surplus_tier   — int 0–3: 0=normal, 1=affordable, 2=cheap, 3=very cheap
 #   sol_good_<good>_scarce         — binary 1 if any scarcity tier (backward compat)
+#   sol_good_<good>_absent         — binary 1 if good is neither produced nor traded in market
 #   sol_weight_indicator_<good>    — float 0.25–2.00 (effective weight for display)
 #   sol_demand_share_<good>        — float 0–100 (% share within indicator group)
 #
@@ -88,6 +90,11 @@ def _gen_good_indicators(good: str) -> List[str]:
             lines.append(f"    {kw} = {{ limit = {{ sol_pp_victuals_compat_is_on = yes {_list_check(good, suffix)} }} value = 1 }}")
         else:
             lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = 1 }}")
+    lines.append("}")
+
+    lines.append(f"sol_good_{good}_absent = {{")
+    lines.append(f"    value = 0")
+    lines.append(f"    if = {{ limit = {{ {_list_check(good, ABSENT_SUFFIX)} }} value = 1 }}")
     lines.append("}")
 
     if is_compat:

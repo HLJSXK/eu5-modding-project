@@ -1,7 +1,7 @@
 # EU5 Mod — Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-05-07 (Added sync_reference.py; refreshed reference_game_files to EU5 1.2)
+> Last updated: 2026-05-07 (Added 7th absent tier to SOL scarcity system; UI shows Unknown for absent goods)
 
 ## Project Identity
 
@@ -22,7 +22,7 @@
 
 5. **Colonial Restrictions** — AI requires a tax base of 1000 (vs. vanilla 100) to colonize. Colonial nations restricted to capital-region colonization. Historical colonizers (Portugal, Spain, England, etc.) are exempt.
 
-6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 6-tier price-scarcity system, and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Market price corrections are per-stratum and budget-share-weighted: commoner demand reacts strongly to staple food prices; noble demand reacts to luxury goods prices. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
+6. **Standard of Living (SOL) System** *(primary feature)* — Replaces static vanilla pop demands with dynamic, income-aware Engel curves. Implements 20 substitute-goods groups, a 7-tier price-scarcity system (3 shortage + 3 surplus + 1 absent), and location-level demand caching. Pops shift consumption to cheaper substitutes when goods are scarce. Goods completely absent from a market (neither produced nor traded) are flagged via `sol_good_<good>_absent` and receive a vcheap-equivalent correction in the income=spending scarcity adj, while their substitution weight remains 1.0 (pops don't seek substitutes for goods they've never encountered). Market price corrections are per-stratum and budget-share-weighted: commoner demand reacts strongly to staple food prices; noble demand reacts to luxury goods prices. UI shows "Unknown/未知" instead of "Normal" for absent goods. Feeds back into a country-level SOL situation with a dedicated UI panel and map overlay.
 
 ## Directory Structure
 
