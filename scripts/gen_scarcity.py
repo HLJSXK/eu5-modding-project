@@ -98,6 +98,7 @@ def main() -> None:
 
     if not dry:
         print("\nDone. Run next:")
+        print("  conda run -n eu5 python scripts/sync_location_window.py")
         print("  conda run -n eu5 python scripts/gen_sol_ui.py --target tooltips")
         print("  conda run -n eu5 python scripts/validate.py --changed")
 

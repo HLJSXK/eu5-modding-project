@@ -558,8 +558,15 @@ def gen_effects_phase_g(estate: str) -> str:
 
 # ── Target runners ────────────────────────────────────────────────────────────
 
+# DISABLED for EU5 v1.2 compatibility.
+# The demography_item block was redesigned in 1.2; the fixed-width row can no
+# longer accommodate 4 substitute-group icons per stratum without layout breakage.
+# Use scripts/sync_location_window.py to rebuild location_window.gui instead.
 def run_location(dry_run: bool) -> None:
-    replace_section(LOCATION_WINDOW, "substitute_icons", gen_substitute_icons(), dry_run)
+    raise SystemExit(
+        "ERROR: --target location is disabled (EU5 v1.2 incompatible).\n"
+        "Run  conda run -n eu5 python scripts/sync_location_window.py  to sync location_window.gui."
+    )
 
 def run_tooltips(dry_run: bool) -> None:
     replace_section(TOOLTIP_FILE, "templates", gen_substitute_tooltips(), dry_run)
@@ -600,7 +607,11 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    runners = list(TARGETS.values()) if args.target == "all" else [TARGETS[args.target]]
+    runners = (
+        [fn for name, fn in TARGETS.items() if name != "location"]
+        if args.target == "all"
+        else [TARGETS[args.target]]
+    )
     for runner in runners:
         runner(args.dry_run)
 
