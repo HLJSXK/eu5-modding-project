@@ -1,32 +1,36 @@
 ﻿##############################################################
 # SOL goods demand script values
 # Scope: pop
-# Single-group formula: (weight / group_total_weight) × N × demand_scale / (development/10)
-# Multi-group formula:  Σ_g (group_weight_g / group_total_g) × N_g × scale_g / (development/10)
+# Single-group formula: (weight / group_total_weight) × N × demand_scale × 20/(20+development)
+# Multi-group formula:  Σ_g (group_weight_g / group_total_g) × N_g × scale_g × 20/(20+development)
 # Weight and preference logic: SOL_goods_weight_values.txt
 #
-# ── DEVELOPMENT CANCELLATION SHIM ─────────────────────────────────────────
-# Every single-group demand block divides by (development / 10):
-#   divide = { value = location.development  min = 1 }
-#   multiply = 10
-# Reason: the EU5 engine silently multiplies ALL pop demands by (development / 10).
-# Pre-dividing by the same factor cancels it exactly to 1, making demand
-# fully development-neutral and identical to the simulator's prediction:
-#   net in-game demand = simulator_scale × (10/development) × (development/10) = scale
+# ── DEVELOPMENT CANCELLATION SHIM (updated for EU5 1.2) ──────────────────
+# Every single-group demand block multiplies by 20 then divides by SOL_dev_demand_divisor:
+#   multiply = 20
+#   divide = SOL_dev_demand_divisor   # = 20 + location.development
+# Reason: EU5 1.2 engine silently multiplies ALL pop demands by (1 + development/20).
+# Pre-multiplying by 20/(20+development) cancels it exactly to 1:
+#   net in-game demand = simulator_scale × 20/(20+dev) × (1+dev/20)
+#                      = simulator_scale × 20/(20+dev) × (20+dev)/20
+#                      = simulator_scale
 #
-# min = 1 on the divisor prevents div/0 for locations with development = 0.
-# At dev=0 the engine also multiplies by 0, so demand is always 0 there anyway;
-# the guard merely avoids the engine crash.
+# SOL_dev_demand_divisor is defined just below (value=20, add=location.development).
+# Its minimum is 20 (when development=0), so no div/0 risk; no min guard needed.
 #
-# DO NOT collapse to bare "divide = location.development" -- that gives net 1/10.
-# DO NOT remove the divide+multiply pair -- without them high-dev locations have
-# demand (development/10)× higher than the simulator predicts.
+# DO NOT remove the multiply+divide pair -- without them high-dev locations have
+# demand (1+development/20)× higher than the simulator predicts.
 #
 # The displayed demand scale in z_SOL_group_demand_scales.txt and
 # z_SOL_group_demand_scales_location.txt is NOT divided -- it shows the pure
 # economic scale for UI readability.
 # ─────────────────────────────────────────────────────────────────────────────
 ##############################################################
+
+SOL_dev_demand_divisor = {
+	value = 20
+	add = location.development
+}
 
 # ── GROUP 1: BASIC_CLOTHING (N=2) ──────────────────────────
 
@@ -35,8 +39,8 @@ SOL_cloth_basic_clothing_demand = {
 	divide = SOL_basic_clothing_total_weight
 	multiply = 2
 	multiply = { value = sol_basic_clothing_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_leather_demand = {
@@ -44,8 +48,8 @@ SOL_leather_demand = {
 	divide = SOL_basic_clothing_total_weight
 	multiply = 2
 	multiply = { value = sol_basic_clothing_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 2: CRUDE_GOODS (N=4) ─────────────────────────────
@@ -55,8 +59,8 @@ SOL_lumber_crude_goods_demand = {
 	divide = SOL_crude_goods_total_weight
 	multiply = 4
 	multiply = { value = sol_crude_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_masonry_demand = {
@@ -64,8 +68,8 @@ SOL_masonry_demand = {
 	divide = SOL_crude_goods_total_weight
 	multiply = 4
 	multiply = { value = sol_crude_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_tools_demand = {
@@ -73,8 +77,8 @@ SOL_tools_demand = {
 	divide = SOL_crude_goods_total_weight
 	multiply = 4
 	multiply = { value = sol_crude_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_pottery_crude_goods_demand = {
@@ -82,8 +86,8 @@ SOL_pottery_crude_goods_demand = {
 	divide = SOL_crude_goods_total_weight
 	multiply = 4
 	multiply = { value = sol_crude_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 3: STAPLE (N=6) ──────────────────────────────────
@@ -93,8 +97,8 @@ SOL_wheat_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_rice_demand = {
@@ -102,8 +106,8 @@ SOL_rice_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_millet_demand = {
@@ -111,8 +115,8 @@ SOL_millet_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_maize_demand = {
@@ -120,8 +124,8 @@ SOL_maize_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_potato_demand = {
@@ -129,8 +133,8 @@ SOL_potato_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_legumes_demand = {
@@ -138,8 +142,8 @@ SOL_legumes_demand = {
 	divide = SOL_staple_total_weight
 	multiply = 6
 	multiply = { value = sol_staple_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 4: CONDIMENTS (N=3) ──────────────────────────────
@@ -149,8 +153,8 @@ SOL_sugar_demand = {
 	divide = SOL_condiments_total_weight
 	multiply = 3
 	multiply = { value = sol_condiments_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_salt_demand = {
@@ -158,8 +162,8 @@ SOL_salt_demand = {
 	divide = SOL_condiments_total_weight
 	multiply = 3
 	multiply = { value = sol_condiments_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_olives_demand = {
@@ -167,8 +171,8 @@ SOL_olives_demand = {
 	divide = SOL_condiments_total_weight
 	multiply = 3
 	multiply = { value = sol_condiments_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 5: HEATING (N=3) ─────────────────────────────────
@@ -178,8 +182,8 @@ SOL_lumber_heating_demand = {
 	divide = SOL_heating_total_weight
 	multiply = 3
 	multiply = { value = sol_heating_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_coal_demand = {
@@ -187,8 +191,8 @@ SOL_coal_demand = {
 	divide = SOL_heating_total_weight
 	multiply = 3
 	multiply = { value = sol_heating_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_beeswax_heating_demand = {
@@ -196,8 +200,8 @@ SOL_beeswax_heating_demand = {
 	divide = SOL_heating_total_weight
 	multiply = 3
 	multiply = { value = sol_heating_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 6: HOUSEHOLD (N=5) ───────────────────────────────
@@ -207,8 +211,8 @@ SOL_furniture_demand = {
 	divide = SOL_household_total_weight
 	multiply = 5
 	multiply = { value = sol_household_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_pottery_household_demand = {
@@ -216,8 +220,8 @@ SOL_pottery_household_demand = {
 	divide = SOL_household_total_weight
 	multiply = 5
 	multiply = { value = sol_household_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_glass_household_demand = {
@@ -225,8 +229,8 @@ SOL_glass_household_demand = {
 	divide = SOL_household_total_weight
 	multiply = 5
 	multiply = { value = sol_household_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_paper_household_demand = {
@@ -234,8 +238,8 @@ SOL_paper_household_demand = {
 	divide = SOL_household_total_weight
 	multiply = 5
 	multiply = { value = sol_household_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_beeswax_household_demand = {
@@ -243,8 +247,8 @@ SOL_beeswax_household_demand = {
 	divide = SOL_household_total_weight
 	multiply = 5
 	multiply = { value = sol_household_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 7: STANDARD_CLOTHING (N=2) ───────────────────────
@@ -254,8 +258,8 @@ SOL_cloth_standard_clothing_demand = {
 	divide = SOL_standard_clothing_total_weight
 	multiply = 2
 	multiply = { value = sol_standard_clothing_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_fine_cloth_standard_clothing_demand = {
@@ -263,8 +267,8 @@ SOL_fine_cloth_standard_clothing_demand = {
 	divide = SOL_standard_clothing_total_weight
 	multiply = 2
 	multiply = { value = sol_standard_clothing_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 8: INTOXICANTS (N=4) ─────────────────────────────
@@ -274,8 +278,8 @@ SOL_wine_intoxicants_demand = {
 	divide = SOL_intoxicants_total_weight
 	multiply = 4
 	multiply = { value = sol_intoxicants_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_beer_demand = {
@@ -283,8 +287,8 @@ SOL_beer_demand = {
 	divide = SOL_intoxicants_total_weight
 	multiply = 4
 	multiply = { value = sol_intoxicants_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_liquor_demand = {
@@ -292,8 +296,8 @@ SOL_liquor_demand = {
 	divide = SOL_intoxicants_total_weight
 	multiply = 4
 	multiply = { value = sol_intoxicants_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_tobacco_demand = {
@@ -301,8 +305,8 @@ SOL_tobacco_demand = {
 	divide = SOL_intoxicants_total_weight
 	multiply = 4
 	multiply = { value = sol_intoxicants_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 9: LUXURY_DRINKS (N=4) ───────────────────────────
@@ -312,8 +316,8 @@ SOL_tea_demand = {
 	divide = SOL_luxury_drinks_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_drinks_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_coffee_demand = {
@@ -321,8 +325,8 @@ SOL_coffee_demand = {
 	divide = SOL_luxury_drinks_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_drinks_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_wine_luxury_drinks_demand = {
@@ -330,8 +334,8 @@ SOL_wine_luxury_drinks_demand = {
 	divide = SOL_luxury_drinks_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_drinks_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_cocoa_demand = {
@@ -339,8 +343,8 @@ SOL_cocoa_demand = {
 	divide = SOL_luxury_drinks_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_drinks_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 10: LUXURY_FOOD (N=4) ────────────────────────────
@@ -350,8 +354,8 @@ SOL_wild_game_luxury_food_demand = {
 	divide = SOL_luxury_food_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_food_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_victuals_demand = {
@@ -359,8 +363,8 @@ SOL_victuals_demand = {
 	divide = SOL_luxury_food_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_food_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_fruit_demand = {
@@ -368,8 +372,8 @@ SOL_fruit_demand = {
 	divide = SOL_luxury_food_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_food_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_fish_luxury_food_demand = {
@@ -377,8 +381,8 @@ SOL_fish_luxury_food_demand = {
 	divide = SOL_luxury_food_total_weight
 	multiply = 4
 	multiply = { value = sol_luxury_food_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 11: LUXURY_GOODS (N=6) ───────────────────────────
@@ -388,8 +392,8 @@ SOL_fine_cloth_luxury_goods_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_fur_demand = {
@@ -397,8 +401,8 @@ SOL_fur_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_porcelain_demand = {
@@ -406,8 +410,8 @@ SOL_porcelain_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_lacquerware_demand = {
@@ -415,8 +419,8 @@ SOL_lacquerware_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_marble_demand = {
@@ -424,8 +428,8 @@ SOL_marble_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_glass_luxury_goods_demand = {
@@ -433,8 +437,8 @@ SOL_glass_luxury_goods_demand = {
 	divide = SOL_luxury_goods_total_weight
 	multiply = 6
 	multiply = { value = sol_luxury_goods_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 12: PROTEIN (N=3) ────────────────────────────────
@@ -444,8 +448,8 @@ SOL_fish_protein_demand = {
 	divide = SOL_protein_total_weight
 	multiply = 3
 	multiply = { value = sol_protein_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_wild_game_protein_demand = {
@@ -453,8 +457,8 @@ SOL_wild_game_protein_demand = {
 	divide = SOL_protein_total_weight
 	multiply = 3
 	multiply = { value = sol_protein_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_livestock_demand = {
@@ -462,8 +466,8 @@ SOL_livestock_demand = {
 	divide = SOL_protein_total_weight
 	multiply = 3
 	multiply = { value = sol_protein_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 13: SPICES (N=4) ─────────────────────────────────
@@ -473,8 +477,8 @@ SOL_saffron_demand = {
 	divide = SOL_spices_total_weight
 	multiply = 4
 	multiply = { value = sol_spices_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_pepper_demand = {
@@ -482,8 +486,8 @@ SOL_pepper_demand = {
 	divide = SOL_spices_total_weight
 	multiply = 4
 	multiply = { value = sol_spices_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_cloves_demand = {
@@ -491,8 +495,8 @@ SOL_cloves_demand = {
 	divide = SOL_spices_total_weight
 	multiply = 4
 	multiply = { value = sol_spices_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_chili_demand = {
@@ -500,8 +504,8 @@ SOL_chili_demand = {
 	divide = SOL_spices_total_weight
 	multiply = 4
 	multiply = { value = sol_spices_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 14: PRECIOUS (N=3) ───────────────────────────────
@@ -511,8 +515,8 @@ SOL_goods_gold_demand = {
 	divide = SOL_precious_total_weight
 	multiply = 3
 	multiply = { value = sol_precious_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_silver_demand = {
@@ -520,8 +524,8 @@ SOL_silver_demand = {
 	divide = SOL_precious_total_weight
 	multiply = 3
 	multiply = { value = sol_precious_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_jewelry_demand = {
@@ -529,8 +533,8 @@ SOL_jewelry_demand = {
 	divide = SOL_precious_total_weight
 	multiply = 3
 	multiply = { value = sol_precious_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 15: TREASURES (N=4) ──────────────────────────────
@@ -540,8 +544,8 @@ SOL_amber_demand = {
 	divide = SOL_treasures_total_weight
 	multiply = 4
 	multiply = { value = sol_treasures_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_gems_demand = {
@@ -549,8 +553,8 @@ SOL_gems_demand = {
 	divide = SOL_treasures_total_weight
 	multiply = 4
 	multiply = { value = sol_treasures_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_ivory_demand = {
@@ -558,8 +562,8 @@ SOL_ivory_demand = {
 	divide = SOL_treasures_total_weight
 	multiply = 4
 	multiply = { value = sol_treasures_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_pearls_demand = {
@@ -567,8 +571,8 @@ SOL_pearls_demand = {
 	divide = SOL_treasures_total_weight
 	multiply = 4
 	multiply = { value = sol_treasures_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 16: MEDICINE (N=2) ───────────────────────────────
@@ -578,8 +582,8 @@ SOL_medicaments_demand = {
 	divide = SOL_medicine_total_weight
 	multiply = 2
 	multiply = { value = sol_medicine_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_mercury_medicine_demand = {
@@ -587,8 +591,8 @@ SOL_mercury_medicine_demand = {
 	divide = SOL_medicine_total_weight
 	multiply = 2
 	multiply = { value = sol_medicine_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 17: RITUAL (N=2) ─────────────────────────────────
@@ -598,8 +602,8 @@ SOL_incense_demand = {
 	divide = SOL_ritual_total_weight
 	multiply = 2
 	multiply = { value = sol_ritual_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_mercury_ritual_demand = {
@@ -607,8 +611,8 @@ SOL_mercury_ritual_demand = {
 	divide = SOL_ritual_total_weight
 	multiply = 2
 	multiply = { value = sol_ritual_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 18: WEAPONS (N=2) ────────────────────────────────
@@ -618,8 +622,8 @@ SOL_weaponry_demand = {
 	divide = SOL_weapons_total_weight
 	multiply = 2
 	multiply = { value = sol_weapons_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_firearms_demand = {
@@ -627,8 +631,8 @@ SOL_firearms_demand = {
 	divide = SOL_weapons_total_weight
 	multiply = 2
 	multiply = { value = sol_weapons_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 19: MOUNTS (N=2) ─────────────────────────────────
@@ -638,8 +642,8 @@ SOL_horses_demand = {
 	divide = SOL_mounts_total_weight
 	multiply = 2
 	multiply = { value = sol_mounts_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_elephants_demand = {
@@ -647,8 +651,8 @@ SOL_elephants_demand = {
 	divide = SOL_mounts_total_weight
 	multiply = 2
 	multiply = { value = sol_mounts_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── GROUP 20: KNOWLEDGE (N=2) ──────────────────────────────
@@ -658,8 +662,8 @@ SOL_paper_knowledge_demand = {
 	divide = SOL_knowledge_total_weight
 	multiply = 2
 	multiply = { value = sol_knowledge_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 SOL_books_demand = {
@@ -667,8 +671,8 @@ SOL_books_demand = {
 	divide = SOL_knowledge_total_weight
 	multiply = 2
 	multiply = { value = sol_knowledge_demand_scale }
-	divide = { value = location.development  min = 1 }
-	multiply = 10
+	multiply = 20
+	divide = SOL_dev_demand_divisor
 }
 
 # ── MULTI-GROUP AGGREGATES ──────────────────────────────────

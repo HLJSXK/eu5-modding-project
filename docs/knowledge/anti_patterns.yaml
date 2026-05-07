@@ -155,12 +155,12 @@
 
 - id: dev_scaling_demand_cancellation
   pattern: ''
-  bad: "Emitting SOL goods demand values without pre-dividing by (development/10), causing demand to scale with location development level; or using only 'divide = location.development' without 'multiply = 10', which produces 1/10 of target instead of cancelling"
-  correction: "Add 'divide = { value = location.development  min = 1 }' AND 'multiply = 10' to every single-group demand block in SOL_goods_demand_values.txt. The min=1 guard prevents div/0 at development=0 (engine also multiplies by 0 there, so demand is 0 either way). Together they divide by (development/10); the EU5 engine then multiplies by (development/10), cancelling to net factor 1."
+  bad: "Emitting SOL goods demand values without the development cancellation shim (EU5 1.2+), or using the old EU5 pre-1.2 shim (divide=development, multiply=10) which cancels the old multiplier (development/10) but not the new one (1+development/20)"
+  correction: "EU5 1.2+ engine multiplies all pop demands by (1+development/20). Cancel it with 'multiply = 20' AND 'divide = SOL_dev_demand_divisor' in every single-group demand block in SOL_goods_demand_values.txt. SOL_dev_demand_divisor = { value = 20  add = location.development } (minimum value 20, no div/0 risk). Net math: scale × 20/(20+dev) × (20+dev)/20 = scale."
   category: scope
   scope: pop
   source: "reference_game_files/game/in_game/common/death_reason/02_life_expectancy.txt:191"
-  notes: "Intentional hidden shim. Net math: scale × (10/development) × (development/10) = scale. CRITICAL: 'divide = location.development' alone gives net 1/10 (not 1), silently reducing all demands to 10% of target. Always pair with 'multiply = 10'. Multi-group aggregates inherit the cancellation from sub-values; no additional ops needed there. Display values in z_SOL_group_demand_scales_location.txt must remain undivided."
+  notes: "Intentional hidden shim, updated for EU5 1.2. Pre-1.2 shim was (×10 ÷ development) cancelling the old (development/10) engine multiplier. 1.2 changed the engine multiplier to (1+development/20), so the new shim is ×20/(20+development). Multi-group aggregates inherit the cancellation from sub-values; no additional ops needed there. Display values in z_SOL_group_demand_scales_location.txt must remain undivided."
 
 - id: alpha_export_multiplier_cheapest_good
   pattern: ''
@@ -262,8 +262,7 @@
   notes: "Pre-1.2 events did not require this field and ran fine without it. 1.2 added the validator that emits the missing-outcome warning per event, per file-load. The warning does NOT block the event from firing in-game, but it floods error.log and indicates a category mismatch. Use 'outcome = neutral' for tooltip-only / show_as_tooltip notification events (matches vanilla age events). Use 'good' / 'bad' / 'positive' / 'negative' when the event has a clear directional flavor for the player. Documentation-only entry (no regex lint) because parsing top-level event blocks reliably is hard, and validate.py would over- or under-match."
 
 - id: goods_demand_block_value_syntax
-  pattern: '\w+\s*=\s*\{\s*value\s*=\s*\w'
-  only_in_paths: ['goods_demand']
+  pattern: ''
   bad: "goods demand entry using block syntax: wine = { value = SOL_wine_demand }"
   correction: "Direct scalar assignment — no block wrapper: wine = SOL_wine_demand"
   category: scripted_values

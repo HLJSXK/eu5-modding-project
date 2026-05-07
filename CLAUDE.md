@@ -80,7 +80,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 `import sys` must also be present (add it if not already there). This is mandatory because Claude's Bash tool and Stop hooks run scripts via a non-TTY pipe; Python then falls back to the system locale encoding (GBK on Chinese Windows), causing `UnicodeEncodeError` for any non-ASCII output.
 
-Also, always run scripts via `conda run -n eu5 python scripts/...` — never bare `python`.
+Also, always run scripts via `PYTHONUTF8=1 conda run -n eu5 python scripts/...` — never bare `python`. The `PYTHONUTF8=1` prefix is mandatory: on Chinese Windows the conda wrapper itself (not just the script) fails with `UnicodeEncodeError: 'gbk'` when printing script output through a non-TTY pipe.
 
 ## Path Mapping
 
@@ -137,4 +137,4 @@ Do NOT update for:
 
 ### After updating
 
-Run `conda run -n eu5 python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
+Run `PYTHONUTF8=1 conda run -n eu5 python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
