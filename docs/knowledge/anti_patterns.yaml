@@ -251,3 +251,12 @@
   scope: global
   source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:23-71; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:6-10"
   notes: "Documentation-only (no regex lint). The situation's on_monthly with current_month=1 gate causes ALL countries to recompute simultaneously on Jan 1, producing a yearly frame-time spike. Vanilla yearly_country_pulse staggers per-country work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07) traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations."
+
+- id: event_missing_outcome_field
+  pattern: ''
+  bad: "country_event / age_event / etc. without an 'outcome = ...' top-level field"
+  correction: "Add 'outcome = neutral' (or good / bad / positive / negative) below 'desc = ...' in every event block. Vanilla 1.2 added a hard validator: events without an outcome emit 'Event #X is missing an outcome' to error.log on game-load. The five accepted values are neutral, good, bad, positive, negative — match the event's actual flavor (use neutral for pure-notification events with no consequential choice)."
+  category: event
+  scope: any
+  source: "reference_game_files/game/in_game/events/ages.txt:7 (ages_of_eu.1 uses 'outcome = neutral'); EU5 1.2 changelog — added in unscoped 'Bug Fixes' / event_database validator pass; engine error: 'Event #X is missing an outcome in events/Y.txt' from event_database.cpp:648"
+  notes: "Pre-1.2 events did not require this field and ran fine without it. 1.2 added the validator that emits the missing-outcome warning per event, per file-load. The warning does NOT block the event from firing in-game, but it floods error.log and indicates a category mismatch. Use 'outcome = neutral' for tooltip-only / show_as_tooltip notification events (matches vanilla age events). Use 'good' / 'bad' / 'positive' / 'negative' when the event has a clear directional flavor for the player. Documentation-only entry (no regex lint) because parsing top-level event blocks reliably is hard, and validate.py would over- or under-match."
