@@ -48,7 +48,7 @@ STRATA_PARAMS = {
 TAX_WEIGHTS = {
     "nobles":    150,
     "clergy":    25,
-    "burghers":  20,
+    "burghers":  40,
     "commoners": 1,     # laborers + peasants + soldiers
     "tribesmen": 0.01,
 }

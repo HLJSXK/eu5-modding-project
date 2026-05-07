@@ -69,7 +69,7 @@ def main() -> None:
     _write(EFFECTS_FILE, gen_effects_file(), dry)
 
     # 2. Weights file (Part 1 string-replace per good)
-    weights_text = WEIGHTS_FILE.read_text(encoding="utf-8")
+    weights_text = WEIGHTS_FILE.read_text(encoding="utf-8-sig")
     patched = patch_weights_file(weights_text)
     _write(WEIGHTS_FILE, patched, dry)
 

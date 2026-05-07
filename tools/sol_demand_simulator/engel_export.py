@@ -488,7 +488,7 @@ def export_bracket_budget_shares(
 
         lines.append("\n")
 
-    output_path.write_text("".join(lines), encoding="utf-8")
+    output_path.write_text("".join(lines), encoding="utf-8-sig")
     return warnings
 
 
@@ -600,7 +600,7 @@ def export_demand_offsets(
 
         lines.append("\n")
 
-    output_path.write_text("".join(lines), encoding="utf-8")
+    output_path.write_text("".join(lines), encoding="utf-8-sig")
     return warnings
 
 
@@ -658,7 +658,7 @@ def export_demand_base(
                 ]
         lines.append("\n")
 
-    output_path.write_text("".join(lines), encoding="utf-8")
+    output_path.write_text("".join(lines), encoding="utf-8-sig")
 
 
 def export_demand_scales_with_offset(
@@ -766,7 +766,7 @@ def export_demand_scales_with_offset(
             f"}}\n",
         ]
 
-    output_path.write_text("".join(lines), encoding="utf-8")
+    output_path.write_text("".join(lines), encoding="utf-8-sig")
 
 
 # ---------------------------------------------------------------------------

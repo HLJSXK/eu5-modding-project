@@ -244,7 +244,7 @@ def _fmt_price(p: float) -> str:
     return str(int(p)) if p == int(p) else f"{p:.1f}"
 
 
-def _write(path: Path, content: str, dry_run: bool, encoding: str = "utf-8") -> None:
+def _write(path: Path, content: str, dry_run: bool, encoding: str = "utf-8-sig") -> None:
     if dry_run:
         print(f"[dry-run] Would write {path.name} ({len(content.splitlines())} lines)")
     else:
