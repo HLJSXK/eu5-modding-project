@@ -269,9 +269,11 @@ def gen_scarcity_score_file() -> str:
     lines.append("SOL_update_market_scarcity_scores = {")
     lines.append(f"{ind}every_market_in_world = {{")
     lines.append(f"{ind}{ind}location = {{")
-    lines.append(f"{ind}{ind}{ind}limit = {{ is_land = yes }}")
+    lines.append(f"{ind}{ind}{ind}if = {{")
+    lines.append(f"{ind}{ind}{ind}{ind}limit = {{ is_land = yes }}")
     for strata in STRATA:
-        lines.append(f"{ind}{ind}{ind}SOL_compute_scarcity_score_{strata} = yes")
+        lines.append(f"{ind}{ind}{ind}{ind}SOL_compute_scarcity_score_{strata} = yes")
+    lines.append(f"{ind}{ind}{ind}}}")
     lines.append(f"{ind}{ind}}}")
     lines.append(f"{ind}}}")
     lines.append("}")
