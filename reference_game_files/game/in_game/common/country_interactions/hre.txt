@@ -1500,6 +1500,7 @@ enforce_landfriede = {
 	type = diplomacy
 	category = CATEGORY_HRE_ACTIONS
 	potential = {
+		exists = international_organization:hre
 		scope:actor = {
 			modifier:allow_landfriede = yes
 			is_emperor = yes
@@ -1529,6 +1530,10 @@ enforce_landfriede = {
 				defender_leader = { is_member_of_international_organization = international_organization:hre }
 			}
 			NOT = { is_at_war_with = scope:actor }
+			scope:actor = {
+				NOT = { has_truce_with = root }
+				NOT = { in_union_with = root }
+			}
 		}
 	}
 	select_trigger = {
@@ -1553,6 +1558,16 @@ enforce_landfriede = {
 			}
 		}
 	}
+	cooldown = {
+		type = enforce_landfriede
+		years = {
+			value = 5
+			if = {
+				limit = { scope:actor.modifier:landfriede_flat_cost >= -5 }
+				add = scope:actor.modifier:landfriede_cooldown
+			}
+		}
+	}
 	effect = {
 		pay_gold_org_country_effect = {
 			international_organization = international_organization:hre
@@ -1566,20 +1581,140 @@ enforce_landfriede = {
 		else = { custom_tooltip = select_a_war_to_leave }
 		scope:recipient = { add_opinion = { target = scope:actor modifier = opinion_forced_landfriede_upon } }
 	}
-	cooldown = {
-		type = enforce_landfriede
-		years = {
-			value = 5
-			if = {
-				limit = { scope:actor.modifier:landfriede_flat_cost >= -5 }
-				add = scope:actor.modifier:landfriede_cooldown
+	reject_effect = {
+		pay_gold_org_country_effect = {
+			international_organization = international_organization:hre
+			country = scope:actor
+			value = enforce_landfriede_cost
+		}
+		scope:actor = {
+			add_prestige = prestige_mild_penalty
+			join_war_against = {
+				war = scope:target
+				target = scope:recipient 
+				call_in_subjects = yes
+				ignore_rules = yes
+				notify_opposing_side = yes
 			}
 		}
 	}
 	ai_will_do = {
+		subtract = {
+			desc = "VOTE_BASE_VALUE"
+			value = 10
+		}
+		if = {
+			limit = { scope:actor = { at_war = yes } }
+			subtract = {
+				desc = "IS_AT_WAR"
+				value = 200
+			}
+		}
+		if = {
+			limit = { scope:actor = { is_during_bankruptcy = yes } }
+			subtract = {
+				desc = "IS_BANKRUPT_TOOLTIP"
+				value = 1000
+			}
+		}
+		subtract = {
+			desc = "DIPLOREASON_NUM_OF_LOANS"
+			value = scope:actor.num_loans
+			multiply = 25
+		}
+		if = {
+			limit = { exists = scope:recipient }
+			if = {
+				limit = {
+					scope:actor = {
+						OR = {
+							wants_to_attack = scope:recipient
+							country_interaction_acceptance = {
+								type = country_interaction:enforce_landfriede
+								target = scope:recipient
+								value > 0
+							}
+						}
+					}
+				}
+				add = {
+					desc = "WANTS_TO_CONTAIN_TARGET"
+					value = 100
+				}
+			}
+			if = {
+				limit = { scope:recipient = { is_rival_of = scope:actor } }
+				add = {
+					desc = "game_concept_rival"
+					value = 50
+				}
+			}
+			if = {
+				limit = { scope:recipient = { is_enemy_of = scope:actor } }
+				add = {
+					desc = "game_concept_enemy"
+					value = 15
+				}
+			}
+			add = {
+				desc = "DIPLOREASON_ANTAGONISM"
+				value = "scope:actor.antagonism(scope:recipient)"
+				multiply = 1.75
+			}
+			if = {
+				limit = {
+					scope:recipient.military_strength > scope:actor.military_strength
+				}
+				add = {
+					desc = "MILITARY_STRENGTH_IN_COMPARISON_TO_TARGET"
+					value = scope:actor.military_strength
+					subtract = {
+						value = scope:recipient.military_strength
+						multiply = 1.5
+					}
+				}
+			}
+			if = {
+				limit = { exists = scope:target }
+				add = {
+					desc = "OPINION_OF_DEFENDER_IN_COMPARISON_TO_TARGET"
+					value = "scope:actor.opinion(scope:target.defender_leader)"
+					multiply = 2
+					subtract = "scope:actor.opinion(scope:recipient)"
+				}
+			}
+		}
+	}
+	accept = {
+		subtract = {
+			desc = "VOTE_BASE_VALUE"
+			value = 10
+		}
+		add = hre_default_diplo_action_acceptance
+		if = {
+			limit = { scope:recipient = { is_member_of_international_organization = international_organization:hre } }
+			add = {
+				desc = "imperial_authority"
+				value = international_organization:hre.var:imperial_authority
+			}
+		}
 		add = {
-			desc = "POLICY_BIAS_GOOD_IDEA"
-			value = 20
+			desc = "MILITARY_STRENGTH_IN_COMPARISON_TO_ACTOR"
+			value = scope:actor.military_strength
+			subtract = scope:recipient.military_strength
+		}
+		if = {
+			limit = { exists = scope:target }
+			subtract = {
+				desc = "DIPLOREASON_WARSCORE"
+				value = "scope:recipient.war_score_in_war(scope:target)"
+				multiply = 2
+			}
+		}
+		subtract = {
+			desc = "PERSONALITY_OF_TARGET"
+			value = scope:recipient.modifier:aggressiveness_modifier
+			multiply = 100
 		}
 	}
 }
