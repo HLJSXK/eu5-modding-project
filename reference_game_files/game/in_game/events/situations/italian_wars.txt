@@ -49,23 +49,16 @@ italian_wars.1 = {
 		custom_tooltip = italian_wars_explanation_tooltip2
 		custom_tooltip = italian_wars_explanation_tooltip3
 		custom_tooltip = italian_wars_explanation_tooltip4
-	}
-}
-
-italian_wars.2 = {	
-	type = country_event
-	category = situation_event	
-
-	title = italian_wars.2.title
-	desc = italian_wars.2.desc
-	outcome = neutral
-	image = "gfx/interface/illustrations/situation/italian_wars.dds"
-	immediate = {
-		scope:target_character = { }
-	}
-	option = {
-		name = italian_wars.2.a
-		custom_tooltip = iw_we_are_safe_for_now_tt
+		if = {
+			limit = {
+				OR = {
+					is_member_of_international_organization = international_organization:italian_league_1
+					is_member_of_international_organization = international_organization:italian_league_2
+					is_member_of_international_organization = international_organization:italian_league_3
+				}
+			}
+			custom_tooltip = iw_italian_league_merc_efficiency_tt
+		}
 	}
 }
 
@@ -87,10 +80,28 @@ italian_wars.3 = {	#Informative Event for the rest of Italy
 	
 	option = {
 		name = italian_wars.1.a
+
+		ai_will_select = { value = 150 }
 		custom_tooltip = italian_wars_explanation_tooltip1
 		custom_tooltip = italian_wars_explanation_tooltip2
 		custom_tooltip = italian_wars_explanation_tooltip3
 		custom_tooltip = italian_wars_explanation_tooltip4
+	}
+
+	option = {
+		name = italian_wars.1.b
+
+		ai_will_select = { value = "root.opinion(international_organization:hre.leader_country)" }
+
+		trigger = {
+			is_member_of_no_foreign_or_italian_league = yes
+			can_join_international_organization = international_organization:foreign_league_hre
+			is_member_of_international_organization = international_organization:hre
+		}
+
+		international_organization:foreign_league_hre = {
+			add_country_to_international_organization = ROOT
+		}
 	}
 }
 
@@ -167,19 +178,19 @@ italian_wars.4 = {
 		}
 		if = {
 			limit = {
-				international_organization:italian_league_1.leader_country = scope:actor
+				international_organization:italian_league_1 ?= { leader_country = scope:actor }
 			}
 			international_organization:italian_league_1 = { add_country_to_international_organization = root }
 		}
 		else_if = {
 			limit = {
-				international_organization:italian_league_2.leader_country = scope:actor
+				international_organization:italian_league_2 ?= { leader_country = scope:actor }
 			}
 			international_organization:italian_league_2 = { add_country_to_international_organization = root }
 		}
 		else_if = {
 			limit = {
-				international_organization:italian_league_3.leader_country = scope:actor
+				international_organization:italian_league_3 ?= { leader_country = scope:actor }
 			}
 			international_organization:italian_league_3 = { add_country_to_international_organization = root }
 		}
@@ -235,88 +246,38 @@ italian_wars.4 = {
 	}
 }
 
-italian_wars.5 = {	
+italian_wars.5 = {
 	type = country_event
-	category = situation_event	
+	category = situation_event
 
 	title = italian_wars.5.title
 	desc = italian_wars.5.desc
 	outcome = neutral
-	image = "gfx/interface/illustrations/situation/italian_wars.dds"
-	immediate = {
-		scope:target_character = { }
+	major = yes
+	major_trigger = {
+		any_current_war = {
+			this = scope:target_war
+		}
 	}
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	immediate = {
+		scope:actor = {
+			ruler_or_regent ?= { save_scope_as = target_character }
+		}
+	}
+
 	option = {
 		name = italian_wars.5.a
-		
-	}
-}
-
-italian_wars.7 = {	
-	hide_portraits = yes
-	type = country_event
-	category = situation_event	
-
-	title = italian_wars.7.title
-	desc = italian_wars.7.desc
-	outcome = neutral
-	image = "gfx/interface/illustrations/situation/italian_wars.dds"
-	immediate = {
-		random_country_at_war_with = {
-			limit = {
-				OR = {
-					this = international_organization:italian_league_1.leader_country
-					this = international_organization:italian_league_2.leader_country
-					this = international_organization:italian_league_3.leader_country
-				}
-			}
-			save_scope_as = target_country
-		}
-		scope:actor = {
-			ruler_or_regent ?= {
-				save_scope_as = target_character
-			}
-		}
-	}
-
-	option = {
-		name = italian_wars.7.a
-		trigger = {
+		show_as_tooltip = {
 			scope:actor = {
-				NOT = { has_truce_with = root }
-			}
-		}
-		random_current_war = {
-			limit = {
-				any_defender = {
-					this = scope:target_country
-				}
-				attacker_leader = {
-					this = scope:target
+				join_war_with = {
+					target = scope:target_country
+					war = scope:target_war
+					call_in_subjects = yes
 				}
 			}
-			scope:actor = { join_war_as_defender = { war = prev } }
-		}
-		scope:target_country = {
-			trigger_event_non_silently = italian_wars.5
-		}
-	}
-
-	option = {
-		name = italian_wars.7.b
-		random_current_war = {
-			limit = {
-				any_defender = {
-					this = scope:target_country
-				}
-				attacker_leader = {
-					this = scope:target
-				}
-			}
-			root = { white_peace = prev }
-		}
-		scope:target_country = {
-			trigger_event_non_silently = italian_wars.2
 		}
 	}
 }
@@ -341,9 +302,11 @@ italian_wars.9 = {
 				remove_variable = iw_received_manpower
 			}
 			show_as_tooltip = {
-				add_manpower = {
-					value = scope:actor.yearly_manpower
-					multiply = 0.5
+				scope:actor = {
+					transfer_yearly_manpower = {
+						value = 0.5
+						target = root
+					}
 				}
 			}
 		}
@@ -352,9 +315,11 @@ italian_wars.9 = {
 				remove_variable = iw_received_money
 			}
 			show_as_tooltip = {
-				add_gold = {
-					value = scope:actor.monthly_income_total
-					multiply = 3
+				scope:actor = {
+					transfer_yearly_gold = {
+						value = 0.25
+						target = root
+					}
 				}
 			}
 		}
@@ -382,18 +347,14 @@ italian_wars.10 = {
 				manpower_percentage >= 0.1
 			}
 			scope:target = {
-				max_manpower >= 0
+				max_manpower > 0
 			}
 		}
-		add_manpower = {
-			value = scope:actor.yearly_manpower
-			multiply = -0.5
+		transfer_yearly_manpower = {
+			value = 0.5
+			target = scope:target
 		}
 		scope:target = {
-			add_manpower = {
-				value = scope:actor.yearly_manpower
-				multiply = 0.5
-			}
 			set_variable = {
 				name = iw_received_manpower
 				days = 91
@@ -414,18 +375,15 @@ italian_wars.10 = {
 		ai_chance = {
 			factor = 5
 		}
-		add_gold = {
-			value = scope:actor.monthly_income_total
-			multiply = -3
+
+		transfer_yearly_gold = {
+			value = 0.25
+			target = scope:target
 		}
 		scope:target = {
 			set_variable = {
 				name = iw_received_money
 				days = 91
-			}
-			add_gold = {
-				value = scope:actor.monthly_income_total
-				multiply = 3
 			}
 		}
 	}
@@ -437,7 +395,97 @@ italian_wars.10 = {
 	}
 }
 
-italian_wars.100 = {	
+######################################
+# Tension max event (fires once at iw_tension = 100)
+######################################
+
+italian_wars.11 = {
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.11.title
+	desc = italian_wars.11.desc
+	outcome = negative
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	immediate = {
+		save_scope_as = target_country
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+
+	option = {
+		name = italian_wars.11.a
+
+		
+		if = {
+			limit = {
+				any_in_global_list = {
+					variable = iw_italian_leagues_list
+					any_international_organization_member = {
+						this != root
+						OR = {
+							has_truce_with = root
+							root = { has_truce_with = prev }
+						}
+					}
+				}
+			}
+			every_in_global_list = {
+				variable = iw_italian_leagues_list
+				every_international_organization_member = {
+					limit = {
+						this != root
+						OR = {
+							has_truce_with = root
+							root = { has_truce_with = prev }
+						}
+					}
+					remove_truce_with = root
+					hidden_effect = {
+						root = { remove_truce_with = prev }
+					}
+				}
+			}
+		}
+		if = {
+			limit = {
+				any_in_global_list = {
+					variable = iw_foreign_leagues_list
+					any_international_organization_member = {
+						this != root
+						OR = {
+							has_truce_with = root
+							root = { has_truce_with = prev }
+						}
+					}
+				}
+			}
+			every_in_global_list = {
+				variable = iw_foreign_leagues_list
+				every_international_organization_member = {
+					limit = {
+						this != root
+						OR = {
+							has_truce_with = root
+							root = { has_truce_with = prev }
+						}
+					}
+					remove_truce_with = root
+					hidden_effect = {
+						root = { remove_truce_with = prev }
+					}
+				}
+			}
+		}
+	
+		# TODO (separate MR): implement the actual mechanic that allows foreign league leaders to call in members for offensive wars at 90+ tension
+		custom_tooltip = as_long_as_90_tension_foreign_leaders_can_call_in_league_members_offensively_tt
+		custom_tooltip = all_leaders_of_leagues_annul_all_truces_tt
+	}
+}
+
+italian_wars.100 = {
 	hide_portraits = yes
 	type = country_event
 	category = situation_event	
@@ -449,78 +497,128 @@ italian_wars.100 = {
 	image = "gfx/interface/illustrations/situation/italian_wars.dds"
 
 	immediate = {
-		if = {
-			limit = { is_member_of_international_organization = international_organization:italian_league_1 }
-			international_organization:italian_league_1 = {
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
+		random_international_organizations_member_of = {
+			limit = {
+				OR = {
+					this = international_organization:italian_league_1
+					this = international_organization:italian_league_2
+					this = international_organization:italian_league_3
 				}
+			}
+			save_scope_as = target_italian_io
+			leader_country = {
+				save_scope_as = target_country
+				ruler_or_regent ?= { save_scope_as = target_character }
 			}
 		}
-		else_if = {
-			limit = { is_member_of_international_organization = international_organization:italian_league_2 }
-			international_organization:italian_league_2 = {
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
+
+		if = {
+			limit = {
+				has_special_status_in_international_organization = {
+					type = special_status:italian_league_sponsor
+					international_organization = scope:target_italian_io
 				}
 			}
-		} 
-		else = {
-			international_organization:italian_league_3 = {
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
-				}
+
+			set_variable = {
+				name = was_sponsor_variable
+				years = 1
 			}
-		} 
+		}
 	}
 	
 	option = {
 		name = italian_wars.100.a
-		custom_tooltip = iw_gain_5_trust_with_every_member_tt
-		hidden_effect = {
-			random_international_organizations_member_of = {
-				limit = {
-					OR = {
-						this = international_organization:italian_league_1
-						this = international_organization:italian_league_2
-						this = international_organization:italian_league_3
-					}
-				}
-				every_international_organization_member = {
-					limit = {
-						this != root
-					}
-					add_trust_equilibrium = {
-						modifier = iw_victors_of_the_war_trust
-						target = root
-					}
-				}
-			}
+
+		ai_will_select = {
+			add = 100
+			add = { value = "opinion(scope:target_country)" }
 		}
+		add_prestige = prestige_severe_bonus
+		add_stability = stability_mild_bonus
 		if = {
 			limit = {
+				scope:target_italian_io = {
+					any_international_organization_member = {
+						is_subject = no
+						count > 1
+					}
+				}
 				scope:target_country = root
 			}
-			add_prestige = prestige_extreme_bonus
-			add_country_modifier = { 
+			custom_tooltip = demand_vassalization_from_members_tt
+		}
+		if = {
+			limit = { scope:target_country = root }
+			add_country_modifier = {
 				modifier = iw_victory_in_the_italian_wars_modifier
-				years = 15
-				mode = add_and_extend
+				mode = replace
+				years = -1
+			}
+			scope:target_character = {
+				add_adm = { 10 25 }
+				add_dip = { 10 25 }
+				add_mil = { 10 25 }
+			}
+			unlock_law_effect = { type = administration_of_italian_lands_law }
+		}
+		else_if = {
+			limit = { is_subject = no }
+			make_subject_of = { target = scope:target_country type = subject_type:vassal }
+		}
+	}
+
+	option = {
+		name = italian_wars.100.b
+
+		ai_will_select = {
+			add = 100
+			add = {
+				value = "opinion(scope:target_country)"
+				multiply = -1
+			}
+		}
+
+		trigger = {
+			scope:target_country != root
+			is_subject = no
+			NOT = { has_variable = was_sponsor_variable }
+		}
+
+		scope:target_country = {
+			add_casus_belli = {
+				target = root
+				type = casus_belli:cb_iw_annexation
+				years = 25
+			}
+		}
+
+		if = {
+			limit = { is_allied_with = { target = scope:target_country } }
+			remove_relation = {
+				type = relation_type:alliance
+				first = this
+				second = scope:target_country
 			}
 		}
 	}
 }
 
-italian_wars.200 = {	
+italian_wars.200 = {
 	hide_portraits = yes
 	type = country_event
-	category = situation_event	
+	category = situation_event
 
 	title = italian_wars.100.title
-	desc = italian_wars.200.desc
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { capital.region = region:italy_region }
+				desc = italian_wars.200.desc
+			}
+			triggered_desc = { desc = italian_wars.200.desc_foreign }
+		}
+	}
 	outcome = neutral
 	image = "gfx/interface/illustrations/situation/italian_wars.dds"
 	immediate = {
@@ -528,11 +626,27 @@ italian_wars.200 = {
 		ruler_or_regent ?= {
 			save_scope_as = target_character
 		}
+		random_in_global_list = {
+			variable = iw_italian_leagues_list
+			limit = { total_locations_owned >= 200 }
+			leader_country = { save_scope_as = winning_io_leader }
+		}
 	}
 	option = {
 		name = italian_wars.200.a
-		add_prestige = prestige_severe_bonus
-		add_stability = stability_mild_bonus
+		trigger = { capital.region = region:italy_region }
+		if = {
+			limit = { exists = scope:winning_io_leader }
+			add_trust_equilibrium_mutual_effect = {
+				modifier = iw_shared_defeat_trust
+				target = scope:winning_io_leader
+			}
+		}
+	}
+	option = {
+		name = italian_wars.200.b
+		trigger = { NOT = { capital.region = region:italy_region } }
+		add_prestige = prestige_mild_penalty
 	}
 }
 
@@ -545,35 +659,29 @@ italian_wars.300 = {
 	outcome = neutral
 	image = "gfx/interface/illustrations/situation/italian_wars.dds"
 	immediate = {
-		if = {
-			limit = { is_member_of_international_organization = international_organization:foreign_league_france }
-			international_organization:foreign_league_france = {
-				save_scope_as = target_io
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
+		random_international_organizations_member_of = {
+			limit = {
+				OR = {
+					this = international_organization:foreign_league_balkan
+					this = international_organization:foreign_league_france
+					this = international_organization:foreign_league_hre
+					this = international_organization:foreign_league_iberia
 				}
+			}
+			save_scope_as = target_io
+			leader_country = {
+				save_scope_as = target_country
+				ruler_or_regent ?= { save_scope_as = target_character }
 			}
 		}
-		else_if = {
-			limit = { is_member_of_international_organization = international_organization:foreign_league_iberia }
-			international_organization:foreign_league_iberia = {
-				save_scope_as = target_io
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
-				}
+
+		if = {
+			limit = { root = scope:target_country }
+			set_variable = {
+				name = io_location_scale_variable
+				value = scope:target_io.total_locations_owned
 			}
-		} 
-		else = {
-			international_organization:foreign_league_hre = {
-				save_scope_as = target_io
-				leader_country = {
-					save_scope_as = target_country
-					ruler_or_regent ?= { save_scope_as = target_character }
-				}
-			}
-		} 
+		}
 	}
 	
 	option = {
@@ -587,25 +695,1342 @@ italian_wars.300 = {
 				modifier = fought_with_us_modifier
 			}
 		}
+		add_country_modifier = {
+			modifier = iw_victory_in_the_italian_wars_modifier
+			years = -1
+			mode = add_and_extend
+		}
 		if = {
 			limit = {
 				root = scope:target_country
 			}
 			add_prestige = prestige_extreme_bonus
-			add_country_modifier = { 
-				modifier = iw_victory_in_the_italian_wars_modifier
-				years = 10
-				mode = add_and_extend
+			# France unique reward — scaled by IO locations
+			if = {
+				limit = { scope:target_io = international_organization:foreign_league_france }
+				add_country_modifier = {
+					modifier = iw_france_victory_modifier
+					years = modifier_duration_years_long
+					mode = replace
+					size = {
+						add = {
+							value = 1
+							desc = BASE_VALUE
+						}
+						add = {
+							value = var:io_location_scale_variable
+							desc = "league_locations_owned_desc"
+						}
+					}
+				}
 			}
+			# Iberia unique reward — scaled by IO locations
+			else_if = {
+				limit = { scope:target_io = international_organization:foreign_league_iberia }
+				add_country_modifier = {
+					modifier = iw_iberia_victory_modifier
+					years = modifier_duration_years_long
+					mode = replace
+					size = {
+						add = {
+							value = 1
+							desc = BASE_VALUE
+						}
+						add = {
+							value = var:io_location_scale_variable
+							desc = "league_locations_owned_desc"
+						}
+					}
+				}
+			}
+			# Balkan unique reward — tiered by tag and DLC
+			else_if = {
+				limit = { scope:target_io = international_organization:foreign_league_balkan }
+				if = {
+					limit = {
+						has_dlc = "d008_fate_of_the_phoenix"
+						OR = { tag = ROM  tag = BYZ }
+					}
+					if = {
+						limit = {
+							OR = {
+								tag = ROM
+								societal_value:latinization_vs_hellenization > 0
+							}
+						}
+						add_country_modifier = {
+							modifier = iw_rom_byz_latin_victory_dlc_modifier
+							years = -1
+							mode = replace
+						}
+					}
+					else = {
+						add_country_modifier = {
+							modifier = iw_byz_hellenic_victory_dlc_modifier
+							years = -1
+							mode = replace
+						}
+					}
+				}
+				else_if = {
+					limit = { OR = { tag = ROM  tag = BYZ } }
+					add_country_modifier = {
+						modifier = iw_balkan_victory_no_dlc_modifier
+						years = -1
+						mode = replace
+					}
+				}
+				else_if = {
+					limit = { country_rank != country_rank:rank_empire }
+					set_country_rank_effect = { rank = country_rank:rank_empire }
+				}
+				else = {
+					add_country_modifier = {
+						modifier = iw_balkan_victory_cabinet_modifier
+						years = -1
+						mode = replace
+					}
+				}
+			}
+			unlock_law_effect = { type = administration_of_italian_lands_law }
 		}
-		else = { add_prestige = prestige_mild_bonus }
+		else = {
+			add_prestige = prestige_mild_bonus
+		}
+
+		if = {
+			limit = {
+				exists = international_organization:hre
+				scope:target_io = international_organization:foreign_league_hre
+				root = scope:target_country
+			}
+			change_imperial_authority = { value = imperial_authority_unique_bonus }
+			custom_tooltip = non_princes_become_princes_tt
+		}
+		else_if = {
+			limit = {
+				root != scope:target_country
+				NOT = { is_member_of_international_organization = international_organization:hre }
+				exists = international_organization:hre
+			}
+			scope:target_io = { add_country_to_international_organization = root }
+		}
+	}
+
+	after = {
+		if = {
+			limit = { root = scope:target_country }
+			hidden_effect = { remove_variable = io_location_scale_variable }
+		}
 	}
 }
 
-italian_wars.400 = {	
+italian_wars.301 = {
 	hide_portraits = yes
 	type = country_event
-	category = situation_event	
+	category = situation_event
+
+	title = italian_wars.100.title
+	desc = italian_wars.301.desc
+	outcome = negative
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+	immediate = {
+		save_scope_as = target_country
+		ruler_or_regent ?= { save_scope_as = target_character }
+	}
+	option = {
+		name = italian_wars.301.a
+		add_prestige = prestige_severe_penalty
+		if = {
+			limit = {
+				OR = {
+					is_member_of_international_organization = international_organization:italian_league_1
+					is_member_of_international_organization = international_organization:italian_league_2
+					is_member_of_international_organization = international_organization:italian_league_3
+				}
+			}
+			add_stability = stability_mild_penalty
+		}
+	}
+}
+
+######################################
+# Periodic flavor events (20-28)
+######################################
+
+italian_wars.20 = { #The Condottiere's Price
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.20.title
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					exists = scope:target_character
+					scope:target_character = {
+						is_ruler = no
+						is_regent = no
+						is_consort = no
+						is_heir = no
+					}
+				}
+				desc = italian_wars.20.desc.a
+			}
+			triggered_desc = {
+				trigger = { NOT = { exists = scope:target_character } }
+				desc = italian_wars.20.desc.b
+			}
+			triggered_desc = {
+				trigger = { always = yes }
+				desc = italian_wars.20.desc.c
+			}
+		}
+	}
+	outcome = neutral
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw20_variable }
+		at_war = no
+		any_army = {
+			any_sub_unit = {
+				is_mercenary = yes
+			}
+
+			unit_location = {
+				top_owner ?= ROOT
+			}
+		}
+	}
+
+	immediate = {
+
+		random_army = {
+			limit = {
+				any_sub_unit = {
+					is_mercenary = yes
+				}
+				unit_location = {
+					top_owner ?= ROOT
+				}
+			}
+			if = {
+				limit = { 
+					has_commander = yes
+					leader = {
+						is_ruler = no
+						is_regent = no
+						is_consort = no
+						is_heir = no
+					}
+				}
+				leader = { save_scope_as = target_character }
+				
+			}
+			save_scope_as = target_merc
+			unit_location = { 
+				save_scope_as = target_location 
+				province = { save_scope_as = target_province }
+			}
+		}
+
+		set_variable = {
+			name = recently_had_iw20_variable
+			years = 10
+		}
+	}
+
+	option = {	#Pay them off
+		name = italian_wars.20.a
+
+		ai_will_select = {
+			add = {
+				value = gold
+				divide = monthly_income_total
+				multiply = 10
+			}
+		}
+
+		change_gold_effect = { scale = -2 }
+
+		custom_tooltip = mercs_among_the_ranks_of_target_merc_are_reigned_in_tt
+	}
+
+	option = {
+		name = italian_wars.20.b
+
+		ai_will_select = {
+			value = 60
+			subtract = {
+				value = gold
+				divide = monthly_income_total
+				multiply = 10
+			}
+		}
+
+		scope:target_province = {
+			change_province_food_percentage = -0.5
+			custom_tooltip = {
+				text = target_province_loses_prosperity_extreme_penalty_tt
+				every_location_in_province = { change_prosperity = prosperity_extreme_penalty }
+			}
+		}
+	}
+
+	option = {	#Ruler personally renegotiates — half cost, prestige gain
+		name = italian_wars.20.c
+
+		trigger = {
+			exists = ruler_or_regent
+			ruler_or_regent = {
+				OR = {
+					has_trait = silver_tongue
+					has_trait = careful
+					total_abilities >= 220
+				}
+			}
+		}
+
+		ai_will_select = {
+			value = 200
+		}
+
+		change_gold_effect = { scale = -1 }
+		add_prestige = prestige_mild_bonus
+
+		custom_tooltip = mercs_among_the_ranks_of_target_merc_are_reigned_in_tt
+	}
+}
+
+italian_wars.21 = { #Battle-Hardened Veterans
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.21.title
+	desc = italian_wars.21.desc
+	outcome = positive
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw21_variable }
+		at_war = no
+		any_army = {
+			experience_percentage > 0.25
+			experience_percentage < 1
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw21_variable
+			years = 15
+		}
+
+		ordered_army = {
+			limit = {
+				#experience_percentage > 0.25
+				#experience_percentage < 1
+			}
+			max = 1
+			check_range_bounds = no  
+			save_scope_as = target_army
+			unit_location = { 
+				save_scope_as = target_location
+				province = { save_scope_as = target_province }
+			}
+		}
+	}
+
+	option = {
+		name = italian_wars.21.a
+
+		ai_will_select = {
+			add = army_tradition
+		}
+
+		scope:target_army = {
+			add_unit_modifier = {
+				modifier = battle_hardened_veterans_modifier
+				years = modifier_duration_years_normal
+				mode = replace
+			}
+		}
+
+		add_army_tradition = army_tradition_extreme_bonus
+	}
+
+	option = {	#A reflection of our militaristic nature!
+		name = italian_wars.21.b
+
+		ai_will_select = {
+			value = 20
+			add = {
+				value = stability
+				multiply = -50
+			}
+			add = {
+				value = modifier:monthly_towards_offensive
+				subtract = modifier:monthly_towards_defensive
+				multiply = 10
+			}
+			add = {
+				value = modifier:monthly_towards_belligerent
+				subtract = modifier:monthly_towards_conciliatory
+				multiply = 10
+			}
+		}
+
+		change_societal_value = {
+			type = offensive_vs_defensive
+			value = societal_value_move_to_left
+		}
+		change_societal_value = {
+			type = belligerent_vs_conciliatory
+			value = societal_value_move_to_left
+		}
+		add_stability = stability_severe_bonus
+	}
+
+	option = {	#Ruler personally drills and inspires the veterans
+		name = italian_wars.21.c
+
+		trigger = {
+			exists = ruler_or_regent
+			ruler_or_regent = {
+				OR = {
+					has_trait = inspiring_leader
+					has_trait = strict
+					total_abilities >= 220
+				}
+			}
+		}
+
+		ai_will_select = {
+			value = 200
+		}
+
+		scope:target_army = {
+			add_unit_modifier = {
+				modifier = battle_hardened_veterans_modifier
+				years = modifier_duration_years_normal
+				mode = replace
+			}
+		}
+		add_army_tradition = army_tradition_extreme_bonus
+		change_societal_value = {
+			type = belligerent_vs_conciliatory
+			value = societal_value_move_to_left
+		}
+	}
+}
+
+italian_wars.22 = { #Growing Distaste to War
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.22.title
+	desc = italian_wars.22.desc
+	outcome = negative
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw22_variable }
+		at_war = no
+		regular_army_size > 0
+		monthly_manpower > 0
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw22_variable
+			years = 15
+		}
+
+		random_estate = {
+			limit = {
+				NOT = { estate_type = estate_type:crown_estate }
+			}
+			save_scope_as = hippie_estate
+		}
+
+		random_list = {
+			1 = { set_variable = iw22_variant_a1 }
+			1 = { set_variable = iw22_variant_a2 }
+			1 = { set_variable = iw22_variant_a3 }
+		}
+		random_list = {
+			1 = { set_variable = iw22_variant_b1 }
+			1 = { set_variable = iw22_variant_b2 }
+			1 = { set_variable = iw22_variant_b3 }
+		}
+	}
+
+	option = {	#Cowards all of you!
+		name = italian_wars.22.a
+
+		switch = {
+			trigger = has_variable
+			iw22_variant_a1 = {
+				add_yearly_manpower = -2
+				if = {
+					limit = { exists = scope:hippie_estate }
+					add_estate_satisfaction = {
+						type = scope:hippie_estate.estate_type
+						value = estate_satisfaction_mild_bonus
+					}
+				}
+			}
+			iw22_variant_a2 = {
+				add_yearly_manpower = -2
+				add_army_tradition = army_tradition_extreme_penalty
+				add_estate_satisfaction = {
+					type = scope:hippie_estate.estate_type
+					value = estate_satisfaction_mild_penalty
+				}
+			}
+			iw22_variant_a3 = {
+				add_legitimacy = legitimacy_severe_penalty
+				add_estate_satisfaction = {
+					type = scope:hippie_estate.estate_type
+					value = estate_satisfaction_mild_penalty
+				}
+			}
+		}
+	}
+
+	option = {	#Not one step back!
+		name = italian_wars.22.b
+
+		switch = {
+			trigger = has_variable
+			iw22_variant_b1 = {
+				add_war_exhaustion = war_exhaustion_extreme_penalty
+				add_estate_satisfaction = {
+					type = scope:hippie_estate.estate_type
+					value = estate_satisfaction_extreme_penalty
+				}
+			}
+			iw22_variant_b2 = {
+				add_stability = stability_severe_penalty
+				add_estate_satisfaction = {
+					type = scope:hippie_estate.estate_type
+					value = estate_satisfaction_extreme_penalty
+				}
+			}
+			iw22_variant_b3 = {
+				iw_increase_tension_effect = { value = iw_tension_gain_low }
+				add_estate_satisfaction = {
+					type = scope:hippie_estate.estate_type
+					value = estate_satisfaction_extreme_penalty
+				}
+			}
+		}
+	}
+
+	after = {
+		hidden_effect = {
+			remove_variable = iw22_variant_a1
+			remove_variable = iw22_variant_a2
+			remove_variable = iw22_variant_a3
+			remove_variable = iw22_variant_b1
+			remove_variable = iw22_variant_b2
+			remove_variable = iw22_variant_b3
+		}
+	}
+}
+
+italian_wars.23 = { #The Turncoat General
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.23.title
+	desc = italian_wars.23.desc
+	outcome = negative
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw23_variable }
+
+		any_army = { 
+			has_commander = yes
+			leader = {
+				is_ruler = no
+				is_regent = no
+				is_consort = no
+				is_heir = no
+			}
+		}
+	}
+
+	major = yes
+	major_trigger = {
+		this = scope:target_country_recipient
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw23_variable
+			years = 10
+		}
+
+		ruler_or_regent ?= { save_scope_as = target_character1 }
+
+		random_army = {
+			limit = {
+				has_commander = yes
+				leader = {
+					is_ruler = no
+					is_regent = no
+					is_consort = no
+					is_heir = no
+				}
+			}
+			save_scope_as = target_army
+			leader = { save_scope_as = target_character2 }
+		}
+		every_in_global_list = {
+			variable = iw_italian_leagues_list
+			if = {
+				limit = { country_exists = leader_country }
+				leader_country = { add_to_list = iw23_list }
+			}
+		}
+		every_in_global_list = {
+			variable = iw_foreign_leagues_list
+			if = {
+				limit = { country_exists = leader_country }
+				leader_country = { add_to_list = iw23_list }
+			}
+		}
+
+		if = {
+			limit = {
+				any_in_list = {
+					list = iw23_list
+					is_at_war_with = root
+				}
+			}
+			random_in_list = {
+				list = iw23_list
+				limit = { is_at_war_with = root }
+				save_scope_as = target_country_recipient
+			}
+		}
+		else = {
+			random_in_list = {
+				list = iw23_list
+				save_scope_as = target_country_recipient
+			}
+		}
+	}
+
+	option = {	#Good riddance turncoat!
+		name = italian_wars.23.a
+
+		ai_will_select = {
+			value = 40
+			subtract = {
+				value = gold
+				divide = monthly_income_total
+				multiply = 5
+			}
+		}
+
+		scope:target_character2 = { move_country = scope:target_country_recipient }
+		add_prestige = prestige_mild_penalty
+	}
+
+	option = {	#Buy [target_character2.GetHerHis] allegiance!
+		name = italian_wars.23.b
+
+		ai_will_select = {
+			value = 20
+			add = {
+				value = gold
+				divide = monthly_income_total
+				multiply = 5
+			}
+			add = army_tradition
+			add = {
+				value = scope:target_character2.total_abilities
+				subtract = 150
+			}
+		}
+
+		change_gold_effect = { scale = -6 }
+		add_prestige = prestige_mild_penalty
+	}
+
+	option = {	#Ruler confronts the traitor personally
+		name = italian_wars.23.c
+
+		trigger = {
+			exists = ruler_or_regent
+			ruler_or_regent = {
+				OR = {
+					has_trait = inspiring_leader
+					has_trait = strict
+					total_abilities >= 220
+				}
+			}
+		}
+
+		ai_will_select = {
+			value = 200
+		}
+
+		custom_tooltip = target_character2_wont_attempt_to_flee_for_10_years_tt
+	}
+}
+
+italian_wars.24 = { #Relations Deteriorate
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.24.title
+	desc = italian_wars.24.desc
+	outcome = negative
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw24_variable }
+		at_war = no
+
+		any_international_organizations_member_of = {
+			OR = {
+				international_organization_type = international_organization_type:italian_league_1
+				international_organization_type = international_organization_type:italian_league_2
+				international_organization_type = international_organization_type:italian_league_3
+				international_organization_type = international_organization_type:foreign_league_france
+				international_organization_type = international_organization_type:foreign_league_iberia
+				international_organization_type = international_organization_type:foreign_league_hre
+			}
+			total_members > 1
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw24_variable
+			years = 4
+		}
+
+		random_international_organizations_member_of = {
+			limit = {
+				OR = {
+					this = international_organization:italian_league_1
+					this = international_organization:italian_league_2
+					this = international_organization:italian_league_3
+					this = international_organization:foreign_league_balkan
+					this = international_organization:foreign_league_france
+					this = international_organization:foreign_league_iberia
+					this = international_organization:foreign_league_hre
+				}
+			}
+			save_scope_as = target_io
+		}
+
+		scope:target_io = {
+			random_international_organization_member = {
+				limit = { this != root }
+				save_scope_as = target_country
+			}
+		}
+	}
+
+	option = {
+		name = italian_wars.24.a 
+		trigger = {
+			exists = ruler_or_regent
+			ruler_or_regent = {
+				OR = {
+					has_trait = calm
+					has_trait = well_advised
+					total_abilities >= 220
+				}
+			}
+		}
+
+		custom_tooltip = ruler_or_regent_skillful_diplomacy_saves_the_day
+	}
+	option = {
+		name = italian_wars.24.b
+
+		if = {
+			limit = {
+				scope:target_country = {
+					has_opinion = { modifier = opinion_diplomatic_accord target = root }
+				}
+			}
+			remove_opinion = { modifier = opinion_diplomatic_accord target = scope:target_country }
+			scope:target_country = { remove_opinion = { modifier = opinion_diplomatic_accord target = root } }
+		}
+		if = {
+			limit = {
+				scope:target_country = {
+					NOT = { has_opinion = { modifier = opinion_diplomatic_misunderstanding target = root } }
+				}
+			}
+			scope:target_country = {
+				add_opinion_mutual_effect = {
+					modifier = opinion_diplomatic_misunderstanding
+					target = root
+				}
+			}
+		}
+		else = { add_government_power = government_power_mild_penalty }
+	}
+}
+
+italian_wars.25 = { #Relations Flourish
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.25.title
+	desc = italian_wars.25.desc
+	outcome = positive
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw25_variable }
+		at_war = no
+
+		any_international_organizations_member_of = {
+			OR = {
+				international_organization_type = international_organization_type:italian_league_1
+				international_organization_type = international_organization_type:italian_league_2
+				international_organization_type = international_organization_type:italian_league_3
+				international_organization_type = international_organization_type:foreign_league_france
+				international_organization_type = international_organization_type:foreign_league_iberia
+				international_organization_type = international_organization_type:foreign_league_hre
+			}
+			total_members > 1
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw25_variable
+			years = 10
+		}
+
+		random_international_organizations_member_of = {
+			limit = {
+				OR = {
+					this = international_organization:italian_league_1
+					this = international_organization:italian_league_2
+					this = international_organization:italian_league_3
+					this = international_organization:foreign_league_balkan
+					this = international_organization:foreign_league_france
+					this = international_organization:foreign_league_iberia
+					this = international_organization:foreign_league_hre
+				}
+			}
+			save_scope_as = target_io
+		}
+
+		scope:target_io = {
+			random_international_organization_member = {
+				limit = { this != root }
+				save_scope_as = target_country
+			}
+		}
+	}
+
+	option = {
+		name = italian_wars.25.a
+
+		if = {
+			limit = {
+				scope:target_country = {
+					has_opinion = { modifier = opinion_diplomatic_misunderstanding target = root }
+				}
+			}
+			remove_opinion = { modifier = opinion_diplomatic_misunderstanding target = scope:target_country }
+			scope:target_country = { remove_opinion = { modifier = opinion_diplomatic_misunderstanding target = root } }
+		}
+		scope:target_country = {
+			add_opinion_mutual_effect = {
+				modifier = opinion_diplomatic_accord
+				target = root
+			}
+		}
+
+		if = {
+			limit = { 
+				scope:target_country = { is_subject = no } 
+				scope:target_io = {
+					international_organization_has_leader = yes
+					leader_country = root
+				}
+			}
+			custom_tooltip = good_relations_will_help_keep_em_in_league_tt
+		}
+		else_if = {
+			limit = { 
+				scope:target_country = { is_subject_of = root }
+			}
+			scope:target_country = { add_liberty_desire = liberty_desire_severe_minus }
+		}
+	}
+
+	option = {
+		name = italian_wars.25.b
+
+		add_prestige = prestige_mild_bonus
+		add_diplomats = 1
+	}
+}
+
+italian_wars.26 = { #Diplomatic Incident
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.26.title
+	desc = italian_wars.26.desc
+	outcome = negative
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		at_war = no
+		NOT = { has_variable = recently_had_iw26_variable }
+		OR = {
+			is_leader_of_international_organization = international_organization:italian_league_1
+			is_leader_of_international_organization = international_organization:italian_league_2
+			is_leader_of_international_organization = international_organization:italian_league_3
+			is_leader_of_international_organization = international_organization:foreign_league_balkan
+			is_leader_of_international_organization = international_organization:foreign_league_france
+			is_leader_of_international_organization = international_organization:foreign_league_iberia
+			is_leader_of_international_organization = international_organization:foreign_league_hre
+		}
+		any_neighbor_country = {
+			capital.region = region:italy_region
+			root = { 
+				NOT = { has_truce_with = prev }
+			}
+			is_member_of_any_italian_wars_league = yes
+			NOT = { is_subject_of = root }
+			root = { can_declare_war_on = prev }
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw26_variable
+			years = 10
+		}
+
+		random_neighbor_country = {
+			limit = {
+				capital.region = region:italy_region
+				root = { 
+					NOT = { has_truce_with = prev }
+				}
+				is_member_of_any_italian_wars_league = yes
+				NOT = { is_subject_of = root }
+				root = { can_declare_war_on = prev }
+			}
+			save_scope_as = target_country
+			ruler_or_regent ?= { save_scope_as = target_character }
+		}
+
+		random_international_organizations_member_of = {
+			limit = {
+				leader_country = root
+				OR = {
+					this = international_organization:italian_league_1
+					this = international_organization:italian_league_2
+					this = international_organization:italian_league_3
+					this = international_organization:foreign_league_balkan
+					this = international_organization:foreign_league_france
+					this = international_organization:foreign_league_iberia
+					this = international_organization:foreign_league_hre
+				}
+			}
+			save_scope_as = our_io
+		}
+	}
+
+	option = {
+		name = italian_wars.26.a
+
+		ai_will_select = {
+			if = {
+				limit = { scope:target_country = { is_subject = yes } }
+				add = {
+					value = 100
+					multiply = "relative_strength(scope:target_country.overlord)"
+					divide = 5
+					desc = "RELATIVE_STRENGTH"
+				}
+			}
+			else = {
+				add = {
+					value = 100
+					multiply = "relative_strength(scope:target_country)"
+					divide = 5
+					desc = "RELATIVE_STRENGTH"
+				}
+			}
+			add = {
+				value = modifier:aggressiveness_modifier
+				subtract = modifier:carefulness_modifier
+				multiply = 50
+				desc = "aggressiveness modifier minus carefulness modifier"
+			}
+			add = {
+				value = manpower_percentage
+				multiply = 10
+				desc = "CURRENT_MANPOWER_TOOLTIP"
+			}
+			add = {
+				value = army_size
+				desc = "army_size"
+			}
+		}
+
+		if = {
+			limit = { is_human = no }
+			declare_war_with_cb = {
+				target = scope:target_country
+				type = casus_belli:cb_secure_italy
+			}
+		}
+		else = {
+			add_casus_belli = {
+				target = scope:target_country
+				type = casus_belli:cb_secure_italy
+			}
+		}
+	}
+
+	option = {
+		name = italian_wars.26.b
+
+		ai_will_select = {
+			add = {
+				value = 100
+				subtract = legitimacy
+				desc = "legitimacy_deficit"
+			}
+			if = {
+				limit = { scope:target_country = { is_subject = yes } }
+				subtract = {
+					value = 100
+					multiply = "relative_strength(scope:target_country.overlord)"
+					divide = 5
+					desc = "RELATIVE_STRENGTH"
+				}
+			}
+			else = {
+				subtract = {
+					value = 100
+					multiply = "relative_strength(scope:target_country)"
+					divide = 5
+					desc = "RELATIVE_STRENGTH"
+				}
+			}
+			subtract = {
+				value = modifier:aggressiveness_modifier
+				subtract = modifier:carefulness_modifier
+				multiply = 50
+				desc = "aggressiveness modifier minus carefulness modifier"
+			}
+		}
+
+		if = {
+			limit = {
+				scope:target_country = {
+					has_opinion = { modifier = opinion_diplomatic_accord target = root }
+				}
+			}
+			remove_opinion = { modifier = opinion_diplomatic_accord target = scope:target_country }
+			scope:target_country = { remove_opinion = { modifier = opinion_diplomatic_accord target = root } }
+		}
+		if = {
+			limit = {
+				scope:target_country = {
+					NOT = { has_opinion = { modifier = opinion_diplomatic_misunderstanding target = root } }
+				}
+			}
+			scope:target_country = {
+				add_opinion_mutual_effect = {
+					modifier = opinion_diplomatic_misunderstanding
+					target = root
+				}
+			}
+		}
+		add_government_power = government_power_mild_penalty
+	}
+}
+
+italian_wars.27 = { #Military Advancements
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.27.title
+	desc = italian_wars.27.desc
+	outcome = positive
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw27_variable }
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw27_variable
+			years = 5
+		}
+		random_list = {
+			1 = {
+				trigger = { NOT = { has_country_modifier = conflict_yields_military_advances_modifier } }
+				set_variable = iw27_variant_a1
+			}
+			1 = {
+				trigger = { NOT = { has_country_modifier = iw_army_tradition_momentum_modifier } }
+				set_variable = iw27_variant_a2
+			}
+			1 = { set_variable = iw27_variant_a3 }
+			1 = {
+				trigger = { NOT = { has_country_modifier = iw_quality_push_modifier } }
+				set_variable = iw27_variant_a4
+			}
+		}
+		random_list = {
+			1 = { set_variable = iw27_variant_b1 }
+			1 = { set_variable = iw27_variant_b2 }
+			1 = { set_variable = iw27_variant_b3 }
+			1 = { set_variable = iw27_variant_b4 }
+		}
+	}
+
+	option = {
+		name = italian_wars.27.a
+
+		switch = {
+			trigger = has_variable
+			iw27_variant_a1 = {
+				add_country_modifier = {
+					modifier = conflict_yields_military_advances_modifier
+					years = modifier_duration_years_normal
+					mode = replace
+				}
+			}
+			iw27_variant_a2 = {
+				add_country_modifier = {
+					modifier = iw_army_tradition_momentum_modifier
+					years = modifier_duration_years_normal
+					mode = replace
+				}
+			}
+			iw27_variant_a3 = {
+				add_research_progress = research_progress_extreme_bonus
+			}
+			iw27_variant_a4 = {
+				add_country_modifier = {
+					modifier = iw_quality_push_modifier
+					years = modifier_duration_years_normal
+					mode = replace
+				}
+				add_legitimacy = legitimacy_mild_bonus
+			}
+		}
+	}
+
+	option = {
+		name = italian_wars.27.b
+
+		switch = {
+			trigger = has_variable
+			iw27_variant_b1 = {
+				ordered_owned_non_rural_location = {
+					limit = {
+						has_land_military_building = yes
+					}
+					order_by = {
+						value = population
+						multiply = local_control
+					}
+					max = {
+						value = root.num_provinces
+						multiply = 0.25
+						min = 1
+					}
+					change_development = development_mild_bonus
+				}
+			}
+			iw27_variant_b2 = {
+				add_yearly_manpower = 1
+			}
+			iw27_variant_b3 = {
+				ordered_owned_non_rural_location = {
+					limit = {
+						has_land_military_building = yes
+					}
+					order_by = {
+						value = population
+						multiply = local_control
+					}
+					max = {
+						value = root.num_provinces
+						multiply = 0.25
+						min = 1
+					}
+					add_location_modifier = {
+						modifier = iw_martial_grasp_modifier
+						years = modifier_duration_years_normal
+						mode = replace
+					}
+				}
+			}
+			iw27_variant_b4 = {
+				ordered_owned_non_rural_location = {
+					limit = {
+						has_land_military_building = yes
+					}
+					order_by = {
+						value = population
+						multiply = local_control
+					}
+					max = {
+						value = root.num_provinces
+						multiply = 0.25
+						min = 1
+					}
+					change_prosperity = prosperity_mild_bonus
+				}
+			}
+		}
+	}
+
+	after = {
+		hidden_effect = {
+			remove_variable = iw27_variant_a1
+			remove_variable = iw27_variant_a2
+			remove_variable = iw27_variant_a3
+			remove_variable = iw27_variant_a4
+			remove_variable = iw27_variant_b1
+			remove_variable = iw27_variant_b2
+			remove_variable = iw27_variant_b3
+			remove_variable = iw27_variant_b4
+		}
+	}
+}
+
+italian_wars.28 = { #New Engineer Offers Services
+	type = country_event
+	category = situation_event
+
+	title = italian_wars.28.title
+	desc = italian_wars.28.desc
+	outcome = neutral
+
+	image = "gfx/interface/illustrations/situation/italian_wars.dds"
+
+	trigger = {
+		is_member_of_any_italian_wars_league = yes
+		NOT = { has_variable = recently_had_iw28_variable }
+	}
+
+	immediate = {
+		set_variable = {
+			name = recently_had_iw28_variable
+			years = 10
+		}
+
+		ordered_owned_location = {
+			order_by = average_location_literacy
+			max = 10
+			check_range_bounds = no
+			add_to_list = iw_28_list
+		}
+
+		random_in_list = {
+			list = iw_28_list
+
+			save_scope_as = target_location
+		}
+
+		create_character = {
+			trait_category = cabinet
+			birth_location = scope:target_location
+			age = { 25 35 }
+			adm = { 40 100 }
+			dip = { 40 100 }
+			mil = { 40 100 }
+			create_in_limbo = yes
+			save_scope_as = new_character
+		}
+	}
+
+	option = {
+		name = italian_wars.28.a
+
+		change_gold_effect = { scale = -6 }
+		add_country_modifier = {
+			modifier = iw_siege_engineer_modifier
+			years = modifier_duration_years_short
+			mode = replace
+		}
+		
+		if = {
+			limit = { 
+				societal_value:traditionalist_vs_innovative < 99 
+				modifier:monthly_towards_innovative > modifier:monthly_towards_traditionalist
+			}
+			random_list = {
+				1 = {
+					show_chance = no
+					desc = engineer_boosts_short_term_research_tt
+					add_research_progress = research_progress_mild_bonus
+				}
+				1 = {
+					show_chance = no
+					desc = engineer_boosts_literacy_efforts_tt
+					change_societal_value = {
+						type = traditionalist_vs_innovative
+						value = societal_value_move_to_right
+					}
+				}
+			}
+		}
+		else = { add_research_progress = research_progress_mild_bonus }
+		scope:new_character = { move_country = root }
+	}
+	option = {
+		name = italian_wars.28.b
+
+		custom_tooltip = iw28_no_engineer_for_years_tt
+		hidden_effect = { kill_character_silently = scope:new_character }
+	}
+}
+
+
+######################################
+# End events
+######################################
+
+italian_wars.400 = {
+	hide_portraits = yes
+	type = country_event
+	category = situation_event
 
 	title = italian_wars.400.title
 	desc = italian_wars.400.desc
@@ -613,6 +2038,24 @@ italian_wars.400 = {
 	image = "gfx/interface/illustrations/situation/italian_wars.dds"
 	immediate = {
 		ruler_or_regent ?= { save_scope_as = target_character }
+		if = {
+			limit = {
+				any_owned_location = {
+					has_building = building_type:italian_administration_center
+				}
+			}
+			every_owned_location = {
+				limit = {
+					has_building = building_type:italian_administration_center
+				}
+				destroy_building = "building(building_type:italian_administration_center|owner)"
+				add_location_modifier = {
+					modifier = center_of_authority_ruins_modifier
+					years = modifier_duration_years_normal
+					mode = add_and_extend
+				}
+			}
+		}
 	}
 	option = {
 		name = italian_wars.400.a
@@ -623,6 +2066,7 @@ italian_wars.400 = {
 					is_leader_of_international_organization = international_organization:foreign_league_france
 					is_leader_of_international_organization = international_organization:foreign_league_iberia 
 					is_leader_of_international_organization = international_organization:foreign_league_hre
+					is_leader_of_international_organization = international_organization:foreign_league_balkan
 				}
 			}
 			add_government_power = government_power_ultimate_penalty

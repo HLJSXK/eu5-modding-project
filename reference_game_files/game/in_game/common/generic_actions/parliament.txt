@@ -786,18 +786,18 @@ force_parliament_issue = {
 				}
 			}
 			trigger_else = { parliament_type = parliament_type:autocratic_parliament }
-			NOT = { has_cooldown = has_forced_parliament_issue }
 		}
+	}
+
+	cooldown = { #only once per parliament session
+		type = has_forced_parliament_issue
+		years = 5
 	}
 
 	effect = {
 		scope:actor = {
 			set_parliament_issue_support = {
 				value = 1
-			}
-			add_cooldown = { #only once per parliament session
-				type = has_forced_parliament_issue
-				years = 5
 			}
 			if = {
 				limit = {
@@ -931,5 +931,144 @@ challenge_bureaucratic_entrenchment = {
 				desc = "[target_bureaucracy.GetName] entrenchment"
 			}
 		}
+	}
+}
+
+declare_holidays_request = {
+	type = parliament
+	
+	ai_tick = daily
+	ai_tick_frequency = 100
+	
+	
+	automation_tick = daily
+	automation_tick_frequency = 1
+	player_automated_category = parliament
+
+	potential = {
+		scope:actor = {
+			has_reform = government_reform:enlightened_council_reform
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			has_reform = government_reform:enlightened_council_reform
+			is_active_parliament = yes
+			NOT = { has_country_modifier = parliament_declared_holidays }
+			parliament_issue_support > modifier:parliament_request_issue_support_needed
+		}
+	}
+	
+	effect = {
+		scope:actor = {
+			add_country_modifier = { modifier = parliament_declared_holidays years = 1 mode = add_and_extend }  
+			add_stability = stability_severe_bonus
+			change_parliament_issue_support = {
+				value = modifier:parliament_request_issue_support_needed
+				multiply = -1
+			}
+		}
+	}
+	
+	ai_will_do = {
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						OR = {
+							parliament_issue_support > 0.9
+							stability <= -20
+						}
+						NOT = {
+							any_country_in_diplomatic_range = {
+								scope:actor = {
+									wants_casus_belli_with = prev
+								}
+								NOT = {
+									has_target_casus_belli_on_us = scope:actor
+								}
+							}
+						}
+					}
+				}
+				value = 10
+			}
+		}
+	}
+}
+
+iw_militarize_country = {
+	type = parliament
+
+	sound = PARLIAMENT_ASK_FOR_LARGER_LEVIES
+	
+	ai_tick = daily
+	ai_tick_frequency = 100
+	automation_tick = daily
+	automation_tick_frequency = 7
+	player_automated_category = parliament
+
+	potential = {
+		situation:italian_wars = { situation_is_active = yes }
+
+		scope:actor = { can_see_situation = situation:italian_wars }
+	}
+
+	allow = {
+		scope:actor = {	
+			is_active_parliament = yes
+			NOT = { has_country_modifier = parliament_approved_extra_levies }
+			parliament_issue_support > modifier:parliament_request_issue_support_needed
+			regular_army_size > 0
+		}
+
+		situation:italian_wars = { var:iw_tension >= 50 }
+	}
+
+	effect = {
+		scope:actor = {
+			add_country_modifier = {
+				modifier = parliament_approved_militarization 
+				years = 3 
+				mode = add_and_extend 
+			}  
+			add_army_tradition = army_tradition_extreme_bonus
+			if = {
+				limit = { regular_army_size > 0 }
+				ordered_army = {
+					limit = { NOT = { has_unit_modifier = extensive_training_modifier} }
+					order_by = num_subunits  
+					max = 1
+					check_range_bounds = no  
+					save_scope_as = target_army
+					add_unit_modifier = {
+						modifier = extensive_training_modifier
+						years = modifier_duration_years_short
+						mode = replace
+					}
+				}
+			}
+			change_parliament_issue_support = {
+				value = modifier:parliament_request_issue_support_needed
+				multiply = -1
+			}
+		}
+	}
+	
+	ai_will_do = {
+		add = {
+			value = -25
+			desc = "BASE_VALUE"
+		}
+		add = {
+			value = situation:italian_wars.var:iw_tension
+			desc = "[situation_tension|e]"
+		}
+		add = {
+			value = scope:actor.military_strength
+			desc = "military_strength"
+		}
+		
 	}
 }

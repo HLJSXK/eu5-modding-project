@@ -1,4 +1,4 @@
-types CombatTooltipTypes
+﻿types CombatTooltipTypes
 {
 	type TooltipCombatStatsList = TooltipListBase {
 		ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
@@ -116,6 +116,12 @@ template SubUnitCategory_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[SubUnitCategory.GetDebugText]"
+				}
+			}
+
 			TooltipStringPairList = {
 				blockoverride "block_title" {
 					text = "UNIT_ABILITIES"
@@ -600,10 +606,6 @@ template SubUnitUpgradePath {
 						using = bg_round_corners_alt_texture
 						margin = {-1 -1}
 						modify_texture = {
-							color = "[BuildingType.GetPopType.GetColor]"
-							alpha = 0.8
-						}
-						modify_texture = {
 							using = overlay_cloth_texture
 							blend_mode = overlay
 							alpha = 0.1
@@ -656,10 +658,6 @@ template SubUnitUpgradePath {
 							background = {
 								using = bg_round_corners_alt_texture
 								margin = {-1 -1}
-								modify_texture = {
-									color = "[BuildingType.GetPopType.GetColor]"
-									alpha = 0.8
-								}
 								modify_texture = {
 									using = overlay_cloth_texture
 									blend_mode = overlay
@@ -1314,10 +1312,12 @@ template UnitFood_tooltip {
 						TooltipManualTableField = {
 							blockoverride "field_content" {
 								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
 									text = "CURRENT_FOOD_IN_TT"
 								}
-								expand = {}
 								text_single = {
+									autoresize = yes
 									text = "[Unit.GetFoodSupply|2]"
 								}
 							}
@@ -1325,10 +1325,12 @@ template UnitFood_tooltip {
 						TooltipManualTableField = {
 							blockoverride "field_content" {
 								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
 									text = "DAILY_FOOD_BALANCE_IN_TT"
 								}
-								expand = {}
 								text_single = {
+									autoresize = yes
 									text = "[Unit.GetDailyFoodBalance|+=2]"
 								}
 							}
@@ -1336,10 +1338,12 @@ template UnitFood_tooltip {
 						TooltipManualTableField = {
 							blockoverride "field_content" {
 								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
 									text = "MAX_FOOD_IN_TT"
 								}
-								expand = {}
 								text_single = {
+									autoresize = yes
 									text = "[Unit.GetMaximumFoodStorage|2G]"
 								}
 							}
@@ -1591,28 +1595,36 @@ template Garrison_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
-			location_fort_tt_block = {}
+			vbox = {
+				visible = "[HasGarrisonIntelOn(Location.Self)]"
+				location_fort_tt_block = {}
 
-			TooltipTextBlock = {
-				visible = "[And(Location.HasFortTooltip, Not(Location.HasFort))]"
-				blockoverride "text" {
-					text = "[Location.GetFortInfo]"
+				TooltipTextBlock = {
+					visible = "[And(Location.HasFortTooltip, Not(Location.HasFort))]"
+					blockoverride "text" {
+						text = "[Location.GetFortInfo]"
+					}
+				}
+
+				TooltipTextBlock = {
+					visible = "[And(Not(Location.HasFort),Not(Location.HasFortTooltip ))]"
+					datacontext = "[Location]"
+					blockoverride "text" {
+						text = "NO_TYPES_OF_FORTS_HERE"
+					}
+				}
+
+				TooltipFlavorTextBlock = {
+					visible = "[Location.HasFort]"
+					blockoverride "text" {
+						text = "GARRISON_FLAVOR"
+					}
 				}
 			}
-
-			TooltipTextBlock = {
-				visible = "[And(Not(Location.HasFort),Not(Location.HasFortTooltip ))]"
-				datacontext = "[Location]"
-				blockoverride "text" {
-					text = "NO_TYPES_OF_FORTS_HERE"
-				}
-			}
-
-			TooltipFlavorTextBlock = {
-				visible = "[Location.HasFort]"
-				blockoverride "text" {
-					text = "GARRISON_FLAVOR"
-				}
+			text_single = {
+				visible = "[Not(HasGarrisonIntelOn(Location.Self))]"
+				tagtooltip_enabled = yes
+				text = "INTEL_FOG_LOC_GARRISON_UNKNOWN"
 			}
 		}
 	}
@@ -2189,6 +2201,99 @@ template SubUnitCountsRegiments_tooltip {
 	}
 }
 
+template UnitLevies_slice_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Unit.IsArmy]"
+				texture = "[GetConceptTexture('army_levy')]"
+			}
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Not(Unit.IsArmy)]"
+				texture = "[GetConceptTexture('navy_levy')]"
+			}
+		}
+		blockoverride "title_text" {
+			text = "UNIT_LEVIES_SLICE_TOOLTIP_TITLE"
+		}
+		blockoverride "concept_link" {
+			text = "[levies|e]"
+		}
+		blockoverride "tooltip_content" {
+			TooltipColumnList = {
+				blockoverride "block_title" {
+					text = "[SelectLocalization(Unit.IsArmy, 'UNIT_LEVIES_BLOCK_TITLE_ARMY', 'UNIT_LEVIES_BLOCK_TITLE_NAVY')]"
+				}
+				textcontext = "[Unit.GetLeviesTooltipText]"
+			}
+		}
+	}
+}
+
+template UnitMercenaries_slice_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Unit.IsArmy]"
+				texture = "[GetConceptTexture('mercenary')]"
+			}
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Not(Unit.IsArmy)]"
+				texture = "gfx/interface/icons/unit_category/mercenary_navy.dds"
+			}
+		}
+		blockoverride "title_text" {
+			text = "UNIT_MERCENARIES_SLICE_TOOLTIP_TITLE"
+		}
+		blockoverride "concept_link" {
+			text = "[mercenaries|e]"
+		}
+		blockoverride "tooltip_content" {
+			TooltipColumnList = {
+				blockoverride "block_title" {
+					text = "[SelectLocalization(Unit.IsArmy, 'UNIT_MERCENARIES_BLOCK_TITLE_ARMY', 'UNIT_MERCENARIES_BLOCK_TITLE_NAVY')]"
+				}
+				textcontext = "[Unit.GetMercenariesTooltipText]"
+			}
+		}
+	}
+}
+
+template UnitRegulars_slice_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Unit.IsArmy]"
+				texture = "[GetConceptTexture('regular_regiment')]"
+			}
+			icon = {
+				using = tooltip_title_icon_size
+				visible = "[Not(Unit.IsArmy)]"
+				texture = "[GetConceptTexture('regular_ship')]"
+			}
+		}
+		blockoverride "title_text" {
+			text = "UNIT_REGULARS_SLICE_TOOLTIP_TITLE"
+		}
+		blockoverride "concept_link" {
+			text = "[regulars|e]"
+		}
+		blockoverride "tooltip_content" {
+			TooltipColumnList = {
+				blockoverride "block_title" {
+					text = "[SelectLocalization(Unit.IsArmy, 'UNIT_REGULARS_BLOCK_TITLE_ARMY', 'UNIT_REGULARS_BLOCK_TITLE_NAVY')]"
+				}
+				textcontext = "[Unit.GetRegularsTooltipText]"
+			}
+		}
+	}
+}
+
 template UnitRegiments_tooltip {
 	ContextualTooltipType = {
 		blockoverride "title_icon" {
@@ -2616,155 +2721,210 @@ template Unit_tooltip {
 				}
 			}
 
-			TooltipRowList = {
-				blockoverride "block_title" { visible = no }
-				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(Unit.GetSubUnitCounts)]"}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Unit.GetSubUnitCounts)]"}
-				blockoverride "rowlist_datamodel" { datamodel = "[Unit.GetSubUnitCounts]" }
-				blockoverride "rowlist_content" {
-					margin = { 10 0 }
-					spacing = 4
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 8
+				widget = {
+					visible = "[Or(Or(GreaterThan_float(Unit.GetTotalRegularCount, '(float)0'), GreaterThan_float(Unit.GetTotalMercenaryCount, '(float)0')), GreaterThan_float(Unit.GetTotalLevyCount, '(float)0'))]"
+					layoutpolicy_vertical = expanding
+					size = { 14 -1 }
 
-					icon = {
-						size = { 32 32 }
-						texture = "[GetSubUnitCategoryIcon(SubUnitCounts.GetCategory)]"
-					}
-
-					text_single = {
+					barchart = {
 						layoutpolicy_horizontal = expanding
-						autoresize = no
-						align = left|nobaseline
-						text = "[SubUnitCounts.GetName]"
-					}
+						size = { 14 100% }
+						direction = vertical
+						alwaystransparent = yes
+						parentanchor = center
 
-					hbox = {
-						spacing = 4
-						tagtooltip_enabled = yes
-						tooltip = "[levies|e]"
-
-						text_single = {
-							size = { 30 30 }
-							autoresize = no
-							align = right|nobaseline
-							text = "[SubUnitCounts.GetLevyCount]"
+						barslice = {
+							texture = "gfx/interface/progressbars/progress_bar_bronze_rotated.dds"
+							value = "[Unit.GetTotalLevyCount]"
+							color = { 0.9 0.9 0.9 1 }
+							# modify_texture = {
+							# 	using = color_white_texture
+							# 	blend_mode = add
+							# }
+							tooltipwidget = {
+								using = UnitLevies_slice_tooltip
+							}
 						}
 
-						icon = {
-							size = { 24 24 }
-							visible = "[Unit.IsArmy]"
-							texture = "gfx/interface/icons/unit_category/army_levies.dds"
+						barslice = {
+							texture = "gfx/interface/progressbars/progress_bar_goldish_rotated.dds"
+							value = "[Unit.GetTotalRegularCount]"
+							color = { 0.9 0.9 0.9 1 }
+							tooltipwidget = {
+								using = UnitRegulars_slice_tooltip
+							}
 						}
-
-						icon = {
-							size = { 24 24 }
-							visible = "[Not(Unit.IsArmy)]"
-							texture = "gfx/interface/icons/unit_category/navy_levies.dds"
-						}
-					}
-
-					hbox = {
-						spacing = 4
-						tagtooltip_enabled = yes
-						tooltip = "[regulars|e]"
-
-						text_single = {
-							size = { 30 30 }
-							autoresize = no
-							align = right|nobaseline
-							text = "[SubUnitCounts.GetRegularCount]"
-						}
-
-						icon = {
-							size = { 24 24 }
-							visible = "[Unit.IsArmy]"
-							texture = "gfx/interface/icons/unit_actions/regulars.dds"
-						}
-
-						icon = {
-							size = { 24 24 }
-
-							visible = "[Not(Unit.IsArmy)]"
-
-							texture = "gfx/interface/icons/unit_category/regulars_navy.dds"
-						}
-					}
-
-					hbox = {
-						spacing = 4
-						tagtooltip_enabled = yes
-						tooltip = "[mercenaries|e]"
-
-						text_single = {
-							size = { 30 30 }
-							autoresize = no
-							align = right|nobaseline
-							text = "[SubUnitCounts.GetMercenaryCount]"
-						}
-
-						icon = {
-							size = { 24 24 }
-							visible = "[Unit.IsArmy]"
-							texture = "gfx/interface/icons/unit_category/mercenary.dds"
-						}
-
-						icon = {
-							size = { 24 24 }
-							visible = "[Not(Unit.IsArmy)]"
-							texture = "gfx/interface/icons/unit_category/mercenary_navy.dds"
-						}
-					}
-
-					text_single = {
-						size = { 90 30 }
-						autoresize = no
-						align = right|nobaseline
-						raw_text = "[Select_CString(Unit.IsArmy, SubUnitCounts.GetTotalLong, ToString_int32(SubUnitCounts.GetCount))]"
-
-						datacontext = "[SubUnitCounts.GetCategory]"
-						tooltipwidget = {
-							using = SubUnitCountsRegiments_tooltip
-						}
-					}
-
-					icon = {
-						size = { 24 24 }
-						visible = "[Unit.IsArmy]"
-						texture = "gfx/interface/icons/unit_category/total_strength.dds"
-
-						tooltipwidget = {
-							using = SubUnitCountsRegiments_tooltip
-						}
-					}
-
-					icon = {
-						size = { 24 24 }
-						visible = "[Not(Unit.IsArmy)]"
-						texture = "gfx/interface/icons/unit_view/formation_flat.dds"
-
-						tooltipwidget = {
-							using = SubUnitCountsRegiments_tooltip
+						barslice = {
+							texture = "gfx/interface/progressbars/progress_bar_silver_rotated.dds"
+							# texture = "gfx/interface/progressbars/progress_standard.dds"
+							value = "[Unit.GetTotalMercenaryCount]"
+							color = { 1 1 1 1 }
+							tooltipwidget = {
+								using = UnitMercenaries_slice_tooltip
+							}
+							# alwaystransparent = yes
+							# modify_texture = {
+							# 	using = color_white_texture
+							# 	blend_mode = add
+							# }
 						}
 					}
 				}
-
-				blockoverride "block_scrollarea" {
-					maximumsize = { -1 210 }
-				}
-
-				blockoverride "row_size" {
-					maximumsize = { -1 50 }
-					minimumsize = { -1 50 }
-				}
-
-				blockoverride "field_background" {
-					visible = "[NotEqualTo_int32(SubUnitCounts.GetCount, '(int32)0')]"
-
-					background = {
-						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInParent)]"
-						using = tooltip_table_field_texture
+	
+				TooltipRowList = {
+					blockoverride "block_title" { visible = no }
+					blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(Unit.GetSubUnitCounts)]"}
+					blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Unit.GetSubUnitCounts)]"}
+					blockoverride "rowlist_datamodel" { datamodel = "[Unit.GetSubUnitCounts]" }
+					blockoverride "rowlist_content" {
+						margin = { 10 0 }
+						spacing = 4
+	
+						icon = {
+							size = { 32 32 }
+							texture = "[GetSubUnitCategoryIcon(SubUnitCounts.GetCategory)]"
+						}
+	
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							autoresize = no
+							align = left|nobaseline
+							text = "[SubUnitCounts.GetName]"
+						}
+	
+						hbox = {
+							spacing = 4
+							tagtooltip_enabled = yes
+							tooltip = "[levies|e]"
+	
+							text_single = {
+								size = { 30 30 }
+								autoresize = no
+								align = right|nobaseline
+								text = "[SubUnitCounts.GetLevyCount]"
+							}
+	
+							icon = {
+								size = { 24 24 }
+								visible = "[Unit.IsArmy]"
+								texture = "gfx/interface/icons/unit_category/army_levies.dds"
+							}
+	
+							icon = {
+								size = { 24 24 }
+								visible = "[Not(Unit.IsArmy)]"
+								texture = "gfx/interface/icons/unit_category/navy_levies.dds"
+							}
+						}
+	
+						hbox = {
+							spacing = 4
+							tagtooltip_enabled = yes
+							tooltip = "[regulars|e]"
+	
+							text_single = {
+								size = { 30 30 }
+								autoresize = no
+								align = right|nobaseline
+								text = "[SubUnitCounts.GetRegularCount]"
+							}
+	
+							icon = {
+								size = { 24 24 }
+								visible = "[Unit.IsArmy]"
+								texture = "gfx/interface/icons/unit_actions/regulars.dds"
+							}
+	
+							icon = {
+								size = { 24 24 }
+	
+								visible = "[Not(Unit.IsArmy)]"
+	
+								texture = "gfx/interface/icons/unit_category/regulars_navy.dds"
+							}
+						}
+	
+						hbox = {
+							spacing = 4
+							tagtooltip_enabled = yes
+							tooltip = "[mercenaries|e]"
+	
+							text_single = {
+								size = { 30 30 }
+								autoresize = no
+								align = right|nobaseline
+								text = "[SubUnitCounts.GetMercenaryCount]"
+							}
+	
+							icon = {
+								size = { 24 24 }
+								visible = "[Unit.IsArmy]"
+								texture = "gfx/interface/icons/unit_category/mercenary.dds"
+							}
+	
+							icon = {
+								size = { 24 24 }
+								visible = "[Not(Unit.IsArmy)]"
+								texture = "gfx/interface/icons/unit_category/mercenary_navy.dds"
+							}
+						}
+	
+						text_single = {
+							size = { 50 30 }
+							autoresize = no
+							align = right|nobaseline
+							raw_text = "[Select_CString(Unit.IsArmy, SubUnitCounts.GetTotalLong, ToString_int32(SubUnitCounts.GetCount))]"
+	
+							datacontext = "[SubUnitCounts.GetCategory]"
+							tooltipwidget = {
+								using = SubUnitCountsRegiments_tooltip
+							}
+						}
+	
+						icon = {
+							size = { 24 24 }
+							visible = "[Unit.IsArmy]"
+							texture = "gfx/interface/icons/unit_category/total_strength.dds"
+	
+							tooltipwidget = {
+								using = SubUnitCountsRegiments_tooltip
+							}
+						}
+	
+						icon = {
+							size = { 24 24 }
+							visible = "[Not(Unit.IsArmy)]"
+							texture = "[GetConceptTexture('ship')]"
+	
+							tooltipwidget = {
+								using = SubUnitCountsRegiments_tooltip
+							}
+						}
+					}
+	
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 210 }
+					}
+	
+					blockoverride "row_size" {
+						maximumsize = { -1 50 }
+						minimumsize = { -1 50 }
+					}
+	
+					blockoverride "field_background" {
+						visible = "[NotEqualTo_int32(SubUnitCounts.GetCount, '(int32)0')]"
+	
+						background = {
+							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInParent)]"
+							using = tooltip_table_field_texture
+						}
 					}
 				}
 			}
+
 		}
 	}
 }
@@ -3533,7 +3693,6 @@ template UnitOverviewLeviesTooltip {
 					hbox = {
 						using = layoutpolicy_expanding
 						spacing = 5
-						size = { 500 40 }					
 						hbox = {
 							using = layoutpolicy_expanding
 							margin = { 0 5 }
@@ -4753,18 +4912,6 @@ template Mercenary_tooltip {
 			TooltipStringPairList = {
 				textcontext = "[Mercenary.GetUITooltip]"
 			}
-			overlappingitembox = {
-				visible =  "[Not(IsDataModelEmpty(Mercenary.GetTimedModifiers))]"
-				datamodel = "[Mercenary.GetTimedModifiers]"
-				size = { 400 30 }
-				spacing = 5
-
-				item = {
-					timed_modifier_icon = {
-						size = { 20 20 }
-					}
-				}
-			}
 		}
 	}
 }
@@ -4873,31 +5020,6 @@ template Privateer_tooltip {
 	}
 }
 
-template MercenaryModifier_tooltip {
-	ContextualTooltipType = {
-
-		blockoverride "title_icon" {
-			icon = {
-				using = tooltip_title_icon_size
-				texture = "[MercenaryModifierWrap.GetIcon]"
-			}
-		}
-
-		blockoverride "title_text" {
-			text = "[MercenaryModifierWrap.GetName]"
-		}
-
-		blockoverride "concept_link" {
-			text = "[modifier|e]"
-		}
-
-		blockoverride "tooltip_content" {
-			TooltipStringPairList = {
-				textcontext = "[MercenaryModifierWrap.GetTooltip]"
-			}
-		}
-	}
-}
 
 template SelectedUnits_tooltip {
 	ContextualTooltipType = {
@@ -5258,19 +5380,6 @@ template mercenary_card_strength_tooltip {
 			TooltipStringPairList = {
 				textcontext = "[Mercenary.GetUITooltip]"
 			}
-			overlappingitembox = {
-				visible =  "[Not(IsDataModelEmpty(Mercenary.GetTimedModifiers))]"
-				datamodel = "[Mercenary.GetTimedModifiers]"
-				size = { 400 30 }
-				spacing = 5
-
-				item = {
-					timed_modifier_icon = {
-						size = { 20 20 }
-					}
-				}
-			}
-
 			TooltipScrolledRowList = {
 				visible = "[Mercenary.IsEmployed]"
 				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
@@ -6102,32 +6211,60 @@ template ArmyOverview_tooltip {
 		
 		blockoverride "tooltip_content" {
 			TooltipStringPairList = {
-				visible = "[Country.HasArmy]"
+				visible = "[And(HasArmySizeIntelOn(Country.Self), Country.HasArmy)]"
 				blockoverride "block_title" {
 					text = "CURRENT_ARMY_OVERVIEW"
 				}
 				textcontext = "[Country.GetArmyBreakdown]"
 			}
-			
+
 			TooltipTextBlock = {
-				visible = "[Not(Country.HasArmy)]"
+				visible = "[And(HasArmySizeIntelOn(Country.Self), Not(Country.HasArmy))]"
 				blockoverride "text" {
 					text = "CAW_NO_CURRENT_ARMY"
 				}
 			}
-			
-			TooltipStringPairList = {		
+
+			TooltipStringPairList = {
+				visible = "[HasArmySizeIntelOn(Country.Self)]"
 				blockoverride "block_title" {
 					text = "POTENTIAL_ARMY_OVERVIEW"
 				}
-				textcontext = "ARMY_BRK_POT_LEVIES"										
+				textcontext = "[Country.GetPotentialAndBeingRaisedArmyLevyBreakdown]"
+			}
+
+			TooltipListBase = { 
+				TooltipListRowContent = {
+					TooltipManualTableField = {
+						blockoverride "field_content" {
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								autoresize = no
+								raw_text = "[manpower|e]"
+							}
+							text_single = {
+								autoresize = yes
+								raw_text = "[Country.GetMaxManpowerValue|2W] [manpower_icon]"
+							}
+						}
+					}
+				}
 			}
 
 			TooltipStringPairList = {
+				visible = "[HasArmySizeIntelOn(Country.Self)]"
 				blockoverride "block_title" {
 					text = "BEST_POSSIBLE_REGIMENTS"
 				}
-				textcontext = "[Country.GetBestArmyUnits]"										
+				textcontext = "[Country.GetBestArmyUnits]"
+			}
+
+			TooltipTextBlock = {
+				visible = "[Not(HasArmySizeIntelOn(Country.Self))]"
+				tagtooltip_enabled = yes
+				blockoverride "text" {
+					text = "INTEL_FOG_ARMY_SIZE_UNKNOWN"
+				}
 			}
 		}
 	}
@@ -6152,33 +6289,60 @@ template NavyOverview_tooltip {
 		
 		blockoverride "tooltip_content" {
 			TooltipStringPairList = {
-				visible = "[Country.HasNavy]"
+				visible = "[And(HasNavyStrengthIntelOn(Country.Self), Country.HasNavy)]"
 				blockoverride "block_title" {
 					text = "CURRENT_NAVY_OVERVIEW"
 				}
 				textcontext = "[Country.GetNavyBreakdown]"
 			}
-		
+
 			TooltipTextBlock = {
-				visible = "[Not(Country.HasNavy)]"
+				visible = "[And(HasNavyStrengthIntelOn(Country.Self), Not(Country.HasNavy))]"
 				blockoverride "text" {
 					text = "CAW_NO_CURRENT_NAVY"
 				}
 			}
-			
-			TooltipStringPairList = {		
-	
+
+			TooltipStringPairList = {
+				visible = "[HasNavyStrengthIntelOn(Country.Self)]"
 				blockoverride "block_title" {
 					text = "POTENTIAL_NAVY_OVERVIEW"
 				}
-				textcontext = "NAVY_BRK_POT_LEVIES"										
+				textcontext = "NAVY_BRK_POT_LEVIES"
+			}
+
+			TooltipListBase = { 
+				TooltipListRowContent = {
+					TooltipManualTableField = {
+						blockoverride "field_content" {
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								autoresize = no
+								raw_text = "[sailors|e]"
+							}
+							text_single = {
+								autoresize = yes
+								raw_text = "[Country.GetMaxSailorValue|2W] [sailors_icon]"
+							}
+						}
+					}
+				}
 			}
 
 			TooltipStringPairList = {
+				visible = "[HasNavyStrengthIntelOn(Country.Self)]"
 				blockoverride "block_title" {
 					text = "BEST_POSSIBLE_SHIPS"
 				}
 				textcontext = "[Country.GetBestNavyUnits]"
+			}
+
+			TooltipTextBlock = {
+				visible = "[Not(HasNavyStrengthIntelOn(Country.Self))]"
+				tagtooltip_enabled = yes
+				blockoverride "text" {
+					text = "INTEL_FOG_NAVY_STRENGTH_UNKNOWN"
+				}
 			}
 		}
 	}

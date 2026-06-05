@@ -1,11 +1,20 @@
 ﻿join_a_league = {
 	type = situation
-	
+
 	ai_tick = monthly
 	ai_tick_frequency = 1
 
 	automation_tick = never
 	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor ?= {
+			OR = {
+				tag = PAP
+				capital.region = region:italy_region
+			}
+		}
+	}
 
 	allow = {
 		scope:actor ?= {
@@ -19,14 +28,7 @@
 			at_war = no
 			custom_tooltip = {
 				text = is_not_leader_of_any_leagues_tt
-				NOR = {
-					is_leader_of_international_organization = international_organization:foreign_league_france
-					is_leader_of_international_organization = international_organization:foreign_league_hre
-					is_leader_of_international_organization = international_organization:foreign_league_iberia
-					is_leader_of_international_organization = international_organization:italian_league_1
-					is_leader_of_international_organization = international_organization:italian_league_2
-					is_leader_of_international_organization = international_organization:italian_league_3
-				}
+				is_leader_of_any_league = no
 			}
 		}
 	}
@@ -59,6 +61,7 @@
 		looking_for_a = international_organization
 		target_flag = target
 		interaction_source_list = {
+			international_organization:foreign_league_balkan ?= { add_to_list = source }
 			international_organization:foreign_league_france ?= { add_to_list = source }
 			international_organization:foreign_league_hre ?= { add_to_list = source }
 			international_organization:foreign_league_iberia ?= { add_to_list = source }
@@ -189,14 +192,7 @@ create_italian_league = {
 		scope:actor ?= {
 			capital.region = region:italy_region
 			religion.group = religion_group:christian
-			NOR = {
-				is_leader_of_international_organization = international_organization:foreign_league_france
-				is_leader_of_international_organization = international_organization:foreign_league_hre
-				is_leader_of_international_organization = international_organization:foreign_league_iberia
-				is_leader_of_international_organization = international_organization:italian_league_1
-				is_leader_of_international_organization = international_organization:italian_league_2
-				is_leader_of_international_organization = international_organization:italian_league_3
-			}
+			is_leader_of_any_league = no
 		}
 	}
 
@@ -212,14 +208,7 @@ create_italian_league = {
 			#We can not be a leader of another League
 			custom_tooltip = {
 				text = is_not_leader_of_any_leagues_tt
-				NOR = {
-					is_leader_of_international_organization = international_organization:foreign_league_france
-					is_leader_of_international_organization = international_organization:foreign_league_hre
-					is_leader_of_international_organization = international_organization:foreign_league_iberia
-					is_leader_of_international_organization = international_organization:italian_league_1
-					is_leader_of_international_organization = international_organization:italian_league_2
-					is_leader_of_international_organization = international_organization:italian_league_3
-				}
+				is_leader_of_any_league = no
 			}
 
 			#Are we in a union?
@@ -234,14 +223,7 @@ create_italian_league = {
 					}
 					NOT = {
 						any_union_partner = {
-							OR = {
-								is_leader_of_international_organization = international_organization:foreign_league_france
-								is_leader_of_international_organization = international_organization:foreign_league_hre
-								is_leader_of_international_organization = international_organization:foreign_league_iberia
-								is_leader_of_international_organization = international_organization:italian_league_1
-								is_leader_of_international_organization = international_organization:italian_league_2
-								is_leader_of_international_organization = international_organization:italian_league_3
-							}
+							is_leader_of_any_league = yes
 						}
 					}
 				}
@@ -342,12 +324,19 @@ create_italian_league = {
 				}
 			}
 		}
+		iw_increase_tension_effect = { value = iw_tension_gain_mid }
 	}
 
 	ai_will_do = {
 		add = {
 			value = 5
 			desc = BASE_VALUE
+		}
+		add = {
+			value = scope:actor.modifier:aggressiveness_modifier
+			subtract = scope:actor.modifier:carefulness_modifier
+			multiply = 50
+			desc = "aggressiveness modifier minus carefulness modifier"
 		}
 		add = {
 			value = scope:actor.total_control_scaled_population
@@ -460,6 +449,7 @@ dissolve_italian_league = {
 				destroy_international_organization = { target = international_organization:italian_league_3 }
 			}
 		}
+		iw_increase_tension_effect = { value = iw_tension_loss_high }
 	}
 
 	ai_will_do = {	
@@ -581,6 +571,11 @@ plan_campaign_in_italy = {
 			else = {
 				value = 3
 			}
+			subtract = {
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.01
+				desc = "[situation_tension|e]"
+			}
 		}
 	}
 
@@ -609,13 +604,23 @@ plan_campaign_in_italy = {
 		target_flag = target
 		name = "choose_province_to_plan_campaign_text"
 		none_available_msg_key = "plan_campaign_in_italy_no_provinces"
+		pre_evaluation_sort_value = {
+			add = {
+				value = "border_distance_to(scope:actor)"
+				multiply = -1
+			}
+		}
+		pre_evaluation_number_to_evaluate_fully = 5
 		column = { data = name }
 		column = { data = population }
 		visible = {
 			region = region:italy_region
 		}
 		enabled = {
-			scope:actor = { can_declare_war_on = root.owner }
+			scope:actor = {
+				can_declare_war_on = root.owner
+				NOT = { has_truce_with = root.owner }
+			}
 		}
 	}
 	effect = { 
@@ -654,11 +659,33 @@ plan_campaign_in_italy = {
 		if = {
 			limit = { exists = scope:target }
 			add = {
-				desc = "we want their land"
-				value = "scope:actor.conquer_desire(scope:target.owner)"
+				value = {
+					scope:target = {
+						add = {
+							value = "border_distance_to(scope:actor)"
+							multiply = -0.5
+						}
+					}
+				}
+				desc = "distance to [target.GetName]"
 			}
 			if = {
-				limit = { 
+				limit = {
+					"scope:actor.conquer_desire(scope:target.owner)" > 0
+				}
+				add = {
+					desc = "we want their land"
+					value = "scope:actor.conquer_desire(scope:target.owner)"
+				}
+			}
+			else = {
+				subtract = {
+					value = 100
+					desc = "no desire to conquer owner"
+				}
+			}
+			if = {
+				limit = {
 					scope:actor = { wants_casus_belli_with = scope:target.owner }
 				}
 				add = {
@@ -666,17 +693,20 @@ plan_campaign_in_italy = {
 					value = 10
 				}
 			}
+			if = {
+				limit = {
+					scope:actor = { is_neighbor_of = scope:target.owner }
+				}
+				add = {
+					value = 50
+					desc = "directly borders target owner"
+				}
+			}
 			add = {
 				desc = "RELATIVE_STRENGTH"
 				value = 100
 				multiply = "scope:actor.relative_strength(scope:target.owner)"
-				divide = 10
-			}
-			add = {
-				desc = "DISTANCE_FROM_FRANCE_LEADER"
-				value = "scope:actor.border_distance_to(scope:target.owner)"
-				multiply = -0.25
-				min = -1000
+				divide = 5
 			}
 			add = {
 				desc = "CURRENT_MANPOWER_TOOLTIP"
@@ -696,7 +726,6 @@ plan_campaign_in_italy = {
 			add = {
 				desc = "offensive alliance"
 				value = scope:actor.offensive_alliance_strength
-				divide = 10
 			}
 			if = {
 				limit = {
@@ -708,209 +737,40 @@ plan_campaign_in_italy = {
 				}
 			}
 		}
-	}
-}
-
-intervene_in_italian_campaign = {
-	type = situation
-	
-	ai_tick = monthly
-	ai_tick_frequency = 3
-
-	automation_tick = never
-	automation_tick_frequency = 12
-
-	
-	potential = {
-		scope:actor ?= {
-			OR = {
-				is_leader_of_international_organization = international_organization:foreign_league_balkan
-				is_leader_of_international_organization = international_organization:foreign_league_france
-				is_leader_of_international_organization = international_organization:foreign_league_hre
-				is_leader_of_international_organization = international_organization:foreign_league_iberia
-			}
-		}
-	}
-
-	allow = {
-		scope:actor ?= {
-			at_war = no
-		}
-	}
-
-	price = price:intervene_in_italian_campaign_price
-
-	select_trigger = {
-		looking_for_a = situation
-		interaction_source_list = {
-			situation:italian_wars = {
-				add_to_list = source
-			}
-		}
-		target_flag = recipient
-		name = "choose_situation"
-		column = {
-			data = name
-		}
-		visible = {
-			situation:italian_wars = this
-			situation_is_active = yes
-		}
-	}
-
-	select_trigger = {
-		looking_for_a = country
-		target_flag = target
-		name = "choose_province_to_plan_campaign_text"
-		none_available_msg_key = "intervene_in_italian_campaign_no_countries"
-		column = { data = name }
-		column = { data = population }
-		visible = {
-			OR = {
-				AND = {
-					root = international_organization:foreign_league_france.leader_country
-					NOT = { has_truce_with = scope:actor }
-					any_current_war = {
-						attacker_leader = root
-						any_defender = {
-							OR = {
-								is_leader_of_international_organization = international_organization:italian_league_1
-								is_leader_of_international_organization = international_organization:italian_league_2
-								is_leader_of_international_organization = international_organization:italian_league_3
-							}
-						}
-					}
-				}
-				AND = {
-					root = international_organization:foreign_league_hre.leader_country
-					NOT = { has_truce_with = scope:actor }
-					any_current_war = {
-						attacker_leader = root
-						any_defender = {
-							OR = {
-								is_leader_of_international_organization = international_organization:italian_league_1
-								is_leader_of_international_organization = international_organization:italian_league_2
-								is_leader_of_international_organization = international_organization:italian_league_3
-							}
-						}
-					}
-				}
-				AND = {
-					root = international_organization:foreign_league_iberia.leader_country
-					NOT = { has_truce_with = scope:actor }
-					any_current_war = {
-						attacker_leader = root
-						any_defender = {
-							OR = {
-								is_leader_of_international_organization = international_organization:italian_league_1
-								is_leader_of_international_organization = international_organization:italian_league_2
-								is_leader_of_international_organization = international_organization:italian_league_3
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	effect = {
-		if = {
-			limit = {
-				exists = scope:target
-				scope:target = {
-					NOT = { has_truce_with = scope:actor }
-				}
-			}
-			scope:target = {
-				trigger_event_non_silently = italian_wars.7
-			}
-		}
-		custom_tooltip = italian_wars_notify_aggressor_tt
-	}
-
-	ai_will_do = {
-		add = 10
-		if = {
-			limit = {
-				exists = scope:target
-			}
-			add = {
-				desc = "DISTANCE_FROM_FRANCE_LEADER"
-				value = "scope:actor.border_distance_to(scope:target)"
-				multiply = -0.1
-				min = -1000
-			}
-			if = {
-				limit = {
-					scope:target = {
-						any_current_war = {
-							attacker_leader = scope:target
-							any_defender = {
-								OR = {
-									is_leader_of_international_organization = international_organization:italian_league_1
-									is_leader_of_international_organization = international_organization:italian_league_2
-									is_leader_of_international_organization = international_organization:italian_league_3
-								}
-								scope:actor ?= {
-									this_opinion_of_prev > 100
-								}
-							}
-						}
-					}
-				}
-				add = {
-					desc = "GOOD_RELATIONS_WITH_DEFENDER"
-					value = 25
-				}
-			}
-			else = {
-				add = {
-					desc = "NOT_GOOD_RELATIONS_WITH_DEFENDER"
-					value = -50
-				}
-			}
-			if = {
-				limit = {
-					scope:actor ?= {
-						OR = {
-							is_enemy_of = scope:target
-							is_rival_of = scope:target
-						}
-					}
-				}
-				add = {
-					desc = "FIGHTING_OUR_FOE_TOOLTIP"
-					value = 10
-				}
-			}
-		}
 		add = {
-			desc = "NUM_LOANS_TOOLTIP"
-			value = scope:actor.num_loans
-			multiply = -10
+			value = scope:actor.modifier:aggressiveness_modifier
+			subtract = scope:actor.modifier:carefulness_modifier
+			multiply = 50
+			desc = "aggressiveness modifier minus carefulness modifier"
 		}
 	}
 }
-
-attract_condottieri = {
+fortify_key_location = {
 	type = situation
-	
+
 	ai_tick = daily
 	ai_tick_frequency = 80
 
 	automation_tick = never
 	automation_tick_frequency = 12
 
-	
 	potential = {
+		trigger_if = {
+			limit = {
+				situation:italian_wars = { has_variable = iw_tension }
+			}
+			situation:italian_wars.var:iw_tension >= 25
+		}
+		trigger_else = { always = no }
 		scope:actor ?= {
 			OR = {
 				is_member_of_international_organization = international_organization:italian_league_1
 				is_member_of_international_organization = international_organization:italian_league_2
 				is_member_of_international_organization = international_organization:italian_league_3
-				is_leader_of_international_organization = international_organization:foreign_league_france
-				is_leader_of_international_organization = international_organization:foreign_league_hre
-				is_leader_of_international_organization = international_organization:foreign_league_iberia
-				is_leader_of_international_organization = international_organization:foreign_league_balkan
+				is_member_of_international_organization = international_organization:foreign_league_france
+				is_member_of_international_organization = international_organization:foreign_league_hre
+				is_member_of_international_organization = international_organization:foreign_league_iberia
+				is_member_of_international_organization = international_organization:foreign_league_balkan
 				capital.region = region:italy_region
 			}
 		}
@@ -919,10 +779,36 @@ attract_condottieri = {
 	allow = {
 		scope:actor ?= {
 			is_during_bankruptcy = no
-			NOT = { has_country_modifier = iw_attract_condottieri_modifier }
 		}
 	}
-	price = price:attract_condottieri_price
+
+	price = price:fortify_key_location_price
+	price_modifier = {
+		add = {
+			value = 1
+			desc = BASE_VALUE
+		}
+		subtract = {
+			value = situation:italian_wars.var:iw_tension
+			multiply = 0.005
+			desc = "[situation_tension|e]"
+		}
+	}
+
+	cooldown = {
+		type = fortify_key_location
+		years = {
+			add = {
+				value = 10
+				desc = BASE_VALUE
+			}
+			subtract = {
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.005
+				desc = "[situation_tension|e]"
+			}
+		}
+	}
 
 	select_trigger = {
 		looking_for_a = situation
@@ -933,88 +819,93 @@ attract_condottieri = {
 		}
 		target_flag = recipient
 		name = "choose_situation"
-		column = {
-			data = name
-		}
+		column = { data = name }
 		visible = {
 			situation:italian_wars = this
 			situation_is_active = yes
 		}
 	}
 
-	effect = {
-		scope:actor ?= {
-			add_country_modifier = { 
-				modifier = iw_attract_condottieri_modifier 
-				years = 3
-				mode = add_and_extend
+	select_trigger = {
+		looking_for_a = location
+		source = actor
+		source_flags = only_actual_locations
+		target_flag = target_location
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available_fortify_key_location"
+		column = { data = name }
+		column = { data = rank }
+		visible = {
+			region = region:italy_region
+		}
+		enabled = {
+			owner ?= scope:actor
+			OR = {
+				is_capital = yes
+				location_rank = location_rank:city
+				location_rank = location_rank:megalopolis
+				topography = mountains
 			}
+			NOT = { has_location_modifier = iw_fortify_key_location_modifier }
 		}
 	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target_location }
+			scope:target_location = {
+				add_location_modifier = {
+					modifier = iw_fortify_key_location_modifier
+					years = 5
+					mode = add_and_extend
+				}
+			}
+		}
+		else = { custom_tooltip = fortify_key_location_no_target_tt }
+	}
+
 	ai_will_do = {
-		if = {
-			limit = { scope:actor ?= { monthly_balance < 0 } }
-			add = {
-				desc = "game_concept_income"
-				value = scope:actor.monthly_balance
-			}
-		}
-		if = {
-			limit = {
-				scope:actor ?= { government_power > 50 }
-			}
-			add = {
-				desc = "game_concept_government_power"
-				value = scope:actor.government_power
-				divide = 10
-			}
-		}
-		else = {
-			add = {
-				desc = "game_concept_government_power"
-				value = -10
-			}
-		}
+		
 		if = {
 			limit = { scope:actor ?= { at_war = yes } }
 			add = {
 				desc = "IS_AT_WAR"
-				value = 15
+				value = 20
 			}
 		}
-		if = {
-			limit = { scope:actor ?= { at_war = no } }
+		else = {
 			add = {
 				desc = "IS_AT_PEACE"
-				value = -100
-			}
-		}
-		add = {
-			desc = "IS_BANKRUPT_TOOLTIP"
-			if = {
-				limit = {	
-					scope:actor ?= { 
-						is_during_bankruptcy = yes
-					}
-				}
 				value = -1000
 			}
 		}
-		add = {
-			desc = "CURRENT_TREASURY_TOOLTIP"
-			value = {
-				add = scope:actor.gold
-				divide = {
-					value = scope:actor.monthly_income_total
-					min = 1
+		if = {
+			limit = { exists = scope:target_location }
+			add = {
+				value = scope:target_location.population
+				if = {
+					limit = { scope:target_location.local_control > 0 }
+					multiply = scope:target_location.local_control
+				}
+				else = { multiply = 0.05 }
+				desc = "population multiplied by control"
+			}
+			add = {
+				value = scope:target_location.location_tax_base
+				desc = "[target_location.GetName] tax base"
+			}
+			if = {
+				limit = { 
+					scope:target_location = {
+						is_border = yes
+						is_coastal = no
+					}
+				}
+				add = {
+					value = 50
+					desc = "is border"
 				}
 			}
-			multiply = 5
-		}
-		add = {
-			desc = "NUM_LOANS_TOOLTIP"
-			value = scope:actor.num_loans
-			multiply = -10
 		}
 	}
 }
@@ -1025,39 +916,45 @@ iw_send_aid = {
 	potential = {
 		scope:actor ?= {
 			OR = {
-				is_leader_of_international_organization = international_organization:foreign_league_france
-				is_leader_of_international_organization = international_organization:foreign_league_hre
-				is_leader_of_international_organization = international_organization:foreign_league_iberia
-				is_leader_of_international_organization = international_organization:italian_league_1
-				is_leader_of_international_organization = international_organization:italian_league_2
-				is_leader_of_international_organization = international_organization:italian_league_3
-				is_leader_of_international_organization = international_organization:foreign_league_balkan
+				is_leader_of_any_league = yes
 				is_great_power = yes
-				AND = {
-					exists = international_organization:foreign_league_balkan.leader_country
+				trigger_if = {
+					limit = {
+						exists = international_organization:foreign_league_balkan
+						international_organization:foreign_league_balkan = { international_organization_has_leader = yes }
+					}
 					OR = {
 						is_enemy_of = international_organization:foreign_league_balkan.leader_country 
 						is_rival_of = international_organization:foreign_league_balkan.leader_country
 					}
 				}
-				AND = {
-					exists = international_organization:foreign_league_france.leader_country
+				trigger_if = {
+					limit = {
+						exists = international_organization:foreign_league_france
+						international_organization:foreign_league_france = { international_organization_has_leader = yes }
+					}
 					OR = {
 						is_enemy_of = international_organization:foreign_league_france.leader_country 
 						is_rival_of = international_organization:foreign_league_france.leader_country
 					}
 				}
-				AND = {
-					exists = international_organization:foreign_league_hre.leader_country
+				trigger_if = {
+					limit = {
+						exists = international_organization:foreign_league_hre
+						international_organization:foreign_league_hre = { international_organization_has_leader = yes }
+					}
 					OR = {
-						is_enemy_of = international_organization:foreign_league_hre.leader_country
+						is_enemy_of = international_organization:foreign_league_hre.leader_country 
 						is_rival_of = international_organization:foreign_league_hre.leader_country
 					}
 				}
-				AND = {
-					exists = international_organization:foreign_league_iberia.leader_country
+				trigger_if = {
+					limit = {
+						exists = international_organization:foreign_league_iberia
+						international_organization:foreign_league_iberia = { international_organization_has_leader = yes }
+					}
 					OR = {
-						is_enemy_of = international_organization:foreign_league_iberia.leader_country
+						is_enemy_of = international_organization:foreign_league_iberia.leader_country 
 						is_rival_of = international_organization:foreign_league_iberia.leader_country
 					}
 				}
@@ -1141,13 +1038,23 @@ iw_send_aid = {
 				}
 			}
 		}
+		enabled = {
+			custom_tooltip = {
+				text = is_not_receiving_pending_aid_from_another_tt
+				NOR = {
+					has_variable = iw_received_manpower
+					has_variable = iw_received_money
+				}
+			}
+		}
 	}
 
 	effect = {
-		custom_tooltip = {
-			text = iw_send_aid_tt
+		if = {
+			limit = { exists = scope:target }
 			scope:actor ?= { trigger_event_non_silently = italian_wars.10 }
 		}
+		else = { custom_tooltip = iw_send_aid_tt }
 	}
 
 	ai_will_do = {
@@ -1175,11 +1082,12 @@ iw_send_aid = {
 							attacker_leader = {
 								OR = {
 									this = international_organization:foreign_league_france.leader_country
-									this = international_organization:foreign_league_france.leader_country
-									this = international_organization:foreign_league_france.leader_country
+									this = international_organization:foreign_league_hre.leader_country
+									this = international_organization:foreign_league_iberia.leader_country
+									this = international_organization:foreign_league_balkan.leader_country
 								}
 								OR = {
-									is_enemy_of = scope:actor 
+									is_enemy_of = scope:actor
 									is_rival_of = scope:actor
 								}
 							}
@@ -1202,7 +1110,7 @@ iw_send_aid = {
 			}
 			if = {
 				limit = {
-					scope:actor ?= { 
+					scope:actor ?= {
 						OR = {
 							is_rival_of = scope:target
 							is_rival_of = scope:target
@@ -1234,6 +1142,619 @@ iw_send_aid = {
 				desc = "NUM_LOANS_TOOLTIP"
 				value = scope:actor.num_loans
 				multiply = -10
+			}
+		}
+	}
+}
+
+expel_league_member = {
+	type = internationalorganization
+
+	potential = {
+	}
+
+	allow = {
+		scope:actor ?= {
+			at_war = no
+		}
+		custom_tooltip = {
+			text = iw_expel_league_has_members_tt
+			scope:recipient = {
+				leader_country ?= scope:actor
+				total_members > 1
+			}
+		}
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	cooldown = {
+		type = expel_league_member
+		years = 3
+	}
+
+	select_trigger = {
+		looking_for_a = international_organization
+		source = actor
+		target_flag = recipient
+		name = "choose_international_organization"
+		column = {
+			data = name
+		}
+		visible = {
+			OR = {
+				this = international_organization:italian_league_1
+				this = international_organization:italian_league_2
+				this = international_organization:italian_league_3
+			}
+			leader_country ?= scope:actor
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		interaction_source_list = {
+			scope:recipient = {
+				every_international_organization_member = {
+					limit = {
+						NOR = {
+							this = scope:actor
+							has_special_status_in_international_organization = {
+								type = special_status:italian_league_sponsor
+								international_organization = scope:recipient
+							}
+						}
+					}
+					add_to_list = source
+				}
+			}
+		}
+		name = "iw_expel_member_choose_text"
+		none_available_msg_key = "iw_expel_no_members"
+		column = { data = name }
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:recipient = {
+				remove_country_from_international_organization = scope:target
+			}
+			scope:target = {
+				add_opinion = {
+					target = scope:actor
+					modifier = opinion_expelled_from_league
+				}
+			}
+			iw_increase_tension_effect = { value = iw_tension_gain_high }
+		}
+	}
+
+	ai_will_do = {
+		add = 1
+
+		if = {
+			limit = { exists = scope:target }
+			if = {
+				limit = { scope:target = { is_rival_of = scope:actor } }
+				add = {
+					desc = "[rival|e]"
+					value = 100
+				}
+			}
+			if = {
+				limit = { scope:target = { is_enemy_of = scope:actor } }
+				add = {
+					desc = "[enemy|e]"
+					value = 100
+				}
+			}
+			subtract = {
+				desc = "[opinion|e]"
+				value = "scope:target.opinion(scope:actor)"
+			}
+			if = {
+				limit = {
+					scope:recipient = {
+						total_members < 3
+					}
+				}
+				add = {
+					desc = "too few members"
+					value = -50
+				}
+			}
+			subtract = {
+				desc = "[situation_tension|e]"
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.2
+			}
+		}
+	}
+}
+
+challenge_league_leadership = {
+	type = internationalorganization
+
+	potential = {
+		scope:actor = {
+			NOT = {
+				has_special_status_in_international_organization = {
+					type = special_status:italian_league_sponsor
+					international_organization = scope:recipient
+				}
+			}
+		}
+	}
+
+	allow = {
+		scope:actor ?= {
+			at_war = no
+			is_during_bankruptcy = no
+			NOT = { is_leader_of_international_organization = scope:recipient }
+			custom_tooltip = {
+				text = iw_is_stronger_than_league_leader_tt
+				relative_strength = {
+					target = scope:recipient.leader_country
+					value > 0.5
+				}
+			}
+		}
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+
+	force_click_and_confirm_or_hold = yes
+
+	cooldown = {
+		type = challenge_league_leadership
+		years = 25
+	}
+
+	price = price:challenge_league_leadership_price
+
+	select_trigger = {
+		looking_for_a = international_organization
+		source = actor
+		target_flag = recipient
+		name = "choose_international_organization"
+		column = {
+			data = name
+		}
+		visible = {
+			OR = {
+				this = international_organization:italian_league_1
+				this = international_organization:italian_league_2
+				this = international_organization:italian_league_3
+			}
+			scope:actor = {
+				is_member_of_international_organization = root
+				NOT = { is_leader_of_international_organization = root }
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			declare_war_with_cb = {
+				target = scope:recipient.leader_country
+				type = casus_belli:cb_iw_challenge_league_leadership
+			}
+		}
+		iw_increase_tension_effect = { value = iw_tension_gain_very_high }
+	}
+
+	ai_will_do = {
+		add = -25
+
+		scope:recipient.leader_country = { save_temporary_scope_as = league_leader_current }
+		add = {
+			value = "scope:actor.relative_strength(scope:league_leader_current)"
+			multiply = 20
+			desc = "our relative strength against our leader"
+		}
+		subtract = {
+			scope:league_leader_current = {
+				scope:actor = {
+					value = this_opinion_of_prev
+					multiply = 0.15
+				}
+			}
+			desc = "our opinion of our leader"
+		}
+		subtract = {
+			scope:league_leader_current = {
+				scope:actor = {
+					value = this_trust_of_prev
+					multiply = 0.1
+				}
+			}
+			desc = "our trust towards our leader"
+		}
+		add = {
+			value = scope:actor.modifier:aggressiveness_modifier
+			subtract = scope:actor.modifier:carefulness_modifier
+			multiply = 20
+			desc = "aggressiveness modifier minus carefulness modifier"
+		}
+	}
+}
+
+iw_intervene_in_war = {
+	type = situation
+	
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	potential = {
+		situation:italian_wars = { situation_is_active = yes }
+	}
+
+	allow = {
+		situation:italian_wars = { var:iw_tension >= 75 }
+		scope:actor = {
+			OR = {
+				is_leader_of_any_league = yes
+				is_regional_power = yes
+				is_great_power = yes
+			}
+		}
+		scope:actor = { at_war = no }
+		scope:actor = {
+			NOT = {
+				any_current_war = { this = scope:target_war }
+			}
+		}
+	}
+
+	price = price:intervene_in_italian_campaign_price
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:italian_wars = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:italian_wars = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = war
+		interaction_source_list = {
+			every_in_global_list = {
+				variable = iw_foreign_leagues_list
+				leader_country ?= {
+					save_temporary_scope_as = target_leader
+					every_current_war = {
+						limit = {
+							scope:target_leader = { is_war_leader_of = prev }
+							OR = {
+								defender_leader = {
+									is_leader_of_any_league = yes
+									NOT = { this = scope:target_leader }
+								}
+								attacker_leader = {
+									NOT = { this = scope:target_leader }
+									is_leader_of_any_league = yes
+								}
+							}
+						}
+						add_to_list = source
+					}
+				}
+			}
+			every_in_global_list = {
+				variable = iw_italian_leagues_list
+				leader_country ?= {
+					save_temporary_scope_as = target_leader
+					every_current_war = {
+						limit = {
+							scope:target_leader = { is_war_leader_of = prev }
+							OR = {
+								defender_leader = {
+									is_leader_of_any_league = yes
+									NOT = { this = scope:target_leader }
+								}
+								attacker_leader = {
+									NOT = { this = scope:target_leader }
+									is_leader_of_any_league = yes
+								}
+							}
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target_war
+		name = "enforce_landfriede_select_title"
+		none_available_msg_key = "enforce_landfriede_no_wars"
+		column = {
+			data = name
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:target_war = {
+				attacker_leader = { add_to_list = source }
+				defender_leader = { add_to_list = source }
+			}
+		}
+		target_flag = target_country
+		name = "choose_country"
+		column = {
+			data = name
+		}
+		enabled = {
+			not = { is_at_war_with = scope:actor }
+			#scope:actor = { can_declare_war_on = root }
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target_country
+				exists = scope:target_war
+			}
+			scope:target_war = {
+				if = {
+					limit = { attacker_leader = scope:target_country }
+					defender_leader = { save_scope_as = target }
+				}
+				else = {
+					attacker_leader = { save_scope_as = target }
+				}
+			}
+			scope:actor = {
+				join_war_with = {
+					target = scope:target_country
+					war = scope:target_war
+					call_in_subjects = yes
+				}
+			}
+			scope:target_country = {
+				trigger_event_non_silently = italian_wars.5
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = {
+			value = -50
+			desc = "BASE_VALUE"
+		}
+		add = {
+			value = scope:actor.gold
+			divide = scope:actor.monthly_income_trade_and_tax
+			multiply = 2
+			desc = "treasury divided by income and then multiplied by 2"
+		}
+		if = {
+			limit = { scope:actor.war_exhaustion > 0 }
+			subtract = {
+				value = scope:actor.war_exhaustion
+				multiply = 2
+				desc = "war_exhaustion"
+			}
+		}
+		if = {
+			limit = { scope:actor.manpower_percentage > 0.5 }
+			add = {
+				value = scope:actor.manpower_percentage
+				multiply = 25
+				desc = "CURRENT_MANPOWER_TOOLTIP"
+			}
+		}
+		else = {
+			subtract = {
+				value = 25
+				desc = "low manpower"
+			}
+		}
+		if = {
+			limit = { scope:actor.num_loans > 0 }
+			subtract = {
+				value = scope:actor.num_loans
+				multiply = 5
+				desc = "NUM_LOANS"
+			}
+		}
+		add = {
+			value = scope:actor.modifier:aggressiveness_modifier
+			subtract = scope:actor.modifier:carefulness_modifier
+			multiply = 20
+			desc = "aggressiveness modifier minus carefulness modifier"
+		}
+		if = {
+			limit = {
+				exists = scope:target_country
+				exists = scope:target_war
+			}
+			add = {
+				value = "scope:actor.opinion(scope:target_country)"
+				multiply = 0.5
+				desc = "opinion_of_ally"
+			}
+			if = {
+				limit = { scope:target_war = { attacker_leader = scope:target_country } }
+				subtract = {
+					value = "scope:actor.opinion(scope:target_war.defender_leader)"
+					multiply = 0.5
+					desc = "opinion_of_enemy"
+				}
+				subtract = {
+					value = "scope:target_war.defender_leader.relative_strength(scope:actor)"
+					multiply = 20
+					desc = "enemy_relative_strength"
+				}
+				add = {
+					value = scope:actor.military_strength
+					add = scope:target_country.military_strength
+					subtract = scope:target_war.defender_leader.military_strength
+					multiply = 0.01
+					desc = "military_balance"
+				}
+			}
+			else = {
+				subtract = {
+					value = "scope:actor.opinion(scope:target_war.attacker_leader)"
+					multiply = 0.5
+					desc = "opinion_of_enemy"
+				}
+				subtract = {
+					value = "scope:target_war.attacker_leader.relative_strength(scope:actor)"
+					multiply = 20
+					desc = "enemy_relative_strength"
+				}
+				add = {
+					value = scope:actor.military_strength
+					add = scope:target_country.military_strength
+					subtract = scope:target_war.attacker_leader.military_strength
+					multiply = 0.01
+					desc = "military_balance"
+				}
+			}
+			add = {
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.2
+				desc = situation_tension
+			}
+		}
+	}
+}
+
+establish_italian_administration_center = {
+	type = situation
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	potential = {
+		scope:actor ?= {
+			modifier:num_italian_administrations != 0
+		}
+	}
+
+	allow = {
+		scope:actor ?= {
+			is_during_bankruptcy = no
+			custom_tooltip = {
+				text = italian_administration_center_tt
+				total_building_levels_including_construction:italian_administration_center < 1
+			}
+		}
+	}
+
+	price = price:establish_italian_administration_center_price
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:italian_wars = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:italian_wars = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_non_rural_location = {
+					limit = {
+						region = region:italy_region
+						OR = {
+							location_rank = location_rank:city
+							location_rank = location_rank:megalopolis
+						}
+					}
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		enabled = {
+			is_capital = no
+			NOR = {
+				has_building = building_type:italian_administration_center
+				has_building = building_type:local_governor
+				has_building = building_type:naval_governor
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				construct_building = {
+					building_type = building_type:italian_administration_center
+					cost_multiplier = 0
+					cost_multiplier_reason = "italian_administration_sponsorship"
+				}
+			}
+		}
+		else = { custom_tooltip = establish_italian_administration_center_tt }
+	}
+
+	ai_will_do = {
+		if = {
+			limit = { exists = scope:target }
+			subtract = {
+				desc = "[target.GetName] [proximity|e]"
+				value = scope:target.proximity
+			}
+			add = {
+				desc = "[target.GetName] [development|e]"
+				value = scope:target.development
+			}
+			add = {
+				desc = "[target.GetName] [population|e]"
+				value = scope:target.population
+			}
+			if = {
+				limit = {
+					scope:target = { has_river = yes }
+				}
+				add = {
+					value = 50
+					desc = "[river|e]"
+				}
+			}
+		}
+		else = {
+			add = {
+				value = 50
+				desc = BASE_VALUE
 			}
 		}
 	}

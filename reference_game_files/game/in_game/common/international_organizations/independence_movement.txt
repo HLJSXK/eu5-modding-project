@@ -24,15 +24,6 @@
 			scope:target ?= {
 				this = root.international_organization_target
 			}
-			# Don't pull in fellow subjects of the target as offensive joiners — they
-			# should remain free to join as defenders, avoiding the Always/Always
-			# conflict that leaves the target without any defenders and causes instant
-			# 100% war score (e.g. Hanseatic members fighting each other).
-			NOT = {
-				scope:recipient = {
-					is_subject_of = scope:target
-				}
-			}
 			trigger_if = {
 				limit = {
 					exists = scope:casus_belli
@@ -128,7 +119,15 @@
 	}
 	
 	auto_leave_trigger = {
-		always = no
+		or = {
+			is_allied_with = { target = scope:target }
+			has_truce_with = scope:target
+			is_fighting_war_together_with = scope:target
+			AND = {
+				overlord ?= scope:target
+				subject_loyalty > 80
+			}
+		}
 	}
 	
 	auto_disband_trigger = {
@@ -219,11 +218,29 @@
 				value = "scope:recipient.leader_country.modifier:diplomatic_reputation"
 				multiply = 3
 			}
-			add = {
-				desc = "TRUST_OF_SUBJECT"
-				scope:recipient.leader_country = {
+			scope:recipient.leader_country = {
+				save_temporary_value_as = {
+					name = trust
 					value = prev_trust_of_this
-					multiply = 4
+				}
+				if = {
+					limit = {
+						scope:trust > 50
+					}
+					add = {
+						desc = "TRUST_OF_SUBJECT"
+						value = scope:trust
+						subtract = 50
+						multiply = 4
+					}
+				}
+				else = {
+					subtract = {
+						desc = "TRUST_OF_SUBJECT"
+						value = 50
+						subtract = scope:trust
+						multiply = 4
+					}
 				}
 			}
 			if = {

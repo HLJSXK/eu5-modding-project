@@ -1,0 +1,108 @@
+﻿namespace = market_decline
+
+# Fires from yearly_country_pulse when the country owns at least one withering market
+# whose center location hasn't been "handled" by a previous fire of this event.
+# Withering is set by C++ in CMarketManager::UpdateAllMarketsWitheringStatus
+# (market with <= MARKET_WITHERING_LOCATION_THRESHOLD locations for at least
+# MARKET_WITHERING_GRACE_MONTHS months, where most locations have a viable
+# fallback market). Per-market cooldown is stored as the market_decline_handled
+# variable on the center location (5y for accept, 10y for subsidize).
+
+market_decline.1 = {
+	hide_portraits = yes
+	type = country_event
+	title = market_decline.1.title
+	desc = market_decline.1.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = exterior
+	}
+
+	trigger = {
+		has_markets = yes
+		any_market_center_in_country = {
+			is_withering = yes
+			months_at_or_below_withering_threshold > 36
+			location = {
+				NOT = { has_variable = market_decline_handled }
+			}
+		}
+	}
+
+	immediate = {
+		random_market_center_in_country = {
+			limit = {
+				is_withering = yes
+				months_at_or_below_withering_threshold > 36
+				location = {
+					NOT = { has_variable = market_decline_handled }
+				}
+			}
+			save_scope_as = withering_market
+			location = {
+				save_scope_as = withering_market_location
+			}
+		}
+	}
+
+	# Option A — subsidize. Buys time but doesn't fix the underlying cause.
+	option = {
+		name = market_decline.1.a
+		trigger = {
+			gold > 200
+		}
+		change_gold_effect = { scale = -2 }
+		scope:withering_market_location = {
+			set_variable = {
+				name = market_decline_handled
+				value = 1
+				years = 10
+			}
+		}
+		ai_chance = {
+			factor = 30
+			modifier = {
+				factor = 0
+				NOT = {
+					scope:withering_market_location = {
+						is_capital_of = { target = root }
+					}
+				}
+			}
+			modifier = {
+				factor = 0
+				gold < 1000
+			}
+		}
+	}
+
+	# Option B — dissolve. Locations re-attach to the next-best market.
+	option = {
+		name = market_decline.1.b
+		custom_tooltip = {
+			text = market_decline.1.b.tt
+			scope:withering_market = {
+				destroy_market = {}
+			}
+		}
+		ai_chance = {
+			factor = 70
+		}
+	}
+
+	# Option C — accept the decline. Short cooldown so the event resurfaces.
+	option = {
+		name = market_decline.1.c
+		scope:withering_market_location = {
+			set_variable = {
+				name = market_decline_handled
+				value = 1
+				years = 5
+			}
+		}
+		ai_chance = {
+			factor = 10
+		}
+	}
+}

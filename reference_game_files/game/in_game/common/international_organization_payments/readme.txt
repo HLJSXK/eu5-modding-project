@@ -13,3 +13,5 @@
 # - proportion_for_payer: <script value> how much of the price will the country pay (root = potential country, scope:recipient = international organization)
 # - proportion_for_payee: <script value> how much of the price will the country receive (root = potential country, scope:recipient = international organization)
 # - min_slider_value: <float> 0..1 how much a payment slider will affect the total payment. Between this value and 100%. Default is 0.5 (50%).
+# - ai_maintenance_value: <script value> should be between 0 and 1. Sets the slider value for Ai, root - country, recipient - IO, if left empty will use the AI_DEFAULT_IO_MAINETANCE_VALUE define.
+# - ai_maintenance_ignore_saving: <yes/no> should the ai_maintenance_value even when in saving mode. AI in saving mode tries to limit all expenses and stabilize their country. Default is no.

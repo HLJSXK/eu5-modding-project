@@ -18,8 +18,8 @@
 # country_potential = { <country_triggers> }            # Shows the unit to recruit if the triggers are fulfilled
 # mercenaries_per_location = { pop_type = <pop type> multiply = <proportion> }
 # limit = { <value calculations> } / <default_value>    # Determines how many units of this type you can have
-# combat = { <topography> / <vegetation> / <climate> }    # Modifies the damage the unit deals when fighting in certain terrain
-# impact = { <topography> / <vegetation> / <climate> }    # Modifies the movement speed of the unit when in certain terrain.
+# combat = { <topography> / <vegetation> / <climate> / coastal / inland / river }    # Modifies the damage the unit deals when fighting in certain terrain
+# impact = { <topography> / <vegetation> / <climate> / coastal / inland / river }    # Modifies the movement speed of the unit when in certain terrain.
 # copy_from = <unit_type>                               # The unit type will copy all its value from the specified unit template. All traits can be then further modified later
 # gfx_tags = {}
 # color = color 										# override primary color in visuals

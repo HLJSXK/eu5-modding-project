@@ -75,7 +75,7 @@ enforce_landfriede_cost = {
 
 bolster_imperial_army_cost = {
 	desc = "bolster_imperial_army_cost"
-	value = root.country_tax_base
+	value = scope:recipient.country_tax_base
 	multiply = 6
 }
 
@@ -161,6 +161,53 @@ hre_add_actor_trust = {
 		scope:recipient = {
 			value = "trust(scope:actor)"
 			divide = 5
+		}
+	}
+}
+
+# Maximum bias added to an HRE member's policy vote score when they fully
+# align with the Emperor (opinion >= +100 and Imperial Authority = 100).
+# Actual bias scales linearly with opinion (clamped >= 0) and Imperial Authority.
+hre_emperor_alignment_vote_bias_weight = {
+	value = 20
+}
+
+# Gold cost the Emperor pays the leader when bribing a single circle. Also the per-member
+# unit for scaling bribe_imperial_circle_target_cost (each non-leader member adds 25% on top).
+bribe_circle_leader_cost = {
+	value = 100
+}
+
+# Scaled cost the Emperor pays to bribe a circle leader (and through them, every member of
+# every circle that leader runs). Cost = bribe_circle_leader_cost (leader) + 0.25 ×
+# bribe_circle_leader_cost per *other* circle member across all circles led. Reads
+# scope:target = circle leader country — bribe_imperial_circle passes the leader through
+# that scope from the GUI button. owncountry generic actions can't use scope:recipient, so
+# the leader rides on scope:target instead.
+#
+# Walks every circle the target leads, sums 0.25× per member, then subtracts one 0.25×
+# (the leader's own share, which is replaced by the full base). A leader who runs multiple
+# circles is therefore more expensive to bribe in proportion to total members across all of
+# their circles.
+bribe_imperial_circle_target_cost = {
+	desc = "bribe_imperial_circle_target_cost"
+	value = bribe_circle_leader_cost
+	if = {
+		limit = { exists = scope:target }
+		scope:target = {
+			every_imperial_circle_country_is_member_of = {
+				limit = { circle_leader ?= { this = prev } }
+				every_circle_member = {
+					add = {
+						value = bribe_circle_leader_cost
+						multiply = 0.25
+					}
+				}
+			}
+			subtract = {
+				value = bribe_circle_leader_cost
+				multiply = 0.25
+			}
 		}
 	}
 }

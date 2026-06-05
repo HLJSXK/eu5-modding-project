@@ -31,22 +31,13 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 	}
 
 	trigger = {
-		religion.group = religion_group:christian
-		OR = {
-			"religion_percentage_in_country(religion:hussite)" > 0.2
-			religion = religion:hussite
-		}
+		religion = religion:catholic
 		is_subject = no
 		character:boh_jan_hus = {
 			is_alive = no
 		}
-		c:PAP = {
-			is_subject = no
-		}
-		OR = {
-			religion = religion:catholic
-			religion = religion:hussite
-		}
+		country_exists = international_organization:hre.leader_country
+		NOT = { is_leader_of_international_organization = international_organization:hre }
 	}
 
 	fire_only_once = yes
@@ -54,26 +45,24 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 		create_character = {
 			first_name = name_john
 			last_name = zelivsky
-			adm = 34
-			dip = 74
-			mil = 21
+			adm = { 15 100 }
+			dip = { 50 100 }
+			mil = { 10 100 }
 			birth_date = 1380.1.1
 			culture = culture:czech
 			religion = religion:hussite
 			estate = estate_type:clergy_estate
 			save_scope_as = jan_zelivsky_scope
 		}
-		c:BOH = { save_scope_as = target_country }
-		c:BOH = {
-			capital = { save_scope_as = target_boh_capital_scope }
-		}
-		c:PAP = { save_scope_as = target_pope_country }
+		capital = { save_scope_as = target_boh_capital_scope }
+		international_organization:hre.leader_country ?= { save_scope_as = hre_emperor_scope }
 		ordered_owned_location = {
-			order_by = population
-			limit = {
-				dominant_religion = religion:hussite
+			order_by = {
+				value = population
+				multiply = "religion_percentage(religion:hussite)"
 			}
 			max = 1
+			check_range_bounds = no
 			save_scope_as = taborite_capital_scope
 		}
 		create_rebel = {
@@ -81,6 +70,10 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 			estate = clergy_estate
 			name = hussite_rebellion
 			save_scope_as = hussite_rebel_scope
+		}
+		lots_of_religion = {
+			religion = religion:hussite
+			other_religion = religion:catholic
 		}
 	}
 
@@ -104,30 +97,18 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 				ruler = { has_character_modifier = enacted_placitum_regium }
 			}
 
-			ruler = { remove_character_modifier = enacted_placitum_regium }
 		}
 
-		lots_of_religion = {
-			religion = religion:hussite
-			other_religion = religion:catholic
-		}
 		upset_countries_of_religion = {
 			religion = religion:catholic
 			modifier = religious_disagreements_modifier
 		}
 
-		hidden_effect = {
-			destroy_rebel = scope:hussite_rebel_scope
-		}
-
-		custom_tooltip = pap_gets_hussite_wars.2_tt
-		hidden_effect = {
-			c:PAP = { trigger_event_non_silently = hussite_wars.2 }
-		}
+		hidden_effect = { destroy_rebel = scope:hussite_rebel_scope }
 		add_religious_influence = religious_influence_ultimate_bonus
 		add_country_modifier = {
 			modifier = in_defense_of_hussitism_modifier
-			years = 3
+			years = modifier_duration_years_short
 			mode = replace
 		}
 	}
@@ -145,26 +126,20 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 			change_religion_for_ruler_and_family = { country = ROOT religion = religion:catholic }
 		}
 
-		lots_of_religion = {
-			religion = religion:hussite
-			other_religion = religion:catholic
-		}
-
 		custom_tooltip = {
 			text = hussite_rebellion_tooltip
-			every_owned_location = {
-				every_pop = {
-					limit = {
-						owner = root
-						religion = religion:hussite
-					}
-					add_pop_satisfaction = pop_satisfaction_radical_penalty
-					change_pop_allegiance = scope:hussite_rebel_scope
+			every_pop = {
+				limit = {
+					owner = root
+					religion = religion:hussite
 				}
+				add_pop_satisfaction = pop_satisfaction_radical_penalty
+				change_pop_allegiance = scope:hussite_rebel_scope
 			}
 		}
 
-		add_estate_satisfaction = { type = estate_type:clergy_estate
+		add_estate_satisfaction = { 
+			type = estate_type:clergy_estate
 			value = estate_satisfaction_radical_penalty
 		}
 		add_stability = stability_ultimate_penalty
@@ -172,217 +147,21 @@ hussite_wars.1 = { #Jan Želivský's Congregation
 
 		add_country_modifier = {
 			modifier = civil_war_looming
-			years = 10
+			years = modifier_duration_years_normal
 			mode = add_and_extend
 		}
 	}
 
-	option = {
-		name = hussite_wars.1.c
-		trigger = {
-			NOT = { religion = religion:catholic }
-			NOT = { religion = religion:hussite }
-		}
-		add_religious_influence = religious_influence_mild_bonus
-		lots_of_religion = {
-			religion = religion:hussite
-			other_religion = religion:catholic
-		}
-		upset_countries_of_religion = {
-			religion = religion:catholic
-			modifier = religious_disagreements_modifier
-		}
-		hidden_effect = {
-			destroy_rebel = scope:hussite_rebel_scope
-		}
-		religion = {
-			set_mutual_religious_view = {
-				target = religion:catholic
-				value = enemy
-			}
-			set_mutual_religious_view = {
-				target = religion:hussite
-				value = kindred
-			}
-		}
-		religion:hussite = {
-			set_mutual_religious_view = {
-				target = religion:catholic
-				value = enemy
-			}
-		}
-		custom_tooltip = pap_gets_hussite_wars.2_tt
-		hidden_effect = {
-			c:PAP = { trigger_event_non_silently = hussite_wars.2 }
-		}
-		add_religious_influence = religious_influence_ultimate_bonus
-		add_country_modifier = {
-			modifier = heretical_bohemian_defense_modifier
-			years = 3
-			mode = replace
-		}
-	}
-}
-
-
-
-
-hussite_wars.2 = { #Hussite Protests Turn Violent in [BOH.GetCountry.GetCapital.GetName]
-	type = country_event
-	category = situation_event
-	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
-	title = hussite_wars.2.title
-	desc = hussite_wars.2.desc
-	outcome = neutral
-
-	fire_only_once = yes
-
-	immediate = {
-		religion:catholic = {
-			ordered_country_in_religion = {
-				limit = {
-					NOT = { this = c:PAP }
-					NOT = { is_allied_with = { target = c:BOH } }
-					NOT = { is_at_war_with = c:BOH }
-					NOT = { has_truce_with = c:BOH }
-					is_subject = no
-					NOT = { is_rival_of = c:PAP }
-					NOT = { is_enemy_of = c:PAP }
-					NOT = { is_neighbor_of = c:BOH }
-					exists = capital
-					capital.region = {
-						OR = {
-							this = c:BOH.capital.region
-							this = c:PAP.capital.region
-						}
-					}
-				}
-				order_by = expected_army_size
-				max = 1
-				save_scope_as = catholic_champion_scope
-			}
-		}
-		c:BOH = { save_scope_as = target_country }
-		c:BOH = {
-			capital = { save_scope_as = target_boh_capital_scope }
-		}
-	}
-
-	option = {
-		name = hussite_wars.2.a
-
-		historical_option = yes
-
-		activate_situation = situation:hussite_wars
-		declare_war_with_cb = {
-			target = c:BOH
-			type = casus_belli:cb_crush_hussitism
-		}
-		custom_tooltip = {
-			text = every_neighbor_of_bohemia_gets_hussite_wars.3_tt
-			c:BOH = {
-				every_neighbor_country = {
-					limit = {
-						is_subject = no
-						NOT = { has_variable = pending_relevant_event_variable }
-						religion = religion:catholic
-						trigger_if = {
-							limit = { exists = scope:catholic_champion_scope }
-							NOT = { this = scope:catholic_champion_scope }
-						}
-						NOT = {
-							has_mutual_scripted_relation = {
-								type = relation_type:alliance
-								target = c:BOH
-							}
-						}
-						NOT = { has_truce_with = c:BOH }
-						NOT = { is_at_war_with = c:BOH }
-						NOT = { is_subject_of = c:BOH }
-						NOR = {
-							is_rival_of = c:PAP
-							is_enemy_of = c:PAP
-						}
-						NOT = { tag = POL }		#Theirs comes later if they decline hussite_wars.7!
-					}
-					trigger_event_silently = hussite_wars.3
-					set_variable = had_hussite_wars3_event_variable
-				}
-			}
-		}
-		international_organization:hre.leader_country ?= {
-			if = {
-				limit = {
-					NOT = { has_variable = pending_relevant_event_variable }
-					NOT = {
-						has_mutual_scripted_relation = {
-							type = relation_type:alliance
-							target = c:BOH
-						}
-					}
-					NOT = { has_truce_with = c:BOH }
-					NOT = { has_variable = had_hussite_wars3_event_variable }
-					NOT = { is_at_war_with = c:BOH }
-					NOT = { tag = BOH }
-					NOR = {
-						is_rival_of = c:PAP
-						is_enemy_of = c:PAP
-					}
-				}
-				trigger_event_non_silently = hussite_wars.3
-			}
-		}
-		if = {
-			limit = { exists = scope:catholic_champion_scope }
-			custom_tooltip = {
-				text = hussite_wars.6_happens_for_catholic_champion_scope_tt
-				scope:catholic_champion_scope = {
-					trigger_event_silently = hussite_wars.6
-				}
-			}
-		}
-
-		if = {
-			limit = {
-				country_exists = c:POL
-				c:POL = {
-					NOT = { is_at_war_with = c:PAP }
-					is_subject = no
-					NOT = { has_truce_with = c:PAP }
-					NOT = { is_allied_with = { target = c:PAP } }
-				}
-			}
-			c:POL = { trigger_event_non_silently = hussite_wars.7 }
-		}
-
-		custom_tooltip = explain_situation_peace_treaty_tt
-	}
-
-	option = {
-		name = hussite_wars.2.b
-
-		custom_tooltip = hussite_supremacy_tt
-
-		add_stability = stability_ultimate_penalty
-		add_government_power = government_power_radical_penalty
-		add_estate_satisfaction = { 
-			type = estate_type:clergy_estate
-			value = estate_satisfaction_radical_penalty
-		}
-		upset_countries_of_religion = {
-			religion = religion:catholic
-			modifier = folded_to_hussites_modifier
-		}
-		c:BOH = {
-			add_prestige = prestige_extreme_bonus
-		}
-	}
-
 	after = {
-		remove_variable = had_hussite_wars3_event_variable
+		show_as_tooltip = {
+			lots_of_religion = {
+				religion = religion:hussite
+				other_religion = religion:catholic
+			}
+		}
 	}
-
 }
+
 
 hussite_wars.3 = { #A Pious Call to Arms
 	type = country_event
@@ -393,20 +172,19 @@ hussite_wars.3 = { #A Pious Call to Arms
 	outcome = neutral
 
 	immediate = {
-		c:PAP = {
+		c:BOH = {
 			random_current_war = {
 				limit = {
 					defender_leader = c:BOH
 				}
 				save_scope_as = target_war
 			}
-		}
-		c:BOH = {
 			save_scope_as = target_country
 		}
+		international_organization:hre.leader_country ?= { save_scope_as = war_leader_scope }
 
 		add_cooldown = {
-			type = join_the_papal_side_hw_action
+			type = join_the_imperial_side_hw_action
 			months = 6
 		}
 	}
@@ -421,16 +199,19 @@ hussite_wars.3 = { #A Pious Call to Arms
 			modifier = {
 				factor = 0.75
 				opinion = {
-					target = c:PAP
-					value <50
+					target = scope:war_leader_scope
+					value < 50
 				}
 			}
 		}
 
-		create_relation = {
-			first = this
-			second = c:PAP
-			type = relation_type:alliance
+		if = {
+			limit = { exists = scope:war_leader_scope }
+			create_relation = {
+				first = this
+				second = scope:war_leader_scope
+				type = relation_type:alliance
+			}
 		}
 
 		join_war_as_attacker = { war = scope:target_war }
@@ -452,8 +233,8 @@ hussite_wars.3 = { #A Pious Call to Arms
 			modifier = {
 				factor = 1.25
 				opinion = {
-					target = c:PAP
-					value >50
+					target = scope:war_leader_scope
+					value > 50
 				}
 			}
 		}
@@ -664,19 +445,21 @@ hussite_wars.6 = { #Heretics at the Gates
 	outcome = neutral
 
 	immediate = {
-		c:PAP = {
-			ruler_or_regent = { save_scope_as = target_ruler1 }
+		international_organization:hre.leader_country ?= {
+			ruler_or_regent ?= { save_scope_as = target_ruler1 }
 			random_current_war = {
 				limit = {
-					defender_leader = c:BOH
+					c:BOH = { is_war_leader_of = prev }
+					international_organization:hre.leader_country = { is_war_leader_of = prev }
 				}
 				save_scope_as = target_war
 			}
+			save_scope_as = war_leader_scope
 		}
 		ruler_or_regent ?= { save_scope_as = target_ruler2 }
 
 		add_cooldown = {
-			type = join_the_papal_side_hw_action
+			type = join_the_imperial_side_hw_action
 			months = 6
 		}
 	}
@@ -686,7 +469,7 @@ hussite_wars.6 = { #Heretics at the Gates
 		name = hussite_wars.3.a
 
 		ai_will_select = {
-			add = "opinion(c:PAP)"
+			add = "opinion(scope:war_leader_scope)"
 			subtract = "opinion(c:BOH)"
 
 			if = {
@@ -695,10 +478,13 @@ hussite_wars.6 = { #Heretics at the Gates
 			}
 		}
 
-		create_relation = {
-			first = this
-			second = c:PAP
-			type = relation_type:alliance
+		if = {
+			limit = { exists = scope:war_leader_scope }
+			create_relation = {
+				first = this
+				second = scope:war_leader_scope
+				type = relation_type:alliance
+			}
 		}
 
 		join_war_as_attacker = { war = scope:target_war }
@@ -717,7 +503,7 @@ hussite_wars.6 = { #Heretics at the Gates
 
 		ai_will_select = {
 			add = "opinion(c:BOH)"
-			subtract = "opinion(c:PAP)"
+			subtract = "opinion(scope:war_leader_scope)"
 		}
 
 		add_religious_influence_if_valid = {
@@ -740,7 +526,7 @@ hussite_wars.7 = { #The Plight of the Hussites
 	outcome = neutral
 
 	immediate = {
-		c:PAP = {
+		c:BOH = {
 			random_current_war = {
 				limit = {
 					defender_leader = c:BOH
@@ -748,6 +534,7 @@ hussite_wars.7 = { #The Plight of the Hussites
 				save_scope_as = target_war
 			}
 		}
+		international_organization:hre.leader_country ?= { save_scope_as = war_leader_scope }
 
 		set_variable = {
 			name = pending_relevant_event_variable
@@ -763,7 +550,7 @@ hussite_wars.7 = { #The Plight of the Hussites
 		ai_will_select = {
 			add = 25
 			add = "opinion(c:BOH)"
-			subtract = "opinion(c:PAP)"
+			subtract = "opinion(scope:war_leader_scope)"
 		}
 
 		c:BOH = {
@@ -799,7 +586,7 @@ hussite_wars.7 = { #The Plight of the Hussites
 
 		ai_will_select = {
 			subtract = 25
-			add = "opinion(c:PAP)"
+			add = "opinion(scope:war_leader_scope)"
 			subtract = "opinion(c:BOH)"
 		}
 
@@ -924,7 +711,12 @@ hussite_wars.9 = {
 		}
 
 		if = {
-			limit = { tag = PAP }
+			limit = {
+				OR = {
+					is_leader_of_international_organization = international_organization:hre
+					tag = PAP
+				}
+			}
 			hidden_effect = {
 				c:BOH = {
 					add_country_modifier = {
@@ -954,9 +746,15 @@ hussite_wars.9 = {
 			}
 			if = {
 				limit = {
-					NOT = { is_at_war_with = c:BOH }
+					can_declare_legal_war_on = { target = c:BOH }
 				}
 				declare_war_with_cb = {
+					target = c:BOH
+					type = casus_belli:cb_crush_hussitism
+				}
+			}
+			else = {
+				add_casus_belli = {
 					target = c:BOH
 					type = casus_belli:cb_crush_hussitism
 				}
@@ -966,23 +764,25 @@ hussite_wars.9 = {
 				limit = {
 					NOT = { this = root }
 					NOT = { is_at_war_with = c:BOH }
-					has_mutual_scripted_relation = {
-						type = relation_type:alliance
-						target = c:BOH
+					NOT = {
+						has_mutual_scripted_relation = {
+							type = relation_type:alliance
+							target = c:BOH
+						}
 					}
 				}
 				trigger_event_non_silently = { id = hussite_wars.9 days = 3 }
 			}
 		}
 		else = {
-			c:PAP = {
+			# Ally of the war leader — join the ongoing war on the crusade side
+			c:BOH = {
 				random_current_war = {
 					limit = {
 						defender_leader = c:BOH
-						attacker_leader = c:PAP
 					}
 					root = {
-						join_war_as_defender = { war = prev }
+						join_war_as_attacker = { war = prev }
 					}
 				}
 			}
@@ -1010,15 +810,43 @@ hussite_wars.10 = {
 	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
 
 	immediate = {
-		c:PAP = {
-			save_scope_as = target_papal_states
+		c:PAP ?= {
 			capital = { save_scope_as = target_location1 }
-			ruler_or_regent = { save_scope_as = target_character1 }
+		}
+		international_organization:hre.leader_country ?= {
+			ruler_or_regent ?= { save_scope_as = target_character1 }
 		}
 		c:BOH = {
 			capital = { save_scope_as = target_location2 }
-			save_scope_as = target_bohemia
+			save_scope_as = target_country
 			ruler_or_regent = { save_scope_as = target_character2 }
+		}
+		religion:catholic = {
+			ordered_country_in_religion = {
+				limit = {
+					NOR = {
+						is_leader_of_international_organization = international_organization:hre
+						is_allied_with = { target = c:BOH }
+						is_at_war_with = c:BOH
+						has_truce_with = c:BOH
+						is_rival_of = root
+						is_enemy_of = root
+						is_neighbor_of = c:BOH
+					}
+					is_subject = no
+					exists = capital
+					capital.region = {
+						OR = {
+							this = c:BOH.capital.region
+							this = root.capital.region
+						}
+					}
+				}
+				order_by = expected_army_size
+				max = 1
+				check_range_bounds = no
+				save_scope_as = catholic_champion_scope
+			}
 		}
 	}
 
@@ -1026,11 +854,151 @@ hussite_wars.10 = {
 		name = hussite_wars.10.a
 		historical_option = yes
 
+		trigger = {
+			NOT = { is_leader_of_international_organization = international_organization:hre }
+		}
+
 		add_country_modifier = {
 			modifier = hussite_heresy_modifier
 			days = -1
 			mode = add_and_extend
 		}
+	}
+
+	option = {
+		name = hussite_wars.10.b
+		historical_option = yes
+
+		trigger = {
+			is_leader_of_international_organization = international_organization:hre
+		}
+
+		add_country_modifier = {
+			modifier = hussite_heresy_modifier
+			days = -1
+			mode = add_and_extend
+		}
+
+		if = {
+			limit = {
+				can_declare_legal_war_on = { target = c:BOH }
+			}
+			declare_war_with_cb = {
+				target = c:BOH
+				type = casus_belli:cb_crush_hussitism
+			}
+		}
+		else = {
+			add_casus_belli = {
+				target = c:BOH
+				type = casus_belli:cb_crush_hussitism
+				years = 10
+			}
+		}
+
+		custom_tooltip = {
+			text = every_neighbor_of_bohemia_gets_hussite_wars.3_tt
+			c:BOH = {
+				every_neighbor_country = {
+					limit = {
+						is_subject = no
+						NOT = { has_variable = pending_relevant_event_variable }
+						religion = religion:catholic
+						trigger_if = {
+							limit = { exists = scope:catholic_champion_scope }
+							NOT = { this = scope:catholic_champion_scope }
+						}
+						NOT = {
+							has_mutual_scripted_relation = {
+								type = relation_type:alliance
+								target = c:BOH
+							}
+						}
+						NOT = { has_truce_with = c:BOH }
+						NOT = { is_at_war_with = c:BOH }
+						NOT = { is_subject_of = c:BOH }
+						NOR = {
+							is_rival_of = root
+							is_enemy_of = root
+						}
+						NOT = { tag = POL }		#Theirs comes later if they decline hussite_wars.7!
+					}
+					trigger_event_silently = hussite_wars.3
+					set_variable = had_hussite_wars3_event_variable
+				}
+			}
+		}
+
+		if = {
+			limit = { exists = scope:catholic_champion_scope }
+			custom_tooltip = {
+				text = hussite_wars.6_happens_for_catholic_champion_scope_tt
+				scope:catholic_champion_scope = {
+					trigger_event_silently = hussite_wars.6
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				country_exists = c:POL
+				c:POL = {
+					NOT = { is_at_war_with = root }
+					is_subject = no
+					NOT = { has_truce_with = root }
+					NOT = { is_allied_with = { target = root } }
+				}
+			}
+			c:POL = { trigger_event_non_silently = hussite_wars.7 }
+		}
+
+		custom_tooltip = explain_situation_peace_treaty_tt
+	}
+
+	option = {
+		name = hussite_wars.10.c
+
+		trigger = {
+			is_leader_of_international_organization = international_organization:hre
+		}
+
+		ai_will_select = { value = 0 }
+
+		add_stability = stability_extreme_penalty
+		add_government_power = government_power_extreme_penalty
+
+		add_casus_belli = {
+			target = c:BOH
+			type = casus_belli:cb_crush_hussitism
+			years = 10
+		}
+	}
+
+	after = {
+		remove_variable = had_hussite_wars3_event_variable
+	}
+}
+
+hussite_wars.11 = { #The Hussite Wars Begin for Bohemia
+	type = country_event
+	category = situation_event
+	image = "gfx/interface/illustrations/situation/hussite_wars.dds"
+
+	title = hussite_wars.11.title
+	desc = hussite_wars.11.desc
+	outcome = neutral
+
+	fire_only_once = yes
+
+	immediate = {
+		capital = { save_scope_as = target_boh_capital_scope }
+		international_organization:hre.leader_country ?= { save_scope_as = hre_emperor_scope }
+	}
+
+	option = {
+		name = hussite_wars.11.a
+
+		custom_tooltip = hussite_wars_11_tt
 	}
 }
 

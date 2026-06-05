@@ -6,15 +6,73 @@
 	expel_members_who_are_attackers_at_war_with_other_members = yes
 	expel_members_who_are_defenders_at_war_with_other_members = yes
 
-	leader_color = define:NMapColors|INTERNATIONAL_ORGANIZATION_LEADER_COLOR
-	#member_color = rgb { 180 211 228 }
+	leader_color = map_iw_italian_1
+	member_color = map_iw_italian_1_member
 
 	has_leader_country = yes
 	leader_type = country
 	disband_if_no_leader = yes
+	take_over_wars_when_called = yes
 	land_ownership_rule = italian_wars_land_ownership
 	non_leader_modifier = {
 		block_from_change_to_empire_rank = yes
+	}
+
+	modifier = {
+		mercenary_maintenance_efficiency = 0.33
+		scale = {
+			add = {
+				value = scope:recipient.total_locations_owned
+				divide = 301
+				desc = "IO_LOCATIONS_IN_ITALY"
+			}
+		}
+	}
+
+	modifier = {
+		monthly_towards_defensive = 0.05
+	}
+
+	modifier = {
+		monthly_towards_defensive = 0.28
+		scale = {
+			add = {
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.01
+				desc = "[situation_tension|e]"
+			}
+		}
+	}
+
+	leader_modifier = {
+		aggressiveness_modifier = 0.5
+		ai_months_between_wars = -12
+		scale = { 
+			add = {
+				value = 1
+				desc = BASE_VALUE
+			}
+			add = {
+				value = situation:italian_wars.var:iw_tension
+				multiply = 0.01
+				desc = "[situation_tension|e]"
+			}
+		}
+	}
+
+	diplomatic_capacity_cost = {
+		scope:recipient = {
+			add = {
+				desc = "UPKEEP_NUM_MEMBERS"
+				value = total_members
+				multiply = 0.1
+			}
+			add = {
+				desc = "UPKEEP_TOTAL_ECO_BASE"
+				value = international_organization_economical_base
+				multiply = 0.00025
+			}
+		}
 	}
 
 	#Yes. but you will be removed from the League
@@ -38,6 +96,15 @@
 	on_disband = {
 		remove_list_global_variable = { name = iw_italian_leagues_list target = root }
 	}
+
+	special_statuses_implemented = {
+		italian_league_sponsor
+	}
+
+	payments_implemented = {
+		italian_league_sponsor_gold_contribution
+		italian_league_sponsor_manpower_contribution
+	}
 	
 	has_military_access = {
 		scope:recipient ?= {
@@ -48,9 +115,22 @@
 		}
 	}
 
+	fleet_basing_rights = {
+		scope:recipient ?= {
+			is_member_of_international_organization = root
+		}
+		scope:actor ?= {
+			is_member_of_international_organization = root
+		}
+	}
+
+	gives_food_access_to_members = yes
+	can_recruit_regiments_in_members = yes
+	can_build_ships_in_members = yes
+
 	#Even if the leader is not an Empire, they will have access to these actions
 	leader_modifier = {
-		allowed_intervene_in_war = yes
+		
 		allowed_enforce_peace = yes
 
 	}
@@ -90,9 +170,12 @@
 			NOT = { has_cooldown = join_a_league }	
 		}
 		trigger_else = {
-			scope:recipient ?= {
-				any_international_organization_member = {
-					root = { is_disloyal_subject = no is_subject_or_below_of = prev }
+			custom_tooltip = {
+				text = league_subject_can_join_tt
+				scope:recipient ?= {
+					any_international_organization_member = {
+						root = { is_disloyal_subject = no is_subject_or_below_of = prev }
+					}
 				}
 			}
 		}
@@ -183,12 +266,19 @@
 	}
 
 	join_defensive_wars_auto_call = {
+		situation:italian_wars = { var:iw_tension >= 75 }
 		scope:recipient ?= {
 			OR = {
 				this = root.leader_country
 				at_war = no
 			}
 			is_subject = no
+			NOT = {
+				has_special_status_in_international_organization = {
+					type = special_status:italian_league_sponsor
+					international_organization = root
+				}
+			}
 		}
 		scope:target ?= {
 			NOT = {
@@ -198,10 +288,11 @@
 				is_leader_of_international_organization = international_organization:foreign_league_france
 				is_leader_of_international_organization = international_organization:foreign_league_iberia
 				is_leader_of_international_organization = international_organization:foreign_league_hre
+				is_leader_of_international_organization = international_organization:foreign_league_balkan
 			}
 		}
 	}
-	
+
 	auto_disband_trigger = {
 		total_members < 1
 	}
@@ -249,6 +340,12 @@
 				if = {
 					limit = { is_member_of_international_organization = international_organization:italian_league_3 }
 					international_organization:italian_league_3 = {
+						remove_country_from_international_organization = prev
+					}
+				}
+				if = {
+					limit = { is_member_of_international_organization = international_organization:foreign_league_balkan }
+					international_organization:foreign_league_balkan = {
 						remove_country_from_international_organization = prev
 					}
 				}

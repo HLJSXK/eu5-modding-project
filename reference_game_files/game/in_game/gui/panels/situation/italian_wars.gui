@@ -1,7 +1,403 @@
 
+types ItalianWarsTypes {
+	type tension_threshold_icon = widget  {
+		ignore_layout = yes
+		block "tension_threshold_icon_position" { position = { 385 4 } }
+		size = { 34 38 }
+
+		icon = {
+			parentanchor = center
+			size = { 34 34 }
+			block "tension_threshold_texture" {
+				texture = "gfx/interface/progressbars/yellow_circle_bg.dds"
+			}
+			text_single = {
+				margin_left = 1
+				maximumsize = { 26 18 }
+				autoresize = yes
+				parentanchor = center
+				fontsize = 13
+				block "tension_threshold_text" {}
+			}
+		}
+	}
+
+	type italian_wars_member_country_row = situation_member_country_row {
+
+		blockoverride "situation_member_leader_bg" {
+			background = {
+				visible = "[GetUniqueInternationalOrganization(ItalianWarsCountryItem.GetLeagueTypeKey).IsIOLeaderCountry(ItalianWarsCountryItem.GetCountry)]"
+				using = color_purple_texture
+				margin = { 1 1 }
+				margin_bottom = 2
+				alpha = 0.4
+			}
+		}
+
+		blockoverride "situation_member_country_row_rank" {
+			button = {
+				size = { 26 26 }
+				texture = "[ItalianWarsCountryItem.GetLeagueIcon]"
+				texture_density = 2
+				datacontext = "[GetUniqueInternationalOrganization(ItalianWarsCountryItem.GetLeagueTypeKey)]"
+				action_tooltip = {
+					title = "OPEN_IO"
+					on_action = "[OpenInternationalOrganizationView(InternationalOrganization.Self)]"
+				}
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+			}
+			divider_flavor_01 = { size = {8 -1} }
+		}
+
+		blockoverride "situation_member_country_datacontext" {
+			datacontext = "[ItalianWarsCountryItem.GetCountry]"
+		}
+		blockoverride "situation_member_gp" {}
+		blockoverride "situation_member_opinion" {}
+		blockoverride "situation_member_extra_columns" {
+			divider_flavor_01 = { size = { 8 -1 } }
+			action_button_regular = {
+				visible = yes
+				size = { 60 25 }
+				fontsize = 13
+				text = "bribe_voter_short"
+				actor = "[SituationView.GetPlayer]"
+				parameter = {
+					parameter_name = "recipient"
+					parameter_value = "[ItalianWarsCountryItem.GetCountry]"
+				}
+				left_click_and_hold_action = { action_name = "italian_wars_bribe_country" }
+				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, And(Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer), UIAction.IsEnabled))]"
+				tooltipwidget = {
+					ContextualTooltipType = {
+						blockoverride "title_text" { text = "italian_wars_bribe_country" }
+						blockoverride "concept_link" { text = "[action|E]" }
+						blockoverride "tooltip_content" {
+							TooltipFlavorTextBlock = {
+								visible = "[Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer)]"
+								blockoverride "text" { text = "italian_wars_bribe_country_desc" }
+							}
+							TooltipRowList = {
+								visible = "[Not(StringIsEmpty(UIAction.GetEffects))]"
+								textcontext = "[UIAction.GetEffects]"
+							}
+							TooltipRowList = {
+								visible = "[Not(StringIsEmpty(UIAction.GetConditions))]"
+								textcontext = "[UIAction.GetConditions]"
+							}
+							TooltipTextBlock = {
+								visible = "[ItalianWarsCountryItem.IsInSameLeagueAsPlayer]"
+								blockoverride "text" { text = "IW_INVITE_TARGET_IN_LEAGUE_TT" }
+							}
+							TooltipTextBlock = {
+								visible = "[And(Not(SituationView.IsPlayerItalianWarsLeagueLeader), And(Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer), StringIsEmpty(UIAction.GetConditions)))]"
+								blockoverride "text" { text = "IW_BRIBE_NOT_LEAGUE_LEADER_TT" }
+							}
+						}
+					}
+				}
+			}
+			divider_flavor_01 = { size = { 8 -1 } }
+			action_button_regular = {
+				visible = "[Not(ObjectsEqual(Country.Self, SituationView.GetPlayer))]"
+				size = { 60 25 }
+				fontsize = 13
+				text = "IW_INVITE_SHORT"
+				actor = "[SituationView.GetPlayer]"
+				left_action = {
+					action_name = "invite_to_international_organization"
+					action_direction = "offer"
+					parameter = {
+						parameter_name = "international_organization"
+						parameter_value = "[SituationView.GetItalianWarsPlayerLeagueIO]"
+					}
+					parameter = {
+						parameter_name = "recipient"
+						parameter_value = "[ItalianWarsCountryItem.GetCountry]"
+					}
+				}
+				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, UIAction.IsEnabled)]"
+				tooltipwidget = {
+					ContextualTooltipType = {
+						blockoverride "title_text" { text = "IW_INVITE_TO_LEAGUE_TITLE" }
+						blockoverride "concept_link" { text = "[action|E]" }
+						blockoverride "title_icon_texture" {
+							texture = "gfx/interface/icons/location_icons/diplomacy.dds"
+						}
+						blockoverride "tooltip_content" {
+							# Cases 1 & 2: leader, target not in league (action is valid regardless of other requirements)
+							TooltipFlavorTextBlock = {
+								visible = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, UIAction.IsVisible)]"
+								blockoverride "text" { text = "[UIAction.GetDescription]" }
+							}
+							TooltipRowList = {
+								visible = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, And(UIAction.IsVisible, Not(StringIsEmpty(UIAction.GetEffects))))]"
+								textcontext = "[UIAction.GetEffects]"
+							}
+							TooltipRowList = {
+								visible = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, And(UIAction.IsVisible, Not(StringIsEmpty(UIAction.GetConditions))))]"
+								textcontext = "[UIAction.GetConditions]"
+							}
+							# Case 4: leader, but target is already a member of our league
+							TooltipTextBlock = {
+								visible = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, Not(UIAction.IsVisible))]"
+								blockoverride "text" { text = "IW_INVITE_TARGET_IN_LEAGUE_TT" }
+							}
+							# Case 3: member but not the leader
+							TooltipTextBlock = {
+								visible = "[And(SituationView.IsPlayerInItalianWarsLeague, Not(SituationView.IsPlayerItalianWarsLeagueLeader))]"
+								blockoverride "text" { text = "IW_INVITE_NOT_LEAGUE_LEADER_TT" }
+							}
+							# Case 5: not in any Italian Wars league
+							TooltipTextBlock = {
+								visible = "[Not(SituationView.IsPlayerInItalianWarsLeague)]"
+								blockoverride "text" { text = "IW_INVITE_NOT_IN_LEAGUE_TT" }
+							}
+						}
+					}
+				}
+			}
+
+			divider_flavor_01 = { size = { 8 -1 } }
+			hbox = {
+				minimumsize = { 55 -1 }
+				maximumsize = { 55 -1 }
+				tooltipwidget = {
+					ContextualTooltipType = {
+						blockoverride "title_text" { text = "IW_INVITE_ACCEPTANCE_TITLE" }
+						blockoverride "title_icon_texture" {
+							texture = "gfx/interface/icons/location_icons/diplomacy.dds"
+						}
+						blockoverride "tooltip_content" {
+							TooltipTextBlock = {
+								visible = "[ItalianWarsCountryItem.IsInSameLeagueAsPlayer]"
+								blockoverride "text" { text = "IW_INVITE_TARGET_IN_LEAGUE_TT" }
+							}
+							TooltipTextBlock = {
+								visible = "[And(SituationView.IsPlayerInItalianWarsLeague, Not(SituationView.IsPlayerItalianWarsLeagueLeader))]"
+								blockoverride "text" { text = "IW_INVITE_NOT_LEAGUE_LEADER_TT" }
+							}
+							TooltipTextBlock = {
+								visible = "[Not(SituationView.IsPlayerInItalianWarsLeague)]"
+								blockoverride "text" { text = "IW_INVITE_NOT_IN_LEAGUE_TT" }
+							}
+							TooltipScrolledStringPairList = {
+								ontextcontextchanged = "[SetStringPairListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+								visible = "[Not(StringIsEmpty(ItalianWarsCountryItem.GetInviteAcceptanceTooltip))]"
+								blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+								textcontext = "[ItalianWarsCountryItem.GetInviteAcceptanceTooltip]"
+							}
+						}
+					}
+				}
+				text_single = {
+					visible = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer))]"
+					align = center
+					text = "[ItalianWarsCountryItem.GetInviteAcceptanceScore|+=2]"
+				}
+				text_single = {
+					visible = "[Not(And(SituationView.IsPlayerItalianWarsLeagueLeader, Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer)))]"
+					align = center
+					text = "-"
+				}
+			}
+
+			divider_flavor_01 = { size = { 8 -1 } }
+			text_single = {
+				minimumsize = { 30 -1 }
+				maximumsize = { 30 -1 }
+				align = center
+				text = "[ItalianWarsCountryItem.GetItalyLocationCount]"
+				tooltipwidget = {
+					ContextualTooltipType = {
+						blockoverride "title_text" { text = "IW_ITALY_LOCATION_COUNT_TITLE" }
+						blockoverride "title_icon_texture" {
+							texture = "gfx/interface/icons/diplomatic_status/war.dds"
+						}
+						blockoverride "tooltip_content" {
+							TooltipTextBlock = {
+								blockoverride "text" {
+									text = "IW_ITALY_LOCATION_COUNT_TT"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+
+	}
+}
+
 situation_panel = {
 
 	##################################### TOP HEADER #####################################
+	blockoverride "situation_top_subheader_content" {
+		hbox = {
+			layoutpolicy_horizontal = expanding
+			background = {
+				texture = "gfx/interface/progressbars/tension_header_bg.dds"
+			}
+			
+			hbox = {
+				size = { 60 28 }
+				margin = { 6 5 }
+				icon = {
+					size = { 26 26 }
+					texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+				}
+				text_single = {
+					autoresize = yes
+					minimumsize = { 24 -1 }
+					maximumsize = { 24 -1 }
+					fontsize = 13
+					raw_text = "[FixedPointToInt(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue)]%"
+				}
+				tooltipwidget = {
+					ContextualTooltipType = {
+						blockoverride "title_icon_texture" {
+							texture = "gfx/interface/icons/situations/tension.dds"
+						}
+						blockoverride "title_text" {
+							text = "IW_TENSION_LABEL"
+						}
+						blockoverride "tooltip_content" {
+							TooltipTextBlock = {
+								blockoverride "text" {
+									text = "iw_tension_explain_tt"
+								}
+							}
+						}
+					}
+				}
+			}
+
+			hbox = {
+				using = bg_cabinet_card_frame
+				margin = { 4 4 }
+				using = situation_disaster_progressbar_with_thresholds
+				blockoverride "progressbar_with_thresholds_size" {
+					size = { 450 10 }
+				}
+				blockoverride "progress_bar_min_max" {
+					min = 0
+					max = 25
+				}
+				blockoverride "progress_bar_progresstexture_low" { progresstexture = "gfx/interface/progressbars/progress_bar_yellow.dds" }
+				blockoverride "progress_bar_value_low" {
+					value = "[Min_float(FixedPointToFloat(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue), '(float)25')]"
+				}	
+
+				blockoverride "progress_bar_size_mid" {
+					position = { 25% 0 }
+					size = { 30% 100% }
+				}
+				blockoverride "progress_bar_progresstexture_mid" { progresstexture = "gfx/interface/progressbars/progress_bar_yellange.dds" }
+				blockoverride "progress_bar_value_mid" {
+					value = "[Max_float(Subtract_float(Min_float(FixedPointToFloat(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue), '(float)50'), '(float)25'), '(float)0')]"
+				}
+
+				blockoverride "progress_bar_size_high" {
+					position = { 50% 0 }
+					size = { 30% 100% }
+				}
+				blockoverride "progress_bar_progresstexture_high" { progresstexture = "gfx/interface/progressbars/progress_bar_orange.dds" }
+				blockoverride "progress_bar_value_high" {
+					value = "[Max_float(Subtract_float(Min_float(FixedPointToFloat(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue), '(float)75'), '(float)50'), '(float)0')]"
+				}
+
+				blockoverride "progress_threshold_bar_extra" {
+					widget = {
+						parentanchor = left|top
+						position = { 75% 0 }
+						size = { 25% 100% }
+
+						progressbar = {
+							size = { 100% 100% }
+							noprogresstexture = "gfx/interface/icons/unit_view/moral_bar_transparent.dds"
+							progresstexture = "gfx/interface/progressbars/progress_bar_red_alt.dds"
+							texture_density = 2
+							spriteType = Corneredstretched
+							spriteborder = { 12 0 }
+							min = 0
+							max = 25
+							value = "[Max_float(Subtract_float(FixedPointToFloat(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue), '(float)75'), '(float)0')]"
+						}
+					}
+				}
+			}
+			expand = {}
+		}
+
+		tension_threshold_icon = {
+			blockoverride "tension_threshold_icon_position" { position = { 162 4 } }
+			enabled = "[GreaterThanOrEqualTo_CFixedPoint(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue, '(CFixedPoint)25')]"
+			blockoverride "tension_threshold_text" { text = "iw_first_tension_threshold" }
+			tooltipwidget = {
+				SimpleContextualStringPairTooltipType = {
+					blockoverride "title_icon" {
+						icon = {
+							using = tooltip_title_icon_size
+							texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						}
+					}
+					lowpriotextcontext = iw_tension_25_tt
+				}
+			}
+		}
+		tension_threshold_icon = {
+			blockoverride "tension_threshold_icon_position" { position = { 276 4 } }
+			enabled = "[GreaterThanOrEqualTo_CFixedPoint(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue, '(CFixedPoint)50')]"
+			blockoverride "tension_threshold_texture" { texture = "gfx/interface/progressbars/orange_circle_bg.dds" }
+			blockoverride "tension_threshold_text" { text = "iw_second_tension_threshold" }
+			tooltipwidget = {
+				SimpleContextualStringPairTooltipType = {
+					blockoverride "title_icon" {
+						icon = {
+							using = tooltip_title_icon_size
+							texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						}
+					}
+					lowpriotextcontext = iw_tension_50_tt
+				}
+			}
+		}
+		tension_threshold_icon = {
+			blockoverride "tension_threshold_icon_position" { position = { 388 4 } }
+			enabled = "[GreaterThanOrEqualTo_CFixedPoint(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue, '(CFixedPoint)75')]"
+			blockoverride "tension_threshold_texture" { texture = "gfx/interface/progressbars/red_circle_bg.dds" }
+			blockoverride "tension_threshold_text" { text = "iw_third_tension_threshold" }
+			tooltipwidget = {
+				SimpleContextualStringPairTooltipType = {
+					blockoverride "title_icon" {
+						icon = {
+							using = tooltip_title_icon_size
+							texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						}
+					}
+					lowpriotextcontext = iw_tension_75_tt
+				}
+			}
+		}
+		tension_threshold_icon = {
+			blockoverride "tension_threshold_icon_position" { position = { 502 4 } }
+			enabled = "[GreaterThanOrEqualTo_CFixedPoint(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue, '(CFixedPoint)100')]"
+			blockoverride "tension_threshold_texture" { texture = "gfx/interface/progressbars/empty_circle_bg.dds" }
+			blockoverride "tension_threshold_text" { text = "iw_fourth_tension_threshold" }
+			tooltipwidget = {
+				SimpleContextualStringPairTooltipType = {
+					blockoverride "title_icon" {
+						icon = {
+							using = tooltip_title_icon_size
+							texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						}
+					}
+					lowpriotextcontext = iw_tension_100_tt
+				}
+			}
+		}
+	}
 
 	##################################### MAIN IMAGE #####################################
 	blockoverride "situation_panel_image" {	
@@ -38,6 +434,11 @@ situation_panel = {
 		}
 
 		# blockoverride "history_button_anchor" {}
+		blockoverride "character_role" {
+			datacontext = "[Character.GetRuledCountry]"
+			country_flag_small = {}
+		}
+
 
 		blockoverride "first_character_portrait_anchor" {
 			parentanchor = bottom|left
@@ -69,7 +470,33 @@ situation_panel = {
 
 	##################################### TAB NAME #####################################
 
-
+	blockoverride "situation_extra_tabs_content" {
+		button_secondary_tab_alt = {
+			using = layoutpolicy_expanding
+			blockoverride "tab_text" { text = "SITUATION_MEMBERS" }
+			action_tooltip = {
+				title = "OPEN_TAB"
+				on_action = "[SituationView.Vars.Set( 'situation_tab', 'situation_members' )]"
+			}
+			down = "[SituationView.Vars.HasValue( 'situation_tab', 'situation_members' )]"
+			tooltipwidget = {
+				ContextualTooltipType = {
+					blockoverride "title_icon_texture" {
+						texture = "gfx/interface/icons/international_organizations/special_statuses/members.dds"
+					}
+					blockoverride "title_text" { text = "SITUATION_MEMBERS" }
+					blockoverride "concept_link" { text = "[situation|e]" }
+					blockoverride "tooltip_content" {
+						TooltipTextBlock = {
+							blockoverride "text" {
+								text = "SITUATION_MEMBERS_TT_TEXT"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	
 	##################################### SUBHEADER #####################################
 
@@ -80,36 +507,282 @@ situation_panel = {
 
 	blockoverride "situation_panel_main_content" {
 
-		situation_card_expandable = {
-			blockoverride "header_button_onclick" {
-				onclick = "[LateralView.Vars.Toggle( 'requirements_toggled' )]"
+		widget = {
+			size = { 510 160 }
+			using = bg_dark_paper_card
+			using = bg_cabinet_card_frame
+			icon_pie = {
+				margin = { 5 5 }
+				blockoverride "item_bg_color" {
+					using = color_light_paper_texture
+					alpha = 0.1
+				}
+				blockoverride "population_culture_tooltip_bg" {}
+				blockoverride "PieSize" { size = { 112 112 } }
+				blockoverride "pie_datamodel" { datamodel = "[SituationView.GetItalianWarsPieSlices]"  }
+	
+				###Slices and Icon
+				blockoverride "SliceTooltip" {
+					tooltipwidget = {
+						using = iw_league_entry_tooltip
+					}
+				}
+
+				blockoverride "SliceValue" { value = "[ItalianWarsLeaguePieSlice.GetPercentage]" }
+				blockoverride "SliceColor" { color = "[ItalianWarsLeaguePieSlice.GetColor]" }
+				blockoverride "Icon" { texture = "gfx/interface/icons/diplomatic_status/war.dds" }
+				
+				blockoverride "datamodel" {	datamodel = "[SituationView.GetItalianWarsPieSlices]" }
+				blockoverride "color" { color = "[ItalianWarsLeaguePieSlice.GetColor]" }
+				blockoverride "tooltip" {
+					tooltipwidget = {
+						using = iw_league_entry_tooltip
+					}
+				}
+				blockoverride "leftside_info" { 
+					text = "[ItalianWarsLeaguePieSlice.GetTitle]" 
+					default_format = "#yellow_titles"
+				}
+				blockoverride "rightside_info" { text = "[SelectLocalization(ItalianWarsLeaguePieSlice.HasIO, 'IW_PIE_LOCATION_COUNT', 'IW_PIE_LOCATION_COUNT_NO_IO')]" }
 			}
-			blockoverride "header_text" {
-				text = "END_REQUIREMENTS"
-			}
-			blockoverride "header_icon" {
-				texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
-			}
-			blockoverride "bottom_content" {
-				TooltipRequirementsList = {
-					textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
+		}
+
+		vbox = {
+			widget = {
+				layoutpolicy_horizontal = expanding
+				size = {510 40}
+				using = bg_card_header_01_military
+				
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 4
+					margin = {10 0}
+					expand = {}
+					icon = {
+						size = { 25 25 }
+						texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						texture_density = 2
+						glow = {
+							name = "drop_shadow"
+							glow_radius = 3
+							color = {0.0 0.0 0.0 1.0}
+							alpha = 0.5
+						}
+					}
+					text_single = {
+						text = "IW_CURRENT_WARS_TT"
+					}
+					expand = {}
 				}
 			}
-			blockoverride "visible_hint" {}
-			blockoverride "onaction_hint" {
-				action_tooltip = {
-					title = "OPEN_HINT"
-					on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_italian_wars')]"
+			using = bg_dark_paper_card
+			using = bg_cabinet_card_frame
+			widget = {
+				size = { 510 120 }
+				scrollarea = {
+					using = layoutpolicy_expanding
+					scrollbarpolicy_horizontal = always_off
+					autoresizescrollarea = yes
+					minimumsize = { 508 60 }
+					maximumsize = { 508 116 }
+
+					scrollbar_vertical = {
+						using = Scrollbar_Vertical
+					}
+
+					scrollwidget = {
+						vbox = {
+							layoutpolicy_horizontal = expanding
+							spacing = 4
+							maximumsize = { 500 -1 }
+							margin = { 8 6 }
+							margin_left = 12
+							datamodel = "[SituationView.GetItalianWarsWarItems]"
+							text_single = {
+								visible = "[IsDataModelEmpty(SituationView.GetItalianWarsWarItems)]"
+								text = "IW_NO_CURRENT_WARS"
+								align = center
+								minimumsize = { 490 48 }
+							}
+							item = {
+								hbox = {
+									using = bg_paper_card
+									using = bg_cabinet_card_frame
+									layoutpolicy_horizontal = expanding
+									spacing = 2
+									margin = { 4 6 }
+
+									action_button_regular = {
+										visible = yes
+										size = { 50 28 }
+										text = "IW_JOIN_WAR_SHORT"
+										actor = "[SituationView.GetPlayer]"
+										left_action = {
+											action_name = "iw_intervene_in_war"
+											parameter = {
+												parameter_name = "recipient"
+												parameter_value = "[SituationView.GetActiveSituation.GetSituation]"
+											}
+											parameter = {
+												parameter_name = "target_war"
+												parameter_value = "[ItalianWarsWarItem.GetWar]"
+											}
+											parameter = {
+												parameter_name = "target_country"
+												parameter_value = "[ItalianWarsWarItem.GetAttackerLeader]"
+											}
+										}
+										enabled = "[UIAction.IsEnabled]"
+										tooltipwidget = {
+											ContextualTooltipType = {
+												blockoverride "title_text" { text = "iw_intervene_in_war" }
+												blockoverride "tooltip_content" {
+													TooltipTextBlock = {
+														visible = "[ItalianWarsWarItem.IsPlayerInWar]"
+														blockoverride "text" { text = "IW_ALREADY_IN_WAR_TT" }
+													}
+													TooltipTextBlock = {
+														name = "DescriptionTest"
+														visible = "[And(Not(StringIsEmpty(UIAction.GetDescription)), Not(ItalianWarsWarItem.IsPlayerInWar))]"
+														blockoverride "text" { text = "[UIAction.GetDescription]" }
+													}
+													TooltipConditionList = {
+														name = "Effects"
+														visible = "[And(ConditionList.HasItems, Not(ItalianWarsWarItem.IsPlayerInWar))]"
+														blockoverride "block_title" { text = "game_concept_effects" }
+														datacontext = "[StringToConditionListOnlyPassedAndNeutral(UIAction.GetEffects)]"
+													}
+													TooltipScrolledRequirementsList = {
+														name = "Conditions"
+														visible = "[And(DataModelHasItems(RequirementsList.GetLines), Not(ItalianWarsWarItem.IsPlayerInWar))]"
+														blockoverride "block_title" { text = "game_concept_conditions" }
+														blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
+														textcontext = "[UIAction.GetConditions]"
+													}
+												}
+												blockoverride "tooltip_ui_action_block" {
+													TooltipUIActionBlockOld = {
+														visible = "[And(PdxGuiWidget.HasUIAction, Not(ItalianWarsWarItem.IsPlayerInWar))]"
+													}
+												}
+											}
+										}
+									}
+
+									button_regular = {
+										layoutpolicy_horizontal = expanding
+										size = { -1 32 }
+										action_tooltip = {
+											title = "OPEN_WAR"
+											on_action = "[ItalianWarsWarItem.OnClick]"
+										}
+
+										tooltipwidget = { BasicFunctionalTooltip = {} }
+										hbox = {
+											margin = { 4 2 }
+											layoutpolicy_horizontal = expanding
+
+											icon = {
+												size = { 30 30 }
+												texture = "[ItalianWarsWarItem.GetAttackerLeagueIcon]"
+												texture_density = 2
+											}
+											country_flag_small = {
+												datacontext = "[ItalianWarsWarItem.GetAttackerLeader]"
+												blockoverride "show_as_icon" { visible = yes }
+												blockoverride "show_as_button" { visible = no }
+											}
+											text_single = {
+												layoutpolicy_horizontal = expanding
+												text = "[ItalianWarsWarItem.GetAttackerLeader.GetName]"
+												maximumsize = { 90 -1 }
+											}
+											text_single = {
+												align = center
+												raw_text = "[ItalianWarsWarItem.GetWarScore|+=0%/]"
+												minimumsize = { 50 -1 }
+											}
+											text_single = {
+												align = right
+												layoutpolicy_horizontal = expanding
+												text = "[ItalianWarsWarItem.GetDefenderLeader.GetName]"
+												maximumsize = { 90 -1 }
+											}
+											country_flag_small = {
+												datacontext = "[ItalianWarsWarItem.GetDefenderLeader]"
+												blockoverride "show_as_icon" { visible = yes }
+												blockoverride "show_as_button" { visible = no }
+											}
+											icon = {
+												size = { 30 30 }
+												texture = "[ItalianWarsWarItem.GetDefenderLeagueIcon]"
+												texture_density = 2
+											}
+										}
+									}
+
+
+									action_button_regular = {
+										visible = yes
+										size = { 50 28 }
+										text = "IW_JOIN_WAR_SHORT"
+										actor = "[SituationView.GetPlayer]"
+										left_action = {
+											action_name = "iw_intervene_in_war"
+											parameter = {
+												parameter_name = "recipient"
+												parameter_value = "[SituationView.GetActiveSituation.GetSituation]"
+											}
+											parameter = {
+												parameter_name = "target_war"
+												parameter_value = "[ItalianWarsWarItem.GetWar]"
+											}
+											parameter = {
+												parameter_name = "target_country"
+												parameter_value = "[ItalianWarsWarItem.GetDefenderLeader]"
+											}
+										}
+										enabled = "[UIAction.IsEnabled]"
+										tooltipwidget = {
+										ContextualTooltipType = {
+											blockoverride "title_text" { text = "iw_intervene_in_war" }
+											blockoverride "tooltip_content" {
+												TooltipTextBlock = {
+													visible = "[ItalianWarsWarItem.IsPlayerInWar]"
+													blockoverride "text" { text = "IW_ALREADY_IN_WAR_TT" }
+												}
+												TooltipTextBlock = {
+													name = "DescriptionTest"
+													visible = "[And(Not(StringIsEmpty(UIAction.GetDescription)), Not(ItalianWarsWarItem.IsPlayerInWar))]"
+													blockoverride "text" { text = "[UIAction.GetDescription]" }
+												}
+												TooltipConditionList = {
+													name = "Effects"
+													visible = "[And(ConditionList.HasItems, Not(ItalianWarsWarItem.IsPlayerInWar))]"
+													blockoverride "block_title" { text = "game_concept_effects" }
+													datacontext = "[StringToConditionListOnlyPassedAndNeutral(UIAction.GetEffects)]"
+												}
+												TooltipScrolledRequirementsList = {
+													name = "Conditions"
+													visible = "[And(DataModelHasItems(RequirementsList.GetLines), Not(ItalianWarsWarItem.IsPlayerInWar))]"
+													blockoverride "block_title" { text = "game_concept_conditions" }
+													blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
+													textcontext = "[UIAction.GetConditions]"
+												}
+											}
+											blockoverride "tooltip_ui_action_block" {
+												TooltipUIActionBlockOld = {
+													visible = "[And(PdxGuiWidget.HasUIAction, Not(ItalianWarsWarItem.IsPlayerInWar))]"
+												}
+											}
+										}
+									}
+									}
+								}
+							}
+						}
+					}
 				}
-			}
-			blockoverride "bottom_content_onclick" {
-				visible = "[LateralView.Vars.Exists( 'requirements_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[LateralView.Vars.Exists( 'requirements_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(LateralView.Vars.Exists( 'requirements_toggled' ))]"
 			}
 		}
 
@@ -139,642 +812,138 @@ situation_panel = {
 		# 		}
 		# 	}
 		# }
+		# raw_text = "[InternationalOrganization.GetOwnedLocationsSize]/200"
 
-		situation_card_expandable = {	#Foreign League Balkan
+	}
 
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('foreign_league_balkan').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('foreign_league_balkan')]"
+	##################################### MEMBERS TAB ######################################
 
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'foreign_league_balkan_toggle' )]"
-			}
+	blockoverride "situation_extra_tab_panels" {
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			layoutpolicy_vertical = expanding
+			visible = "[SituationView.Vars.HasValue( 'situation_tab', 'situation_members' )]"
+			using = bg_secondary_inner_alt
+			margin = { 10 10 }
+			spacing = 4
 
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_balkan_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_balkan_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'foreign_league_balkan_toggle' ))]"
-			}
+			blockoverride "searchbar_extra_pre_content" {
+				# League filter buttons
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 2
+					margin_top = 4
+	
+					datamodel = "[SituationView.GetItalianWarsLeagueItems]"
+					item = {
 
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('foreign_league_balkan').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('foreign_league_balkan').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
+						header_button_left = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 34 }
+							blockoverride "button_icon_stretch_sprite" {}
+							blockoverride "header_button_frame_inner" { visible = no }
+							blockoverride "header_button_text_layout" {}
+							blockoverride "icon_overlay" {}
+							blockoverride "icon_texture" {
+								# size = { 100% 100% }
+								# parentanchor = center
+								# texture = "gfx/interface/icons/flat_icons/balance/foreign_loan.dds"
 							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
+
+							hbox = {
+								using = layoutpolicy_expanding
+								spacing = 4
+								expand = {}
+								icon = {
+									size = { 28 28 }
+									texture = "[ItalianWarsLeagueItem.GetIcon]"
+								}
+								text_single = {
+									text = "[ItalianWarsLeagueItem.GetCount]"
+								}
+								expand = {}
 							}
 							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
+							tooltipwidget = {
+								ContextualTooltipType = {
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[ItalianWarsLeagueItem.GetIcon]"
+										}
 									}
+									blockoverride "title_text" { text = "[ItalianWarsLeagueItem.GetTitle]" }
+									blockoverride "concept_link" { text = "[international_organization|e]" }
 								}
 							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('foreign_league_balkan').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
+	
+							action_tooltip = {
+								title = "TOGGLE_FILTER"
+								on_action = "[SituationView.ToggleItalianWarsLeagueFilter( ItalianWarsLeagueItem.GetKey )]"
 							}
+							down = "[SituationView.IsItalianWarsLeagueFilterEnabled( ItalianWarsLeagueItem.GetKey )]"
 						}
 					}
 				}
 			}
 
-		}
+			# Sorted + searchable member list
+			filtered_sorted_list = {
+				datacontext = "[SituationView.GetItalianWarsMembersSortSearch]"
 
-		situation_card_expandable = {	#Foreign League France
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('foreign_league_france').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('foreign_league_france')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'foreign_league_france_toggle' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_france_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_france_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'foreign_league_france_toggle' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('foreign_league_france').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('foreign_league_france').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
+				blockoverride "scroll_list_is_empty" {
+					visible = "[IsDataModelEmpty(SituationView.GetItalianWarsMemberItems)]"
 				}
-				expand = {}
-			}
 
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
+				blockoverride "scroll_list_is_empty_text" {
+					text = "MEMBERS_SCROLL_LIST_EMPTY"
+				}
+
+				blockoverride "sort_buttons_filtered_list" {
+					sort_by_key_button = {
+						name = "rank"
+						layoutpolicy_vertical = expanding
+						size = { 38 -1 }
 					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('foreign_league_france').GetMembers]"
-							item = {
+					sort_by_key_button = {
+						name = "name"
+						layoutpolicy_vertical = expanding
+						size = { 190 -1 }
+					}
+					expand = {}
+					sort_by_key_button = {
+						name = "dip"
+						layoutpolicy_vertical = expanding
+						size = { 146 -1 }
+					}
+					sort_by_key_button = {
+						name = "location"
+						layoutpolicy_vertical = expanding
+						size = { 64 -1 }
+					}
+				}
 
-								country_flag_small_plus = {}
+				blockoverride "scroll_list_layout" {
+					vbox = {
+						using = layoutpolicy_expanding
+						margin_bottom = 20
+						bottomtotop = yes
+
+						datamodel = "[SituationView.GetItalianWarsMemberItems]"
+						item = {
+							widget = {
+								layoutpolicy_horizontal = expanding
+								size = { -1 35 }
+								italian_wars_member_country_row = {}
 							}
 						}
+
+						expand = {}
 					}
 				}
 			}
 
-		}
-
-		situation_card_expandable = {	#Foreign League HRE
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('foreign_league_hre').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('foreign_league_hre')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'foreign_league_hre_toggle' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_hre_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_hre_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'foreign_league_hre_toggle' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('foreign_league_hre').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('foreign_league_hre').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('foreign_league_hre').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
-							}
-						}
-					}
-				}
-			}
-
-		}
-
-		situation_card_expandable = {	#Foreign League Iberia
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('foreign_league_iberia').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('foreign_league_iberia')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'foreign_league_iberia_toggle' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_iberia_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'foreign_league_iberia_toggle' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'foreign_league_iberia_toggle' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('foreign_league_iberia').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('foreign_league_iberia').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('foreign_league_iberia').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
-							}
-						}
-					}
-				}
-			}
-
-		}
-
-		situation_card_expandable = {	#First Italian League
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('italian_league_1').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('italian_league_1')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'italian_league_1_toggled' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_1_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_1_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'italian_league_1_toggled' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('italian_league_1').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('italian_league_1').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('italian_league_1').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
-							}
-						}
-					}
-				}
-			}
-
-		}
-
-		situation_card_expandable = {	#Second Italian League
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('italian_league_2').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('italian_league_2')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'italian_league_2_toggled' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_2_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_2_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'italian_league_2_toggled' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('italian_league_2').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('italian_league_2').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('italian_league_2').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
-							}
-						}
-					}
-				}
-			}
-
-		}
-
-		situation_card_expandable = {	#Third Italian League
-
-			#Can we see this card? 
-			visible = "[GetUniqueInternationalOrganization('italian_league_3').Exists]"
-			
-			#What is the context of this card ?
-			datacontext = "[GetUniqueInternationalOrganization('italian_league_3')]"
-
-			blockoverride "header_button_onclick" {
-				onclick = "[GetVariableSystem.Toggle( 'italian_league_3_toggled' )]"
-			}
-
-			blockoverride "bottom_content_onclick" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_3_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_yes" {
-				visible = "[GetVariableSystem.Exists( 'italian_league_3_toggled' )]"
-			}
-			blockoverride "icon_replace_visible_not" {
-				visible = "[Not(GetVariableSystem.Exists( 'italian_league_3_toggled' ))]"
-			}
-
-			#Icon
-			blockoverride "header_icon" { 
-				texture = "[GetUniqueInternationalOrganization('italian_league_3').GetIcon]" 
-			}
-			
-			#Title
-			blockoverride "header_text" {
-				text = "[GetUniqueInternationalOrganization('italian_league_3').GetName]"
-			}
-
-			blockoverride "header_content_rest" {
-				text_single = {
-					align = right
-					tooltipwidget = {
-						ContextualTooltipType = {
-							blockoverride "title_icon_texture" {
-								texture = "gfx/interface/icons/situations/italian_wars_icon.dds"
-							}
-						
-							blockoverride "title_text" {
-								text = "IO_OWNED_LOCATIONS_TITLE"
-							}
-					
-							blockoverride "concept_link" {
-								text = "[international_organization|e]"
-							}
-							
-							blockoverride "tooltip_content" {
-								TooltipTextBlock = {
-									blockoverride "text" {
-										text = "IO_OWNED_LOCATIONS"
-									}
-								}
-							}
-						}
-					}
-					layoutpolicy_horizontal = expanding
-					text = "[InternationalOrganization.GetOwnedLocationsSize]"
-				}
-				expand = {}
-			}
-
-			blockoverride "bottom_content" {
-				scrollarea = {
-					layoutpolicy_horizontal = expanding
-					autoresizescrollarea = yes
-					scrollbarpolicy_horizontal = always_off
-					scrollbar_vertical = {
-						using = Scrollbar_Vertical
-					}
-					
-					scrollwidget = {
-						dynamicgridbox = {
-							layoutpolicy_horizontal = expanding
-							flipdirection = yes
-							datamodel_wrap = 9
-							maxhorizontalslots = 9
-							datamodel = "[GetInternationalOrganization('italian_league_3').GetMembers]"
-							item = {
-
-								country_flag_small_plus = {}
-							}
-						}
-					}
-				}
-			}
-
+			expand = {}
 		}
 	}
 
@@ -872,5 +1041,25 @@ template biggest_country_from_biggest_italian_io {
 	datacontext_from_model = {
 		datamodel = "[Scope.GetInternationalOrganization.GetMembers]"
 		index = 0
+	}
+}
+
+template iw_league_entry_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" { raw_text = "[ItalianWarsLeaguePieSlice.GetTitle]" }
+		blockoverride "title_icon_texture" { texture = "[ItalianWarsLeaguePieSlice.GetIcon]" }
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				blockoverride "text" { text = "[SelectLocalization(ItalianWarsLeaguePieSlice.HasIO, 'IW_PIE_SLICE_TT', 'IW_PIE_SLICE_NOT_OWNED_TT')]" }
+			}
+			TooltipTextBlock = {
+				visible = "[ItalianWarsLeaguePieSlice.HasIO]"
+				blockoverride "text" { text = "[ItalianWarsLeaguePieSlice.GetVictoryTooltipKey]" }
+			}
+			TooltipTextBlock = {
+				visible = "[ItalianWarsLeaguePieSlice.HasIO]"
+				blockoverride "text" { text = "[ItalianWarsLeaguePieSlice.GetStalemateTooltipKey]" }
+			}
+		}
 	}
 }

@@ -131,11 +131,18 @@ template relation_list_tooltip {
 										}
 
 										text_single = {
+											visible = "[RelationTypeItem.IsRelationType('vassalizing')]"
 											align = nobaseline
 											text = "[RelationDescItem.GetCountry.GetLongNameWithNoTooltip]"
 											tooltipwidget = {												
 												using = SubjectType2_Tooltip
 											}
+										}
+
+										text_single = {
+											visible = "[Not(RelationTypeItem.IsRelationType('vassalizing'))]"
+											align = nobaseline
+											text = "[RelationDescItem.GetCountry.GetLongNameWithNoTooltip]"											
 										}
 
 										expand = {}
@@ -333,7 +340,10 @@ template diplomacy_main_tabs {
 		tooltipwidget = {
 			using = TabDiplomaticActionsTooltip
 		}
-		onclick = "[OpenLateralView('diplomacy_macrobuilder')]"
+		action_tooltip = {
+			title = "OPEN_TAB"
+			on_action = "[OpenLateralView('diplomacy_macrobuilder')]"
+		}
 		down = "[IsLateralViewOpened('diplomacy_macrobuilder')]"
 	}
 }
@@ -523,15 +533,12 @@ template organization_entry {
 								size = { 23 23 }
 								visible = "[IsPlayerValid]"
 								datacontext = "[OrgItem.GetOrg]"
-								onclick = "[ToggleIOFav(InternationalOrganization.Self)]"
-								checked = "[IsIOFaved(InternationalOrganization.Self)]"
-								tooltipwidget = { 
-									LeftClickButtonTooltip = {
-										blockoverride "onclick_text" { 
-											text = "[SelectLocalization(IsIOFaved(InternationalOrganization.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
-										}
-									}
+								action_tooltip = {
+									title = "[SelectLocalization(IsIOFaved(InternationalOrganization.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
+									on_action = "[ToggleIOFav(InternationalOrganization.Self)]"
 								}
+								tooltipwidget = { BasicFunctionalTooltip = {} }
+								down = "[IsIOFaved(InternationalOrganization.Self)]"
 							}
 							
 							text_single = {
@@ -646,6 +653,27 @@ template organization_entry {
 lateralview = {
 	name = "diplomacy_lateralview"
 	widgetid = "diplomacy_lateralview"
+
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			parentanchor = vcenter
+			size = { 40 40 }
+			position = { 30 0 }
+
+			button_automation_shortcut = {
+				parentanchor = vcenter
+				size = { 25 25 }
+
+
+				action_tooltip = {
+					title = "OPEN_AUTOMATION_PANEL_FILTER"
+					on_action = "[OpenLateralViewWithFilter('automation', 'automation_filter_diplomacy')]"
+				}
+
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+			}
+		}
+	}
 
 	blockoverride "panel_header" {
 		window_header_alt = {
@@ -1157,7 +1185,10 @@ lateralview = {
 							tooltipwidget = {
 								using = SubTabCurrentRelationsTooltip
 							}
-							onclick = "[DiplomacyLateralView.Vars.Set( 'relations_tab', 'current_relations' )]"
+							action_tooltip = {
+								title = "OPEN_TAB"
+								on_action = "[DiplomacyLateralView.Vars.Set( 'relations_tab', 'current_relations' )]"
+							}
 							down = "[DiplomacyLateralView.Vars.NotExistOrHasValue( 'relations_tab', 'current_relations' )]"
 						}
 
@@ -1175,7 +1206,10 @@ lateralview = {
 							tooltipwidget = {
 								using = SubTabKnownCountriesTooltip
 							}
-							onclick = "[DiplomacyLateralView.Vars.Set( 'relations_tab', 'known_countries' )]"
+							action_tooltip = {
+								title = "OPEN_TAB"
+								on_action = "[DiplomacyLateralView.Vars.Set( 'relations_tab', 'known_countries' )]"
+							}
 							down = "[DiplomacyLateralView.Vars.HasValue( 'relations_tab', 'known_countries' )]"
 						}
 
@@ -1436,7 +1470,28 @@ lateralview = {
 								}
 					
 								expand = {}
-								
+
+								card_header_button_04 = {
+									size = { 37 37 }
+									down = "[DiplomacyLateralView.IsGreatPowerFilterEnabled]"
+									action_tooltip = {
+										click_type = left
+										click_mode = single
+										title = "search_filter_country_is_great_power_desc"
+										on_action = "[DiplomacyLateralView.ToggleGreatPowerFilter]"
+									}
+									tooltipwidget = {
+										BasicFunctionalTooltip = {}
+									}
+									icon = {
+										size = { 32 32 }
+										parentanchor = center
+										texture = "[GetConceptTexture('great_power_rank')]"
+									}
+								}
+
+								expand = {}
+
 								subheader_unified_icon = {
 									blockoverride "mirror_layout" { righttoleft = yes }
 									datacontext = "[Player]"
@@ -1592,6 +1647,19 @@ lateralview = {
 						
 						filtered_sorted_list = {
 							datacontext = "[DiplomacyLateralView.GetOrgsSortSearch]"
+
+							blockoverride "sort_buttons_filtered_list" {
+								sort_by_key_button = {
+									name = "name"
+									using = layoutpolicy_expanding
+								}
+
+								sort_by_key_button = {
+									name = "members"
+									layoutpolicy_vertical = expanding
+									size = { 117 -1 }
+								}
+							}
 
 							blockoverride "scroll_list_is_empty" {
 								visible = "[IsDataModelEmpty(DiplomacyLateralView.GetOrgsItems)]"
@@ -2379,10 +2447,12 @@ types diplomacy_cards {
 						
 							TooltipManualTableField = {
 								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
 									text = "[subject_loyalty|e]"
 								}
-								expand = {}
 								text_single = {
+									autoresize = yes
 									text = "[Player.GetModifierValue('subject_loyalty')]"
 								}
 							}
@@ -4443,14 +4513,11 @@ types diplomacy_cards {
 							# 	size = { 80% 80% }
 							# }
 							
-							onclick = "[OpenInternationalOrganizationView(InternationalOrganization.Self)]"
-							tooltipwidget = {
-								LeftClickButtonTooltip = {
-									blockoverride "onclick_text" { 
-										text = "OPEN_IO"
-									}
-								}
+							action_tooltip = {
+								title = "OPEN_IO"
+								on_action = "[OpenInternationalOrganizationView(InternationalOrganization.Self)]"
 							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
 							visible = "[InternationalOrganization.IsCountryMember(Player.Self)]"
 						}
 					}
@@ -4587,14 +4654,11 @@ types diplomacy_cards {
 							# 	size = { 80% 80% }
 							# }
 							
-							onclick = "[OpenInternationalOrganizationView(InternationalOrganization.Self)]"
-							tooltipwidget = {
-								LeftClickButtonTooltip = {
-									blockoverride "onclick_text" { 
-										text = "OPEN_IO"
-									}
-								}
+							action_tooltip = {
+								title = "OPEN_IO"
+								on_action = "[OpenInternationalOrganizationView(InternationalOrganization.Self)]"
 							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
 						}
 					}
 				}
@@ -4641,7 +4705,7 @@ types diplomacy_cards {
 	# 	icon = {
 	# 		size = { 20 20 }
 	# 		visible = no
-	# 		texture = "gfx/interface/debug/generic_icon.png" ## PLACEHOLDER
+	# 		texture = "gfx/interface/debug/placeholder.dds" ## PLACEHOLDER
 
 	# 		block "icon_setup" {}
 	# 	}

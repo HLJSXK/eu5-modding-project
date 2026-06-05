@@ -1,4 +1,4 @@
-﻿lateralview = {
+lateralview = {
 	name = "character_lateralview"
 
 	blockoverride "lateralview_topbuttons_extra" {
@@ -7,11 +7,14 @@
 			size = { 40 40 }
 			position = { -30 0 }
 			
-			button = {
+			button_minimize = {
 				parentanchor = right|vcenter
 
 				size = { 25 25 }
-				texture = "gfx/interface/icons/unit_actions/go_to.dds"
+				blockoverride "button_texture" {
+					texture = "gfx/interface/buttons/flats/goto.dds"					
+					texture_density = 2
+				}
 
 				modify_texture = {
 					using = color_white_texture
@@ -40,7 +43,7 @@
 					header_title = {
 						layoutpolicy_horizontal = fixed
 						autoresize = yes
-						maximumsize = { 450 -1 }
+						maximumsize = { 430 -1 }
 						text = "[CharacterLateralview.GetCharacter.GetNameToFitWithNoTooltip('(int32)-1', '(bool)yes')]"
 						using = snd_UI_window_state
 					}
@@ -49,15 +52,12 @@
 						size = { 23 23 }
 						visible = "[IsPlayerValid]"
 						datacontext = "[CharacterLateralview.GetCharacter]"
-						onclick = "[ToggleCharacterFav(Character.Self)]"
-						checked = "[IsCharacterFaved(Character.Self)]"
-						tooltipwidget = { 
-							LeftClickButtonTooltip = {
-								blockoverride "onclick_text" { 
-									text = "[SelectLocalization(IsCharacterFaved(Character.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
-								}
-							}
+						action_tooltip = {
+							title = "[SelectLocalization(IsCharacterFaved(Character.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
+							on_action = "[ToggleCharacterFav(Character.Self)]"
 						}
+						tooltipwidget = { BasicFunctionalTooltip = {} }
+						down = "[IsCharacterFaved(Character.Self)]"
 					}
 
 					expand = {}
@@ -372,15 +372,12 @@
 							using = bg_circle_alt_brown
 
 							enabled = "[Character.HasUnit]"
-							onclick = "[SelectUnitAndPan(Character.GetUnitPointer)]"
-
-							tooltipwidget = {
-								LeftClickButtonTooltip = {
-									blockoverride "onclick_text" { 
-										text = "SELECT_UNIT_TT"
-									}
-								}
+							action_tooltip = {
+								title = "SELECT_UNIT_TT"
+								on_action = "[SelectUnitAndPan(Character.GetUnitPointer)]"
 							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+
 						}
 
 						navigational_button_alt = {
@@ -402,14 +399,11 @@
 							using = bg_circle_alt_brown
 
 							enabled = "[Character.HasUnit]"
-							onclick = "[SelectUnitAndPan(Character.GetUnitPointer)]"
-							tooltipwidget = {
-								LeftClickButtonTooltip = {
-									blockoverride "onclick_text" { 
-										text = "SELECT_UNIT_TT"
-									}
-								}
+							action_tooltip = {
+								title = "SELECT_UNIT_TT"
+								on_action = "[SelectUnitAndPan(Character.GetUnitPointer)]"
 							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
 						}
 
 						vbox = {
@@ -520,6 +514,22 @@
 										datacontext = "[Character.GetCourtCountry]"
 										tooltipwidget = {
 											using = Estate_tooltip
+										}
+									}
+
+									icon = {
+										visible = "[CharacterLateralview.GetCharacter.HasJoinedChivalricOrder]"
+										size = { 37 37 }
+										texture = "[GetChivalricOrderIcon(CharacterLateralview.GetCharacter.GetJoinedChivalricOrder)]"
+										datacontext = "[CharacterLateralview.GetCharacter.GetJoinedChivalricOrder]"
+										tooltipwidget = {
+											using = ChivalricOrder_tooltip
+										}
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 3
+											color = { 0.0 0.0 0.0 1.0 }
+											alpha = 0.3
 										}
 									}
 								}
@@ -1261,15 +1271,12 @@ template "character_actions" {
 								button_pin = {
 									size = { 23 23 }
 	
-									onclick = "[PinCollection.Toggle( CharacterActionItem.GetKey )]"
-									checked = "[PinCollection.IsPinned( CharacterActionItem.GetKey )]"
-									tooltipwidget = { 
-										LeftClickButtonTooltip = {
-											blockoverride "onclick_text" { 
-												text = "[SelectLocalization(PinCollection.IsPinned( CharacterActionItem.GetKey ), 'UNPIN_ACTION', 'PIN_ACTION')]"
-											}
-										}
+									action_tooltip = {
+										title = "[SelectLocalization(PinCollection.IsPinned( CharacterActionItem.GetKey ), 'UNPIN_ACTION', 'PIN_ACTION')]"
+										on_action = "[PinCollection.Toggle( CharacterActionItem.GetKey )]"
 									}
+									tooltipwidget = { BasicFunctionalTooltip = {} }
+									down = "[PinCollection.IsPinned( CharacterActionItem.GetKey )]"
 								}
 							}
 						}
@@ -1287,11 +1294,27 @@ types CharacterPanel {
 		size = { -1 220 }
 
 		hbox = {
-			ecs_scene_viewer_widget =  {
+			# Living character: default shader
+			ecs_scene_viewer_widget = {
+				visible = "[CharacterLateralview.GetCharacter.IsAlive]"
 				layoutpolicy_horizontal = expanding
 				layoutpolicy_vertical = expanding
 				name = "event_window_scene_viewer"
 				scene = "[CharacterLateralview.GetCharacter.GenerateSceneDesc]"
+			}
+
+			# Dead character: same scene, grayscale shader on the camera output
+			ecs_scene_viewer_widget = {
+				visible = "[Not(CharacterLateralview.GetCharacter.IsAlive)]"
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = expanding
+				name = "event_window_scene_viewer_dead"
+				scene = "[CharacterLateralview.GetCharacter.GenerateSceneDesc]"
+
+				blockoverride "camera_shader" {
+					shaderfile = "gfx/FX/pdxgui_desaturate.shader"
+					effectname = "PdxGuiDesaturate"
+				}
 			}
 		}
 

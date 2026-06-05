@@ -360,7 +360,7 @@ template mercenary_card {
 								widget = {
 									visible = "[Or(And(MercenaryItem.GetMercenary.IsShip, Not(SubUnitCounts.GetCategory.IsArmy)), 
 									And(Not(MercenaryItem.GetMercenary.IsShip), SubUnitCounts.GetCategory.IsArmy))]"
-									size = { 50 20 }
+									size = { 35 20 }
 									hbox = {
 										icon = {
 											size = { 20 20 }
@@ -368,7 +368,7 @@ template mercenary_card {
 										}
 				
 										text_single = {
-											size = { 30 20 }
+											size = { 15 20 }
 											autoresize = no
 											align = left|nobaseline
 											text = "[SubUnitCounts.GetCount]"
@@ -386,7 +386,7 @@ template mercenary_card {
 
 					text_single = {
 						visible = "[MercenaryItem.GetMercenary.IsAvailable]"
-						size = {60 20}
+						size = {50 20}
 						autoresize = no
 						align = center
 
@@ -474,7 +474,7 @@ template mercenary_card {
 
 						text_single = {
 							visible = "[Not(MercenaryItem.GetMercenary.IsEmployed)]"
-							size = { 60 20 }
+							size = { 50 20 }
 							autoresize = no
 							raw_text = "#R -[MercenaryItem.GetMercenary.GetMonthlyMaintenanceCost(Player.Self)|2]#!@expense!"
 							align = nobaseline
@@ -501,19 +501,14 @@ template mercenary_card {
 
 					checkbox_square_alt = {
 						visible = "[CanToggleAllowExtendMercenary(MercenaryItem.GetMercenary)]"
-						checked = "[MercenaryItem.GetMercenary.AllowExtend]"
-						onclick = "[ToggleAllowExtendMercenary(MercenaryItem.GetMercenary)]"
+						down = "[MercenaryItem.GetMercenary.AllowExtend]"
+						action_tooltip = {
+							title = "TOGGLE_ALLOW_EXTEND_MERCENARIES_TOOLTIP_TOGGLE"
+							on_action = "[ToggleAllowExtendMercenary(MercenaryItem.GetMercenary)]"
+						}
 						tooltipwidget = {
 							SimpleContextualTooltipType = {
 								lowpriotextcontext = "[SelectLocalization( MercenaryItem.GetMercenary.AllowExtend, 'TOGGLE_ALLOW_EXTEND_MERCENARIES_TOOLTIP_IS_ON', 'TOGGLE_ALLOW_EXTEND_MERCENARIES_TOOLTIP_IS_OFF' )]"
-								blockoverride "tooltip_extra_content" {
-									TooltipFunctionalBlock = {
-										using = tooltip_left_click_template
-										blockoverride "action_left_text" {
-											text = "TOGGLE_ALLOW_EXTEND_MERCENARIES_TOOLTIP_TOGGLE"
-										}
-									}
-								}
 							}
 						}
 					}
@@ -549,6 +544,12 @@ template Detach_From_Unit_Template {
 		}
 		
 		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				visible = "[And(Unit.IsArmy, GreaterThan_int32(SubUnitCategory.GetCount(Unit.Self), '(int32)0'))]"
+				blockoverride "text" {
+					text = "DETACH_CATEGORY_ARMY_STRENGTH_INFO"
+				}
+			}
 			TooltipColumnList = {
 				visible = "[GreaterThan_int32(SubUnitCategory.GetCount(Unit.Self), '(int32)0')]"
 				textcontext = "[GetDetachCategoryInfo(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
@@ -559,20 +560,6 @@ template Detach_From_Unit_Template {
 					text = "[GetDetachCategoryInfo(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
 				}
 			}	
-			
-			# TooltipTextBlock = {
-			# 	blockoverride "text" {
-			# 		text = "[GetDetachCategoryInfoPossible(Unit.Self,SubUnitCategory.Self,'(bool)yes')]"
-			# 	}
-			# }
-
-			# TooltipFunctionalBlock = {
-			# 	using = tooltip_left_click_template
-
-			# 	blockoverride "action_left_text" {
-			# 		text = "DETACH_SUBUNIT_FROM"
-			# 	}
-			# }
 		}
 	}
 }
@@ -673,6 +660,37 @@ types UnitCardTypes
 		}
 	}
 
+	type unit_composition_bar = barchart {
+		visible = "[Or(Or(GreaterThan_float(Unit.GetTotalRegularCount, '(float)0'), GreaterThan_float(Unit.GetTotalMercenaryCount, '(float)0')), GreaterThan_float(Unit.GetTotalLevyCount, '(float)0'))]"
+		direction = vertical
+		alwaystransparent = yes
+		parentanchor = center
+		datacontext = "[GetQuickUnitAdjustedCount(Unit.Self)]"
+		barslice_no_highlight = {
+			texture = "gfx/interface/progressbars/progress_bar_map_widget_bronze.dds"
+			# using = color_gold_dark_texture
+			#visible = "[UnitAdjustedCount.HasLevies]"
+			value = "[UnitAdjustedCount.GetLevyCount]"
+			color = { 0.95 0.95 0.95 1 }
+			alwaystransparent = yes
+		}
+		barslice_no_highlight = {
+			texture = "gfx/interface/progressbars/progress_bar_map_widget_gold.dds"
+			#visible = "[UnitAdjustedCount.HasRegulars]"
+			value = "[UnitAdjustedCount.GetRegularCount]"
+			color = { 0.95 0.95 0.95 1 }
+			alwaystransparent = yes
+			
+		}
+		barslice_no_highlight = {
+			texture = "gfx/interface/progressbars/progress_bar_map_widget_silver.dds"
+			#visible = "[UnitAdjustedCount.HasMercenaries]"
+			value = "[UnitAdjustedCount.GetMercenaryCount]"
+			color = { 1 1 1 1 }
+			alwaystransparent = yes
+		}
+	}
+
 	type SubUnitCategoryCardButton = button_regular {
 		using = layoutpolicy_expanding
 		enabled = "[CanDetachCategory(Unit.Self,SubUnitCategory.Self)]"
@@ -717,14 +735,14 @@ types UnitCardTypes
 		hbox = {
 			spacing = 3
 			expand = {}
+			# text_single = { #uncomment in order to shot total strength, instead of number of regiments
+			# 	visible = "[Unit.IsArmy]"
+			# 	maximumsize = {33 20}
+			# 	align = nobaseline
+			# 	text = "[SubUnitCategory.GetTotalStrengthShort(Unit.Self)]"
+			# }
 			text_single = {
-				visible = "[Unit.IsArmy]"
-				maximumsize = {33 20}
-				align = nobaseline
-				text = "[SubUnitCategory.GetTotalStrength(Unit.Self)]"
-			}
-			text_single = {
-				visible = "[Not(Unit.IsArmy)]"
+				# visible = "[Not(Unit.IsArmy)]" #uncomment in order to shot total strength, instead of number of regiments
 				maximumsize = {33 20}
 				align = nobaseline
 				text = "[SubUnitCategory.GetCount(Unit.Self)]"

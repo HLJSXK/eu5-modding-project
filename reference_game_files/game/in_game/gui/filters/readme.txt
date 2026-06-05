@@ -16,9 +16,10 @@
 #    max:
 #    step:
 #    format: <string> used to format the display text
-# tag: <string> this tag will be used by each list in .gui files to show only the filters with the tag specified
+# tag: <string> pipe-separated list of tags ("a|b|c"). A view's .gui calls WithFilterTags('x|y|z') to expose only filters whose tag list intersects the requested set. OMITTING tag entirely makes the filter universally visible across every view of this scope — use only for filters that genuinely belong everywhere; most filters should declare at least one tag.
 # group: <integer> for grouping filters in the same UI background.
 # exclusive_group: <integer> for using radio buttons in the group, so filters will exclude each other so if you select one, the previous selected will be unselected. MUST BE IN EVERY FILTER IN THE GROUP.
 # invert: <yes/no> exclude items by default and include them if checked
 # enabled_at_start: <yes/no> initial state of the filter, ticked or not
+# hidden_in_searchbar: <yes/no> if yes, the filter still works and still appears in the filter side menu and autocomplete, but its enabled chip is not shown in the search bar's chip strip. Use this when the panel exposes a dedicated button for the filter (e.g. estates_filter_button) and you do not want the same affordance to appear twice.
 # group_sorting: for sorting the fitlers in that group, for now there is only alphabetical sorting.

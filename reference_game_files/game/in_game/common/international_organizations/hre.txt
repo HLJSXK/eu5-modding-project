@@ -2,6 +2,7 @@
 
 	has_target = no
 	unique = yes
+	max_circles_at_formation = 10
 	expel_members_who_are_targets_of_other_members = no
 	has_buildings = yes
 	show_leave_message = no
@@ -13,6 +14,7 @@
 
 	has_parliament = yes
 	parliament_type = hre_court_assembly
+	alert_view_tab = parliament
 	resolution_widget = parliament
 	has_dynastic_power = yes
 	
@@ -136,9 +138,13 @@
 		hre_max_archbishop_elector = 3
 	}
 	
-	leader_modifier = {
-		great_power_score_exempt_from_forfeit = 50
+	imperial_circle_leader_modifier = {
+		monthly_prestige = 0.1
+		diplomatic_reputation = 1
+	}
 
+	leader_modifier = {
+		monthly_prestige = 0.1
 		diplomatic_capacity = 1
 		max_diplomats = 2
 		diplomatic_range = 500
@@ -267,6 +273,9 @@
 				NOT = { international_organization_has_policy = policy:sc_leave_the_hre }
 			}
 		}
+		NOT = {
+			has_variable = gag_left_hre_guelph_victory
+		}
 	}
 	
 	can_leave_trigger = {
@@ -344,7 +353,7 @@
 				}
 				ordered_country_with_special_status_of_type = {
 					type = elector
-					order_by = { value = great_power_score multiply = -1 }
+					order_by = { value = country_tax_base multiply = -1 }
 					max = 1
 					check_range_bounds = no
 					root = { international_organization_remove_special_status = { type = special_status:elector country = prev } }
@@ -357,7 +366,7 @@
 				}
 				ordered_country_with_special_status_of_type = {
 					type = archbishop_elector
-					order_by = { value = great_power_score multiply = -1 }
+					order_by = { value = country_tax_base multiply = -1 }
 					max = 1
 					check_range_bounds = no
 					root = { international_organization_remove_special_status = { type = special_status:archbishop_elector country = prev } }
@@ -387,7 +396,7 @@
 					}
 				}
 				ordered_international_organization_member = {
-					order_by = great_power_score
+					order_by = country_tax_base
 					limit = { can_lead_international_organization = root }
 					max = 1
 					check_range_bounds = no
@@ -396,6 +405,90 @@
 				if = {
 					limit = { exists = scope:new_leader }
 					set_leader_country = scope:new_leader
+				}
+			}
+
+			# ---- Imperial Circles monthly checks ----
+			if = {
+				limit = { circles_are_active = yes }
+
+				# .1 — Notify Emperor exactly once when circles first lock
+				if = {
+					limit = {
+						NOT = { has_variable = circles_established_notified }
+						international_organization_has_leader = yes
+					}
+					set_variable = circles_established_notified
+					leader_country ?= {
+						trigger_event_non_silently = imperial_circles.1
+					}
+				}
+
+				leader_country ?= {
+					save_scope_as = hre_emperor_scope
+				}
+
+				# .11 / .12 — Fire to each circle leader when satisfaction is critically low
+				every_imperial_circle = {
+					limit = {
+						has_circle_leader = yes
+						NOT = { is_dormant_imperial_circle = yes }
+					}
+					circle_leader ?= {
+						if = {
+							limit = {
+								any_imperial_circle_country_is_member_of = {
+									imperial_circle_satisfaction < 15
+								}
+								NOT = { has_variable = circle_critical_satisfaction_cooldown }
+							}
+							set_variable = { name = circle_critical_satisfaction_cooldown months = 6 }
+							trigger_event_non_silently = imperial_circles.12
+						}
+						else_if = {
+							limit = {
+								any_imperial_circle_country_is_member_of = {
+									imperial_circle_satisfaction < 30
+								}
+								NOT = { has_variable = circle_low_satisfaction_cooldown }
+							}
+							set_variable = { name = circle_low_satisfaction_cooldown months = 6 }
+							trigger_event_non_silently = imperial_circles.11
+						}
+					}
+				}
+
+				# .70 / .71 — Handle leaderless circles: auto-elect or notify Emperor
+				every_imperial_circle = {
+					limit = {
+						NOT = { has_circle_leader = yes }
+						NOT = { is_dormant_imperial_circle = yes }
+					}
+					ordered_circle_member = {
+						order_by = prestige
+						max = 1
+						check_range_bounds = no
+						save_scope_as = new_circle_leader
+					}
+					if = {
+						limit = { exists = scope:new_circle_leader }
+						set_circle_leader = scope:new_circle_leader
+						scope:new_circle_leader = {
+							trigger_event_non_silently = imperial_circles.70
+						}
+					}
+					else_if = {
+						limit = {
+							exists = scope:hre_emperor_scope
+							scope:hre_emperor_scope = {
+								NOT = { has_variable = circle_no_leader_cooldown }
+							}
+						}
+						scope:hre_emperor_scope = {
+							set_variable = { name = circle_no_leader_cooldown months = 12 }
+							trigger_event_non_silently = imperial_circles.71
+						}
+					}
 				}
 			}
 		}
@@ -719,6 +812,7 @@
 	# Put the opinion component here such that AI can understand that improving opinion will make it easier to invite people which doenst work in ai_desire_to_join
 	join_diplo_chance = {
 		opinion = 0.25
+		base = -10
 	}
 	ai_desire_to_join = {
 		if = {
@@ -932,6 +1026,38 @@
 	}
 	
 	ai_issue_voting_bias = {
+		# HRE members lean toward the Emperor's pick when they like the Emperor
+		# and Imperial Authority is high. Applies both to pre-proposal previews
+		# (scope:vote is the policy being weighed by the would-be proposer, who
+		# must be the Emperor in the HRE) and to active votes (scope:vote must
+		# match the policy actually proposed - var:io_law_target).
+		add = {
+			desc = "POLICY_BIAS_VOTE_WITH_EMPEROR"
+			if = {
+				limit = {
+					exists = scope:vote
+					scope:recipient = {
+						international_organization_has_leader = yes
+					}
+					not = { scope:actor = scope:recipient.leader_country }
+					OR = {
+						scope:recipient = { NOT = { resolution_is_active = resolution:policy_vote } }
+						scope:recipient = {
+							has_variable = io_law_target
+							var:io_law_target = scope:vote
+						}
+					}
+				}
+				value = {
+					value = "scope:actor.opinion(scope:recipient.leader_country)"
+					min = 0
+					divide = 100
+					multiply = scope:recipient.var:imperial_authority
+					divide = 100
+					multiply = hre_emperor_alignment_vote_bias_weight
+				}
+			}
+		}
 	}
 
 	ai_desire_to_attack_other_members = {

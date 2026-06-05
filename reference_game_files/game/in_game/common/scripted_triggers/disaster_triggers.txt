@@ -15,10 +15,6 @@ ambrosian_republic_disaster_end_trigger = {
 			estate_satisfaction:burghers_estate > 0.5
 			estate_satisfaction:peasants_estate > 0.5
 		}
-		custom_tooltip = {
-			has_variable = chose_ally_union
-			text = has_chosen_ally_union_variable_tt
-		}
 		government_type = government_type:monarchy
 	}
 }
@@ -228,8 +224,8 @@ sinicization_disaster_end_trigger = {
 	OR = {
 		NOT = { country_exists = c:CHI }
 		is_subject_or_below_of = c:CHI
-		great_power_score > {
-			value = c:CHI.great_power_score
+		country_economical_base > {
+			value = c:CHI.country_economical_base
 			multiply = 0.75
 		}
 		societal_value:sinicized_vs_unsinicized > 0
@@ -370,6 +366,28 @@ war_of_the_roses_end_trigger = {
 			at_war = no
 			has_ruler = yes
 			legitimacy > 90
+		}
+		AND = {
+			OR = {
+				dynasty:york_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
+					}
+				}
+				dynasty:lancaster_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
+					}
+				}
+			}
+			NOT = {
+				any_rebel = {
+					OR = {
+						rebel_name_key = york_rebel_name
+						rebel_name_key = lancaster_rebel_name
+					}
+				}
+			}
 		}
 	}
 }
@@ -584,7 +602,14 @@ decline_of_mali_end_trigger = {
 			stability > 20
 			num_locations > 35
 		}
-		num_locations < var:projected_num_locations_bad_variable
+		AND = {
+			# Block the shrink-based end during a civil war: civil war start
+			# transfers ownership of rebel-held locations and would otherwise trip
+			# num_locations < projected_num_locations_bad_variable immediately,
+			# firing decline_of_mali.2 before the war is resolved (CAESAR-67492).
+			in_civil_war = no
+			num_locations < var:projected_num_locations_bad_variable
+		}
 	}
 }
 
@@ -642,35 +667,6 @@ coup_attempt_end_trigger = {
 	}
 }
 
-fate_of_the_phoenix_end_trigger = {
-	OR = {
-		AND = {
-			NOT = { is_situation_active = situation:rise_of_the_ottomans }
-			num_locations_owned_or_owned_by_subjects_or_below > 150
-		}
-		AND = {
-			current_year > 1401
-			num_locations_owned_or_owned_by_subjects_or_below < 150
-		}
-	}
-	custom_tooltip = {
-		text = remember_no_turk_tt
-		region:anatolia_region = {
-			NOT = {
-				any_country_with_capital_in_geography = {
-					this != root
-					OR = {
-						has_reform = government_reform:anatolian_beylik
-						culture = culture:turkish_culture
-						culture = culture:turkoman_culture
-					}
-					num_locations_owned_or_owned_by_subjects_or_below > 100
-				}
-			}
-		}
-	}
-}
-
 turmoil_in_brandenburg_end_trigger = {
 	OR = {
 		AND = {
@@ -693,4 +689,19 @@ turmoil_in_brandenburg_end_trigger = {
 		text = robber_barons_resolved_tt
 		has_variable = PRU_robber_barons_not_active
 	}
+}
+
+twilight_of_the_tsardom_end_trigger = {
+	OR = {
+		AND = {
+			NOT = { any_rebel = { rebel_category = pretender } }
+			at_war = no
+			has_ruler = yes
+			legitimacy > 90
+			stability > 50
+			num_locations > 50
+		}
+	}
+	NOT = { country_exists = c:KVN }
+	NOT = { country_exists = c:VID }
 }

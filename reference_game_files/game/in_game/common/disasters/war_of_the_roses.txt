@@ -9,39 +9,47 @@
 	can_start = {
 		has_any_active_disaster = no
 		tag = ENG
-		current_year > 1430
+		current_year > 1399
 		current_year < 1500
-		
+
 		dynasty_exists = york_dynasty
 		dynasty_exists = lancaster_dynasty
-		
-		
+
 		dynasty:york_dynasty ?= {
-			dynasty_head ?= {
-				is_adult = yes
-			}
+			any_character_in_dynasty = { is_alive = yes }
 		}
 		dynasty:lancaster_dynasty ?= {
-			dynasty_head ?= {
-				is_adult = yes
-			}
+			any_character_in_dynasty = { is_alive = yes }
 		}
-	
+
 		ruler ?= {
 			is_adult = yes
 			OR = {
-				fertility <= 0
-				NOT = {
-					any_child = { is_alive = yes }
+				dynasty = dynasty:plantagenet_dynasty
+				dynasty = dynasty:lancaster_dynasty
+			}
+		}
+
+		OR = {
+			ruler ?= {
+				OR = {
+					fertility <= 0
+					NOT = { any_child = { is_alive = yes } }
 				}
 			}
-			dynasty = dynasty:plantagenet_dynasty
+			AND = {
+				legitimacy < 70
+				stability < 35
+			}
 		}
 	}
 	
 
 	can_end = {
-		war_of_the_roses_end_trigger = yes
+		end_reason = {
+			trigger = { war_of_the_roses_end_trigger = yes }
+			desc = "war_concluded"
+		}
 	}
 	modifier = {
 		monthly_pretender_rebel_growth = 0.01
@@ -49,20 +57,94 @@
 	}
 	
 	on_start = {
+		# Resurrect the dynasties if they have no living adult male, so the rebel scopes can always be populated.
+		if = {
+			limit = {
+				dynasty:york_dynasty ?= {
+					NOT = {
+						any_character_in_dynasty = {
+							is_alive = yes
+							is_adult = yes
+							is_female = no
+						}
+					}
+				}
+			}
+			create_character = {
+				dynasty = dynasty:york_dynasty
+				female = no
+				age = { 18 25 }
+				birth_location = location:york
+			}
+		}
+		if = {
+			limit = {
+				dynasty:lancaster_dynasty ?= {
+					NOT = {
+						any_character_in_dynasty = {
+							is_alive = yes
+							is_adult = yes
+							is_female = no
+						}
+					}
+				}
+			}
+			create_character = {
+				dynasty = dynasty:lancaster_dynasty
+				female = no
+				age = { 18 25 }
+				birth_location = location:lancaster
+			}
+		}
+
 		trigger_event_silently = war_of_the_roses.1
-		
+
+		# When the ruler is the dynasty head, pick a non-ruler non-heir cadet instead
 		dynasty:lancaster_dynasty = {
-			dynasty_head ?= {
-				rebel = {
-					save_scope_as = lancaster_rebel
+			if = {
+				limit = { dynasty_head ?= { is_ruler = yes } }
+				random_character_in_dynasty = {
+					limit = {
+						is_alive = yes
+						is_adult = yes
+						is_female = no
+						is_ruler = no
+						is_heir = no
+					}
+					rebel = {
+						save_scope_as = lancaster_rebel
+					}
+				}
+			}
+			else = {
+				dynasty_head ?= {
+					rebel = {
+						save_scope_as = lancaster_rebel
+					}
 				}
 			}
 		}
-		
 		dynasty:york_dynasty = {
-			dynasty_head ?= {
-				rebel = {
-					save_scope_as = york_rebel
+			if = {
+				limit = { dynasty_head ?= { is_ruler = yes } }
+				random_character_in_dynasty = {
+					limit = {
+						is_alive = yes
+						is_adult = yes
+						is_female = no
+						is_ruler = no
+						is_heir = no
+					}
+					rebel = {
+						save_scope_as = york_rebel
+					}
+				}
+			}
+			else = {
+				dynasty_head ?= {
+					rebel = {
+						save_scope_as = york_rebel
+					}
 				}
 			}
 		}
@@ -77,14 +159,24 @@
 	on_monthly = {
 		
 	
+		every_rebel = {
+			limit = {
+				OR = {
+					rebel_name_key = york_rebel_name
+					rebel_name_key = lancaster_rebel_name
+				}
+				rebel_size = 0
+			}
+			prev = { destroy_rebel = prev }
+		}
+
+		# Enemy dynasty has no adult male claimant: disband the rebellion in its name.
 		if = {
 			limit = {
 				has_variable = supports_house_of_lancaster
-				NOT = { 
-					dynasty:york_dynasty ?= {
-						dynasty_head ?= {
-							is_adult = yes
-						}
+				dynasty:york_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
 					}
 				}
 			}
@@ -94,68 +186,43 @@
 		if = {
 			limit = {
 				has_variable = supports_house_of_york
-				NOT = {
-					dynasty:lancaster_dynasty ?= {
-						dynasty_head ?= {
-							is_adult = yes
-						}
+				dynasty:lancaster_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
 					}
 				}
 			}
 			destroy_rebel = scope:lancaster_rebel
 		}
 
-		# Rebellion crushed but rebel object lingers (create_rebel uses destroy = no,
-		# so CRebel::ShouldRemove never fires on its own); end_trigger keys off
-		# rebel_name_key existing, so the disaster would otherwise never resolve.
+		# Supported dynasty has no adult male claimant: stop championing a dead house.
 		if = {
 			limit = {
-				exists = scope:york_rebel
-				scope:york_rebel = { rebel_size < 1 }
-			}
-			destroy_rebel = scope:york_rebel
-		}
-
-		if = {
-			limit = {
-				exists = scope:lancaster_rebel
-				scope:lancaster_rebel = { rebel_size < 1 }
-			}
-			destroy_rebel = scope:lancaster_rebel
-		}
-
-		# Neither pretender ended up on the throne (e.g. Lancaster heir died childless
-		# and a third dynasty inherited): wipe support state and any lingering rebels
-		# so the disaster can resolve and stops firing no-op flavor events.
-		if = {
-			limit = {
-				has_ruler = yes
-				ruler = {
-					has_dynasty = yes
-					NOT = { dynasty = dynasty:plantagenet_dynasty }
-					NOT = { dynasty = dynasty:lancaster_dynasty }
-					NOT = { dynasty = dynasty:york_dynasty }
+				has_variable = supports_house_of_lancaster
+				dynasty:lancaster_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
+					}
 				}
 			}
-			if = {
-				limit = { exists = scope:york_rebel }
-				destroy_rebel = scope:york_rebel
-			}
-			if = {
-				limit = { exists = scope:lancaster_rebel }
-				destroy_rebel = scope:lancaster_rebel
-			}
-			if = {
-				limit = { has_variable = supports_house_of_lancaster }
-				remove_variable = supports_house_of_lancaster
-			}
-			if = {
-				limit = { has_variable = supports_house_of_york }
-				remove_variable = supports_house_of_york
-			}
+			destroy_rebel = scope:lancaster_rebel
+			remove_variable = supports_house_of_lancaster
 		}
 
+		if = {
+			limit = {
+				has_variable = supports_house_of_york
+				dynasty:york_dynasty ?= {
+					dynasty_head ?= {
+						is_adult = no
+					}
+				}
+			}
+			destroy_rebel = scope:york_rebel
+			remove_variable = supports_house_of_york
+		}
 
+	
 		random_list = {
 			25 = { custom_tooltip = an_event_occurs_tt }
 			75 = { custom_tooltip = no_event_occurs_tt }
