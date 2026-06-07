@@ -1,11 +1,12 @@
 """
 sync_location_window.py — Rebuild src/stable/in_game/gui/location_window.gui.
 
-Copies the 1.2 vanilla baseline from reference_game_files/ and re-injects the
-mod's sole surviving UI addition: the StandardofLiving_tooltip navigational button
-in the demography shortcuts row (between AverageSatisfaction and the expand spacer).
+Copies the current vanilla baseline from reference_game_files/ and re-injects
+the mod's active location-window UI addition: the StandardofLiving_tooltip
+navigational button in the demography shortcuts row, between AverageSatisfaction
+and the expand spacer.
 
-Run after every gen_scarcity.py invocation:
+Run after syncing reference_game_files/ to a new EU5 version:
   conda run -n eu5 python scripts/sync_location_window.py
 """
 
@@ -66,6 +67,11 @@ SOL_BUTTON = (
 )
 
 
+def strip_trailing_whitespace(text: str) -> str:
+    newline = "\n" if text.endswith("\n") else ""
+    return "\n".join(line.rstrip(" \t") for line in text.splitlines()) + newline
+
+
 def main() -> None:
     text = REF.read_text(encoding="utf-8")
 
@@ -77,6 +83,7 @@ def main() -> None:
         )
 
     text = text.replace(ANCHOR, ANCHOR + "\n" + SOL_BUTTON, 1)
+    text = strip_trailing_whitespace(text)
     SRC.write_text(text, encoding="utf-8")
     print(f"Synced  {SRC.relative_to(ROOT)}")
     print("        SOL tooltip button injected after AverageSatisfaction shortcut.")

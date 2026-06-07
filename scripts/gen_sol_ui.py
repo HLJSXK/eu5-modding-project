@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-gen_sol_ui.py — regenerate the four UI sections that reference substitute groups.
+gen_sol_ui.py — legacy generator for UI sections that reference substitute groups.
 
 Usage:
     python scripts/gen_sol_ui.py [--target all|location|tooltips|gls|effects] [--dry-run]
 
 Each target rewrites the content between @GEN_BEGIN/@GEN_END anchors in its file:
-  location  → location_window.gui            substitute icon block (5×4)
+  location  -> disabled legacy target; use sync_location_window.py instead
   tooltips  → SOL_substitute_tooltip.gui     20 template blocks (full regen after header)
   gls       → global_living_standard.gui     20 demand rows
   effects   → A_SOL_economy_effects.txt      Phase D / Phase B / Phase G anchors
@@ -558,13 +558,12 @@ def gen_effects_phase_g(estate: str) -> str:
 
 # ── Target runners ────────────────────────────────────────────────────────────
 
-# DISABLED for EU5 v1.2 compatibility.
-# The demography_item block was redesigned in 1.2; the fixed-width row can no
-# longer accommodate 4 substitute-group icons per stratum without layout breakage.
-# Use scripts/sync_location_window.py to rebuild location_window.gui instead.
+# DISABLED for the EU5 1.3 active SOL flow.
+# Legacy substitute-group icons are no longer part of the location window. Rebuild
+# location_window.gui from the current vanilla baseline with sync_location_window.py.
 def run_location(dry_run: bool) -> None:
     raise SystemExit(
-        "ERROR: --target location is disabled (EU5 v1.2 incompatible).\n"
+        "ERROR: --target location is legacy-disabled for EU5 1.3.\n"
         "Run  conda run -n eu5 python scripts/sync_location_window.py  to sync location_window.gui."
     )
 
