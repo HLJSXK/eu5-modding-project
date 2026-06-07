@@ -23,7 +23,7 @@
 
 5. **Colonial Restrictions** - AI requires a tax base of 1000 (vs. vanilla 100) to colonize. Colonial nations restricted to capital-region colonization. Historical colonizers (Portugal, Spain, England, etc.) are exempt.
 
-6. **Standard of Living (SOL) System** *(primary feature)* - Keeps the calibrated `demand_add` baseline in `z_SOL_pop_goods.txt`, then applies a monthly location-level `local_pop_demand` modifier from `monthly_country_pulse`. Per-pop, per-good unit spending constants are generated from `data/demand_price_table.csv`; yearly market scans cache which pop-consumed goods are active and the unit-pop base spending for each market. Each monthly location coefficient is income-closed: local stratum income, unified country savings pressure, local pop counts, and market-keyed base spending are combined so liquid funds divided by base spending becomes the final demand multiplier. The former substitute-goods, scarcity-tier, per-stratum Engel, and per-good redistribution chain is no longer active in EU5 1.3. Feeds back into streamlined location and country SOL GUI panels.
+6. **Standard of Living (SOL) System** *(primary feature)* - Keeps the calibrated `demand_add` baseline in `z_SOL_pop_goods.txt`, then applies a monthly location-level `local_pop_demand` modifier from `monthly_country_pulse`. Per-pop, per-good unit spending constants are generated from `data/demand_price_table.csv`; yearly market scans cache which pop-consumed goods are active and the unit-pop base spending for each market. Each monthly location coefficient is income-closed: local stratum income, unified country savings pressure, local pop counts, market-keyed base spending, and the engine's automatic development demand divisor `(1 + development / 20)` are combined so liquid funds divided by development-adjusted base spending becomes the final demand multiplier. The former substitute-goods, scarcity-tier, per-stratum Engel, and per-good redistribution chain is no longer active in EU5 1.3. Feeds back into streamlined location and country SOL GUI panels.
 
 ## Directory Structure
 
@@ -98,8 +98,8 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 - **Hardcoded unit spending constants** - `data/demand_price_table.csv` is converted into `src/stable/in_game/common/script_values/SOL_market_unit_spending_values.txt`, storing price times net demand for each pop type and good. Duplicate goods that appear in multiple old demand groups are counted once.
 - **Yearly market spending maps** - `sol_refresh_market_pop_demand_maps` scans `every_market_in_world`, checks `demands_goods_by_pops`, writes one `global_variable_map` per pop type keyed by market scope, and writes consumed-goods `global_variable_map` flags keyed by the same market scope for GUI display.
 - **Monthly local demand modifier** - `monthly_country_pulse` calls `sol_update_local_pop_demand_modifiers`, which computes each owned land location's income-closed coefficient and applies `sol_local_pop_demand_modifier` for one month with `size = var:sol_location_pop_demand_modifier_size`.
-- **Income-closed location scale** - Each location sums five displayed stratum incomes, applies the country's unified savings adjustment `(total savings / total savings target - 1) * 0.1`, divides liquid funds by market-keyed base spending, and exposes the result as `local_pop_demand`. Commoner base spending remains exact by internally using laborer, peasant, and soldier unit-spending maps.
-- **Country-level aggregation** - Location income, savings, base spending, liquid funds, final coefficient, and consumed market goods feed the situation panel and map overlay.
+- **Income-closed location scale** - Each location sums five displayed stratum incomes, applies the country's unified savings adjustment `(total savings / total savings target - 1) * 0.1`, divides liquid funds by market-keyed base spending multiplied by `(1 + development / 20)`, and exposes the corrected result as `local_pop_demand`. Commoner base spending remains exact by internally using laborer, peasant, and soldier unit-spending maps.
+- **Country-level aggregation** - Location income, savings, base spending, development-adjusted base spending, liquid funds, final coefficient, and consumed market goods feed the situation panel and map overlay.
 - **Retired 1.2 chain** - Substitute groups, scarcity tiers, per-good redistribution weights, per-stratum Engel curves, market-hub scarcity corrections, and `sol_era_coeff` are no longer part of the active EU5 1.3 demand calculation.
 
 ## Known Anti-Patterns
@@ -164,7 +164,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | Scripted Triggers | 495 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
 | Scripted Effects | 486 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2391 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 197 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 199 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 

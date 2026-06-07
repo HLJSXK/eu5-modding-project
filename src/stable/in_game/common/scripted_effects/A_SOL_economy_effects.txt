@@ -951,14 +951,16 @@ sol_compute_location_pop_demand = {
 	}
 	set_variable = { name = sol_location_liquid_funds_multiplier value = { value = 1 add = var:sol_location_savings_pressure_adjustment min = 0 } }
 	set_variable = { name = sol_location_liquid_funds value = { value = var:sol_location_total_income multiply = var:sol_location_liquid_funds_multiplier } }
+	set_variable = { name = sol_location_development_demand_divisor value = { value = development divide = 20 add = 1 } }
+	set_variable = { name = sol_location_development_adjusted_base_spending value = { value = var:sol_location_base_total_spending multiply = var:sol_location_development_demand_divisor } }
 	set_variable = { name = sol_location_final_demand_scale value = 1 }
 	if = {
-		limit = { var:sol_location_base_total_spending > 0 }
-		set_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_liquid_funds divide = var:sol_location_base_total_spending min = 0 } }
+		limit = { var:sol_location_development_adjusted_base_spending > 0 }
+		set_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_liquid_funds divide = var:sol_location_development_adjusted_base_spending min = 0 } }
 	}
 	set_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }
 	set_variable = { name = gls_location_avg_scale value = var:sol_location_final_demand_scale }
-	set_variable = { name = gls_location_sol_weighted value = { value = var:gls_location_avg_scale multiply = development } }
+	set_variable = { name = gls_location_sol_weighted value = var:gls_location_avg_scale }
 }
 
 sol_update_local_pop_demand_modifiers = {
@@ -996,6 +998,7 @@ gls_accumulate_panel_stats = {
 	set_variable = { name = gls_location_scale_sum value = 0 }
 	set_variable = { name = gls_country_wealth value = 0 }
 	set_variable = { name = gls_development_sum value = 0 }
+	set_variable = { name = gls_development_divisor_sum value = 0 }
 	set_variable = { name = gls_control_sum value = 0 }
 	set_variable = { name = gls_pop_nobles value = 0 }
 	set_variable = { name = gls_pop_clergy value = 0 }
@@ -1010,7 +1013,9 @@ gls_accumulate_panel_stats = {
 	set_variable = { name = gls_income_tribesmen value = 0 }
 	set_variable = { name = gls_total_income value = 0 }
 	set_variable = { name = gls_country_base_spending value = 0 }
+	set_variable = { name = gls_country_development_adjusted_base_spending value = 0 }
 	set_variable = { name = gls_country_liquid_funds value = 0 }
+	set_variable = { name = gls_country_development_avg_divisor value = 1 }
 	set_variable = { name = gls_country_sol_all value = 1 }
 	save_scope_as = gls_panel_country
 	remove_from_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country }
@@ -1634,6 +1639,7 @@ gls_accumulate_panel_stats = {
 				change_variable = { name = gls_location_scale_sum add = scope:gls_cached_location.local_sol_pop_demand_scale }
 				change_variable = { name = gls_country_wealth add = scope:gls_cached_location.local_wealth_display }
 				change_variable = { name = gls_development_sum add = scope:gls_cached_location.development }
+				change_variable = { name = gls_development_divisor_sum add = scope:gls_cached_location.local_sol_development_demand_divisor }
 				change_variable = { name = gls_control_sum add = scope:gls_cached_location.local_control }
 				change_variable = { name = gls_pop_nobles add = scope:gls_cached_location.num_pop_type:nobles }
 				change_variable = { name = gls_pop_clergy add = scope:gls_cached_location.num_pop_type:clergy }
@@ -1648,12 +1654,14 @@ gls_accumulate_panel_stats = {
 				change_variable = { name = gls_income_tribesmen add = scope:gls_cached_location.local_sol_tribesmen_income_display }
 				change_variable = { name = gls_total_income add = scope:gls_cached_location.local_sol_total_income }
 				change_variable = { name = gls_country_base_spending add = scope:gls_cached_location.local_sol_base_spending_display }
+				change_variable = { name = gls_country_development_adjusted_base_spending add = scope:gls_cached_location.local_sol_development_adjusted_base_spending_display }
 				change_variable = { name = gls_country_liquid_funds add = scope:gls_cached_location.local_sol_liquid_funds_display }
 			}
 		}
 	}
 	if = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_location_avg_scale value = { add = var:gls_location_scale_sum divide = var:gls_location_count } } }
-	if = { limit = { var:gls_country_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_base_spending min = 0 } } }
+	if = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_development_avg_divisor value = { add = var:gls_development_divisor_sum divide = var:gls_location_count } } }
+	if = { limit = { var:gls_country_development_adjusted_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_development_adjusted_base_spending min = 0 } } }
 }
 
 gls_full_refresh_country = {
