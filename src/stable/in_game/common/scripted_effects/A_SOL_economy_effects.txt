@@ -88,1280 +88,1480 @@ TRY_REPLACE:change_estate_gold_effect = {
 ### ============================================================
 ### SECTION: Standard of Living Computation
 ### ============================================================
-# SOL calculation effects: savings pressure, panel display, map coloring,
-# and panel stat accumulation. Called from yearly_country_pulse (Pass A/B).
+# EU5 1.3 demand path: calibrated demand_add remains in goods, while
+# monthly location local_pop_demand is sized as liquid funds / base spending.
 
 gls_compute_savings_pressure = {
-	# 计算财富锚点和各阶层存款压力。
-	# 地图着色依赖这些值（通过 local_*_savings_pressure → local_average_gdp_per_capita_scale）。
-	# 调用者：Pass A（所有国家，每年）、Pass B（人类，每月）
-	# root = country
-	set_variable = {
-		name = gls_country_wealth_anchor_cached
-		value = {
-			value = monthly_income_trade_and_tax
-			min = 0
-		}
+	# root = country. Unified pressure: (total savings / total target - 1) * 0.1
+	set_variable = { name = gls_country_wealth_anchor_cached value = { value = monthly_income_trade_and_tax min = 0 } }
+
+	set_variable = { name = gls_nobles_gold value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:nobles_estate }
+		set_variable = { name = gls_nobles_gold value = "estate(estate_type:nobles_estate).estate_gold" }
+	}
+	set_variable = { name = gls_nobles_target value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:nobles_estate }
+		set_variable = { name = gls_nobles_target value = { value = 200 add = { value = var:gls_country_wealth_anchor_cached multiply = 8 } min = 80 } }
 	}
 
-	set_variable = {
-		name = gls_nobles_savings_pressure
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:nobles_estate }
-				value = "estate(estate_type:nobles_estate).estate_gold"
-				divide = {
-					value = 200
-					add = {
-						value = var:gls_country_wealth_anchor_cached
-						multiply = 8
-					}
-					min = 80
-				}
-				subtract = 1
-				multiply = 0.25
-				min = -0.50
-				max = 3
-			}
-		}
+	set_variable = { name = gls_clergy_gold value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:clergy_estate }
+		set_variable = { name = gls_clergy_gold value = "estate(estate_type:clergy_estate).estate_gold" }
+	}
+	set_variable = { name = gls_clergy_target value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:clergy_estate }
+		set_variable = { name = gls_clergy_target value = { value = 100 add = { value = var:gls_country_wealth_anchor_cached multiply = 3 } min = 60 } }
 	}
 
-	set_variable = {
-		name = gls_clergy_savings_pressure
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:clergy_estate }
-				value = "estate(estate_type:clergy_estate).estate_gold"
-				divide = {
-					value = 100
-					add = {
-						value = var:gls_country_wealth_anchor_cached
-						multiply = 3
-					}
-					min = 60
-				}
-				subtract = 1
-				multiply = 0.25
-				min = -0.50
-				max = 2
-			}
-		}
+	set_variable = { name = gls_burghers_gold value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:burghers_estate }
+		set_variable = { name = gls_burghers_gold value = "estate(estate_type:burghers_estate).estate_gold" }
+	}
+	set_variable = { name = gls_burghers_target value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:burghers_estate }
+		set_variable = { name = gls_burghers_target value = { value = 100 add = { value = var:gls_country_wealth_anchor_cached multiply = 3 } min = 60 } }
 	}
 
-	set_variable = {
-		name = gls_burghers_savings_pressure
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:burghers_estate }
-				value = "estate(estate_type:burghers_estate).estate_gold"
-				divide = {
-					value = 100
-					add = {
-						value = var:gls_country_wealth_anchor_cached
-						multiply = 3
-					}
-					min = 60
-				}
-				subtract = 1
-				multiply = 0.25
-				min = -0.50
-				max = 2
-			}
-		}
+	set_variable = { name = gls_commoner_gold value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:peasants_estate }
+		set_variable = { name = gls_commoner_gold value = "estate(estate_type:peasants_estate).estate_gold" }
+	}
+	set_variable = { name = gls_commoner_target value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:peasants_estate }
+		set_variable = { name = gls_commoner_target value = { value = 0 add = { value = var:gls_country_wealth_anchor_cached multiply = 2 } min = 45 } }
 	}
 
-	set_variable = {
-		name = gls_commoner_savings_pressure
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:peasants_estate }
-				value = "estate(estate_type:peasants_estate).estate_gold"
-				divide = {
-					value = 0
-					add = {
-						value = var:gls_country_wealth_anchor_cached
-						multiply = 2
-					}
-					min = 45
-				}
-				subtract = 1
-				multiply = 0.25
-				min = -0.50
-				max = 1.5
-			}
-		}
+	set_variable = { name = gls_tribesmen_gold value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:tribes_estate }
+		set_variable = { name = gls_tribesmen_gold value = "estate(estate_type:tribes_estate).estate_gold" }
+	}
+	set_variable = { name = gls_tribesmen_target value = 0 }
+	if = {
+		limit = { country_has_estate = estate_type:tribes_estate }
+		set_variable = { name = gls_tribesmen_target value = { value = 0 add = { value = var:gls_country_wealth_anchor_cached multiply = 1 } min = 35 } }
 	}
 
-	set_variable = {
-		name = gls_tribesmen_savings_pressure
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:tribes_estate }
-				value = "estate(estate_type:tribes_estate).estate_gold"
-				divide = {
-					value = 0
-					add = {
-						value = var:gls_country_wealth_anchor_cached
-						multiply = 1
-					}
-					min = 35
-				}
-				subtract = 1
-				multiply = 0.25
-				min = -0.50
-				max = 1.5
-			}
-		}
+	set_variable = { name = gls_total_savings value = { add = var:gls_nobles_gold add = var:gls_clergy_gold add = var:gls_burghers_gold add = var:gls_commoner_gold add = var:gls_tribesmen_gold } }
+	set_variable = { name = gls_total_savings_target value = { add = var:gls_nobles_target add = var:gls_clergy_target add = var:gls_burghers_target add = var:gls_commoner_target add = var:gls_tribesmen_target } }
+	set_variable = { name = gls_savings_pressure_adjustment value = 0 }
+	if = {
+		limit = { var:gls_total_savings_target > 0 }
+		set_variable = { name = gls_savings_pressure_adjustment value = { value = var:gls_total_savings divide = var:gls_total_savings_target subtract = 1 multiply = 0.1 } }
 	}
-
-	# Liquid funds = 1 + savings_pressure (consumption rate at country level)
-	set_variable = { name = gls_nobles_liquid_funds    value = { add = 1  add = var:gls_nobles_savings_pressure } }
-	set_variable = { name = gls_clergy_liquid_funds    value = { add = 1  add = var:gls_clergy_savings_pressure } }
-	set_variable = { name = gls_burghers_liquid_funds  value = { add = 1  add = var:gls_burghers_savings_pressure } }
-	set_variable = { name = gls_commoner_liquid_funds  value = { add = 1  add = var:gls_commoner_savings_pressure } }
-	set_variable = { name = gls_tribesmen_liquid_funds value = { add = 1  add = var:gls_tribesmen_savings_pressure } }
-
+	set_variable = { name = gls_liquid_funds_multiplier value = { value = 1 add = var:gls_savings_pressure_adjustment min = 0 } }
 }
 
-gls_compute_panel_display = {
-	# 计算面板 UI 展示变量（税率、资产、目标存款、制度加成）。
-	# 依赖：gls_country_wealth_anchor_cached（由 gls_compute_savings_pressure 设置）。
-	# 调用者：Pass B（人类，每月）
-	# root = country
+sol_refresh_market_pop_demand_maps = {
+	# Global scope. Rebuild per-market unit spending and market-keyed goods flags.
+	every_market_in_world = {
+		save_scope_as = sol_market_cache
+		set_local_variable = { name = sol_market_nobles_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_clergy_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_burghers_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_laborers_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_peasants_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_soldiers_unit_spending value = 0 }
+		set_local_variable = { name = sol_market_tribesmen_unit_spending value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_amber key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_amber key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_beer key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_beer key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_beeswax key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_beeswax key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_books key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_books key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_chili key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_chili key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_cloth key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_cloth key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_cloves key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_cloves key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_coal key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_coal key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_cocoa key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_cocoa key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_coffee key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_coffee key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_elephants key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_elephants key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_fine_cloth key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_fine_cloth key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_firearms key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_firearms key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_fish key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_fish key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_fruit key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_fruit key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_fur key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_fur key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_furniture key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_furniture key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_gems key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_gems key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_glass key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_glass key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_goods_gold key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_goods_gold key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_horses key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_horses key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_incense key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_incense key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_ivory key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_ivory key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_jewelry key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_jewelry key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_lacquerware key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_lacquerware key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_leather key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_leather key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_legumes key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_legumes key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_liquor key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_liquor key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_livestock key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_livestock key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_lumber key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_lumber key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_maize key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_maize key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_marble key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_marble key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_masonry key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_masonry key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_medicaments key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_medicaments key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_mercury key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_mercury key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_millet key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_millet key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_olives key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_olives key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_paper key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_paper key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_pearls key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_pearls key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_pepper key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_pepper key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_porcelain key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_porcelain key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_potato key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_potato key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_pottery key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_pottery key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_rice key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_rice key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_saffron key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_saffron key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_salt key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_salt key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_silver key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_silver key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_sugar key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_sugar key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_tea key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_tea key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_tobacco key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_tobacco key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_tools key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_tools key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_weaponry key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_weaponry key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_wheat key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_wheat key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_wild_game key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_wild_game key = scope:sol_market_cache value = 0 }
+		remove_from_global_variable_map = { name = sol_market_consumes_wine key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_consumes_wine key = scope:sol_market_cache value = 0 }
 
-	# Section 1 / 2 / 3 / 4 of the situation panel
-	set_variable = {
-		name = gls_nobles_tax_pct
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:nobles_estate }
-				value = "estate_tax_percentage:nobles_estate"
-			}
+		if = {
+			limit = { demands_goods_by_pops = goods:amber }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_amber }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_amber }
+			remove_from_global_variable_map = { name = sol_market_consumes_amber key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_amber key = scope:sol_market_cache value = 1 }
 		}
-	}
-	set_variable = {
-		name = gls_clergy_tax_pct
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:clergy_estate }
-				value = "estate_tax_percentage:clergy_estate"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_burghers_tax_pct
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:burghers_estate }
-				value = "estate_tax_percentage:burghers_estate"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_commoner_tax_pct
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:peasants_estate }
-				value = "estate_tax_percentage:peasants_estate"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_tribesmen_tax_pct
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:tribes_estate }
-				value = "estate_tax_percentage:tribes_estate"
-			}
-		}
-	}
 
-	set_variable = {
-		name = gls_nobles_gold
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:nobles_estate }
-				value = "estate(estate_type:nobles_estate).estate_gold"
-			}
+		if = {
+			limit = { demands_goods_by_pops = goods:beer }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_beer }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_beer }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_beer }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_beer }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_beer }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_beer }
+			remove_from_global_variable_map = { name = sol_market_consumes_beer key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_beer key = scope:sol_market_cache value = 1 }
 		}
-	}
-	set_variable = {
-		name = gls_clergy_gold
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:clergy_estate }
-				value = "estate(estate_type:clergy_estate).estate_gold"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_burghers_gold
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:burghers_estate }
-				value = "estate(estate_type:burghers_estate).estate_gold"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_commoner_gold
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:peasants_estate }
-				value = "estate(estate_type:peasants_estate).estate_gold"
-			}
-		}
-	}
-	set_variable = {
-		name = gls_tribesmen_gold
-		value = {
-			value = 0
-			if = {
-				limit = { country_has_estate = estate_type:tribes_estate }
-				value = "estate(estate_type:tribes_estate).estate_gold"
-			}
-		}
-	}
 
-	set_variable = {
-		name = gls_nobles_target
-		value = {
-			value = 200
-			add = {
-				value = var:gls_country_wealth_anchor_cached
-				multiply = 8
-			}
-			min = 80
+		if = {
+			limit = { demands_goods_by_pops = goods:beeswax }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_beeswax }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_beeswax }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_beeswax }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_beeswax }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_beeswax }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_beeswax }
+			remove_from_global_variable_map = { name = sol_market_consumes_beeswax key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_beeswax key = scope:sol_market_cache value = 1 }
 		}
-	}
-	set_variable = {
-		name = gls_clergy_target
-		value = {
-			value = 100
-			add = {
-				value = var:gls_country_wealth_anchor_cached
-				multiply = 3
-			}
-			min = 60
-		}
-	}
-	set_variable = {
-		name = gls_burghers_target
-		value = {
-			value = 100
-			add = {
-				value = var:gls_country_wealth_anchor_cached
-				multiply = 3
-			}
-			min = 60
-		}
-	}
-	set_variable = {
-		name = gls_commoner_target
-		value = {
-			value = 0
-			add = {
-				value = var:gls_country_wealth_anchor_cached
-				multiply = 2
-			}
-			min = 45
-		}
-	}
-	set_variable = {
-		name = gls_tribesmen_target
-		value = {
-			value = 0
-			add = {
-				value = var:gls_country_wealth_anchor_cached
-				multiply = 1
-			}
-			min = 35
-		}
-	}
 
-	set_variable = {
-		name = gls_num_institutions
-		value = { add = num_embraced_institutions }
-	}
-	set_variable = {
-		name = gls_institution_bonus
-		value = {
-			add = num_embraced_institutions
-			multiply = 0.05
+		if = {
+			limit = { demands_goods_by_pops = goods:books }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_books }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_books }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_books }
+			remove_from_global_variable_map = { name = sol_market_consumes_books key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_books key = scope:sol_market_cache value = 1 }
 		}
-	}
 
-	# Acknowledge GUI-only display variables — used via GetVariable in the situation panel.
-	# This block puts them in an active call-graph path so the engine stops reporting them
-	# as unused. The condition is always false at runtime; cost is zero.
+		if = {
+			limit = { demands_goods_by_pops = goods:chili }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_chili }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_chili }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_chili }
+			remove_from_global_variable_map = { name = sol_market_consumes_chili key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_chili key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:cloth }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_cloth }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_cloth }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_cloth }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_cloth }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_cloth }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_cloth }
+			remove_from_global_variable_map = { name = sol_market_consumes_cloth key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_cloth key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:cloves }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_cloves }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_cloves }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_cloves }
+			remove_from_global_variable_map = { name = sol_market_consumes_cloves key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_cloves key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:coal }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_coal }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_coal }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_coal }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_coal }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_coal }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_coal }
+			remove_from_global_variable_map = { name = sol_market_consumes_coal key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_coal key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:cocoa }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_cocoa }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_cocoa }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_cocoa }
+			remove_from_global_variable_map = { name = sol_market_consumes_cocoa key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_cocoa key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:coffee }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_coffee }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_coffee }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_coffee }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_coffee }
+			remove_from_global_variable_map = { name = sol_market_consumes_coffee key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_coffee key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:elephants }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_elephants }
+			remove_from_global_variable_map = { name = sol_market_consumes_elephants key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_elephants key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:fine_cloth }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_fine_cloth }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_fine_cloth }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_fine_cloth }
+			remove_from_global_variable_map = { name = sol_market_consumes_fine_cloth key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_fine_cloth key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:firearms }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_firearms }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_firearms }
+			remove_from_global_variable_map = { name = sol_market_consumes_firearms key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_firearms key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:fish }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_fish }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_fish }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_fish }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_fish }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_fish }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_fish }
+			remove_from_global_variable_map = { name = sol_market_consumes_fish key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_fish key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:fruit }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_fruit }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_fruit }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_fruit }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_fruit }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_fruit }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_fruit }
+			remove_from_global_variable_map = { name = sol_market_consumes_fruit key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_fruit key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:fur }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_fur }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_fur }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_fur }
+			remove_from_global_variable_map = { name = sol_market_consumes_fur key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_fur key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:furniture }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_furniture }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_furniture }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_furniture }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_furniture }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_furniture }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_furniture }
+			remove_from_global_variable_map = { name = sol_market_consumes_furniture key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_furniture key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:gems }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_gems }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_gems }
+			remove_from_global_variable_map = { name = sol_market_consumes_gems key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_gems key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:glass }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_glass }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_glass }
+			remove_from_global_variable_map = { name = sol_market_consumes_glass key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_glass key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:goods_gold }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_goods_gold }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_goods_gold }
+			remove_from_global_variable_map = { name = sol_market_consumes_goods_gold key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_goods_gold key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:horses }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_horses }
+			remove_from_global_variable_map = { name = sol_market_consumes_horses key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_horses key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:incense }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_incense }
+			remove_from_global_variable_map = { name = sol_market_consumes_incense key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_incense key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:ivory }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_ivory }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_ivory }
+			remove_from_global_variable_map = { name = sol_market_consumes_ivory key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_ivory key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:jewelry }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_jewelry }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_jewelry }
+			remove_from_global_variable_map = { name = sol_market_consumes_jewelry key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_jewelry key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:lacquerware }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_lacquerware }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_lacquerware }
+			remove_from_global_variable_map = { name = sol_market_consumes_lacquerware key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_lacquerware key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:leather }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_leather }
+			remove_from_global_variable_map = { name = sol_market_consumes_leather key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_leather key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:legumes }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_legumes }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_legumes }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_legumes }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_legumes }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_legumes }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_legumes }
+			remove_from_global_variable_map = { name = sol_market_consumes_legumes key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_legumes key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:liquor }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_liquor }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_liquor }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_liquor }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_liquor }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_liquor }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_liquor }
+			remove_from_global_variable_map = { name = sol_market_consumes_liquor key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_liquor key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:livestock }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_livestock }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_livestock }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_livestock }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_livestock }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_livestock }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_livestock }
+			remove_from_global_variable_map = { name = sol_market_consumes_livestock key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_livestock key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:lumber }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_lumber }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_lumber }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_lumber }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_lumber }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_lumber }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_lumber }
+			remove_from_global_variable_map = { name = sol_market_consumes_lumber key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_lumber key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:maize }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_maize }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_maize }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_maize }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_maize }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_maize }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_maize }
+			remove_from_global_variable_map = { name = sol_market_consumes_maize key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_maize key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:marble }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_marble }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_marble }
+			remove_from_global_variable_map = { name = sol_market_consumes_marble key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_marble key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:masonry }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_masonry }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_masonry }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_masonry }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_masonry }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_masonry }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_masonry }
+			remove_from_global_variable_map = { name = sol_market_consumes_masonry key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_masonry key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:medicaments }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_medicaments }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_medicaments }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_medicaments }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_medicaments }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_medicaments }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_medicaments }
+			remove_from_global_variable_map = { name = sol_market_consumes_medicaments key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_medicaments key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:mercury }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_mercury }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_mercury }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_mercury }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_mercury }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_mercury }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_mercury }
+			remove_from_global_variable_map = { name = sol_market_consumes_mercury key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_mercury key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:millet }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_millet }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_millet }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_millet }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_millet }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_millet }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_millet }
+			remove_from_global_variable_map = { name = sol_market_consumes_millet key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_millet key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:olives }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_olives }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_olives }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_olives }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_olives }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_olives }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_olives }
+			remove_from_global_variable_map = { name = sol_market_consumes_olives key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_olives key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:paper }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_paper }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_paper }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_paper }
+			remove_from_global_variable_map = { name = sol_market_consumes_paper key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_paper key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:pearls }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_pearls }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_pearls }
+			remove_from_global_variable_map = { name = sol_market_consumes_pearls key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_pearls key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:pepper }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_pepper }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_pepper }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_pepper }
+			remove_from_global_variable_map = { name = sol_market_consumes_pepper key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_pepper key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:porcelain }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_porcelain }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_porcelain }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_porcelain }
+			remove_from_global_variable_map = { name = sol_market_consumes_porcelain key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_porcelain key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:potato }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_potato }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_potato }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_potato }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_potato }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_potato }
+			remove_from_global_variable_map = { name = sol_market_consumes_potato key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_potato key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:pottery }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_pottery }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_pottery }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_pottery }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_pottery }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_pottery }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_pottery }
+			remove_from_global_variable_map = { name = sol_market_consumes_pottery key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_pottery key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:rice }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_rice }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_rice }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_rice }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_rice }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_rice }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_rice }
+			remove_from_global_variable_map = { name = sol_market_consumes_rice key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_rice key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:saffron }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_saffron }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_saffron }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_saffron }
+			remove_from_global_variable_map = { name = sol_market_consumes_saffron key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_saffron key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:salt }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_salt }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_salt }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_salt }
+			remove_from_global_variable_map = { name = sol_market_consumes_salt key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_salt key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:silver }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_silver }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_silver }
+			remove_from_global_variable_map = { name = sol_market_consumes_silver key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_silver key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:sugar }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_sugar }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_sugar }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_sugar }
+			remove_from_global_variable_map = { name = sol_market_consumes_sugar key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_sugar key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:tea }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_tea }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_tea }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_tea }
+			remove_from_global_variable_map = { name = sol_market_consumes_tea key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_tea key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:tobacco }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_tobacco }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_tobacco }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_tobacco }
+			remove_from_global_variable_map = { name = sol_market_consumes_tobacco key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_tobacco key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:tools }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_tools }
+			remove_from_global_variable_map = { name = sol_market_consumes_tools key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_tools key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:weaponry }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_weaponry }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_weaponry }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_weaponry }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_weaponry }
+			remove_from_global_variable_map = { name = sol_market_consumes_weaponry key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_weaponry key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:wheat }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_wheat }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_wheat }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_wheat }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_wheat }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_wheat }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_wheat }
+			remove_from_global_variable_map = { name = sol_market_consumes_wheat key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_wheat key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:wild_game }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_wild_game }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_wild_game }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_wild_game }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_wild_game }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_wild_game }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_wild_game }
+			remove_from_global_variable_map = { name = sol_market_consumes_wild_game key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_wild_game key = scope:sol_market_cache value = 1 }
+		}
+
+		if = {
+			limit = { demands_goods_by_pops = goods:wine }
+			change_local_variable = { name = sol_market_nobles_unit_spending add = sol_unit_spending_nobles_wine }
+			change_local_variable = { name = sol_market_clergy_unit_spending add = sol_unit_spending_clergy_wine }
+			change_local_variable = { name = sol_market_burghers_unit_spending add = sol_unit_spending_burghers_wine }
+			change_local_variable = { name = sol_market_laborers_unit_spending add = sol_unit_spending_laborers_wine }
+			change_local_variable = { name = sol_market_peasants_unit_spending add = sol_unit_spending_peasants_wine }
+			change_local_variable = { name = sol_market_soldiers_unit_spending add = sol_unit_spending_soldiers_wine }
+			remove_from_global_variable_map = { name = sol_market_consumes_wine key = scope:sol_market_cache }
+			add_to_global_variable_map = { name = sol_market_consumes_wine key = scope:sol_market_cache value = 1 }
+		}
+
+		remove_from_global_variable_map = { name = sol_market_unit_spending_nobles key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_nobles key = scope:sol_market_cache value = local_var:sol_market_nobles_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_clergy key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_clergy key = scope:sol_market_cache value = local_var:sol_market_clergy_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_burghers key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_burghers key = scope:sol_market_cache value = local_var:sol_market_burghers_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_laborers key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_laborers key = scope:sol_market_cache value = local_var:sol_market_laborers_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_peasants key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_peasants key = scope:sol_market_cache value = local_var:sol_market_peasants_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_soldiers key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_soldiers key = scope:sol_market_cache value = local_var:sol_market_soldiers_unit_spending }
+		remove_from_global_variable_map = { name = sol_market_unit_spending_tribesmen key = scope:sol_market_cache }
+		add_to_global_variable_map = { name = sol_market_unit_spending_tribesmen key = scope:sol_market_cache value = local_var:sol_market_tribesmen_unit_spending }
+	}
+	set_global_variable = { name = sol_market_pop_demand_maps_initialized value = 1 }
+}
+
+sol_compute_location_pop_demand = {
+	# root = location. Final coefficient = liquid funds / market-filtered base spending.
+	market ?= { save_scope_as = sol_location_market }
+
+	set_variable = { name = sol_unit_spending_nobles value = 0 }
 	if = {
 		limit = {
-			always = no
-			has_variable = gls_nobles_tax_pct
-			has_variable = gls_clergy_tax_pct
-			has_variable = gls_burghers_tax_pct
-			has_variable = gls_commoner_tax_pct
-			has_variable = gls_tribesmen_tax_pct
-			has_variable = gls_nobles_liquid_funds
-			has_variable = gls_clergy_liquid_funds
-			has_variable = gls_burghers_liquid_funds
-			has_variable = gls_commoner_liquid_funds
-			has_variable = gls_tribesmen_liquid_funds
-			has_variable = gls_nobles_nonlinear
-			has_variable = gls_clergy_nonlinear
-			has_variable = gls_burghers_nonlinear
-			has_variable = gls_commoner_nonlinear
-			has_variable = gls_tribesmen_nonlinear
-			has_variable = gls_nobles_gold
-			has_variable = gls_clergy_gold
-			has_variable = gls_burghers_gold
-			has_variable = gls_commoner_gold
-			has_variable = gls_tribesmen_gold
-			has_variable = gls_nobles_target
-			has_variable = gls_clergy_target
-			has_variable = gls_burghers_target
-			has_variable = gls_commoner_target
-			has_variable = gls_tribesmen_target
-			has_variable = gls_num_institutions
-			has_variable = gls_institution_bonus
-			has_variable = gls_avg_development
-			has_variable = gls_avg_control
-			has_variable = gls_demand_nobles
-			has_variable = gls_demand_clergy
-			has_variable = gls_demand_burghers
-			has_variable = gls_demand_commoners
-			has_variable = gls_demand_tribesmen
-			has_variable = gls_country_wealth_anchor_cached
-			# @GEN_BEGIN:phase_g_guard
-				has_variable = gls_nobles_basic_clothing_offset
-				has_variable = gls_nobles_crude_goods_offset
-				has_variable = gls_nobles_staple_offset
-				has_variable = gls_nobles_condiments_offset
-				has_variable = gls_nobles_heating_offset
-				has_variable = gls_nobles_household_offset
-				has_variable = gls_nobles_standard_clothing_offset
-				has_variable = gls_nobles_intoxicants_offset
-				has_variable = gls_nobles_luxury_drinks_offset
-				has_variable = gls_nobles_luxury_food_offset
-				has_variable = gls_nobles_luxury_goods_offset
-				has_variable = gls_nobles_protein_offset
-				has_variable = gls_nobles_spices_offset
-				has_variable = gls_nobles_precious_offset
-				has_variable = gls_nobles_treasures_offset
-				has_variable = gls_nobles_medicine_offset
-				has_variable = gls_nobles_ritual_offset
-				has_variable = gls_nobles_weapons_offset
-				has_variable = gls_nobles_mounts_offset
-				has_variable = gls_nobles_knowledge_offset
-				has_variable = gls_clergy_basic_clothing_offset
-				has_variable = gls_clergy_crude_goods_offset
-				has_variable = gls_clergy_staple_offset
-				has_variable = gls_clergy_condiments_offset
-				has_variable = gls_clergy_heating_offset
-				has_variable = gls_clergy_household_offset
-				has_variable = gls_clergy_standard_clothing_offset
-				has_variable = gls_clergy_intoxicants_offset
-				has_variable = gls_clergy_luxury_drinks_offset
-				has_variable = gls_clergy_luxury_food_offset
-				has_variable = gls_clergy_luxury_goods_offset
-				has_variable = gls_clergy_protein_offset
-				has_variable = gls_clergy_spices_offset
-				has_variable = gls_clergy_medicine_offset
-				has_variable = gls_clergy_ritual_offset
-				has_variable = gls_clergy_knowledge_offset
-				has_variable = gls_burghers_basic_clothing_offset
-				has_variable = gls_burghers_crude_goods_offset
-				has_variable = gls_burghers_staple_offset
-				has_variable = gls_burghers_condiments_offset
-				has_variable = gls_burghers_heating_offset
-				has_variable = gls_burghers_household_offset
-				has_variable = gls_burghers_standard_clothing_offset
-				has_variable = gls_burghers_intoxicants_offset
-				has_variable = gls_burghers_luxury_drinks_offset
-				has_variable = gls_burghers_luxury_food_offset
-				has_variable = gls_burghers_luxury_goods_offset
-				has_variable = gls_burghers_protein_offset
-				has_variable = gls_burghers_spices_offset
-				has_variable = gls_burghers_precious_offset
-				has_variable = gls_burghers_treasures_offset
-				has_variable = gls_burghers_medicine_offset
-				has_variable = gls_burghers_ritual_offset
-				has_variable = gls_burghers_knowledge_offset
-				has_variable = gls_commoners_basic_clothing_offset
-				has_variable = gls_commoners_crude_goods_offset
-				has_variable = gls_commoners_staple_offset
-				has_variable = gls_commoners_condiments_offset
-				has_variable = gls_commoners_heating_offset
-				has_variable = gls_commoners_household_offset
-				has_variable = gls_commoners_standard_clothing_offset
-				has_variable = gls_commoners_intoxicants_offset
-				has_variable = gls_commoners_luxury_drinks_offset
-				has_variable = gls_commoners_luxury_food_offset
-				has_variable = gls_commoners_protein_offset
-				has_variable = gls_commoners_medicine_offset
-				has_variable = gls_commoners_ritual_offset
-				has_variable = gls_commoners_weapons_offset# @GEN_END:phase_g_guard
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_nobles
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_nobles target = scope:sol_location_market }
 		}
-		change_variable = { name = gls_nobles_tax_pct add = 0 }
+		set_variable = { name = sol_unit_spending_nobles value = "global_variable_map(sol_market_unit_spending_nobles|scope:sol_location_market)" }
 	}
+
+	set_variable = { name = sol_unit_spending_clergy value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_clergy
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_clergy target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_clergy value = "global_variable_map(sol_market_unit_spending_clergy|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_unit_spending_burghers value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_burghers
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_burghers target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_burghers value = "global_variable_map(sol_market_unit_spending_burghers|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_unit_spending_laborers value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_laborers
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_laborers target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_laborers value = "global_variable_map(sol_market_unit_spending_laborers|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_unit_spending_peasants value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_peasants
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_peasants target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_peasants value = "global_variable_map(sol_market_unit_spending_peasants|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_unit_spending_soldiers value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_soldiers
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_soldiers target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_soldiers value = "global_variable_map(sol_market_unit_spending_soldiers|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_unit_spending_tribesmen value = 0 }
+	if = {
+		limit = {
+			exists = scope:sol_location_market
+			has_global_variable_map = sol_market_unit_spending_tribesmen
+			is_key_in_global_variable_map = { name = sol_market_unit_spending_tribesmen target = scope:sol_location_market }
+		}
+		set_variable = { name = sol_unit_spending_tribesmen value = "global_variable_map(sol_market_unit_spending_tribesmen|scope:sol_location_market)" }
+	}
+
+	set_variable = { name = sol_location_nobles_income value = { add = local_noble_gdp_display } }
+	set_variable = { name = sol_location_clergy_income value = { add = local_clergy_gdp_display } }
+	set_variable = { name = sol_location_burghers_income value = { add = local_burghers_gdp_display } }
+	set_variable = { name = sol_location_commoners_income value = { add = local_commoner_gdp_display } }
+	set_variable = { name = sol_location_tribesmen_income value = { add = local_tribesmen_gdp_display } }
+	set_variable = { name = sol_location_total_income value = { add = var:sol_location_nobles_income add = var:sol_location_clergy_income add = var:sol_location_burghers_income add = var:sol_location_commoners_income add = var:sol_location_tribesmen_income } }
+
+	set_variable = { name = sol_location_nobles_base_spending value = { value = var:sol_unit_spending_nobles multiply = num_pop_type:nobles } }
+	set_variable = { name = sol_location_clergy_base_spending value = { value = var:sol_unit_spending_clergy multiply = num_pop_type:clergy } }
+	set_variable = { name = sol_location_burghers_base_spending value = { value = var:sol_unit_spending_burghers multiply = num_pop_type:burghers } }
+	set_variable = { name = sol_location_laborers_base_spending value = { value = var:sol_unit_spending_laborers multiply = num_pop_type:laborers } }
+	set_variable = { name = sol_location_peasants_base_spending value = { value = var:sol_unit_spending_peasants multiply = num_pop_type:peasants } }
+	set_variable = { name = sol_location_soldiers_base_spending value = { value = var:sol_unit_spending_soldiers multiply = num_pop_type:soldiers } }
+	set_variable = { name = sol_location_tribesmen_base_spending value = { value = var:sol_unit_spending_tribesmen multiply = num_pop_type:tribesmen } }
+	set_variable = { name = sol_location_commoners_base_spending value = 0 }
+	change_variable = { name = sol_location_commoners_base_spending add = var:sol_location_laborers_base_spending }
+	change_variable = { name = sol_location_commoners_base_spending add = var:sol_location_peasants_base_spending }
+	change_variable = { name = sol_location_commoners_base_spending add = var:sol_location_soldiers_base_spending }
+	set_variable = { name = sol_location_base_total_spending value = 0 }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_nobles_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_clergy_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_burghers_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_laborers_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_peasants_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_soldiers_base_spending }
+	change_variable = { name = sol_location_base_total_spending add = var:sol_location_tribesmen_base_spending }
+
+	set_variable = { name = sol_location_savings_pressure_adjustment value = 0 }
+	set_variable = { name = sol_location_total_savings value = 0 }
+	set_variable = { name = sol_location_total_savings_target value = 0 }
+	if = {
+		limit = { exists = owner }
+		if = { limit = { owner = { has_variable = gls_savings_pressure_adjustment } } set_variable = { name = sol_location_savings_pressure_adjustment value = owner.var:gls_savings_pressure_adjustment } }
+		if = { limit = { owner = { has_variable = gls_total_savings } } set_variable = { name = sol_location_total_savings value = owner.var:gls_total_savings } }
+		if = { limit = { owner = { has_variable = gls_total_savings_target } } set_variable = { name = sol_location_total_savings_target value = owner.var:gls_total_savings_target } }
+	}
+	set_variable = { name = sol_location_liquid_funds_multiplier value = { value = 1 add = var:sol_location_savings_pressure_adjustment min = 0 } }
+	set_variable = { name = sol_location_liquid_funds value = { value = var:sol_location_total_income multiply = var:sol_location_liquid_funds_multiplier } }
+	set_variable = { name = sol_location_final_demand_scale value = 1 }
+	if = {
+		limit = { var:sol_location_base_total_spending > 0 }
+		set_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_liquid_funds divide = var:sol_location_base_total_spending min = 0 } }
+	}
+	set_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }
+	set_variable = { name = gls_location_avg_scale value = var:sol_location_final_demand_scale }
+	set_variable = { name = gls_location_sol_weighted value = { value = var:gls_location_avg_scale multiply = development } }
 }
 
-gls_update_location_map = {
-	# 设置地图着色所需的地点变量，对 AI 和人类国家均执行。
-	# 调用者：Pass A（所有国家，每年）
-	# root = country
+sol_update_local_pop_demand_modifiers = {
+	# root = country. Monthly country pulse applies one-month location modifiers.
+	gls_compute_savings_pressure = yes
 	if = {
 		limit = { num_locations > 0 }
 		every_owned_location = {
 			limit = { is_land = yes }
-			set_variable = {
-				name = gls_location_avg_scale
-				value = { add = local_average_gdp_per_capita_scale }
+			sol_compute_location_pop_demand = yes
+			add_location_modifier = {
+				modifier = sol_local_pop_demand_modifier
+				months = 1
+				mode = replace
+				size = var:sol_location_pop_demand_modifier_size
 			}
-			set_variable = {
-				name = gls_location_sol_weighted
-				value = {
-					value = var:gls_location_avg_scale
-					multiply = development
-				}
-			}
-			# Per-stratum scarcity scores are now cached on each market's hub location
-			# (market.location). See SOL_update_market_scarcity_scores in
-			# z_SOL_scarcity_score.txt — runs once per market in the situation's Pass 0,
-			# replacing the previous O(locations × 5 × 336) per-location work.
 		}
 	}
 	set_variable = { name = gls_map_cache_initialized value = 1 }
 }
 
+gls_update_location_map = {
+	# root = country. Rebuild display caches without waiting for pulse order.
+	gls_compute_savings_pressure = yes
+	if = { limit = { num_locations > 0 } every_owned_location = { limit = { is_land = yes } sol_compute_location_pop_demand = yes } }
+	set_variable = { name = gls_map_cache_initialized value = 1 }
+}
+
+gls_compute_panel_display = {
+	# root = country. Kept as the situation GUI entry point.
+	gls_compute_savings_pressure = yes
+}
+
 gls_accumulate_panel_stats = {
-	# 地点循环累加 + 聚合/SoL/需求计算，仅对人类国家执行。
-	# 依赖：gls_institution_bonus（由 gls_compute_panel_display 设置）。
-	# 调用者：Pass B 内年度条件块（人类，每年）
-	# root = country
+	# root = country. National version of the location demand calculation.
 	set_variable = { name = gls_location_count value = 0 }
 	set_variable = { name = gls_location_scale_sum value = 0 }
 	set_variable = { name = gls_country_wealth value = 0 }
 	set_variable = { name = gls_development_sum value = 0 }
 	set_variable = { name = gls_control_sum value = 0 }
-
-	set_variable = { name = gls_sum_nobles_offset value = 0 }
-	set_variable = { name = gls_sum_clergy_offset value = 0 }
-	set_variable = { name = gls_sum_burghers_offset value = 0 }
-	set_variable = { name = gls_sum_commoners_offset value = 0 }
-	set_variable = { name = gls_sum_tribesmen_offset value = 0 }
-	set_variable = { name = gls_sum_all_offset value = 0 }
-
-	# Per-group demand scale sums (Phase B loop → Phase G offsets)
-	# @GEN_BEGIN:phase_d_scales
-	set_variable = { name = gls_sum_nobles_basic_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_crude_goods_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_staple_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_condiments_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_heating_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_household_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_standard_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_intoxicants_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_luxury_drinks_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_luxury_food_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_luxury_goods_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_protein_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_spices_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_precious_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_treasures_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_medicine_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_ritual_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_weapons_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_mounts_scale value = 0 }
-	set_variable = { name = gls_sum_nobles_knowledge_scale value = 0 }
-
-	set_variable = { name = gls_sum_clergy_basic_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_crude_goods_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_staple_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_condiments_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_heating_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_household_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_standard_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_intoxicants_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_luxury_drinks_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_luxury_food_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_luxury_goods_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_protein_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_spices_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_medicine_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_ritual_scale value = 0 }
-	set_variable = { name = gls_sum_clergy_knowledge_scale value = 0 }
-
-	set_variable = { name = gls_sum_burghers_basic_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_crude_goods_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_staple_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_condiments_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_heating_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_household_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_standard_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_intoxicants_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_luxury_drinks_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_luxury_food_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_luxury_goods_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_protein_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_spices_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_precious_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_treasures_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_medicine_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_ritual_scale value = 0 }
-	set_variable = { name = gls_sum_burghers_knowledge_scale value = 0 }
-
-	set_variable = { name = gls_sum_commoners_basic_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_crude_goods_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_staple_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_condiments_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_heating_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_household_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_standard_clothing_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_intoxicants_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_luxury_drinks_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_luxury_food_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_protein_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_medicine_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_ritual_scale value = 0 }
-	set_variable = { name = gls_sum_commoners_weapons_scale value = 0 }
-# @GEN_END:phase_d_scales
-
 	set_variable = { name = gls_pop_nobles value = 0 }
 	set_variable = { name = gls_pop_clergy value = 0 }
 	set_variable = { name = gls_pop_burghers value = 0 }
 	set_variable = { name = gls_pop_commoners value = 0 }
 	set_variable = { name = gls_pop_tribesmen value = 0 }
 	set_variable = { name = gls_pop_all value = 0 }
+	set_variable = { name = gls_income_nobles value = 0 }
+	set_variable = { name = gls_income_clergy value = 0 }
+	set_variable = { name = gls_income_burghers value = 0 }
+	set_variable = { name = gls_income_commoners value = 0 }
+	set_variable = { name = gls_income_tribesmen value = 0 }
+	set_variable = { name = gls_total_income value = 0 }
+	set_variable = { name = gls_country_base_spending value = 0 }
+	set_variable = { name = gls_country_liquid_funds value = 0 }
+	set_variable = { name = gls_country_sol_all value = 1 }
+	set_variable = { name = gls_good_amber value = 0 }
+	set_variable = { name = gls_good_beer value = 0 }
+	set_variable = { name = gls_good_beeswax value = 0 }
+	set_variable = { name = gls_good_books value = 0 }
+	set_variable = { name = gls_good_chili value = 0 }
+	set_variable = { name = gls_good_cloth value = 0 }
+	set_variable = { name = gls_good_cloves value = 0 }
+	set_variable = { name = gls_good_coal value = 0 }
+	set_variable = { name = gls_good_cocoa value = 0 }
+	set_variable = { name = gls_good_coffee value = 0 }
+	set_variable = { name = gls_good_elephants value = 0 }
+	set_variable = { name = gls_good_fine_cloth value = 0 }
+	set_variable = { name = gls_good_firearms value = 0 }
+	set_variable = { name = gls_good_fish value = 0 }
+	set_variable = { name = gls_good_fruit value = 0 }
+	set_variable = { name = gls_good_fur value = 0 }
+	set_variable = { name = gls_good_furniture value = 0 }
+	set_variable = { name = gls_good_gems value = 0 }
+	set_variable = { name = gls_good_glass value = 0 }
+	set_variable = { name = gls_good_goods_gold value = 0 }
+	set_variable = { name = gls_good_horses value = 0 }
+	set_variable = { name = gls_good_incense value = 0 }
+	set_variable = { name = gls_good_ivory value = 0 }
+	set_variable = { name = gls_good_jewelry value = 0 }
+	set_variable = { name = gls_good_lacquerware value = 0 }
+	set_variable = { name = gls_good_leather value = 0 }
+	set_variable = { name = gls_good_legumes value = 0 }
+	set_variable = { name = gls_good_liquor value = 0 }
+	set_variable = { name = gls_good_livestock value = 0 }
+	set_variable = { name = gls_good_lumber value = 0 }
+	set_variable = { name = gls_good_maize value = 0 }
+	set_variable = { name = gls_good_marble value = 0 }
+	set_variable = { name = gls_good_masonry value = 0 }
+	set_variable = { name = gls_good_medicaments value = 0 }
+	set_variable = { name = gls_good_mercury value = 0 }
+	set_variable = { name = gls_good_millet value = 0 }
+	set_variable = { name = gls_good_olives value = 0 }
+	set_variable = { name = gls_good_paper value = 0 }
+	set_variable = { name = gls_good_pearls value = 0 }
+	set_variable = { name = gls_good_pepper value = 0 }
+	set_variable = { name = gls_good_porcelain value = 0 }
+	set_variable = { name = gls_good_potato value = 0 }
+	set_variable = { name = gls_good_pottery value = 0 }
+	set_variable = { name = gls_good_rice value = 0 }
+	set_variable = { name = gls_good_saffron value = 0 }
+	set_variable = { name = gls_good_salt value = 0 }
+	set_variable = { name = gls_good_silver value = 0 }
+	set_variable = { name = gls_good_sugar value = 0 }
+	set_variable = { name = gls_good_tea value = 0 }
+	set_variable = { name = gls_good_tobacco value = 0 }
+	set_variable = { name = gls_good_tools value = 0 }
+	set_variable = { name = gls_good_weaponry value = 0 }
+	set_variable = { name = gls_good_wheat value = 0 }
+	set_variable = { name = gls_good_wild_game value = 0 }
+	set_variable = { name = gls_good_wine value = 0 }
 
-	### --- Phase B: Location loop ---
+	save_scope_as = gls_panel_country
+	every_market_present_in_country = {
+		save_scope_as = gls_panel_market
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_amber
+				is_key_in_global_variable_map = { name = sol_market_consumes_amber target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_amber|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_amber value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_beer
+				is_key_in_global_variable_map = { name = sol_market_consumes_beer target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_beer|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_beer value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_beeswax
+				is_key_in_global_variable_map = { name = sol_market_consumes_beeswax target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_beeswax|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_beeswax value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_books
+				is_key_in_global_variable_map = { name = sol_market_consumes_books target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_books|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_books value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_chili
+				is_key_in_global_variable_map = { name = sol_market_consumes_chili target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_chili|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_chili value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_cloth
+				is_key_in_global_variable_map = { name = sol_market_consumes_cloth target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_cloth|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_cloth value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_cloves
+				is_key_in_global_variable_map = { name = sol_market_consumes_cloves target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_cloves|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_cloves value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_coal
+				is_key_in_global_variable_map = { name = sol_market_consumes_coal target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_coal|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_coal value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_cocoa
+				is_key_in_global_variable_map = { name = sol_market_consumes_cocoa target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_cocoa|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_cocoa value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_coffee
+				is_key_in_global_variable_map = { name = sol_market_consumes_coffee target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_coffee|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_coffee value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_elephants
+				is_key_in_global_variable_map = { name = sol_market_consumes_elephants target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_elephants|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_elephants value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_fine_cloth
+				is_key_in_global_variable_map = { name = sol_market_consumes_fine_cloth target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_fine_cloth|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_fine_cloth value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_firearms
+				is_key_in_global_variable_map = { name = sol_market_consumes_firearms target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_firearms|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_firearms value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_fish
+				is_key_in_global_variable_map = { name = sol_market_consumes_fish target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_fish|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_fish value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_fruit
+				is_key_in_global_variable_map = { name = sol_market_consumes_fruit target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_fruit|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_fruit value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_fur
+				is_key_in_global_variable_map = { name = sol_market_consumes_fur target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_fur|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_fur value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_furniture
+				is_key_in_global_variable_map = { name = sol_market_consumes_furniture target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_furniture|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_furniture value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_gems
+				is_key_in_global_variable_map = { name = sol_market_consumes_gems target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_gems|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_gems value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_glass
+				is_key_in_global_variable_map = { name = sol_market_consumes_glass target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_glass|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_glass value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_goods_gold
+				is_key_in_global_variable_map = { name = sol_market_consumes_goods_gold target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_goods_gold|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_goods_gold value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_horses
+				is_key_in_global_variable_map = { name = sol_market_consumes_horses target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_horses|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_horses value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_incense
+				is_key_in_global_variable_map = { name = sol_market_consumes_incense target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_incense|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_incense value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_ivory
+				is_key_in_global_variable_map = { name = sol_market_consumes_ivory target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_ivory|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_ivory value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_jewelry
+				is_key_in_global_variable_map = { name = sol_market_consumes_jewelry target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_jewelry|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_jewelry value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_lacquerware
+				is_key_in_global_variable_map = { name = sol_market_consumes_lacquerware target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_lacquerware|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_lacquerware value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_leather
+				is_key_in_global_variable_map = { name = sol_market_consumes_leather target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_leather|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_leather value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_legumes
+				is_key_in_global_variable_map = { name = sol_market_consumes_legumes target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_legumes|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_legumes value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_liquor
+				is_key_in_global_variable_map = { name = sol_market_consumes_liquor target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_liquor|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_liquor value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_livestock
+				is_key_in_global_variable_map = { name = sol_market_consumes_livestock target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_livestock|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_livestock value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_lumber
+				is_key_in_global_variable_map = { name = sol_market_consumes_lumber target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_lumber|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_lumber value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_maize
+				is_key_in_global_variable_map = { name = sol_market_consumes_maize target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_maize|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_maize value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_marble
+				is_key_in_global_variable_map = { name = sol_market_consumes_marble target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_marble|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_marble value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_masonry
+				is_key_in_global_variable_map = { name = sol_market_consumes_masonry target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_masonry|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_masonry value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_medicaments
+				is_key_in_global_variable_map = { name = sol_market_consumes_medicaments target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_medicaments|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_medicaments value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_mercury
+				is_key_in_global_variable_map = { name = sol_market_consumes_mercury target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_mercury|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_mercury value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_millet
+				is_key_in_global_variable_map = { name = sol_market_consumes_millet target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_millet|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_millet value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_olives
+				is_key_in_global_variable_map = { name = sol_market_consumes_olives target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_olives|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_olives value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_paper
+				is_key_in_global_variable_map = { name = sol_market_consumes_paper target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_paper|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_paper value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_pearls
+				is_key_in_global_variable_map = { name = sol_market_consumes_pearls target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_pearls|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_pearls value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_pepper
+				is_key_in_global_variable_map = { name = sol_market_consumes_pepper target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_pepper|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_pepper value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_porcelain
+				is_key_in_global_variable_map = { name = sol_market_consumes_porcelain target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_porcelain|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_porcelain value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_potato
+				is_key_in_global_variable_map = { name = sol_market_consumes_potato target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_potato|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_potato value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_pottery
+				is_key_in_global_variable_map = { name = sol_market_consumes_pottery target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_pottery|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_pottery value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_rice
+				is_key_in_global_variable_map = { name = sol_market_consumes_rice target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_rice|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_rice value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_saffron
+				is_key_in_global_variable_map = { name = sol_market_consumes_saffron target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_saffron|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_saffron value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_salt
+				is_key_in_global_variable_map = { name = sol_market_consumes_salt target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_salt|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_salt value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_silver
+				is_key_in_global_variable_map = { name = sol_market_consumes_silver target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_silver|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_silver value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_sugar
+				is_key_in_global_variable_map = { name = sol_market_consumes_sugar target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_sugar|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_sugar value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_tea
+				is_key_in_global_variable_map = { name = sol_market_consumes_tea target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_tea|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_tea value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_tobacco
+				is_key_in_global_variable_map = { name = sol_market_consumes_tobacco target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_tobacco|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_tobacco value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_tools
+				is_key_in_global_variable_map = { name = sol_market_consumes_tools target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_tools|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_tools value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_weaponry
+				is_key_in_global_variable_map = { name = sol_market_consumes_weaponry target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_weaponry|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_weaponry value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_wheat
+				is_key_in_global_variable_map = { name = sol_market_consumes_wheat target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_wheat|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_wheat value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_wild_game
+				is_key_in_global_variable_map = { name = sol_market_consumes_wild_game target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_wild_game|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_wild_game value = 1 } }
+		}
+		if = {
+			limit = {
+				has_global_variable_map = sol_market_consumes_wine
+				is_key_in_global_variable_map = { name = sol_market_consumes_wine target = scope:gls_panel_market }
+				"global_variable_map(sol_market_consumes_wine|scope:gls_panel_market)" > 0
+			}
+			scope:gls_panel_country = { set_variable = { name = gls_good_wine value = 1 } }
+		}
+	}
+
 	if = {
 		limit = { num_locations > 0 }
 		every_owned_location = {
 			limit = { is_land = yes }
+			sol_compute_location_pop_demand = yes
 			save_scope_as = gls_cached_location
-
 			owner = {
 				change_variable = { name = gls_location_count add = 1 }
-				change_variable = { name = gls_location_scale_sum add = prev.var:gls_location_avg_scale }
+				change_variable = { name = gls_location_scale_sum add = scope:gls_cached_location.local_sol_pop_demand_scale }
 				change_variable = { name = gls_country_wealth add = scope:gls_cached_location.local_wealth_display }
 				change_variable = { name = gls_development_sum add = scope:gls_cached_location.development }
 				change_variable = { name = gls_control_sum add = scope:gls_cached_location.local_control }
-			}
-
-			if = {
-				limit = { num_pop_type:nobles > 0 }
-				owner = {
-					change_variable = {
-						name = gls_sum_nobles_offset
-						add = {
-							value = scope:gls_cached_location.local_nobles_savings_pressure
-							multiply = scope:gls_cached_location.num_pop_type:nobles
-						}
-					}
-					change_variable = { name = gls_pop_nobles add = scope:gls_cached_location.num_pop_type:nobles }
-					# @GEN_BEGIN:phase_b_nobles
-					change_variable = { name = gls_sum_nobles_basic_clothing_scale   add = { value = scope:gls_cached_location.local_nobles_basic_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_crude_goods_scale   add = { value = scope:gls_cached_location.local_nobles_crude_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_staple_scale   add = { value = scope:gls_cached_location.local_nobles_staple_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_condiments_scale   add = { value = scope:gls_cached_location.local_nobles_condiments_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_heating_scale   add = { value = scope:gls_cached_location.local_nobles_heating_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_household_scale   add = { value = scope:gls_cached_location.local_nobles_household_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_standard_clothing_scale   add = { value = scope:gls_cached_location.local_nobles_standard_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_intoxicants_scale   add = { value = scope:gls_cached_location.local_nobles_intoxicants_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_luxury_drinks_scale   add = { value = scope:gls_cached_location.local_nobles_luxury_drinks_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_luxury_food_scale   add = { value = scope:gls_cached_location.local_nobles_luxury_food_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_luxury_goods_scale   add = { value = scope:gls_cached_location.local_nobles_luxury_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_protein_scale   add = { value = scope:gls_cached_location.local_nobles_protein_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_spices_scale   add = { value = scope:gls_cached_location.local_nobles_spices_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_precious_scale   add = { value = scope:gls_cached_location.local_nobles_precious_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_treasures_scale   add = { value = scope:gls_cached_location.local_nobles_treasures_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_medicine_scale   add = { value = scope:gls_cached_location.local_nobles_medicine_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_ritual_scale   add = { value = scope:gls_cached_location.local_nobles_ritual_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_weapons_scale   add = { value = scope:gls_cached_location.local_nobles_weapons_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_mounts_scale   add = { value = scope:gls_cached_location.local_nobles_mounts_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }
-					change_variable = { name = gls_sum_nobles_knowledge_scale   add = { value = scope:gls_cached_location.local_nobles_knowledge_demand_scale   multiply = scope:gls_cached_location.num_pop_type:nobles } }# @GEN_END:phase_b_nobles
-				}
-			}
-
-			if = {
-				limit = { num_pop_type:clergy > 0 }
-				owner = {
-					change_variable = {
-						name = gls_sum_clergy_offset
-						add = {
-							value = scope:gls_cached_location.local_clergy_savings_pressure
-							multiply = scope:gls_cached_location.num_pop_type:clergy
-						}
-					}
-					change_variable = { name = gls_pop_clergy add = scope:gls_cached_location.num_pop_type:clergy }
-					# @GEN_BEGIN:phase_b_clergy
-					change_variable = { name = gls_sum_clergy_basic_clothing_scale   add = { value = scope:gls_cached_location.local_clergy_basic_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_crude_goods_scale   add = { value = scope:gls_cached_location.local_clergy_crude_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_staple_scale   add = { value = scope:gls_cached_location.local_clergy_staple_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_condiments_scale   add = { value = scope:gls_cached_location.local_clergy_condiments_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_heating_scale   add = { value = scope:gls_cached_location.local_clergy_heating_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_household_scale   add = { value = scope:gls_cached_location.local_clergy_household_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_standard_clothing_scale   add = { value = scope:gls_cached_location.local_clergy_standard_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_intoxicants_scale   add = { value = scope:gls_cached_location.local_clergy_intoxicants_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_luxury_drinks_scale   add = { value = scope:gls_cached_location.local_clergy_luxury_drinks_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_luxury_food_scale   add = { value = scope:gls_cached_location.local_clergy_luxury_food_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_luxury_goods_scale   add = { value = scope:gls_cached_location.local_clergy_luxury_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_protein_scale   add = { value = scope:gls_cached_location.local_clergy_protein_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_spices_scale   add = { value = scope:gls_cached_location.local_clergy_spices_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_medicine_scale   add = { value = scope:gls_cached_location.local_clergy_medicine_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_ritual_scale   add = { value = scope:gls_cached_location.local_clergy_ritual_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }
-					change_variable = { name = gls_sum_clergy_knowledge_scale   add = { value = scope:gls_cached_location.local_clergy_knowledge_demand_scale   multiply = scope:gls_cached_location.num_pop_type:clergy } }# @GEN_END:phase_b_clergy
-				}
-			}
-
-			if = {
-				limit = { num_pop_type:burghers > 0 }
-				owner = {
-					change_variable = {
-						name = gls_sum_burghers_offset
-						add = {
-							value = scope:gls_cached_location.local_burghers_savings_pressure
-							multiply = scope:gls_cached_location.num_pop_type:burghers
-						}
-					}
-					change_variable = { name = gls_pop_burghers add = scope:gls_cached_location.num_pop_type:burghers }
-					# @GEN_BEGIN:phase_b_burghers
-					change_variable = { name = gls_sum_burghers_basic_clothing_scale   add = { value = scope:gls_cached_location.local_burghers_basic_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_crude_goods_scale   add = { value = scope:gls_cached_location.local_burghers_crude_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_staple_scale   add = { value = scope:gls_cached_location.local_burghers_staple_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_condiments_scale   add = { value = scope:gls_cached_location.local_burghers_condiments_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_heating_scale   add = { value = scope:gls_cached_location.local_burghers_heating_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_household_scale   add = { value = scope:gls_cached_location.local_burghers_household_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_standard_clothing_scale   add = { value = scope:gls_cached_location.local_burghers_standard_clothing_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_intoxicants_scale   add = { value = scope:gls_cached_location.local_burghers_intoxicants_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_luxury_drinks_scale   add = { value = scope:gls_cached_location.local_burghers_luxury_drinks_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_luxury_food_scale   add = { value = scope:gls_cached_location.local_burghers_luxury_food_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_luxury_goods_scale   add = { value = scope:gls_cached_location.local_burghers_luxury_goods_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_protein_scale   add = { value = scope:gls_cached_location.local_burghers_protein_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_spices_scale   add = { value = scope:gls_cached_location.local_burghers_spices_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_precious_scale   add = { value = scope:gls_cached_location.local_burghers_precious_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_treasures_scale   add = { value = scope:gls_cached_location.local_burghers_treasures_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_medicine_scale   add = { value = scope:gls_cached_location.local_burghers_medicine_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_ritual_scale   add = { value = scope:gls_cached_location.local_burghers_ritual_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }
-					change_variable = { name = gls_sum_burghers_knowledge_scale   add = { value = scope:gls_cached_location.local_burghers_knowledge_demand_scale   multiply = scope:gls_cached_location.num_pop_type:burghers } }# @GEN_END:phase_b_burghers
-				}
-			}
-
-			if = {
-				limit = { local_commoner_population > 0 }
-				owner = {
-					change_variable = {
-						name = gls_sum_commoners_offset
-						add = {
-							value = scope:gls_cached_location.local_commoner_savings_pressure
-							multiply = scope:gls_cached_location.local_commoner_population
-						}
-					}
-					change_variable = { name = gls_pop_commoners add = scope:gls_cached_location.local_commoner_population }
-					# @GEN_BEGIN:phase_b_commoners
-					change_variable = { name = gls_sum_commoners_basic_clothing_scale   add = { value = scope:gls_cached_location.local_commoners_basic_clothing_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_crude_goods_scale   add = { value = scope:gls_cached_location.local_commoners_crude_goods_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_staple_scale   add = { value = scope:gls_cached_location.local_commoners_staple_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_condiments_scale   add = { value = scope:gls_cached_location.local_commoners_condiments_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_heating_scale   add = { value = scope:gls_cached_location.local_commoners_heating_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_household_scale   add = { value = scope:gls_cached_location.local_commoners_household_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_standard_clothing_scale   add = { value = scope:gls_cached_location.local_commoners_standard_clothing_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_intoxicants_scale   add = { value = scope:gls_cached_location.local_commoners_intoxicants_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_luxury_drinks_scale   add = { value = scope:gls_cached_location.local_commoners_luxury_drinks_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_luxury_food_scale   add = { value = scope:gls_cached_location.local_commoners_luxury_food_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_protein_scale   add = { value = scope:gls_cached_location.local_commoners_protein_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_medicine_scale   add = { value = scope:gls_cached_location.local_commoners_medicine_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_ritual_scale   add = { value = scope:gls_cached_location.local_commoners_ritual_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }
-					change_variable = { name = gls_sum_commoners_weapons_scale   add = { value = scope:gls_cached_location.local_commoners_weapons_demand_scale   multiply = scope:gls_cached_location.local_commoner_population } }# @GEN_END:phase_b_commoners
-				}
-			}
-
-			if = {
-				limit = { num_pop_type:tribesmen > 0 }
-				owner = {
-					change_variable = {
-						name = gls_sum_tribesmen_offset
-						add = {
-							value = scope:gls_cached_location.local_tribesmen_savings_pressure
-							multiply = scope:gls_cached_location.num_pop_type:tribesmen
-						}
-					}
-					change_variable = { name = gls_pop_tribesmen add = scope:gls_cached_location.num_pop_type:tribesmen }
-				}
+				change_variable = { name = gls_pop_nobles add = scope:gls_cached_location.num_pop_type:nobles }
+				change_variable = { name = gls_pop_clergy add = scope:gls_cached_location.num_pop_type:clergy }
+				change_variable = { name = gls_pop_burghers add = scope:gls_cached_location.num_pop_type:burghers }
+				change_variable = { name = gls_pop_commoners add = scope:gls_cached_location.local_commoner_population }
+				change_variable = { name = gls_pop_tribesmen add = scope:gls_cached_location.num_pop_type:tribesmen }
+				change_variable = { name = gls_pop_all add = scope:gls_cached_location.local_sol_population_sum }
+				change_variable = { name = gls_income_nobles add = scope:gls_cached_location.local_sol_nobles_income_display }
+				change_variable = { name = gls_income_clergy add = scope:gls_cached_location.local_sol_clergy_income_display }
+				change_variable = { name = gls_income_burghers add = scope:gls_cached_location.local_sol_burghers_income_display }
+				change_variable = { name = gls_income_commoners add = scope:gls_cached_location.local_sol_commoners_income_display }
+				change_variable = { name = gls_income_tribesmen add = scope:gls_cached_location.local_sol_tribesmen_income_display }
+				change_variable = { name = gls_total_income add = scope:gls_cached_location.local_sol_total_income }
+				change_variable = { name = gls_country_base_spending add = scope:gls_cached_location.local_sol_base_spending_display }
+				change_variable = { name = gls_country_liquid_funds add = scope:gls_cached_location.local_sol_liquid_funds_display }
 			}
 		}
 	}
-
-	### --- Phase C: Post-loop averages ---
-	set_variable = {
-		name = gls_pop_all
-		value = {
-			add = var:gls_pop_nobles
-			add = var:gls_pop_clergy
-			add = var:gls_pop_burghers
-			add = var:gls_pop_commoners
-			add = var:gls_pop_tribesmen
-		}
-	}
-
-	set_variable = {
-		name = gls_sum_all_offset
-		value = {
-			add = var:gls_sum_nobles_offset
-			add = var:gls_sum_clergy_offset
-			add = var:gls_sum_burghers_offset
-			add = var:gls_sum_commoners_offset
-			add = var:gls_sum_tribesmen_offset
-		}
-	}
-
-	set_variable = { name = gls_country_location_avg_scale value = 0 }
-	if = {
-		limit = { var:gls_location_count > 0 }
-		set_variable = {
-			name = gls_country_location_avg_scale
-			value = {
-				add = var:gls_location_scale_sum
-				divide = var:gls_location_count
-			}
-		}
-	}
-
-	set_variable = { name = gls_avg_development value = 0 }
-	if = {
-		limit = { var:gls_location_count > 0 }
-		set_variable = {
-			name = gls_avg_development
-			value = {
-				add = var:gls_development_sum
-				divide = var:gls_location_count
-			}
-		}
-	}
-
-	set_variable = { name = gls_avg_control value = 0 }
-	if = {
-		limit = { var:gls_location_count > 0 }
-		set_variable = {
-			name = gls_avg_control
-			value = {
-				add = var:gls_control_sum
-				divide = var:gls_location_count
-			}
-		}
-	}
-
-	### --- Phase D: Per-estate SoL ---
-	set_variable = { name = gls_country_sol_nobles value = 0 }
-	if = {
-		limit = { var:gls_pop_nobles > 0 }
-		set_variable = {
-			name = gls_country_sol_nobles
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_nobles_offset
-					divide = var:gls_pop_nobles
-				}
-			}
-		}
-	}
-
-	set_variable = { name = gls_country_sol_clergy value = 0 }
-	if = {
-		limit = { var:gls_pop_clergy > 0 }
-		set_variable = {
-			name = gls_country_sol_clergy
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_clergy_offset
-					divide = var:gls_pop_clergy
-				}
-			}
-		}
-	}
-
-	set_variable = { name = gls_country_sol_burghers value = 0 }
-	if = {
-		limit = { var:gls_pop_burghers > 0 }
-		set_variable = {
-			name = gls_country_sol_burghers
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_burghers_offset
-					divide = var:gls_pop_burghers
-				}
-			}
-		}
-	}
-
-	set_variable = { name = gls_country_sol_commoners value = 0 }
-	if = {
-		limit = { var:gls_pop_commoners > 0 }
-		set_variable = {
-			name = gls_country_sol_commoners
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_commoners_offset
-					divide = var:gls_pop_commoners
-				}
-			}
-		}
-	}
-
-	set_variable = { name = gls_country_sol_tribesmen value = 0 }
-	if = {
-		limit = { var:gls_pop_tribesmen > 0 }
-		set_variable = {
-			name = gls_country_sol_tribesmen
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_tribesmen_offset
-					divide = var:gls_pop_tribesmen
-				}
-			}
-		}
-	}
-
-	set_variable = { name = gls_country_sol_all value = 0 }
-	if = {
-		limit = { var:gls_pop_all > 0 }
-		set_variable = {
-			name = gls_country_sol_all
-			value = {
-				add = 1
-				add = {
-					value = var:gls_sum_all_offset
-					divide = var:gls_pop_all
-				}
-			}
-		}
-	}
-
-	### --- Phase E: Nonlinear income component ---
-	# Nonlinear income component per estate (= sol - 1 - savings_pressure).
-	# Derived after per-estate SOL is known; monthly cache must run first.
-	set_variable = {
-		name = gls_nobles_nonlinear
-		value = {
-			value = 0
-			if = {
-				limit = { has_variable = gls_country_sol_nobles }
-				add = var:gls_country_sol_nobles
-				subtract = 1
-				if = {
-					limit = { has_variable = gls_nobles_savings_pressure }
-					subtract = var:gls_nobles_savings_pressure
-				}
-			}
-		}
-	}
-	set_variable = {
-		name = gls_clergy_nonlinear
-		value = {
-			value = 0
-			if = {
-				limit = { has_variable = gls_country_sol_clergy }
-				add = var:gls_country_sol_clergy
-				subtract = 1
-				if = {
-					limit = { has_variable = gls_clergy_savings_pressure }
-					subtract = var:gls_clergy_savings_pressure
-				}
-			}
-		}
-	}
-	set_variable = {
-		name = gls_burghers_nonlinear
-		value = {
-			value = 0
-			if = {
-				limit = { has_variable = gls_country_sol_burghers }
-				add = var:gls_country_sol_burghers
-				subtract = 1
-				if = {
-					limit = { has_variable = gls_burghers_savings_pressure }
-					subtract = var:gls_burghers_savings_pressure
-				}
-			}
-		}
-	}
-	set_variable = {
-		name = gls_commoner_nonlinear
-		value = {
-			value = 0
-			if = {
-				limit = { has_variable = gls_country_sol_commoners }
-				add = var:gls_country_sol_commoners
-				subtract = 1
-				if = {
-					limit = { has_variable = gls_commoner_savings_pressure }
-					subtract = var:gls_commoner_savings_pressure
-				}
-			}
-		}
-	}
-	set_variable = {
-		name = gls_tribesmen_nonlinear
-		value = {
-			value = 0
-			if = {
-				limit = { has_variable = gls_country_sol_tribesmen }
-				add = var:gls_country_sol_tribesmen
-				subtract = 1
-				if = {
-					limit = { has_variable = gls_tribesmen_savings_pressure }
-					subtract = var:gls_tribesmen_savings_pressure
-				}
-			}
-		}
-	}
-
-	### --- Phase G: Per-group demand scale offsets (country average) ---
-	# offset = (Σ scale_i × pop_i) / Σ pop_i  − 1
-	# Displayed as signed % in the GLS panel (|+=0% format).
-	# @GEN_BEGIN:phase_g_nobles
-	set_variable = { name = gls_nobles_basic_clothing_offset    value = 0 }
-	set_variable = { name = gls_nobles_crude_goods_offset    value = 0 }
-	set_variable = { name = gls_nobles_staple_offset    value = 0 }
-	set_variable = { name = gls_nobles_condiments_offset    value = 0 }
-	set_variable = { name = gls_nobles_heating_offset    value = 0 }
-	set_variable = { name = gls_nobles_household_offset    value = 0 }
-	set_variable = { name = gls_nobles_standard_clothing_offset    value = 0 }
-	set_variable = { name = gls_nobles_intoxicants_offset    value = 0 }
-	set_variable = { name = gls_nobles_luxury_drinks_offset    value = 0 }
-	set_variable = { name = gls_nobles_luxury_food_offset    value = 0 }
-	set_variable = { name = gls_nobles_luxury_goods_offset    value = 0 }
-	set_variable = { name = gls_nobles_protein_offset    value = 0 }
-	set_variable = { name = gls_nobles_spices_offset    value = 0 }
-	set_variable = { name = gls_nobles_precious_offset    value = 0 }
-	set_variable = { name = gls_nobles_treasures_offset    value = 0 }
-	set_variable = { name = gls_nobles_medicine_offset    value = 0 }
-	set_variable = { name = gls_nobles_ritual_offset    value = 0 }
-	set_variable = { name = gls_nobles_weapons_offset    value = 0 }
-	set_variable = { name = gls_nobles_mounts_offset    value = 0 }
-	set_variable = { name = gls_nobles_knowledge_offset    value = 0 }
-	if = {
-		limit = { var:gls_pop_nobles > 0 }
-		set_variable = { name = gls_nobles_basic_clothing_offset    value = { add = var:gls_sum_nobles_basic_clothing_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_crude_goods_offset    value = { add = var:gls_sum_nobles_crude_goods_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_staple_offset    value = { add = var:gls_sum_nobles_staple_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_condiments_offset    value = { add = var:gls_sum_nobles_condiments_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_heating_offset    value = { add = var:gls_sum_nobles_heating_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_household_offset    value = { add = var:gls_sum_nobles_household_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_standard_clothing_offset    value = { add = var:gls_sum_nobles_standard_clothing_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_intoxicants_offset    value = { add = var:gls_sum_nobles_intoxicants_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_luxury_drinks_offset    value = { add = var:gls_sum_nobles_luxury_drinks_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_luxury_food_offset    value = { add = var:gls_sum_nobles_luxury_food_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_luxury_goods_offset    value = { add = var:gls_sum_nobles_luxury_goods_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_protein_offset    value = { add = var:gls_sum_nobles_protein_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_spices_offset    value = { add = var:gls_sum_nobles_spices_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_precious_offset    value = { add = var:gls_sum_nobles_precious_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_treasures_offset    value = { add = var:gls_sum_nobles_treasures_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_medicine_offset    value = { add = var:gls_sum_nobles_medicine_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_ritual_offset    value = { add = var:gls_sum_nobles_ritual_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_weapons_offset    value = { add = var:gls_sum_nobles_weapons_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_mounts_offset    value = { add = var:gls_sum_nobles_mounts_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-		set_variable = { name = gls_nobles_knowledge_offset    value = { add = var:gls_sum_nobles_knowledge_scale    divide = var:gls_pop_nobles  subtract = 1 } }
-	}# @GEN_END:phase_g_nobles
-
-	# @GEN_BEGIN:phase_g_clergy
-	set_variable = { name = gls_clergy_basic_clothing_offset    value = 0 }
-	set_variable = { name = gls_clergy_crude_goods_offset    value = 0 }
-	set_variable = { name = gls_clergy_staple_offset    value = 0 }
-	set_variable = { name = gls_clergy_condiments_offset    value = 0 }
-	set_variable = { name = gls_clergy_heating_offset    value = 0 }
-	set_variable = { name = gls_clergy_household_offset    value = 0 }
-	set_variable = { name = gls_clergy_standard_clothing_offset    value = 0 }
-	set_variable = { name = gls_clergy_intoxicants_offset    value = 0 }
-	set_variable = { name = gls_clergy_luxury_drinks_offset    value = 0 }
-	set_variable = { name = gls_clergy_luxury_food_offset    value = 0 }
-	set_variable = { name = gls_clergy_luxury_goods_offset    value = 0 }
-	set_variable = { name = gls_clergy_protein_offset    value = 0 }
-	set_variable = { name = gls_clergy_spices_offset    value = 0 }
-	set_variable = { name = gls_clergy_medicine_offset    value = 0 }
-	set_variable = { name = gls_clergy_ritual_offset    value = 0 }
-	set_variable = { name = gls_clergy_knowledge_offset    value = 0 }
-	if = {
-		limit = { var:gls_pop_clergy > 0 }
-		set_variable = { name = gls_clergy_basic_clothing_offset    value = { add = var:gls_sum_clergy_basic_clothing_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_crude_goods_offset    value = { add = var:gls_sum_clergy_crude_goods_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_staple_offset    value = { add = var:gls_sum_clergy_staple_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_condiments_offset    value = { add = var:gls_sum_clergy_condiments_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_heating_offset    value = { add = var:gls_sum_clergy_heating_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_household_offset    value = { add = var:gls_sum_clergy_household_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_standard_clothing_offset    value = { add = var:gls_sum_clergy_standard_clothing_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_intoxicants_offset    value = { add = var:gls_sum_clergy_intoxicants_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_luxury_drinks_offset    value = { add = var:gls_sum_clergy_luxury_drinks_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_luxury_food_offset    value = { add = var:gls_sum_clergy_luxury_food_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_luxury_goods_offset    value = { add = var:gls_sum_clergy_luxury_goods_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_protein_offset    value = { add = var:gls_sum_clergy_protein_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_spices_offset    value = { add = var:gls_sum_clergy_spices_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_medicine_offset    value = { add = var:gls_sum_clergy_medicine_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_ritual_offset    value = { add = var:gls_sum_clergy_ritual_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-		set_variable = { name = gls_clergy_knowledge_offset    value = { add = var:gls_sum_clergy_knowledge_scale    divide = var:gls_pop_clergy  subtract = 1 } }
-	}# @GEN_END:phase_g_clergy
-
-	# @GEN_BEGIN:phase_g_burghers
-	set_variable = { name = gls_burghers_basic_clothing_offset    value = 0 }
-	set_variable = { name = gls_burghers_crude_goods_offset    value = 0 }
-	set_variable = { name = gls_burghers_staple_offset    value = 0 }
-	set_variable = { name = gls_burghers_condiments_offset    value = 0 }
-	set_variable = { name = gls_burghers_heating_offset    value = 0 }
-	set_variable = { name = gls_burghers_household_offset    value = 0 }
-	set_variable = { name = gls_burghers_standard_clothing_offset    value = 0 }
-	set_variable = { name = gls_burghers_intoxicants_offset    value = 0 }
-	set_variable = { name = gls_burghers_luxury_drinks_offset    value = 0 }
-	set_variable = { name = gls_burghers_luxury_food_offset    value = 0 }
-	set_variable = { name = gls_burghers_luxury_goods_offset    value = 0 }
-	set_variable = { name = gls_burghers_protein_offset    value = 0 }
-	set_variable = { name = gls_burghers_spices_offset    value = 0 }
-	set_variable = { name = gls_burghers_precious_offset    value = 0 }
-	set_variable = { name = gls_burghers_treasures_offset    value = 0 }
-	set_variable = { name = gls_burghers_medicine_offset    value = 0 }
-	set_variable = { name = gls_burghers_ritual_offset    value = 0 }
-	set_variable = { name = gls_burghers_knowledge_offset    value = 0 }
-	if = {
-		limit = { var:gls_pop_burghers > 0 }
-		set_variable = { name = gls_burghers_basic_clothing_offset    value = { add = var:gls_sum_burghers_basic_clothing_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_crude_goods_offset    value = { add = var:gls_sum_burghers_crude_goods_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_staple_offset    value = { add = var:gls_sum_burghers_staple_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_condiments_offset    value = { add = var:gls_sum_burghers_condiments_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_heating_offset    value = { add = var:gls_sum_burghers_heating_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_household_offset    value = { add = var:gls_sum_burghers_household_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_standard_clothing_offset    value = { add = var:gls_sum_burghers_standard_clothing_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_intoxicants_offset    value = { add = var:gls_sum_burghers_intoxicants_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_luxury_drinks_offset    value = { add = var:gls_sum_burghers_luxury_drinks_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_luxury_food_offset    value = { add = var:gls_sum_burghers_luxury_food_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_luxury_goods_offset    value = { add = var:gls_sum_burghers_luxury_goods_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_protein_offset    value = { add = var:gls_sum_burghers_protein_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_spices_offset    value = { add = var:gls_sum_burghers_spices_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_precious_offset    value = { add = var:gls_sum_burghers_precious_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_treasures_offset    value = { add = var:gls_sum_burghers_treasures_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_medicine_offset    value = { add = var:gls_sum_burghers_medicine_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_ritual_offset    value = { add = var:gls_sum_burghers_ritual_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-		set_variable = { name = gls_burghers_knowledge_offset    value = { add = var:gls_sum_burghers_knowledge_scale    divide = var:gls_pop_burghers  subtract = 1 } }
-	}# @GEN_END:phase_g_burghers
-
-	# @GEN_BEGIN:phase_g_commoners
-	set_variable = { name = gls_commoners_basic_clothing_offset    value = 0 }
-	set_variable = { name = gls_commoners_crude_goods_offset    value = 0 }
-	set_variable = { name = gls_commoners_staple_offset    value = 0 }
-	set_variable = { name = gls_commoners_condiments_offset    value = 0 }
-	set_variable = { name = gls_commoners_heating_offset    value = 0 }
-	set_variable = { name = gls_commoners_household_offset    value = 0 }
-	set_variable = { name = gls_commoners_standard_clothing_offset    value = 0 }
-	set_variable = { name = gls_commoners_intoxicants_offset    value = 0 }
-	set_variable = { name = gls_commoners_luxury_drinks_offset    value = 0 }
-	set_variable = { name = gls_commoners_luxury_food_offset    value = 0 }
-	set_variable = { name = gls_commoners_protein_offset    value = 0 }
-	set_variable = { name = gls_commoners_medicine_offset    value = 0 }
-	set_variable = { name = gls_commoners_ritual_offset    value = 0 }
-	set_variable = { name = gls_commoners_weapons_offset    value = 0 }
-	if = {
-		limit = { var:gls_pop_commoners > 0 }
-		set_variable = { name = gls_commoners_basic_clothing_offset    value = { add = var:gls_sum_commoners_basic_clothing_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_crude_goods_offset    value = { add = var:gls_sum_commoners_crude_goods_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_staple_offset    value = { add = var:gls_sum_commoners_staple_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_condiments_offset    value = { add = var:gls_sum_commoners_condiments_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_heating_offset    value = { add = var:gls_sum_commoners_heating_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_household_offset    value = { add = var:gls_sum_commoners_household_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_standard_clothing_offset    value = { add = var:gls_sum_commoners_standard_clothing_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_intoxicants_offset    value = { add = var:gls_sum_commoners_intoxicants_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_luxury_drinks_offset    value = { add = var:gls_sum_commoners_luxury_drinks_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_luxury_food_offset    value = { add = var:gls_sum_commoners_luxury_food_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_protein_offset    value = { add = var:gls_sum_commoners_protein_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_medicine_offset    value = { add = var:gls_sum_commoners_medicine_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_ritual_offset    value = { add = var:gls_sum_commoners_ritual_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-		set_variable = { name = gls_commoners_weapons_offset    value = { add = var:gls_sum_commoners_weapons_scale    divide = var:gls_pop_commoners  subtract = 1 } }
-	}# @GEN_END:phase_g_commoners
-
-	### --- Phase F: Demand deviation ---
-	# Demand deviation per estate = sol_<estate> × (avg_development / 10) - 1
-	# Stored as offset from baseline (0 = neutral); displayed as signed %.
-	set_variable = {
-		name = gls_demand_nobles
-		value = {
-			value = 0
-			if = {
-				limit = { var:gls_pop_nobles > 0 }
-				add = var:gls_country_sol_nobles
-				if = {
-					limit = { var:gls_avg_development > 0 }
-					multiply = var:gls_avg_development
-					divide = 10
-				}
-				subtract = 1
-			}
-		}
-	}
-	set_variable = {
-		name = gls_demand_clergy
-		value = {
-			value = 0
-			if = {
-				limit = { var:gls_pop_clergy > 0 }
-				add = var:gls_country_sol_clergy
-				if = {
-					limit = { var:gls_avg_development > 0 }
-					multiply = var:gls_avg_development
-					divide = 10
-				}
-				subtract = 1
-			}
-		}
-	}
-	set_variable = {
-		name = gls_demand_burghers
-		value = {
-			value = 0
-			if = {
-				limit = { var:gls_pop_burghers > 0 }
-				add = var:gls_country_sol_burghers
-				if = {
-					limit = { var:gls_avg_development > 0 }
-					multiply = var:gls_avg_development
-					divide = 10
-				}
-				subtract = 1
-			}
-		}
-	}
-	set_variable = {
-		name = gls_demand_commoners
-		value = {
-			value = 0
-			if = {
-				limit = { var:gls_pop_commoners > 0 }
-				add = var:gls_country_sol_commoners
-				if = {
-					limit = { var:gls_avg_development > 0 }
-					multiply = var:gls_avg_development
-					divide = 10
-				}
-				subtract = 1
-			}
-		}
-	}
-	set_variable = {
-		name = gls_demand_tribesmen
-		value = {
-			value = 0
-			if = {
-				limit = { var:gls_pop_tribesmen > 0 }
-				add = var:gls_country_sol_tribesmen
-				if = {
-					limit = { var:gls_avg_development > 0 }
-					multiply = var:gls_avg_development
-					divide = 10
-				}
-				subtract = 1
-			}
-		}
-	}
-
-	# Pop counts stored as raw game units; GUI appends "K" for display.
+	if = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_location_avg_scale value = { add = var:gls_location_scale_sum divide = var:gls_location_count } } set_variable = { name = gls_avg_development value = { add = var:gls_development_sum divide = var:gls_location_count } } set_variable = { name = gls_avg_control value = { add = var:gls_control_sum divide = var:gls_location_count } } }
+	if = { limit = { var:gls_country_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_base_spending min = 0 } } }
 }
 
 gls_full_refresh_country = {
-	# 单国完整刷新：存款压力 + 面板展示 + 地图地点变量 + 面板统计累加。
-	# 调用者：gls_recalculate_global_living_standard（on_start、决议手动触发）
 	# root = country
-	gls_compute_savings_pressure = yes
+	sol_update_local_pop_demand_modifiers = yes
 	gls_compute_panel_display = yes
-	gls_update_location_map = yes
 	gls_accumulate_panel_stats = yes
 }
 
 gls_recalculate_global_living_standard = {
-	# 世界 scope：先更新全局替代组稀缺列表，再对各国执行完整刷新。
-	SOL_update_substitute_scarcity = yes
-	every_country = {
-		if = {
-			limit = { total_population > 0 }
-			gls_full_refresh_country = yes
-		}
-	}
-}
-
-sol_init_export_adj = {
-	# Progressive goods unlock correction — initialisation.
-	# Purpose: the simulator assumes the full goods catalogue exists at all times; some goods
-	# require technology or institutions that are absent in early game, leaving unfilled demand
-	# slots.  sol_era_coeff compensates: it starts at 1.5 (maximum gap, Age 1) and decays
-	# ×0.95 per era as more goods unlock and the gap between simulator and reality narrows.
-	# Called at post-lobby initialisation (world scope) for both new games and save loads.
-	# Reads the current age so mid-campaign save loads start with the correct value.
-	if = {
-		limit = { current_age = age_1_traditions }
-		set_global_variable = { name = sol_era_coeff  value = 1.5 }
-	}
-	else_if = {
-		limit = { current_age = age_2_renaissance }
-		set_global_variable = { name = sol_era_coeff  value = 1.425 }
-	}
-	else_if = {
-		limit = { current_age = age_3_discovery }
-		set_global_variable = { name = sol_era_coeff  value = 1.35375 }
-	}
-	else_if = {
-		limit = { current_age = age_4_reformation }
-		set_global_variable = { name = sol_era_coeff  value = 1.28606 }
-	}
-	else_if = {
-		limit = { current_age = age_5_absolutism }
-		set_global_variable = { name = sol_era_coeff  value = 1.22176 }
-	}
-	else_if = {
-		limit = { current_age = age_6_revolutions }
-		set_global_variable = { name = sol_era_coeff  value = 1.16067 }
-	}
-}
-
-sol_update_export_adj_era = {
-	# Progressive goods unlock correction — era step.
-	# Each new era unlocks more goods (technologies, institutions), shrinking the gap between
-	# the simulator's full-catalogue assumption and actual in-game availability.
-	# sol_era_coeff decays ×0.95 per era: 1.5 → 1.425 → 1.35375 → … → 1.16067 by Age 6.
-	# Called from sol_ae_new_age (country scope).  Hardcoded per-age values are idempotent:
-	# multiple countries triggering on_new_age for the same age all write the same value.
-	if = {
-		limit = { current_age = age_2_renaissance }
-		set_global_variable = { name = sol_era_coeff  value = 1.425 }
-	}
-	else_if = {
-		limit = { current_age = age_3_discovery }
-		set_global_variable = { name = sol_era_coeff  value = 1.35375 }
-	}
-	else_if = {
-		limit = { current_age = age_4_reformation }
-		set_global_variable = { name = sol_era_coeff  value = 1.28606 }
-	}
-	else_if = {
-		limit = { current_age = age_5_absolutism }
-		set_global_variable = { name = sol_era_coeff  value = 1.22176 }
-	}
-	else_if = {
-		limit = { current_age = age_6_revolutions }
-		set_global_variable = { name = sol_era_coeff  value = 1.16067 }
-	}
+	# World scope: refresh market maps once, then refresh all countries.
+	sol_refresh_market_pop_demand_maps = yes
+	every_country = { if = { limit = { total_population > 0 } gls_full_refresh_country = yes } }
 }

@@ -9,13 +9,11 @@ Usage:
   python scripts/validate.py --changed         # validate only git-changed files
 """
 
-import csv
 import json
 import re
 import sys
 import subprocess
 from pathlib import Path
-from typing import Dict
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -27,17 +25,6 @@ except ImportError:
     sys.exit(1)
 
 REPO_ROOT = Path(__file__).parent.parent
-SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
-DATA_DIR      = REPO_ROOT / "data"
-BRACKET_CSV   = DATA_DIR / "alpha_bracket_table.csv"
-
-_GROUPS     = [
-    "basic_clothing", "crude_goods", "staple", "condiments", "heating",
-    "household", "standard_clothing", "intoxicants", "luxury_drinks",
-    "luxury_food", "luxury_goods", "protein", "spices", "precious",
-    "treasures", "medicine", "ritual", "weapons", "mounts", "knowledge",
-]
-_STRATA_KEYS = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 MODIFIER_TYPES_FILE = (
     REPO_ROOT
@@ -189,7 +176,7 @@ def check_modifier_names(path: Path, content: str, whitelist: set[str]):
 
 
 # ---------------------------------------------------------------------------
-# New checks: INJECT demand_multiply, alpha sums, consistency
+# SOL demand baseline checks
 # ---------------------------------------------------------------------------
 
 def check_inject_demand_multiply(path: Path, content: str) -> None:
@@ -223,130 +210,57 @@ def check_inject_demand_multiply(path: Path, content: str) -> None:
             i += 1
 
 
-def check_bracket_table_sum() -> None:
-    """Validate that each (strata, bracket) row in alpha_bracket_table.csv sums to 1.0."""
-    if not BRACKET_CSV.exists():
-        issues.append(
-            f"[BRACKET] {BRACKET_CSV.relative_to(REPO_ROOT)} not found -- "
-            "run: python tools/sol_demand_simulator/engel_export.py --init"
-        )
-        return
-    try:
-        with BRACKET_CSV.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                strata = row.get("strata", "?")
-                bracket = row.get("bracket", "?")
-                try:
-                    total = sum(float(row[g]) for g in _GROUPS if g in row)
-                except ValueError:
-                    issues.append(
-                        f"[BRACKET] alpha_bracket_table.csv -- "
-                        f"strata '{strata}' bracket {bracket} has non-numeric values"
-                    )
-                    continue
-                if abs(total - 1.0) > 1e-3:
-                    issues.append(
-                        f"[BRACKET] alpha_bracket_table.csv -- "
-                        f"strata '{strata}' bracket {bracket} sums to {total:.6f}, expected 1.0"
-                    )
-    except Exception as e:
-        issues.append(f"[BRACKET] Could not read alpha_bracket_table.csv: {e}")
+_GLOBAL_MAP_EFFECT_RE = re.compile(
+    r"\b(?P<op>add_to_global_variable_map|remove_from_global_variable_map)"
+    r"\s*=\s*\{(?P<body>[^{}]*)\}"
+)
+_GLOBAL_MAP_FIELD_RE = re.compile(r"\b(name|key)\s*=\s*([^\s{}]+)")
 
 
-
-def check_group_prices_consistency() -> None:
-    """Verify z_SOL_group_prices.txt matches values computed from demand matrix."""
-    try:
-        sys.path.insert(0, str(SIMULATOR_DIR))
-        from parser import _auto_group_prices, GROUP_PRICES_FILE, _read  # type: ignore
-        import re as _re
-
-        expected = _auto_group_prices()
-        if not GROUP_PRICES_FILE.exists():
-            issues.append(
-                f"[PRICES] {GROUP_PRICES_FILE.relative_to(REPO_ROOT)} missing -- "
-                "run: python tools/sol_demand_simulator/engel_export.py"
-            )
-            return
-
-        text = _read(GROUP_PRICES_FILE)
-        actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
-        for m in _re.finditer(r"local_(\w+?)_(\w+?)_P\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text):
-            s, g, v = m.group(1), m.group(2), float(m.group(3))
-            if s in actual and g in _GROUPS:
-                actual[s][g] = v
-
-        stale = []
-        for s in _STRATA_KEYS:
-            for g in _GROUPS:
-                exp = expected.get(s, {}).get(g, 0.0)
-                act = actual.get(s, {}).get(g, 0.0)
-                if abs(exp - act) > 1e-4:
-                    stale.append(f"{s}_{g}_P (expected {exp:.6f}, got {act:.6f})")
-        if stale:
-            issues.append(
-                f"[PRICES] z_SOL_group_prices.txt is stale ({len(stale)} value(s)). "
-                "Run: python tools/sol_demand_simulator/engel_export.py"
-            )
-    except ImportError as e:
-        issues.append(f"[PRICES] Could not import parser for consistency check: {e}")
-    except Exception as e:
-        issues.append(f"[PRICES] Error during consistency check: {e}")
+def _parse_global_map_effect(line: str):
+    code = line.split("#", 1)[0]
+    m = _GLOBAL_MAP_EFFECT_RE.search(code)
+    if not m:
+        return None
+    fields = dict(_GLOBAL_MAP_FIELD_RE.findall(m.group("body")))
+    name = fields.get("name")
+    key = fields.get("key")
+    if not name or not key:
+        return None
+    return (m.group("op"), name, key)
 
 
-def check_budget_shares_consistency() -> None:
-    """Verify z_SOL_group_budget_shares.txt matches bracket-0 values from alpha_bracket_table.csv."""
-    if not BRACKET_CSV.exists():
-        return  # already reported by check_bracket_table_sum
+def check_global_variable_map_updates(path: Path, content: str) -> None:
+    """Require remove+add when writing global_variable_map values.
 
-    try:
-        sys.path.insert(0, str(SIMULATOR_DIR))
-        from parser import BUDGET_SHARES_FILE, _read  # type: ignore
-        from engel_export import EXPORT_ALPHA_MULTIPLIER  # type: ignore
-        import re as _re
+    add_to_global_variable_map is insert-only. If the key exists, the old value
+    is silently kept, so every add must be preceded by a same-name same-key remove.
+    """
+    lines = content.splitlines()
+    previous_meaningful_effect = None
 
-        if not BUDGET_SHARES_FILE.exists():
-            issues.append(
-                f"[SHARES] {BUDGET_SHARES_FILE.relative_to(REPO_ROOT)} missing -- "
-                "run: python tools/sol_demand_simulator/engel_export.py"
-            )
-            return
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
 
-        alpha: Dict[str, Dict[str, float]] = {}
-        with BRACKET_CSV.open(encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if int(row["bracket"]) != 0:
-                    continue
-                s = row["strata"]
-                alpha[s] = {g: float(row[g]) for g in _GROUPS if g in row}
+        effect = _parse_global_map_effect(line)
+        if not effect:
+            previous_meaningful_effect = None
+            continue
 
-        text = _read(BUDGET_SHARES_FILE)
-        actual: Dict[str, Dict[str, float]] = {s: {} for s in _STRATA_KEYS}
-        for m in _re.finditer(
-            r"local_(\w+?)_(\w+?)_budget_share\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", text
-        ):
-            s, g, v = m.group(1), m.group(2), float(m.group(3))
-            if s in actual and g in _GROUPS:
-                actual[s][g] = v
+        op, name, key = effect
+        if op == "add_to_global_variable_map":
+            expected = ("remove_from_global_variable_map", name, key)
+            if previous_meaningful_effect != expected:
+                issues.append(
+                    f"[GLOBAL_MAP] {path.relative_to(REPO_ROOT)}:{i} -- "
+                    "add_to_global_variable_map does not update existing keys; "
+                    "put remove_from_global_variable_map with the same name/key "
+                    "immediately before it"
+                )
 
-        stale = []
-        for s in _STRATA_KEYS:
-            for g in _GROUPS:
-                exp = alpha.get(s, {}).get(g, 0.0) * EXPORT_ALPHA_MULTIPLIER
-                act = actual.get(s, {}).get(g, 0.0)
-                if abs(exp - act) > 1e-3:
-                    stale.append(f"{s}_{g}")
-        if stale:
-            issues.append(
-                f"[SHARES] z_SOL_group_budget_shares.txt is stale vs alpha_bracket_table.csv (bracket 0) "
-                f"({len(stale)} value(s)). Run: python tools/sol_demand_simulator/engel_export.py"
-            )
-    except ImportError as e:
-        issues.append(f"[SHARES] Could not import parser for consistency check: {e}")
-    except Exception as e:
-        issues.append(f"[SHARES] Error during consistency check: {e}")
+        previous_meaningful_effect = effect
 
 
 def check_loc_coverage() -> None:
@@ -395,77 +309,6 @@ def check_autogenerated_staged() -> None:
                 f"[AUTOGEN] {name} is auto-generated — edit its source script/data instead "
                 f"(see first-line comment for the generator)"
             )
-
-
-def check_sol_economy_dash_cells() -> None:
-    """Cross-check SOL_economy_local.gui demand rows against z_SOL_group_prices.txt.
-
-    Every (strata, group) cell where P = 0 must show raw_text = "-".
-    Every (strata, group) cell where P > 0 must reference the demand_scale_offset sv.
-    Catches stale GUI after price values are updated.
-    """
-    prices_file = REPO_ROOT / "src/stable/in_game/common/script_values/z_SOL_group_prices.txt"
-    gui_file    = REPO_ROOT / "src/stable/in_game/gui/SOL_economy_local.gui"
-
-    if not prices_file.exists() or not gui_file.exists():
-        return
-
-    # ── 1. Parse P values ────────────────────────────────────────────────────
-    prices_text = prices_file.read_text(encoding="utf-8-sig")
-    p_zero:    set[tuple[str, str]] = set()
-    p_nonzero: set[tuple[str, str]] = set()
-    for m in re.finditer(
-        r"local_(\w+?)_(\w+?)_P\s*=\s*\{[^}]*value\s*=\s*([\d.]+)", prices_text
-    ):
-        strata, group, val = m.group(1), m.group(2), float(m.group(3))
-        if strata in _STRATA_KEYS and group in _GROUPS:
-            (p_zero if val == 0.0 else p_nonzero).add((strata, group))
-
-    # ── 2. Parse GUI demand rows ─────────────────────────────────────────────
-    STRATA_ORDER = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
-    TITLE_TO_GROUP = {f"SOL_TT_{g.upper()}_TITLE": g for g in _GROUPS}
-    DATA_CELL = re.compile(r'min_width\s*=\s*68.*?raw_text\s*=\s*"([^"]*)"')
-
-    gui_lines = gui_file.read_text(encoding="utf-8-sig").splitlines()
-    dash_in_gui:  set[tuple[str, str]] = set()
-    value_in_gui: set[tuple[str, str]] = set()
-
-    i = 0
-    while i < len(gui_lines):
-        line = gui_lines[i]
-        m = re.search(r'text\s*=\s*"(SOL_TT_\w+_TITLE)"', line)
-        if m and m.group(1) in TITLE_TO_GROUP:
-            group = TITLE_TO_GROUP[m.group(1)]
-            cells_found = 0
-            j = i + 1
-            while j < len(gui_lines) and cells_found < 5:
-                dm = DATA_CELL.search(gui_lines[j])
-                if dm:
-                    strata = STRATA_ORDER[cells_found]
-                    raw = dm.group(1)
-                    if raw == "-":
-                        dash_in_gui.add((strata, group))
-                    elif "demand_scale_offset" in raw:
-                        value_in_gui.add((strata, group))
-                    cells_found += 1
-                j += 1
-        i += 1
-
-    # ── 3. Report mismatches ─────────────────────────────────────────────────
-    errors = []
-    for pair in sorted(p_zero):
-        if pair in value_in_gui:
-            errors.append(f"  {pair[0]}_{pair[1]}: P=0 but shows value -> change to '-'")
-    for pair in sorted(dash_in_gui):
-        if pair in p_nonzero:
-            errors.append(f"  {pair[0]}_{pair[1]}: P>0 but shows '-' -> restore demand_scale_offset ref")
-
-    if errors:
-        issues.append(
-            f"[SOL_GUI] SOL_economy_local.gui dash-cell mismatch "
-            f"({len(errors)} cell(s)); update GUI or re-run engel_export.py:\n"
-            + "\n".join(errors)
-        )
 
 
 def _parse_issue_structured(raw: str) -> dict:
@@ -537,13 +380,10 @@ def main():
         check_enums(path, content, enum_data)
         check_modifier_names(path, content, modifier_whitelist)
         check_inject_demand_multiply(path, content)
+        check_global_variable_map_updates(path, content)
 
     # File-independent checks
-    check_bracket_table_sum()
-    check_group_prices_consistency()
-    check_budget_shares_consistency()
     check_loc_coverage()
-    check_sol_economy_dash_cells()
     check_autogenerated_staged()
 
     if ai_report:

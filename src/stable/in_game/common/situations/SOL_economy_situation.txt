@@ -17,55 +17,19 @@
 	on_monthly = {
 		if = {
 			limit = { sol_sol_is_on = yes }
-			# ── Pass 0：全球市场稀缺性扫描 + 市场枢纽稀缺评分缓存 ────────────────
-			# 频率：每年（月1）| 范围：全市场 | 操作：列表增删 + 市场枢纽 set_variable
-			# 开销估算：O(市场数 × (672 + 5×336))，已从原先 O(地点数 × 5 × 336) 降至此值
-			# 设计依据：稀缺评分仅依赖市场价格档，全部 336 个判断都是 market ?= { ... }
-			# 形式，因此在每个市场的贸易中心位置（market.location）算一次,所有同市场
-			# 位置共享读取 var:sol_market_scarcity_adj_<strata>。
 			if = {
-				limit = { current_month = 1 }
-				SOL_update_substitute_scarcity = yes
-				SOL_update_market_scarcity_scores = yes
+				limit = { OR = { current_month = 1 NOT = { has_global_variable = sol_market_pop_demand_maps_initialized } } }
+				sol_refresh_market_pop_demand_maps = yes
 			}
-
-			# ── Pass A+B：单次 every_country 遍历 ───────────────────────────────────
-			# 依赖顺序：savings_pressure → update_location_map → compute_panel_display → accumulate_panel_stats
 			every_country = {
 				if = {
 					limit = { total_population > 0 }
-
-					# 频率：所有国家每月 | 范围：单国，无循环 | 操作：6 × set_variable
-					# 开销估算：O(1)·轻量，无条件调用比条件分支更简洁
 					gls_compute_savings_pressure = yes
-
-					# 频率：每年+首次 | 范围：每陆地地点 | 操作：2 × set_variable / 地点
-					# 开销估算：O(省份数)·年度，大国（100+ 省）需关注
-					if = {
-						limit = {
-							OR = {
-								current_month = 1
-								NOT = { has_variable = gls_map_cache_initialized }
-							}
-						}
-						gls_update_location_map = yes
-					}
-
 					if = {
 						limit = { is_human = yes }
-						# 频率：人类每月 | 范围：单国，无循环 | 操作：~17 × set_variable
-						# 开销估算：O(1)·轻量，仅人类触发
 						gls_compute_panel_display = yes
-
-						# 频率：人类每年+首次 | 范围：每陆地地点 × owner scope | 操作：最多 12 cv/地点 + 后处理 ~30 次赋值
-						# 开销估算：O(省份数)·最重，省份多时显著；每地点最多 6 次 scope 切换
 						if = {
-							limit = {
-								OR = {
-									current_month = 1
-									NOT = { has_variable = gls_country_sol_all }
-								}
-							}
+							limit = { OR = { current_month = 1 NOT = { has_variable = gls_country_sol_all } } }
 							gls_accumulate_panel_stats = yes
 						}
 					}

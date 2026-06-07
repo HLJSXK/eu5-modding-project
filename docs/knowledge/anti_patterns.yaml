@@ -27,6 +27,24 @@
   source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
   notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
 
+- id: sol_demand_add_baseline_must_remain
+  pattern: null
+  bad: "Deleting or bypassing the calibrated SOL demand_add baseline when moving runtime demand to local_pop_demand"
+  correction: "Keep data/target_demand.csv -> src/stable/in_game/common/goods/z_SOL_pop_goods.txt as the corrected demand_add baseline; apply local_pop_demand only as the monthly location-level multiplier."
+  category: modifier
+  scope: location
+  source: "src/stable/in_game/common/goods/z_SOL_pop_goods.txt; reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11864"
+  notes: "The SOL multiplier is calibrated against corrected demand_add values. Removing that baseline changes absolute pop demand before the multiplier is applied."
+
+- id: monthly_country_pulse_singleton_preserve_entries
+  pattern: null
+  bad: "Defining monthly_country_pulse with only new mod actions, dropping vanilla or framework entries"
+  correction: "Treat monthly_country_pulse as a singleton merge point: copy the vanilla on_actions/random_events/events payload, preserve CMF dispatchers when the mod depends on CMF, and append the new on_action."
+  category: scope
+  scope: country
+  source: "reference_game_files/game/in_game/common/on_action/country_monthly.txt:2; reference_mods/3686272563/in_game/common/on_action/country_monthly.txt:3"
+  notes: "A bare replacement monthly_country_pulse silently removes vanilla monthly actions and can break dependency framework dispatch."
+
 - id: cost_modifier_renamed_to_efficiency_1_3
   pattern: '\b(?:global_build_buildings_cost|local_build_buildings_cost|local_build_new_buildings_cost|local_trade_embark_disembark_cost_modifier|stability_cost)\s*='
   only_in_paths: ['src/stable']
@@ -109,15 +127,6 @@
   source: "reference_game_files/game/in_game/common/"
   notes: "EU4 province scope triggers do not exist in EU5"
 
-- id: demand_hardcoded_redistribution
-  pattern: ''
-  bad: "Hardcoded redistribution coefficients for substitute goods (multiply = 0.4 on scarce good + add = X on every other good)"
-  correction: "Weight-normalization: demand_i = (weight_i / total_weight) × N × scale; each good starts at weight 1; scarcity subtracts 0.5; total_weight uses min = 0.001 guard; redistribution is automatic"
-  category: scope
-  scope: any
-  source: "src/stable/in_game/common/script_values/SOL_goods_weight_values.txt"
-  notes: "Hardcoded coefficients require O(N²) recalculation when adding a new good; weight-normalization requires only one new weight value and one add line in the group total"
-
 - id: script_value_inline_subexpr_variable_refs
   pattern: 'multiply\s*=\s*\{[^}]*(?:multiply|divide)\s*=\s*local_'
   bad: "multiply = { value = X  multiply = local_var  divide = local_var  add = local_var } inside a script_value"
@@ -136,15 +145,6 @@
   source: "user-reported engine behavior (2026-04)"
   notes: "EU5 engine truncates all float literals at 5 decimal places; digits beyond the 5th are silently ignored"
 
-- id: demand_share_pop_scope_in_location_indicator
-  pattern: ''
-  bad: "Referencing pop-scoped weight values (SOL_<good>_weight) from location-scope indicator script_values"
-  correction: "In location-scope indicators, compute scarcity-only base weights inline via market variable list checks; do not reference pop-scope weight values which include religion/culture modifiers unavailable at location scope"
-  category: scope
-  scope: location
-  source: "src/stable/in_game/common/script_values/SOL_substitute_good_indicators.txt"
-  notes: "Location-scope script_values cannot access pop attributes; sol_demand_share_* replicate only the scarcity adjustment, not religion/culture multipliers"
-
 - id: gui_no_getgoods_from_string
   pattern: "GetGoods\\('|GetGoodsFromKey|MakeGoods\\("
   bad: "GetGoods('key'), GetGoodsFromKey, or MakeGoods('key') in GUI expressions to construct a Goods object from a string literal"
@@ -162,24 +162,6 @@
   scope: any
   source: "reference_game_files/game/in_game/gui/goods_overview.gui:77"
   notes: "Exhaustive search of reference_game_files found GoodsView only in the goods_overview panel; tooltip templates have no equivalent all-goods iteration datamodel"
-
-- id: dev_scaling_demand_cancellation
-  pattern: ''
-  bad: "Emitting SOL goods demand values without the development cancellation shim (EU5 1.2+), or using the old EU5 pre-1.2 shim (divide=development, multiply=10) which cancels the old multiplier (development/10) but not the new one (1+development/20)"
-  correction: "EU5 1.2+ engine multiplies all pop demands by (1+development/20). Cancel it with 'multiply = 20' AND 'divide = SOL_dev_demand_divisor' in every single-group demand block in SOL_goods_demand_values.txt. SOL_dev_demand_divisor = { value = 20  add = location.development } (minimum value 20, no div/0 risk). Net math: scale × 20/(20+dev) × (20+dev)/20 = scale."
-  category: scope
-  scope: pop
-  source: "reference_game_files/game/in_game/common/death_reason/02_life_expectancy.txt:191"
-  notes: "Intentional hidden shim, updated for EU5 1.2. Pre-1.2 shim was (×10 ÷ development) cancelling the old (development/10) engine multiplier. 1.2 changed the engine multiplier to (1+development/20), so the new shim is ×20/(20+development). Multi-group aggregates inherit the cancellation from sub-values; no additional ops needed there. Display values in z_SOL_group_demand_scales_location.txt must remain undivided."
-
-- id: alpha_export_multiplier_cheapest_good
-  pattern: ''
-  bad: "Exporting alpha (budget-share) values directly from simulator without adjustment, causing in-game spending to fall below simulated income"
-  correction: "EXPORT_ALPHA_MULTIPLIER = 1.0 in engel_export.py (Σα = 1 preserved). The compensating multiplier now lives in-game as global_var:sol_era_coeff (initialised to 1.5 at Age 1, decays ×0.95/era to 1.16067 by Age 6). Both multipliers are injected in z_SOL_group_demand_scales_location.txt via 'multiply = local_sol_era_coeff' and 'multiply = local_sol_scarcity_adj_<strata>'. To recalibrate the base: edit sol_init_export_adj and sol_update_export_adj_era in A_SOL_economy_effects.txt — both must change in lockstep."
-  category: encoding
-  scope: any
-  source: "tools/sol_demand_simulator/engel_export.py:68 / src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt"
-  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these underfeed actual spending vs. simulator prediction. The era coefficient compensates and is dynamic: era decay (×0.95/era starting at 1.5) + per-market scarcity correction (per stratum via local_sol_scarcity_adj_<strata> script_values). The starting value was tuned down from 2.0 to 1.5 to reduce over-compensation observed in early-game balance testing (2026-05-07)."
 
 - id: multiply_global_variable_nonexistent
   pattern: 'multiply_global_variable'
@@ -232,26 +214,45 @@
   correction: "Wrap the global read in a guarded local script_value: define 'local_NAME = { value = <safe_default>  if = { limit = { has_global_variable = NAME }  value = global_var:NAME } }' and reference 'multiply = local_NAME' instead. Optionally also init via on_game_start as defense-in-depth, but the wrapper is the load-bearing fix."
   category: scope
   scope: global
-  source: "src/stable/in_game/common/script_values/SOL_pop_values.txt (local_sol_era_coeff)"
+  source: "runtime observation from EU5 script_value validation"
   notes: "EU5 evaluates script_values during file-load validation BEFORE any on_action (including on_game_start) fires. An unguarded global_var read produces 'Failed to fetch variable', 'Event target link global_var returned an unset scope', and 'Got value of type none' errors that propagate up to every caller script_value. on_game_start init alone cannot fix this — the validation pass runs earlier. Wrapping with has_global_variable + safe default is the only robust approach."
+
+- id: global_variable_map_add_does_not_update
+  pattern: null
+  bad: "Using add_to_global_variable_map by itself to update an existing key"
+  correction: "Remove the existing key first, then add the new value: remove_from_global_variable_map = { name = X key = scope:Y } followed by add_to_global_variable_map = { name = X key = scope:Y value = Z }."
+  category: scope
+  scope: global
+  source: "user-reported engine behavior (2026-06)"
+  notes: "add_to_global_variable_map only inserts missing keys. If the key already exists, the old value is silently kept."
 
 - id: market_scope_set_variable_unsupported
   pattern: 'every_market_in_world\s*=\s*\{[^{}]*\bset_variable\b'
   bad: "Direct set_variable / change_variable on market scope (e.g. every_market_in_world = { set_variable = { name = X value = Y } ... })"
-  correction: "Markets do NOT support persistent script variables. Hop to the trade-center location first: every_market_in_world = { location = { set_variable = { ... } } }. Downstream readers fetch via market.location.var:NAME (single shared cache for all locations sharing the market). For GUI, use Market.GetCenterLocation.MakeScope.GetVariable(...) — note the accessor is GetCenterLocation, NOT GetLocation."
+  correction: "Markets do NOT support persistent script variables. For market-keyed caches, write a global_variable_map and use the market scope as key: remove_from_global_variable_map/add_to_global_variable_map with key = scope:market_cache, then read via global_variable_map(name|scope:market_cache) or GUI GetVariableFromGlobalVariableMap('name', Market.MakeScope)."
   category: scope
   scope: global
-  source: "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt (SOL_update_market_scarcity_scores); reference_game_files/game/in_game/gui/context_menu.gui:940 — '[PanToLocation(Location.GetMarket.GetCenterLocation)]'; reference_game_files/game/in_game/events/economy/prices.txt:417 — 'from_market.location.sub_continent'"
-  notes: "Market is a scope but its variable system is read-only at script level — set_variable / change_variable / has_variable on a bare market scope silently fail. The market's hub location (script: market.location, GUI: Market.GetCenterLocation) IS a normal Location and supports the full variable system. Pattern works because all locations sharing a market dereference market.location to the same trade-center Location, giving a per-market shared cache without per-location duplication. GUI accessor is GetCenterLocation, not GetLocation — only GetCenterLocation appears in vanilla GUI files."
+  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_game_files/game/in_game/gui/context_menu.gui:1748"
+  notes: "Market scopes are valid keys for global_variable_map even though direct market set_variable/change_variable storage is unsupported. Do not use the market center location as an artificial cache owner for SOL market data."
+
+- id: sol_market_center_location_cache
+  pattern: "GetCenterLocation\\.MakeScope\\.GetVariable\\('sol_market_|location\\s*=\\s*\\{\\s*set_variable\\s*=\\s*\\{\\s*name\\s*=\\s*sol_market_"
+  only_in_paths: ['src/stable']
+  bad: "Using a market center location variable as a SOL market-keyed cache"
+  correction: "Use global_variable_map keyed by the market scope instead. Script: remove_from_global_variable_map = { name = sol_market_* key = scope:sol_market_cache } then add_to_global_variable_map = { name = sol_market_* key = scope:sol_market_cache value = ... }. GUI: GetVariableFromGlobalVariableMap('sol_market_*', Location.GetMarket.MakeScope)."
+  category: scope
+  scope: global
+  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_mods/3692202776/loading_screen/data_binding/cmm_macros_settings.txt:88"
+  notes: "SOL market data belongs to the market key, not to an arbitrary center location. Center-location caches are brittle and obscure the actual key."
 
 - id: gui_market_getlocation_invalid
   pattern: '\.GetMarket\.GetLocation\b'
   bad: "Calling .GetMarket.GetLocation in GUI expressions to access a market's hub location"
-  correction: "Use .GetMarket.GetCenterLocation instead. The accessor on a Market data object is GetCenterLocation (returns the trade-center Location), not GetLocation. Example: Player.GetCapital.GetMarket.GetCenterLocation.MakeScope.GetVariable('foo')."
+  correction: "Use .GetMarket.GetCenterLocation only when the UI truly needs the trade-center Location object. For market-keyed caches, prefer global_variable_map keyed by Market.MakeScope instead of center-location variables."
   category: gui
   scope: any
   source: "reference_game_files/game/in_game/gui/context_menu.gui:940 — 'ondoubleclick = \"[PanToLocation(Location.GetMarket.GetCenterLocation)]\"'"
-  notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor. Using the wrong name silently returns a null/invalid datacontext — the GUI element renders empty without an error tooltip."
+  notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor for navigation to the center location. It is not a recommended cache storage path for SOL market data."
 
 - id: yearly_january_pulse_spike
   pattern: ''
