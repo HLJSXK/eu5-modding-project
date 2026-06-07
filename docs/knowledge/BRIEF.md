@@ -166,7 +166,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | Scripted Triggers | 495 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
 | Scripted Effects | 488 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2391 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 199 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 200 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 
