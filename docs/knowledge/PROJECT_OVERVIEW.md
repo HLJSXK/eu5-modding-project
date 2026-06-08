@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-06-08 (estate building maintenance net-income display corrected)
+> Last updated: 2026-06-08 (market pop-demand trigger corrected)
 
 ## Project Identity
 
@@ -95,7 +95,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 - **Calibrated demand baseline** - `data/target_demand.csv` drives `src/stable/in_game/common/goods/z_SOL_pop_goods.txt`. These `demand_add` values remain the baseline that the SOL multiplier scales.
 - **Hardcoded unit spending constants** - `data/demand_price_table.csv` is converted into `src/stable/in_game/common/script_values/SOL_market_unit_spending_values.txt`, storing price times net demand for each pop type and good. Duplicate goods that appear in multiple old demand groups are counted once.
-- **Yearly market spending maps** - `sol_refresh_market_pop_demand_maps` scans `every_market_in_world`, checks `demands_goods_by_pops`, writes one unit-spending `global_variable_map` per pop type keyed by market scope, and stores one numeric consumed-good counter per good keyed by the same market scope. New counters start at 2; each refresh adds 1 when the good is demanded by pops or subtracts 1 otherwise, clamped at 0. Any positive counter counts as consumed for base-spending calculation and GUI display.
+- **Yearly market spending maps** - `sol_refresh_market_pop_demand_maps` scans `every_market_in_world`, checks each goods scope with `is_demanded_in_market_by_pops = scope:sol_market_cache`, writes one unit-spending `global_variable_map` per pop type keyed by market scope, and stores one numeric consumed-good counter per good keyed by the same market scope. New counters start at 2; each refresh adds 1 when the good is demanded by pops or subtracts 1 otherwise, clamped at 0. Any positive counter counts as consumed for base-spending calculation and GUI display.
 - **Yearly estate building maintenance** - `yearly_country_pulse` calls `sol_update_estate_building_maintenance` to scan every owned land location, cache the five SOL estate building counts, and subtract 1 gold per cached estate building from the matching stratum income.
 - **Monthly local demand modifier** - `monthly_country_pulse` calls `sol_update_local_pop_demand_modifiers`, which computes each owned land location's income-closed coefficient and applies `sol_local_pop_demand_modifier` for one month with `size = var:sol_location_pop_demand_modifier_size`.
 - **Income-closed location scale** - Each location sums five gross stratum incomes, subtracts cached estate building maintenance to derive total net stratum income, applies the country's unified savings adjustment `(total savings / total savings target - 1) * 0.1`, divides liquid funds by market-keyed base spending multiplied by `(1 + development / 20)`, and exposes the corrected result as `local_pop_demand`. Commoner base spending remains exact by internally using laborer, peasant, and soldier unit-spending maps.
