@@ -281,6 +281,25 @@
   source: "reference_game_files/game/in_game/gui/context_menu.gui:940 — 'ondoubleclick = \"[PanToLocation(Location.GetMarket.GetCenterLocation)]\"'"
   notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor for navigation to the center location. It is not a recommended cache storage path for SOL market data."
 
+- id: situation_custom_mapmode_not_script_field
+  pattern: null
+  bad: "Adding map_mode = <tag> or using trigger_on_create on a reusable situation panel to force a separate custom mapmode"
+  correction: "Keep is_data_map/map_color for the situation data map. To auto-select a separate mapmode when a situation panel opens, add a zero-size GUI widget inside the situation_panel, gate it with LateralView.IsShown so the visible expression flips on each reopen, and call on_start = \"[GetMapMode('<tag>').SetMapMode]\" from a _show state."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/common/situations/readme.txt:12-18; reference_official_defines/docs/data_types_uncategorized.txt:72079; src/stable/in_game/gui/SOL_migration_caller.gui:21-31; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
+  notes: "Situation script supports setup effects and data-map coloring, but no verified custom mapmode field. trigger_on_create is one-shot for widget lifetime; _show retriggers when LateralView.IsShown flips on each reopen. Mapmode selection is a MapMode GUI action; direct chained action expressions are valid in state on_start."
+
+- id: gui_state_on_start_does_not_inherit_datacontext
+  pattern: 'state\s*=\s*\{[^{}]*\btrigger_on_create\s*=\s*yes[^{}]*\bon_start\s*=\s*"\[MapMode\.SetMapMode\]"'
+  only_in_paths: ['src/stable/in_game/gui']
+  bad: "Calling [MapMode.SetMapMode] from state.on_start while expecting a sibling or parent datacontext = [GetMapMode('<tag>')] to supply the MapMode object"
+  correction: "Call the object-returning function inside the action expression: on_start = \"[GetMapMode('<tag>').SetMapMode]\"."
+  category: gui
+  scope: any
+  source: "EU5 error.log: No context supplied, wanted context of type 'MapMode' for 'MapMode.SetMapMode'; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
+  notes: "trigger_on_create state actions do not inherit the widget's datacontext for method dispatch. The action expression must create or receive the required object itself."
+
 - id: yearly_january_pulse_spike
   pattern: ''
   bad: "Gating heavy per-country / per-location work behind 'limit = { current_month = 1 }' inside a situation's on_monthly block — fires on every January 1 for every country at once"

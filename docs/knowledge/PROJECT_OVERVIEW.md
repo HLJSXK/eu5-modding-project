@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-06-09 (workshop description sync)
+> Last updated: 2026-06-09 (SOL mapmode panel reopen fix)
 
 ## Project Identity
 
@@ -12,7 +12,7 @@
 
 ## Core Features
 
-1. **Standard of Living (SOL) System** *(primary feature)* - Recalibrates baseline `demand_add` for 55 goods in `z_SOL_pop_goods.txt`, then applies a monthly location-level `local_pop_demand` modifier from `monthly_country_pulse`. The monthly coefficient is income-closed: local stratum income, estate-building maintenance, unified country savings pressure, local pop counts, market-keyed base spending, and the engine's automatic development demand divisor `(1 + development / 20)` combine into the final demand multiplier. Yearly market scans cache one-unit pop spending per market using `min(market_price, default_price)`. The old substitute-goods, scarcity-tier, per-stratum Engel, and per-good redistribution chain is retired in EU5 1.3. The system feeds the Living Standard situation panel, map coloring, and location GUI.
+1. **Standard of Living (SOL) System** *(primary feature)* - Recalibrates baseline `demand_add` for 55 goods in `z_SOL_pop_goods.txt`, then applies a monthly location-level `local_pop_demand` modifier from `monthly_country_pulse`. The monthly coefficient is income-closed: local stratum income, estate-building maintenance, unified country savings pressure, local pop counts, market-keyed base spending, and the engine's automatic development demand divisor `(1 + development / 20)` combine into the final demand multiplier. Yearly market scans cache one-unit pop spending per market using `min(market_price, default_price)`. The old substitute-goods, scarcity-tier, per-stratum Engel, and per-good redistribution chain is retired in EU5 1.3. The system feeds the Living Standard situation panel, its Black Death-style situation data map, the separate economy-category Living Standard mapmode with panel auto-selection, and location GUI.
 
 2. **Economic Balance & Anti-Snowballing** - Base tax efficiency defaults to -15% and is CMF-adjustable. Age escalation raises construction, RGO expansion, city/town upgrade, and food-consumption pressure across ages; by Age 6 it reaches -100% global building efficiency, +100% RGO expansion cost, +50% city/town upgrade cost, and +50% pop food consumption. Base RGO size is halved to 1, total-population RGO scaling is reduced, low-control locations receive a construction-efficiency penalty, and road prices are increased to gravel x2, paved x2, modern x3, railroad x5.
 
@@ -36,6 +36,8 @@ eu5-modding-project/
 |       |-- loading_screen/
 |       |   `-- common/defines/       pop demand performance refresh cap
 |       |-- in_game/
+|       |   |-- gfx/
+|       |   |   `-- map/map_modes/    custom SOL map modes
 |       |   |-- common/
 |       |   |   |-- auto_modifiers/     war exhaustion, tax efficiency penalties
 |       |   |   |-- cabinet_actions/    war exhaustion reduction restriction
@@ -107,4 +109,5 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 - **Monthly local demand modifier** - `monthly_country_pulse` calls `sol_update_local_pop_demand_modifiers`, which computes each owned land location's income-closed coefficient and applies `sol_local_pop_demand_modifier` for one month with `size = var:sol_location_pop_demand_modifier_size`.
 - **Income-closed location scale** - Each location sums five gross stratum incomes, subtracts cached estate building maintenance to derive total net stratum income, applies the country's unified savings adjustment `(total savings / total savings target - 1) * 0.25`, divides liquid funds by market-keyed base spending multiplied by `(1 + development / 20)`, and exposes the corrected result as `local_pop_demand`. Commoner base spending remains exact by internally using laborer, peasant, and soldier unit-spending maps.
 - **Country-level aggregation** - Location income, savings, base spending, development-adjusted base spending, liquid funds, final coefficient, and consumed market goods feed the situation panel and map overlay.
+- **Map display** - The automatic situation map uses vanilla's `situation_data` path via `is_data_map = yes` plus the situation's own `tooltip`, `map_color`, and `legend_key` blocks. The `sol_living_standard` economy mapmode is a separate selectable mapmode using the same SOL location cache metrics, and the SOL situation panel auto-selects it with a zero-size GUI widget whose `_show` state calls `GetMapMode('sol_living_standard').SetMapMode` when `LateralView.IsShown` flips on each reopen; EU5 reference syntax still does not expose a verified situation script field that points to a custom mapmode tag.
 - **Retired 1.2 chain** - Substitute groups, scarcity tiers, per-good redistribution weights, per-stratum Engel curves, market-hub scarcity corrections, and `sol_era_coeff` are no longer part of the active EU5 1.3 demand calculation.
