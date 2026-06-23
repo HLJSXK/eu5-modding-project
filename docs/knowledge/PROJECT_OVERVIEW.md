@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-06-24 (SOL map actual per-capita spending display)
+> Last updated: 2026-06-24 (SOL icon generation helper)
 
 ## Project Identity
 
@@ -87,6 +87,7 @@ eu5-modding-project/
 | `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
 | `sync_reference.py` | After EU5 game updates to a new version | Mirrors reference game files with whitelist and size caps |
 | `validate.py` | Before launching game (`--changed` flag); `--ai-report` for JSON output | Console validation report for anti-patterns, enums, modifiers, SOL baseline, and global_variable_map remove/add writes; exit code indicates pass/fail |
+| `generate_sol_icon.py` | After setting an Images API relay key, or with `--convert-existing-png` for a local source image | Shared `sol_living_standard.dds` icon plus PNG/metadata under `data/generated_icons/`; uses `dds_image_lib.py` for dependency-free PNG/DDS conversion |
 
 The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `engel_export.py`, or `gen_goods_demand_overrides.py`; those tools are retained only as legacy/reference helpers unless explicitly revived.
 
