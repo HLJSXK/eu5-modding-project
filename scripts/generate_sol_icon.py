@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the shared SOL 128x128 DDS icon through a gpt-image-2 Images API relay.
+Generate shared SOL 128x128 DDS icons through a gpt-image-2 Images API relay.
 
 Usage:
   1. Edit generate_sol_icon_config.json if needed.
@@ -8,8 +8,8 @@ Usage:
      or put api.api_key in generate_sol_icon.local.json.
   3. Run: PYTHONUTF8=1 conda run -n eu5 python scripts/generate_sol_icon.py
 
-The output DDS is intended to be reused by the SOL situation, the SOL mapmode,
-and the location-window SOL button.
+The output DDS files are intended to be reused by the SOL situation, the SOL
+mapmode, and the location-window SOL button.
 """
 
 from __future__ import annotations
@@ -76,6 +76,7 @@ class UploadFile:
 class IconTarget:
     name: str
     path: Path
+    extra_paths: tuple[Path, ...]
     width: int
     height: int
     resize: str
@@ -211,6 +212,10 @@ def load_target(config: dict[str, Any]) -> IconTarget:
     asset_name = safe_slug(str(output.get("name") or "sol_living_standard"))
     path_template = str(output.get("path") or str(DEFAULT_DDS_PATH.relative_to(REPO_ROOT)).replace("\\", "/"))
     path = resolve_repo_path(path_template.replace("{name}", asset_name), DEFAULT_DDS_PATH)
+    extra_paths = tuple(
+        resolve_repo_path(extra_path.replace("{name}", asset_name))
+        for extra_path in parse_path_list(output.get("extra_paths", []), "output.extra_paths")
+    )
 
     width = int(output.get("width", 128))
     height = int(output.get("height", 128))
@@ -233,6 +238,7 @@ def load_target(config: dict[str, Any]) -> IconTarget:
     return IconTarget(
         name=asset_name,
         path=path,
+        extra_paths=extra_paths,
         width=width,
         height=height,
         resize=resize,
@@ -643,38 +649,51 @@ def write_prepared_png(output_config: dict[str, Any], target: IconTarget, image:
     return png_path
 
 
-def write_target(output_config: dict[str, Any], target: IconTarget, source_image: RgbaImage) -> dict[str, Any]:
-    overwrite = bool(output_config.get("overwrite", False))
-    if target.path.exists() and not overwrite:
-        size = target.path.stat().st_size
-        print(f"[skip] {display_path(target.path)} exists; output.overwrite is false")
-        return {"path": display_path(target.path).replace("\\", "/"), "skipped": True, "file_size_bytes": size}
+def iter_unique_output_paths(target: IconTarget) -> list[Path]:
+    paths: list[Path] = []
+    seen: set[str] = set()
+    for path in (target.path, *target.extra_paths):
+        key = str(path.resolve()).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        paths.append(path)
+    return paths
 
-    prepared = prepare_target_image(source_image, target)
-    png_path = write_prepared_png(output_config, target, prepared)
+
+def write_single_dds_path(
+    path: Path,
+    target: IconTarget,
+    prepared: RgbaImage,
+    overwrite: bool,
+) -> dict[str, Any]:
+    if path.exists() and not overwrite:
+        size = path.stat().st_size
+        print(f"[skip] {display_path(path)} exists; output.overwrite is false")
+        return {"path": display_path(path).replace("\\", "/"), "skipped": True, "file_size_bytes": size}
+
     levels = write_dds(
         prepared,
-        target.path,
+        path,
         dds_format=target.dds_format,
         overwrite=overwrite,
         opaque_background=target.opaque_background,
         mipmaps=target.mipmaps,
         mipmap_min_dimension=target.mipmap_min_dimension,
     )
-    file_size = target.path.stat().st_size
+    file_size = path.stat().st_size
     if file_size > target.max_file_size_bytes:
         raise RuntimeError(
             f"DDS output is {format_bytes(file_size)}, above the "
-            f"{format_bytes(target.max_file_size_bytes)} limit: {target.path}"
+            f"{format_bytes(target.max_file_size_bytes)} limit: {path}"
         )
     print(
-        f"[dds] {display_path(target.path)} "
+        f"[dds] {display_path(path)} "
         f"({target.width}x{target.height} {target.dds_format}, levels={levels}, "
         f"{format_bytes(file_size)} <= {format_bytes(target.max_file_size_bytes)})"
     )
     return {
-        "path": display_path(target.path).replace("\\", "/"),
-        "png": display_path(png_path).replace("\\", "/"),
+        "path": display_path(path).replace("\\", "/"),
         "width": target.width,
         "height": target.height,
         "dds_format": target.dds_format,
@@ -682,6 +701,35 @@ def write_target(output_config: dict[str, Any], target: IconTarget, source_image
         "file_size_bytes": file_size,
         "max_file_size_bytes": target.max_file_size_bytes,
     }
+
+
+def write_target(output_config: dict[str, Any], target: IconTarget, source_image: RgbaImage) -> dict[str, Any]:
+    overwrite = bool(output_config.get("overwrite", False))
+    prepared = prepare_target_image(source_image, target)
+    target_results = [
+        write_single_dds_path(path, target, prepared, overwrite)
+        for path in iter_unique_output_paths(target)
+    ]
+    wrote_any_dds = any(not result.get("skipped") for result in target_results)
+    png_path = write_prepared_png(output_config, target, prepared) if wrote_any_dds and bool(output_config.get("keep_png", True)) else None
+
+    primary = dict(target_results[0])
+    result = {
+        **primary,
+        "path": display_path(target.path).replace("\\", "/"),
+        "targets": target_results,
+        "skipped": not wrote_any_dds,
+        "width": target.width,
+        "height": target.height,
+        "dds_format": target.dds_format,
+        "max_file_size_bytes": target.max_file_size_bytes,
+    }
+    if png_path:
+        result["png"] = display_path(png_path).replace("\\", "/")
+        for target_result in target_results:
+            if not target_result.get("skipped"):
+                target_result["png"] = result["png"]
+    return result
 
 
 def write_metadata(
@@ -706,6 +754,11 @@ def write_metadata(
         "revised_prompt": revised_prompt,
         "target": written_target,
         "usage_texture": "gfx/interface/icons/sol/sol_living_standard.dds",
+        "usage_textures": [
+            "gfx/interface/icons/sol/sol_living_standard.dds",
+            "gfx/interface/icons/map_modes/sol_living_standard.dds",
+            "gfx/interface/icons/situations/global_living_standard.dds",
+        ],
     }
     metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[metadata] {display_path(metadata_path)}")
@@ -720,6 +773,8 @@ def run(args: argparse.Namespace, config: dict[str, Any], target: IconTarget) ->
 
     print(f"[target] {target.name}: {target.width}x{target.height}, request_size={target.image_size}")
     print(f"[target] output={display_path(target.path)}")
+    for extra_path in target.extra_paths:
+        print(f"[target] extra_output={display_path(extra_path)}")
 
     if args.convert_existing_png:
         source_path = resolve_repo_path(args.convert_existing_png)
