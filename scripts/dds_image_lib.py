@@ -522,7 +522,7 @@ def build_dds_header(
         height,
         width,
         data_size,
-        0,
+        1,
         mipmap_count,
     )
     header += struct.pack("<11I", *([0] * 11))

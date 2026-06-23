@@ -138,6 +138,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         metavar="PATH",
         help="Convert an existing PNG to the configured DDS target without calling the API.",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing DDS outputs instead of skipping them.",
+    )
     return parser.parse_args(argv)
 
 
@@ -244,7 +249,7 @@ def load_target(config: dict[str, Any]) -> IconTarget:
         resize=resize,
         dds_format=dds_format,
         mipmaps=bool(output.get("mipmaps", True)),
-        mipmap_min_dimension=int(output.get("mipmap_min_dimension", 2)),
+        mipmap_min_dimension=int(output.get("mipmap_min_dimension", 1)),
         opaque_background=parse_rgb(output.get("opaque_background", [0, 0, 0]), "output.opaque_background"),
         max_file_size_bytes=int(output.get("max_file_size_bytes", 100_000)),
         image_size=image_size,
@@ -770,6 +775,8 @@ def run(args: argparse.Namespace, config: dict[str, Any], target: IconTarget) ->
     image_config = require_object(config, "image")
     style_config = require_object(config, "style_reference")
     output_config = require_object(config, "output")
+    if args.overwrite:
+        output_config = {**output_config, "overwrite": True}
 
     print(f"[target] {target.name}: {target.width}x{target.height}, request_size={target.image_size}")
     print(f"[target] output={display_path(target.path)}")
