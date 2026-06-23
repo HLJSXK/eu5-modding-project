@@ -84,6 +84,7 @@
 # - modifier: modifiers we apply to members (scale - root = country, scope:recipient = organization)
 # - leader_modifier: modifiers we apply to the leader (scale - root = country, scope:recipient = organization)
 # - non_leader_modifier: modifiers we apply to every member who is not the leader (scale - root = country, scope:recipient = organization)
+# - owned_location_modifier: modifiers we apply to every location owned by the IO (not scaled)
 # - target_modifier: modifiers we apply to the target of the io (scale - root = country, scope:recipient = organization)
 # - international_organization_modifier: modifiers which are applied on the international organization as a base (root = organization)
 # - can_join_trigger: can we join this organization type (root = potential joiner, actor = potential leader, recipient = existing organization if it already exists, target = target if available)
@@ -98,6 +99,9 @@
 # - join_offensive_wars_can_call: do we allow a call to arms from a fellow member in offensive wars (root = international organization, scope:actor = caller, scope:recipient = callee, scope:target (optional) = against who)
 # - only_leader_country_joins_defensive_wars = yes/no: Default: no, when calling to war defensively do we consider all members or just the leader, improves performance of big IOs
 # - only_leader_country_joins_offensive_wars = yes/no: Default: no, when calling to war offensively do we consider all members or just the leader, improves performance of big IOs
+# - joins_defensive_wars_as_co_belligerent = yes/no: Default: no, members of the IO will join the attacked country in defensive wars as co-belligerents
+# - joins_offensive_wars_as_co_belligerent = yes/no: Default: no, members of the IO will join the attacked country in offensive wars as co-belligerents
+# - take_over_wars_when_called = yes/no: Default: no, when the leader joins the war as co-belligerent, they automatically take over the war as warleader
 # - can_declare_war: trigger to determine if war can be declared (attacker = attacker, defender = defender, recipient = international organization)
 # - has_military_access: trigger to determine if a country has military access in another. (root = int org, actor = country we want to know about, recipient = country we want to know if they have access in, war = boolean if we should include war access or not)
 # - gives_military_access_to_all_when_at_war = yes/no: optimized has_military_access, if any war member is part of the IO, everyone in the war gets access to the IO, use this for higher performance
@@ -107,6 +111,7 @@
 # - can_build_roads_in_members = yes/no: whether members can build roads in locations owned by other members
 # - can_build_buildings_in_members = yes/no: whether members can build buildings in locations owned by other members
 # - can_build_rgos_in_members = yes/no: whether members can build rgos in locations owned by other members
+# - has_buildings = yes/no: whether this organization can have buildings be linked to it. These linked buildings will always be owned by the IO leader if one exists, get destroyed if the IO gets destroyed, and the IO pays for them
 # - annulled_by_peace_treaty = yes/no: if yes, an annull treaties peace treaty will force a country out of this IO if the other country is also in it
 # - annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically
 # - opinion_bonus = float: additional opinion bonus applied to all members

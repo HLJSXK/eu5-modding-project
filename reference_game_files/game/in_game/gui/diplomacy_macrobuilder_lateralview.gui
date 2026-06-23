@@ -4,6 +4,24 @@ lateralview = {
 
 	# SOUND - Diplomacy Macrobuilder (Left Panel)
 	blockoverride "snd_panel_identifier" { soundeffect = "UI_panelAux_diplomacy_macrobuilder_show" }
+
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			parentanchor = vcenter
+			size = { 40 40 }
+			position = { 30 0 }
+			button_automation_shortcut = {
+				parentanchor = vcenter
+				size = { 25 25 }
+				action_tooltip = {
+					title = "OPEN_AUTOMATION_PANEL_FILTER"
+					on_action = "[OpenLateralViewWithFilter('automation', 'automation_filter_diplomacy')]"
+				}
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+			}
+		}
+	}
+
 	blockoverride "panel_header" {
 		window_header_alt = {
 			blockoverride "header_text" {
@@ -480,6 +498,7 @@ types DiplomaticActions {
 				hbox = {
 					using = layoutpolicy_expanding
 					layoutstretchfactor_vertical = 5
+					visible = "[Country.Exists]"
 
 					# COUNTRY BUTTON
 					card_header_button_01 = {
@@ -575,15 +594,6 @@ types DiplomaticActions {
 							spacing = 8
 							
 							country_rank_banner = {
-								visible = "[Not(Country.IsGreatPower)]"
-								blockoverride "country_rank_banner_size" {
-									size = {28 32}
-								}
-								tooltipwidget = {
-									using = non_great_power_info_tooltip
-								}
-							}
-							country_rank_banner = {
 								visible = "[Country.IsGreatPower]"
 								blockoverride "country_rank_banner_size" {
 									size = {28 32}
@@ -592,9 +602,34 @@ types DiplomaticActions {
 									using = great_power_info_tooltip
 								}
 							}
+							country_rank_banner = {
+								visible = "[Country.IsRegionalPower]"
+								blockoverride "country_rank_banner_size" {
+									size = {28 32}
+								}
+								tooltipwidget = {
+									using = regional_power_info_tooltip
+								}
+							}
+							country_rank_banner = {
+								visible = "[Not(Or(Country.IsGreatPower, Country.IsRegionalPower))]"
+								blockoverride "country_rank_banner_size" {
+									size = {28 32}
+								}
+								tooltipwidget = {
+									using = non_great_power_info_tooltip
+								}
+							}
+
+							icon = {
+								size = { 20 20 }
+								texture = "[GetAiPersonalityIcon(Country.GetAiPersonality)]"
+								datacontext = "[Country.GetAiPersonality]"
+								tooltipwidget = { using = AiPersonality_tooltip }
+							}
 
 							block "country_card_title_extra" {}
-			
+
 							text_single = {
 								using = layoutpolicy_expanding
 								autoresize = no
@@ -607,15 +642,12 @@ types DiplomaticActions {
 							button_pin = {
 								size = { 21 21 }
 								visible = "[IsPlayerValid]"
-								onclick = "[ToggleCountryFav(Country.Self)]"
-								checked = "[IsCountryFaved(Country.Self)]"
-								tooltipwidget = { 
-									LeftClickButtonTooltip = {
-										blockoverride "onclick_text" { 
-											text = "[SelectLocalization(IsCountryFaved(Country.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
-										}
-									}
+								action_tooltip = {
+									title = "[SelectLocalization(IsCountryFaved(Country.Self), 'UNPIN_OUTLINER', 'PIN_OUTLINER')]"
+									on_action = "[ToggleCountryFav(Country.Self)]"
 								}
+								tooltipwidget = { BasicFunctionalTooltip = {} }
+								down = "[IsCountryFaved(Country.Self)]"
 							}
 
 							# block "country_card_topcontent_extra" {}
@@ -925,8 +957,55 @@ types DiplomaticActions {
 					}
 				}
 
+				# TOP CONTENT (non-existing country)
+				hbox = {
+					using = layoutpolicy_expanding
+					layoutstretchfactor_vertical = 5
+					visible = "[Not(Country.Exists)]"
+
+					button = {
+						using = layoutpolicy_expanding
+						using = bg_card_header_01
+						tooltipwidget = {
+							using = CountryTooltip
+						}
+						blockoverride "bg_card_header_01_bg" {
+							background = {
+								texture = "[GetGraphicalCultureTexture('top_header_bg')]"
+								texture_density = 2.4
+								spriteType = corneredtiled
+								spriteborder = { 0 0 }
+								alpha = 0.6
+							}
+							background = {
+								using = color_grey_texture
+								alpha = 0.8
+								modify_texture = {
+									using = color_black_texture
+									alpha = 0.4
+									blend_mode = multiply
+								}
+							}
+						}
+
+						hbox = {
+							margin = {10 0}
+							margin_left = 10
+							spacing = 8
+
+							text_single = {
+								using = layoutpolicy_expanding
+								autoresize = no
+								align = nobaseline
+								text = "[Country.GetLongNameWithNoTooltip]"
+							}
+						}
+					}
+				}
+
 				# BOTTOM CONTENT
 				hbox = {
+					visible = "[Country.Exists]"
 					using = layoutpolicy_expanding
 					layoutstretchfactor_vertical = 6
 					margin = { 2 0 }
@@ -1055,7 +1134,7 @@ types DiplomaticActions {
 							tooltipwidget = {
 								using = diplomatic_action_tooltip
 								blockoverride "diplomatic_action_tooltip_content_extra"{
-									TooltipScrolledStringPairList = {
+									TooltipScrolledBlockList = {
 										blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
 										textcontext = "[Country.GetDiplomacy.GetTrustDescription(GetPlayer)]"
 									}
@@ -1075,7 +1154,7 @@ types DiplomaticActions {
 									size = { -1 18}
 									autoresize = no
 									align = center
-									raw_text = "[Country.GetDiplomacy.GetTrustTowards(GetPlayer)|+=2]"
+									raw_text = "[Country.GetDiplomacy.GetTrustTowardsString(GetPlayer)]"
 								}
 
 								block "trust_sort_highlight" {}
@@ -1201,6 +1280,10 @@ types DiplomaticActions {
 										blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
 										textcontext = "[Country.GetDiplomaticCurrencyDesc('spy_network')]"
 									}
+									TooltipRowList = {
+										visible = "[And(Not(Country.IsLocalPlayer), Not(StringIsEmpty(Country.GetObjectivesDisplayText)))]"
+										textcontext = "[Country.GetObjectivesDisplayText]"
+									}
 								}
 							}
 
@@ -1247,6 +1330,7 @@ types DiplomaticActions {
 								click_modifier = shift
 								click_type = left
 								title = "ALERT_HINT"
+								click_modifier_description = "OPEN_HINT_TEXT"
 								using = snd_UI_alert_openAndCycle
 								on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_casus_belli')]"
 								on_action = "[PdxGuiTriggerAllAnimations('reset_carousel')]"
@@ -1277,9 +1361,6 @@ types DiplomaticActions {
 
 							tooltipwidget = {
 								using = diplomatic_action_tooltip
-								blockoverride "shift_left_extra" {
-									replacement_shift_item = {}
-								}
 
 								blockoverride "title_button" {
 									hint_button = {
@@ -1456,10 +1537,35 @@ types DiplomaticActions {
 							using = bg_black_fade_horizontal
 
 							country_rank_banner = {
+								visible = "[Country.IsGreatPower]"
 								blockoverride "country_rank_banner_size" {
 									size = {34 55}
 								}
+								tooltipwidget = {
+									using = great_power_info_tooltip
+								}
 							}
+
+							country_rank_banner = {
+								visible = "[Country.IsRegionalPower]"
+								blockoverride "country_rank_banner_size" {
+									size = {34 55}
+								}
+								tooltipwidget = {
+									using = regional_power_info_tooltip
+								}
+							}
+
+							country_rank_banner = {
+								visible = "[Not(Or(Country.IsGreatPower, Country.IsRegionalPower))]"
+								blockoverride "country_rank_banner_size" {
+									size = {34 55}
+								}
+								tooltipwidget = {
+									using = non_great_power_info_tooltip
+								}
+							}
+
 			
 							text_single = {
 								using = layoutpolicy_expanding
@@ -1486,77 +1592,115 @@ types DiplomaticActions {
         widget = {
             size = {100% 100%}
 			allow_outside = yes
-			block "great_power_tooltip" {
-				button = {
-					size = {105% 100%} 
-					visible = "[Country.IsGreatPower]"
-					texture = "gfx/interface/great_powers/greatpower_0.dds"
-					texture_density = 2
-					parentanchor = center
-					spriteType = Corneredstretched
-					spriteborder = {20 20}
-					action_tooltip = {
-						click_type = left
-						click_mode = single
-						title = "OPEN_KNOWN_COUNTRIES_TAB"
-						on_action = "[OpenLateralViewWithParams('diplomacy', 'relations_tab = known_countries')]"
-					}
-					tooltipwidget = {
-						using = great_power_info_tooltip
-					}
+			button = {
+				size = {105% 100%}
+				visible = "[Country.IsGreatPower]"
+				texture = "gfx/interface/great_powers/greatpower_0.dds"
+				texture_density = 2
+				parentanchor = center
+				spriteType = Corneredstretched
+				spriteborder = {20 20}
+				action_tooltip = {
+					click_type = left
+					click_mode = single
+					title = "OPEN_KNOWN_COUNTRIES_TAB"
+					on_action = "[OpenLateralViewWithParams('diplomacy', 'relations_tab = known_countries')]"
 				}
-				button = {
-					size = {105% 100%} 
-					visible = "[Not(Country.IsGreatPower)]"
-					texture = "gfx/interface/great_powers/greatpower_0.dds"
-					texture_density = 2
-					parentanchor = center
-					spriteType = Corneredstretched
-					spriteborder = {20 20}
-					action_tooltip = {
-						click_type = left
-						click_mode = single
-						title = "OPEN_KNOWN_COUNTRIES_TAB"
-						on_action = "[OpenLateralViewWithParams('diplomacy', 'relations_tab = known_countries')]"
-					}
-					tooltipwidget = {
-						using = non_great_power_info_tooltip
-					}
+				tooltipwidget = {
+					using = great_power_info_tooltip
 				}
 			}
-            widget = {
-                size = {100% 100%}
-                icon = {
-                    texture = "gfx/interface/great_powers/greatpower_frame.dds"
-                    texture_density = 2
-                    size = { 28 32 }
-                    parentanchor = left|bottom
-                    position = {-6 -2}
-                    frame_grid = {8 1}
-                    visible = "[Country.IsGreatPower]"
-                    frame = "[Country.GetGreatPowerRank]"
-                }
-                icon = {
-                    texture = "gfx/interface/great_powers/greatpower_frame.dds"
-                    texture_density = 2
-                    size = { 28 32 }
-                    parentanchor = right|bottom
-					mirror = horizontal
-                    position = {7 -2}
-                    frame_grid = {8 1}
-					visible = "[Country.IsGreatPower]"
-                    frame = "[Country.GetGreatPowerRank]"
-                }
-            }
-            text_single = {
-				maximumsize = { 20 -1 }
-                autoresize = yes
-                text = "[Country.GetGreatPowerRank]"
-                parentanchor = center
-                align = center|nobaseline
-             	block "great_power_sort_highlight" {}
-            }			
-        }
+			button = {
+				size = {105% 100%}
+				visible = "[Country.IsRegionalPower]"
+				texture = "gfx/interface/great_powers/greatpower_0.dds"
+				texture_density = 2
+				parentanchor = center
+				spriteType = Corneredstretched
+				spriteborder = {20 20}
+				action_tooltip = {
+					click_type = left
+					click_mode = single
+					title = "OPEN_KNOWN_COUNTRIES_TAB"
+					on_action = "[OpenLateralViewWithParams('diplomacy', 'relations_tab = known_countries')]"
+				}
+				tooltipwidget = {
+					using = regional_power_info_tooltip
+				}
+			}
+			button = {
+				size = {105% 100%}
+				visible = "[Not(Or(Country.IsGreatPower, Country.IsRegionalPower))]"
+				texture = "gfx/interface/great_powers/greatpower_0.dds"
+				texture_density = 2
+				parentanchor = center
+				spriteType = Corneredstretched
+				spriteborder = {20 20}
+				action_tooltip = {
+					click_type = left
+					click_mode = single
+					title = "OPEN_KNOWN_COUNTRIES_TAB"
+					on_action = "[OpenLateralViewWithParams('diplomacy', 'relations_tab = known_countries')]"
+				}
+				tooltipwidget = {
+					using = non_great_power_info_tooltip
+				}
+			}
+		}
+		widget = {
+			size = {100% 100%}
+			icon = {
+				texture = "gfx/interface/great_powers/greatpower_frame.dds"
+				texture_density = 2
+				size = { 28 32 }
+				parentanchor = left|bottom
+				position = {-6 -2}
+				frame_grid = {8 1}
+				visible = "[Country.IsGreatPower]"
+				frame = "1"
+			}
+			icon = {
+				texture = "gfx/interface/great_powers/greatpower_frame.dds"
+				texture_density = 2
+				size = { 28 32 }
+				parentanchor = right|bottom
+				mirror = horizontal
+				position = {7 -2}
+				frame_grid = {8 1}
+				visible = "[Country.IsGreatPower]"
+				frame = "1"
+			}
+			icon = {
+				texture = "gfx/interface/great_powers/greatpower_frame.dds"
+				texture_density = 2
+				size = { 28 32 }
+				parentanchor = left|bottom
+				position = {-6 -2}
+				frame_grid = {8 1}
+				visible = "[Country.IsRegionalPower]"
+				frame = "6"
+			}
+			icon = {
+				texture = "gfx/interface/great_powers/greatpower_frame.dds"
+				texture_density = 2
+				size = { 28 32 }
+				parentanchor = right|bottom
+				mirror = horizontal
+				position = {7 -2}
+				frame_grid = {8 1}
+				visible = "[Country.IsRegionalPower]"
+				frame = "6"
+			}
+		}
+		text_single = {
+			maximumsize = { 20 -1 }
+			autoresize = yes
+			text = "[Country.GetGreatPowerRank]"
+			parentanchor = center
+			align = center|nobaseline
+			block "great_power_sort_highlight" {}
+		}			
+	
     }
 
 	type country_card_right_buttons = hbox {
@@ -2011,6 +2155,18 @@ types DiplomaticActions {
 											alpha = 0.5
 										}
 									}
+									icon = {
+										size = { 40 40 }
+										texture = "gfx/interface/icons/diplomatic_actions/military_actions.dds"
+										visible = "[EqualTo_string(DiplomaticActionCategory.GetNameKey, 'CATEGORY_MILITARY_ACTIONS')]"
+				
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 3
+											color = {0.0 0.0 0.0 1.0}
+											alpha = 0.5
+										}
+									}
 
 									text_single = {
 										layoutpolicy_horizontal = expanding
@@ -2190,10 +2346,7 @@ select_menu_left = {
 		name = "diplomacy_macrobuilder_select_country"
 	}
 
-	blockoverride "close_button" {
-		onclick = "[DiplomacyMacrobuilderSelectCountry.OnClose]"
-	}
-
+	blockoverride "close_on_action" { on_action = "[DiplomacyMacrobuilderSelectCountry.OnClose]" }
 	blockoverride "select_content" {
 		select_menu_header = {
 			blockoverride "select_menu_header_extra" {

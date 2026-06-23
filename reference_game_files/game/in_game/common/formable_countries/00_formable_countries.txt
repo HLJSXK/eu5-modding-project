@@ -3,6 +3,7 @@
 	level = 3
 	required_locations_fraction = 0.75
 	rule = plausible
+	content_priority = 800
 	
 	potential = {
 		culture = { has_culture_group = culture_group:scandinavian_group }
@@ -131,13 +132,14 @@ DRD_f = {
 }
 
 GBR_f = {
+	content_priority = 800
 	level = 3
 	required_locations_fraction = 0.75
 
 	rule = historical
 	
 	potential = {
-		any_primary_or_accepted_or_tolerated_culture = { has_culture_group = culture_group:british_group }
+		culture ?= { has_culture_group = culture_group:british_group }
 	}
 
 	allow = {
@@ -373,6 +375,20 @@ IRE_f = {
 					}
 				}
 			}
+			custom_tooltip = {
+				#allow if they're the sole remaining member of the Ireland High Kingship
+				text = IRE_f_sole_high_kingship_tt
+				is_member_of_international_organization_of_type = { type = high_kingship }
+				any_international_organizations_member_of = {
+					count = all
+					filter = {
+						international_organization_type = international_organization_type:high_kingship
+						has_variable = high_kingship_region
+						var:high_kingship_region = region:ireland_region
+					}
+					total_members = 1
+				}
+			}
 		}
 		custom_tooltip = {
 			text = IRE_f_lordship_tt
@@ -393,6 +409,84 @@ IRE_f = {
 		if = {
 			limit = { unique_international_organization_type_exists = international_organization_type:lordship_of_ireland }
 			destroy_international_organization = { target = international_organization:lordship_of_ireland }
+		}
+
+		# Leave the High Kingship before rank change to avoid block_from_change_to_kingdom_rank
+		if = {
+			limit = { is_member_of_international_organization_of_type = { type = high_kingship } }
+			every_international_organizations_member_of = {
+				limit = {
+					international_organization_type = international_organization_type:high_kingship
+					has_variable = high_kingship_region
+					var:high_kingship_region = region:ireland_region
+				}
+				remove_country_from_international_organization = root
+			}
+		}
+
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}
+
+	}
+}
+
+MTH_f = {
+	level = 1
+	required_locations_fraction = 0.75
+	rule = historical
+
+	potential = {
+		culture = { has_culture_group = culture_group:hibernian_group }
+	}
+
+	allow = {
+	}
+
+	name = MTH
+	flag = MTH
+	adjective = MTH_ADJ
+	tag = MTH
+	color = map_MTH
+
+	provinces = {
+		meath_province
+		dublin_province
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 2 }
+			set_country_rank_effect = { rank = country_rank:rank_duchy }
+		}
+	}
+}
+
+MCM_f = {
+	level = 1
+	required_locations_fraction = 0.75
+	rule = historical
+
+	potential = {
+		culture = { has_culture_group = culture_group:hibernian_group }
+	}
+
+	allow = {
+	}
+
+	name = MCM
+	flag = MCM
+	adjective = MCM_ADJ
+	tag = MCM
+	color = map_MCM
+
+	areas = {
+		munster_area
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
 		}
 	}
 }
@@ -469,13 +563,14 @@ SWI_f = {
 }
 
 SPA_f = {
+	content_priority = 800
 
 	level = 3
 	required_locations_fraction = 0.75
 	rule = historical
 	
 	potential = {
-		culture = { has_culture_group = culture_group:iberian_group }
+		culture ?= { has_culture_group = culture_group:iberian_group }
 		religion.group = religion_group:christian
 	}
 
@@ -639,15 +734,32 @@ KOA_f = {
 LAT_f = { 
 
 	level = 3
-	required_locations_fraction = 0.5
+	required_locations_fraction = 0.75
 	rule = plausible
 
 	potential = {
+		NOT = { country_exists = c:LAT }
+		NOT = { has_variable = lat_reduced_requirements_to_form }
 		religion = religion:catholic
+		is_frankokratia_state = yes
+		NOT = { current_age_or_later = { age = age_5_absolutism } }
 	}
 
 	allow = {
+		NOT = { country_exists = c:LAT }
 		owns = location:constantinople
+		religion = religion:catholic
+		OR = {
+			culture = { has_culture_group = culture_group:french_group }
+			culture = { has_culture_group = culture_group:iberian_group }
+			culture = { has_culture_group = culture_group:italian_group }
+		}
+		OR = {
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
+			current_age = age_3_discovery
+			current_age = age_4_reformation
+		}	
 	}
 	
 	name = LAT
@@ -657,16 +769,293 @@ LAT_f = {
 	color = map_LAT
 	
 	areas = {
-		thrace_area
+		northern_greece_area
+		morea_area
 	}
 	provinces = {
-		thessaly_province
+		north_epirus_province
+		constantinople_province
+		edirne_province
+		evros_province
+		dardanelles_province
+		central_macedonia_province
+		lower_macedonia_province
+		upper_macedonia_province
+		chalkidiki_province
+		naxos_province
+		euboea_province
+		lemnos_province
 	}
 	form_effect = {
+		if = {
+			limit = { country_rank_level < 4 }
+			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+		if = {
+			limit = { has_reform = government_reform:partitio_reform }
+			remove_reform = government_reform:partitio_reform
+		}
+		unlock_government_reform_effect = { type = lat_restored_rule_of_the_latins }
+		add_reform = government_reform:lat_restored_rule_of_the_latins
+		if = {
+			limit = { 
+				culture = culture:catalan
+				NOT = { has_variable = de_brienne_rule_of_athens }
+				NOT = { has_reform = government_reform:ach_heirs_of_the_latin_empire } 
+			}
+			hidden_effect = {
+				change_country_color = map_LAT_catalan_restoration
+			}
+		}
+		if = {
+			limit = { 
+				has_reform = government_reform:ach_heirs_of_the_latin_empire
+				NOT = { has_variable = de_brienne_rule_of_athens }
+			}
+			hidden_effect = {
+				change_country_color = map_LAT_titular_restoration
+			}            
+		}
+		else_if = {
+			limit = {
+				NOT = { has_reform = government_reform:ach_heirs_of_the_latin_empire } 
+				NOT = { culture = culture:catalan }
+			}
+			hidden_effect = {
+				change_country_color = map_LAT
+			} 
+		}			
+	}
+}
+
+LAT_REDUCED_REQUIREMENTS_f = { 
+
+	level = 3
+	required_locations_fraction = 0.33
+	rule = plausible
+
+	potential = {
+		NOT = { country_exists = c:LAT }
+		religion = religion:catholic
+		has_variable = lat_reduced_requirements_to_form
+		is_frankokratia_state = yes
+		NOT = { current_age_or_later = { age = age_4_reformation } }
+	}
+
+	allow = {
+		NOT = { country_exists = c:LAT }
+		owns = location:constantinople
+		religion = religion:catholic
+		OR = {
+			culture = { has_culture_group = culture_group:french_group }
+			culture = { has_culture_group = culture_group:iberian_group }
+			culture = { has_culture_group = culture_group:italian_group }
+		}
+		OR = {
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
+			current_age = age_3_discovery
+		}		
+	}
+	
+	name = LAT
+	flag = LAT
+	adjective = LAT_ADJ
+	tag = LAT
+	color = map_LAT
+	
+	areas = {
+		northern_greece_area
+		morea_area
+	}
+	provinces = {
+		north_epirus_province
+		constantinople_province
+		edirne_province
+		evros_province
+		dardanelles_province
+		central_macedonia_province
+		lower_macedonia_province
+		upper_macedonia_province
+		chalkidiki_province
+		naxos_province
+		euboea_province
+		lemnos_province
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 4 }
+			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+		if = {
+			limit = { has_reform = government_reform:partitio_reform }
+			remove_reform = government_reform:partitio_reform
+		}
+		unlock_government_reform_effect = { type = lat_restored_rule_of_the_latins }
+		add_reform = government_reform:lat_restored_rule_of_the_latins
+		if = {
+			limit = { 
+				culture = culture:catalan
+				NOT = { has_variable = de_brienne_rule_of_athens }
+				NOT = { has_reform = government_reform:ach_heirs_of_the_latin_empire } 
+			}
+			hidden_effect = {
+				change_country_color = map_LAT_catalan_restoration
+			}
+		}
+		if = {
+			limit = { 
+				has_reform = government_reform:ach_heirs_of_the_latin_empire
+				NOT = { has_variable = de_brienne_rule_of_athens }
+			}
+			hidden_effect = {
+				change_country_color = map_LAT_titular_restoration
+			}            
+		}
+		else_if = {
+			limit = {
+				NOT = { has_reform = government_reform:ach_heirs_of_the_latin_empire } 
+				NOT = { culture = culture:catalan }
+			}
+			hidden_effect = {
+				change_country_color = map_LAT
+			} 
+		}					
+	}
+}
+
+THE_f = {
+	level = 1
+	required_locations_fraction = 0.80
+	rule = plausible
+	capital_required = no
+	potential = {
+		NOT = { country_exists = c:THE }
+		NOT = { tag = LAT }
+		is_frankokratia_state = yes
+		NOT = { has_variable = halved_cost_to_form_thesslonica }
+		NOT = { tag = ACH }
+		NOT = { current_age_or_later = { age = age_3_discovery } }
+	}
+	allow = {
+		NOT = { country_exists = c:THE }
+		owns = location:thessaloniki
+		religion = religion:catholic 
+		OR = {
+			culture = { has_culture_group = culture_group:french_group }
+			culture = { has_culture_group = culture_group:iberian_group }
+			culture = { has_culture_group = culture_group:italian_group }
+		}
+		OR = {
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
+		}
+	}
+	
+	name = THE
+	flag = THE
+	adjective = THE_ADJ
+	tag = THE
+	color = map_THE
+
+	provinces = {
+		neopatras_province
+		thessaly_province
+		upper_macedonia_province
+		central_macedonia_province
+		chalkidiki_province
+		lower_macedonia_province
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}		
+	}
+}
+
+THE_REDUCED_REQUIREMENTS_f = {
+	level = 1
+	required_locations_fraction = 0.50
+	rule = plausible
+	capital_required = no
+	potential = {
+		NOT = { country_exists = c:THE }
+		NOT = { tag = LAT }
+		is_frankokratia_state = yes
+		OR = {
+			has_variable = halved_cost_to_form_thesslonica
+			tag = ACH
+		}
+		NOT = { current_age_or_later = { age = age_3_discovery } }
+	}
+	allow = {
+		NOT = { country_exists = c:THE }
+		owns = location:thessaloniki
+		religion = religion:catholic
+		OR = {
+			culture = { has_culture_group = culture_group:french_group }
+			culture = { has_culture_group = culture_group:iberian_group }
+			culture = { has_culture_group = culture_group:italian_group }
+		}
+		OR = {
+			current_age = age_1_traditions
+			current_age = age_2_renaissance
+		}	
+	}
+	
+	name = THE
+	flag = THE
+	adjective = THE_ADJ
+	tag = THE
+	color = map_THE
+
+	provinces = {
+		neopatras_province
+		thessaly_province
+		upper_macedonia_province
+		central_macedonia_province
+		chalkidiki_province
+		lower_macedonia_province
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}			
 	}
 }
 
 SAR_f = { 
+
+	level = 2
+	required_locations_fraction = 0.85
+	rule = historical
+
+	capital_required = no
+
+	potential = {
+		culture = culture:sardinian
+	}
+
+	allow = {
+	}
+	
+	name = SAR
+	flag = SAR
+	adjective = SAR_ADJ
+	tag = SAR
+	color = map_sardinian
+	
+	areas = {
+		sardinia_area
+	}
+	form_effect = {
+		set_country_rank_effect = { rank = country_rank:rank_kingdom }
+	}
+}
+
+SAR_piedmont_f = { 
 
 	level = 2
 	required_locations_fraction = 0.85
@@ -681,14 +1070,15 @@ SAR_f = {
 	allow = {
 	}
 	
-	name = SAR
-	flag = SAR
-	adjective = SAR_ADJ
-	tag = SAR
+	name = SAR_piedmont
+	flag = SAR_piedmont
+	adjective = SAR_piedmont_ADJ
+	tag = SAR_piedmont
 	color = map_sardinia
 	
 	areas = {
 		sardinia_area
+		piemonte_area
 	}
 	form_effect = {
 		set_country_rank_effect = { rank = country_rank:rank_kingdom }
@@ -906,14 +1296,14 @@ SAX_f = { # Saxony
 	}
 
 	allow = {
-		international_organization:hre = {
+		international_organization:hre ?= {
 			country_has_special_status = {
 				type = special_status:elector
 				country = root
 			}
 		}
 	}
-	
+
 	name = SAX
 	flag = SAX
 	adjective = SAX_ADJ
@@ -1003,6 +1393,7 @@ POM_f = {
 }
 
 PRU_f = { #Prussia
+	content_priority = 800
 	level = 2
 	required_locations_fraction = 0.75
 	rule = historical
@@ -1110,7 +1501,7 @@ LVA_f = { # Baltic
 GER_f = {
 
 	level = 4
-	required_locations_fraction = 0.66
+	required_locations_fraction = 0.6
 	rule = plausible
 	potential = {
 		culture = { has_culture_group = culture_group:german_group }
@@ -1288,7 +1679,12 @@ PLC_f = {
 				OR = {
 					tag = POL
 					NOT = { country_exists = c:POL }
-					c:POL = { is_subject_or_below_of = root }
+					c:POL = { 
+						OR = {
+							is_subject_or_below_of = root
+							in_union_with = root
+						}
+					}
 				}			
 			}
 		}
@@ -1302,7 +1698,12 @@ PLC_f = {
 				OR = {
 					tag = LIT
 					NOT = { country_exists = c:LIT }
-					c:LIT = { is_subject_or_below_of = root }
+					c:LIT = {
+						OR = {
+							is_subject_or_below_of = root
+							in_union_with = root
+						}
+					}
 				}			
 			}
 		}
@@ -1375,8 +1776,11 @@ ROM_f = {
 	rule = fantasy
 	
 	potential = {
-		OR = {
+		NOR = {
 			has_or_had_tag = BYZ
+			has_or_had_tag = TRE
+		}
+		OR = {
 			country_rank = country_rank:rank_empire
 			owns = location:constantinople
 			AND = {
@@ -1391,11 +1795,7 @@ ROM_f = {
 		owns = location:constantinople
 		country_rank = country_rank:rank_empire
 		is_hegemon = yes
-
-		OR = {
-			has_or_had_tag = BYZ
-			NOT = { country_exists = c:BYZ }
-		}
+		NOT = { country_exists = c:BYZ }
 		OR = {
 			religion.group = religion_group:christian
 			religion = religion:hellenism_religion
@@ -1423,13 +1823,82 @@ ROM_f = {
 		caucasus_region
 	}
 	form_effect = {
-		if = { 
-			limit = { NOT = { court_language = language:latin_language } }
-			set_court_language = dialect:latin_language
+		if = {
+			limit = {
+				NOT = { court_language = language:latin_language }
+			}
+			set_court_language = dialect:roman_dialect
 		}
-		if = { 
+		if = {
 			limit = { NOT = { capital = location:rome } }
-			set_capital = location:rome
+			move_capital_event_effect = {
+				from = root.capital
+				to = location:rome
+			}
+		}
+		if = {
+			limit = { has_dlc = "d008_fate_of_the_phoenix" }
+			unlock_casus_belli_effect = { type = cb_restore_roman_borders }
+		}
+	}
+}
+
+ROM_BYZ_f = {
+	level = 5
+	required_locations_fraction = 0.25
+	rule = historical
+
+	capital_required = no
+	potential_requires_own = no
+	
+	potential = {
+		OR = {
+			has_or_had_tag = BYZ
+			has_or_had_tag = TRE
+		}
+	}
+
+	allow = {
+		owns = location:rome
+		owns = location:constantinople
+		country_rank = country_rank:rank_empire
+
+		OR = {
+			has_or_had_tag = BYZ
+			NOT = { country_exists = c:BYZ }
+		}
+	}
+
+	name = ROM
+	flag = ROM
+	adjective = ROM_ADJ
+	tag = ROM
+	color = map_ROM
+
+	regions = {
+		italy_region
+	}
+	form_effect = {
+		if = {
+			limit = { NOT = { capital = location:rome } }
+			move_capital_event_effect = {
+				from = root.capital
+				to = location:rome
+			}
+		}
+		province_definition:marittima_province = {
+			every_ownable_location_in_province_definition = {
+				limit = { owner = root }
+				change_integration_level = integrated
+			}
+		}
+		if = {
+			limit = { has_societal_value = societal_value_type:latinization_vs_hellenization }
+			change_societal_value = { type = latinization_vs_hellenization value = societal_value_huge_move_to_left }
+		}
+		if = {
+			limit = { has_dlc = "d008_fate_of_the_phoenix" }
+			unlock_casus_belli_effect = { type = cb_restore_roman_borders }
 		}
 	}
 }
@@ -1577,9 +2046,13 @@ MLC_f = {
 EUR_f = {
 	level = 5
 	required_locations_fraction = 0.5
-	rule = fantasy	
+	rule = fantasy
 
+	# is_hegemon mirrors the allow gate; promoting it to potential keeps EUR_f
+	# out of the lobby Content panel (no one is hegemon at game start) while
+	# leaving it formable once a player actually achieves hegemony in-game.
 	potential = {
+		is_hegemon = yes
 	}
 
 	allow = {
@@ -1665,9 +2138,17 @@ ITA_f = {
 	}
 
 	allow = {
-		owns = location:milano
-		owns = location:florence
-		owns = location:naples
+		OR = {
+			AND = {
+				owns = location:milano
+				owns = location:florence
+				owns = location:naples
+			}
+			custom_tooltip = {
+				text = gag_guelphs_winner_may_form_italy_without_location_requirements_tt
+				has_variable = gag_guelphs_winner_may_form_italy_without_location_requirements
+			}
+		}
 	}
 	
 	name = ITA
@@ -1794,6 +2275,7 @@ TWS_f = {
 	level = 2
 	required_locations_fraction = 0.8
 	rule = historical
+	content_priority = 800
 	potential = {
 		not = { tag = ITA }
 		OR = {
@@ -1808,20 +2290,26 @@ TWS_f = {
 		# 3 Cases
 		trigger_if = {
 			limit = { tag = SIC }
-			c:NAP = { 
-				NOT = { has_presence_in = region:italy_region }
+			OR = {
+				NOT = { country_exists = c:NAP }
+				c:NAP = { NOT = { has_presence_in = region:italy_region } }
 			}
 		}
 		trigger_else_if = {
 			limit = { tag = NAP }
-			c:SIC ?= { 
-				NOT = { has_presence_in = region:italy_region }
+			OR = {
+				NOT = { country_exists = c:SIC }
+				c:SIC = { NOT = { has_presence_in = region:italy_region } }
 			}
 		}
 		trigger_else = {
-			NOR = {
-				c:NAP ?= { has_presence_in = region:italy_region }
-				c:SIC ?= { has_presence_in = region:italy_region }
+			OR = {
+				NOT = { country_exists = c:NAP }
+				c:NAP = { NOT = { has_presence_in = region:italy_region } }
+			}
+			OR = {
+				NOT = { country_exists = c:SIC }
+				c:SIC = { NOT = { has_presence_in = region:italy_region } }
 			}
 		}
 	}
@@ -1846,6 +2334,7 @@ TWS_f = {
 RUS_f = {
 	level = 4
 	required_locations_fraction = 0.5
+	content_priority = 800
 	rule = historical
 
 	potential = {
@@ -1894,7 +2383,7 @@ GRE_f = {
 	flag = GRE
 	adjective = GRE_ADJ
 	tag = GRE
-	color = map_greek
+	color = map_GRE
 
 	areas = {
 		thrace_area
@@ -1913,6 +2402,7 @@ BYZ_f = {
 	rule = historical
 	potential = {
 		culture = { has_culture_group = culture_group:greek_group }
+		NOT = { has_or_had_tag = TRE }
 	}
 	allow = {
 		religion = religion:orthodox
@@ -1931,17 +2421,76 @@ BYZ_f = {
 	}
 	form_effect = {
 		if = {
-			limit = { 
-				NOR = { 
+			limit = {
+				NOR = {
 					capital = location:constantinople
 					capital = location:rome
-				} 
+				}
 			}
 			set_capital = location:constantinople
 		}
 		if = {
 			limit = { country_rank_level < 4 }
 			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+		if = {
+			limit = { has_dlc = "d008_fate_of_the_phoenix" }
+			unlock_casus_belli_effect = { type = cb_restore_roman_borders }
+		}
+	}
+}
+
+BYZ_trebizond_f = {
+	level = 4
+	required_locations_fraction = 0.15
+	rule = historical
+	potential = {
+		has_or_had_tag = TRE
+		culture = { has_culture_group = culture_group:greek_group }
+	}
+	allow = {
+		religion = religion:orthodox
+		owns = location:constantinople
+		NOT = { country_exists = c:BYZ }
+	}
+
+	name = BYZ
+	flag = BYZ
+	adjective = BYZ_ADJ
+	tag = BYZ
+	color = map_BYZ
+
+	regions = {
+		balkan_region
+		anatolia_region
+	}
+	form_effect = {
+		if = {
+			limit = {
+				NOR = {
+					capital = location:constantinople
+					capital = location:rome
+				}
+			}
+			set_capital = location:constantinople
+		}
+		if = {
+			limit = { country_rank_level < 4 }
+			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+
+		# Unlock BYZ content
+		unlock_government_reform_effect = { type = kritai_katholikoi_reformed }
+		unlock_government_reform_effect = { type = modern_imperial_army }
+		unlock_policy_effect = { type = stavraton_coin_policy }
+		unlock_policy_effect = { type = komnenian_formalization }
+		unlock_policy_effect = { type = palaeologan_hereditary_transition }
+		unlock_policy_effect = { type = reformed_pronoia_system }
+
+		if = {
+			limit = { has_dlc = "d008_fate_of_the_phoenix" }
+			research_advance = advance_type:byz_bureaucracy_advance
+			unlock_casus_belli_effect = { type = cb_restore_roman_borders }
 		}
 	}
 }
@@ -2671,7 +3220,7 @@ NAV_f = {
 }
 
 KOJ_f = {
-	level = 2
+	level = 3
 	required_locations_fraction = 0.75
 	rule = plausible
 
@@ -4128,6 +4677,7 @@ CIR_f = { # Circassia
 	rule = historical
 
 	potential = {
+		culture = culture:circassian_culture
 	}
 	allow = {
 		
@@ -4179,6 +4729,54 @@ AZT_f = {
 			limit = { country_rank_level < 4 }
 			set_country_rank_effect = { rank = country_rank:rank_empire }
 		}
+	}
+}
+
+PON_f = {
+
+	level = 3	
+	required_locations_fraction = 0.75
+	rule = fantasy
+
+	potential = {
+		OR = {			
+			culture = culture:pontic_greek_culture
+			owns = location:trebizond
+		}
+		
+	}
+	
+	allow = {
+		AND = {
+			culture = culture:pontic_greek_culture
+			owns = location:trebizond
+		}
+	}
+	
+	name = PON
+	flag = PON
+	adjective = PON_ADJ
+	tag = PON
+	color = map_pontus
+	
+	
+	areas = {
+		pontus_area
+		crimea_area
+	}
+
+	provinces = {
+		taman_province
+		samegrelo_province
+		abkhazia_province
+
+		amasya_province
+		tokat_province
+		erzurum_province
+	}
+
+	form_effect = {
+		set_country_rank_effect = { rank = country_rank:rank_kingdom }
 	}
 }
 
@@ -4326,6 +4924,58 @@ CSH_f = {
 	color = map_CSH
 
 	regions = {
+	}
+	form_effect = {
+	}
+}
+
+OCC_f = { #Occitania
+	level = 3
+	rule = plausible
+	required_locations_fraction = 0.75
+
+	potential = {
+		OR = {
+			culture.dialect = dialect:occitan_dialect
+			culture.dialect = dialect:gascon_dialect
+		}
+	}
+
+	allow = {
+	}
+
+	tag = OCC
+	name = OCC
+	adjective = OCC_ADJ
+	flag = OCC
+	color = map_OCC
+
+	areas = {
+		provence_area
+		languedoc_area
+	}
+	provinces = {
+		valentinois_province
+		agenais_province
+		bazadais_province
+		perigord_province
+		quercy_province
+		rouergue_province
+		turenne_province
+		limousin_province
+		lower_auvergne_province
+		combraille_province
+		upper_auvergne_province
+		armagnac_province
+		bearn_bigorre_province
+		comminges_province
+		tursan_province
+	}
+	locations = {
+		briancon gap
+		bordeaux benauges castelnau_de_medoc la_teste_de_buch lesparre_medoc
+		gueret aubusson bellac bourganeuf rochechouart
+		cuneo saluzzo pinerolo pragelato la_mure romans vielha chabanais
 	}
 	form_effect = {
 	}

@@ -88,6 +88,8 @@ types SelectionCardsTypes
 			datamodel = "[RowList.GetRows]"
 			item = {
 				text_multi = {
+					visible = "[CPdxStringView.IsStringViewNotEmptyOrNull]"
+					layoutpolicy_horizontal = expanding
 					margin = { 10 5 }
 					align = nobaseline
 					fontsize = 14
@@ -98,7 +100,7 @@ types SelectionCardsTypes
 						maximumsize = { 520 -1 }
 					}
 					
-					text = "[CString.GetString]"
+					text = "[CPdxStringView.GetStringView]"
 
 					background = {
 						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
@@ -111,7 +113,7 @@ types SelectionCardsTypes
 	}
 
 	type card_block_list = card_list {
-		ontextcontextchanged = "[SetBlockListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+		ontextcontextchanged = "[SetBlockListFromTextContext(PdxGuiWidget.AccessSelf)]"
 
 		vbox = {
 			layoutpolicy_horizontal = expanding
@@ -122,52 +124,118 @@ types SelectionCardsTypes
 
 					card_column = {
 						visible = "[BlockListBlock.IsSingle]"
-
+						layoutpolicy_horizontal = expanding
 						blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetSingleRows]" }
 						blockoverride "field_text" {
 							layoutpolicy_horizontal = expanding
 							minimumsize = { -1 30 }
 							autoresize = yes
-							multiline = yes
 							align = left|nobaseline
-							text = "[CString.GetString]"
+							multiline = yes
+							text = "[ConditionLine.GetText]"
 						}
 
-						blockoverride "field_left" {}	
+						blockoverride "field_left" {}
 						blockoverride "field_right" { expand = {} }
 					}
 
 					hbox = {
 						visible = "[BlockListBlock.IsPair]"
 						layoutpolicy_horizontal = expanding
-						margin = { 0 2 }
 
 						card_column = {
+							layoutpolicy_horizontal = expanding
 							blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetPairRows]" }
 							blockoverride "field_text" {
-								maximumsize = { 440 30 }
+								maximumsize = { -1 30 }
 								minimumsize = { -1 30 }
 								autoresize = yes
 								align = left|nobaseline
-								text = "[StringPair.GetLeft][AddTextIf(StringIsEmpty(StringPair.GetLeft), ' ')]"
+								text = "[StringViewPair.GetLeft.GetStringView]"
 							}
 
-							blockoverride "field_left" {}	
+							blockoverride "field_left" {}
 							blockoverride "field_right" { expand = {} }
 						}
 
 						card_column = {
+							layoutpolicy_horizontal = fixed
 							blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetPairRows]" }
 							blockoverride "field_text" {
-								maximumsize = { 70 30 }
+								maximumsize = { -1 30 }
 								minimumsize = { -1 30 }
 								autoresize = yes
 								align = right|nobaseline
-								text = "[StringPair.GetRight][AddTextIf(StringIsEmpty(StringPair.GetRight), ' ')]"
+								text = "[StringViewPair.GetRight.GetStringView]"
 							}
 
-							blockoverride "field_left" { expand = {} }	
+							blockoverride "field_left" { expand = {} }
 							blockoverride "field_right" {}
+						}
+					}
+
+					hbox = {
+						visible = "[BlockListBlock.IsColumns]"
+						layoutpolicy_horizontal = expanding
+
+						block "columnlist_datamodel" {
+							datamodel = "[TableColumnList.GetColumns]"
+							ignoreinvisible = yes
+						}
+				
+						item = {
+							card_column = {
+								layoutpolicy_horizontal = "[TableColumn.GetHorizontalLayoutPolicy]"
+				
+								blockoverride "column_datamodel" {
+									datamodel = "[TableColumn.GetRows]"
+									ignoreinvisible = yes
+								}
+				
+								blockoverride "column_title" {
+									visible = "[TableColumn.GetTitle.IsStringViewNotEmptyOrNull]"
+								}
+				
+								blockoverride "column_title_text" {
+									maximumsize = { 70 30 }
+									minimumsize = { -1 30 }
+									autoresize = yes
+									text = "[TableColumn.GetTitle.GetStringView]"
+									align = "[TableColumn.GetTextAlignment]"
+								}
+				
+								blockoverride "column_title_left" {
+									expand = {
+										visible = "[TableColumn.IsTextRight]"
+									}
+								}
+				
+								blockoverride "column_title_right" {
+									expand = {
+										visible = "[TableColumn.IsTextLeft]"
+									}
+								}
+				
+								blockoverride "field_text" {
+									maximumsize = { 70 30 }
+									minimumsize = { -1 30 }
+									autoresize = yes
+									text = "[CPdxStringView.GetStringView]"
+									align = "[TableColumn.GetTextAlignment]"
+								}
+				
+								blockoverride "field_left" {
+									expand = {
+										visible = "[TableColumn.IsTextRight]"
+									}
+								}
+				
+								blockoverride "field_right" {
+									expand = {
+										visible = "[TableColumn.IsTextLeft]"
+									}
+								}
+							}
 						}
 					}
 				}
@@ -183,13 +251,15 @@ types SelectionCardsTypes
 			margin = { 0 2 }
 
 			card_column = {
+				layoutpolicy_horizontal = expanding
 				blockoverride "column_datamodel" { datamodel = "[StringPairList.GetRows]" }
 				blockoverride "field_text" {
-					maximumsize = { 440 30 }
+					maximumsize = { -1 30 }
 					minimumsize = { -1 30 }
 					autoresize = yes
+					
 					align = left|nobaseline
-					text = "[StringPair.GetLeft][AddTextIf(StringIsEmpty(StringPair.GetLeft), ' ')]"
+					text = "[StringViewPair.GetLeft.GetStringView][AddTextIf(Not(StringViewPair.GetLeft.IsStringViewNotEmptyOrNull), ' ')]"
 				}
 
 				blockoverride "field_left" {}	
@@ -197,18 +267,69 @@ types SelectionCardsTypes
 			}
 
 			card_column = {
+				layoutpolicy_horizontal = fixed
 				blockoverride "column_datamodel" { datamodel = "[StringPairList.GetRows]" }
 				blockoverride "field_text" {
-					maximumsize = { 70 30 }
+					maximumsize = { -1 30 }
 					minimumsize = { -1 30 }
 					autoresize = yes
 					align = right|nobaseline
-					text = "[StringPair.GetRight][AddTextIf(StringIsEmpty(StringPair.GetRight), ' ')]"
+					text = "[StringViewPair.GetRight.GetStringView][AddTextIf(Not(StringViewPair.GetRight.IsStringViewNotEmptyOrNull), ' ')]"
 				}
 
-				blockoverride "field_left" { expand = {} }	
+				blockoverride "field_left" { expand = {} }
 				blockoverride "field_right" {}
 			}
+		}
+	}
+
+	type card_2row_stringpair_list = card_list {
+		ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
+
+		datamodel = "[StringPairList.GetRows]"
+		item = {
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				margin = { 5 0 }
+				spacing = 5
+				background = {
+					visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+					block "bg_color" { using = color_intense_bg_blue_texture }
+					alpha = 0.2
+				}
+
+				datacontext = "[StringToIconAndText(StringViewPair.GetLeft.GetString)]"
+				text_single = {
+					autoresize = yes
+					using = Font_Size_Medium
+					visible = "[StringViewPair.GetRight.IsStringViewNotEmptyOrNull]"
+					text = "[IconAndText.GetIcon]"
+
+					tagtooltip_enabled = yes
+					tooltip = "[IconAndText.GetText]"
+				}
+
+				vbox = {
+					visible = "[StringViewPair.GetRight.IsStringViewNotEmptyOrNull]"
+					layoutpolicy_horizontal = expanding
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						text = "[IconAndText.GetText]"
+					}
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						text = "[StringViewPair.GetRight.GetStringView]"
+					}
+				}
+
+				text_multi = {
+					margin = { 5 5 }
+					visible = "[Not(StringViewPair.GetRight.IsStringViewNotEmptyOrNull)]"
+					layoutpolicy_horizontal = expanding
+					autoresize = yes
+					text = "[IconAndText.GetText]"
+				}
+			}	
 		}
 	}
 }
@@ -464,7 +585,10 @@ types CabinetActionColumns
 		}
 	}
 
-	type cabinet_action_power = container {
+	type cabinet_action_power = widget {
+		block cabinet_action_power_bg_size {
+			size = { 36 36 }
+		}
 		
 		background = {
 			alwaystransparent = yes
@@ -496,8 +620,8 @@ types CabinetActionColumns
 		}
 
 		icon = {
-			block "cabinet_action_power_size" {
-				size = { 23 23 }
+			block cabinet_action_power_icon_size {
+				size = { 75% 75%}
 			}
 			texture = "[GetCabinetActionIcon(CabinetAction.Self)]"
 			parentanchor = center
@@ -554,6 +678,45 @@ types CabinetActionColumns
 	# 		}
 	# 	}
 	# }
+
+	# Harbor capacity total for the player's ports in an area (e.g. Maritime Support target list)
+	type cab_area_harbor_capacity = widget {
+		size = { 110 32 }
+
+		tooltipwidget = {
+			SimpleContextualStringPairTooltipType = {
+				blockoverride "tooltip_title_text" {
+					text = "game_concept_harbor_capacity"
+				}
+				blockoverride "title_icon" {
+					icon = {
+						using = tooltip_title_icon_size
+						texture = "[GetConceptTexture('harbor_capacity')]"
+					}
+				}
+				blockoverride "concept_link" {
+					text = "[harbor_capacity|e]"
+				}
+				lowpriotextcontext = "[InteractionTarget.GetArea.GetHarborCapacitySumForCountryPortsInfo(SelectInteractionTargetView.GetPlayer.Self)]"
+			}
+		}
+
+		hbox = {
+			margin = { 5 0 }
+			spacing = 5
+
+			text_single = {
+				margin_left = 8
+				sort_by_small_highlight = {
+					name = "harbor_capacity"
+				}
+				using = layoutpolicy_expanding
+				autoresize = no
+				align = nobaseline
+				text = "[InteractionTarget.GetArea.GetHarborCapacitySumForCountryPorts(SelectInteractionTargetView.GetPlayer.Self)|W2]"
+			}
+		}
+	}
 
 	type cabinet_efficiency_icon = widget {
 		visible = "[Cabinet.IsActive]"

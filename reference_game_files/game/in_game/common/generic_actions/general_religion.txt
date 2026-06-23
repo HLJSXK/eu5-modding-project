@@ -55,6 +55,25 @@
 				}
 			}
 		}
+		trigger_else_if = {
+			limit = {
+				tag = BOH
+				religion != religion:hussite
+				OR = {
+					situation:hussite_wars = {
+						situation_is_active = no
+						situation_has_ended = no
+					}
+					situation:hussite_wars = {
+						situation_is_active = yes
+					}
+				}
+			}
+			religion_percentage_in_country = {
+				religion = religion:hussite
+				value > 0.2
+			}
+		}
 		trigger_else = {
 			dominant_religion ?= {
 				NOT = { this = root.religion }
@@ -73,6 +92,16 @@
 			scope:actor = {
 				modifier:blocked_from_conversion = no
 				is_colonial_subject = no
+				custom_tooltip = {
+					text = theocracy_subject_cannot_convert_tt
+					NOT = {
+						AND = {
+							government_type = government_type:theocracy
+							is_subject = yes
+							overlord ?= { government_type = government_type:theocracy }
+						}
+					}
+				}
 			}
 		}
 	}
@@ -88,7 +117,7 @@
 		looking_for_a = religion
 		target_flag = target
 		name = "convert_religion_select_religion"
-		none_available_msg_key = "convert_religion_no_religions"
+		none_available_msg_key = "no_convert_religion_tt"
 		column = {
 			data = name
 		}
@@ -183,23 +212,49 @@
 	}
 
 	ai_will_do = {
-		#add = -150
 
-		if = {
-			limit = { 
-				exists = scope:target
-				situation:hussite_wars = {
-					situation_is_active = yes
+		if = {	#BOH pre-target: general will-to-convert bonus
+			limit = {
+				scope:actor = c:BOH
+				OR = {
+					scope:actor = {
+						religion != religion:hussite
+						religion_percentage_in_country = {
+							religion = religion:hussite
+							value > 0.2
+						}
+					}
+					situation:hussite_wars = {
+						situation_is_active = no
+						situation_has_ended = no
+					}
 				}
-				scope:actor.religion = religion:catholic
 			}
 			add = {
-				value = 100
+				value = 250
+				desc = "DIPLOREASON_HISTORICAL_DECISION"
+			}
+		}
+		if = {	#BOH per-target: steer specifically towards hussite
+			limit = {
+				scope:actor = c:BOH
+				exists = scope:target
+				scope:target = religion:hussite
+				scope:actor = {
+					religion != religion:hussite
+					religion_percentage_in_country = {
+						religion = religion:hussite
+						value > 0.2
+					}
+				}
+			}
+			add = {
+				value = 500
 				desc = "DIPLOREASON_HISTORICAL_DECISION"
 			}
 		}
 		if = {
-			limit = { 
+			limit = {
 				scope:actor = {
 					has_or_had_tag = TUR
 				}
@@ -240,7 +295,8 @@
 				#take Catholic Lithuania with Orthodox majority as example
 				scope:target = { ai_wants_convert = no }
 				scope:actor.dominant_religion = scope:target	
-				scope:actor.ruler ?= { religion != scope:target }
+				scope:actor.ruler_or_regent ?= { religion != scope:target }
+				scope:actor != c:BOH
 			}
 			subtract = {
 				desc = "DIPLOREASON_RULER_RELIGION"
@@ -280,6 +336,7 @@
 }
 
 change_religious_aspect = {
+	icon = add_religious_aspect
 	type = owncountry
 
 	sound = UI_action_religion_aspect_change
@@ -312,6 +369,14 @@ change_religious_aspect = {
 				}
 			}
 			value = price:add_religious_aspect_christian
+		}
+		else_if = {
+			limit = {
+				scope:actor = {
+					religion = religion:hellenism_religion
+				}
+			}
+			value = price:change_religious_aspect_hellenism
 		}
 		else = {
 			value = price:change_religious_aspect_inti
@@ -353,6 +418,7 @@ change_religious_aspect = {
 		}
 		enabled = {
 			NOT = { scope:actor = { has_religious_aspect = prev } }
+			scope:actor = { is_religious_aspect_enabled = prev }
 		}
 	}
 
@@ -418,6 +484,14 @@ add_religious_aspect = {
 			}
 			value = price:add_religious_aspect_christian
 		}
+		else_if = {
+			limit = {
+				scope:actor = {
+					religion = religion:hellenism_religion
+				}
+			}
+			value = price:add_religious_aspect_hellenism
+		}
 		else = {
 			value = price:add_religious_aspect_inti
 		}
@@ -438,6 +512,9 @@ add_religious_aspect = {
 		visible = {
 			NOT = { scope:actor = { has_religious_aspect = prev } }
 			scope:actor = { can_see_religious_aspect = prev }
+		}
+		enabled = {
+			scope:actor = { is_religious_aspect_enabled = prev }
 		}
 	}
 
@@ -461,6 +538,7 @@ add_religious_aspect = {
 }
 
 remove_religious_aspect = {
+	icon = add_religious_aspect
 	type = owncountry
 
 	sound = UI_action_religion_aspect_remove
@@ -495,6 +573,14 @@ remove_religious_aspect = {
 				}
 			}
 			value = price:remove_religious_aspect_christian
+		}
+		else_if = {
+			limit = {
+				scope:actor = {
+					religion = religion:hellenism_religion
+				}
+			}
+			value = price:remove_religious_aspect_hellenism
 		}
 		else = {
 			value = price:remove_religious_aspect_inti

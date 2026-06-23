@@ -47,6 +47,7 @@
 # - modifier: replaces any modifiers we apply to members (scale - root = country, scope:recipient = organization) These replace any modifiers that came before them. For adding extra modifiers, use country_modifier/province_modifier/location_modifier as above
 # - leader_modifier: replaces any modifiers we apply to the leader (scale - root = country, scope:recipient = organization) This replaces any previous leader_modifier
 # - non_leader_modifier: replaces any modifiers we apply to every member who is not the leader (scale - root = country, scope:recipient = organization) This replaces any previous non_leader_modifier
+# - owned_location_modifier: replaces any modifiers we apply to every location owned by the IO
 # - can_join_trigger: can we join this organization type (root = potential joiner, actor = potential leader, recipient = existing organization if it already exists, target = target if available)
 # - can_leave_trigger: can we leave this organization type (root = potential leaver, recipient = existing organization)
 # - auto_leave_trigger: trigger to auto-leave this organization type (root = country, scope:recipient contains the international organization)

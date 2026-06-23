@@ -187,6 +187,8 @@ influence_french_subject = {	#Influence French Subject
 		months = 2
 	}
 
+	price = price:hyw_main_actions_price
+
 	potential = {
 		scope:actor = { tag = ENG }
 	}
@@ -198,14 +200,14 @@ influence_french_subject = {	#Influence French Subject
 					is_subject_type = appanage
 					is_subject_type = vassal
 				}
-				NOT = { has_country_modifier = appanage_diplomatic_betrayal_modifier }
+				NOR = {
+					has_country_modifier = diplomatic_betrayal_modifier
+					has_country_modifier = strong_diplomacy_modifier
+				}
 			}
 		}
 		scope:actor = {
-			gold >= {
-				value = monthly_income_trade_and_tax
-				multiply = 3
-			}
+			gold >= monthly_income_trade_and_tax
 			NOT = { has_truce_with = c:FRA }
 			at_war = no
 		}
@@ -239,9 +241,10 @@ influence_french_subject = {	#Influence French Subject
 							is_subject_type = appanage
 							is_subject_type = vassal
 						}
-						NOR = { 
-							has_country_modifier = appanage_diplomatic_betrayal_modifier 
+						NOR = {
+							has_country_modifier = diplomatic_betrayal_modifier
 							has_variable = recently_declined_backstab_variable
+							has_country_modifier = strong_diplomacy_modifier
 						}
 					}
 					add_to_list = source
@@ -265,15 +268,29 @@ influence_french_subject = {	#Influence French Subject
 	}
 
 	ai_will_do = {
-		subtract = {
-			value = 25
-			desc = BASE_VALUE
-		}
-
 		add = {
-			value = "c:FRA.relative_strength(scope:actor)"
-			multiply = 100
-			desc = "France Strength towards England"
+			if = {
+				limit = {
+					scope:actor = {
+						relative_strength = {
+							target = c:FRA
+							value < 0.5
+						}
+					}
+				}
+				value = {
+					add = "c:FRA.relative_strength(scope:actor)"
+					multiply = 100
+					subtract = 50
+				}
+			}
+			else = {
+				value = {
+					add = "c:FRA.relative_strength(scope:actor)"
+					multiply = 100
+				}
+			}
+			desc = "France Strength towards England (dampened if England too weak to follow up)"
 		}
 
 		add = {
@@ -281,8 +298,37 @@ influence_french_subject = {	#Influence French Subject
 			divide = 5
 			desc = "English Income"
 		}
-		
-		
+
+		# Deprioritize if England cannot afford the scaled cost
+		if = {
+			limit = {
+				scope:actor = {
+					NOT = {
+						gold >= {
+							value = monthly_income_trade_and_tax
+							multiply = 2
+						}
+					}
+				}
+			}
+			subtract = {
+				value = 50
+				desc = "cannot comfortably afford action"
+			}
+		}
+
+		if = {
+			limit = {
+				scope:actor = {
+					NOT = { has_casus_belli_on = c:FRA }
+				}
+			}
+			subtract = {
+				value = 200
+				desc = "England has no casus belli against France"
+			}
+		}
+
 		if = {
 			limit = {
 				exists = scope:target_subject
@@ -301,9 +347,15 @@ influence_french_subject = {	#Influence French Subject
 				}
 			}
 
-			subtract = {
-				value = scope:target_subject.subject_loyalty
-				desc = "subject loyalty"
+			if = {
+				limit = {
+					scope:target_subject = { is_disloyal_subject = yes }
+				}
+				add = {
+					value = 50
+					subtract = scope:target_subject.subject_loyalty
+					desc = "subject is disloyal, bribe is efficient"
+				}
 			}
 
 			add = {
@@ -314,7 +366,7 @@ influence_french_subject = {	#Influence French Subject
 
 			add = {
 				if = {
-					limit = { 
+					limit = {
 						scope:actor = { is_at_war_with = c:FRA }
 					}
 					value = {
@@ -341,8 +393,8 @@ fra_diplomacy_with_subjects = {	#Influence French Subject
 	type = situation
 	show_message = no
 	potential = {
-		scope:actor = { 
-			tag = FRA 
+		scope:actor = { tag = FRA }
+		c:FRA ?= {
 			any_subject = {
 				exists = capital
 				capital.region = c:FRA.capital.region
@@ -356,7 +408,7 @@ fra_diplomacy_with_subjects = {	#Influence French Subject
 	allow = {
 		c:FRA = {
 			any_subject = {
-				NOT = { modifier:appanage_prevented_from_call_to_war = yes }
+				NOT = { modifier:french_subject_prevented_from_call_to_war = yes }
 				NOT = { has_country_modifier = strong_diplomacy_modifier }
 				subject_loyalty < 50
 			}
@@ -391,7 +443,7 @@ fra_diplomacy_with_subjects = {	#Influence French Subject
 		scope:actor = {
 			ordered_subject = {
 				limit = { 
-					NOT = { modifier:appanage_prevented_from_call_to_war = yes }
+					NOT = { modifier:french_subject_prevented_from_call_to_war = yes }
 					NOT = { has_country_modifier = strong_diplomacy_modifier }
 				}
 				order_by = {
@@ -672,7 +724,11 @@ betray_our_allegiance = {	#Betray our Allegiance
 						}
 					}
 				}
-				war_length > 6
+				trigger_if = {
+					limit = { exists = this }
+					war_length > 12
+				}
+				trigger_else = { custom_tooltip = war_going_on_longer_than_year_tt }
 			}
 			trigger_if = {
 				limit = { is_subject = yes }
@@ -800,24 +856,24 @@ betray_our_allegiance = {	#Betray our Allegiance
 			}
 
 			add = {
-				value = c:FRA.modifier:diplomatic_reputation
-				subtract = c:ENG.modifier:diplomatic_reputation
-				desc = "FRA dip rep minus ENG dip rep"
+				value = c:ENG.modifier:diplomatic_reputation
+				subtract = c:FRA.modifier:diplomatic_reputation
+				desc = "ENG dip rep minus FRA dip rep"
 				multiply = 5
 			}
 		}
 		else = {
 			add = {
-				value = "scope:actor.opinion(c:ENG)"
-				subtract = "scope:actor.opinion(c:FRA)"
-				desc = "our opinion of England minus opinion of france"
+				value = "scope:actor.opinion(c:FRA)"
+				subtract = "scope:actor.opinion(c:ENG)"
+				desc = "our opinion of France minus opinion of England"
 				multiply = 0.25
 			}
 
 			add = {
-				value = c:ENG.modifier:diplomatic_reputation
-				subtract = c:FRA.modifier:diplomatic_reputation
-				desc = "ENG dip rep minus FRA dip rep"
+				value = c:FRA.modifier:diplomatic_reputation
+				subtract = c:ENG.modifier:diplomatic_reputation
+				desc = "FRA dip rep minus ENG dip rep"
 				multiply = 5
 			}
 		}
@@ -1092,7 +1148,7 @@ request_war_entry = {	#Request War Entry
 			limit = { exists = scope:target_country }
 			custom_tooltip = target_country_will_be_asked_to_join_hyw_tt
 			scope:target_country = { 
-				trigger_event_silently = hundred_years_war.217
+				trigger_event_non_silently = hundred_years_war.217
 			}
 		}
 		else = { custom_tooltip = selected_country_will_be_asked_to_join_hyw_tt }
@@ -1200,7 +1256,7 @@ hyw_sign_truce = {	#Sign a Truce
 
 	cooldown = {
 		type = hyw_sign_truce
-		years = 4
+		years = 10
 	}
 
 	select_trigger = {
@@ -1238,6 +1294,10 @@ hyw_sign_truce = {	#Sign a Truce
 								value > 0.2
 							}
 						}
+						NOR = {
+							AND = { scope:actor = c:ENG  this = c:FRA }
+							AND = { scope:actor = c:FRA  this = c:ENG }
+						}
 					}
 					add_to_list = source
 				}
@@ -1256,7 +1316,7 @@ hyw_sign_truce = {	#Sign a Truce
 			limit = { exists = scope:target_country }
 			custom_tooltip = {
 				text = target_country_will_be_asked_for_truce_tt
-				scope:target_country = { trigger_event_silently = hundred_years_war.218 }
+				scope:target_country = { trigger_event_non_silently = hundred_years_war.218 }
 			}
 		}
 		else = { custom_tooltip = selected_country_will_be_asked_for_truce_tt }
@@ -1264,9 +1324,10 @@ hyw_sign_truce = {	#Sign a Truce
 
 	ai_will_do = {
 		add = {
-			value = 30
+			value = 15
 			desc = BASE_VALUE
 		}
+
 		if = {
 			limit = { exists = scope:target_country }
 			if = {
@@ -1418,10 +1479,20 @@ hyw_defect_action = {	#Betray our Allegiance
 
 	ai_will_do = {
 
-		add = {
-			value = 40
-			subtract = scope:actor.subject_loyalty
-			desc = "lack of loyalty"
+		if = {
+			limit = { c:FRA = { is_at_war_with = c:ENG } }
+			add = {
+				value = 30
+				subtract = scope:actor.subject_loyalty
+				desc = "lack of loyalty (wartime threshold)"
+			}
+		}
+		else = {
+			add = {
+				value = 15
+				subtract = scope:actor.subject_loyalty
+				desc = "lack of loyalty (peacetime threshold)"
+			}
 		}
 
 		scope:actor = {
@@ -1458,3 +1529,213 @@ hyw_defect_action = {	#Betray our Allegiance
 		}
 	}
 }
+
+crown_new_ruler = {	#Crown a New Ruler
+	type = situation
+	show_message = no
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = 4
+
+	potential = {
+		scope:actor = {
+			OR = {
+				AND = {
+					this = c:FRA
+					in_union_with = c:ENG
+				}
+				AND = {
+					this = c:ENG
+					in_union_with = c:FRA
+				}
+			}
+			NOT = {
+				any_union_partner = {
+					union = { 
+						custom_tooltip = {
+							text = empty_text
+							country_has_special_status = {
+								type = special_status:senior_partner
+								country = prev
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			government_type = government_type:monarchy
+			at_war = no
+			is_during_bankruptcy = no
+			any_character = {
+				is_adult = yes
+				is_eligible_heir = prev
+				NOR = {
+					is_ruler_of = prev
+					is_heir_of = prev
+					is_regent_of = prev
+				}
+			}
+			
+
+			trigger_if = {
+				limit = { this = c:FRA }
+				NOT = { has_truce_with = c:ENG }
+				ruler_or_regent = { 
+					culture = { 
+						NOT = { has_culture_group = culture_group:french_group }
+					}
+				}
+			}
+
+			trigger_else = {
+				NOT = { has_truce_with = c:FRA }
+				ruler_or_regent = { 
+					culture = { 
+						NOT = { has_culture_group = culture_group:british_group }
+					}
+				}
+			}
+		}
+	}
+
+	price = price:hyw_main_actions_price
+	price_modifier = {
+		add = {
+			value = 2
+			desc = BASE_VALUE
+		}
+		if = {
+			limit = { scope:actor = c:FRA }
+			multiply = {
+				value = "scope:actor.relative_military_strength(c:ENG)"
+				desc = "[military_strength|e]"
+			}
+		}
+		else = {
+			multiply = {
+				value = "scope:actor.relative_military_strength(c:FRA)"
+				desc = "[military_strength|e]"
+			}
+		}
+	}
+
+	cooldown = {
+		type = crown_new_ruler
+		years = 30
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		interaction_source_list = {
+			situation:hundred_years_war = {
+				add_to_list = source
+			}
+		}
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:hundred_years_war = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		interaction_source_list = {
+			scope:actor = {
+				ordered_character = {
+					limit = { 
+						is_female = no 
+						is_adult = yes
+						is_eligible_heir = prev
+						NOR = {
+							is_ruler_of = prev
+							is_heir_of = prev
+							is_regent_of = prev
+						}
+					}
+					max = 5
+					order_by = total_abilities
+					check_range_bounds = no
+					add_to_list = source
+				}
+				ordered_character = {
+					limit = { 
+						is_female = yes 
+						is_adult = yes
+						is_eligible_heir = prev
+						NOR = {
+							is_ruler_of = prev
+							is_heir_of = prev
+							is_regent_of = prev
+						}
+					}
+					max = 5
+					order_by = total_abilities
+					check_range_bounds = no
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target_character
+		name = "choose_character"
+		column = { data = name }
+		column = { data = character_info }
+	}
+
+	effect = { 
+		if = {
+			limit = { exists = scope:target_character }
+
+			scope:actor = { set_new_ruler = scope:target_character }
+			if = {
+				limit = { scope:actor = c:FRA }
+				c:ENG = { trigger_event_non_silently = hundred_years_war.240 }
+			}
+			else = { 
+				c:FRA = { trigger_event_non_silently = hundred_years_war.240 }
+			}
+		}
+		else = { custom_tooltip = selected_character_takes_actor_crown_tt }
+	}
+
+	ai_will_do = {
+		add = {
+			value = 25
+			desc = BASE_VALUE
+		}
+
+		if = {
+			limit = { scope:actor = c:FRA }
+			subtract = {
+				value = "scope:actor.opinion(c:ENG)"
+				desc = "our opinion of England"
+			}
+		}
+		else = {
+			subtract = {
+				value = "scope:actor.opinion(c:FRA)"
+				desc = "our opinion of France"
+			}
+		}
+
+		
+		if = {
+			limit = { exists = scope:target_character }
+			add = {
+				value = scope:target_character.total_abilities
+				subtract = scope:actor.ruler_or_regent.total_abilities
+				desc = "candidate abilities"
+			}
+		}
+	}
+}
+

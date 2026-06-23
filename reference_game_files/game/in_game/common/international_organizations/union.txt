@@ -8,8 +8,16 @@
 	leader_type = character
 	leader = {
 		every_international_organization_member = {
-			ruler_or_heir_if_regent ?= {
-				add_to_list = leaders
+			if = {
+				#normal case: an adult monarch (or an adult heir during a regency) leads the union
+				limit = { ruler_or_heir_if_regent ?= { is_adult = yes } }
+				ruler_or_heir_if_regent ?= { add_to_list = leaders }
+			}
+			else_if = {
+				#the nominal monarch is a child under regency: the regent leads in their stead, so the
+				#union keeps a valid adult leader instead of falling into interregnum (which left the Union panel empty)
+				limit = { has_regent = yes }
+				regent ?= { add_to_list = leaders }
 			}
 		}
 	}
@@ -53,6 +61,27 @@
 			international_organization = scope:recipient
 		}
 		scope:recipient.modifier:enable_annexation_of_members = yes
+	}
+
+	diplomatic_capacity_cost = {
+		add = {
+			desc = "UPKEEP_UNION_PARTNER_WEIGHT"
+			value = union_partner_weight
+		}
+		scope:recipient = {
+			add = {
+				desc = "UPKEEP_UNION_INTEGRATION"
+				value = modifier:union_integration_level
+				multiply = total_members
+				multiply = 0.1
+			}
+			
+			add = {
+				desc = "UPKEEP_TOTAL_ECO_BASE"
+				value = international_organization_economical_base
+				multiply = 0.00025
+			}
+		}
 	}
 
 	#Baseline of a union, will never change
@@ -212,7 +241,7 @@
 				}
 				ordered_country_with_special_status_of_type = {
 					type = senior_partner
-					order_by = great_power_score
+					order_by = country_economical_base
 					check_range_bounds = no
 					max = 1
 					save_scope_as = target_country
@@ -250,7 +279,9 @@
 			if = {
 				limit = {
 					has_variable = union_senior_partner
-					var:union_senior_partner = { has_heir = yes }
+					var:union_senior_partner = {
+						has_heir = yes
+					}
 					OR = {
 						NOT = { has_variable = union_heir_character }
 						NOT = { var:union_heir_character ?= var:union_senior_partner.heir }
@@ -290,15 +321,21 @@
 									heir != root.var:union_heir_character
 								}
 							}
-							root = { remove_country_from_international_organization = prev }
+							root = { remove_country_from_international_organization = { country = prev reason = LackOfValidHeir } }
 						}
 					}
 				}
 				if = {
 					limit = {
 						has_variable = union_heir_character
+						exists = var:union_heir_character
 						has_variable = union_senior_partner
-						var:union_heir_character = { NOT = { owner = root.var:union_senior_partner } }
+						var:union_heir_character = {
+							NOT = {
+								owner = root.var:union_senior_partner
+							}
+							is_ruler = no #don't move them if they're busy ruling somewhere
+						}
 					}
 					var:union_heir_character = {
 						move_country = root.var:union_senior_partner

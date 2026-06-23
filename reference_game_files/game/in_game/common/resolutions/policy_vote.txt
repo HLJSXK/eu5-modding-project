@@ -222,8 +222,7 @@
 							is_ai = yes
 						}
 					}
-					custom_tooltip = {
-						text = law_debate_cooldowns_tt
+					NOT = {
 						is_target_in_variable_list = {
 							name = law_debate_cooldowns
 							target = root
@@ -234,7 +233,10 @@
 
 			scope:recipient = {
 				not = { law_is_locked_in_international_organization = root }
-				law_enabled_to_international_organization = root
+				trigger_if = {
+					limit = { NOT = { resolution_is_active = resolution:policy_vote } }
+					law_enabled_to_international_organization = root
+				}
 			}
 			
 			trigger_if = {
@@ -276,7 +278,14 @@
 		enabled = {
 			law ?= scope:target
 			scope:recipient = {
-				policy_enabled_to_international_organization = root
+				trigger_if = {
+					limit = {
+						NOT = {
+							resolution_is_active = resolution:policy_vote
+						}
+					}
+					policy_enabled_to_international_organization = root
+				}
 				#if we're proposing a policy, make sure we can't propose what's already implemented
 				custom_tooltip = {
 					text = policy_vote_select_policy_at
@@ -285,6 +294,9 @@
 							exists = scope:actor
 							exists = scope:proposer
 							scope:actor = scope:proposer
+							NOT = {
+								resolution_is_active = resolution:policy_vote
+							}
 						}
 						not = { international_organization_has_policy = root }
 					}
@@ -308,18 +320,6 @@
 							}
 						}
 					}
-				}
-			}
-			custom_tooltip = {
-				text = policy_vote_select_policy_bt
-				trigger_if = {
-					limit = {
-						exists = scope:actor
-						exists = scope:proposer
-						scope:actor = scope:proposer
-						exists = price
-					}
-					scope:proposer ?= { can_pay_price = root.price }
 				}
 			}
 		}
@@ -382,10 +382,6 @@
 						}
 					}
 				}
-			}
-			if = {
-				limit = { scope:vote ?= { exists = price } }
-				scope:proposer = { pay_price = scope:vote.price }
 			}
 			if = {
 				limit = {
@@ -472,17 +468,26 @@
 				}
 				#Catholic Church vote
 				council_of_trent_pass_effect = yes
-				#Special ai cooldown so they don't spam it
-				scope:recipient = {
-					add_cooldown = {
-						type = ai_policy_vote_cooldown
-						years = 5
-					}
-				}
 			}
 		}
 		else = {
 			custom_tooltip = policy_vote_tt
+		}
+		#Special ai cooldown so they don't spam it
+		if = {
+			limit = {
+				exists = scope:recipient
+				exists = scope:target
+			}
+			hidden_effect = {
+				scope:recipient = {
+					add_to_variable_list = {
+						name = ai_law_vote_cooldowns
+						target = scope:target
+						years = 20
+					}
+				}
+			}
 		}
 	}
 	reject_effect = {
@@ -517,13 +522,19 @@
 			}
 			#Catholic Church vote
 			council_of_trent_reject_effect = yes
-			if = {
-				limit = { exists = scope:recipient }
-				#Special ai cooldown so they don't spam it
+		}
+		#Special ai cooldown so they don't spam it
+		if = {
+			limit = {
+				exists = scope:recipient
+				exists = scope:target
+			}
+			hidden_effect = {
 				scope:recipient = {
-					add_cooldown = {
-						type = ai_policy_vote_cooldown
-						years = 5
+					add_to_variable_list = {
+						name = ai_law_vote_cooldowns
+						target = scope:target
+						years = 20
 					}
 				}
 			}
@@ -550,6 +561,18 @@
 						has_ongoing_parliament_debate = yes
 					}
 					recalculate_parliament_vote_for_law_change = yes
+				}
+			}
+			scope:actor = {
+				if = {
+					limit = { exists = scope:vote }
+					if = {
+						limit = { scope:vote = policy:revoke_privilegia_policy }
+						set_variable = voted_for_privilegia
+					}
+					else = {
+						remove_variable = voted_for_privilegia
+					}
 				}
 			}
 		}
@@ -579,6 +602,9 @@
 						recalculate_parliament_vote_for_law_change = yes
 					}
 				}
+			}
+			scope:actor = {
+				remove_variable = voted_for_privilegia
 			}
 		}
 	}
@@ -618,6 +644,19 @@
 			scope:actor = {
 				"country_combined_special_status_power(scope:recipient)" > 0
 			}
+		}
+		trigger_else_if = {
+			#Italian League Sponsors finance the League but are exempt from its offensive wars, so they hold no vote on its laws (eg Mutual Offense)
+			limit = {
+				exists = scope:recipient
+				scope:actor = {
+					has_special_status_in_international_organization = {
+						type = special_status:italian_league_sponsor
+						international_organization = scope:recipient
+					}
+				}
+			}
+			always = no
 		}
 		trigger_else = {
 			always = yes
@@ -672,8 +711,8 @@
 				}
 			}
 			add = {
-				desc = "[great_power_score|e]"
-				value = scope:actor.great_power_score
+				desc = "[tax_base|e]"
+				value = scope:actor.country_tax_base
 			}
 		}
 		else = {
@@ -687,8 +726,12 @@
 			limit = {
 				exists = scope:vote
 				exists = scope:recipient
+				exists = scope:target
 				scope:recipient = {
-					NOT = { has_cooldown = ai_policy_vote_cooldown }
+					OR = {
+						NOT = { has_variable_list = ai_law_vote_cooldowns }
+						NOT = { is_target_in_variable_list = { name = ai_law_vote_cooldowns target = scope:target } }
+					}
 				}
 			}
 			#add on voting bias from the policy itself
@@ -709,7 +752,11 @@
 		if = {
 			limit = {
 				exists = scope:recipient
-				scope:recipient = { has_cooldown = ai_policy_vote_cooldown }
+				exists = scope:target
+				scope:recipient = {
+					has_variable_list = ai_law_vote_cooldowns
+					is_target_in_variable_list = { name = ai_law_vote_cooldowns target = scope:target }
+				}
 			}
 			subtract = {
 				desc = "INERTIA"

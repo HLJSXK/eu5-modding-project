@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-gen_sol_ui.py — regenerate the four UI sections that reference substitute groups.
+gen_sol_ui.py — legacy generator for UI sections that reference substitute groups.
 
 Usage:
     python scripts/gen_sol_ui.py [--target all|location|tooltips|gls|effects] [--dry-run]
 
 Each target rewrites the content between @GEN_BEGIN/@GEN_END anchors in its file:
-  location  → location_window.gui            substitute icon block (5×4)
+  location  -> disabled legacy target; use sync_location_window.py instead
   tooltips  → SOL_substitute_tooltip.gui     20 template blocks (full regen after header)
   gls       → global_living_standard.gui     20 demand rows
   effects   → A_SOL_economy_effects.txt      Phase D / Phase B / Phase G anchors
@@ -79,6 +79,35 @@ GROUP_DISPLAY: Dict[str, str] = {
     "weapons":           "Weapons",
     "mounts":            "Mounts",
     "knowledge":         "Knowledge",
+}
+
+# Primary indicator group for each good — must mirror INDICATOR_GROUPS in gen_scarcity.py.
+# Used to detect guest goods (goods whose primary group differs from the display group).
+GOOD_TO_PRIMARY_GROUP: Dict[str, str] = {
+    g: grp
+    for grp, members in [
+        ("basic_clothing",    ["cloth", "leather"]),
+        ("standard_clothing", ["fine_cloth"]),
+        ("luxury_goods",      ["fur", "porcelain", "lacquerware", "marble", "glass"]),
+        ("crude_goods",       ["lumber", "masonry", "tools", "pottery"]),
+        ("heating",           ["beeswax", "coal"]),
+        ("household",         ["furniture"]),
+        ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
+        ("condiments",        ["sugar", "salt", "olives"]),
+        ("luxury_food",       ["wild_game", "victuals", "fruit"]),
+        ("protein",           ["fish", "livestock"]),
+        ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
+        ("luxury_drinks",     ["tea", "coffee", "cocoa"]),
+        ("spices",            ["saffron", "pepper", "cloves", "chili"]),
+        ("precious",          ["goods_gold", "silver", "jewelry"]),
+        ("treasures",         ["amber", "gems", "ivory", "pearls"]),
+        ("medicine",          ["medicaments", "mercury"]),
+        ("ritual",            ["incense"]),
+        ("weapons",           ["weaponry", "firearms"]),
+        ("mounts",            ["horses", "elephants"]),
+        ("knowledge",         ["paper", "books"]),
+    ]
+    for g in members
 }
 
 # Which GLS estates participate in each group.
@@ -221,11 +250,16 @@ _GOOD_LOC_SUFFIX: Dict[str, str] = {
     "goods_gold": "GOLD",
 }
 
-def _good_row(good: str) -> List[str]:
+def _good_row(good: str, group: str = None) -> List[str]:
     sc = f"sol_good_{good}_scarcity_tier"   # 0-3
     su = f"sol_good_{good}_surplus_tier"    # 0-3
+    ab = f"sol_good_{good}_absent"          # 0 or 1
     wt = f"sol_weight_indicator_{good}"
-    ds = f"sol_demand_share_offset_{good}"
+    primary = GOOD_TO_PRIMARY_GROUP.get(good)
+    if group is not None and primary != group:
+        ds = f"sol_demand_share_offset_{good}_in_{group}"
+    else:
+        ds = f"sol_demand_share_offset_{good}"
     loc_suffix = _GOOD_LOC_SUFFIX.get(good, good.upper())
 
     def _gt(sv: str, n: int) -> str:
@@ -243,13 +277,17 @@ def _good_row(good: str) -> List[str]:
     su_any    = _gt(su, 0)                          # any surplus
     su_gt1    = _gt(su, 1)                          # cheap or vcheap
     su_gt2    = _gt(su, 2)                          # vcheap only
+    ab_1      = _gt(ab, 0)                          # good absent from market
     v_severe   = sc_gt2
     v_moderate = _and(sc_gt1, _not(sc_gt2))
     v_mild     = _and(sc_any, _not(sc_gt1))
-    v_normal   = _and(_not(sc_any), _not(su_any))
+    # v_normal excludes absent; v_no_tier covers normal+absent for weight/share display
+    v_normal   = _and(_not(sc_any), _and(_not(su_any), _not(ab_1)))
+    v_no_tier  = _and(_not(sc_any), _not(su_any))  # normal OR absent (weight stays 1.0)
     v_afford   = _and(su_any, _not(su_gt1))
     v_cheap    = _and(su_gt1, _not(su_gt2))
     v_vcheap   = su_gt2
+    v_absent   = ab_1
 
     return [
         f"                    # Row: {good}",
@@ -258,7 +296,7 @@ def _good_row(good: str) -> List[str]:
         f"                        spacing = 4",
         f"                        icon = {{ size = {{ 20 20 }} texture = \"gfx/interface/icons/trade_goods/icon_goods_{good}.dds\" }}",
         f"                        text_single = {{ layoutpolicy_horizontal = expanding text = \"SOL_TT_GOODS_{loc_suffix}\" }}",
-        # Status column (7 states)
+        # Status column (8 states: 7 price tiers + absent)
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_severe}]\"   text = \"SOL_TT_STATUS_SEVERE\" }}",
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_moderate}]\" text = \"SOL_TT_STATUS_MODERATE\" }}",
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_mild}]\"     text = \"SOL_TT_STATUS_MILD\" }}",
@@ -266,22 +304,24 @@ def _good_row(good: str) -> List[str]:
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_afford}]\"   text = \"SOL_TT_STATUS_AFFORDABLE\" }}",
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_cheap}]\"    text = \"SOL_TT_STATUS_CHEAP\" }}",
         f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_vcheap}]\"   text = \"SOL_TT_STATUS_VCHEAP\" }}",
-        # Weight column (3 color states: scarce=red, normal=plain, surplus=green)
+        f"                        text_single = {{ min_width = 55 align = hcenter visible = \"[{v_absent}]\"   text = \"SOL_TT_STATUS_ABSENT\" }}",
+        # Weight column (3 color states: scarce=red, no-tier=plain, surplus=green)
+        # Absent goods keep weight 1.0 and display as plain (v_no_tier covers normal+absent)
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{sc_any}]\"",
         f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{wt}')|2]#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{v_normal}]\"",
+        f"                            visible = \"[{v_no_tier}]\"",
         f"                            raw_text = \"[Location.MakeScope.ScriptValue('{wt}')|2]\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{su_any}]\"",
         f"                            raw_text = \"#G [Location.MakeScope.ScriptValue('{wt}')|2]#!\" }}",
-        # Demand share offset column (signed %, scarce=red, normal=plain, surplus=green)
+        # Demand share offset column (signed %, scarce=red, no-tier=plain, surplus=green)
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{sc_any}]\"",
         f"                            raw_text = \"#R [Location.MakeScope.ScriptValue('{ds}')|+=0%]#!\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
-        f"                            visible = \"[{v_normal}]\"",
+        f"                            visible = \"[{v_no_tier}]\"",
         f"                            raw_text = \"[Location.MakeScope.ScriptValue('{ds}')|+=0%]\" }}",
         f"                        text_single = {{ min_width = 50 align = hcenter",
         f"                            visible = \"[{su_any}]\"",
@@ -344,7 +384,7 @@ def gen_substitute_tooltips() -> str:
             f"                    }}",
         ]
         for good in goods:
-            lines.extend(_good_row(good))
+            lines.extend(_good_row(good, group=group))
         lines += [
             f"                }}",
             f"            }}",
@@ -518,8 +558,14 @@ def gen_effects_phase_g(estate: str) -> str:
 
 # ── Target runners ────────────────────────────────────────────────────────────
 
+# DISABLED for the EU5 1.3 active SOL flow.
+# Legacy substitute-group icons are no longer part of the location window. Rebuild
+# location_window.gui from the current vanilla baseline with sync_location_window.py.
 def run_location(dry_run: bool) -> None:
-    replace_section(LOCATION_WINDOW, "substitute_icons", gen_substitute_icons(), dry_run)
+    raise SystemExit(
+        "ERROR: --target location is legacy-disabled for EU5 1.3.\n"
+        "Run  conda run -n eu5 python scripts/sync_location_window.py  to sync location_window.gui."
+    )
 
 def run_tooltips(dry_run: bool) -> None:
     replace_section(TOOLTIP_FILE, "templates", gen_substitute_tooltips(), dry_run)
@@ -560,7 +606,11 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    runners = list(TARGETS.values()) if args.target == "all" else [TARGETS[args.target]]
+    runners = (
+        [fn for name, fn in TARGETS.items() if name != "location"]
+        if args.target == "all"
+        else [TARGETS[args.target]]
+    )
     for runner in runners:
         runner(args.dry_run)
 

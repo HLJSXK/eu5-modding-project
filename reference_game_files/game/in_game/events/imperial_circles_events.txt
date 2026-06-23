@@ -1,0 +1,382 @@
+﻿namespace = imperial_circles
+
+# -------------------------------------------------------------------------
+# .1  — The Imperial Circles Are Established
+# Fires to the Emperor when the formation period ends and circles lock.
+# -------------------------------------------------------------------------
+imperial_circles.1 = {
+	type = country_event
+	title = imperial_circles.1.title
+	desc = imperial_circles.1.desc
+	outcome = positive
+	category = international_organization_event
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.1.a
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+imperial_circles.2 = { #Missing Funds - Imperial Bribe is not distributed in time
+	type = country_event
+	title = imperial_circles.2.title
+	desc = imperial_circles.2.desc
+	outcome = neutral
+	category = international_organization_event
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	immediate = {
+		save_scope_as = actor
+	}
+
+	option = { #executes distribute_imperial_grant effect without granting the Circle Satisfaction
+		name = imperial_circles.2.a
+
+		custom_tooltip = {
+				text = distribute_imperial_grant_tt
+
+				scope:actor = {
+					save_temporary_scope_value_as = {
+						name = total_grant
+						value = {
+							value = country_economical_base
+							multiply = 0.20
+						}
+					}
+				}
+				every_imperial_circle_country_is_member_of = {
+					save_temporary_scope_value_as = {
+						name = grant_per_member
+						value = {
+							value = scope:total_grant
+							divide = {
+								value = imperial_circle_member_count
+								subtract = 1
+							}
+						}
+					}
+
+					every_circle_member = {
+						limit = {
+							NOT = { this = scope:actor }
+						}
+						add_gold = scope:grant_per_member
+						scope:actor = {
+							add_gold = {
+								value = scope:grant_per_member
+								multiply = -1
+							}
+						}
+						add_country_modifier = {
+							modifier = received_imperial_circle_grant
+							years = 2
+						}
+						add_opinion = {
+							target = scope:actor
+							modifier = opinion_received_imperial_grant
+						}
+					}
+				}
+			}
+	}
+
+	option = { #hurst circle satisfaction
+		name = imperial_circles.2.b
+
+		every_imperial_circle_country_is_member_of = {
+				add_circle_satisfaction = -5
+			}
+	}
+
+	option = { #very good relations with the emperor prevent damage
+		name = imperial_circles.2.c
+
+		trigger = {
+			international_organization:hre = {
+				international_organization_has_leader = yes
+			}
+			is_emperor = no
+			international_organization:hre.leader_country = {
+				opinion = {
+					target = root
+					value >= 150
+				}
+			}
+		}
+
+		add_prestige = prestige_mild_bonus
+	}
+
+	after = {
+		remove_variable = has_received_imperial_bribe
+	}
+
+}
+
+# -------------------------------------------------------------------------
+# .11 — Discontent in the Circle
+# Fires to the circle leader when circle satisfaction drops below 30.
+# -------------------------------------------------------------------------
+imperial_circles.11 = {
+	type = country_event
+	title = imperial_circles.11.title
+	desc = imperial_circles.11.desc
+	outcome = negative
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.11.a		# Distribute emergency funds
+		trigger = { gold >= 30 }
+		add_gold = -30
+		every_imperial_circle_country_is_member_of = {
+			add_circle_satisfaction = 5
+		}
+	}
+
+	option = {
+		name = imperial_circles.11.b		# Let them complain — fallback
+		fallback = yes
+		add_prestige = prestige_mild_penalty
+	}
+}
+
+# -------------------------------------------------------------------------
+# .12 — The Princes Demand Change
+# Fires to the circle leader when circle satisfaction drops below 15.
+# -------------------------------------------------------------------------
+imperial_circles.12 = {
+	type = country_event
+	title = imperial_circles.12.title
+	desc = imperial_circles.12.desc
+	outcome = negative
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.12.a		# We must act
+		add_prestige = prestige_mild_penalty
+		every_imperial_circle_country_is_member_of = {
+			add_circle_satisfaction = 5
+		}
+	}
+}
+
+# -------------------------------------------------------------------------
+# .20 — Our Circle Has Been Bought
+# Fires to every non-leader member of a circle whose leader has just been
+# bribed by the Emperor via bribe_imperial_circle. Triggered from the
+# generic action's every_circle_member loop so each affected country gets
+# a visible log entry (popup for human players, silent history line for AI)
+# explaining who paid us, how much, and that our vote is now locked.
+# Informational only — single OK option, no decision branch (the rewrite
+# keeps the bribe deterministic).
+# scope:actor    = the bribing Emperor
+# scope:target   = our circle leader (the country named by the action)
+# scope:received_bribe = the gold we received as our share of the bribe
+# -------------------------------------------------------------------------
+imperial_circles.20 = {
+	type = country_event
+	title = imperial_circles.20.title
+	desc = imperial_circles.20.desc
+	outcome = neutral
+	category = international_organization_event
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	immediate = {
+		save_scope_value_as = {
+			name = received_bribe
+			value = {
+				value = bribe_circle_leader_cost
+				multiply = 0.25
+			}
+		}
+	}
+
+	option = {
+		name = imperial_circles.20.a
+	}
+}
+
+# -------------------------------------------------------------------------
+# .50 — Challenge for Circle Leadership
+# Fires to the challenger (scope:actor of challenge_circle_leadership).
+# scope:recipient = incumbent circle leader
+# Option A: press the challenge (outcome determined by prestige comparison)
+# Option B: withdraw
+# -------------------------------------------------------------------------
+imperial_circles.50 = {
+	type = country_event
+	title = imperial_circles.50.title
+	desc = imperial_circles.50.desc
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+	# TODO: stub to fix error log, set proper value later
+	outcome = neutral
+
+	immediate = {
+		save_scope_as = challenger
+		scope:recipient = { save_scope_as = incumbent }
+	}
+
+	option = {
+		name = imperial_circles.50.a		# Press the challenge
+		# Win path (tiered):
+		#   Crisis  — any circle has satisfaction < 15: challenger wins regardless of prestige
+		#   Discontent — any circle has satisfaction < 30 and challenger prestige >= incumbent
+		#   Standard — challenger prestige >= incumbent + 25 (margin damps oscillation)
+		if = {
+			limit = {
+				OR = {
+					any_imperial_circle_country_is_member_of = {
+						imperial_circle_satisfaction < 15
+					}
+					AND = {
+						any_imperial_circle_country_is_member_of = {
+							imperial_circle_satisfaction < 30
+						}
+						prestige >= scope:incumbent.prestige
+					}
+					prestige >= {
+						value = scope:incumbent.prestige
+						add = 25
+					}
+				}
+			}
+			every_imperial_circle_country_is_member_of = {
+				set_circle_leader = scope:challenger
+			}
+			add_country_modifier = {
+				modifier = consolidating_circle_leadership
+				years = 2
+			}
+			scope:incumbent = {
+				add_prestige = prestige_mild_penalty
+				trigger_event_silently = { id = imperial_circles.51 }
+			}
+		}
+		else = {
+			add_prestige = prestige_mild_penalty
+			scope:incumbent = {
+				trigger_event_silently = { id = imperial_circles.52 }
+			}
+			trigger_event_silently = { id = imperial_circles.53 }
+		}
+	}
+
+	option = {
+		name = imperial_circles.50.b		# Withdraw the challenge
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+# -------------------------------------------------------------------------
+# .51 — Circle Leadership Deposed
+# Silent notification to the incumbent who lost the challenge.
+# -------------------------------------------------------------------------
+imperial_circles.51 = {
+	type = country_event
+	title = imperial_circles.51.title
+	desc = imperial_circles.51.desc
+	outcome = negative
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.51.a
+		add_prestige = prestige_weak_penalty
+	}
+}
+
+# -------------------------------------------------------------------------
+# .52 — Circle Leadership Upheld
+# Silent notification to the incumbent who repelled the challenge.
+# -------------------------------------------------------------------------
+imperial_circles.52 = {
+	type = country_event
+	title = imperial_circles.52.title
+	desc = imperial_circles.52.desc
+	outcome = positive
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.52.a
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+# -------------------------------------------------------------------------
+# .53 — Challenge Defeated
+# Fires to the challenger after a failed challenge so the prestige loss is
+# accompanied by explicit feedback instead of a silent ticker drop.
+# scope:incumbent = the leader who repelled the challenge
+# -------------------------------------------------------------------------
+imperial_circles.53 = {
+	type = country_event
+	title = imperial_circles.53.title
+	desc = imperial_circles.53.desc
+	outcome = negative
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.53.a
+	}
+}
+
+
+# -------------------------------------------------------------------------
+# .70 — New Circle Leader Rises
+# Fires to the newly elected circle leader after the previous leader left the HRE.
+# -------------------------------------------------------------------------
+imperial_circles.70 = {
+	type = country_event
+	title = imperial_circles.70.title
+	desc = imperial_circles.70.desc
+	outcome = positive
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.70.a
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+# -------------------------------------------------------------------------
+# .71 — No Eligible Leader for the Circle
+# Fires to the Emperor when no candidate qualifies for a leaderless circle.
+# -------------------------------------------------------------------------
+imperial_circles.71 = {
+	type = country_event
+	title = imperial_circles.71.title
+	desc = imperial_circles.71.desc
+	outcome = neutral
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	option = {
+		name = imperial_circles.71.a
+		change_imperial_authority = { value = -3 }
+	}
+}
+
+# -------------------------------------------------------------------------
+# .80 — Circle Leader Ascends to the Imperial Throne
+# Fires to the new Emperor who previously held circle leadership.
+# Circle leadership is cleared in immediate; .70 fires to elect a successor.
+# -------------------------------------------------------------------------
+imperial_circles.80 = {
+	type = country_event
+	title = imperial_circles.80.title
+	desc = imperial_circles.80.desc
+	outcome = positive
+	image = "gfx/interface/illustrations/international_organization_types/hre.dds"
+
+	immediate = {
+		save_scope_as = new_emperor
+		every_imperial_circle_country_is_member_of = {
+			clear_circle_leader = { }
+		}
+	}
+
+	option = {
+		name = imperial_circles.80.a
+		add_prestige = prestige_mild_bonus
+		change_imperial_authority = { value = 3 }
+	}
+}

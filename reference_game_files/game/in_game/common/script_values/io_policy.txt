@@ -95,69 +95,41 @@ io_electors_opinion_value = {
 	}
 }
 
-io_get_average_great_power_score = {
-	desc = "AVERAGE_GREAT_POWER_SCORE_OF_IO"
-	save_temporary_value_as = {
-		name = great_power_score_count
-		value = 0
-	}
+io_get_average_tax_base = {
+	desc = "AVERAGE_TAX_BASE_OF_IO"
 	#IO might not exist yet
 	scope:recipient ?= {
-		every_international_organization_member = {
-			root = { add = { value = great_power_score } }
+		if = {
+			limit = { total_members > 0 }
+			add = io_total_tax_base
+			divide = total_members
 		}
-		save_temporary_value_as = {
-			name = great_power_score_count
-			value = {
-				value = scope:great_power_score_count
-				add = total_members
-			}
-		}
-	}
-	#take the average opinion
-	if = {
-		limit = { scope:great_power_score_count > 0 }
-		divide = scope:great_power_score_count
 	}
 }
 
-io_compared_great_power_score_to_leader = {
+io_compared_tax_base_to_leader = {
 	if = {
 		limit = {
 			scope:recipient = { international_organization_has_leader = yes }
 			NOT = { is_leader_of_international_organization = scope:recipient }
 		}
 		add = {
-			desc = "GREAT_POWER_LEADER_COMPARISON"
-			value = scope:recipient.leader_country.great_power_score
-			subtract = great_power_score
+			desc = "TAX_BASE_LEADER_COMPARISON"
+			value = scope:recipient.leader_country.country_tax_base
+			subtract = country_tax_base
 		}
 	}
 }
 
 io_get_average_military_strength = {
 	desc = "AVERAGE_MILITARY_STRENGTH_OF_IO"
-	save_temporary_value_as = {
-		name = military_strength_count
-		value = 0
-	}
 	#IO might not exist yet
 	scope:recipient ?= {
-		every_international_organization_member = {
-			root = { add = { value = military_strength } }
+		if = {
+			limit = { total_members > 0 }
+			add = io_total_military_strength
+			divide = total_members
 		}
-		save_temporary_value_as = {
-			name = military_strength_count
-			value = {
-				value = scope:military_strength_count
-				add = total_members
-			}
-		}
-	}
-	#take the average opinion
-	if = {
-		limit = { scope:military_strength_count > 0 }
-		divide = scope:military_strength_count
 	}
 }
 
@@ -295,10 +267,10 @@ hre_default_policy_opinion = {
 			multiply = -0.5
 		}
 		add = {
-			desc = "GREAT_POWER_LEADER_COMPARISON"
-			value = scope:recipient.leader_country.great_power_score
-			subtract = great_power_score
-			multiply = 0.25 # Balance factor
+			desc = "TAX_BASE_LEADER_COMPARISON"
+			value = scope:recipient.leader_country.country_tax_base
+			subtract = country_tax_base
+			multiply = 0.025 # Balance factor
 		}
 		if = {
 			limit = { is_allied_with = { target = scope:recipient.leader_country } }
@@ -392,6 +364,7 @@ hre_default_opinion_check = {
 	if = {
 		limit = {
 			exists = scope:recipient
+			scope:recipient = { international_organization_has_leader = yes }
 			NOT = { is_leader_of_international_organization = scope:recipient }
 		}
 		#opinion of the leader country
@@ -426,11 +399,10 @@ hre_default_opinion_check = {
 			multiply = -0.5
 		}
 		add = {
-			desc = "GREAT_POWER_LEADER_COMPARISON"
-			value = scope:recipient.leader_country.great_power_score
-			subtract = 250 # Dont take Great Power Score from being emperor into account here
-			subtract = great_power_score
-			multiply = 0.25 # Balance factor
+			desc = "TAX_BASE_LEADER_COMPARISON"
+			value = scope:recipient.leader_country.country_tax_base
+			subtract = country_tax_base
+			multiply = 0.025 # Balance factor
 		}
 		if = {
 			limit = { is_allied_with = { target = scope:recipient.leader_country } }
@@ -511,6 +483,137 @@ hre_default_opinion_check = {
 			limit = { scope:recipient = { has_variable = hre_imperial_religion } }
 			if = {
 				limit = { NOT = { religion = scope:recipient.var:hre_imperial_religion } }
+				add = {
+					desc = "DIPLOREASON_DIFFERENT_RELIGION"
+					value = -50
+				}
+			}
+		}
+	}
+}
+
+hre_circle_opinion_check = {
+	if = {
+		limit = {
+			exists = scope:recipient
+			scope:recipient = { is_leader_of_international_organization = scope:recipient }
+		}
+		#opinion of the leader country
+		if = {
+			limit = { "opinion(scope:recipient)" > 0 }
+			add = {
+				desc = "POLICY_BIAS_OPINION_OF_EMPEROR"
+				value = "opinion(scope:recipient)"
+				multiply = 0.25
+			}
+		}
+		else = {
+			add = {
+				desc = "POLICY_BIAS_OPINION_OF_EMPEROR"
+				value = "opinion(scope:recipient)"
+				multiply = 0.5
+			}
+		}
+		#diplomatic rep of the leader country
+		add = {
+			desc = "IO_LEADER_DIP_REP"
+			value = scope:recipient.modifier:diplomatic_reputation
+		}
+		add = {
+			desc = "POLICY_BIAS_FAVORS_OF_EMPEROR"
+			value = "favors(scope:recipient)"
+			multiply = 2
+		}
+		add = {
+			desc = "POLICY_BIAS_ANTAGONISM_OF_EMPEROR"
+			value = "antagonism(scope:recipient)"
+			multiply = -0.5
+		}
+		add = {
+			desc = "TAX_BASE_LEADER_COMPARISON"
+			value = scope:recipient.country_tax_base
+			subtract = country_tax_base
+			multiply = 0.025 # Balance factor
+		}
+		if = {
+			limit = { is_allied_with = { target = scope:recipient } }
+			add = {
+				desc = "game_concept_alliance"
+				value = 5
+			}
+		}
+		if = {
+			limit = { same_dynasty_as = { target = scope:recipient } }
+			add = {
+				desc = "opinion_same_dynasty"
+				value = 10
+			}
+		}
+		if = {
+			limit = { is_subject_of = scope:recipient }
+			add = {
+				desc = "game_concept_subject"
+				value = 25
+			}
+		}
+		if = {
+			limit = { culture.language = scope:recipient.culture.language }
+			add = {
+				desc = "DIPLOREASON_SAME_COMMON_LANGUAGE"
+				value = 5
+			}
+		}
+		if = {
+			limit = { NOT = { culture.language = scope:recipient.culture.language } }
+			add = {
+				desc = "DIPLOREASON_DIFFERENT_COMMON_LANGUAGE"
+				value = -5
+			}
+		}
+		# Dynastic Power of Emperor
+		add = {
+			desc = "IA_DYNASTIC_POWER"
+			value = "scope:recipient.dynastic_power(international_organization:hre)"
+			multiply = 0.5
+		}
+		# Higher IA gives higher ability to pass reforms
+		if = {
+			limit = { international_organization:hre.var:imperial_authority > 50 }
+			add = {
+				desc = "imperial_authority"
+				value = "international_organization:hre.var:imperial_authority"
+				subtract = 50
+				multiply = 2.5
+			}
+		}
+		if = {
+			limit = { government_type = government_type:monarchy }
+			add = {
+				desc = "monarchy"
+				value = 5
+			}
+		}
+		if = {
+			limit = { government_type = government_type:theocracy }
+			add = {
+				desc = "theocracy"
+				value = -5
+			}
+		}
+		if = {
+			limit = { international_organization:hre = { has_variable = hre_imperial_religion_group } }
+			if = {
+				limit = { NOT = { religion.group = international_organization:hre.var:hre_imperial_religion_group } }
+				add = {
+					desc = "DIPLOREASON_DIFFERENT_RELIGION_GROUP"
+					value = -250
+				}
+			}
+		}
+		if = {
+			limit = { international_organization:hre = { has_variable = hre_imperial_religion } }
+			if = {
+				limit = { NOT = { religion = international_organization:hre.var:hre_imperial_religion } }
 				add = {
 					desc = "DIPLOREASON_DIFFERENT_RELIGION"
 					value = -50
@@ -726,6 +829,7 @@ union_treasury_parliament_payment = {
 }
 
 union_parliament_gold_bribe_recipient = {
+	desc = "union_parliament_gold_bribe_cost"
 	if = {
 		limit = { exists = scope:recipient }
 		save_temporary_value_as = {
@@ -763,6 +867,60 @@ union_parliament_gold_bribe_actor = {
 	multiply = -1
 }
 
+union_parliament_gold_bribe_from_target = {
+    desc = "union_parliament_gold_bribe_cost"
+
+	if = {
+        limit = { exists = scope:target }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_upper_limit
+            value = { value = scope:target.monthly_income_trade_and_tax  multiply = 4 }
+        }
+        value = scope:target.monthly_income_trade_and_tax
+    }
+    else = {
+        save_temporary_value_as = {
+            name = gold_bribe_ft_upper_limit
+            value = { value = root.monthly_income_trade_and_tax  multiply = 4 }
+        }
+        value = root.monthly_income_trade_and_tax
+    }
+
+    if = {
+        limit = { exists = scope:recipient  scope:target = { has_variable = integrated_in_union } }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_cost_factor
+            value = {
+                value = scope:recipient.modifier:union_integration_level
+                subtract = scope:target.var:integrated_in_union
+            }
+        }
+    }
+    else_if = {
+        limit = { exists = scope:recipient }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_cost_factor
+            value = scope:recipient.modifier:union_integration_level
+        }
+    }
+
+	if = {
+        limit = { exists = scope:gold_bribe_ft_cost_factor }
+        multiply = scope:gold_bribe_ft_cost_factor
+    }
+
+    if = {
+        limit = { country_economical_base > 0  scope:target.country_economical_base > 0 }
+        save_temporary_value_as = {
+            name = gold_bribe_ft_gp_multiplier
+            value = { value = country_economical_base  divide = scope:target.country_economical_base  add = 1 }
+        }
+        multiply = scope:gold_bribe_ft_gp_multiplier
+    }
+
+	max = scope:gold_bribe_ft_upper_limit
+}
+
 union_member_opinion_on_maintain = {
 	#AI is always in favor of not being anyone's puppet. We don't need some high math here as this is the default when the centralization option is rejected
 	add = {
@@ -771,6 +929,7 @@ union_member_opinion_on_maintain = {
 	}
 	if = {
 		limit = {
+			exists = scope:recipient
 			scope:recipient = {
 				country_is_senior_partner = { country = root }
 			}
@@ -796,6 +955,7 @@ union_member_opinion_on_centralization = {
 	}
 	if = {
 		limit = {
+			exists = scope:recipient
 			scope:recipient = {
 				country_is_senior_partner = { country = root }
 			}
@@ -837,9 +997,9 @@ union_member_opinion_on_centralization = {
 		}
 		#Great Power Score comparison
 		add = {
-			desc = "UNION_GREAT_POWER_SCORE_COMPARED_TO_SENIOR_PARTNER"
-			value = scope:senior_partner_scope.great_power_score
-			subtract = root.great_power_score
+			desc = "UNION_ECONOMICAL_BASE_COMPARED_TO_SENIOR_PARTNER"
+			value = scope:senior_partner_scope.country_economical_base
+			subtract = root.country_economical_base
 		}
 		#Different Culture
 		if = {

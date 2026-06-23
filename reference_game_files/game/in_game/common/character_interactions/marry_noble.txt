@@ -16,6 +16,7 @@
 		scope:actor = {
 			OR = {
 				government_type = government_type:monarchy
+				government_type = government_type:theocracy
 				succession_law = heir_selection:signoria_selection
 				succession_law = heir_selection:matrilineal_non_exclusive
 			}
@@ -26,6 +27,13 @@
 	ai_tick_frequency = 120
 	
 	allow = {
+		scope:actor = {
+			NAND = {
+				government_type = government_type:theocracy
+				religion = { group = religion_group:christian }
+				modifier:clergy_estate_cannot_marry = yes
+			}
+		}
 	}
 	
 	select_trigger = {
@@ -51,10 +59,29 @@
 		target_flag = target
 		name = "marry_noble_select_title"
 		none_available_msg_key = "marry_noble_no_characters"
+		pre_evaluation_sort_value = {
+			value = 50
+			subtract = age_in_years   # younger candidates ranked higher (fertility)
+		}
+		pre_evaluation_number_to_evaluate_fully = 10
 		column = {
 			data = character_info
 		}
 		visible = {
+			NOT = { is_same_gender = scope:recipient }
+			not = { is_spouse_of = scope:recipient }
+			modifier:blocked_from_character_interactions = no
+			OR = {
+				has_estate = estate_type:nobles_estate
+				AND = {
+					scope:actor = { succession_law = heir_selection:signoria_selection }
+					has_estate = estate_type:burghers_estate
+				}
+			}
+			NOT = { is_close_relative = scope:recipient }
+			character_can_marry_trigger = yes
+			character_can_marry_recipient_trigger = yes
+			# Expensive dynasty check last: only runs for characters that passed all above filters
 			OR = {
 				scope:actor = { modifier:can_marry_only_overlord_dynasty_characters = no }
 				AND = {
@@ -70,26 +97,12 @@
 					}
 				}
 			}
-			OR = {
-				has_estate = estate_type:nobles_estate
-				AND = {
-					scope:actor = { succession_law = heir_selection:signoria_selection }
-					has_estate = estate_type:burghers_estate
-				}
-			}
-			NOT = { is_same_gender = scope:recipient }
-			NOT = { is_close_relative = scope:recipient }
-			character_can_marry_trigger = yes
-			not = { is_spouse_of = scope:recipient }
-			modifier:blocked_from_character_interactions = no
-			character_can_marry_recipient_trigger = yes
 		}
 
-		#enabled = {
-		#	scope:recipient = {
-		#		character_can_marry_recipient_trigger = yes
-		#	}
-		#}
+		enabled = {
+			character_can_marry_trigger = yes
+			character_can_marry_recipient_trigger = yes
+		}
 	}
 	
 	effect = {
@@ -119,6 +132,19 @@
 				add_to_list = bukka_raya_previous_spouses
 			}
 		}
+
+		# Prestige penalty for marrying an undesirable spouse
+		if = {
+			limit = {
+				scope:target = { modifier:marriage_desirability < 0 }
+			}
+			scope:actor = {
+				add_prestige = {
+					value = scope:target.modifier:marriage_desirability
+					multiply = 0.5
+				}
+			}
+		}
 	}
 
 	ai_will_do = {
@@ -129,7 +155,7 @@
 			if= {
 				limit = {
 					scope:recipient ?= {
-						is_married = yes
+						has_available_marriage_slot = no
 					}
 				}
 				value = -1000

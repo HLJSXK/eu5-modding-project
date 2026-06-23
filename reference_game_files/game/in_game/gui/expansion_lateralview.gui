@@ -214,22 +214,33 @@ types ExpansionWindowTypes {
 		block "colony_item_size" {
 			using = layoutpolicy_expanding
 		}
-		action_button = {
+		button = {
 			default_format = "#color_white"
 			size = { 100% 100% }
 			name = "abandon charter button"
-			title = "ABANDON_BUTTON"
-			actor = "[Player]"
-			right_click_and_hold_action = {
+
+			button_tooltip_override = {
+				title = "ABANDON_BUTTON"
+			}
+
+			scripted_action_tooltip = {
+				click_type = right
+				click_mode = confirm
 				action_name = "abandon_colonial_charter"
+				actor = "[Player]"
 				parameter = {
 					parameter_name = "target"
 					parameter_value = "[ColonialCharterItem.GetColonialCharter]"
 				}
 			}
 
-			onclick = "[ShowProvinceDefinition(ColonialCharterItem.GetProvinceDefinition)]"
-			
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				title = "GO_TO_COLONY"
+				on_action = "[ShowProvinceDefinition(ColonialCharterItem.GetProvinceDefinition)]"
+			}
+
 			datacontext = "[ColonialCharterItem.GetColonialCharter]"
 			tooltipwidget = {
 				using = ColonialCharter_tooltip
@@ -672,11 +683,6 @@ types ExpansionWindowTypes {
 					}
 				}
 
-				blockoverride "tooltip_ui_action_block" {
-					TooltipUIActionBlockOld = {
-						visible = "[PdxGuiWidget.HasUIAction]"
-					}
-				}
 			}
 		}
 	}
@@ -949,9 +955,6 @@ template exploration_item {
 						margin_left = 72
 						margin_right = 5
 						datacontext = "[PossibleExplorationItem.GetExploration]"
-						tooltipwidget = {
-							using = exploration_total_progress_tt
-						}
 						spacing = 10
 					
 						expand = {}
@@ -970,6 +973,10 @@ template exploration_item {
 
 							piechart = {
 								size = { 29 29 }
+
+								tooltipwidget = {
+									using = exploration_total_progress_tt
+								}
 				
 								using = piechart_angles
 								using = bg_circle_piechart
@@ -1402,6 +1409,27 @@ lateralview = {
 	name = "expansion_lateralview"
 	widgetid = "expansion_lateralview"
 
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			parentanchor = vcenter
+			size = { 40 40 }
+			position = { 30 0 }
+
+			button_automation_shortcut = {
+				parentanchor = vcenter
+				size = { 25 25 }
+
+
+				action_tooltip = {
+					title = "OPEN_AUTOMATION_PANEL_FILTER"
+					on_action = "[OpenLateralViewWithFilter('automation', 'automation_filter_expansion')]"
+				}
+
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+			}
+		}
+	}
+
 	blockoverride "panel_header" {
 		using = geopolitics_header
 	}
@@ -1471,18 +1499,9 @@ lateralview = {
 						layoutpolicy_vertical = expanding
 						name = "balance_overview_scene"
 						scene = "[Player.GenerateSceneDesc('expansion')]"
-						alpha = 0.5
-		
-						icon = {
-							size = { 100% 100% }
-							using = color_black_texture
-							alpha = 0.8
-		
-							modify_texture = {
-								using = bg_fade_vertical_up_mask_texture
-								blend_mode = alphamultiply
-							}
-						}
+						alpha = 1
+
+						using = scene_fade_horizontal
 					}
 				}
 
@@ -1513,7 +1532,7 @@ lateralview = {
 								default_format = "#explanation_link_overview"
 							}
 							blockoverride "bottom_text_setup" {
-								text = "[Player.GetModifierValueNoFormat('exploration_maintenance_cost')]"
+								text = "[Player.GetModifierValueNoFormat('exploration_maintenance_efficiency')]"
 							}
 							datacontext = "[Player]"
 							tooltipwidget = {
@@ -1657,7 +1676,7 @@ lateralview = {
 							}
 							blockoverride "bottom_text_setup" {
 								align = right|nobaseline
-								text = "[Player.GetModifierValueNoFormat('colonial_maintenance_cost')]"
+								text = "[Player.GetModifierValueNoFormat('colonial_maintenance_efficiency')]"
 							}
 							datacontext = "[Player]"
 							tooltipwidget = {
@@ -1864,10 +1883,31 @@ lateralview = {
 								margin = {5 5}
 								spacing = 8
 
-								header_action_button_left = {
-									title = "CREATE_CONQUISTADOR_T"
-									actor = "[ExpansionLateralView.GetPlayer]"
-									left_action = { action_name = "create_conquistador" }
+								header_button_left = {
+									scripted_action_tooltip = {
+										click_type = left
+										click_mode = single
+										action_name = "create_conquistador"
+										actor = "[ExpansionLateralView.GetPlayer]"
+									}
+									action_tooltip = {
+										click_type = right
+										click_mode = confirm
+										click_modifier = default
+										enabled = "[ExpansionLateralView.CanCancelQueuedConquistador]"
+										title = "CANCEL_CONQUISTADOR_COMMISSION"
+										description = "[ExpansionLateralView.GetCancelQueuedConquistadorInfo]"
+										on_action = "[ExpansionLateralView.CancelQueuedConquistador]"
+									}
+									action_tooltip = {
+										click_type = right
+										click_mode = confirm
+										click_modifier = shift
+										enabled = "[ExpansionLateralView.CanCancelQueuedConquistador]"
+										title = "CANCEL_ALL_CONQUISTADOR_COMMISSIONS"
+										description = "CANCEL_ALL_CONQUISTADOR_COMMISSIONS_DESC"
+										on_action = "[ExpansionLateralView.CancelAllQueuedConquistadors]"
+									}
 									tooltipwidget = {
 										using = CreateConquistadorTooltip
 									}
@@ -2225,15 +2265,13 @@ lateralview = {
 																click_modifier = shift
 																click_type = left
 																title = "OPEN_HINT"
+																click_modifier_description = "OPEN_HINT_TEXT"
 																on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_control')]"
 															}
 															enabled = "[And(IsCabinetActionAllowed('increase_control_province'), Province.GetCountry.IsPlayer)]"
 
 															tooltipwidget = {
 																using = province_control_tooltip
-																blockoverride "shift_left_extra" {
-																	replacement_shift_item = {}
-																}
 															}
 
 															hbox = {

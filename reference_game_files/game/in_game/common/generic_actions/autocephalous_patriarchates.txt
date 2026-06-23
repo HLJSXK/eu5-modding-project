@@ -252,7 +252,7 @@ create_autocephalous_patriarchate = {
 				country_rank = country_rank:rank_kingdom
 				country_rank = country_rank:rank_empire
 			}
-			prestige >= 80
+			prestige >= 60
 			OR = {
 				NOT = {
 					exists = autocephalous_patriarchate
@@ -282,12 +282,22 @@ create_autocephalous_patriarchate = {
 		scope:actor = {
 			custom_tooltip = {
 				text = create_autocephalous_patriarchate_tt
+				autocephalous_patriarchate ?= { save_scope_as = previous_patriarchate }
 				create_international_organization = {
 					type = international_organization_type:autocephalous_patriarchate
+					creator = scope:actor
 					add_country_to_international_organization = prev
 					set_leader_country = prev
 					#so we can use it in text
 					save_scope_as = target
+				}
+				if = {
+					limit = { exists = scope:previous_patriarchate }
+					scope:previous_patriarchate = {
+						every_current_policy_in_international_organization = {
+							scope:target = { add_policy_to_international_organization = prev }
+						}
+					}
 				}
 			}
 		}
@@ -434,14 +444,7 @@ relocate_ecumenical_patriarchate = {
 	potential = {
 	}
 	allow = {
-		scope:recipient.var:seat ?= {
-			NOT = { is_location_holy_site_for = "scope:recipient.var:religion" }
-		}
-		scope:actor ?= {
-			any_holy_site_in_country = {
-				is_holy_site_for = "scope:recipient.var:religion"
-			}
-		}
+		scope:actor ?= { is_leader_of_international_organization = scope:recipient }
 	}
 	price = price:relocate_ecumenical_patriarchate
 
@@ -454,10 +457,14 @@ relocate_ecumenical_patriarchate = {
 		}
 		visible = {
 			international_organization_type = international_organization_type:autocephalous_patriarchate
+			exists = "scope:recipient.var:patriarch"
 		}
 		enabled = {
 			var:seat ?= {
-				NOT = { is_location_holy_site_for = "scope:recipient.var:religion" }
+				NAND = {
+					is_location_holy_site_for = "scope:recipient.var:religion"
+					is_location_holy_site_type = holy_site_type:episcopal_see
+				}
 			}
 			scope:actor ?= {
 				any_holy_site_in_country = {
@@ -486,6 +493,58 @@ relocate_ecumenical_patriarchate = {
 			set_variable = {
 				name = seat
 				value = scope:target.location
+			}
+		}
+		if = {
+			limit = {
+				scope:target ?= {
+					location = { is_location_holy_site_type = holy_site_type:episcopal_see }
+				}
+			}
+			custom_tooltip = {
+				text = restore_ecumenical_patriarchate_tt
+				scope:actor = { trigger_event_silently = autocephalous_patriarchates.3 }
+			}
+		}
+		if = {
+			limit = {
+				has_dlc = "d008_fate_of_the_phoenix"
+				"scope:recipient.var:religion" = religion:orthodox
+				scope:target ?= {
+					location = {
+						is_pentarchy_seat = yes
+					}
+				}
+			}
+			if = {
+				limit = {
+					"scope:recipient.var:patriarch" = { NOT = { has_variable = is_pentarch } }
+				}
+				"scope:recipient.var:patriarch" = { save_scope_as = target_patriarch }
+			}
+			else = {
+				scope:actor = { select_suitable_patriarch = { pentarchy = yes } }
+			}
+			scope:recipient.var:religion ?= {
+				if = {
+					limit = {
+						is_key_in_variable_map = { name = pentarchy target = scope:target }
+					}
+					"variable_map(pentarchy|scope:target)" ?= {
+						remove_variable = is_pentarch
+					}
+				}
+				add_to_variable_map = {
+					name = pentarchy
+					key = scope:target.location
+					value = scope:target_patriarch
+				}
+			}
+			scope:target_patriarch ?= {
+				set_pentarch_variable = { location = scope:target.location }
+			}
+			scope:actor ?= {
+				add_pentarchy_modifier = { location = scope:target.location }
 			}
 		}
 	}

@@ -9,7 +9,7 @@
 #   pattern   : Python regex to detect the bad form in source files
 #   bad       : human-readable description of the bad form
 #   correction: what to do instead
-#   category  : modifier | enum | encoding | gui | scope | event | localization
+#   category  : modifier | enum | encoding | gui | scope | event | localization | trigger
 #   scope     : country | location | character | global | any
 #   source    : reference file that verifies the correction (path:line if known)
 #   notes     : one-line explanation of why the bad form fails
@@ -26,6 +26,34 @@
   scope: location
   source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
   notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
+
+- id: sol_demand_add_baseline_must_remain
+  pattern: null
+  bad: "Deleting or bypassing the calibrated SOL demand_add baseline when moving runtime demand to local_pop_demand"
+  correction: "Keep data/target_demand.csv -> src/stable/in_game/common/goods/z_SOL_pop_goods.txt as the corrected demand_add baseline; apply local_pop_demand only as the monthly location-level multiplier."
+  category: modifier
+  scope: location
+  source: "src/stable/in_game/common/goods/z_SOL_pop_goods.txt; reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11864"
+  notes: "The SOL multiplier is calibrated against corrected demand_add values. Removing that baseline changes absolute pop demand before the multiplier is applied."
+
+- id: country_pulse_manual_on_action_merge_unnecessary
+  pattern: null
+  bad: "Copying vanilla or framework entries into monthly_country_pulse/yearly_country_pulse just to preserve existing on_actions"
+  correction: "Use the compact yearly_country_pulse style for both monthly_country_pulse and yearly_country_pulse: define only this mod's on_actions entries. The engine merges on_actions from duplicate pulse definitions automatically."
+  category: scope
+  scope: country
+  source: "user-reported engine behavior (2026-06-08); src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:5-12"
+  notes: "Manual payload copies are noisy and drift-prone. Keep events/random_events only when this mod itself adds them; do not duplicate vanilla or CMF on_action dispatchers."
+
+- id: cost_modifier_renamed_to_efficiency_1_3
+  pattern: '\b(?:global_build_buildings_cost|local_build_buildings_cost|local_build_new_buildings_cost|local_trade_embark_disembark_cost_modifier|stability_cost)\s*='
+  only_in_paths: ['src/stable']
+  bad: "EU5 <=1.2 cost modifier name for construction, trade embark/disembark, or stability investment"
+  correction: "Use the EU5 1.3 efficiency modifier name: global_build_buildings_efficiency, local_build_buildings_efficiency, local_build_new_buildings_efficiency, local_trade_embark_disembark_efficiency, or stability_cost_efficiency. Flip the sign when preserving old cost penalties/discounts."
+  category: modifier
+  scope: any
+  source: "reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:4103,4167,4175,6838,10255"
+  notes: "EU5 1.3 renamed these cost-style modifiers to positive-good efficiency modifiers. Positive efficiency reduces cost, so old positive cost penalties become negative efficiency and old negative cost discounts become positive efficiency."
 
 - id: location_rank_invalid_village
   pattern: 'location_rank\s*[=?]=\s*location_rank:village'
@@ -99,15 +127,6 @@
   source: "reference_game_files/game/in_game/common/"
   notes: "EU4 province scope triggers do not exist in EU5"
 
-- id: demand_hardcoded_redistribution
-  pattern: ''
-  bad: "Hardcoded redistribution coefficients for substitute goods (multiply = 0.4 on scarce good + add = X on every other good)"
-  correction: "Weight-normalization: demand_i = (weight_i / total_weight) × N × scale; each good starts at weight 1; scarcity subtracts 0.5; total_weight uses min = 0.001 guard; redistribution is automatic"
-  category: scope
-  scope: any
-  source: "src/stable/in_game/common/script_values/SOL_goods_weight_values.txt"
-  notes: "Hardcoded coefficients require O(N²) recalculation when adding a new good; weight-normalization requires only one new weight value and one add line in the group total"
-
 - id: script_value_inline_subexpr_variable_refs
   pattern: 'multiply\s*=\s*\{[^}]*(?:multiply|divide)\s*=\s*local_'
   bad: "multiply = { value = X  multiply = local_var  divide = local_var  add = local_var } inside a script_value"
@@ -125,15 +144,6 @@
   scope: any
   source: "user-reported engine behavior (2026-04)"
   notes: "EU5 engine truncates all float literals at 5 decimal places; digits beyond the 5th are silently ignored"
-
-- id: demand_share_pop_scope_in_location_indicator
-  pattern: ''
-  bad: "Referencing pop-scoped weight values (SOL_<good>_weight) from location-scope indicator script_values"
-  correction: "In location-scope indicators, compute scarcity-only base weights inline via market variable list checks; do not reference pop-scope weight values which include religion/culture modifiers unavailable at location scope"
-  category: scope
-  scope: location
-  source: "src/stable/in_game/common/script_values/SOL_substitute_good_indicators.txt"
-  notes: "Location-scope script_values cannot access pop attributes; sol_demand_share_* replicate only the scarcity adjustment, not religion/culture multipliers"
 
 - id: gui_no_getgoods_from_string
   pattern: "GetGoods\\('|GetGoodsFromKey|MakeGoods\\("
@@ -153,20 +163,230 @@
   source: "reference_game_files/game/in_game/gui/goods_overview.gui:77"
   notes: "Exhaustive search of reference_game_files found GoodsView only in the goods_overview panel; tooltip templates have no equivalent all-goods iteration datamodel"
 
-- id: dev_scaling_demand_cancellation
-  pattern: ''
-  bad: "Emitting SOL goods demand values without pre-dividing by (development/10), causing demand to scale with location development level; or using only 'divide = location.development' without 'multiply = 10', which produces 1/10 of target instead of cancelling"
-  correction: "Add 'divide = { value = location.development  min = 1 }' AND 'multiply = 10' to every single-group demand block in SOL_goods_demand_values.txt. The min=1 guard prevents div/0 at development=0 (engine also multiplies by 0 there, so demand is 0 either way). Together they divide by (development/10); the EU5 engine then multiplies by (development/10), cancelling to net factor 1."
+- id: multiply_global_variable_nonexistent
+  pattern: 'multiply_global_variable'
+  bad: "multiply_global_variable = { name = X  value = 0.95 } to scale a global variable in-place"
+  correction: "Use set_global_variable with hardcoded per-case values: set_global_variable = { name = X  value = computed_literal }. For era-decay patterns, hardcode the result per age (idempotent, no dedup guard needed). If truly dynamic, compute in a local_variable then use set_global_variable = { name = X  value = local_var:tmp }."
   category: scope
-  scope: pop
-  source: "reference_game_files/game/in_game/common/death_reason/02_life_expectancy.txt:191"
-  notes: "Intentional hidden shim. Net math: scale × (10/development) × (development/10) = scale. CRITICAL: 'divide = location.development' alone gives net 1/10 (not 1), silently reducing all demands to 10% of target. Always pair with 'multiply = 10'. Multi-group aggregates inherit the cancellation from sub-values; no additional ops needed there. Display values in z_SOL_group_demand_scales_location.txt must remain undivided."
-
-- id: alpha_export_multiplier_cheapest_good
-  pattern: ''
-  bad: "Exporting alpha (budget-share) values directly from simulator without adjustment, causing in-game spending to fall below simulated income"
-  correction: "Apply EXPORT_ALPHA_MULTIPLIER = 2.0 in engel_export.py when building bracket_values before alpha_0 and jumps are computed. The simulator's internal Engel curves and alpha_bracket_table.csv must stay at Σα = 1; only the emitted .txt files use Σα = 2."
-  category: encoding
   scope: any
-  source: "tools/sol_demand_simulator/engel_export.py"
-  notes: "Intentional backend shim: substitute groups cause pops to choose cheapest good (not average-priced), and conditional-unlock goods are absent in early game. Together these halve actual spending vs. simulator prediction. The ×2 multiplier restores balance. To recalibrate, update EXPORT_ALPHA_MULTIPLIER and re-run engel_export.py."
+  source: "reference_game_files/game/in_game/common/scripted_effects/global_effects.txt"
+  notes: "Exhaustive search of reference_game_files/ and reference_mods/ found no multiply_global_variable effect. Only set_global_variable and change_global_variable exist for global-scope numeric variables."
+
+- id: positive_sign_in_float_literal
+  pattern: 'value = +0.xxx'
+  bad: "Writing a leading + sign on positive float literals, e.g. value = +0.025 or change_variable = { ... value = +0.003 }"
+  correction: "Omit the + sign entirely: value = 0.025. The EU5/Jomini parser does not accept a leading + on numeric literals and will misread the value."
+  category: scripted_values
+  scope: any
+  source: "runtime observation"
+  notes: "Triggered by Python f-string format spec +:  e.g. f'{delta:+.5f}' emits +0.00357 for positive deltas. Fix: use f'{delta:.5f}' so no leading sign is emitted for positive values."
+
+- id: icon_widget_before_texticon_check
+  pattern: ''
+  bad: "Using an icon widget or designing custom icon syntax without first checking if @icon_name! inline texticon syntax already covers the case"
+  correction: "Check font_icons.gui for existing texticon definitions first; use @icon_name! in raw_text/text/localization if available; fall back to icon widget; only design from scratch as last resort"
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/font_icons.gui"
+  notes: "EU5 has 180+ pre-defined inline icons via the @xxx! texticon system; skipping this check causes unnecessary widget complexity and misses the preferred engine-native approach"
+
+- id: modifier_icon_not_effect_field
+  pattern: null
+  bad: "Trying to assign an icon to add_location_modifier, add_static_modifier, or the static modifier block itself"
+  correction: "Define the icon in main_menu/common/modifier_icons/<file>.txt using modifier keys with positive/negative texture paths. For a custom static modifier, map the static modifier id; only map the contained modifier type if that key is not already defined by vanilla or another loaded mod."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/common/modifier_icons/00_modifier_icons.txt:1-4; reference_mods/3613232232/main_menu/common/modifier_icons/pp_victuals_modifier_icons.txt:4-7"
+  notes: "Modifier tooltips and location modifier rows call GetIcon on StaticModifier/ModifierWrap objects; the texture mapping is data-driven from modifier_icons, not an effect parameter."
+
+- id: modifier_icon_duplicate_vanilla_key
+  pattern: null
+  bad: "Defining a vanilla modifier_icons key such as local_pop_demand in a mod add-on file to override its texture"
+  correction: "Do not duplicate existing modifier_icons keys in additive files. Map the custom static modifier id instead, or use an explicit replacement strategy for the whole vanilla definition if a vanilla-key override is truly required."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/common/modifier_icons/00_modifier_icons.txt:5853-5855"
+  notes: "modifier_icons is a keyed database; duplicate keys are rejected with a 'Duplicated key ... will not be created' log, leaving the original definition active."
+
+- id: mapmode_dds_incomplete_mips
+  pattern: null
+  bad: "Custom mapmode DDS with an incomplete mip chain or non-vanilla-compatible DDS header"
+  correction: "Write mapmode DDS files with a full mip chain down to 1x1 and a Clausewitz-style 2D header (`dwDepth = 1`); keep the file under `main_menu/gfx/interface/icons/map_modes/<map_mode_id>.dds`."
+  category: gui
+  scope: any
+  source: "reference_mods/3613232232/in_game/gfx/map/map_modes/MAP_MODE_ICONS.md:75-83; reference_mods/3613232232/main_menu/gfx/interface/icons/map_modes/pp_local_fruit_output_modifier.dds header"
+  notes: "MapMode.GetIcon uses ID-based DDS lookup and is stricter than direct GUI texture references; reference mapmode DXT5 assets use complete mip chains (for 128x128, 8 levels and 22,000 bytes)."
+
+- id: mapmode_pinned_by_default_field_invalid
+  pattern: 'pinned_by_default\s*='
+  only_in_paths: ['gfx/map/map_modes']
+  bad: "Adding pinned_by_default = yes/no inside an in_game/gfx/map/map_modes/*.txt mapmode definition"
+  correction: "Omit pinned_by_default from mapmode data files unless a current official schema verifies the field. Keep category/index so the mapmode remains selectable; players can pin it from the UI."
+  category: gui
+  scope: any
+  source: "EU5 error.log: Malformed token: yes in gfx/map/map_modes/SOL_map_modes.txt; reference_official_defines/1.3.4-beta/docs/data_types_uncategorized.txt:88402"
+  notes: "The UI exposes MapMode.IsMapModePinnedByDefault, but the current mapmode data parser does not accept pinned_by_default as a writable field and can fail on the yes/no value."
+
+- id: variable_prefix_must_be_var
+  pattern: '\bvariable:[a-zA-Z_]'
+  bad: "variable:NAME as an event-target / value reference (e.g. value = variable:foo, multiply = variable:foo, add = variable:foo)"
+  correction: "Use the short form: var:NAME (e.g. value = var:foo). EU5/Jomini's event-target link prefix for scope variables is 'var', not 'variable'. The long form does not resolve."
+  category: scripted_values
+  scope: any
+  source: "reference_game_files/game/in_game/common/attribute_columns/06_country.txt:149"
+  notes: "Engine error: 'Failed to find a valid event target link variable:NAME' / 'Cannot read [variable:NAME] as a script value'. The set_variable / change_variable / has_variable effects all use the keyword 'variable' inside their own block (name = NAME, value = X), but READING a variable elsewhere in script_values, triggers, or modifier values requires the var: prefix. Comments in source files often informally write 'variable:foo' for documentation — never copy that into actual code."
+
+- id: change_variable_value_op_invalid
+  pattern: 'change_variable\s*=\s*\{[^{}]*\bvalue\s*='
+  bad: "change_variable = { name = X  value = Y } — value is not a valid operation for change_variable"
+  correction: "Use change_variable = { name = X  add = Y } (or subtract / multiply / divide). Negative literals are fine for add: e.g. add = -0.00020. value = is reserved for set_variable."
+  category: scripted_values
+  scope: any
+  source: "EU5 engine error: 'change_variable effect [ No operation specified ]'"
+  notes: "set_variable accepts 'value = X' (absolute assignment); change_variable does NOT — it requires an operation keyword (add/subtract/multiply/divide). Mixing them up emits a runtime PostValidate error and the change is silently dropped. Often introduced by codegen scripts that mirror set_variable templates without adapting the op keyword. Pattern uses [^{}]* (not [^}]*) so it does NOT cross nested-block boundaries — this prevents false positives on the legal form 'change_variable = { name = X  add = { value = Y  multiply = Z } }' where value = is the inner-block scalar literal of add's value-with-operations form."
+
+- id: global_var_unguarded_in_script_value
+  pattern: 'multiply\s*=\s*global_var:|add\s*=\s*global_var:|divide\s*=\s*global_var:|subtract\s*=\s*global_var:'
+  bad: "Direct 'multiply = global_var:NAME' (or add/subtract/divide) inside a script_value, expecting an on_game_start effect to set the global first"
+  correction: "Wrap the global read in a guarded local script_value: define 'local_NAME = { value = <safe_default>  if = { limit = { has_global_variable = NAME }  value = global_var:NAME } }' and reference 'multiply = local_NAME' instead. Optionally also init via on_game_start as defense-in-depth, but the wrapper is the load-bearing fix."
+  category: scope
+  scope: global
+  source: "runtime observation from EU5 script_value validation"
+  notes: "EU5 evaluates script_values during file-load validation BEFORE any on_action (including on_game_start) fires. An unguarded global_var read produces 'Failed to fetch variable', 'Event target link global_var returned an unset scope', and 'Got value of type none' errors that propagate up to every caller script_value. on_game_start init alone cannot fix this — the validation pass runs earlier. Wrapping with has_global_variable + safe default is the only robust approach."
+
+- id: global_variable_map_add_does_not_update
+  pattern: null
+  bad: "Using add_to_global_variable_map by itself to update an existing key"
+  correction: "Remove the existing key first, then add the new value: remove_from_global_variable_map = { name = X key = scope:Y } followed by add_to_global_variable_map = { name = X key = scope:Y value = Z }."
+  category: scope
+  scope: global
+  source: "user-reported engine behavior (2026-06)"
+  notes: "add_to_global_variable_map only inserts missing keys. If the key already exists, the old value is silently kept."
+
+- id: market_scope_set_variable_unsupported
+  pattern: 'every_market_in_world\s*=\s*\{[^{}]*\bset_variable\b'
+  bad: "Direct set_variable / change_variable on market scope (e.g. every_market_in_world = { set_variable = { name = X value = Y } ... })"
+  correction: "Markets do NOT support persistent script variables. For market-keyed caches, write a global_variable_map and use the market scope as key: remove_from_global_variable_map/add_to_global_variable_map with key = scope:market_cache, then read via global_variable_map(name|scope:market_cache) or GUI GetVariableFromGlobalVariableMap('name', Market.MakeScope)."
+  category: scope
+  scope: global
+  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_game_files/game/in_game/gui/context_menu.gui:1748"
+  notes: "Market scopes are valid keys for global_variable_map even though direct market set_variable/change_variable storage is unsupported. Do not use the market center location as an artificial cache owner for SOL market data."
+
+- id: sol_market_center_location_cache
+  pattern: "GetCenterLocation\\.MakeScope\\.GetVariable\\('sol_market_|location\\s*=\\s*\\{\\s*set_variable\\s*=\\s*\\{\\s*name\\s*=\\s*sol_market_"
+  only_in_paths: ['src/stable']
+  bad: "Using a market center location variable as a SOL market-keyed cache"
+  correction: "Use global_variable_map keyed by the market scope instead. Script: remove_from_global_variable_map = { name = sol_market_* key = scope:sol_market_cache } then add_to_global_variable_map = { name = sol_market_* key = scope:sol_market_cache value = ... }. GUI: GetVariableFromGlobalVariableMap('sol_market_*', Location.GetMarket.MakeScope)."
+  category: scope
+  scope: global
+  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_mods/3692202776/loading_screen/data_binding/cmm_macros_settings.txt:88"
+  notes: "SOL market data belongs to the market key, not to an arbitrary center location. Center-location caches are brittle and obscure the actual key."
+
+- id: demands_goods_by_pops_is_shortage_not_consumption
+  pattern: null
+  bad: "Using demands_goods_by_pops = goods:<good> as a generic consumed-good or market pop-demand test"
+  correction: "For a known market, scope to the good and use is_demanded_in_market_by_pops = scope:<market>. Reserve demands_goods_by_pops for checks where pop demand exceeds supply."
+  category: trigger
+  scope: market
+  source: "reference_game_files/game/main_menu/localization/english/triggers_l_english.yml:5842; reference_game_files/game/in_game/common/trigger_localization/goods_triggers.txt:61; reference_mods/3629022149/in_game/common/on_action/country_monthly_stockpile.txt:3967"
+  notes: "The trigger localization for demands_goods_by_pops describes a shortage condition, not mere consumption. The goods-scope trigger is_demanded_in_market_by_pops accepts a market scope target."
+
+- id: gui_only_scope_variable_unused_warning
+  pattern: null
+  bad: "Using set_variable only to feed GUI/localization display, with no live script-side read"
+  correction: "For GUI-only display caches, ensure the scope variable is also read in a live script path. Moving the cache to global_variable_map can be correct for keying/storage, but does not by itself satisfy unused-variable validation."
+  category: gui
+  scope: any
+  source: "EU5 error.log jomini_effect.cpp:1162; reference_official_defines/docs/data_types_script.txt:34; reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17"
+  notes: "Jomini's unused-variable validation does not count GUI/localization-only reads. Scope variables written only for panel display can flood error.log with 'Variable X is set but is never used'."
+
+- id: gui_only_global_variable_map_unused_warning
+  pattern: null
+  bad: "Writing global_variable_map values only for GUI display, with GetVariableFromGlobalVariableMap(...) as the sole read"
+  correction: "Keep global_variable_map for keyed caches when appropriate, but also read each map name in a live script path with global_variable_map(name|scope:key). A local-variable count or no-op script-side read is enough when the value is only displayed."
+  category: gui
+  scope: global
+  source: "EU5 error.log jomini_effect.cpp:1162 for gls_country_consumes_*; reference_mods/3692202776/in_game/common/scripted_triggers/cmf_core_triggers.txt:9"
+  notes: "Jomini's unused-variable validation also ignores GUI-only GetVariableFromGlobalVariableMap reads. Use in unused scripted triggers/effects does not count; the read must sit in an effect/trigger that actually runs."
+
+- id: gui_market_getlocation_invalid
+  pattern: '\.GetMarket\.GetLocation\b'
+  bad: "Calling .GetMarket.GetLocation in GUI expressions to access a market's hub location"
+  correction: "Use .GetMarket.GetCenterLocation only when the UI truly needs the trade-center Location object. For market-keyed caches, prefer global_variable_map keyed by Market.MakeScope instead of center-location variables."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/context_menu.gui:940 — 'ondoubleclick = \"[PanToLocation(Location.GetMarket.GetCenterLocation)]\"'"
+  notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor for navigation to the center location. It is not a recommended cache storage path for SOL market data."
+
+- id: situation_custom_mapmode_not_script_field
+  pattern: null
+  bad: "Adding map_mode = <tag> or using trigger_on_create on a reusable situation panel to force a separate custom mapmode"
+  correction: "Keep is_data_map/map_color for the situation data map. To auto-select a separate mapmode when a situation panel opens, add a zero-size GUI widget inside the situation_panel, gate it with LateralView.IsShown so the visible expression flips on each reopen, and call on_start = \"[GetMapMode('<tag>').SetMapMode]\" from a _show state."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/common/situations/readme.txt:12-18; reference_official_defines/docs/data_types_uncategorized.txt:72079; src/stable/in_game/gui/SOL_migration_caller.gui:21-31; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
+  notes: "Situation script supports setup effects and data-map coloring, but no verified custom mapmode field. trigger_on_create is one-shot for widget lifetime; _show retriggers when LateralView.IsShown flips on each reopen. Mapmode selection is a MapMode GUI action; direct chained action expressions are valid in state on_start."
+
+- id: gui_state_on_start_does_not_inherit_datacontext
+  pattern: 'state\s*=\s*\{[^{}]*\btrigger_on_create\s*=\s*yes[^{}]*\bon_start\s*=\s*"\[MapMode\.SetMapMode\]"'
+  only_in_paths: ['src/stable/in_game/gui']
+  bad: "Calling [MapMode.SetMapMode] from state.on_start while expecting a sibling or parent datacontext = [GetMapMode('<tag>')] to supply the MapMode object"
+  correction: "Call the object-returning function inside the action expression: on_start = \"[GetMapMode('<tag>').SetMapMode]\"."
+  category: gui
+  scope: any
+  source: "EU5 error.log: No context supplied, wanted context of type 'MapMode' for 'MapMode.SetMapMode'; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
+  notes: "trigger_on_create state actions do not inherit the widget's datacontext for method dispatch. The action expression must create or receive the required object itself."
+
+- id: yearly_january_pulse_spike
+  pattern: ''
+  bad: "Gating heavy per-country / per-location work behind 'limit = { current_month = 1 }' inside a situation's on_monthly block — fires on every January 1 for every country at once"
+  correction: "Use vanilla 'yearly_country_pulse' on_action instead — it fires once per country per year on each country's own anniversary date, naturally distributing load across the whole year. For globally-scoped yearly work (e.g. every_market_in_world scans), keep the situation-month-1 gate but split the work into market-hub-cached or quarterly passes. Anything that iterates every_owned_location per country per year MUST go through yearly_country_pulse, not the global situation."
+  category: scope
+  scope: global
+  source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:23-71; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:6-10"
+  notes: "Documentation-only (no regex lint). The situation's on_monthly with current_month=1 gate causes ALL countries to recompute simultaneously on Jan 1, producing a yearly frame-time spike. Vanilla yearly_country_pulse staggers per-country work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07) traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations."
+
+- id: first_month_estate_trade_income_missing
+  pattern: null
+  bad: "Computing SOL country estate income/expense ratios during the first game month"
+  correction: "Keep income/expense compensation neutral before current_date >= 1337.5.1, then initialize the country poverty compensation once from monthly_country_pulse before applying local_pop_demand."
+  category: scope
+  scope: country
+  source: "user-reported engine behavior (2026-06-24); src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:2732-2756; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:18-29"
+  notes: "Documentation-only (no regex lint). EU5 does not include estate trade income in the first game month, so first-month country stratum income/expense ratios understate income and can overstate poverty compensation. New-game initialization must defer ratio calculation until the second month while old saves can refresh immediately."
+
+- id: estate_building_count_hardcoded_lists
+  pattern: null
+  bad: "Counting estate buildings with hard-coded building type lists or plain num_buildings instead of checking the building's estate owner/type"
+  correction: "Iterate a location with every_buildings_in_location and filter the building scope with estate_type ?= estate_type:<estate>, e.g. estate_type ?= estate_type:nobles_estate."
+  category: scope
+  scope: location
+  source: "reference_game_files/game/in_game/events/DHE/flavor_SWE.txt:1076-1078"
+  notes: "Building scope exposes estate_type; this avoids brittle building-name lists and excludes non-estate buildings while counting per-location estate buildings."
+
+- id: event_missing_outcome_field
+  pattern: ''
+  bad: "country_event / age_event / etc. without an 'outcome = ...' top-level field"
+  correction: "Add 'outcome = neutral' (or good / bad / positive / negative) below 'desc = ...' in every event block. Vanilla 1.2 added a hard validator: events without an outcome emit 'Event #X is missing an outcome' to error.log on game-load. The five accepted values are neutral, good, bad, positive, negative — match the event's actual flavor (use neutral for pure-notification events with no consequential choice)."
+  category: event
+  scope: any
+  source: "reference_game_files/game/in_game/events/ages.txt:7 (ages_of_eu.1 uses 'outcome = neutral'); EU5 1.2 changelog — added in unscoped 'Bug Fixes' / event_database validator pass; engine error: 'Event #X is missing an outcome in events/Y.txt' from event_database.cpp:648"
+  notes: "Pre-1.2 events did not require this field and ran fine without it. 1.2 added the validator that emits the missing-outcome warning per event, per file-load. The warning does NOT block the event from firing in-game, but it floods error.log and indicates a category mismatch. Use 'outcome = neutral' for tooltip-only / show_as_tooltip notification events (matches vanilla age events). Use 'good' / 'bad' / 'positive' / 'negative' when the event has a clear directional flavor for the player. Documentation-only entry (no regex lint) because parsing top-level event blocks reliably is hard, and validate.py would over- or under-match."
+
+- id: goods_demand_block_value_syntax
+  pattern: ''
+  bad: "goods demand entry using block syntax: wine = { value = SOL_wine_demand }"
+  correction: "Direct scalar assignment — no block wrapper: wine = SOL_wine_demand"
+  category: scripted_values
+  scope: pop
+  source: "reference_game_files/game/in_game/common/goods_demand/pop_demands.txt"
+  notes: "pop_demand good entries must be plain key = value pairs (matching vanilla wine = 1 pattern). Block wrapper { value = ... } causes the parser to load only the first entry and drop all subsequent goods plus category. Both quoted strings and block wrappers are broken; direct assignment is the only valid form."
+
+- id: limit_in_scope_transition_block
+  pattern: null
+  bad: "'limit = { ... }' directly inside a scope-transition block such as 'location = { limit = { ... } }', 'country = { limit = { ... } }', etc."
+  correction: "Wrap with 'if = { limit = { ... } }' inside the scope-transition block. 'limit' is only valid directly inside iteration effects (every_*, random_*, ordered_*, while). Inside a scope-hop block it is an 'Unknown effect limit' error."
+  category: scope
+  scope: any
+  source: "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt:1864 — engine error: 'Unknown effect limit at ... :1864' from jomini_effect.cpp:556"
+  notes: "Scope-transition blocks (location={}, country={}, etc.) are NOT loops — the engine does not recognise 'limit' there. Use 'if = { limit = { ... } }' for conditional execution inside a scope hop."

@@ -1,9 +1,11 @@
 ﻿# SUBJECT TYPES
 #
-# visible_through_diplomacy = <trigger> is this subject type visible through diplomacy in general. root = overlord, target = subject
-# enabled_through_diplomacy = <trigger> is this subject type enabled through diplomacy. root = overlord, target = potential subject
-# visible_through_treaty = (optional) <trigger> is this subject type visible to be offered in a peace treaty. root = overlord, target = subject, recipient = peace offer recipient, war = current war
-# enabled_through_treaty = (optional) <trigger> is this subject type enabled in a peace treaty. root = overlord, target = potential subject, recipient = peace offer recipient, war = current war
+# visible = <trigger> is this subject type visible at all. root = overlord, target = subject
+# enabled = <trigger> is this subject type enabled at all. root = overlord, target = potential subject
+# visible_through_diplomacy = <trigger> is this subject type visible through diplomacy in general (additional to visible). root = overlord, target = subject
+# enabled_through_diplomacy = <trigger> is this subject type enabled through diplomacy (additional to enabled). root = overlord, target = potential subject
+# visible_through_treaty = (optional) <trigger> is this subject type visible to be offered in a peace treaty (additional to visible). root = overlord, target = subject, recipient = peace offer recipient, war = current war
+# enabled_through_treaty = (optional) <trigger> is this subject type enabled in a peace treaty (additional to enabled). root = overlord, target = potential subject, recipient = peace offer recipient, war = current war
 # creation_visible = <trigger> can this subject type be created in general. root = overlord
 # subject_creation_enabled = <trigger> can a new province or building subject be released with this subject type. root = overlord, target_province = potential geography for location- or region- based subject types
 # release_country_enabled = <trigger> can the potential overlord create released countries as this subject type. root = overlord, target = potential subject
@@ -45,6 +47,7 @@
 # fleet_basing_rights = <yes/no> whether or not the subject gives fleet basing rights to the overlord
 # food_access = <yes/no> whether or not the subject gives food access to the overlord
 # use_overlord_laws = <yes/no> whether or not the subject gives uses the same set of laws and policies as the overlord
+# on_overlord_becomes_a_subject = <cancel_subjects/transfer_subjects/nothing> what happens to this subject when its overlord itself becomes a subject of another country. cancel_subjects = release subject as independent; transfer_subjects = move subject to the new top overlord (downgrading to vassal if the subject type conditions fail); nothing = default, subject stays under the old overlord as a sub-subject. default: nothing
 # annulled_by_peace_treaty = <yes/no> whether this subject type gets broken / becomes unavailable when treaties get annulled, default: yes
 # annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically
 # allow_declaring_wars = <trigger> whether or not the subject can declare their own wars. (root = subject type, scope:attacker = subject trying to declare war, scope:defender = country they are trying to declare war on)
@@ -61,6 +64,7 @@
 # overlord_share_exploration = <yes/no> whether or not the overlord will share their exploration or not
 # overlord_protects_external = <yes/no> whether or not the overlord will protect the subject from external attackers, defaults to yes
 # overlord_protects_other_subjects = <yes/no> whether or not the overlord will protect the subject from internal attackers (such as other subjects), defaults to no
+# counts_as_external = <yes/no> whether or not that subject type is seen as an external threat if it attacks other subjects of their overlord, in which case the overlord will consider overlord_protects_external against them, defaults to no
 # can_be_force_broken_in_peace_treaty = <yes/no> can this subject type be demanded to be broken in a peace treaty
 # overlord_can_enforce_peace_on_subject = <yes/no> can the overlord demand that the subject leave any wars they're in
 # war_score_cost = <script_value> how much will this subject cost to establish in wars, modifies the base war score cost calculation

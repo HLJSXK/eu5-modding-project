@@ -3,6 +3,7 @@ template message_template {
 	name = "basic_message_template"
 	parentanchor = center
 	allow_outside = yes
+	layer = top # match events
 	
 	# using = bg_window_message_t3
 
@@ -23,6 +24,7 @@ template message_template {
 				spacing = 10
 				using = layoutpolicy_expanding
 				using = bg_age_event_inner
+				block "message_bg_extra" {}
 				using = bg_age_event_frame
 
 				widget = {
@@ -290,45 +292,50 @@ template message_template {
 		}
 	}
 
-	widget = {
-		ignore_layout = yes
-		allow_outside = yes
-		parentanchor = top|right
-		position = {-10 5}
-		size = {55 55}
-		
-		# Avoiding using cancel input action in go-to button
-		button_close_alt = {
-			name = "dummy_button"
-			tooltip_enabled = no
-			parentanchor = left|top
-			position = {25 20}
+	block "message_close_button" {
+		widget = {
+			ignore_layout = yes
+			allow_outside = yes
+			parentanchor = top|right
+			position = {-10 5}
+			size = {55 55}
+			
+			# Avoiding using cancel input action in go-to button
+			button_close_alt = {
+				name = "dummy_button"
+				tooltip_enabled = no
+				parentanchor = left|top
+				position = {25 20}
 
-			size = { 22 22 }
-			using = bg_circle
+				size = { 22 22 }
+				using = bg_circle
 
-			input_action = "close_window"
-			use_global_input_instance = yes
-			onclick = "[MessagePopup.OnAccept]"
-			# using = snd_UI_confirm
-			using = bg_circle_piechart
-		}
-
-		button_menu_alt = {
-			name = "message_settings"
-			tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "MESSAGE_SETTINGS_POPUP" } } }
-			parentanchor = left|top
-			position = {25 20}
- 
-			blockoverride "close_inputaction" {}
-			blockoverride "button_texture" {
-				texture = "gfx/interface/buttons/flats/list_button.dds"
+				input_action = "close_window"
+				use_global_input_instance = yes
+				action_tooltip = {
+					title = "MESSAGE_SETTINGS_POPUP"
+					on_action = "[MessagePopup.OnAccept]"
+				}
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+				# using = snd_UI_confirm
+				using = bg_circle_piechart
 			}
 
-			onclick = "[MessagePopup.OpenMessagePopup]"
-			size = { 22 22 }
-			using = bg_circle
-			using = bg_circle_piechart
+			button_menu_alt = {
+				name = "message_settings"
+				parentanchor = left|top
+				position = {25 20}
+ 
+				blockoverride "close_inputaction" {}
+				blockoverride "button_texture" {
+					texture = "gfx/interface/buttons/flats/list_button.dds"
+				}
+
+				onclick = "[MessagePopup.OpenMessagePopup]"
+				size = { 22 22 }
+				using = bg_circle
+				using = bg_circle_piechart
+			}
 		}
 	}
 }
@@ -336,7 +343,9 @@ template message_template {
 template peace_message_units_block {
 	hbox = {
 		overlappingitembox = {
-			size = { 315 170 }
+			block "peace_message_units_block_size" {
+				size = { 450 170 }
+			}
 			spacing = 7
 			block "peace_message_units_block_datamodel" { datamodel = "[CountryMessage.GetWarInfo.GetAttackerUnitStats]" }
 			ignoreinvisible = yes
@@ -1205,34 +1214,34 @@ window = {
 					}
 					#Player won
 					modify_texture = {
-						visible = "[CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)]"
+						visible = "[Or(Not(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self)), CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
 						using = color_mid_green_texture
 						blend_mode = multiply
 					}
 					modify_texture = {
-						visible = "[CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)]"
+						visible = "[Or(Not(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self)), CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
 						using = color_blue_texture
 						blend_mode = overlay
 					}	
 					modify_texture = {
-						visible = "[CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)]"
+						visible = "[Or(Not(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self)), CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
 						using = color_bone_texture
 						blend_mode = overlay
 					}
 
 					#Player lost
 					modify_texture = {
-						visible = "[Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
+						visible = "[And(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self), Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)))]"
 						using = color_light_red_texture
 						blend_mode = multiply
 					}
 					modify_texture = {
-						visible = "[Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
+						visible = "[And(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self), Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)))]"
 						using = color_whiteish_texture
 						blend_mode = overlay
 					}
 					modify_texture = {
-						visible = "[Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self))]"
+						visible = "[And(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self), Not(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self)))]"
 						using = color_whiteish_texture
 						blend_mode = overlay
 						alpha = 0.5
@@ -1243,7 +1252,7 @@ window = {
 					using = Font_Size_Medium
 					align = center|nobaseline
 					margin_bottom = 2
-					text = "[SelectLocalization(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self), 'WAR_WON_NO_SCORE', 'WAR_LOST_NO_SCORE')]"
+					text = "[SelectLocalization(CountryMessage.GetWarInfo.IsWinningCountry(GetPlayer.Self), 'WAR_WON_NO_SCORE', SelectLocalization(CountryMessage.GetWarInfo.IsCountryPartOfWar(GetPlayer.Self), 'WAR_LOST_NO_SCORE', 'WAR_WON_OTHER_COUNTRY'))]"
 				}
 			}
 
@@ -1313,20 +1322,7 @@ window = {
 						# Attacker side casualties
 						hbox = {
 							tooltipwidget = {
-								SimpleContextualTooltipType = {
-									blockoverride "title_icon" {
-										icon = {
-											using = tooltip_title_icon_size
-											texture = "gfx/interface/icons/disasters/_default.dds"
-										}
-									}
-	
-									blockoverride "concept_link" {
-										text = "[war|e]"
-									}
-	
-									lowpriotextcontext = "PEACE_COUNTRY_POP_LOSSES"
-								}
+								using = PeaceAttackerPopCassualties_tooltip
 							}
 							using = peace_piechart_attacker_side_block
 						}
@@ -1334,20 +1330,7 @@ window = {
 						# Defender side casualties
 						hbox = {
 							tooltipwidget = {
-								SimpleContextualTooltipType = {
-									blockoverride "title_icon" {
-										icon = {
-											using = tooltip_title_icon_size
-											texture = "gfx/interface/icons/disasters/_default.dds"
-										}
-									}
-	
-									blockoverride "concept_link" {
-										text = "[war|e]"
-									}
-	
-									lowpriotextcontext = "PEACE_COUNTRY_POP_LOSSES"
-								}
+								using = PeaceDefenderPopCassualties_tooltip
 							}
 							using = peace_piechart_defender_side_block
 						}
@@ -1414,7 +1397,7 @@ window = {
 					hbox = {
 						# Attacker land
 						widget = {
-							size = { 340 170 }
+							size = { 450 170 }
 							using = peace_message_units_block
 						}
 
@@ -1508,7 +1491,7 @@ window = {
 
 						# Defender land
 						widget = {
-							size = { 340 170 }
+							size = { 450 170 }
 							using = peace_message_units_block
 							blockoverride "peace_message_units_block_datamodel" { datamodel = "[CountryMessage.GetWarInfo.GetDefenderUnitStats]" }
 						}
@@ -1516,10 +1499,17 @@ window = {
 
 					# Naval unit stats
 					hbox = {
+						layoutpolicy_horizontal = expanding
 						# Attacker naval
-						widget = {
-							size = { 340 170 }
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							size = { 450 170 }
+							righttoleft = yes
+							expand = {}
 							using = peace_message_units_block
+							blockoverride "peace_message_units_block_size" {
+								size = { 322 170 }
+							}
 							blockoverride "peace_message_units_block_datamodel" { datamodel = "[CountryMessage.GetWarInfo.GetAttackerNavalUnitStats]" }
 						}
 
@@ -1614,7 +1604,7 @@ window = {
 
 						# Defender naval
 						widget = {
-							size = { 340 170 }
+							size = { 450 170 }
 							using = peace_message_units_block
 							blockoverride "peace_message_units_block_datamodel" { datamodel = "[CountryMessage.GetWarInfo.GetDefenderNavalUnitStats]" }
 						}
@@ -1622,8 +1612,8 @@ window = {
 
 					hbox = {
 						layoutpolicy_horizontal = expanding
-						margin = { 10 0 }
-						spacing = 5
+						margin = { 40 0 }
+						spacing = 16
 						# Attacker side army/navy casualties
 						hbox = {
 							tooltipwidget = {
@@ -1819,7 +1809,7 @@ window = {
 				spacing = 5
 				hbox = {
 					layoutpolicy_horizontal = expanding
-					maximumsize = { 870 -1 }
+					maximumsize = { 1070 -1 }
 					margin = { 0 5 }
 					background = {
 						texture = "gfx/interface/buttons/button_banner_02.dds"
@@ -1845,8 +1835,8 @@ window = {
 				
 				scrollarea = {
 					layoutpolicy_horizontal = expanding
-					minimumsize = { 860 100 }
-					maximumsize = { 860 200 }
+					minimumsize = { 1060 100 }
+					maximumsize = { 1060 200 }
 					
 					scrollbarpolicy_horizontal = always_off
 					autoresizescrollarea = yes
@@ -2189,11 +2179,7 @@ window = {
 
 			blockoverride "editbox_properties" {
 				name = "newborn_name"
-				tooltipwidget = {
-					LeftClickButtonTooltip = {
-						blockoverride "onclick_text" { text = "EDIT_NEWBORN_FIRST_NAME" } 
-					}
-				}
+				tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "EDIT_NEWBORN_FIRST_NAME" } } }
 				text = "[NewBornMessage.GetCharacter.GetFirstNameForEditbox]"
 				# onreturnpressed = "[NewBornMessage.DerivedOnAccept]"
 				maxcharacters = 20
@@ -2202,12 +2188,11 @@ window = {
 		icon_button_small_round = {
 			position = { 270 00 }
 			size = { 30 30 }			
-			tooltipwidget = {
-				LeftClickButtonTooltip = {
-					blockoverride "onclick_text" { text = "EDIT_NEWBORN_RANDOM_FIRST_NAME" } 
-				}
+			action_tooltip = {
+				title = "EDIT_NEWBORN_RANDOM_FIRST_NAME"
+				on_action = "[NewBornMessage.GiveRandomName]"
 			}
-			onclick = "[NewBornMessage.GiveRandomName]"
+			tooltipwidget = { BasicFunctionalTooltip = {} }
 		}
 	}
 
@@ -2336,7 +2321,7 @@ window = {
 	name = "war_message_popup"
 	layer = confirmation
 
-	blockoverride "snd_popup_type" { soundeffect = "UI_popup_war_message" }
+	#blockoverride "snd_popup_type" { soundeffect = "UI_popup_war_message" }
 
 	blockoverride "message_decoration_left" {
 		country_flag_big = {

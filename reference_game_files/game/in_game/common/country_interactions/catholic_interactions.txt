@@ -1,8 +1,16 @@
 ﻿#Catholic-to-Pope Actions
 request_divorce =  {
 	type = diplomacy
-	price = price:catholic_country_interaction
+	price = price:request_divorce_price
 	category = CATEGORY_PAPAL_ACTIONS
+
+	# Actor-only gate: the only positive-score branch in ai_will_do required a non-catholic
+	# spouse. Short-circuit catholic-spouse rulers before per-pair scoring.
+	ai_prerequisite = {
+		ruler.first_spouse ?= {
+			NOT = { religion = religion:catholic }
+		}
+	}
 
 	potential = {
 		papacy_active = yes
@@ -10,9 +18,9 @@ request_divorce =  {
 		scope:actor = {
 			religion = religion:catholic
 			modifier:is_pope = no
-			exists = ruler	
+			exists = ruler
 		}
-	}	
+	}
 
 	allow = {
 		scope:actor = {
@@ -23,6 +31,11 @@ request_divorce =  {
 				owner = scope:actor
 			}
 		}
+	}
+
+	cooldown = {
+		type = request_divorce
+		years = 10
 	}
 
 	select_trigger = {
@@ -45,21 +58,9 @@ request_divorce =  {
 		scope:actor = { ruler = { divorce_character = first_spouse } }
 	}
 	ai_will_do = {
-		add = -10
-		add = {
-			if = {
-				limit = {
-					scope:actor = {
-						ruler = {
-							first_spouse = {
-								NOT = { religion = religion:catholic }
-							}
-						}
-					}
-				}
-				value = 100
-			}
-		}
+		# Base score folds in the +100 non-catholic-spouse bonus that the ai_prerequisite gate
+		# now guarantees (was: add = -10 + conditional +100 = effective +90).
+		add = 90
 		add = {
 			if = {
 				limit = {
@@ -72,6 +73,42 @@ request_divorce =  {
 					}
 				}
 				value = 100
+			}
+		}
+		#dynastic continuity already secured by a Catholic heir
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						has_heir = yes
+						heir ?= { religion = religion:catholic }
+					}
+				}
+				value = -150
+			}
+		}
+		#wait for outcome before annulling a fertile marriage
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						ruler = {
+							first_spouse = { is_pregnant = yes }
+						}
+					}
+				}
+				value = -200
+			}
+		}
+		#ruler too old to benefit from remarriage
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						ruler = { age_in_years > 55 }
+					}
+				}
+				value = -150
 			}
 		}
 	}
@@ -109,13 +146,26 @@ request_divorce =  {
 			}
 		}
 	}
+	# Engine-level cooldown only fires on accept; declined requests run ExecuteReject which skips it,
+	# so without this the AI re-fires the action next month. Same type as the top-level cooldown,
+	# so the action's HasCooldown check gates re-submission automatically.
+	reject_effect = {
+		hidden_effect = {
+			scope:actor = {
+				add_cooldown = {
+					type = request_divorce
+					years = 5
+				}
+			}
+		}
+	}
 	diplo_chance = {
 		base = -25
 		opinion = 0.2
 		diplomatic_reputation = 3
 		trust_in_actor = 0.2
 	}
-}	
+}
 
 #Pope-to-Catholic Actions
 excommunicate = {
@@ -157,6 +207,17 @@ excommunicate = {
 			is_excommunicated = no
 		}
         enabled = {
+			custom_tooltip = {
+				text = excommunicate_is_not_resolution_target_tt
+				trigger_if = {
+					limit = { international_organization:catholic_church = { resolution_is_active = resolution:excommunicate_resolution } }
+					international_organization:catholic_church = {
+						"active_resolution(resolution:excommunicate_resolution)" ?= {
+							"resolution_target(target)" != root
+						}
+					}
+				}
+			}
 			scope:actor = {		
 				opinion = {
 					target = root

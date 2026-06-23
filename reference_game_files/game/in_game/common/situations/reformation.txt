@@ -29,14 +29,6 @@
 		religion:lutheran = {
 			enable_religion = yes
 		}
-		set_variable = {
-			name = reformation_lutheran_preachers_counter
-			value = 0
-		}
-		set_variable = {
-			name = reformation_calvinist_preachers_counter
-			value = 0
-		}
 		continent:europe = {
 			random_location_in_continent = {
 				limit = {
@@ -74,7 +66,7 @@
 						is_owned_by_international_organization = international_organization:hre
 					}
 				}
-	
+
 				every_pop = {
 					limit = {
 						religion = religion:catholic
@@ -85,10 +77,18 @@
 					}
 				}
 				root = {
-					set_variable = { name = lutheran_origin value = prev } 
+					set_variable = { name = lutheran_origin value = prev }
 				}
-	
-				construct_building = { building_type = building_type:lutheran_preachers }
+
+				# Spawn the Lutheran movement with the newly-converted pops as seed supporters
+				spawn_movement = {
+					movement_definition = movement_definition:lutheranism_movement
+					supporters = {
+						value = population
+						multiply = 0.4
+					}
+				}
+
 				owner ?= {
 					create_character = {
 						first_name = name_martin
@@ -103,9 +103,27 @@
 						mil = { 80 100 }
 						script = martin_luther
 						root = {
-							set_variable = { name = lutheran_character value = prev } 
+							set_variable = { name = lutheran_character value = prev }
 						}
 					}
+				}
+			}
+		}
+
+		# Martin Luther becomes the first spreader of the Lutheran movement
+		var:lutheran_character = {
+			save_scope_as = reformation_first_spreader
+		}
+		var:lutheran_origin = {
+			save_scope_as = reformation_first_spreader_location
+		}
+		religion:lutheran = {
+			ordered_movement_in_religion = {
+				max = 1
+				order_by = { value = 1 }
+				add_spreader = {
+					character = scope:reformation_first_spreader
+					location = scope:reformation_first_spreader_location
 				}
 			}
 		}
@@ -121,42 +139,6 @@
 	}
 
 	on_monthly = {
-		continent:europe = {
-			every_location_in_continent = {
-				limit = {
-					OR = {
-						has_building = building_type:lutheran_preachers
-						dominant_religion ?= religion:lutheran
-					}
-				}
-				
-				every_coast_border_location = {
-						limit = {
-							population > 0
-							dominant_religion = religion:catholic
-							OR = {
-								NOT = { has_building = building_type:lutheran_preachers }
-								"building(building_type:lutheran_preachers|owner)" ?= { is_at_max_level = no }
-							}
-							NOT = { has_variable = lutherans_blocked_in_location }
-						}
-				
-					random_list =  {
-						3 = {
-							construct_building = { building_type = building_type:lutheran_preachers }
-						}
-						2 = {
-							set_variable = {
-								name = lutherans_blocked_in_location 
-								value = 1
-							}
-						}
-						20 = {  }
-					}
-				}
-			}
-		}
-
 		# bible translations
 		
 		random_country = {
@@ -487,9 +469,6 @@
 
 
 	on_ended = {
-		every_location_in_the_world = {
-			remove_variable = lutherans_blocked_in_location
-		}
 		every_country = {
 			remove_variable = bibles_translated_in_country
 			remove_variable = lutheran_origin
@@ -497,6 +476,19 @@
 		remove_variable = reformation_lutheran_preachers_counter
 		remove_variable = reformation_calvinist_preachers_counter
 		clear_global_variable_list = reformer_list
+
+		# Outbreaks survive the situation end (movement potential only gates spawning, not spread).
+		# Burn them down so post-1700/Council-of-Trent saves don't keep converting pops indefinitely.
+		religion:lutheran = {
+			every_movement_in_religion = {
+				destroy_movement = yes
+			}
+		}
+		religion:calvinist = {
+			every_movement_in_religion = {
+				destroy_movement = yes
+			}
+		}
 	}
 
 	tooltip = {
@@ -511,15 +503,29 @@
 		}
 		if = {
 			limit = {
-				has_building = building_type:lutheran_preachers
+				has_owner = yes
+				"religion_percentage(religion:lutheran)" >= 0.05
 			}
-			custom_tooltip = REFORMATION_HAS_LUTHERAN_PREACHERS
+			custom_tooltip = REFORMATION_HAS_LUTHERAN_MOVEMENT
 		}
 		if = {
 			limit = {
-				has_building = building_type:calvinist_preachers
+				has_owner = yes
+				"religion_percentage(religion:calvinist)" >= 0.05
 			}
-			custom_tooltip = REFORMATION_HAS_CALVINIST_PREACHERS
+			custom_tooltip = REFORMATION_HAS_CALVINIST_MOVEMENT
+		}
+		if = {
+			limit = {
+				has_owner = yes
+				NOT = { "religion_percentage(religion:lutheran)" >= 0.05 }
+				NOT = { "religion_percentage(religion:calvinist)" >= 0.05 }
+				NOT = { dominant_religion ?= religion:lutheran }
+				NOT = { dominant_religion ?= religion:calvinist }
+				NOT = { dominant_religion ?= religion:hussite }
+				NOT = { dominant_religion ?= religion:anglican }
+			}
+			custom_tooltip = REFORMATION_MAP_NO_MOVEMENT_PRESENT
 		}
 		if = {
 			limit = {
@@ -583,19 +589,23 @@
 	secondary_map_color = {
 		if = {
 			limit = {
-				has_building = building_type:lutheran_preachers
+				has_owner = yes
+				"religion_percentage(religion:lutheran)" >= 0.05
+				NOT = { dominant_religion ?= religion:lutheran }
 			}
 			value = color_lutheran
 		}
 		else_if = {
 			limit = {
-				has_building = building_type:calvinist_preachers
+				has_owner = yes
+				"religion_percentage(religion:calvinist)" >= 0.05
+				NOT = { dominant_religion ?= religion:calvinist }
 			}
 			value = color_calvinist
 		}
 	}
-	
-	legend_key = { 
+
+	legend_key = {
 		desc = "REFORMER_STATE"
 		color = reformation_reformer
 		require_color_on_map = yes

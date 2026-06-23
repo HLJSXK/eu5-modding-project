@@ -1,4 +1,4 @@
-template CurrentRegencyTooltip {
+﻿template CurrentRegencyTooltip {
 	ContextualTooltipType = {
 		blockoverride "title_icon" {
 			icon = {
@@ -65,6 +65,93 @@ template CourtLanguage_tooltip {
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text =  "[GovernmentView.GetLanguageImpact]"
+				}
+			}
+		}
+	}
+}
+
+template ChivalricOrder_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[ChivalricOrder.GetNameWithNoTooltip]"
+		}
+
+		blockoverride "concept_link" {
+			text = "[chivalric_order|e]"
+		}
+
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetChivalricOrderIcon(ChivalricOrder.Self)]"
+			}
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipRowList = {
+				blockoverride "block_title" {
+					text = "CHIVALRIC_ORDER_COUNTRY_MODIFIERS_TITLE"
+				}
+				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "[ChivalricOrder.GetCountryModifierText]"
+			}
+
+			TooltipRowList = {
+				blockoverride "block_title" {
+					text = "CHIVALRIC_ORDER_CHARACTER_MODIFIERS_TITLE"
+				}
+				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "[ChivalricOrder.GetCharacterModifierText]"
+			}
+
+			TooltipListBase = {
+				datacontext = "[GetQuickChivalricOrderMembers(ChivalricOrder.Self)]"
+
+				blockoverride "block_title" {
+					text = "CHIVALRIC_ORDER_MEMBERS_TITLE"
+				}
+
+				TooltipScrolledContentSection = {
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 400 }
+					}
+					blockoverride "scrollarea_content" {
+						fixedgridbox = {
+							addcolumn = 420
+							addrow = 30
+							setitemsizefromcell = yes
+		
+							datamodel = "[QuickChivalricOrderMembers.GetMembers]"
+							item = {
+								widget = {
+									background = {
+										visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+										using = tooltip_table_field_texture
+									}
+									hbox = {
+										margin = { 10 0 }
+										spacing = 10
+
+										country_flag_very_small = {
+											datacontext = "[Character.GetCourtCountry]"
+										}
+		
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											text = "[Character.GetName]"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[ChivalricOrder.GetDesc]"
 				}
 			}
 		}
@@ -198,7 +285,7 @@ template VoteGlue_List_tooltip {
 							addcolumn = 420
 							addrow = 30
 							setitemsizefromcell = yes
-		
+
 							datamodel = "[VoteGlue.GetVotes]"
 							item = {
 								widget = {
@@ -215,7 +302,7 @@ template VoteGlue_List_tooltip {
 									hbox = {
 										margin = { 5 0 }
 										spacing = 5
-										
+
 										country_flag_very_small = {}
 										text_single = { text = "[VoterGlue.GetVoter.GetName]" }
 
@@ -232,6 +319,68 @@ template VoteGlue_List_tooltip {
 
 										text_single = {
 											raw_text = "([VoterGlue.GetVotes|0L])"
+										}
+
+										icon = {
+											size = { 18 18 }
+											texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
+											texture_density = 2
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			TooltipListBase = {
+				visible = "[DataModelHasItems(VoteGlue.GetVotesNotForThis)]"
+
+				blockoverride "block_title" {
+					text = "VOTE_NOT_SUPPORTING_TT"
+				}
+
+				TooltipListScrollArea = {
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 200 }
+					}
+					blockoverride "scrollarea_content" {
+						fixedgridbox = {
+							addcolumn = 420
+							addrow = 30
+							setitemsizefromcell = yes
+
+							datamodel = "[VoteGlue.GetVotesNotForThis]"
+							item = {
+								widget = {
+									tooltipwidget = {
+										using = individual_country_not_voting_tooltip
+									}
+
+									background = {
+										visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+										using = tooltip_table_field_texture
+									}
+
+									hbox = {
+										margin = { 5 0 }
+										spacing = 5
+
+										country_flag_very_small = {}
+										text_single = { text = "[Country.GetName]" }
+
+										expand = {}
+
+										icon = {
+											size = { 18 18 }
+											texture = "gfx/interface/icons/international_organizations/special_statuses/curia.dds"
+											texture_density = 2
+											visible = "[EqualTo_string(InternationalOrganizationsView.GetInternationalOrganization.GetType.GetNameKey,'catholic_church')]"
+										}
+
+										text_single = {
+											raw_text = "([ResolutionGlue.GetVotes(Country.Self)|0L])"
 										}
 
 										icon = {
@@ -321,7 +470,7 @@ template IO_Law_tooltip {
 			TooltipScrolledRowList = {
 				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
 				
-				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 }} 
 				blockoverride "block_title" {
 					datacontext = "[Law]"
 					text = "LAW_TOOLTIP_POSSIBLE_POLICIES"
@@ -331,14 +480,44 @@ template IO_Law_tooltip {
 			}
 
 			#show potential voting here
+			TooltipTextBlock = {
+				visible = "[And(ResolutionGlue.CanResolutionBeVoted, And(Not(ResolutionGlue.HasHighestVote), Not(ResolutionGlue.IsUndecisiveVote)))]"
+				tooltipmeta = {
+					texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
+					game_concept = "[resolution|e]"
+				}
+				textcontext = "RESOLUTION_PREDICTED_VOTE_OUTCOME_NONE"
+			}
+
+			TooltipTextBlock = {
+				visible = "[And(ResolutionGlue.CanResolutionBeVoted, And(ResolutionGlue.IsUndecisiveVote, ResolutionGlue.HasHighestVote))]"
+				tooltipmeta = {
+					texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
+					game_concept = "[resolution|e]"
+				}
+				textcontext = "RESOLUTION_PREDICTED_VOTE_OUTCOME_UNDECISIVE"
+			}
+
+			TooltipTextBlock = {
+				visible = "[And(ResolutionGlue.CanResolutionBeVoted, And(ResolutionGlue.HasHighestVote, Not(ResolutionGlue.IsUndecisiveVote)))]"
+				tooltipmeta = {
+					texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
+					game_concept = "[resolution|e]"
+				}
+				textcontext = "RESOLUTION_PREDICTED_VOTE_OUTCOME"
+			}
+
 			TooltipListBase = {
 				blockoverride "block_title" {
 					text = "RESOLUTIONS"
 				}
 
-				visible = "[ResolutionGlue.CanResolutionBeVoted]"				
-				
+				visible = "[ResolutionGlue.CanResolutionBeVoted]"
+
 				TooltipListScrollArea = {
+					blockoverride "block_scrollarea" {
+						maximumsize = { -1 200 }
+					}
 					blockoverride "scrollarea_content" {
 						vbox = {
 							set_parent_dimension_to_minimum = height
@@ -384,17 +563,19 @@ template IO_Law_tooltip {
 	}
 }
 
+template Policy_player_tooltip {
+	datacontext = "[GetPlayer]"
+	using = Policy_tooltip
+}
+
 template Policy_tooltip {
 	ContextualTooltipType = {
 		blockoverride "title_text" {
 			text = "[Policy.GetNameWithNoTooltip]"
 		}
 
-		blockoverride "title_icon" {
-			icon = {
-				using = tooltip_title_icon_size
-				texture = "[GetLawIcon(Policy.GetLaw)]"
-			}
+		blockoverride "title_icon_texture" {
+			texture = "[GetPolicyIcon(Policy.Self)]"
 		}
 
 		blockoverride "concept_link" {
@@ -404,13 +585,17 @@ template Policy_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[Policy.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				textcontext = "[Policy.GetPolicyPartOfDescription]"
 			}
 
 			TooltipContentSection = {
-				block "country_datacontext" {
-					visible = "[IsPlayerValid]"
+				block "country_datacontext" {				
 					datacontext = "[Player]"
 				}
 				
@@ -443,6 +628,9 @@ template Policy_tooltip {
 
 			TooltipRowList = {
 				visible = "[Not(StringIsEmpty(Policy.GetEffectOnlyText))]"
+				blockoverride "rowlist_footer_visibility" {
+					visible = no
+				}
 				blockoverride "block_title" {
 					text = "WHEN_IMPLEMENTED"
 				}
@@ -521,6 +709,18 @@ template PolicyWithContext_tooltip {
 					text = "[PolicyWithContextWrap.GetPolicy.GetDesc]"
 				}
 			}
+
+			TooltipRowList = {
+				visible = "[PolicyWithContextWrap.GetPolicy.GetTagObject.CanShowTags]"
+				blockoverride "block_title" {
+					text = "CUSTOM_TAGS_TITLE"
+				}
+				blockoverride "set_textcontext" {
+					ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
+				}
+				ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+				textcontext = "[PolicyWithContextWrap.GetPolicy.GetTagObject.ShowTags]"
+			}
 		}
 	}
 }
@@ -540,7 +740,8 @@ template PolicyTrigger_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
-			TooltipRequirementsList = {
+			TooltipScrolledRequirementsList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 600 }}
 				textcontext = "[Policy.GetPotentialTriggerDesc]"
 			}
 		}
@@ -560,6 +761,68 @@ template PolicyTrigger_tooltip {
 # 		}
 # 	}
 # }
+
+template government_reform_action_provider {
+	enabled = "[GovernmentReformItem.IsEnabled]"
+
+	button_tooltip_override = {
+		title = "[GovernmentReformItem.GetReform.GetNameWithNoTooltip]"
+		description = "[GovernmentReformItem.GetDescription]"
+		effects = "[GovernmentReformItem.GetEffects]"
+	}
+
+	action_tooltip = {
+		click_type = left
+		click_mode = confirm
+		enabled = "[GovernmentReformItem.IsApplyReformEnabled]"
+		title = "[GovernmentReformItem.GetApplyReformTitle]"
+		cost = "[GovernmentReformItem.GetApplyReformCost]"
+		description = "[GovernmentReformItem.GetApplyReformDescription]"
+		effects = "[GovernmentReformItem.GetApplyReformEffects]"
+		conditions = "[GovernmentReformItem.GetApplyReformConditions]"
+		on_action_with_params = "[GovernmentReformItem.OnApplyReform]"
+	}
+}
+
+template reform_item_action_provider {
+	enabled = "[ReformItem.IsEnabled]"
+
+	button_tooltip_override = {
+		title = "[ReformItem.GetReform.GetNameWithNoTooltip]"
+		description = "[ReformItem.GetDescription]"
+	}
+
+	action_tooltip = {
+		click_type = right
+		click_mode = confirm
+		enabled = "[ReformItem.IsRemoveReformEnabled]"
+		title = "[ReformItem.GetRemoveReformTitle]"
+		cost = "[ReformItem.GetRemoveReformCost]"
+		description = "[ReformItem.GetRemoveReformDescription]"
+		on_action_with_params = "[ReformItem.OnRemoveReform]"
+	}
+
+	action_tooltip = {
+		click_type = left
+		click_mode = single
+		enabled = "[ReformItem.IsChangeReformEnabled]"
+		title = "[ReformItem.GetChangeReformTitle]"
+		cost = "[ReformItem.GetChangeReformCost]"
+		description = "[ReformItem.GetChangeReformDescription]"
+		on_action_with_params = "[ReformItem.OnChangeReform]"
+	}
+
+	action_tooltip = {
+		click_type = left
+		click_mode = single
+		click_modifier = ctrl
+		enabled = "[ReformItem.IsChangeReformEnabled]"
+		title = "[ReformItem.GetChangeReformPerAgeTitle]"
+		cost = "[ReformItem.GetChangeReformCost]"
+		description = "[ReformItem.GetChangeReformDescription]"
+		on_action_with_params = "[ReformItem.OnChangeReformPerAge]"
+	}
+}
 
 template GovernmentReform_tooltip {
 	ContextualTooltipType = {
@@ -613,7 +876,7 @@ template GovernmentReform_tooltip {
 			}
 
 			# block "reform_tooltip" {
-				TooltipRowList = {
+				TooltipBlockList = {
 					visible = "[GovernmentReform.IsMajor]"
 					blockoverride "block_title" {
 						text = "[major_reform|e]"
@@ -623,7 +886,7 @@ template GovernmentReform_tooltip {
 			# }
 
 			# block "reform_effect" {
-				TooltipStringPairList = {
+				TooltipBlockList = {
 					visible = "[GovernmentReform.HasEffectText]"
 					textcontext = "[GovernmentReform.GetEffectText]"
 				}
@@ -637,6 +900,8 @@ template GovernmentReform_tooltip {
 					textcontext = "[GovernmentReform.GetModifiersText]"
 				}
 			# }
+
+			block "time_to_reform" {}
 
 			block "UIActionDescription" {}
 			# block "reform_flavor" {
@@ -710,6 +975,11 @@ template CabinetAction_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[CabinetAction.GetDebugText]"
+				}
+			}
 			TooltipStringPairList = {
 				textcontext = "[CabinetAction.GetTooltip]"
 			}
@@ -760,6 +1030,11 @@ template EstatePrivilege_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[EstatePrivilege.GetDebugText]"
+				}
+			}
 			TooltipStatsBar = {
 				blockoverride "items" {
 					TooltipStatBarIconTextItem = {
@@ -780,7 +1055,7 @@ template EstatePrivilege_tooltip {
 				}
 			}
 
-			TooltipStringPairList = {
+			TooltipBlockList = {
 				blockoverride "block_title" {
 					text = "[modifiers|e]"
 				}
@@ -788,7 +1063,15 @@ template EstatePrivilege_tooltip {
 				textcontext = "[EstatePrivilege.GetPrunedModifiers]"
 			}
 
-			TooltipStringPairList = {
+			TooltipRequirementsList = {
+				blockoverride "block_title" {
+					text = "REVOKE_PRIVILEGE_CONDITIONS"
+				}
+				visible = "[Not(StringIsEmpty(EstatePrivilege.GetRevokeDescription))]"
+				textcontext = "[EstatePrivilege.GetRevokeDescription]"
+			}
+
+			TooltipBlockList = {
 				name = "Description_2"
 				visible = "[And(Not(StringIsEmpty(UIAction.GetDescription)), UIAction.IsEnabled)]"
 				textcontext = "[UIAction.GetDescription]"
@@ -800,7 +1083,7 @@ template EstatePrivilege_tooltip {
 				textcontext = "[UIAction.GetConditions]"
 			}
 
-			TooltipStringPairList = {
+			TooltipBlockList = {
 				name = "Description"
 				visible = "[And(Not(StringIsEmpty(UIAction.GetDescription)), Not(UIAction.IsEnabled))]"
 				textcontext = "estate_privilege_description_tt"
@@ -969,7 +1252,7 @@ template EstatePrivilege_tooltip_alt {
 				}
 			}
 
-			TooltipStringPairList = {
+			TooltipBlockList = {
 				blockoverride "block_title" {
 					text = "[modifiers|e]"
 				}
@@ -985,13 +1268,13 @@ template EstatePrivilege_tooltip_alt {
 				textcontext = "[EstatePrivilege.GetRevokeDescription]"
 			}
 
-			TooltipStringPairList = {
+			TooltipBlockList = {
 				name = "Effects"
 				visible = "[Not(StringIsEmpty(UIAction.GetEffects))]"
 				textcontext = "[UIAction.GetEffects]"
 			}
 
-			# TooltipStringPairList = {
+			# TooltipBlockList = {
 			# 	name = "LoyaltyEffects"
 			# 	blockoverride "block_title" { text = "ESTATE_PRIVILEGE_LOYALTY_IMPACT_T" }
 			# 	visible = "[Not(StringIsEmpty(EstatePrivilege.GetLoyaltyEffectsOnGrant))]"
@@ -1034,6 +1317,11 @@ template GovernmentType_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[GovernmentType.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text =  "[GovernmentType.GetPowerDesc]"
@@ -1105,12 +1393,9 @@ template GovernmentTypeHeirSelections_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
-			TooltipRowList = {
-				blockoverride "block_title" { visible = no }
-				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(GovernmentType.GetHeirSelections)]"}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(GovernmentType.GetHeirSelections)]"}
-				blockoverride "rowlist_datamodel" { datamodel = "[GovernmentType.GetHeirSelections]" }
-				blockoverride "rowlist_item" { text = "[HeirSelection.GetName]" }
+			TooltipScrolledBlockList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+				textcontext = "[GovernmentType.GetHeirSelectionNamesForUI]"
 			}
 		}
 	}
@@ -1134,12 +1419,9 @@ template GovernmentTypeLaws_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
-			TooltipRowList = {
-				blockoverride "block_title" { visible = no }
-				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(GovernmentType.GetLaws)]"}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(GovernmentType.GetLaws)]"}
-				blockoverride "rowlist_datamodel" { datamodel = "[GovernmentType.GetLaws]" }
-				blockoverride "rowlist_item" { text = "[Law.GetName]" }
+			TooltipScrolledBlockList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+				textcontext = "[GovernmentType.GetLawNamesForUI]"
 			}
 		}
 	}
@@ -1167,44 +1449,13 @@ template GovernmentTypePolicies_tooltip {
 			item = {
 				TooltipRowList = {
 					blockoverride "block_title" { text = "[Law.GetName]" }
-					blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(Law.GetPolicies)]"}
-					blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(Law.GetPolicies)]"}
-					blockoverride "rowlist_datamodel" { datamodel = "[Law.GetPolicies]" }
-					blockoverride "rowlist_item" { text = "[Policy.GetName]" }
+					textcontext = "[Law.GetPolicyNamesForUI]"
 				}
 			}
 		}
 	}
 }
 
-template GovernmentTypeEstatePrivileges_tooltip {
-	ContextualTooltipType = {
-		blockoverride "title_icon" {
-			icon = {
-				using = tooltip_title_icon_size
-				texture = "[GetGovernmentTypeIcon(GovernmentType.Self)]"
-			}
-		}
-
-		blockoverride "title_text" {
-			text = "government_type_list_title"
-		}
-
-		blockoverride "concept_link" {
-			text = "[estate_privileges|e]"
-		}
-
-		blockoverride "tooltip_content" {
-			TooltipRowList = {
-				blockoverride "block_title" { visible = no }
-				blockoverride "rowlist_datamodel_is_empty" { visible = "[IsDataModelEmpty(GovernmentType.GetEstatePrivileges)]"}
-				blockoverride "rowlist_datamodel_has_items" { visible = "[DataModelHasItems(GovernmentType.GetEstatePrivileges)]"}
-				blockoverride "rowlist_datamodel" { datamodel = "[GovernmentType.GetEstatePrivileges]" }
-				blockoverride "rowlist_item" { text = "[EstatePrivilege.GetName]" }
-			}
-		}
-	}
-}
 
 template HeirSelection_tooltip {
 	ContextualTooltipType = {
@@ -1216,23 +1467,18 @@ template HeirSelection_tooltip {
 			text = [heir_selection|E]
 		}
 
-		blockoverride "title_icon" {
-			icon = {
-				using = tooltip_title_icon_size
-				block "heir_selection_texture_tooltip" {
-					texture = "[GetHeirSelectionIcon(InteractionTarget.GetHeirSelection)]"
-				}
-
-				glow = {
-					name = "drop_shadow"
-					glow_radius = 3
-					color = {0.0 0.0 0.0 1.0}
-					alpha = 0.3
-				}
+		blockoverride "title_icon_texture" {
+			block "heir_selection_texture_tooltip" {
+				texture = "[GetHeirSelectionIcon(HeirSelection.Self)]"
 			}
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[HeirSelection.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[HeirSelection.GetDesc]"
@@ -1251,7 +1497,7 @@ template HeirSelection_tooltip {
 				textcontext = "[HeirSelection.GetProperties]"
 			}
 
-			TooltipStringPairList = {
+			TooltipScrolledStringPairList = {
 				blockoverride "block_title" {
 					text = "HEIR_SELECTION_PER_CHARACTER"
 				}
@@ -1259,6 +1505,12 @@ template HeirSelection_tooltip {
 				blockoverride "set_textcontext" {
 					ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
 				}
+
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 200 }
+				}
+
+				visible = "[Not(StringIsEmpty(HeirSelection.GetEffect))]"
 
 				textcontext = "[HeirSelection.GetEffect]"
 			}
@@ -1306,11 +1558,14 @@ template HeirSelectionCandidate_tooltip {
 				textcontext = "[HeirSelectionCandidate.GetHeirSelection.GetProperties]"
 			}
 
-			TooltipRowList = {
+			TooltipScrolledRowList = {
 				blockoverride "block_title" {
 					text = "HEIR_SELECTION_PER_CHARACTER"
 				}
-
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 200 }
+				}
+				visible = "[Not(StringIsEmpty(HeirSelectionCandidate.GetHeirSelection.GetEffect))]"
 				textcontext = "[HeirSelectionCandidate.GetHeirSelection.GetEffect]"
 			}
 
@@ -1372,15 +1627,7 @@ template HeirSelectionCandidate_tooltip {
 				}
 			}
 
-			block "heir_selection_candidate_tooltip_action" {
-				TooltipFunctionalBlock = {
-					using = tooltip_left_click_template
-
-					blockoverride "action_left_text" {
-						text = "NEW_SUCCESSION_LAW"
-					}
-				}
-			}
+			block "heir_selection_candidate_tooltip_action" {}
 		}
 	}
 }
@@ -1484,13 +1731,20 @@ template SocietalValue_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[SocietalValue.GetDebugText]"
+				}
+			}
 			TooltipScrolledContentSection = {
 				blockoverride "section_content"	{
 					TooltipStringPairList = {
+						visible = "[IsPlayerValid]"
 						textcontext = "[Player.GetSocietalValuePositionTooltip(SocietalValue.Self)]"
 					}
 
 					TooltipStringPairList = {
+						visible = "[IsPlayerValid]"
 						textcontext = "[Player.GetSocietalValueDirectionTooltip(SocietalValue.Self)]"
 					}
 
@@ -1525,6 +1779,7 @@ template SocietalValue_tooltip {
 
 template SocietalValueLeft_tooltip {
 	ContextualTooltipType = {
+		block "extra_datacontext" {}
 		blockoverride "title_text" {
 			text = "[SocietalValue.GetLeftLabelWithNoTooltip]"
 		}
@@ -1547,6 +1802,9 @@ template SocietalValueLeft_tooltip {
 				textcontext = "[SocietalValue.GetLeftTooltip]"
 			}
 
+			block "societal_value_left_tooltip_extra" {
+			}
+
 			TooltipFlavorTextBlock = {
 				blockoverride "text" {
 					text = "[SocietalValue.GetDesc]"
@@ -1558,6 +1816,7 @@ template SocietalValueLeft_tooltip {
 
 template SocietalValueRight_tooltip {
 	ContextualTooltipType = {
+		block "extra_datacontext" {}
 		blockoverride "title_text" {
 			text = "[SocietalValue.GetRightLabelWithNoTooltip]"
 		}
@@ -1578,6 +1837,9 @@ template SocietalValueRight_tooltip {
 
 			TooltipStringPairList = {
 				textcontext = "[SocietalValue.GetRightTooltip]"
+			}
+
+			block "societal_value_right_tooltip_extra" {
 			}
 
 			TooltipFlavorTextBlock = {
@@ -1651,89 +1913,57 @@ template SocietalValueItem_tooltip {
 	}
 }
 
-template SocietalValueItemLeft_tooltip {
-	ContextualTooltipType = {
-		blockoverride "title_text" {
-			text = "[SocietalValueItem.GetType.GetLeftLabelWithNoTooltip]"
-		}
-
-		blockoverride "title_icon_texture" {
-			texture = "[SocietalValueItem.GetType.GetLeftIcon]"
-		}
-
-		blockoverride "concept_link" {
-			text = [societal_value|E]
-		}
-
-		blockoverride "tooltip_content" {
-			icon = {
-				size = { 450 90 }
-				texture = "[SocietalValueItem.GetType.GetLeftIllustration]"
+template SocietalValueCountryLeft_tooltip {
+	using = SocietalValueLeft_tooltip
+	blockoverride "societal_value_left_tooltip_extra" {
+		TooltipScrolledStringPairList = {
+			# visible = "[SocietalValue.ShowLeftHint(Player.Self)]"
+			blockoverride "block_scrollarea" {
+				maximumsize = { -1 160 }
 			}
 
-			TooltipStringPairList = {
-				textcontext = "[SocietalValueItem.GetType.GetLeftTooltip]"
+			blockoverride "block_title" {
+				text = "TO_MOVE_FURTHER_TO_LEFT"
+				default_format = "#help"
 			}
 
-			TooltipTutorialStringPairList = {
-				# visible = "[SocietalValueItem.ShowRightHint]"
-				blockoverride "block_title" {
-					text = "TO_MOVE_FURTHER_TO_LEFT"
-					default_format = "#help"
-				}
-
-				textcontext = "[SocietalValueItem.GetLeftHint]"
-			}
-
-			TooltipFlavorTextBlock = {
-				blockoverride "text" {
-					text = "[SocietalValueItem.GetType.GetDesc]"
-				}
-			}
+			textcontext = "[SocietalValue.GetLeftHint(Player.Self)]"
 		}
 	}
 }
 
+template SocietalValueCountryRight_tooltip {
+	using = SocietalValueRight_tooltip
+	blockoverride "societal_value_right_tooltip_extra" {
+		TooltipScrolledStringPairList = {
+			# visible = "[SocietalValue.ShowRightHint(Player.Self)]"
+			blockoverride "block_scrollarea" {
+				maximumsize = { -1 160 }
+			}
+
+			blockoverride "block_title" {
+				text = "TO_MOVE_FURTHER_TO_RIGHT"
+				default_format = "#help"
+			}
+
+			textcontext = "[SocietalValue.GetRightHint(Player.Self)]"
+		}
+	}
+}
+
+template SocietalValueItemLeft_tooltip {
+	using = SocietalValueCountryLeft_tooltip
+	blockoverride "extra_datacontext" {
+		datacontext = "[SocietalValueItem.GetType]"
+		datacontext = "[SocietalValueItem.GetCountry]"
+	}
+}
+
 template SocietalValueItemRight_tooltip {
-	ContextualTooltipType = {
-		blockoverride "title_text" {
-			text = "[SocietalValueItem.GetType.GetRightLabelWithNoTooltip]"
-		}
-
-		blockoverride "title_icon_texture" {
-			texture = "[SocietalValueItem.GetType.GetRightIcon]"
-		}
-
-		blockoverride "concept_link" {
-			text = [societal_value|E]
-		}
-
-		blockoverride "tooltip_content" {
-			icon = {
-				size = { 450 90 }
-				texture = "[SocietalValueItem.GetType.GetRightIllustration]"
-			}
-
-			TooltipStringPairList = {
-				textcontext = "[SocietalValueItem.GetType.GetRightTooltip]"
-			}
-
-			TooltipTutorialStringPairList = {
-				# visible = "[SocietalValueItem.ShowRightHint]"
-				blockoverride "block_title" {
-					text = "TO_MOVE_FURTHER_TO_RIGHT"
-					default_format = "#help"
-				}
-
-				textcontext = "[SocietalValueItem.GetRightHint]"
-			}
-
-			TooltipFlavorTextBlock = {
-				blockoverride "text" {
-					text = "[SocietalValueItem.GetType.GetDesc]"
-				}
-			}
-		}
+	using = SocietalValueCountryRight_tooltip
+	blockoverride "extra_datacontext" {
+		datacontext = "[SocietalValueItem.GetType]"
+		datacontext = "[SocietalValueItem.GetCountry]"
 	}
 }
 
@@ -1916,6 +2146,11 @@ template ParliamentAgenda_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[ParliamentAgenda.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				blockoverride "text" {
 					text = "[ParliamentAgenda.GetEffect]"
@@ -2057,6 +2292,11 @@ template ParliamentIssue_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[ParliamentIssue.GetDebugText]"
+				}
+			}
 			TooltipTextBlock = {
 				visible = "[Not(ParliamentIssue.IsInternationalOrganizationIssue)]"
 				blockoverride "text" {
@@ -2133,6 +2373,11 @@ template ParliamentType_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[ParliamentType.GetDebugText]"
+				}
+			}
 			TooltipStringPairList = {
 				textcontext = "[ParliamentType.GetEffects]"
 			}
@@ -2205,22 +2450,7 @@ template EstateSatisfactionEquilibrium_tooltip {
 
 		blockoverride "tooltip_content" {
 			TooltipStringPairList = {
-				blockoverride "block_title" {
-					visible = "[FormattedTooltipWrap.HasListTitle]"
-					text = "[FormattedTooltipWrap.GetListTitle]"
-				}
-
-				blockoverride "stringpair_datamodel" {
-					datamodel = "[FormattedTooltipWrap.GetRows]"
-				}
-
-				blockoverride "stringpair_datamodel_has_items" {
-					visible = "[DataModelHasItems(FormattedTooltipWrap.GetRows)]"
-				}
-
-				blockoverride "stringpair_datamodel_is_empty" {
-					visible = "[IsDataModelEmpty(FormattedTooltipWrap.GetRows)]"
-				}
+				textcontext = "[FormattedTooltipWrap.GetEstate.GetTargetSatisfactionInfo]"
 			}
 		}
 	}
@@ -2253,22 +2483,7 @@ template EstateSatisfactionChange_tooltip {
 		blockoverride "tooltip_content" {
 
 			TooltipStringPairList = {
-				blockoverride "block_title" {
-					visible = "[FormattedTooltipWrap.HasListTitle]"
-					text = "[FormattedTooltipWrap.GetListTitle]"
-				}
-
-				blockoverride "stringpair_datamodel" {
-					datamodel = "[FormattedTooltipWrap.GetRows]"
-				}
-
-				blockoverride "stringpair_datamodel_has_items" {
-					visible = "[DataModelHasItems(FormattedTooltipWrap.GetRows)]"
-				}
-
-				blockoverride "stringpair_datamodel_is_empty" {
-					visible = "[IsDataModelEmpty(FormattedTooltipWrap.GetRows)]"
-				}
+				textcontext = "[FormattedTooltipWrap.GetEstate.GetMonthlySatisfactionChangeInfo]"
 			}
 		}
 	}
@@ -2334,6 +2549,11 @@ template Estate_tooltip {
 		}
 
 		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[Estate.GetDebugText]"
+				}
+			}
 			block "extra_estates_info" {}
 
 			TooltipStringPairList = {
@@ -2345,21 +2565,25 @@ template Estate_tooltip {
 				TooltipManualTableField = {
 					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
 					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
 						text = "[gold|e]"
 					}
-					expand = {}
 					text_single = {
+						autoresize = yes
 						raw_text = "[Estate.GetGold|2]([Estate.GetBalance|+=2])@gold!"
 					}
 				}
-			
+
 				TooltipManualTableField = {
 					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
 					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
 						text = "ESTATE_INCOME"
 					}
-					expand = {}
 					text_single = {
+						autoresize = yes
 						raw_text = "[Estate.GetLastMonthsIncomeAfterTaxWithTooltip]@gold!"
 					}
 				}
@@ -2374,20 +2598,75 @@ template Estate_tooltip {
 				TooltipManualTableField = {
 					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
 					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
 						text = "ESTATE_EXPENSES"
 					}
-					expand = {}
 					text_single = {
+						autoresize = yes
 						raw_text = "#R -[Estate.GetLastMonthsExpense|2]@gold!#!"
 					}
-					
+
 					tooltipwidget = {
 						using = estate_expense_tooltip
 					}
 
 				}
+
+				TooltipManualTableField = {
+					visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
+						text = "ESTATE_WEALTH_IMPACT"
+					}
+					text_single = {
+						autoresize = yes
+						raw_text = "[Estate.GetWealthImpactString]"
+					}
+				}
 			}
 	
+
+			TooltipListBase = {
+				visible = "[Not(Estate.GetType.IsAlwaysLoyal)]"
+
+				TooltipManualTableField = {
+					text_single = {
+						text = "[estate_culture|e]"
+					}
+					expand = {}
+					hbox = {
+						spacing = 4
+						icon = {
+							size = { 18 18 }
+							texture = "[Estate.GetCultureStatusIcon]"
+						}
+						text_single = {
+							autoresize = yes
+							text = "[Estate.GetCultureDisplayText]"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					text_single = {
+						text = "[estate_religion|e]"
+					}
+					expand = {}
+					hbox = {
+						spacing = 4
+						icon = {
+							size = { 18 18 }
+							texture = "[GetReligionIcon(Estate.GetReligion)]"
+						}
+						text_single = {
+							autoresize = yes
+							text = "[Estate.GetReligionDisplayText]"
+						}
+					}
+				}
+			}
 
 			TooltipTextBlock = {
 				visible = "[Estate.IsNextBuildSetUp]"
@@ -2440,6 +2719,52 @@ template Estate_tooltip {
 					text = "[Estate.GetType.GetFlavorText]"
 				}
 			}
+		}
+	}
+}
+
+template PopEstateLocationPower_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetEstateIcon(PopEstatePerLocationPowerWrap.GetEstate.GetType)]"
+		}
+
+		blockoverride "title_text" {
+			text = "[PopEstatePerLocationPowerWrap.GetTitle]"
+		}
+
+		blockoverride "concept_link" {
+			text = [estate_power|E]
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipScrolledBlockList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+				textcontext = "[PopEstatePerLocationPowerWrap.GetTooltip]"
+			}			
+		}
+	}
+}
+
+template CrownPowerPerLocation_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetEstateIcon(Country.GetAlwaysLoyal)]"
+		}
+
+		blockoverride "title_text" {
+			text = "CROWN_POWER_PER_LOCATION_TITLE"
+		}
+
+		blockoverride "concept_link" {
+			text = [crown_power|E]
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipScrolledBlockList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+				textcontext = "[Country.GetCrownPowerPerLocationTooltip]"
+			}			
 		}
 	}
 }
@@ -2507,6 +2832,146 @@ template LanguagePower_tooltip {
 		blockoverride "tooltip_content" {
 			TooltipScrolledBlockList = {
 				textcontext = "[Language.GetDetailedPowerInfo]"
+			}
+		}
+	}
+}
+
+template AiPersonality_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetAiPersonalityIcon(AiPersonality.Self)]"
+		}
+
+
+		blockoverride "concept_link" {
+			text = "[country_personality|e]"
+		}
+
+		blockoverride "title_text" {
+			text = "[AiPersonality.GetName]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipDebugTextBlock = {
+				blockoverride "text" {
+					debug_text = "[AiPersonality.GetDebugText]"
+				}
+			}
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "AI_PERSONALITY_MODIFIERS"
+				}
+				textcontext = "[AiPersonality.GetEffect]"
+			}
+
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[AiPersonality.GetDescription]"
+				}
+			}
+		}
+	}
+}
+
+template AiDispositionValue_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetAiDispositionIconForKey(TooltipString.GetString)]"
+		}
+
+		blockoverride "concept_link" {
+			text = "[country_disposition|e]"
+		}
+
+		blockoverride "title_text" {
+			text = "[GetAiDispositionNameForKey(TooltipString.GetString)]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[GetAiDispositionDescForKey(TooltipString.GetString)]"
+				}
+			}
+		}
+	}
+}
+
+template AiDisposition_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "[GetAiDispositionIcon(Country.Self)]"
+		}
+		
+		blockoverride "concept_link" {
+			text = "[country_disposition|e]"
+		}
+
+
+		blockoverride "title_text" {
+			text = "[Country.GetDispositionToPlayer]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "[Country.GetDispositionToPlayerDesc]"
+				}
+			}
+
+			TooltipScrolledStringPairList = {
+				visible = "[And(Not(Country.IsLocalPlayer), Not(StringIsEmpty(Country.GetDispositionToPlayerBreakdown)))]"
+				textcontext = "[Country.GetDispositionToPlayerBreakdown]"
+			}
+
+			TooltipRowList = {
+				visible = "[And(Not(Country.IsLocalPlayer), Not(StringIsEmpty(Country.GetDispositionToPlayerExpect)))]"
+				textcontext = "[Country.GetDispositionToPlayerExpect]"
+			}
+
+			TooltipRowList = {
+				visible = "[And(Not(Country.IsLocalPlayer), Not(StringIsEmpty(Country.GetObjectivesDisplayText)))]"
+				textcontext = "[Country.GetObjectivesDisplayText]"
+			}
+		}
+	}
+}
+
+template disposition_pair_tooltip {
+	ContextualTooltipType = {
+		blockoverride "concept_link" {
+			text = "[country_disposition|e]"
+		}
+
+		blockoverride "title_text" {
+			text = "[DispositionPairWrap.GetTitle]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 420 } }
+				textcontext = "[DispositionPairWrap.GetTooltip]"
+			}
+		}
+	}
+}
+
+template HumanPlayerDisposition_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_icon_texture" {
+			texture = "gfx/interface/icons/outliner/human_player.dds"
+		}
+
+		blockoverride "title_text" {
+			text = "HUMAN_PLAYER_DISPOSITION_LABEL"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipFlavorTextBlock = {
+				blockoverride "text" {
+					text = "HUMAN_PLAYER_DISPOSITION_DESC"
+				}
 			}
 		}
 	}

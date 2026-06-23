@@ -1,3 +1,29 @@
+template cabinet_item_advisor_action_provider {
+	enabled = "[CabinetItem.IsEnabled]"
+
+	action_tooltip = {
+		click_type = left
+		click_mode = single
+		visible = "[CabinetItem.IsAssignMemberVisible]"
+		enabled = "[CabinetItem.IsAssignMemberEnabled]"
+		title = "SELECT_CABINET_CHARACTER"
+		cost = "[CabinetItem.GetAssignMemberCost]"
+		description = "[CabinetItem.GetAssignMemberDescription]"
+		on_action_with_params = "[CabinetItem.OnAssignMember]"
+	}
+
+	action_tooltip = {
+		click_type = left
+		click_mode = single
+		visible = "[CabinetItem.IsReplaceMemberVisible]"
+		enabled = "[CabinetItem.IsReplaceMemberEnabled]"
+		title = "CHANGE_CABINET"
+		cost = "[CabinetItem.GetReplaceMemberCost]"
+		description = "[CabinetItem.GetReplaceMemberDescription]"
+		on_action_with_params = "[CabinetItem.OnReplaceMember]"
+	}
+}
+
 template cabinet_card_header_content {
 	hbox = {
 		using = layoutpolicy_expanding
@@ -11,8 +37,13 @@ template cabinet_card_header_content {
 			datacontext = "[Cabinet.GetAction]"
 			cabinet_action_power = {
 				visible = "[Cabinet.IsActive]"
-				position = { 0 1 }
 				parentanchor = left|vcenter
+				blockoverride cabinet_action_power_bg_size {
+					size = { 24 24 }
+				}
+				blockoverride cabinet_action_power_icon_size {
+					size = { 95% 95%}
+				}
 			}
 		}
 
@@ -23,6 +54,11 @@ template cabinet_card_header_content {
 				default_format = "#yellow_titles"
 				align = left
 			}
+
+            tooltipwidget = {
+                using = action_progress_tooltip
+            }
+
 
 			text_single = {
 				visible = "[Not(Cabinet.IsActive)]"
@@ -109,31 +145,31 @@ types CabinetCards
 				}
 
 				background = {
-					visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('adm'))]"
+					visible = "[And3(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('adm'), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					alpha = 0.4
 					texture = "gfx/interface/illustrations/cabinet/adm_cabinet.dds"
 				}
 
 				background = {
-					visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('dip'))]"
+					visible = "[And3(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('dip'), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					alpha = 0.4
 					texture = "gfx/interface/illustrations/cabinet/dip_cabinet.dds"
 				}
 
 				background = {
-					visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('mil'))]"
+					visible = "[And3(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('mil'), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					alpha = 0.4
 					texture = "gfx/interface/illustrations/cabinet/mil_cabinet.dds"
 				}
 
 				background = {
-					visible = "[Not(Cabinet.IsActive)]"
+					visible = "[And(Not(Cabinet.IsActive), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					alpha = 0.4
 					texture = "gfx/interface/illustrations/cabinet/empty.dds"
 				}
 
 				widget = {
-					visible = "[And(Not(Cabinet.IsCharacterSet), Cabinet.IsActive)]"
+					visible = "[And3(Not(Cabinet.IsCharacterSet), Cabinet.IsActive, Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					size = { 70 70 }
 
 					block "no_advisor_portrait"{
@@ -151,8 +187,7 @@ types CabinetCards
 							}
 		
 							blockoverride "portrait_click" {
-								datacontext = "[CabinetItem.GetNoAdvisorUIAction]"
-								using = button_action_provider_base
+								using = cabinet_item_advisor_action_provider
 							}
 							
 							blockoverride "character_contextmenu"{}
@@ -169,7 +204,7 @@ types CabinetCards
 
 				# CABINET CHARACTER
 				widget = {
-					visible = "[Cabinet.IsCharacterSet]"
+					visible = "[And(Cabinet.IsCharacterSet, Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 					size = { 80 70 }
 					# allow_outside = yes
 					character_frame_small = {
@@ -190,17 +225,21 @@ types CabinetCards
 					}
 				}
 
-				# CHARACTER ABILITIES
-				vbox = {
-					margin_right = 5
+				### Role Data
+				# Role Assigned
+				hbox = {
+					using = layoutpolicy_expanding
+					visible = "[Cabinet.IsActive]"
+					spacing = 5
+
+					# CHARACTER ABILITIES FOR SELECT INTERACTION TARGET
 					vbox = {
-						# set_parent_size_to_minimum = yes
+						block "char_abilities_visible" { visible = no }
 						layoutpolicy_vertical = expanding
 						spacing = 2
 						margin = {8 7}
 	
 						tagtooltip_enabled = yes
-						visible = "[Cabinet.IsCharacterSet]"
 						datacontext = "[Cabinet.GetCharacter]"
 						tooltip = "[Character.GetAbilityTooltip]"
 	
@@ -286,16 +325,9 @@ types CabinetCards
 							}
 						}
 					}
-				}			
-
-				### Role Data
-				# Role Assigned
-				hbox = {
-					using = layoutpolicy_expanding
-					visible = "[Cabinet.IsActive]"
-					spacing = 5
 
 					scrollarea = {
+                        visible = "[Not(LateralView.Vars.Exists( 'cabinet_compacted' ))]"
 						using = bg_text_mask_container_brown
 						
 						scrollbarpolicy_horizontal = always_off
@@ -350,7 +382,7 @@ types CabinetCards
 					}
 
 					hbox = {
-						visible = "[IsDataModelEmpty(CabinetCardModifier.GetEntries)]"
+						visible = "[And(IsDataModelEmpty(CabinetCardModifier.GetEntries), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 						layoutpolicy_horizontal = expanding
 					}
 					
@@ -417,7 +449,7 @@ types CabinetCards
 		}
 		# #CABINET CHARACTER
 		widget = {
-			visible = "[And(Not(Cabinet.IsCharacterSet), Not(Cabinet.IsActive))]"
+			visible = "[And3(Not(Cabinet.IsCharacterSet), Not(Cabinet.IsActive), Not(LateralView.Vars.Exists( 'cabinet_compacted' )))]"
 			size = { 90 90 }
 			parentanchor = bottom
 
@@ -436,8 +468,7 @@ types CabinetCards
 					}
 
 					blockoverride "portrait_click" {
-						datacontext = "[CabinetItem.GetNoAdvisorUIAction]"
-						using = button_action_provider_base
+						using = cabinet_item_advisor_action_provider
 					}
 					
 					blockoverride "character_contextmenu"{}
@@ -496,6 +527,7 @@ types CabinetCards
 			}
 		}
 		hbox = {
+            visible = "[Not(LateralView.Vars.Exists( 'cabinet_compacted' ))]"
 			layoutpolicy_horizontal = expanding
 			layoutpolicy_vertical = expanding
 			block "bottom_content" {}
@@ -574,18 +606,37 @@ types CabinetCards
 		
 			hbox = {
 				layoutpolicy_horizontal = expanding
-				spacing = 5
-				margin_left = 5
+				spacing = -2
+				margin_left = 0
+                margin_right = 10
+                
+                icon = {
+                    visible = "[LateralView.Vars.Exists( 'cabinet_compacted' )]"
+                    block "estate_icon" {}
+                    block "character_frame_estate_visible" {
+                        visible = "[And(Cabinet.IsCharacterSet, LateralView.Vars.Exists( 'cabinet_compacted' ))]"
+                    }
+                    block "character_frame_estate_size" {
+                        size = { 30 30 }
+                    }
+                    texture = "[GetEstateIcon(Cabinet.GetCharacter.GetEstateType)]"
+                    datacontext = "[Cabinet.GetCharacter.GetCourtCountry.GetGovernment.GetEstate(Cabinet.GetCharacter.GetEstateType)]"
+                    datacontext = "[Cabinet.GetCharacter.GetCourtCountry]"
+                    tooltipwidget = {
+                        using = Estate_tooltip
+                    }
+                }
 				
 				text_single = {
-					maximumsize = {290 -1}
+					maximumsize = {280 -1}
 					align = nobaseline
 					using = Font_Type_Flavor
 					text = "[Cabinet.GetCharacter.GetCourtCountry.Custom('GetHeadOfCabinetName')] [Cabinet.GetCharacter.GetNameWithNoTooltip], [Cabinet.GetCharacter.GetAgeInYears]"
 					visible = "[And(Cabinet.IsCharacterSet, Cabinet.GetCharacter.IsHeadOfCabinet)]"
 				}
+				
 				text_single = {
-					maximumsize = {290 -1}
+					maximumsize = {280 -1}
 					align = nobaseline
 					using = Font_Type_Flavor
 					text = "[Localize('game_concept_cabinet_member')] [Cabinet.GetCharacter.GetNameWithNoTooltip], [Cabinet.GetCharacter.GetAgeInYears]"
@@ -598,31 +649,146 @@ types CabinetCards
 					text = "ADD_CABINET_CHARACTER"
 					visible = "[Not(Cabinet.IsCharacterSet)]"
 				}
-	
-				expand = {}
-	
-				# HEAD OF CABINET
-				widget = {
-					visible = "[Cabinet.GetCharacter.IsHeadOfCabinet]"
-					tooltip = "[head_of_the_cabinet|e]"
-					tagtooltip_enabled = yes
-					size = { 32 32 }
-					icon = {
-						using = bg_circle_piechart
-						using = bg_circle_alt_brown
-						size = { 91% 91% }
-						parentanchor = center
-	
-						texture = "gfx/interface/icons/character_roles/head_of_cabinet.dds"
-						glow = {
-							name = "drop_shadow"
-							glow_radius = 3
-							color = {0.0 0.0 0.0 1.0}
-							alpha = 0.6
+
+                expand = {}
+
+				hbox = {
+					visible = "[Cabinet.IsCharacterSet]"
+					margin = { 5 0 }
+					datamodel = "[Cabinet.GetCharacter.GetTraitsByCategory('cabinet')]"
+					
+					item = {
+						widget = {
+							size = { 24 24 }
+							using = trait_item
+							blockoverride "trait_item_size" {
+								size = { 24 24 }
+							}
+							blockoverride "trait_positive_negative_overlay" {
+								allow_outside = yes
+								icon = {
+									ignore_layout = yes
+									size = { 20 20 }
+									position = { 10 10 }
+									texture = "gfx/interface/buttons/flats/plus.dds"
+									visible = "[Not(Trait.IsBad)]"
+									modify_texture = {
+										blend_mode = colordodge
+										using = color_light_green_texture
+									}
+								}
+								icon = {
+									ignore_layout = yes
+									size = { 14 16 }
+									position = { 13 11 }
+									texture = "gfx/interface/buttons/flats/minus.dds"
+									visible = "[Trait.IsBad]"
+									modify_texture = {
+										blend_mode = colordodge
+										using = color_red_texture
+									}
+								}
+							}
 						}
 					}
 				}
+                hbox = {
+                    tagtooltip_enabled = yes
+                    visible = "[Cabinet.IsCharacterSet]"
+                    datacontext = "[Cabinet.GetCharacter]"
+                    tooltip = "[Character.GetAbilityTooltip]"
+					spacing = 8
+
+                    hbox = {
+                        visible = "[Cabinet.IsCharacterSet]"
+                        spacing = 5
+                        hbox = {
+                            icon = {
+                                name = "adm"
+                                size = { 20 20 }
+                                using = icon_adm_alt
+                            }
+                            text_single = {
+                                visible = "[Or(Cabinet.IsActive, Cabinet.IsCharacterSet)]"
+                                text = "[Cabinet.GetCharacter.GetAbility('adm')]"
+                                align = nobaseline
+                            }
+							background = {
+								visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('adm'))]"
+								texture = "gfx/interface/component_masks/mask_rough_edges.dds"
+								modify_texture = {
+									using = color_paper_texture
+									blend_mode = multiply
+								}
+								margin = { 2 2 }
+							}
+                        }
+                        hbox = {
+                            icon = {
+                                name = "dip"
+                                size = { 20 20 }
+                                using = icon_dip_alt
+                            }
+                            text_single = {
+                                visible = "[Or(Cabinet.IsActive, Cabinet.IsCharacterSet)]"
+                                text = "[Cabinet.GetCharacter.GetAbility('dip')]"
+                                align = nobaseline
+                            }
+							background = {
+								visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('dip'))]"
+								texture = "gfx/interface/component_masks/mask_rough_edges.dds"
+								modify_texture = {
+									using = color_paper_texture
+									blend_mode = multiply
+								}
+								margin = { 2 2 }
+							}
+                        }
+                        hbox = {
+                            icon = {
+                                name = "mil"
+                                size = { 20 20 }
+                                using = icon_mil_alt
+                            }
+                            text_single = {
+                                visible = "[Or(Cabinet.IsActive, Cabinet.IsCharacterSet)]"
+                                text = "[Cabinet.GetCharacter.GetAbility('mil')]"
+                                align = nobaseline
+                            }
+							background = {
+								visible = "[And(Cabinet.IsActive, Cabinet.GetAction.IsAbilityType('mil'))]"
+								texture = "gfx/interface/component_masks/mask_rough_edges.dds"
+								modify_texture = {
+									using = color_paper_texture
+									blend_mode = multiply
+								}
+								margin = { 2 2 }
+							}
+                        }
+                    }
+                }
 			}
+            # HEAD OF CABINET
+            widget = {
+                visible = "[Cabinet.GetCharacter.IsHeadOfCabinet]"
+                tooltip = "[head_of_the_cabinet|e]"
+                tagtooltip_enabled = yes
+                size = { 32 32 }
+                icon = {
+                    using = bg_circle_piechart
+                    using = bg_circle_alt_brown
+                    size = { 91% 91% }
+                    parentanchor = center
+
+                    texture = "gfx/interface/icons/character_roles/head_of_cabinet.dds"
+                    glow = {
+                        name = "drop_shadow"
+                        glow_radius = 3
+                        color = {0.0 0.0 0.0 1.0}
+                        alpha = 0.6
+                    }
+                }
+            }
 		}
 	}
 }

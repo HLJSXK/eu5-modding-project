@@ -28,6 +28,8 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - Any `scripted_trigger` or `scripted_effect` not defined in this mod
 - Localization YAML encoding and quote character rules
 - GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.)
+- Any GUI icon display — check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
+  for `@xxx!` inline syntax **before** using icon widgets or custom solutions
 
 ## Critical EU5 Gotchas
 
@@ -36,6 +38,20 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - **Localization YAML** — must be UTF-8 BOM (not plain UTF-8); only straight ASCII double-quotes `"` are valid
 - **`custom_tooltip`** — never remove it; dotted suffix format IS valid in event options; verify key format before changing
 - **Pre-test validation** — run `python scripts/validate.py --changed` before launching the game
+
+## GUI Icon Display Rule
+
+When displaying an icon in the UI, follow this exact priority order and stop at the first tier that works:
+
+1. **`@icon_name!` inline syntax** — Check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
+   for the icon name. Use in `raw_text` / `text` GUI fields and localization YAML values.
+   Requires zero new code and no widget overhead.
+2. **Icon widget** — Use `icon = { texture = "..." }` or equivalent widget when the display context
+   cannot use inline text (e.g. standalone widget placement), or when the icon is not in `font_icons.gui`.
+3. **From scratch** — Only if tiers 1 and 2 both fail: define a new `texticon` block in a `.gui` file
+   or create a new sprite. This is the most expensive option and requires explicit justification.
+
+Before using tier 2 or 3, you MUST output a verification line confirming the icon is absent from `font_icons.gui`.
 
 ## Declarative Verification Requirement
 
@@ -64,7 +80,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 `import sys` must also be present (add it if not already there). This is mandatory because Claude's Bash tool and Stop hooks run scripts via a non-TTY pipe; Python then falls back to the system locale encoding (GBK on Chinese Windows), causing `UnicodeEncodeError` for any non-ASCII output.
 
-Also, always run scripts via `conda run -n eu5 python scripts/...` — never bare `python`.
+Also, always run scripts via `PYTHONUTF8=1 conda run -n eu5 python scripts/...` — never bare `python`. The `PYTHONUTF8=1` prefix is mandatory: on Chinese Windows the conda wrapper itself (not just the script) fails with `UnicodeEncodeError: 'gbk'` when printing script output through a non-TTY pipe.
 
 ## Path Mapping
 
@@ -91,3 +107,34 @@ When triggered, do ALL of:
 For minor discoveries (single modifier name, single typo fix), steps 1 and 4 only.
 
 **Do not wait for the user to ask.** Knowledge capture must happen in the same response as the fix, before the task is marked complete.
+
+## Project Overview Update Protocol
+
+After completing any task you MUST read `docs/knowledge/PROJECT_OVERVIEW.md` and decide whether an update is needed.
+
+### When to update
+
+Update when any of the following are true for this session:
+- A new gameplay system, feature, or mechanic was added or significantly changed in `src/`
+- A directory was created, renamed, or deleted anywhere in `src/`
+- A new Python script was added to `scripts/`, or an existing script's purpose or output changed
+- A new tool was added to `tools/`
+
+### When NOT to update
+
+Do NOT update for:
+- Changes confined to `docs/`, `reference_*/`, or other non-mod support files
+- Localization text edits (wording changes, not feature existence)
+- Bug fixes that correct behavior without adding or removing features
+- Style or formatting changes with no functional effect
+
+### What to write
+
+`PROJECT_OVERVIEW.md` describes the **complete current project state**, not the changes made this session.
+- Describe what features EXIST NOW — add new ones, update changed ones, remove deleted ones.
+- Keep descriptions concise (1–2 sentences per feature, one-line per directory entry).
+- Update the "Last updated" date at the top of the file.
+
+### After updating
+
+Run `PYTHONUTF8=1 conda run -n eu5 python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.

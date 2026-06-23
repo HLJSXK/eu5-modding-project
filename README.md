@@ -49,7 +49,8 @@ Bucket and region can also come from environment variables:
 - `TENCENT_COS_BUCKET`
 - `TENCENT_COS_REGION`
 
-This copies `src/stable/` to:
+This mirrors `src/stable/` into the existing EU5 mod folder with `robocopy /MIR`
+so debug hot reload can keep watching the same target directory:
 
 `C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\stable`
 

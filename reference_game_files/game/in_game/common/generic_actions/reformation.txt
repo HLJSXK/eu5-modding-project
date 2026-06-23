@@ -1,4 +1,98 @@
-﻿embrace_the_reformation = {
+﻿spread_reformation_through_trade = {
+	type = situation
+
+	potential = {
+		scope:actor = {
+			religion = religion:catholic
+			country_type = building
+		}
+	}
+
+	allow = {
+		is_situation_active = situation:reformation
+		scope:actor = {
+			any_owned_foreign_building = {
+				building_type = building_type:hanseatic_kontor
+				linked_pop = {
+					religion = religion:catholic
+				}
+			}
+		}
+	}
+
+	cooldown = {
+		type = spread_reformation_through_trade
+		years = 10
+	}
+
+	automation_tick = never
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:reformation = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = religion
+		target_flag = target
+		name = "convert_religion_select_religion"
+		none_available_msg_key = "convert_religion_no_religions"
+		column = {
+			data = name
+		}
+		visible = {
+			OR = {
+				root = religion:lutheran
+				root = religion:calvinist
+			}
+			is_religion_enabled = yes
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			scope:actor = {
+				every_owned_foreign_building = {
+					limit = {
+						building_type = building_type:hanseatic_kontor
+					}
+					linked_pop = {
+						if = {
+							limit = {
+								religion = religion:catholic
+							}
+							change_pop_religion = scope:target
+							split_pop = {
+								fraction = 0.5
+								religion = religion:catholic
+							}
+						}
+					}
+				}
+			}
+		}
+		else = {
+			custom_tooltip = spread_reformation_through_trade_tt
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+embrace_the_reformation = {
 	type = situation
 
 	potential = {
@@ -35,9 +129,6 @@
 						value > 0
 					}
 				}
-				NOT = {
-					has_cooldown = convert_religion
-				}
 			}
 		}
 		trigger_else = {
@@ -52,15 +143,30 @@
 						value > 0
 					}
 				}
-				NOT = {
-					has_cooldown = convert_religion
-				}
 			}
 		}
 	}
 
+	cooldown = {
+		type = convert_religion
+		years = 10
+	}
+
 	automation_tick = never
-	automation_tick_frequency = 12
+	ai_tick_frequency = 12
+
+	ai_prerequisite = {
+		OR = {
+			religion_percentage_in_country = {
+				religion = religion:lutheran
+				value > 0
+			}
+			religion_percentage_in_country = {
+				religion = religion:calvinist
+				value > 0
+			}
+		}
+	}
 
 	select_trigger = {
 		looking_for_a = situation
@@ -124,11 +230,6 @@
 				ruler ?= { remove_character_modifier = enacted_placitum_regium }
 				
 				add_policy = scope:target_policy
-				
-				add_cooldown = {
-					type = convert_religion
-					years = 10
-				}
 			}
 		}
 		else = {
@@ -173,5 +274,104 @@
 				multiply = "scope:actor.religion_percentage_in_country(scope:target)"
 			}
 		}
+	}
+}
+
+sponsor_the_reformation = {
+	type = situation
+
+	potential = {
+		scope:actor = {
+			OR = {
+				religion = religion:catholic
+				religion = religion:anglican
+				religion = religion:calvinist
+				religion = religion:catharism
+				religion = religion:lutheran
+				religion = religion:hussite
+				religion = religion:lollardy
+				religion = religion:waldensian
+			}
+			NOT = {
+				tag = PAP
+			}
+			country_type = location
+		}
+	}
+
+	allow = {
+		is_situation_active = situation:reformation
+		scope:actor = {
+			NOT = {
+				any_movement_in_country = {
+					num_locations_affected > 0
+				}
+			}
+		}
+	}
+
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:sponsor_the_reformation
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = {
+			data = name
+		}
+		visible = {
+			situation:reformation = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = movement
+		target_flag = target
+		name = "sponsor_the_reformation_select_movement"
+		none_available_msg_key = "sponsor_the_reformation_no_movements"
+		column = {
+			data = name
+		}
+		visible = {
+			always = yes
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			scope:actor = {
+				random_owned_location = {
+					limit = {
+						has_road_to_capital = yes
+					}
+					save_scope_as = new_movement_location
+				}
+			}
+			scope:target = {
+				spread_to_location = {
+					location = scope:new_movement_location
+					supporters_percent = {
+						value = 0.2
+						multiply = scope:new_movement_location.local_control
+						multiply =scope:new_movement_location.average_satisfaction
+						min = 0.05
+					}
+				}
+			}
+		}
+		else = {
+			custom_tooltip = sponsor_the_reformation_tt
+		}
+	}
+
+	ai_will_do = {
+		add = -100
 	}
 }

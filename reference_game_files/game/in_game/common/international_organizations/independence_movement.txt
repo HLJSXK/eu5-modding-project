@@ -24,14 +24,28 @@
 			scope:target ?= {
 				this = root.international_organization_target
 			}
+			trigger_if = {
+				limit = {
+					exists = scope:casus_belli
+				}
+				scope:casus_belli = casus_belli:cb_independence_war
+			}
 		}
 	}
 	
 	join_defensive_wars_always = {
-		custom_tooltip = {
-			text = independence_movement_join_war_def_always_tt
-			scope:target ?= {
-				this = root.international_organization_target
+		or = {
+			custom_tooltip = {
+				text = independence_movement_join_war_def_always_tt
+				scope:target ?= {
+					this = root.international_organization_target
+				}
+			}
+			custom_tooltip = {
+				text = independence_movement_join_war_def_always_tt_during
+				scope:recipient = {
+					is_at_war_with = root.international_organization_target
+				}
 			}
 		}
 	}
@@ -96,7 +110,7 @@
 		#either we can do our own diplomacy; or our overlord is the same as the leader's
 		or = {
 			has_limited_diplomacy = no
-			overlord = scope:target
+			overlord ?= scope:target
 		}
 	}
 	
@@ -105,7 +119,15 @@
 	}
 	
 	auto_leave_trigger = {
-		always = no
+		or = {
+			is_allied_with = { target = scope:target }
+			has_truce_with = scope:target
+			is_fighting_war_together_with = scope:target
+			AND = {
+				overlord ?= scope:target
+				subject_loyalty > 80
+			}
+		}
 	}
 	
 	auto_disband_trigger = {
@@ -127,9 +149,9 @@
 					total_members = 1
 				}
 			}
-			add_casus_belli = { 
+			add_casus_belli = {
 				type = casus_belli:cb_independence_war
-				province = scope:actor.capital.province
+				province = scope:recipient.leader_country.capital.province
 				target = scope:target
 			}
 		}
@@ -196,11 +218,27 @@
 				value = "scope:recipient.leader_country.modifier:diplomatic_reputation"
 				multiply = 3
 			}
-			add = {
-				desc = "TRUST_OF_SUBJECT"
-				scope:recipient.leader_country = {
+			scope:recipient.leader_country = {
+				save_temporary_value_as = {
+					name = trust
 					value = prev_trust_of_this
-					multiply = 4
+				}
+				if = {
+					limit = {
+						scope:trust > 50
+					}
+					add = {
+						desc = "TRUST_OF_SUBJECT"
+						value = scope:trust
+						subtract = 50
+					}
+				}
+				else = {
+					subtract = {
+						desc = "TRUST_OF_SUBJECT"
+						value = 50
+						subtract = scope:trust
+					}
 				}
 			}
 			if = {
@@ -224,7 +262,8 @@
             desc = "TRUST_OF_TARGET"
             scope:target = {
                 value = prev_trust_of_this
-                multiply = -4
+				subtract = 50
+                multiply = -1
             }
         }
         
@@ -297,7 +336,7 @@
 				scope:relative_strength_of_target != 0
 			}
 			add = {
-            	#get a value in range of -50..0..50
+            	#get a value in range of -50..0..25
 				desc = "RELATIVE_STRENGTH_IO"
 				value = 100
 				multiply = {
@@ -308,15 +347,17 @@
 					}
 				}
 				subtract = 50
+				max = 25
 			}
 		}
 		else = {
 			add = {
-            	#get a value in range of -50..0..50
+            	#get a value in range of -50..0..25
 				desc = "RELATIVE_STRENGTH_TO_TARGET"
 				value = 100
 				multiply = "root.relative_strength(scope:target)" #this is 0..1
 				subtract = 50
+				max = 25
 			}
 		}
 		if = {

@@ -20,6 +20,7 @@
 # - country_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to whole countries
 # - province_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to provinces
 # - location_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to locations
+# - is_female: yes/no: whether or not they appear as God or Goddess in the UI. use it in script with is_god_female trigger
 #
 # Use the following to add gods to a country
 # add_god = <god id>

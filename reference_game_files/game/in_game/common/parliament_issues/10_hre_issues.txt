@@ -177,6 +177,13 @@ hre_roman_month = {
 hre_demand_internal_peace = {
 	type = international_organization
 	special_status = emperor
+	potential = {
+		OR = {
+			international_organization_has_policy = policy:landfriede_rank_2_policy
+			international_organization_has_policy = policy:landfriede_rank_3_policy
+			international_organization_has_policy = policy:landfriede_rank_4_policy
+		}
+	}
 	allow = {
 		OR = {
 			international_organization_has_policy = policy:landfriede_rank_2_policy
@@ -223,7 +230,11 @@ hre_demand_internal_peace = {
 			add_international_organization_modifier = {
 				modifier = enforced_internal_peace
 				mode = replace
-				years = modifier_duration_years_very_short
+				years = 3
+			}
+			every_international_organization_member = {
+				limit = { is_leader_of_international_organization = root }
+				add_country_modifier = { modifier = hre_internal_peace_enforced years = 3 mode = replace }
 			}
 		}
 		else_if = {
@@ -231,7 +242,11 @@ hre_demand_internal_peace = {
 			add_international_organization_modifier = {
 				modifier = enforced_internal_peace
 				mode = replace
-				years = modifier_duration_years_short
+				years = 5
+			}
+			every_international_organization_member = {
+				limit = { is_leader_of_international_organization = root }
+				add_country_modifier = { modifier = hre_internal_peace_enforced years = 5 mode = replace }
 			}
 		}
 		else_if = {
@@ -239,7 +254,11 @@ hre_demand_internal_peace = {
 			add_international_organization_modifier = {
 				modifier = enforced_internal_peace
 				mode = replace
-				years = modifier_duration_years_normal
+				years = 10
+			}
+			every_international_organization_member = {
+				limit = { is_leader_of_international_organization = root }
+				add_country_modifier = { modifier = hre_internal_peace_enforced years = 10 mode = replace }
 			}
 		}
 	}
@@ -415,6 +434,112 @@ hre_force_emperor_to_abdicate = {
 				desc = "VOTE_BASE_VALUE"
 				value = 0
 			}
+		}
+	}
+}
+hre_circle_levy_request = {
+	type = international_organization
+	special_status = emperor
+	potential = {
+		international_organization:hre = { circles_are_active = yes }
+	}
+	allow = {
+		NOT = { has_cooldown = hre_circle_levy_request }
+	}
+	chance = 10
+	selectable_for = {
+		is_leader_of_international_organization = scope:recipient
+	}
+	on_debate_passed = {
+		hidden_effect = {
+			add_cooldown = {
+				type = hre_circle_levy_request
+				years = 10
+			}
+		}
+		leader_country ?= {
+			save_scope_as = hre_emperor_scope
+		}
+		international_organization:hre = {
+			every_imperial_circle = {
+				limit = { NOT = { is_dormant_imperial_circle = yes } }
+				every_circle_member = {
+					limit = {
+						NOT = { is_leader_of_international_organization = international_organization:hre }
+					}
+					add_manpower = { value = -1 }
+				}
+				circle_leader ?= {
+					add_country_modifier = {
+						modifier = distributed_circle_levy
+						years = 1
+					}
+				}
+			}
+		}
+		if = {
+			limit = { exists = scope:hre_emperor_scope }
+			scope:hre_emperor_scope = {
+				change_imperial_authority = { value = 5 }
+			}
+		}
+	}
+	on_debate_failed = {
+		hre_parliament_debate_failed_effect = yes
+	}
+	wants_this_parliament_issue_bias = {
+		add = {
+			desc = "VOTE_BASE_VALUE"
+			value = 25
+		}
+	}
+}
+
+hre_enforce_circle_landfriede = {
+	type = international_organization
+	special_status = emperor
+	potential = {
+		international_organization:hre = {
+			circles_are_active = yes
+			international_organization_has_policy = policy:landfriede_policy
+		}
+	}
+	allow = {
+		NOT = { has_cooldown = hre_enforce_circle_landfriede }
+	}
+	chance = 8
+	selectable_for = {
+		is_leader_of_international_organization = scope:recipient
+	}
+	on_debate_passed = {
+		hidden_effect = {
+			add_cooldown = {
+				type = hre_enforce_circle_landfriede
+				years = 5
+			}
+		}
+		international_organization:hre = {
+			every_imperial_circle = {
+				limit = {
+					NOT = { is_dormant_imperial_circle = yes }
+					has_circle_leader = yes
+				}
+				circle_leader ?= {
+					add_country_modifier = {
+						modifier = circle_landfriede_enforcer
+						years = 2
+					}
+				}
+			}
+		}
+	}
+	on_debate_failed = {
+		hre_parliament_debate_failed_effect = yes
+	}
+	wants_this_parliament_issue_bias = {
+		add = {
+			desc = "VOTE_BASE_VALUE"
+			value = 20
 		}
 	}
 }

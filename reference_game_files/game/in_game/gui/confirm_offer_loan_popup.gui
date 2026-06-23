@@ -70,6 +70,7 @@ window = {
 	name = "confirm_offer_loan_popup"
 	minimumsize = { 550 260 }
 	parentanchor = center
+	layer = confirmation
 
 	using = message_template
 
@@ -87,6 +88,7 @@ window = {
 			}
 		}
 	}
+	blockoverride "message_bg_extra" { using = bg_age_event_inner_image_alt }
 
 	blockoverride "message_template_content" {
 	
@@ -110,10 +112,14 @@ window = {
 				layoutpolicy_horizontal = expanding
 				margin = {0 10}
 				spacing = 5
-				using = bg_number_container_bckg
-				blockoverride "number_container_extra" {
-					alpha = 0.4
-					margin = {-34 5}
+				using = bg_loans_card_texture
+				blockoverride "loans_container_extra" {
+					alpha = 0.9
+					margin = {-30 5}
+				}
+				using = bg_loans_card_frame
+				blockoverride "loans_frame_container_extra" {
+					margin = {-30 5}
 				}
 		
 				# Amount
@@ -154,16 +160,33 @@ window = {
 						onvaluechanged = "[ConfirmOfferLoanAction.SetAmount]"
 					}
 		
-					text_single = {
+					editbox = {
 						margin_left = 5
-						minimumsize = {100 20}
-						size = { 100 20 }
+						minimumsize = { 80 20 }
+						size = { 80 20 }
+						align = center|nobaseline
+						text = "[ConfirmOfferLoanAction.GetAmount|2]"
+						oneditingfinished = "[ConfirmOfferLoanAction.OnAmountChangedByEditbox(PdxGuiWidget.Self)]"
+						multiline = no
+						alwaystransparent = no
+						focuspolicy = all
+						maxcharacters = 10
+						default_format = "#high"
+						background = {
+							margin = { 4 4 }
+							using = bg_round_corners
+							alpha = 0.6
+						}
+					}
+
+					text_single = {
+						margin_left = 2
 						align = left|nobaseline
-						raw_text = "[ConfirmOfferLoanAction.GetAmount|2]@gold!"
+						raw_text = "@gold!"
 					}
 					expand = {}
 				}
-		
+
 				# Interest
 				hbox = {
 					spacing = 5
@@ -205,39 +228,93 @@ window = {
 						text = "OFFER_LOAN_DURATION"
 						align = right
 					}
-		
+
 					dropdown_menu_default = {
 						name = "duration_dropdown"
-		
+
 						datamodel = "[ConfirmOfferLoanAction.GetCandidates]"
 						onselectionchanged = "[ConfirmOfferLoanAction.SelectView]"
 						selectedindex = "[ConfirmOfferLoanAction.GetSelectedView]"
-		
+
 						blockoverride "dropdown_active_item_properties" {
 							raw_text = "[LoanDurationCandidate.GetText]"
 						}
-		
+
 						blockoverride "dropdown_item_properties" {
 							raw_text = "[LoanDurationCandidate.GetText]"
 						}
 					}
 					expand = {}
 				}
+
+				# Borrower creditworthiness
+				hbox = {
+					spacing = 5
+
+					expand = {}
+
+					text_single = {
+						margin_right = 10
+						size = { 180 20 }
+						text = "BORROWER_CREDITWORTHINESS"
+						align = left|nobaseline
+					}
+
+					widget = {
+						size = { 80 8 }
+
+						progressbar = {
+							size = { 100% 100% }
+							using = morale_progressbar_bar
+							using = progress_bar_blue_alt
+							value = "[Multiply_float(FixedPointToFloat(ConfirmOfferLoanAction.GetRecipientCreditworthiness), '(float)100')]"
+						}
+					}
+
+					text_single = {
+						margin_left = 5
+						minimumsize = { 40 20 }
+						size = { 40 20 }
+						align = left|nobaseline
+						raw_text = "[Multiply_CFixedPoint(ConfirmOfferLoanAction.GetRecipientCreditworthiness, '(CFixedPoint)100')|0]"
+					}
+					expand = {}
+				}
 			}
 			
+	
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				expand = {}
+				button_regular = {
+					text = "OFFER_LOAN_SUGGEST_BUTTON"
+					action_tooltip = {
+						title = "OFFER_LOAN_SUGGEST_BUTTON"
+						on_action = "[ConfirmOfferLoanAction.SetSuggestedTerms]"
+					}
+					size = { 160 30 }
+					tooltipwidget = {
+						SimpleContextualTooltipType = {
+							lowpriotextcontext = "OFFER_LOAN_SUGGEST_DESC"
+						}
+					}
+				}
+				expand = {}
+			}
 	
 			vbox = {
 				layoutpolicy_horizontal = expanding
 				margin = {0 5}
-				using = bg_number_container_bckg
-				blockoverride "number_container_extra" {
-					alpha = 0.4
-					margin = {-34 5}
+				using = message_text_box_background	
+				blockoverride "credit_container_extra" {
+					alpha = 0.8
+					margin = {-30 5}
 				}
 
 				textbox = {
-					maximumsize = { 460 -1 }
-					minimumsize = { 460 -1 }
+					maximumsize = { 458 -1 }
+					minimumsize = { 458 -1 }
+					margin = { 10 10 }
 					autoresize = yes
 					multiline = yes
 					text = "[DialogConfig.GetDescription]"
@@ -256,10 +333,13 @@ window = {
 	blockoverride "message_template_buttons" {
 		button_regular = {
 			text = "[DialogConfig.GetDeclineText]"
-			onclick = "[DialogConfig.OnDecline]"
+			action_tooltip = {
+				title = "[DialogConfig.GetDeclineText]"
+				on_action = "[DialogConfig.OnDecline]"
+			}
+			tooltipwidget = { BasicFunctionalTooltip = {} }
 			input_action = "close_window"
 			use_global_input_instance = yes
-			tooltip_enabled = no
 			using = button_resize_to_fit_text
 			using = snd_UI_close
 
@@ -268,12 +348,17 @@ window = {
 		button_regular = {
 			text = "[DialogConfig.GetAcceptText]"
 			enabled = "[ConfirmOfferLoanAction.CanSend]"
-			onclick = "[DialogConfig.OnAccept]"
+			action_tooltip = {
+				title = "[DialogConfig.GetAcceptText]"
+				on_action = "[DialogConfig.OnAccept]"
+			}
+			tooltipwidget = { BasicFunctionalTooltip = {} }
 			input_action = "confirm"
 			use_global_input_instance = yes
-			tooltip_enabled = no
 			using = button_resize_to_fit_text
 			using = snd_UI_popup_confirm
 		}
 	}
+
+	blockoverride "message_close_button" {}
 }

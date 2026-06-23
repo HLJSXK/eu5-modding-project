@@ -51,7 +51,7 @@
 					is_protestant = yes
 					is_subject = no
 				}
-				order_by = great_power_score
+				order_by = military_strength
 				max = 1
 				check_range_bounds = no
 				create_international_organization = {
@@ -60,13 +60,20 @@
 					set_leader_country = prev
 				}
 				international_organization:protestant_union = { set_leader_country = PREV }
+				save_scope_as = protestant_union_leader
 			}
 			ordered_international_organization_member = {
 				limit = {
 					religion = religion:catholic
 					is_subject = no
+					any_union_partner = {
+						NOT = {
+							is_leader_of_international_organization = international_organization:protestant_union
+						}
+					}
+					NOT = { is_allied_with = { target = scope:protestant_union_leader } }
 				}
-				order_by = great_power_score
+				order_by = military_strength
 				max = 1
 				check_range_bounds = no
 				create_international_organization = {
@@ -97,7 +104,8 @@
 				clear_global_variable_list = war_of_religions_wants_war_list
 				clear_global_variable_list = war_of_religions_wants_peace_list
 				#Update the list of countries who favor war / peace
-				var:war_of_religion_current_war = { 
+				var:war_of_religion_current_war = {
+					save_scope_as = target_war
 					every_war_participant = {
 						root = { change_variable = { name = war_of_religions_total_war_participants_counter add = 1 } }
 						if = {
@@ -126,8 +134,7 @@
 						else = {
 							add_to_global_variable_list = { name = war_of_religions_wants_war_list target = this }
 						}
-					}			
-					save_scope_as = target_war 
+					}
 				}
 				if = {
 					limit = { var:war_of_religions_total_war_participants_counter > 0 }
@@ -154,6 +161,40 @@
 							trigger_event_non_silently = war_of_religions.1300	#Peace of Westphalia
 						}
 					}	
+				}
+			}
+			# Bug fix: keep league leaders as war participants after IO leadership transfers (e.g. imperial succession mid-war)
+			if = {
+				limit = { has_variable = war_of_religion_current_war }
+				# Catholic League leader must be on the attacker side
+				if = {
+					limit = {
+						exists = international_organization:catholic_league.leader_country
+						var:war_of_religion_current_war = {
+							NOT = { any_war_participant = { this = international_organization:catholic_league.leader_country } }
+						}
+					}
+					international_organization:catholic_league.leader_country = {
+						join_war_as_attacker = {
+							war = situation:war_of_religions.var:war_of_religion_current_war
+							call_in_subjects = yes
+						}
+					}
+				}
+				# Protestant Union leader must be on the defender side
+				if = {
+					limit = {
+						exists = international_organization:protestant_union.leader_country
+						var:war_of_religion_current_war = {
+							NOT = { any_war_participant = { this = international_organization:protestant_union.leader_country } }
+						}
+					}
+					international_organization:protestant_union.leader_country = {
+						join_war_as_defender = {
+							war = situation:war_of_religions.var:war_of_religion_current_war
+							call_in_subjects = yes
+						}
+					}
 				}
 			}
 		}
@@ -752,7 +793,7 @@
 		require_color_on_map = yes
 	}
 	legend_key = {
-		desc = "WAR_OF_RELIGIONS_PROTESTANT_LEAGUE_LEADER_ALLY"
+		desc = "WAR_OF_RELIGIONS_PROTESTANT_UNION_LEADER_ALLY"
 		color = war_of_religions_protestant_union_ally_color
 		require_color_on_map = yes
 	}

@@ -1,7 +1,7 @@
 ﻿# Situations
 #
 #
-#
+# custom_description: <string> key for a custom description loc in customizable_localization
 # monthly_spawn_chance: script value for how likely the disease is to spawn per month (0..1) (scope:situation is the situation)
 # international_organization_type = <international_organization_type_tag> IO type associated with the situation
 # resolution = <resolution_tag> a specific resolution that the situation references

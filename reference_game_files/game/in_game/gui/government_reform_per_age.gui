@@ -1,0 +1,547 @@
+lateralview_full = {
+	name = "government_reforms_per_age"
+
+	blockoverride "snd_panel_identifier" { soundeffect = "UI_panelAux_government_reform_show" }
+	blockoverride "panel_header" {
+		window_header_alt = {
+			using = bg_main_inner_alt
+			blockoverride "header_text" {
+				text = "ADD_REFORM_TT_TITLE"
+			}
+			blockoverride "window_header_alt_color_texture" {
+				using = color_default_brown_texture
+			}
+		}
+	}
+
+	blockoverride "lateralview_topbuttons_extra" {
+		widget = {
+			size = { 100% 40 }
+			allow_outside = yes
+	
+			widget = {
+				parentanchor = left|vcenter
+				size = { 40 40 }
+				position = { 30 0 }
+				
+				button_minimize = {	
+					parentanchor = left|vcenter						
+					action_tooltip = {
+						title = "TOGGLE_GOVERNMENT_REFORMS_EXPANDED_VIEW"
+						on_action = "[GovernmentReformsPerAgeLateralView.ToggleExpand]"
+					}
+			
+					input_action = "toggle_window_collapse"
+				}
+			}
+		}
+	}
+	
+	blockoverride "panel_content" {
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_notabs_alt
+			using = window_main_tabs_margin_alt
+
+			searchbar = {
+				datacontext = "[GovernmentReformsPerAgeLateralView.GetSearchBar]"
+				blockoverride "searchbar_visible" {
+					visible = "[Or(SearchBar.HasSearchFilterCategories, SearchBar.HasTextSearchFilters)]"
+				}
+
+				blockoverride "filters_wrap_length" {
+					wrap_length = 1855
+				}
+
+				blockoverride "searchbar_top_extra" {
+					button_check_visibility = {
+						size = { 32 32 }
+						down = "[GovernmentReformsPerAgeLateralView.IsExpandedModifiers]"
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "TOGGLE_GOVERNMENT_REFORM_PER_AGE_DESCRIPTIONS_VISIBILITY"
+							on_action = "[GovernmentReformsPerAgeLateralView.ToggleExpandModifiers]"
+						}
+
+						tooltipwidget = {
+							BasicFunctionalTooltip = {
+							}
+						}
+					}
+				}
+
+				blockoverride "searchbar_extra_pre_content" {	
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 15
+						margin_bottom = 10
+						margin_left = 6
+						margin_right = 12
+		
+						datamodel = "[GovernmentReformsPerAgeLateralView.GetSocietalValueTypes]"
+						item = {
+							government_reforms_societal_value_filter_button = {
+							}
+						}
+					}
+				}
+			}
+
+			vbox = {
+				using = layoutpolicy_expanding
+				widget = {
+					ignore_layout = yes
+					size = { 100% 100% }
+	
+					hbox = {
+						using = layoutpolicy_expanding
+						spacing = 0
+
+						datamodel = "[GovernmentReformsPerAgeLateralView.GetAgeGroups]"
+						
+						item = {
+							widget = {
+								using = layoutpolicy_expanding
+								vbox = {
+									margin_left = -5
+									margin_right = 12
+									widget = {
+										using = layoutpolicy_expanding
+										background = {
+											visible = "[Not(IsFutureAge(GovernmentReformAgeGroup.GetAge))]"
+											texture = "gfx/interface/icons/government_reforms/gov_ref_bg.dds"
+											texture_density = 2
+											spriteType = corneredstretched
+											spriteborder = { 40 40 }
+											modify_texture = {
+												using = color_light_green_texture
+												alpha = 0.5
+												blend_mode = multiply
+											}
+										}
+										background = {
+											visible = "[IsFutureAge(GovernmentReformAgeGroup.GetAge)]"
+											texture = "gfx/interface/icons/government_reforms/gov_ref_dark_bg.dds"
+											texture_density = 2
+											spriteType = corneredstretched
+											spriteborder = { 40 40 }
+											modify_texture = {
+												using = color_grey_texture
+												alpha = 0.2
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					margin_right = 15
+					datamodel = "[GovernmentReformsPerAgeLateralView.GetAgeGroups]"
+					item = {
+						widget = {
+							layoutpolicy_horizontal = expanding
+							size = { -1 45 }
+
+							datacontext = "[GovernmentReformAgeGroup.GetAge]"
+							tooltipwidget = {
+								using = Age_tooltip
+							}
+
+							flowcontainer = {
+								parentanchor = center
+								position = { 0 4 }
+								spacing = 5
+
+								icon = {
+									size = {27 27}
+									texture = "[GetAgeIcon(Age.Self)]"
+								}
+
+								text_single = {
+									autoresize = yes
+									using = Font_Size_Medium
+									default_format = "#yellow_titles"
+									align = center|nobaseline
+									text = "[Age.GetNameWithNoTooltip]"
+								}
+							}
+						}
+					}
+				}
+
+
+				scroll_list = {
+					name = "reforms_list"
+					blockoverride "scroll_list_setup" {
+						using = layoutpolicy_expanding
+						scrollbarpolicy_horizontal = always_off
+						
+						scrollbar_vertical = {
+							using = Scrollbar_Vertical
+						}
+					}
+
+					blockoverride "scroll_list_layout" {
+						container = {
+							datamodel = "[GovernmentReformsPerAgeLateralView.GetAllReforms]"
+							item = {
+								widget = {
+									visible = "[GovernmentReformItem.IsReady]"
+									position = "[GovernmentReformItem.GetPosition]"
+									vbox = {
+										set_parent_size_to_minimum = yes
+										minimumsize = "[GovernmentReformItem.GetSize]"
+										maximumsize = "[GovernmentReformItem.GetSizeWithWidget(PdxGuiWidget.Self)]"
+										margin = { 0 5 }
+										margin_right = 20
+										government_reforms_per_age_item = {
+											blockoverride "field_highlight" {}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+types government_reform_per_age_items {
+	type government_reforms_per_age_item = government_reforms_base_item {
+		blockoverride "societal_value_item" {
+			widget = {
+				size = { 35 35 }
+				button = {
+					visible = "[SocietalValueRequirement.IsLeft]"
+					size = { 100% 100% }
+					texture = "gfx/interface/buttons/button_societal_values.dds"
+
+					background = {
+						visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueLeftFilterEnabled(SocietalValue.Self)]"
+						using = color_white_texture
+						alpha = 0.35
+						blend_mode = overlay
+						spriteType = stretched
+						spriteborder = { 11 11 }
+					}
+
+					background = {
+						visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueLeftExcludeFilterEnabled(SocietalValue.Self)]"
+						using = color_red_texture
+						alpha = 0.5
+						blend_mode = overlay
+						spriteType = stretched
+						spriteborder = { 11 11 }
+					}
+
+					icon = {
+						parentanchor = center
+						size = { 80% 80% }
+						texture = "[SocietalValue.GetLeftIcon]"
+					}
+
+					action_tooltip = {
+						click_type = left
+						click_mode = single
+						on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueLeftFilter(SocietalValue.Self)]"
+						title = "TOGGLE_FILTER"
+					}
+
+					action_tooltip = {
+						click_type = right
+						click_mode = single
+						on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueLeftExcludeFilter(SocietalValue.Self)]"
+						title = "TOGGLE_FILTER_EXCLUDE"
+					}
+
+					datacontext = "[SocietalValueRequirement.GetSocietalValue]"
+					datacontext = "[Player]"
+					tooltipwidget = {
+						SimpleContextualRowTooltipType = {
+							blockoverride "title_icon" {
+								icon = {
+									visible = "[SocietalValueRequirement.IsLeft]"
+									using = tooltip_title_icon_size
+									texture = "[SocietalValueRequirement.GetSocietalValue.GetLeftIcon]"
+								}
+								icon = {
+									visible = "[Not(SocietalValueRequirement.IsLeft)]"
+									texture = "[SocietalValueRequirement.GetSocietalValue.GetRightIcon]"
+									using = tooltip_title_icon_size
+								}
+							}
+							blockoverride "concept_link" {
+								text = "[societal_value|e]"
+							}
+
+							lowpriotextcontext = "[GovernmentReformItem.GetSocietalValueRequirementInfo]"
+						}
+					}
+				}
+
+				button = {
+					visible = "[Not(SocietalValueRequirement.IsLeft)]"
+					size = { 100% 100% }
+					texture = "gfx/interface/buttons/button_societal_values.dds"
+
+					background = {
+						visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueRightFilterEnabled(SocietalValue.Self)]"
+						using = color_white_texture
+						alpha = 0.35
+						blend_mode = overlay
+						spriteType = stretched
+						spriteborder = { 11 11 }
+					}
+
+					background = {
+						visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueRightExcludeFilterEnabled(SocietalValue.Self)]"
+						using = color_red_texture
+						alpha = 0.5
+						blend_mode = overlay
+						spriteType = stretched
+						spriteborder = { 11 11 }
+					}
+
+					icon = {
+						parentanchor = center
+						size = { 80% 80% }
+						texture = "[SocietalValue.GetRightIcon]"
+					}
+
+					action_tooltip = {
+						click_type = left
+						click_mode = single
+						on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueRightFilter(SocietalValue.Self)]"
+						title = "TOGGLE_FILTER"
+					}
+
+					action_tooltip = {
+						click_type = right
+						click_mode = single
+						on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueRightExcludeFilter(SocietalValue.Self)]"
+						title = "TOGGLE_FILTER_EXCLUDE"
+					}
+
+					datacontext = "[SocietalValueRequirement.GetSocietalValue]"
+					datacontext = "[Player]"
+					tooltipwidget = {
+						SimpleContextualRowTooltipType = {
+							blockoverride "title_icon" {
+								icon = {
+									visible = "[SocietalValueRequirement.IsLeft]"
+									using = tooltip_title_icon_size
+									texture = "[SocietalValueRequirement.GetSocietalValue.GetLeftIcon]"
+								}
+								icon = {
+									visible = "[Not(SocietalValueRequirement.IsLeft)]"
+									texture = "[SocietalValueRequirement.GetSocietalValue.GetRightIcon]"
+									using = tooltip_title_icon_size
+								}
+							}
+							blockoverride "concept_link" {
+								text = "[societal_value|e]"
+							}
+
+							lowpriotextcontext = "[GovernmentReformItem.GetSocietalValueRequirementInfo]"
+						}
+					}
+				}
+			}
+		}
+		
+		blockoverride "reform_bottom_content" {
+			vbox = {
+				visible = "[GovernmentReformsPerAgeLateralView.IsExpandedModifiers]"
+				layoutpolicy_horizontal = expanding
+				spacing = 5
+				margin = { 5 5 }
+
+				background = {
+					visible = "[Not(GovernmentReformItem.IsEnabled)]"
+					using = color_grey_texture
+				}
+
+				card_row_list = {
+					visible = "[Not(StringIsEmpty(GovernmentReformItem.GetEffectText))]"
+					textcontext = "[GovernmentReformItem.GetEffectText]"
+				}
+
+				card_2row_stringpair_list = {
+					visible = "[Not(StringIsEmpty(GovernmentReformItem.GetModifiersText))]"
+					textcontext = "[GovernmentReformItem.GetModifiersText]"
+				}
+
+				blockoverride "row_size" {
+					minimumsize = { 280 -1 }
+				}
+			}
+		}
+	}
+}
+
+types government_reforms_per_age_filters {
+	type government_reforms_societal_value_filter_button = hbox {
+		layoutpolicy_horizontal = expanding
+		minimumsize = { -1 30 }
+
+		tooltipwidget = {
+			using = SocietalValue_tooltip
+		}
+
+		background = {
+			margin = { -7 0 }
+			margin_top = -3
+			texture = "gfx/interface/icons/government_reforms/card_bg_sv.dds"
+		}
+		
+		spacing = 2
+		button = {
+			size = { 30 30 }
+			texture = "gfx/interface/buttons/button_societal_values.dds"
+
+			modify_texture = {
+				visible = "[LessThan_float(SocietalValue.GetPosition(Player.Self), '(float)0')]"
+				using = color_progress_blue_texture
+				alpha = 0.75
+			}
+
+			background = {
+				visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueLeftFilterEnabled(SocietalValue.Self)]"
+				using = color_white_texture
+				alpha = 0.35
+				blend_mode = overlay
+				spriteType = stretched
+				spriteborder = { 11 11 }
+			}
+
+			background = {
+				visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueLeftExcludeFilterEnabled(SocietalValue.Self)]"
+				using = color_red_texture
+				alpha = 0.5
+				blend_mode = overlay
+				spriteType = stretched
+				spriteborder = { 11 11 }
+			}
+
+			icon = {
+				parentanchor = center
+				size = { 80% 80% }
+				texture = "[SocietalValue.GetLeftIcon]"
+			}
+
+
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueLeftFilter(SocietalValue.Self)]"
+				title = "TOGGLE_FILTER"
+			}
+
+			action_tooltip = {
+				click_type = right
+				click_mode = single
+				on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueLeftExcludeFilter(SocietalValue.Self)]"
+				title = "TOGGLE_FILTER_EXCLUDE"
+			}
+
+			datacontext = "[Player]"
+			tooltipwidget = {
+				using = SocietalValueCountryLeft_tooltip
+			}
+		}
+
+		expand = {}
+
+		widget = {
+			size = { 16 10 }
+			visible = "[And(Not(SocietalValue.CanMoveForward(Player.Self)), LessThan_float(SocietalValue.GetDirection(Player.Self), '(float)0'))]"
+			icon = {
+				parentanchor = right|vcenter
+				size = { 16 10 }
+				texture = "gfx/interface/icons/government_reforms/soc_value_indicator.dds"
+			}
+		}
+
+		text_single = {
+			autoresize = yes
+			fontsize = 12
+			align = center|nobaseline
+			text = "[Abs_float(SocietalValue.GetPosition(Player.Self))|2]"
+		}
+
+		widget = {
+			size = { 16 10 }
+			visible = "[And(Not(SocietalValue.CanMoveForward(Player.Self)), GreaterThan_float(SocietalValue.GetDirection(Player.Self), '(float)0'))]"
+			icon = {
+				parentanchor = left|vcenter
+				size = { 16 10 }
+				mirror = horizontal
+				texture = "gfx/interface/icons/government_reforms/soc_value_indicator.dds"
+			}
+		}
+
+		expand = {}
+
+		button = {
+			size = { 30 30 }
+			texture = "gfx/interface/buttons/button_societal_values.dds"
+
+			modify_texture = {
+				visible = "[GreaterThan_float(SocietalValue.GetPosition(Player.Self), '(float)0')]"
+				using = color_progress_blue_texture
+				alpha = 0.75
+			}
+
+			background = {
+				visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueRightFilterEnabled(SocietalValue.Self)]"
+				using = color_white_texture
+				alpha = 0.35
+				blend_mode = overlay
+				spriteType = stretched
+				spriteborder = { 11 11 }
+			}
+
+			background = {
+				visible = "[GovernmentReformsPerAgeLateralView.IsSocietalValueRightExcludeFilterEnabled(SocietalValue.Self)]"
+				using = color_red_texture
+				alpha = 0.5
+				blend_mode = overlay
+				spriteType = stretched
+				spriteborder = { 11 11 }
+			}
+
+			icon = {
+				parentanchor = center
+				texture = "[SocietalValue.GetRightIcon]"
+				size = { 80% 80% }
+			}
+
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueRightFilter(SocietalValue.Self)]"
+				title = "TOGGLE_FILTER"
+			}
+
+			action_tooltip = {
+				click_type = right
+				click_mode = single
+				on_action = "[GovernmentReformsPerAgeLateralView.ToggleSocietalValueRightExcludeFilter(SocietalValue.Self)]"
+				title = "TOGGLE_FILTER_EXCLUDE"
+			}
+
+			datacontext = "[Player]"
+			tooltipwidget = {
+				using = SocietalValueCountryRight_tooltip
+			}
+		}
+	}
+}

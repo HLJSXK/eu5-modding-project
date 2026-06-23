@@ -6,8 +6,8 @@
 	ai_tick_frequency = 6
 
 	allow = {
-        scope:actor = { 
-            at_war = no 
+        scope:actor = {
+            at_war = no
             any_international_organizations_member_of = {
                 international_organization_type = international_organization_type:high_kingship
                 international_organization_has_leader = yes
@@ -24,6 +24,8 @@
             }
         }
 	}
+
+	price = price:high_kingship_reclaim_land
 
 	cooldown = {
 		type = reclaim_high_kingship_land
@@ -69,11 +71,10 @@
 
 	effect = { #
 		scope:actor = {
-            add_casus_belli = { 
-                type = casus_belli:cb_high_kingship_reclamation 
-                province = scope:target_province 
+            add_casus_belli = {
+                type = casus_belli:cb_high_kingship_reclamation
+                province = scope:target_province
                 target = scope:target_province.owner
-                years = 10
             }
         }
 	}
@@ -111,6 +112,7 @@
 }
 
 overthrow_high_king = {
+	icon = claim_high_kingship
 	type = internationalorganization
 	show_message = no
 
@@ -118,8 +120,8 @@ overthrow_high_king = {
 	ai_tick_frequency = 6
 
 	allow = {
-        scope:actor = { 
-            at_war = no 
+        scope:actor = {
+            at_war = no
             any_international_organizations_member_of = {
                 international_organization_type = international_organization_type:high_kingship
                 international_organization_has_leader = yes
@@ -130,6 +132,8 @@ overthrow_high_king = {
             }
         }
 	}
+
+	price = price:high_kingship_overthrow
 
 	cooldown = {
 		type = overthrow_high_king
@@ -173,10 +177,9 @@ overthrow_high_king = {
 
 	effect = {
 		scope:actor = {
-            add_casus_belli = { 
+            add_casus_belli = {
                 type = casus_belli:cb_high_kingship_overthrow
                 target = scope:target_country
-                years = 10
             }
         }
 	}
@@ -213,7 +216,76 @@ overthrow_high_king = {
     }
 }
 
+claim_high_kingship = {
+	type = internationalorganization
+	show_message = yes
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			has_ruler = yes
+			OR = {
+				government_type = government_type:monarchy
+				government_type = government_type:tribe
+			}
+			ruler ?= {
+				is_adult = yes
+				NOT = { has_character_modifier = blocked_from_high_kingship }
+			}
+			NOT = {
+				any_overlord_or_above = {
+					is_member_of_international_organization_of_type = { type = high_kingship }
+				}
+			}
+			any_international_organizations_member_of = {
+				international_organization_type = international_organization_type:high_kingship
+				has_variable = high_kingship_dormant
+				international_organization_has_leader = no
+			}
+			prestige >= 75
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = international_organization
+		source = actor
+		target_flag = recipient
+		name = "choose_international_organization"
+		column = { data = name }
+		visible = {
+			international_organization_type = international_organization_type:high_kingship
+			has_variable = high_kingship_dormant
+			international_organization_has_leader = no
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			add_prestige = -75
+		}
+		scope:recipient = {
+			remove_variable = high_kingship_dormant
+		}
+	}
+
+	ai_will_do = {
+		value = -25
+		add = scope:actor.prestige
+		if = {
+			limit = { scope:actor = { legitimacy >= 75 } }
+			add = 25
+		}
+		if = {
+			limit = { scope:actor = { is_during_bankruptcy = yes } }
+			subtract = 1000
+		}
+	}
+}
+
 subjugate_high_kingship_member = {
+	icon = claim_high_kingship
 	type = internationalorganization
 	show_message = no
 
@@ -221,16 +293,17 @@ subjugate_high_kingship_member = {
 	ai_tick_frequency = 6
 
 	allow = {
-        scope:actor = { 
-            at_war = no 
+        scope:actor = {
+            at_war = no
             any_international_organizations_member_of = {
                 international_organization_type = international_organization_type:high_kingship
-                international_organization_has_leader = yes
-                NOT = { leader_country = prev }
+                NOT = { leader_country ?= prev }
                 scope:actor = { can_declare_war_on = prev }
             }
         }
 	}
+
+	price = price:high_kingship_subjugate_member
 
 	cooldown = {
 		type = subjugate_high_kingship_member
@@ -252,36 +325,33 @@ subjugate_high_kingship_member = {
 
     select_trigger = {
 		looking_for_a = country
-		interaction_source_list = {
-            scope:actor = {
-                every_international_organizations_member_of = {
-                    limit = {
-                        international_organization_type = international_organization_type:high_kingship
-                        international_organization_has_leader = yes
-                        NOT = { leader_country = scope:actor }
-                    }
-                    every_international_organization_member = {
-                        limit = {
-                            scope:actor = { can_declare_war_on = prev }
-                        }
-                        add_to_list = source
-                    }
-                }
-            }
-		}
 		target_flag = target_country
-		name = "choose_international_organization"
+		name = "choose_country"
+		none_available_msg_key = "no_valid_countries"
+		interaction_source_list = {
+			scope:recipient = {
+				every_international_organization_member = {
+					add_to_list = source
+				}
+			}
+		}
+		visible = {
+		}
+		enabled = {
+			this != scope:actor
+			NOT = { is_leader_of_international_organization = scope:recipient }
+			scope:actor = { can_declare_war_on = prev }
+		}
 		column = { data = name }
-        column = { data = population }
-        column = { data = great_power_score }
+		column = { data = population }
+		column = { data = great_power_score }
 	}
 
 	effect = {
 		scope:actor = {
-            add_casus_belli = { 
+            add_casus_belli = {
                 type = casus_belli:cb_high_kingship_subjugate
                 target = scope:target_country
-                years = 10
             }
         }
 	}

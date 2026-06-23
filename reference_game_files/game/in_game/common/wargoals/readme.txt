@@ -21,6 +21,7 @@
 #		call_in_subjects = <yes/no> do subjects get called in
 #		conquer_cost = <float> # factor applied to warscore cost of taking land in peace deal
 #		subjugate_cost = <float> # factor applied to warscore cost when making the target a subject
+#       release_cost = <float> # factor applied to warscore cost when making the target release countries/areas
 #       antagonism = <float> # factor applied to whole peace deal
 #		allowed_locations = { <triggers> } # checks what locations the attacker is allowed to take with this war goal; scope:loser = giver, scope:winner = taker, scope:war = war, scope:location = location
 #		allowed_subjugation = { <triggers> } # allow the attacker to subjugate the defender if the triggers are true; scope:loser = giver, scope:winner = taker, scope:war = war
@@ -30,6 +31,7 @@
 #		call_in_subjects = <yes/no> do subjects get called in
 #		conquer_cost = <float> #cost of taking provinces
 #		subjugate_cost = <float> # factor applied to warscore cost when making the target a subject
+#       release_cost = <float> # factor applied to warscore cost when making the target release countries/areas
 #       antagonism = <float> # factor applied to whole peace deal
 #		allowed_locations = { <triggers> } # checks what locations the defender is allowed to take with this war goal; scope:loser = giver, scope:winner = taker, scope:war = war, scope:location = location
 #		allowed_subjugation = { <triggers> } # allow the defender to subjugate the attacker if the triggers are true; scope:loser = giver, scope:winner = taker, scope:war = war

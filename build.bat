@@ -1,7 +1,9 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Build/deploy script for stable/develop mods with optional COS upload.
+REM Build/deploy script for stable mod with optional COS upload.
+REM Deployment mirrors files into the existing target root so EU5 debug hot reload
+REM can keep watching the same directory handle.
 REM Default deploy target:
 REM   C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod
 REM
@@ -19,10 +21,8 @@ REM   2) TENCENT_SECRET_ID / TENCENT_SECRET_KEY environment variables
 
 set "REPO_ROOT=%~dp0"
 set "SOURCE_DIR=%REPO_ROOT%src\stable"
-set "SOURCE_DIR_DEVELOP=%REPO_ROOT%src\develop"
 set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
 set "TARGET_DIR=%TARGET_ROOT%\stable"
-set "TARGET_DIR_DEVELOP=%TARGET_ROOT%\develop"
 set "BUILD_DIR=%REPO_ROOT%build"
 set "ZIP_PATH=%BUILD_DIR%\stable.zip"
 
@@ -89,8 +89,13 @@ if "%COS_SECRET_ID%"=="" if not "%TENCENTCLOUD_SECRET_ID%"=="" set "COS_SECRET_I
 if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRET_KEY%"=="" set "COS_SECRET_KEY=%TENCENTCLOUD_SECRET_KEY%"
 
 echo [INFO] Running static validator on changed files...
-python "%REPO_ROOT%scripts\validate.py" --changed
-if errorlevel 1 (
+set "PYTHONUTF8=1"
+set "VALIDATE_OUT=%TEMP%\sol_validate_out.txt"
+call conda run --no-capture-output -n eu5 python "%REPO_ROOT%scripts\validate.py" --changed > "!VALIDATE_OUT!" 2>&1
+set "VALIDATE_RC=!errorlevel!"
+type "!VALIDATE_OUT!"
+del "!VALIDATE_OUT!" 2>nul
+if !VALIDATE_RC! neq 0 (
     echo [ERROR] Validation failed. Fix the issues above before deploying.
     exit /b 1
 )
@@ -107,11 +112,6 @@ if not exist "%SOURCE_DIR%" (
     exit /b 1
 )
 
-if not exist "%SOURCE_DIR_DEVELOP%" (
-    echo [ERROR] Source directory not found: "%SOURCE_DIR_DEVELOP%"
-    exit /b 1
-)
-
 if not exist "%TARGET_ROOT%" (
     echo [INFO] Target root not found. Creating: "%TARGET_ROOT%"
     mkdir "%TARGET_ROOT%"
@@ -121,41 +121,16 @@ if not exist "%TARGET_ROOT%" (
     )
 )
 
-if exist "%TARGET_DIR%" (
-    echo [INFO] Removing previous deployment: "%TARGET_DIR%"
-    rmdir /s /q "%TARGET_DIR%"
-    if errorlevel 1 (
-        echo [ERROR] Failed to remove old target directory. Close EU5/Steam and retry.
-        exit /b 1
-    )
-)
-
-echo [INFO] Copying "%SOURCE_DIR%" to "%TARGET_DIR%"
-robocopy "%SOURCE_DIR%" "%TARGET_DIR%" /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+echo [INFO] Mirroring "%SOURCE_DIR%" to "%TARGET_DIR%"
+robocopy "%SOURCE_DIR%" "%TARGET_DIR%" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
+set "ROBOCOPY_RC=!errorlevel!"
 
 REM Robocopy exit code: 0-7 success, 8+ failure
-if errorlevel 8 (
-    echo [ERROR] Copy failed. Robocopy exit code: %errorlevel%
+if !ROBOCOPY_RC! GEQ 8 (
+    echo [ERROR] Copy failed. Robocopy exit code: !ROBOCOPY_RC!
     exit /b 1
 )
 cmd /c "exit /b 0"
-
-if exist "%TARGET_DIR_DEVELOP%" (
-    echo [INFO] Removing previous deployment: "%TARGET_DIR_DEVELOP%"
-    rmdir /s /q "%TARGET_DIR_DEVELOP%"
-    if errorlevel 1 (
-        echo [ERROR] Failed to remove old develop target directory. Close EU5/Steam and retry.
-        exit /b 1
-    )
-)
-
-echo [INFO] Copying "%SOURCE_DIR_DEVELOP%" to "%TARGET_DIR_DEVELOP%"
-robocopy "%SOURCE_DIR_DEVELOP%" "%TARGET_DIR_DEVELOP%" /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >nul
-
-if errorlevel 8 (
-    echo [ERROR] Develop copy failed. Robocopy exit code: %errorlevel%
-    exit /b 1
-)
 
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 if exist "%ZIP_PATH%" del /q "%ZIP_PATH%"
@@ -167,9 +142,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [OK] Stable and develop mods deployed successfully.
+echo [OK] Stable mod deployed successfully.
 echo [OK] Target: "%TARGET_DIR%"
-echo [OK] Target: "%TARGET_DIR_DEVELOP%"
 echo [OK] Archive: "%ZIP_PATH%"
 
 if "%UPLOAD_COS%"=="0" exit /b 0

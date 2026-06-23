@@ -600,10 +600,10 @@ is_same_ruler_personal_union = {
 	custom_description = {
 		text = is_same_ruler_personal_union_text
 		any_international_organization_member = {
-			ruler_or_heir_if_regent ?= { save_temporary_scope_as = ruler_character }
+			ruler ?= { save_temporary_scope_as = ruler_character }
 		}
 		any_international_organization_member = {
-			ruler_or_heir_if_regent ?= scope:ruler_character
+			ruler ?= scope:ruler_character
 			count > 1
 		}
 	}
@@ -683,21 +683,21 @@ is_most_likely_candidate_for_seniority = {
 	trigger_if = {
 		limit = { exists = $union$ }
 		save_temporary_scope_value_as = {
-			name = union_highest_non_root_great_power_score
+			name = union_highest_non_root_economical_base
 			value = {
 				value = 0
 				$union$ = {
 					ordered_international_organization_member = {
 						limit = { this != root }
-						order_by = great_power_score
+						order_by = country_economical_base
 						max = 1
 						check_range_bounds = no
-						add = great_power_score
+						add = country_economical_base
 					}
 				}
 			}
 		}
-		great_power_score >= scope:union_highest_non_root_great_power_score
+		country_economical_base >= scope:union_highest_non_root_economical_base
 	}
 	trigger_else = {
 		exists = $union$
@@ -708,24 +708,24 @@ get_senior_partner = {
 	trigger_if = {
 		limit = { exists = $union$ }
 		save_temporary_scope_value_as = {
-			name = union_highest_non_root_great_power_score
+			name = union_highest_non_root_economical_base
 			value = {
 				value = 0
 				$union$ = {
 					ordered_country_with_special_status_of_type = {
 						type = senior_partner
 						limit = { this != root }
-						order_by = great_power_score
+						order_by = country_economical_base
 						max = 1
 						check_range_bounds = no
-						add = great_power_score
+						add = country_economical_base
 					}
 				}
 			}
 		}
 		$union$ = {
 			any_international_organization_member = {
-				great_power_score >= scope:union_highest_non_root_great_power_score
+				country_economical_base >= scope:union_highest_non_root_economical_base
 				save_temporary_scope_as = senior_partner_scope
 			}
 		}
@@ -739,15 +739,15 @@ get_most_likely_candidate_for_seniority = {
 	trigger_if = {
 		limit = { exists = $union$ }
 		save_temporary_scope_value_as = {
-			name = union_highest_non_root_great_power_score
+			name = union_highest_non_root_economical_base
 			value = {
 				value = 0
 				$union$ = {
 					ordered_international_organization_member = {
-						order_by = great_power_score
+						order_by = country_economical_base
 						max = 1
 						check_range_bounds = no
-						add = great_power_score
+						add = country_economical_base
 					}
 				}
 			}
@@ -756,13 +756,13 @@ get_most_likely_candidate_for_seniority = {
 			trigger_if = {
 				limit = { has_variable = pre_selected_senior_partner }
 				var:pre_selected_senior_partner = {
-					great_power_score >= scope:union_highest_non_root_great_power_score
+					country_economical_base >= scope:union_highest_non_root_economical_base
 					save_temporary_scope_as = likely_senior_partner
 				}
 			}
 			trigger_else = {
 				any_international_organization_member = {
-					great_power_score >= scope:union_highest_non_root_great_power_score
+					country_economical_base >= scope:union_highest_non_root_economical_base
 					save_temporary_scope_as = likely_senior_partner
 				}
 			}
@@ -826,9 +826,87 @@ union_flavor_is_spain = {
 union_flavor_is_habsburg = {
 	any_country_with_special_status_of_type = {
 		type = senior_partner
+		OR = {
+			has_ruler = yes
+			has_heir = yes
+		}
 		ruler_or_heir_if_regent ?= {
 			has_dynasty = yes
 			dynasty ?= dynasty:habsburg_dynasty
+		}
+	}
+}
+
+current_papal_authority = {
+	international_organization:catholic_church ?= {
+		var:papal_authority >= $value$
+	}
+}
+
+papal_authority_is_high = {
+	international_organization:catholic_church ?= {
+		var:papal_authority >= 75
+	}
+}
+
+papal_authority_is_low = {
+	international_organization:catholic_church ?= {
+		var:papal_authority < 25
+	}
+}
+
+ai_international_organization_diplo_action_cooldown = {
+	$international_organization$ = {
+		is_target_in_variable_list = {
+			name = ai_rejected_org_actions_$key$
+			target = $target$
+		}
+	}
+}
+
+#$target$ is the target of the coalition
+scope_country_can_join_coalition_against = {
+	is_rebel_country = no
+	OR = {
+		is_subject = no
+		is_subject_type = tributary
+	}
+	knows_country = $target$
+
+	opinion = {
+		target = $target$
+		value < -50
+	}
+
+	within_diplomatic_range = $target$
+	antagonism = {
+		target = $target$
+		value > 50
+	}
+
+	has_limited_diplomacy = no
+
+	not = { is_subject_or_below_of = $target$ }
+	not = {
+		$target$ = {
+			is_subject_or_below_of = root
+		}
+	}
+	not = { has_truce_with = $target$ }
+	NOT = { in_union_with = $target$ }
+	not = { is_at_war_with = $target$ }
+
+	#Do not allow joining 2 coalitions at once against the same country
+	NOT = {
+		is_member_of_international_organization_of_type = {
+			type = coalition
+			target = $target$
+		}
+	}
+	NOT = {
+		giving_scripted_relation = {
+			type = relation_type:anti_coalition_treaty
+			target = $target$
 		}
 	}
 }

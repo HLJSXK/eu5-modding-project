@@ -55,6 +55,7 @@
 }
 
 stop_hide_from_black_death = {
+	icon = isolate_cities_black_death
 	type = situation
 
 	ai_tick = daily
@@ -196,6 +197,7 @@ isolate_cities_black_death = {
 }
 
 stop_isolate_cities_black_death = {
+	icon = isolate_cities_black_death
 	type = situation
 	ai_tick = daily
 	ai_tick_frequency = 120
@@ -350,7 +352,7 @@ close_the_borders = {
 	type = situation
 
 	ai_tick = daily
-	ai_tick_frequency = 40
+	ai_tick_frequency = 120
 	automation_tick = daily
 	automation_tick_frequency = 7
 
@@ -366,6 +368,8 @@ close_the_borders = {
 	allow = {
 		scope:actor ?= {
 			NOT = { has_country_modifier = control_the_food_market }
+			#cheap O(1) guard: already infected countries gain nothing from closing borders to outside spread
+			NOT = { country_has_disease = disease:bubonic_plague }
 			any_neighbor_country = {
 				country_has_disease = disease:bubonic_plague
 			}
@@ -392,13 +396,20 @@ close_the_borders = {
 	}
 
 	ai_will_do = {
-		#this will be negative as it basically annoys your estates, so we need to bias against the advantage of removing trade happening
-		#which will in turn reduce the speed of contagion
-		add = "scope:actor.add_static_modifier_utility(close_the_borders)"
+		#trade_isolation reduces plague spread via trade routes (primary benefit)
+		#nations with burghers resist because trade isolation is very costly for them
+		add = 10
+		if = {
+			limit = {
+				scope:actor ?= { country_has_estate = estate_type:burghers_estate }
+			}
+			subtract = 12
+		}
 	}
 }
 
 stop_close_the_borders = {
+	icon = close_the_borders
 	type = situation
 
 	ai_tick = daily
@@ -443,8 +454,7 @@ stop_close_the_borders = {
 procure_remedies = {
 	type = situation
 
-	ai_tick = daily
-	ai_tick_frequency = 40
+	ai_tick = never
 	automation_tick = daily
 	automation_tick_frequency = 7
 
@@ -548,74 +558,10 @@ procure_remedies = {
 		}
 	}
 
-	ai_will_do = {
-		#this will be too positive as it does not take into account the increase in demands
-
-		#not worth doing this for AI currently as if locations becomes unaffected this gets force removed but you have to pay the stability hit
-		subtract = {
-			desc = "bias against doing stuff"
-			value = 1000
-		}
-
-		# Replicate cost logic from the effect application
-		if = {
-			limit = {
-				has_expensive_procure_remedies_goods = yes
-			}
-
-			if = {
-				limit = {
-					save_temporary_scope_value_as = {
-						name = cost_mult_to_use
-						value = {
-							value = 0.1
-							multiply = scope:actor.monthly_income_total
-							min = 1
-						}
-					}
-				}
-			}
-		}
-		else = {
-			if = {
-				limit = {
-					save_temporary_scope_value_as = {
-						name = cost_mult_to_use
-						value = {
-							value = 0.05
-							multiply = scope:actor.monthly_income_total
-							min = 1
-						}
-					}
-				}
-			}
-		}
-		
-		# Script workaround to resave the value into a scope value such that it works in tooltips
-
-		add = "scope:actor.add_static_modifier_utility(procure_remedies_cost|scope:cost_mult_to_use)"
-		add = "scope:actor.add_static_modifier_utility(procure_remedies)"
-		
-		#add if there are affected locations
-		add = {
-			desc = "present plague"
-			if = {
-				limit = {
-					scope:actor = {
-						country_has_disease = disease:bubonic_plague
-					}
-				}
-				value = 50
-			}
-		}
-		add = {
-			desc = "increased demands"
-			value = -10
-		}
-	}
 }
 
 stop_procure_remedies = {
+	icon = procure_remedies
 	type = situation
 
 	ai_tick = daily
@@ -742,6 +688,7 @@ segregate_the_infected = {
 }
 
 stop_segregate_the_infected = {
+	icon = segregate_the_infected
 	type = situation
 
 	ai_tick = daily
@@ -867,6 +814,7 @@ strict_quarantines = {
 }
 
 stop_strict_quarantines = {
+	icon = strict_quarantines
 	type = situation
 
 	ai_tick = daily

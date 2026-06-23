@@ -296,7 +296,7 @@ template battle_result_side_template_outer {
 
 template battle_result_subunits {
 	widget = {
-		size = { 360 170 }
+		size = "[BattleResultMessage.GetSubunitsWidgetSize]"
 
 		hbox = {
 			block "icon_column_left" {
@@ -305,8 +305,8 @@ template battle_result_subunits {
 				}
 			}
 
-			overlappingitembox = {
-				size = { 315 170 }
+			flowcontainer = {
+				direction = horizontal
 				spacing = 7
 				datamodel = "[BattleResultMessageSide.GetUnitStats]"
 				ignoreinvisible = yes
@@ -537,7 +537,7 @@ template battle_result_subunits {
 											visible = "[Not(EqualTo_CFixedPoint(BattleUnitStats.GetSize, '(CFixedPoint)0'))]"
 											datacontext = "[BattleUnitStats]"
 											autoresize = yes
-											text = "[BattleUnitStats.GetRemaining]"
+											text = "[BattleUnitStats.GetCombatCapableRemaining]"
 											align = center|nobaseline
 											alwaystransparent = yes
 											default_format = "#color_white"
@@ -580,7 +580,7 @@ types BattleResults {
 window = {
 	name = "battle_result_message_popup"
 	parentanchor = center
-	size = { 930 580 }
+	size = "[BattleResultMessage.GetWindowSize]"
 
 	widget = {
 		size = { 100% 100% }
@@ -1156,8 +1156,13 @@ window = {
 								vbox = { #stats
 									spacing = 10
 									using = layoutpolicy_expanding
-									hbox = {#subunits
-										using = battle_result_subunits
+									hbox = {#casualties
+										layoutpolicy_horizontal = expanding
+										expand = {}
+										margin_right = 10
+										hbox = {#subunits
+											using = battle_result_subunits
+										}
 									}
 									
 									hbox = {#casualties
@@ -1166,6 +1171,8 @@ window = {
 										margin_right = 10
 
 										hbox = {
+											datacontext = "[BattleResultMessage.GetBattleResult.GetAttacker]"
+											minimumsize = { 315 64 }
 											tooltipwidget = {
 												SimpleContextualTooltipType = {
 													blockoverride "title_icon" {
@@ -1179,7 +1186,7 @@ window = {
 														text = "[battle|e]"
 													}
 		
-													lowpriotextcontext = "BATTLE_COUNTRY_LOSES"
+													lowpriotextcontext = "BATTLE_COUNTRY_SUMMARY_TT"
 		
 												}
 											}
@@ -1189,28 +1196,80 @@ window = {
 											using = bg_cabinet_card_frame
 											expand = {}
 
-											vbox = {
-												text_single = {
-													text = "OVERALL_CHANGE"
-													default_format = "#color_white"
-												}
+											widget = {
+												size = { 240 48 }
+												vbox = {
+													margin = { 10 7 }
+													spacing = 6
 
-												text_single = {
-													visible = "[GreaterThan_CFixedPoint(BattleResultMessage.GetBattleResult.GetAttacker.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "+[BattleResultMessage.GetBattleResult.GetAttacker.GetOverallChangeForUI]"
-													default_format = "#color_green"
-												}
+													hbox = {
+														size = { 220 14 }
+														spacing = 6
 
-												text_single = {
-													visible = "[LessThan_CFixedPoint(BattleResultMessage.GetBattleResult.GetAttacker.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "[BattleResultMessage.GetBattleResult.GetAttacker.GetOverallChangeForUI]"
-													default_format = "#color_red"
-												}
+														text_single = {
+															align = left|nobaseline
+															text = "BATTLE_COUNTRY_SUMMARY_OVERALL_CHANGE"
+															default_format = "#color_white"
+														}
 
-												text_single = {
-													visible = "[EqualTo_CFixedPoint(BattleResultMessage.GetBattleResult.GetAttacker.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "0"
-													default_format = "#color_gray"
+														expand = {}
+
+														text_single = {
+															visible = "[And(BattleResultMessage.GetBattleResult.IsLand, GreaterThan_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0'))]"
+															align = right|nobaseline
+															raw_text = "-[BattleSide.GetLosses]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[And(Not(BattleResultMessage.GetBattleResult.IsLand), GreaterThan_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0'))]"
+															align = right|nobaseline
+															raw_text = "-[BattleSide.GetNavalLosses]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[EqualTo_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "0"
+															default_format = "#color_gray"
+														}
+													}
+
+													hbox = {
+														visible = "[Not(EqualTo_CFixedPoint(BattleSide.GetTotalImprisoned, '(CFixedPoint)0'))]"
+														size = { 220 14 }
+														spacing = 6
+
+														text_single = {
+															align = left|nobaseline
+															text = "BATTLE_COUNTRY_SUMMARY_WITH_CAPTURED"
+															default_format = "#color_white"
+														}
+
+														expand = {}
+
+														text_single = {
+															visible = "[GreaterThan_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "+[BattleSide.GetOverallChangeForUI]"
+															default_format = "#color_green"
+														}
+
+														text_single = {
+															visible = "[LessThan_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "[BattleSide.GetOverallChangeForUI]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[EqualTo_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "0"
+															default_format = "#color_gray"
+														}
+													}
 												}
 											}
 
@@ -1609,12 +1668,17 @@ window = {
 								vbox = { #stats
 									spacing = 10
 									using = layoutpolicy_expanding
-									hbox = {#subunits
-										using = battle_result_subunits
-										blockoverride "icon_column_left" {}
-										blockoverride "icon_column_right" {
-											battle_result_icon_column = {}
+									hbox = {#casualties
+										layoutpolicy_horizontal = expanding
+										margin_left = 10
+										hbox = {#subunits
+											using = battle_result_subunits
+											blockoverride "icon_column_left" {}
+											blockoverride "icon_column_right" {
+												battle_result_icon_column = {}
+											}
 										}
+										expand = {}
 									}
 
 									hbox = {#casualties
@@ -1622,6 +1686,8 @@ window = {
 										margin_left = 10
 									
 										hbox = {
+											datacontext = "[BattleResultMessage.GetBattleResult.GetDefender]"
+											minimumsize = { 315 64 }
 											spacing = 10
 											tooltipwidget = {
 												SimpleContextualTooltipType = {
@@ -1636,7 +1702,7 @@ window = {
 														text = "[battle|e]"
 													}
 		
-													lowpriotextcontext = "BATTLE_COUNTRY_LOSES"
+													lowpriotextcontext = "BATTLE_COUNTRY_SUMMARY_TT"
 		
 												}
 											}
@@ -1662,28 +1728,80 @@ window = {
 												using = bg_circle_piechart
 											}
 
-											vbox = {
-												text_single = {
-													text = "OVERALL_CHANGE"
-													default_format = "#color_white"
-												}
+											widget = {
+												size = { 240 48 }
+												vbox = {
+													margin = { 10 7 }
+													spacing = 6
 
-												text_single = {
-													visible = "[GreaterThan_CFixedPoint(BattleResultMessage.GetBattleResult.GetDefender.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "+[BattleResultMessage.GetBattleResult.GetDefender.GetOverallChangeForUI]"
-													default_format = "#color_green"
-												}
+													hbox = {
+														size = { 220 14 }
+														spacing = 6
 
-												text_single = {
-													visible = "[LessThan_CFixedPoint(BattleResultMessage.GetBattleResult.GetDefender.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "[BattleResultMessage.GetBattleResult.GetDefender.GetOverallChangeForUI]"
-													default_format = "#color_red"
-												}
+														text_single = {
+															align = left|nobaseline
+															text = "BATTLE_COUNTRY_SUMMARY_OVERALL_CHANGE"
+															default_format = "#color_white"
+														}
 
-												text_single = {
-													visible = "[EqualTo_CFixedPoint(BattleResultMessage.GetBattleResult.GetDefender.GetOverallChange, '(CFixedPoint)0')]"
-													raw_text = "0"
-													default_format = "#color_gray"
+														expand = {}
+
+														text_single = {
+															visible = "[And(BattleResultMessage.GetBattleResult.IsLand, GreaterThan_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0'))]"
+															align = right|nobaseline
+															raw_text = "-[BattleSide.GetLosses]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[And(Not(BattleResultMessage.GetBattleResult.IsLand), GreaterThan_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0'))]"
+															align = right|nobaseline
+															raw_text = "-[BattleSide.GetNavalLosses]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[EqualTo_CFixedPoint(BattleSide.GetTotalLossesValue, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "0"
+															default_format = "#color_gray"
+														}
+													}
+
+													hbox = {
+														visible = "[Not(EqualTo_CFixedPoint(BattleSide.GetTotalImprisoned, '(CFixedPoint)0'))]"
+														size = { 220 14 }
+														spacing = 6
+
+														text_single = {
+															align = left|nobaseline
+															text = "BATTLE_COUNTRY_SUMMARY_WITH_CAPTURED"
+															default_format = "#color_white"
+														}
+
+														expand = {}
+
+														text_single = {
+															visible = "[GreaterThan_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "+[BattleSide.GetOverallChangeForUI]"
+															default_format = "#color_green"
+														}
+
+														text_single = {
+															visible = "[LessThan_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "[BattleSide.GetOverallChangeForUI]"
+															default_format = "#color_red"
+														}
+
+														text_single = {
+															visible = "[EqualTo_CFixedPoint(BattleSide.GetOverallChange, '(CFixedPoint)0')]"
+															align = right|nobaseline
+															raw_text = "0"
+															default_format = "#color_gray"
+														}
+													}
 												}
 											}
 

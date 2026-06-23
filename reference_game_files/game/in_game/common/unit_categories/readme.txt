@@ -1,4 +1,5 @@
 ﻿#<unit_category_id> = {
+#	fallback = <unit_category_id>	#Optional, for falling back to the pre-1.2 values which some things like illustrations still use
 #	startup_amount = <int>
 #	build_time = <int>
 #	assault = yes/no
