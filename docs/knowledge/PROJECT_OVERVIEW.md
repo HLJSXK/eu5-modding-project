@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-06-24 (SOL icon DDS compatibility)
+> Last updated: 2026-06-24 (SOL modifier icon wiring)
 
 ## Project Identity
 
@@ -61,9 +61,10 @@ eu5-modding-project/
 |       |       |-- panels/             situation panels
 |       |       `-- scripted_widgets/
 |       `-- main_menu/
-|           |-- gfx/interface/icons/    generated SOL icon targets for shared UI, map modes, and situations
+|           |-- gfx/interface/icons/    generated SOL icon targets for shared UI, map modes, modifier types, and situations
 |           |-- gui/                   message category definitions
 |           |-- common/
+|           |   |-- modifier_icons/      SOL modifier-type icon mappings
 |           |   `-- static_modifiers/   country, location, province modifiers
 |           `-- localization/
 |-- docs/                              project knowledge, guides, technical notes
@@ -88,7 +89,7 @@ eu5-modding-project/
 | `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
 | `sync_reference.py` | After EU5 game updates to a new version | Mirrors reference game files with whitelist and size caps |
 | `validate.py` | Before launching game (`--changed` flag); `--ai-report` for JSON output | Console validation report for anti-patterns, enums, modifiers, SOL baseline, and global_variable_map remove/add writes; exit code indicates pass/fail |
-| `generate_sol_icon.py` | After setting an Images API relay key, or with `--convert-existing-png` for a local source image; add `--overwrite` to refresh existing DDS outputs | Shared SOL icon DDS outputs for `icons/sol/sol_living_standard.dds`, `icons/map_modes/sol_living_standard.dds`, and `icons/situations/global_living_standard.dds`, plus PNG/metadata under `data/generated_icons/`; uses `dds_image_lib.py` for dependency-free, Clausewitz-compatible PNG/DDS conversion with full mip chains |
+| `generate_sol_icon.py` | After setting an Images API relay key, or with `--convert-existing-png` for a local source image; add `--overwrite` to refresh existing DDS outputs | Shared SOL icon DDS outputs for `icons/sol/sol_living_standard.dds`, `icons/map_modes/sol_living_standard.dds`, `icons/situations/global_living_standard.dds`, and `icons/modifier_types/sol_living_standard.dds`, plus PNG/metadata under `data/generated_icons/`; uses `dds_image_lib.py` for dependency-free, Clausewitz-compatible PNG/DDS conversion with full mip chains |
 
 The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `engel_export.py`, or `gen_goods_demand_overrides.py`; those tools are retained only as legacy/reference helpers unless explicitly revived.
 

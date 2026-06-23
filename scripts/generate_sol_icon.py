@@ -763,6 +763,7 @@ def write_metadata(
             "gfx/interface/icons/sol/sol_living_standard.dds",
             "gfx/interface/icons/map_modes/sol_living_standard.dds",
             "gfx/interface/icons/situations/global_living_standard.dds",
+            "gfx/interface/icons/modifier_types/sol_living_standard.dds",
         ],
     }
     metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
