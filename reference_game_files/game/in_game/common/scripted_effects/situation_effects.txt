@@ -567,6 +567,27 @@ council_of_trent_pass_effect = {
 				}
 			}
 		}
+		# Winner policy != proposed policy: engine routes through pass_effect, but the proposer's debate failed.
+		else_if = {
+			limit = {
+				situation:council_of_trent = {
+					has_variable = council_of_trent_current_debate
+				}
+			}
+			situation:council_of_trent = {
+				change_variable = { name = council_of_trent_failed_debates add = 1 }
+				remove_variable = council_of_trent_current_debate
+			}
+			international_organization:catholic_church = {
+				if = {
+					limit = { NOT = { has_variable = council_of_trent_reforms_done_counter } }
+					set_variable = { name = council_of_trent_reforms_done_counter value = -1 }
+				}
+				else = {
+					change_variable = { name = council_of_trent_reforms_done_counter subtract = 1 }
+				}
+			}
+		}
 		clear_global_variable_list = council_of_trent_unvoters
 		clear_global_variable_list = council_of_trent_voting_for_debate
 		clear_global_variable_list = council_of_trent_voting_against_debate
@@ -1139,4 +1160,61 @@ remove_italian_wars_militarization_demands = {
 			}
 		}
 	}
+}
+
+reconcile_italian_wars_league_land = {
+	#Resync each league's recorded Italian land with what its members actually own.
+	#Safety net for locations conquered during a war/peace that on_location_changed_owner missed (see common/on_action/_hardcoded.txt).
+	every_in_global_list = {
+		variable = iw_italian_leagues_list
+
+		limit = { 
+			any_international_organization_owned_location = {
+				region = region:italy_region
+			}
+		}
+		reconcile_single_italian_wars_league_land = yes
+	}
+	every_in_global_list = {
+		variable = iw_foreign_leagues_list
+
+		limit = { 
+			any_international_organization_owned_location = {
+				region = region:italy_region
+			}
+		}
+		reconcile_single_italian_wars_league_land = yes
+	}
+}
+
+reconcile_single_italian_wars_league_land = {
+	#this = a league international organization
+	save_temporary_scope_as = iw_reconcile_league
+	#Drop recorded land whose current owner is no longer a member of this league
+	every_international_organization_owned_location = {
+		limit = {
+			OR = {
+				has_owner = no
+				owner ?= { NOT = { is_member_of_international_organization = scope:iw_reconcile_league } }
+			}
+		}
+		scope:iw_reconcile_league = {
+			remove_location_from_international_organization = prev
+		}
+	}
+	#Add any Italy-region land a current member owns that the league has not recorded yet
+	every_international_organization_member = {
+		every_owned_location = {
+			limit = {
+				region = region:italy_region
+				is_land = yes
+				is_passable = yes
+				NOT = { is_owned_by_international_organization = scope:iw_reconcile_league }
+			}
+			scope:iw_reconcile_league = {
+				add_location_to_international_organization = prev
+			}
+		}
+	}
+	
 }

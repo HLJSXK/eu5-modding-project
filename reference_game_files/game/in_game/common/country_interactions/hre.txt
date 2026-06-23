@@ -306,6 +306,7 @@ request_elector_status = {
 		add = {
 			desc = "TARGET_ACCEPTANCE"
 			value = "scope:actor.country_interaction_acceptance(country_interaction:request_elector_status|scope:recipient)"
+			subtract = 50	#just so the AI doesn't spam it
 		}
 	}
 	
@@ -1523,6 +1524,12 @@ grant_county_privileges = {
 enforce_landfriede = {
 	type = diplomacy
 	category = CATEGORY_HRE_ACTIONS
+
+	# Actor-only gate: per-recipient ai_will_do hard-rejected bankrupt actors with -1000. Short-circuit once.
+	ai_prerequisite = {
+		NOT = { is_during_bankruptcy = yes }
+	}
+
 	potential = {
 		exists = international_organization:hre
 		scope:actor = {
@@ -1636,13 +1643,6 @@ enforce_landfriede = {
 			subtract = {
 				desc = "IS_AT_WAR"
 				value = 200
-			}
-		}
-		if = {
-			limit = { scope:actor = { is_during_bankruptcy = yes } }
-			subtract = {
-				desc = "IS_BANKRUPT_TOOLTIP"
-				value = 1000
 			}
 		}
 		subtract = {
@@ -1929,7 +1929,13 @@ enforce_religious_unity = {
 demand_unlawful_territory = {
 	type = diplomacy
 	category = CATEGORY_HRE_ACTIONS
-	
+
+	# Actor-only spam-protection gate: when the AI cooldown is active the per-recipient
+	# ai_will_do hard-rejected with -10000 anyway. Short-circuit once instead.
+	ai_prerequisite = {
+		NOT = { has_cooldown = ai_spam_protection_demand_unlawful_territory }
+	}
+
 	potential = {
 		scope:actor = {
 			is_emperor = yes
@@ -2294,17 +2300,6 @@ demand_unlawful_territory = {
 					value = 1000
 				}
 			}
-
-			# General spam protection so the AI is not overly aggressive with its demand
-			if = {
-				limit = {
-					scope:actor = { has_cooldown = ai_spam_protection_demand_unlawful_territory }
-				}
-				subtract = {
-					desc = "DIPLOREASON_WE_ALREADY_MADE_DEMAND"
-					value = 10000
-				}
-			}
 		}
 
 	}
@@ -2345,7 +2340,19 @@ ask_to_vote_for_me_as_emperor = {
 
 	diplomatic_cost = ask_to_vote_for_me_as_emperor_cost
 
-	potential = {	
+	# Actor-only gate: when no one is voting for the actor yet, ai_will_do hard-rejected with
+	# -1000 anyway. Short-circuit once instead of per HRE elector recipient.
+	ai_prerequisite = {
+		international_organization:hre = {
+			votes_for_resolution = {
+				resolution = resolution:hre_election
+				outcome = scope:actor
+				value > 1
+			}
+		}
+	}
+
+	potential = {
 		unique_international_organization_type_exists = international_organization_type:hre
 	}
 
@@ -2473,23 +2480,6 @@ ask_to_vote_for_me_as_emperor = {
 					scope:actor = { value = this_opinion_of_prev }
 				}
 			}
-		}
-		# very likely if someone is voting for them already
-		if = {
-			limit = {
-				exists = international_organization:hre
-				international_organization:hre = {
-					votes_for_resolution = {
-						resolution = resolution:hre_election
-						outcome = scope:actor
-						value > 1
-					}
-				}
-			}
-			add = 1000
-		}
-		else = {
-			subtract = 1000
 		}
 		# spam protection
 		if = {

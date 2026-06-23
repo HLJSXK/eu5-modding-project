@@ -4,15 +4,23 @@ request_divorce =  {
 	price = price:request_divorce_price
 	category = CATEGORY_PAPAL_ACTIONS
 
+	# Actor-only gate: the only positive-score branch in ai_will_do required a non-catholic
+	# spouse. Short-circuit catholic-spouse rulers before per-pair scoring.
+	ai_prerequisite = {
+		ruler.first_spouse ?= {
+			NOT = { religion = religion:catholic }
+		}
+	}
+
 	potential = {
 		papacy_active = yes
 		has_global_variable_list = pope_countries
 		scope:actor = {
 			religion = religion:catholic
 			modifier:is_pope = no
-			exists = ruler	
+			exists = ruler
 		}
-	}	
+	}
 
 	allow = {
 		scope:actor = {
@@ -50,21 +58,9 @@ request_divorce =  {
 		scope:actor = { ruler = { divorce_character = first_spouse } }
 	}
 	ai_will_do = {
-		add = -10
-		add = {
-			if = {
-				limit = {
-					scope:actor = {
-						ruler = {
-							first_spouse = {
-								NOT = { religion = religion:catholic }
-							}
-						}
-					}
-				}
-				value = 100
-			}
-		}
+		# Base score folds in the +100 non-catholic-spouse bonus that the ai_prerequisite gate
+		# now guarantees (was: add = -10 + conditional +100 = effective +90).
+		add = 90
 		add = {
 			if = {
 				limit = {
@@ -150,13 +146,26 @@ request_divorce =  {
 			}
 		}
 	}
+	# Engine-level cooldown only fires on accept; declined requests run ExecuteReject which skips it,
+	# so without this the AI re-fires the action next month. Same type as the top-level cooldown,
+	# so the action's HasCooldown check gates re-submission automatically.
+	reject_effect = {
+		hidden_effect = {
+			scope:actor = {
+				add_cooldown = {
+					type = request_divorce
+					years = 5
+				}
+			}
+		}
+	}
 	diplo_chance = {
 		base = -25
 		opinion = 0.2
 		diplomatic_reputation = 3
 		trust_in_actor = 0.2
 	}
-}	
+}
 
 #Pope-to-Catholic Actions
 excommunicate = {

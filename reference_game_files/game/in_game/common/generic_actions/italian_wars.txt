@@ -969,7 +969,6 @@ iw_send_aid = {
 
 	allow = {
 		scope:actor ?= {
-			has_presence_in = region:italy_region
 			at_war = no
 			OR = {
 				manpower_percentage >= 0.1
@@ -1058,21 +1057,47 @@ iw_send_aid = {
 	}
 
 	ai_will_do = {
-		add = -25
+		#Health signals - small nudges that we can afford to help, never the deciding factor
+		add = {
+			desc = "CURRENT_MANPOWER_TOOLTIP"
+			value = scope:actor.manpower_percentage
+			multiply = 3
+		}
+		add = {
+			desc = "CURRENT_TREASURY_TOOLTIP"
+			value = {
+				add = scope:actor.gold
+				divide = {
+					value = scope:actor.monthly_income_total
+					max = 1
+				}
+				max = 2
+			}
+			multiply = 2
+		}
+		add = {
+			desc = "NUM_LOANS_TOOLTIP"
+			value = scope:actor.num_loans
+			multiply = -5
+		}
 		if = {
 			limit = {
 				exists = scope:target
 			}
 			add = {
+				value = -25
+				desc = "BASE_VALUE"
+			}
+			#Primary drivers - aiding largely rides on how much we like them and how reputable they are
+			add = {
 				desc = "OUR_OPINION_OF_IO_LEADER"
 				value = "scope:actor.opinion(scope:target)"
-				divide = 10
+				divide = 4
 			}
 			add = {
 				desc = "THEIR_DIP_REP"
 				scope:target = {
 					value = modifier:diplomatic_reputation
-					multiply = 3
 				}
 			}
 			if = {
@@ -1113,7 +1138,7 @@ iw_send_aid = {
 					scope:actor ?= {
 						OR = {
 							is_rival_of = scope:target
-							is_rival_of = scope:target
+							is_enemy_of = scope:target
 						}
 					}
 				}
@@ -1122,26 +1147,12 @@ iw_send_aid = {
 					value = -1000
 				}
 			}
+			#Proximity - we are likelier to aid a neighbor than a distant power
 			add = {
-				desc = "CURRENT_MANPOWER_TOOLTIP"
-				value = scope:actor.manpower_percentage
-				multiply = 5
-			}
-			add = {
-				desc = "CURRENT_TREASURY_TOOLTIP"
-				value = {
-					add = scope:actor.gold
-					divide = {
-						value = scope:actor.monthly_income_total
-						max = 1
-					}
-				}
-				multiply = 5
-			}
-			add = {
-				desc = "NUM_LOANS_TOOLTIP"
-				value = scope:actor.num_loans
-				multiply = -10
+				desc = "distance to [target.GetName]"
+				value = "scope:actor.border_distance_to(scope:target)"
+				multiply = -0.05
+				min = -15
 			}
 		}
 	}
@@ -1279,14 +1290,6 @@ challenge_league_leadership = {
 	type = internationalorganization
 
 	potential = {
-		scope:actor = {
-			NOT = {
-				has_special_status_in_international_organization = {
-					type = special_status:italian_league_sponsor
-					international_organization = scope:recipient
-				}
-			}
-		}
 	}
 
 	allow = {
@@ -1333,6 +1336,12 @@ challenge_league_leadership = {
 			scope:actor = {
 				is_member_of_international_organization = root
 				NOT = { is_leader_of_international_organization = root }
+				NOT = {
+					has_special_status_in_international_organization = {
+						type = special_status:italian_league_sponsor
+						international_organization = root
+					}
+				}
 			}
 		}
 	}
@@ -1439,7 +1448,10 @@ iw_intervene_in_war = {
 					save_temporary_scope_as = target_leader
 					every_current_war = {
 						limit = {
-							scope:target_leader = { is_war_leader_of = prev }
+							scope:target_leader = { 
+								is_war_leader_of = prev 
+								NOT = { has_truce_with = scope:actor }
+							}
 							OR = {
 								defender_leader = {
 									is_leader_of_any_league = yes
@@ -1461,7 +1473,10 @@ iw_intervene_in_war = {
 					save_temporary_scope_as = target_leader
 					every_current_war = {
 						limit = {
-							scope:target_leader = { is_war_leader_of = prev }
+							scope:target_leader = { 
+								is_war_leader_of = prev 
+								NOT = { has_truce_with = scope:actor }
+							}
 							OR = {
 								defender_leader = {
 									is_leader_of_any_league = yes
@@ -1501,7 +1516,6 @@ iw_intervene_in_war = {
 		}
 		enabled = {
 			not = { is_at_war_with = scope:actor }
-			#scope:actor = { can_declare_war_on = root }
 		}
 	}
 
@@ -1527,9 +1541,6 @@ iw_intervene_in_war = {
 					call_in_subjects = yes
 				}
 			}
-			scope:target_country = {
-				trigger_event_non_silently = italian_wars.5
-			}
 		}
 	}
 
@@ -1542,7 +1553,7 @@ iw_intervene_in_war = {
 			value = scope:actor.gold
 			divide = scope:actor.monthly_income_trade_and_tax
 			multiply = 2
-			desc = "treasury divided by income and then multiplied by 2"
+			desc = "treasury divided by income and then multiplied by 2 max"
 		}
 		if = {
 			limit = { scope:actor.war_exhaustion > 0 }
@@ -1577,7 +1588,7 @@ iw_intervene_in_war = {
 		add = {
 			value = scope:actor.modifier:aggressiveness_modifier
 			subtract = scope:actor.modifier:carefulness_modifier
-			multiply = 20
+			multiply = 15
 			desc = "aggressiveness modifier minus carefulness modifier"
 		}
 		if = {
@@ -1587,14 +1598,14 @@ iw_intervene_in_war = {
 			}
 			add = {
 				value = "scope:actor.opinion(scope:target_country)"
-				multiply = 0.5
+				multiply = 0.35
 				desc = "opinion_of_ally"
 			}
 			if = {
 				limit = { scope:target_war = { attacker_leader = scope:target_country } }
 				subtract = {
 					value = "scope:actor.opinion(scope:target_war.defender_leader)"
-					multiply = 0.5
+					multiply = 0.35
 					desc = "opinion_of_enemy"
 				}
 				subtract = {
@@ -1613,7 +1624,7 @@ iw_intervene_in_war = {
 			else = {
 				subtract = {
 					value = "scope:actor.opinion(scope:target_war.attacker_leader)"
-					multiply = 0.5
+					multiply = 0.35
 					desc = "opinion_of_enemy"
 				}
 				subtract = {
@@ -1633,6 +1644,19 @@ iw_intervene_in_war = {
 				value = situation:italian_wars.var:iw_tension
 				multiply = 0.2
 				desc = situation_tension
+			}
+			#Distance - marching an army into Italy from afar is far less appealing
+			add = {
+				desc = "distance to [target_country.GetName]"
+				value = "scope:actor.border_distance_to(scope:target_country)"
+				multiply = -0.05
+				min = -100
+			}
+			#Balance of power - do not pile onto a side that is already winning; lean toward helping the underdog
+			add = {
+				desc = "they are already winning this war"
+				value = "scope:target_country.war_score_in_war(scope:target_war)"
+				multiply = -0.4
 			}
 		}
 	}

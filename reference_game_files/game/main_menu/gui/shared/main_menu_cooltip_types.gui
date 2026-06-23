@@ -25,15 +25,9 @@ template click_modifier_bg_texture {
 	}
 }
 
-# Background box
-template Background_Area {
-	using = bg_round_corners_texture
-	shaderfile = "gfx/FX/pdxgui_default.shader"
-	alpha = 0.4
-}
-
-template Scrollbar_Vertical_Tooltips {
-	scrollbar = {
+types ScrollbarTypes 
+{
+	type Scrollbar_Vertical_Tooltips = scrollbar {
 		name = "vertical_scrollbar_messages"
 		size = { 4 12 }
 		wheelstep = 60
@@ -91,6 +85,17 @@ template Scrollbar_Vertical_Tooltips {
 			}
 		}
 	}
+}
+
+# Background box
+template Background_Area {
+	using = bg_round_corners_texture
+	shaderfile = "gfx/FX/pdxgui_default.shader"
+	alpha = 0.4
+}
+
+template Scrollbar_Vertical_Tooltips {
+	Scrollbar_Vertical_Tooltips = {}
 }
 
 template tooltip_left_click_template {
@@ -474,45 +479,49 @@ types AuxBuldingBlocksTooltipsTypes
 types BuildingBlocksTooltipsTypes
 {
 	type TooltipYesNoCheckbox = icon {
-		texture = "gfx/interface/component_masks/mask_texture_01.dds"
-		texture_density = 2
-		alpha = 1
-		spriteType = corneredstretched
-		spriteBorder = { 12 12 }
-		size = { 20 20 }
-
-		modify_texture = {
-			texture = "gfx/interface/buttons/checkbox_square.dds"
+		block "checkbox_frame" {
+			texture = "gfx/interface/component_masks/mask_texture_01.dds"
 			texture_density = 2
-			frame_grid = { 2 1 }
-			blend_mode = alphamultiply
-		}
+			alpha = 1
+			spriteType = corneredstretched
+			spriteBorder = { 12 12 }
+			size = { 20 20 }
 
-		modify_texture = {
-			using = color_grey_texture
-		}
-		modify_texture = {
-			using = color_white_texture
-			alpha = 0.3
+			modify_texture = {
+				texture = "gfx/interface/buttons/checkbox_square.dds"
+				texture_density = 2
+				frame_grid = { 2 1 }
+				blend_mode = alphamultiply
+			}
+
+			modify_texture = {
+				using = color_grey_texture
+			}
+			modify_texture = {
+				using = color_white_texture
+				alpha = 0.3
+			}
 		}
 
 		icon = {
 			block "yes_visible" { visible = no }
 			texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
-			size = { 80% 80% }
+			block "yes_icon_size" { size = { 80% 80% } }
 			parentanchor = center
 
-			glow = {
-				glow_radius = 3
-				color = {0.3 1.0 0.3 1.0}
-				alpha = 0.4
+			block "yes_glow" {
+				glow = {
+					glow_radius = 3
+					color = {0.3 1.0 0.3 1.0}
+					alpha = 0.4
+				}
 			}
 		}
 
 		icon = {
 			block "no_visible" { visible = no }
 			texture = "gfx/interface/icons/text_icons/trigger_no.dds"
-			size = { 80% 80% }
+			block "no_icon_size" { size = { 80% 80% } }
 			parentanchor = center
 		}
 	}
@@ -1880,6 +1889,8 @@ types ContextualTooltipTypes
 		}
 
 		TooltipTableHeader = {
+			block "rowlist_footer_visibility" {}
+
 			block "table_header_background" {
 				background = {
 					using = tile_background_squared_texture
@@ -1943,281 +1954,6 @@ types ContextualTooltipTypes
 
 					block "field_text_format" {}
 				}
-			}
-		}
-	}
-
-	type TooltipUIActionBlockOld = vbox {
-		layoutpolicy_horizontal = expanding
-		ignoreinvisible = yes
-		spacing = 5
-
-		vbox = {
-			layoutpolicy_horizontal = expanding
-			ignoreinvisible = yes
-
-			TooltipConditionList = {
-				using = tooltip_left_click_conditions_template
-
-				visible = "[And3(UIAction.IsLeftClickVisible, Not(UIAction.IsLeftClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickConditions).GetOutput)))]"
-				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetLeftClickConditions]"
-
-				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetLeftClickConditions]"
-			}
-
-			# Single click
-			TooltipFunctionalBlock = {
-				visible = "[And(UIAction.IsLeftClickVisible, Not(UIAction.IsRightClickVisible))]"
-				using = tooltip_left_click_template
-			}
-
-			TooltipFunctionalBlock = {
-				visible = "[And(Not(UIAction.IsLeftClickVisible), UIAction.IsRightClickVisible)]"
-				using = tooltip_right_click_template
-			}
-
-			TooltipFunctionalBlock = {
-				visible = "[And(UIAction.IsLeftClickVisible, UIAction.IsRightClickVisible)]"
-				using = tooltip_left_right_click_template
-			}
-
-			TooltipConditionList = {
-				using = tooltip_right_click_conditions_template
-				blockoverride "conditionlist_item_setup" { righttoleft = yes }
-
-				visible = "[And3(UIAction.IsRightClickVisible, Not(UIAction.IsRightClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickConditions).GetOutput)))]"
-				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetRightClickConditions]"
-
-				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetRightClickConditions]"
-			}
-
-			blockoverride "action_left" {
-				enabled = "[UIAction.IsLeftClickEnabled]"
-
-				tooltip_enabled = "[Not(StringIsEmpty(UIAction.GetLeftClickTooltip))]"
-				datacontext = "[StringToConditionList(UIAction.GetLeftClickTooltip)]"
-				tooltipwidget = {
-					ContextualTooltipTypeBase = {
-						TooltipConditionList = {
-							set_parent_size_to_minimum = yes
-							margin = { 5 5 }
-						}
-
-						widget = { using = bg_tooltip_frame }
-					}
-				}
-			}
-
-			blockoverride "action_left_text" {
-				text = "[UIAction.GetLeftClickName]"
-			}
-
-			blockoverride "action_left_cost" {
-				visible = "[Not(StringIsEmpty(UIAction.GetLeftClickCost))]"
-				text = "[UIAction.GetLeftClickCost]"
-			}
-
-			blockoverride "action_right" {
-				enabled = "[UIAction.IsRightClickEnabled]"
-
-				tooltip_enabled = "[Not(StringIsEmpty(UIAction.GetRightClickTooltip))]"
-				datacontext = "[StringToConditionList(UIAction.GetRightClickTooltip)]"
-				tooltipwidget = {
-					ContextualTooltipTypeBase = {
-						TooltipConditionList = {
-							set_parent_size_to_minimum = yes
-							margin = { 5 5 }
-						}
-
-						widget = { using = bg_tooltip_frame }
-					}
-				}
-			}
-
-			blockoverride "action_right_text" {
-				text = "[UIAction.GetRightClickName]"
-			}
-
-			blockoverride "action_right_cost" {
-				text = "[UIAction.GetRightClickCost]"
-			}
-		}
-
-		vbox = {
-			layoutpolicy_horizontal = expanding
-			ignoreinvisible = yes
-
-			TooltipConditionList = {
-				using = tooltip_left_click_conditions_template
-
-				visible = "[And3(UIAction.IsLeftClickAndConfirmVisible, Not(UIAction.IsLeftClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickAndConfirmConditions).GetOutput)))]"
-				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetLeftClickAndConfirmConditions]"
-
-				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetLeftClickAndConfirmConditions]"
-			}
-
-			# Confirm click
-			TooltipFunctionalBlock = {
-				visible = "[And(UIAction.IsLeftClickAndConfirmVisible, Not(UIAction.IsRightClickAndConfirmVisible))]"
-				using = tooltip_left_click_template
-			}
-
-			TooltipFunctionalBlock = {
-				visible = "[And(Not(UIAction.IsLeftClickAndConfirmVisible), UIAction.IsRightClickAndConfirmVisible)]"
-				using = tooltip_right_click_template
-			}
-
-			TooltipFunctionalBlock = {
-				visible = "[And(UIAction.IsLeftClickAndConfirmVisible, UIAction.IsRightClickAndConfirmVisible)]"
-				using = tooltip_left_right_click_template
-			}
-
-			TooltipConditionList = {
-				using = tooltip_right_click_conditions_template
-				blockoverride "conditionlist_item_setup" { righttoleft = yes }
-
-				visible = "[And3(UIAction.IsRightClickAndConfirmVisible, Not(UIAction.IsRightClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickAndConfirmConditions).GetOutput)))]"
-				tooltip_enabled = "[IsBuildDebug]"
-				tooltip = "[UIAction.GetRightClickAndConfirmConditions]"
-
-				ontextcontextchanged = "[SetConditionListOnlyFailCollapseRequirementFromTextContext(PdxGuiWidget.AccessSelf)]"
-				textcontext = "[UIAction.GetRightClickAndConfirmConditions]"
-			}
-
-			blockoverride "action_left" {
-				enabled = "[UIAction.IsLeftClickAndConfirmEnabled]"
-
-				tooltip_enabled = "[Not(StringIsEmpty(UIAction.GetLeftClickAndConfirmTooltip))]"
-				datacontext = "[StringToConditionList(UIAction.GetLeftClickAndConfirmTooltip)]"
-				tooltipwidget = {
-					ContextualTooltipTypeBase = {
-						TooltipConditionList = {
-							set_parent_size_to_minimum = yes
-							margin = { 5 5 }
-						}
-
-						widget = { using = bg_tooltip_frame }
-					}
-				}
-			}
-
-			blockoverride "left_icon_extra" {
-				piechart = {
-					size = { 100% 100% }
-
-					visible = "[And(IsActionConfirmAndHoldMode,UIAction.IsLeftClickAndConfirmVisible)]"
-					enabled = "[UIAction.IsLeftClickAndConfirmEnabled]"
-					# tooltip = "[UIAction.GetLeftClickAndConfirmTooltip]"
-
-					using = piechart_angles
-
-					icon = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						size = { 97% 97% }
-						parentanchor = center
-						using = color_value_progress_gray
-					}
-
-					pieslice = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						value = "[UIAction.GetLeftMouseDownPercentage]"
-						using = color_value_progress_blue
-						alpha = 0.8
-					}
-
-					pieslice = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						value = "[UIAction.GetLeftMouseDownPercentageLeft]"
-						using = color_value_progress_gray
-						alpha = 0.8
-					}
-				}
-
-				# dialog image
-				# icon = {
-				# 	visible = "[And(IsActionDialogMode,UIAction.IsLeftClickAndConfirmVisible)]"
-				# 	texture = "gfx/interface/icons/ui_controls/dialog_mode.dds"
-				# 	size = { 100% 100% }
-				# }
-			}
-
-			blockoverride "action_left_text" {
-				text = "[UIAction.GetLeftClickAndConfirmName]"
-			}
-
-			blockoverride "action_left_cost" {
-				text = "[UIAction.GetLeftClickAndConfirmCost]"
-			}
-
-			blockoverride "action_right" {
-				enabled = "[UIAction.IsRightClickAndConfirmEnabled]"
-
-				tooltip_enabled = "[Not(StringIsEmpty(UIAction.GetRightClickAndConfirmTooltip))]"
-				datacontext = "[StringToConditionList(UIAction.GetRightClickAndConfirmTooltip)]"
-				tooltipwidget = {
-					ContextualTooltipTypeBase = {
-						TooltipConditionList = {
-							set_parent_size_to_minimum = yes
-							margin = { 5 5 }
-						}
-
-						widget = { using = bg_tooltip_frame }
-					}
-				}
-			}
-
-			blockoverride "right_icon_extra" {
-				piechart = {
-					size = { 100% 100% }
-
-					visible = "[And(IsActionConfirmAndHoldMode,UIAction.IsRightClickAndConfirmVisible)]"
-					enabled = "[UIAction.IsRightClickAndConfirmEnabled]"
-					# tooltip = "[UIAction.GetRightClickAndConfirmTooltip]"
-
-					using = piechart_angles
-
-					icon = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						size = { 97% 97% }
-						parentanchor = center
-						using = color_value_progress_gray
-					}
-
-					pieslice = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						value = "[UIAction.GetRightMouseDownPercentage]"
-						using = color_value_progress_blue
-						alpha = 0.8
-					}
-
-					pieslice = {
-						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-						value = "[UIAction.GetRightMouseDownPercentageLeft]"
-						using = color_value_progress_gray
-						alpha = 0.8
-					}
-				}
-
-				# dialog image
-				# icon = {
-				# 	visible = "[And(IsActionDialogMode,UIAction.IsRightClickAndConfirmVisible)]"
-				# 	texture = "gfx/interface/icons/ui_controls/dialog_mode.dds"
-				# 	size = { 100% 100% }
-				# }
-			}
-
-			blockoverride "action_right_text" {
-				text = "[UIAction.GetRightClickAndConfirmName]"
-			}
-
-			blockoverride "action_right_cost" {
-				text = "[UIAction.GetRightClickAndConfirmCost]"
 			}
 		}
 	}
@@ -2414,7 +2150,7 @@ types ContextualTooltipTypes
 					# block "requirementslist_content" {
 						hbox = {
 							layoutpolicy_horizontal = expanding
-							spacing = 10
+							spacing = 5
 
 							# Hierarchy arrows
 							hbox = {
@@ -2425,7 +2161,7 @@ types ContextualTooltipTypes
 									datamodel = "[DataModelRepeatedItem(RequirementLine.GetIndent)]"
 									item = {
 										widget = {
-											size = { 20 3 }
+											size = { 25 3 }
 										}
 									}
 								}
@@ -2448,7 +2184,7 @@ types ContextualTooltipTypes
 
 									icon = {
 										visible = "[Not(EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0'))]"
-										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0')]"
+										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0', '(float)10')]"
 										parentanchor = bottom
 										using = color_requirementlist_arrow_white_texture
 									}
@@ -2456,15 +2192,30 @@ types ContextualTooltipTypes
 
 								# Last mile arrow to text
 								icon = {
-									size = { 30 2 }
+									size = { 10 2 }
 									using = color_requirementlist_arrow_white_texture
 								}
 							}
 
-							TooltipYesNoCheckbox = {
-								visible = "[Not(RequirementLine.IsUndefined)]"
-								blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
-								blockoverride "no_visible" { visible = "[RequirementLine.HasFailed]" }
+							widget = {
+								size = { 20 20 }
+
+								TooltipYesNoCheckbox = {
+									visible = "[Not(RequirementLine.IsUndefined)]"
+									blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
+									blockoverride "no_visible" { visible = "[RequirementLine.HasFailed]" }
+								}
+	
+								icon = {
+									size = { 35% 40% }
+									parentanchor = center
+									visible = "[RequirementLine.IsUndefined]"
+									texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds"
+									modify_texture = {
+										using = color_white_texture
+										alpha = 0.6
+									}
+								}
 							}
 
 							textbox = {

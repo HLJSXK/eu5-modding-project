@@ -52,7 +52,7 @@ pa_accept_estate_culture = {
 		on_bribe_default_effect = yes
 	}
 
-	chance = 10
+	chance = 5
 }
 
 
@@ -69,6 +69,7 @@ pa_convert_to_estate_religion = {
 	importance = 3
 
 	potential = {
+		modifier:blocked_from_conversion = no
 		NOT = {
 			"estate(scope:target)" = {
 				dominant_religion ?= {
@@ -88,6 +89,10 @@ pa_convert_to_estate_religion = {
 		add_estate_satisfaction = { type = scope:target value = 0.15 }
 	}
 
+	allow = {
+		modifier:blocked_from_conversion = no
+	}
+
 	can_bribe = {
 		can_bribe_default_trigger = yes
 	}
@@ -95,7 +100,7 @@ pa_convert_to_estate_religion = {
 		on_bribe_default_effect = yes
 	}
 
-	chance = 5
+	chance = 1
 }
 
 
@@ -118,140 +123,19 @@ pa_change_court_language_to_estate_language = {
 		NOT = { has_country_modifier = parliament_recently_changed_court_language }
 		NOT = { has_cooldown = force_change_court_language }
 		NOT = { has_cooldown = change_court_language }
-		OR = {
-			# Non-clergy estates: original culture-based behavior.
-			AND = {
-				NOT = { scope:target = { this = estate_type:clergy_estate } }
-				NOT = {
-					"estate(scope:target)" = {
-						dominant_culture ?= {
-							this = root.dominant_culture
-						}
-					}
-				}
-				NOT = {
-					"estate(scope:target)" = {
-						dominant_culture ?= {
-							dialect = {
-								this = root.court_dialect
-							}
-						}
-					}
-				}
-				# Nobles only push for a change if their language differs from the country's primary culture's language.
-				trigger_if = {
-					limit = { scope:target = { this = estate_type:nobles_estate } }
-					"estate(scope:target)" = {
-						dominant_culture ?= {
-							language = {
-								NOT = { this = root.culture.language }
-							}
-						}
-					}
-				}
-			}
-			# Clergy: religion-first priority chain.
-			AND = {
-				scope:target = { this = estate_type:clergy_estate }
-				OR = {
-					# Case A: clergy religion = country religion, and court isn't already the liturgical dialect.
-					AND = {
-						"estate(scope:target)" = {
-							dominant_religion ?= { this = root.religion }
-						}
-						NOT = { court_dialect = { this = root.liturgical_dialect } }
-					}
-					# Case B: clergy religion differs from country religion, has a fixed liturgical, court isn't it.
-					"estate(scope:target)" = {
-						dominant_religion ?= {
-							NOT = { this = root.religion }
-							has_fixed_liturgical_language = yes
-							NOT = {
-								language = { this = root.court_dialect.language }
-							}
-						}
-					}
-					# Case C (fallback): no liturgical preference applies — same triggers as the non-clergy path.
-					AND = {
-						NOT = {
-							"estate(scope:target)" = {
-								dominant_religion ?= { this = root.religion }
-							}
-						}
-						NOT = {
-							"estate(scope:target)" = {
-								dominant_religion ?= { has_fixed_liturgical_language = yes }
-							}
-						}
-						NOT = {
-							"estate(scope:target)" = {
-								dominant_culture ?= {
-									this = root.dominant_culture
-								}
-							}
-						}
-						NOT = {
-							"estate(scope:target)" = {
-								dominant_culture ?= {
-									dialect = {
-										this = root.court_dialect
-									}
-								}
-							}
-						}
-					}
-				}
+		
+		"estate(scope:target)" = {
+			power > 0.4
+			dialect = {
+				NOT = { this = root.court_dialect }
 			}
 		}
 	}
 
 	on_accept = {
-		if = {
-			limit = { scope:target = { this = estate_type:clergy_estate } }
-			if = {
-				limit = {
-					"estate(scope:target)" = {
-						dominant_religion ?= { this = root.religion }
-					}
-				}
-				# Case A — country's current liturgical dialect.
-				liturgical_dialect = {
-					save_scope_as = court_language_target_dialect
-				}
-			}
-			else_if = {
-				limit = {
-					"estate(scope:target)" = {
-						dominant_religion ?= { has_fixed_liturgical_language = yes }
-					}
-				}
-				# Case B — clergy religion's fixed liturgical language.
-				"estate(scope:target)" = {
-					dominant_religion = {
-						language = {
-							save_scope_as = court_language_target_dialect
-						}
-					}
-				}
-			}
-			else = {
-				# Case C — clergy's dominant culture dialect.
-				"estate(scope:target)" = {
-					dominant_culture = {
-						dialect = {
-							save_scope_as = court_language_target_dialect
-						}
-					}
-				}
-			}
-		}
-		else = {
-			"estate(scope:target)" = {
-				dominant_culture = {
-					dialect = {
-						save_scope_as = court_language_target_dialect
-					}
-				}
+		"estate(scope:target)" = {
+			dialect = {
+				save_scope_as = court_language_target_dialect
 			}
 		}
 		set_court_language = scope:court_language_target_dialect
@@ -283,5 +167,21 @@ pa_change_court_language_to_estate_language = {
 		on_bribe_default_effect = yes
 	}
 
-	chance = 100000
+	ai_will_do = {
+		value = -0.5
+		"estate(scope:target)" = {
+			dialect = {
+				add = "court_language_utility(root)"
+			}
+		}
+		root.court_language = {
+			subtract = {
+				value = 1
+				add = root.modifier:language_change_threshold_modifier
+				multiply = "court_language_utility(root)"
+			}
+		}
+	}
+
+	chance = 0.5
 }

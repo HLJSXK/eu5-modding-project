@@ -84,6 +84,7 @@
 # - modifier: modifiers we apply to members (scale - root = country, scope:recipient = organization)
 # - leader_modifier: modifiers we apply to the leader (scale - root = country, scope:recipient = organization)
 # - non_leader_modifier: modifiers we apply to every member who is not the leader (scale - root = country, scope:recipient = organization)
+# - owned_location_modifier: modifiers we apply to every location owned by the IO (not scaled)
 # - target_modifier: modifiers we apply to the target of the io (scale - root = country, scope:recipient = organization)
 # - international_organization_modifier: modifiers which are applied on the international organization as a base (root = organization)
 # - can_join_trigger: can we join this organization type (root = potential joiner, actor = potential leader, recipient = existing organization if it already exists, target = target if available)

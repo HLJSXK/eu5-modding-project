@@ -72,9 +72,9 @@ template action_tooltip_inner_content {
 
 template action_tooltip_inner_content_select_interaction_target_map {
 	block "description" {
-		TooltipTextBlock = {
+		TooltipBlockList = {
 			visible = "[Not(StringIsEmpty(UIAction.GetDescription))]"
-			blockoverride "text" { text = "[UIAction.GetDescription]" }
+			textcontext = "[UIAction.GetDescription]"
 		}
 	}
 
@@ -108,11 +108,28 @@ template action_tooltip_pop_out {
 			using = action_tooltip_inner_content
 		}
 
-		blockoverride "tooltip_ui_action_block" {
-			TooltipUIActionBlockOld = {
-				visible = "[PdxGuiWidget.HasUIAction]"
+	}
+}
+
+template action_tooltip_pop_out_circle {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "[Select_CString(PdxGuiWidget.HasTooltipMetaTitle, PdxGuiWidget.GetTooltipMetaTitle, UIAction.GetTitle)]"
+		}
+
+		# Role icon (circle leader / emperor / member / bribe) sourced from the action's
+		# `icon` field via CImperialCircleActionItem::GetIconTexture.
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[CircleActionItem.GetIconTexture]"
 			}
 		}
+
+		blockoverride "tooltip_content" {
+			using = action_tooltip_inner_content
+		}
+
 	}
 }
 
@@ -128,11 +145,6 @@ template action_tooltip_pop_out_no_conditions {
 			using = action_tooltip_inner_content_select_interaction_target_map
 		}
 
-		blockoverride "tooltip_ui_action_block" {
-			TooltipUIActionBlockOld = {
-				visible = "[PdxGuiWidget.HasUIAction]"
-			}
-		}
 	}
 }
 
@@ -213,11 +225,6 @@ template action_tooltip_pop_out_cabinet {
 			using = action_tooltip_inner_content_cabinet
 		}
 
-		blockoverride "tooltip_ui_action_block" {
-			TooltipUIActionBlockOld = {
-				visible = "[PdxGuiWidget.HasUIAction]"
-			}
-		}
 	}
 }
 
@@ -244,6 +251,84 @@ template action_tooltip_inner_content_cabinet {
 		name = "Conditions"
 		visible = "[ConditionList.HasItems]"
 		datacontext = "[StringToConditionListOnlyPassedAndNeutral(UIAction.GetConditions)]"
+	}
+}
+
+template tooltip_blocklist_content {
+	# block "blocklist_datamodel" {
+	datamodel = "[BlockList.GetBlocks]"
+	# }
+
+	item = {
+		vbox = {
+			layoutpolicy_horizontal = expanding
+
+			TooltipConditionListContent = {
+				visible = "[BlockListBlock.IsSingle]"
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "conditionlist_datamodel" {
+					datamodel = "[BlockListBlock.GetSingleRows]"
+					ignoreinvisible = yes
+				}
+
+				blockoverride "field_background" {
+					background = {
+						visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+						using = tooltip_table_field_texture
+					}
+				}
+
+				blockoverride "conditionlist_collapsed_tooltip" {}
+			}
+
+			TooltipStringPairListContent = {
+				visible = "[BlockListBlock.IsPair]"
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "stringpair_datamodel" {
+					datamodel = "[BlockListBlock.GetPairRows]"
+					ignoreinvisible = yes
+				}
+
+				blockoverride "field_background" {
+					background = {
+						visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+						using = tooltip_table_field_texture
+					}
+				}
+
+				blockoverride "field_text_content_left" { 
+					block "field_text_content_left" {
+						text = "[StringViewPair.GetLeft.GetStringView]"
+					}
+				}
+
+				blockoverride "field_text_content_right" { 
+					text = "[StringViewPair.GetRight.GetStringView]"
+				}
+			}
+
+			TooltipColumnListContent = {
+				visible = "[BlockListBlock.IsColumns]"
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "columnlist_datamodel" {
+					datamodel = "[BlockListBlock.GetColumns]"
+					ignoreinvisible = yes
+				}
+			}
+
+			TooltipRequirementsListContent = {
+				visible = "[BlockListBlock.IsRequirements]"
+				layoutpolicy_horizontal = expanding
+
+				blockoverride "requirementslist_datamodel" {
+					datamodel = "[BlockListBlock.GetRequirementsRows]"
+					ignoreinvisible = yes
+				}
+			}
+		}
 	}
 }
 
@@ -591,79 +676,19 @@ types BuildingBlocksTooltipsTypes
 	# }
 
 	type TooltipBlockListContent = vbox {
-		# block "blocklist_datamodel" {
-			datamodel = "[BlockList.GetBlocks]"
-		# }
+		using = tooltip_blocklist_content
+	}
 
-		item = {
-			vbox = {
-				layoutpolicy_horizontal = expanding
+	type TooltipScrolledBlockListContent = scrollvbox {
+		using = tooltip_blocklist_content
+		
+		alwaystransparent = no
+		block "block_scrollarea" { maximumsize = { -1 600 }}
 
-				TooltipConditionListContent = {
-					visible = "[BlockListBlock.IsSingle]"
-					layoutpolicy_horizontal = expanding
-
-					blockoverride "conditionlist_datamodel" {
-						datamodel = "[BlockListBlock.GetSingleRows]"
-						ignoreinvisible = yes
-					}
-
-					blockoverride "field_background" {
-						background = {
-							visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
-							using = tooltip_table_field_texture
-						}
-					}
-
-					blockoverride "conditionlist_collapsed_tooltip" {}
-				}
-
-				TooltipStringPairListContent = {
-					visible = "[BlockListBlock.IsPair]"
-					layoutpolicy_horizontal = expanding
-
-					blockoverride "stringpair_datamodel" {
-						datamodel = "[BlockListBlock.GetPairRows]"
-						ignoreinvisible = yes
-					}
-
-					blockoverride "field_background" {
-						background = {
-							visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
-							using = tooltip_table_field_texture
-						}
-					}
-
-					blockoverride "field_text_content_left" { 
-						block "field_text_content_left" {
-							text = "[StringViewPair.GetLeft.GetStringView]"
-						}
-					}
-
-					blockoverride "field_text_content_right" { 
-						text = "[StringViewPair.GetRight.GetStringView]"
-					}
-				}
-
-				TooltipColumnListContent = {
-					visible = "[BlockListBlock.IsColumns]"
-					layoutpolicy_horizontal = expanding
-
-					blockoverride "columnlist_datamodel" {
-						datamodel = "[BlockListBlock.GetColumns]"
-						ignoreinvisible = yes
-					}
-				}
-
-				TooltipRequirementsListContent = {
-					visible = "[BlockListBlock.IsRequirements]"
-					layoutpolicy_horizontal = expanding
-
-					blockoverride "requirementslist_datamodel" {
-						datamodel = "[BlockListBlock.GetRequirementsRows]"
-						ignoreinvisible = yes
-					}
-				}
+		scrollbar_vertical = {
+			Scrollbar_Vertical_Tooltips = {
+				size = { 4 100% }
+				parentanchor = right
 			}
 		}
 	}
@@ -695,6 +720,42 @@ types BuildingBlocksTooltipsTypes
 		}
 	}
 
+	# type TooltipScrolledBlockListOld = TooltipListBase {
+	# 	block "set_textcontext" {
+	# 		ontextcontextchanged = "[SetBlockListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+	# 	}
+
+	# 	blockoverride "block_title" {
+	# 		block "block_title" {
+	# 			visible = "[BlockList.GetTitle.IsStringViewNotEmptyOrNull]"
+	# 			text = "[BlockList.GetTitle.GetStringView]"
+	# 		}
+	# 	}
+
+	# 	TooltipListScrollArea = {
+	# 		# block "blocklist_datamodel_has_items" {
+	# 			visible = "[DataModelHasItems(BlockList.GetBlocks)]"
+	# 		# }
+
+	# 		blockoverride "section_content" {
+	# 			TooltipBlockListContent = {
+	# 				# block "blocklist_datamodel" {
+	# 					datamodel = "[BlockList.GetBlocks]"
+	# 				# }
+
+	# 				set_parent_dimension_to_minimum = height
+	# 				layoutpolicy_horizontal = expanding
+	# 			}
+	# 		}
+	# 	}
+
+	# 	TooltipListEmptyContent = {
+	# 		# block "blocklist_datamodel_is_empty" {
+	# 			visible = "[IsDataModelEmpty(BlockList.GetBlocks)]"
+	# 		# }
+	# 	}
+	# }
+
 	type TooltipScrolledBlockList = TooltipListBase {
 		block "set_textcontext" {
 			ontextcontextchanged = "[SetBlockListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
@@ -707,21 +768,9 @@ types BuildingBlocksTooltipsTypes
 			}
 		}
 
-		TooltipListScrollArea = {
-			# block "blocklist_datamodel_has_items" {
-				visible = "[DataModelHasItems(BlockList.GetBlocks)]"
-			# }
-
-			blockoverride "section_content" {
-				TooltipBlockListContent = {
-					# block "blocklist_datamodel" {
-						datamodel = "[BlockList.GetBlocks]"
-					# }
-
-					set_parent_dimension_to_minimum = height
-					layoutpolicy_horizontal = expanding
-				}
-			}
+		TooltipScrolledBlockListContent = {
+			visible = "[DataModelHasItems(BlockList.GetBlocks)]"
+			layoutpolicy_horizontal = expanding
 		}
 
 		TooltipListEmptyContent = {
@@ -808,9 +857,9 @@ types BuildingBlocksTooltipsTypes
 	}
 
 	type RequirementsListContent = vbox {
-		# block "requirementslist_datamodel" {
+		block "requirementslist_datamodel" {
 			datamodel = "[RequirementsList.GetLines]"
-		# }
+		}
 
 		item = {
 			TooltipTableField = {
@@ -900,7 +949,6 @@ types BuildingBlocksTooltipsTypes
 					# block "requirementslist_content" {
 						hbox = {
 							layoutpolicy_horizontal = expanding
-							margin = { 10 0 }
 							spacing = 5
 
 							# Hierarchy arrows
@@ -912,7 +960,7 @@ types BuildingBlocksTooltipsTypes
 									datamodel = "[DataModelRepeatedItem(RequirementLine.GetIndent)]"
 									item = {
 										widget = {
-											size = { 20 3 }
+											size = { 26 3 }
 										}
 									}
 								}
@@ -935,7 +983,7 @@ types BuildingBlocksTooltipsTypes
 
 									icon = {
 										visible = "[Not(EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0'))]"
-										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0')]"
+										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0', '(float)10')]"
 										parentanchor = bottom
 										using = color_requirementlist_arrow_brown_texture
 									}
@@ -943,55 +991,62 @@ types BuildingBlocksTooltipsTypes
 
 								# Last mile arrow to text
 								icon = {
-									size = { 30 2 }
+									size = { 10 2 }
 									using = color_requirementlist_arrow_brown_texture
 								}
 							}
 
-							icon = {
-								visible = "[Not(RequirementLine.IsUndefined)]"
-								texture = "gfx/interface/component_tiles/tile_background_squared.dds"
-								texture_density = 2
-								size = { 21 21 }
-								alpha = 0.4
+							widget = {
+								size = { 20 20 }
 
-								modify_texture = {
-									using = color_dark_brown_texture
+								TooltipYesNoCheckbox = {
+									visible = "[Not(RequirementLine.IsUndefined)]"
+									blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
+									blockoverride "no_visible" { visible = "[RequirementLine.HasFailed]" }
+	
+									blockoverride "checkbox_frame" {
+										texture = "gfx/interface/component_tiles/tile_background_squared.dds"
+										texture_density = 2
+										size = { 100% 100% }
+										alpha = 0.4
+	
+										modify_texture = {
+											using = color_dark_brown_texture
+										}
+									}
+	
+									blockoverride "yes_icon_size" { size = { 15 15 } }
+									blockoverride "no_icon_size" { size = { 15 15 } }
+									blockoverride "yes_glow" {}
 								}
-
+	
 								icon = {
-									visible = "[RequirementLine.HasPassed]"
-									texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
-									size = { 15 15 }
+									size = { 35% 40% }
 									parentanchor = center
-								}
-
-								icon = {
-									visible = "[RequirementLine.HasFailed]"
-									texture = "gfx/interface/icons/text_icons/trigger_no.dds"
-									size = { 15 15 }
-									parentanchor = center
+									visible = "[RequirementLine.IsUndefined]"
+									texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds"
+									modify_texture = {
+										using = color_white_texture
+										alpha = 0.6
+									}
 								}
 							}
+							
 
-							text_single = {
+							textbox = {
 								layoutpolicy_horizontal = expanding
 								autoresize = yes
 								margin = { 0 5 }
 
 								align = nobaseline
+								using = text_multi_template
 								elide = right
-
-								default_format = "#medium"
-								alwaystransparent = no
 
 								# block "requirement_item" {
 								text = "[RequirementLine.GetText]"
 								block "field_text_format" {}
 								# }
 							}
-
-							expand = {}
 						}
 					# }
 				}

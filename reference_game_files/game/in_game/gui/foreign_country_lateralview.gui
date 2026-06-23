@@ -2,6 +2,27 @@
 @countryinfo_block_height = 47
 template countryinfo_block_margin { margin = { 20 0 } }
 
+types NotableStancesTypes {
+
+	type notable_stances_block = vbox {
+		datacontext = "[ForeignCountryView.GetCountry]"
+		# Only in the double-column ("both") layout, alongside the relations content; hidden in the
+		# relations-only and actions-only single-column variants.
+		visible = "[And4(ForeignCountryView.Vars.NotExistOrHasValue( 'diplomacy', 'both' ), Country.IsValid, Not(Country.HasHumanController), Not(StringIsEmpty(Country.GetNotableDispositionsText)))]"
+		layoutpolicy_horizontal = expanding
+		margin = { 5 5 }
+		background = {
+			using = tooltip_table_field_texture
+		}
+		text_multi = {
+			autoresize = yes
+			layoutpolicy_horizontal = expanding
+			maximumsize = { 280 -1 }
+			text = "[Country.GetNotableDispositionsText]"
+		}
+	}
+}
+
 types SubheaderTypes {
 	type subheader_culture_religion = vbox {
 		layoutpolicy_horizontal = expanding
@@ -1756,8 +1777,8 @@ lateralview = {
 					}
 					hbox = {
 						using = layoutpolicy_expanding
+						datacontext = "[ForeignCountryView.GetCountry]"
 						tooltipwidget = {
-							datacontext = "[ForeignCountryView.GetCountry]"
 							using = ArmyOverview_tooltip
 						}
 						spacing = 5
@@ -1815,8 +1836,8 @@ lateralview = {
 					hbox = {
 						using = layoutpolicy_expanding
 						
+						datacontext = "[ForeignCountryView.GetCountry]"
 						tooltipwidget = {
-							datacontext = "[ForeignCountryView.GetCountry]"
 							using = NavyOverview_tooltip
 						}
 						
@@ -3060,6 +3081,16 @@ lateralview = {
 							using = layoutpolicy_expanding
 							spacing = 6
 
+							# Left column: notable stances on top, then the relations content. Hidden in the
+							# actions-only variant so its expanding policy doesn't claim half the row while empty,
+							# which would push the actions list to the right and clip it.
+							vbox = {
+								using = layoutpolicy_expanding
+								spacing = 6
+								visible = "[Or(IsObserving, Not(ForeignCountryView.Vars.HasValue( 'diplomacy', 'actions' )))]"
+
+								notable_stances_block = {} # 4A "Notable Stances": movable within the left column
+
 							#Show Relations
 							diplomatic_relations_content = {
 								visible = "[Or(IsObserving, And(ForeignCountryView.Vars.HasValue( 'diplomacy', 'relations' ), Country.Exists))]"
@@ -3138,6 +3169,8 @@ lateralview = {
 								}
 							}
 							
+							} # close left-column vbox (notable stances + relations content)
+
 							diplomatic_actions_content = {
 								visible = "[And3(Not(IsObserving), ForeignCountryView.Vars.NotExistOrHasValue( 'diplomacy', 'both' ), Country.Exists)]"
 
@@ -4618,10 +4651,7 @@ select_menu_left = {
 		name = "foreign_country_select_country"
 	}
 
-	blockoverride "close_button" {
-		onclick = "[ForeignCountrySelectCountry.OnClose]"
-	}
-
+	blockoverride "close_on_action" { on_action = "[ForeignCountrySelectCountry.OnClose]" }
 	blockoverride "select_content" {
 		select_menu_header = {
 			blockoverride "select_menu_header_extra" {

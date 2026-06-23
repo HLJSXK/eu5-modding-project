@@ -8069,7 +8069,10 @@ flavor_eng.92 = {
 		c:BYZ = {
 			owns = location:constantinople
 			OR = { has_truce_with = c:TUR is_at_war_with = c:TUR }
-			has_variable = western_tour
+			custom_tooltip = {
+				text = variable_western_tour_tt
+				has_variable = western_tour
+			}
 			country_economical_base < c:TUR.country_economical_base
 		}
 		location:constantinople = {
@@ -8324,39 +8327,71 @@ flavor_eng.94 = {
 
 }
 
-scripted_effect combine_into_percy_and_mortimer_uprising = {
-	create_rebel = {
-		category = estate
-		estate = nobles_estate
-		name = percy_and_mortimer_uprising
-		save_scope_as = percy_and_mortimer_uprising
+scripted_effect tripartite_add_percy_pops = {
+	dynasty:percy_dynasty ?= {
+		random_character_in_dynasty = {
+			limit = {
+				is_alive = yes
+				owner = root
+				is_adult = yes
+				is_female = no
+				has_estate = estate_type:nobles_estate
+			}
+			save_scope_as = henry_percy
+		}
 	}
+	if = {
+		limit = { NOT = { exists = scope:henry_percy } }
+		create_character = {
+			first_name = name_henry
+			dynasty = dynasty:percy_dynasty
+			estate = estate_type:nobles_estate
+			religion = religion:catholic
+			adm = 35
+			dip = 45
+			mil = 65
+			birth_date = 1341.11.10
+			birth_location = location:alnwick
+			save_scope_as = henry_percy
+		}
+	}
+	scope:henry_percy = { change_character_allegiance = scope:tripartite_uprising }
 
-	scope:henry_percy ?= { change_character_allegiance = scope:percy_and_mortimer_uprising }
 	province_definition:northumberland_province = {
 		every_location_in_province_definition = {
 			limit = { owner ?= root }
 			every_pop = {
 				limit = { owner ?= root }
-				change_pop_allegiance = scope:percy_and_mortimer_uprising
+				if = {
+					limit = { pop_type = pop_type:nobles }
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				}
+				change_pop_allegiance = scope:tripartite_uprising
 			}
 		}
 	}
-	destroy_rebel = scope:percy_uprising
+}
 
-	scope:edmund_mortimer ?= { change_character_allegiance = scope:percy_and_mortimer_uprising }
+scripted_effect tripartite_add_mortimer_pops = {
+	character:wls_edmund_mortimer_1376 ?= { change_character_allegiance = scope:tripartite_uprising }
+
 	province_definition:staffordshire_province = {
 		every_location_in_province_definition = {
 			limit = { owner ?= root }
 			every_pop = {
 				limit = { owner ?= root }
-				change_pop_allegiance = scope:percy_and_mortimer_uprising
+				if = {
+					limit = { pop_type = pop_type:nobles }
+					add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				}
+				change_pop_allegiance = scope:tripartite_uprising
 			}
 		}
 	}
-	destroy_rebel = scope:mortimer_uprising
+}
 
-	scope:percy_and_mortimer_uprising = {
+scripted_effect tripartite_start_uprising = {
+	scope:tripartite_uprising = {
 		start_civil_war = { raise_all_levies = { type = army instant = yes } }
 	}
 }
@@ -8384,7 +8419,12 @@ flavor_eng.95 = {
 
 		character:wls_owain_glyndwr ?= { is_alive = yes }
 
-		c:WLS = { has_variable = tripartite_indenture }
+		c:WLS = {
+			custom_tooltip = {
+				text = variable_tripartite_indenture_tt
+				has_variable = tripartite_indenture
+			}
+		}
 
 		character:wls_edmund_mortimer_1376 ?= { is_alive = yes }
 
@@ -8412,80 +8452,6 @@ flavor_eng.95 = {
 		location:london = { save_scope_as = target_location }
 
 		ruler = { save_scope_as = target_character }
-
-		create_rebel = {
-			category = estate
-			estate = nobles_estate
-			name = percy_uprising
-			save_scope_as = percy_uprising
-		}
-
-		province_definition:northumberland_province = {
-			every_location_in_province_definition = {
-				limit = { owner ?= root }
-				every_pop = {
-					limit = { owner ?= root }
-					if = {
-						limit = { pop_type = pop_type:nobles }
-						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
-					}
-					change_pop_allegiance = scope:percy_uprising
-				}
-			}
-		}
-
-		dynasty:percy_dynasty ?= {
-			random_character_in_dynasty = {
-				limit = {
-					is_alive = yes
-					owner = root
-					is_adult = yes
-					is_female = no
-					has_estate = estate_type:nobles_estate
-				}
-				save_scope_as = henry_percy
-			}
-		}
-		if = {
-			limit = { NOT = { exists = scope:henry_percy } }
-			create_character = {
-				first_name = name_henry
-				dynasty = dynasty:percy_dynasty
-				estate = estate_type:nobles_estate
-				religion = religion:catholic
-				adm = 35
-				dip = 45
-				mil = 65
-				birth_date = 1341.11.10
-				birth_location = location:alnwick
-				save_scope_as = henry_percy
-			}
-		}
-		scope:henry_percy = { change_character_allegiance = scope:percy_uprising }
-
-		create_rebel = {
-			category = estate
-			estate = nobles_estate
-			name = mortimer_uprising
-			save_scope_as = mortimer_uprising
-		}
-
-		province_definition:staffordshire_province = {
-			every_location_in_province_definition = {
-				limit = { owner ?= root }
-				every_pop = {
-					limit = { owner ?= root }
-					if = {
-						limit = { pop_type = pop_type:nobles }
-						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
-					}
-					change_pop_allegiance = scope:mortimer_uprising
-				}
-			}
-		}
-
-		character:wls_edmund_mortimer_1376 ?= { change_character_allegiance = scope:mortimer_uprising }
-
 	}
 
 	option = {
@@ -8496,10 +8462,17 @@ flavor_eng.95 = {
 			value = estate_satisfaction_severe_bonus
 		}
 
-		custom_tooltip = flavor_eng.95.tt4
-
-		hidden_effect = {
-			combine_into_percy_and_mortimer_uprising = yes
+		custom_tooltip = {
+			text = flavor_eng.95.tt4
+			create_rebel = {
+				category = estate
+				estate = nobles_estate
+				name = percy_and_mortimer_uprising
+				save_scope_as = tripartite_uprising
+			}
+			tripartite_add_percy_pops = yes
+			tripartite_add_mortimer_pops = yes
+			tripartite_start_uprising = yes
 		}
 
 	}
@@ -8518,24 +8491,34 @@ flavor_eng.95 = {
 
 		change_gold_effect = { scale = -12 }
 
-		random_list =  {
-			75 = {
-				destroy_rebel = scope:percy_uprising
-				dynasty:percy_dynasty = { save_scope_as = dishonorable_dynasty }
-				set_variable = { name = bribe_accepted value = 1 }
-				hidden_effect = {
+		hidden_effect = {
+			random_list =  {
+				75 = {
+					dynasty:percy_dynasty = { save_scope_as = dishonorable_dynasty }
+					set_variable = { name = bribe_accepted value = 1 }
 					c:WLS = {
 						trigger_event_silently = { id = flavor_wls.16 }
 					}
-					scope:mortimer_uprising = {
-						start_civil_war = { raise_all_levies = { type = army instant = yes } }
+					create_rebel = {
+						category = estate
+						estate = nobles_estate
+						name = mortimer_uprising
+						save_scope_as = tripartite_uprising
 					}
+					tripartite_add_mortimer_pops = yes
+					tripartite_start_uprising = yes
 				}
-			}
-			25 = {
-				set_variable = { name = bribe_refused value = 1 }
-				hidden_effect = {
-					combine_into_percy_and_mortimer_uprising = yes
+				25 = {
+					set_variable = { name = bribe_refused value = 1 }
+					create_rebel = {
+						category = estate
+						estate = nobles_estate
+						name = percy_and_mortimer_uprising
+						save_scope_as = tripartite_uprising
+					}
+					tripartite_add_percy_pops = yes
+					tripartite_add_mortimer_pops = yes
+					tripartite_start_uprising = yes
 				}
 			}
 		}
@@ -8543,8 +8526,6 @@ flavor_eng.95 = {
 		trigger_event_silently = { id = flavor_wls.16 }
 
 		custom_tooltip = flavor_eng.95.tt2
-		custom_tooltip = flavor_eng.95.tt4
-
 	}
 
 	option = {
@@ -8561,24 +8542,34 @@ flavor_eng.95 = {
 
 		change_gold_effect = { scale = -12 }
 
-		random_list =  {
-			75 = {
-				destroy_rebel = scope:mortimer_uprising
-				dynasty:mortimer_dynasty = { save_scope_as = dishonorable_dynasty }
-				set_variable = { name = bribe_accepted value = 1 }
-				hidden_effect = {
+		hidden_effect = {
+			random_list =  {
+				75 = {
+					dynasty:mortimer_dynasty = { save_scope_as = dishonorable_dynasty }
+					set_variable = { name = bribe_accepted value = 1 }
 					c:WLS = {
 						trigger_event_silently = { id = flavor_wls.16 }
 					}
-					scope:percy_uprising = {
-						start_civil_war = { raise_all_levies = { type = army instant = yes } }
+					create_rebel = {
+						category = estate
+						estate = nobles_estate
+						name = percy_uprising
+						save_scope_as = tripartite_uprising
 					}
+					tripartite_add_percy_pops = yes
+					tripartite_start_uprising = yes
 				}
-			}
-			25 = {
-				set_variable = { name = bribe_refused value = 1 }
-				hidden_effect = {
-					combine_into_percy_and_mortimer_uprising = yes
+				25 = {
+					set_variable = { name = bribe_refused value = 1 }
+					create_rebel = {
+						category = estate
+						estate = nobles_estate
+						name = percy_and_mortimer_uprising
+						save_scope_as = tripartite_uprising
+					}
+					tripartite_add_percy_pops = yes
+					tripartite_add_mortimer_pops = yes
+					tripartite_start_uprising = yes
 				}
 			}
 		}
@@ -8586,8 +8577,6 @@ flavor_eng.95 = {
 		trigger_event_silently = { id = flavor_wls.16 }
 
 		custom_tooltip = flavor_eng.95.tt3
-		custom_tooltip = flavor_eng.95.tt4
-
 	}
 
 	historical_info = flavor_eng.95.historical_info
@@ -9866,8 +9855,14 @@ flavor_eng.104 = {
 	trigger = {
 
 		OR = {
-			has_variable = supports_house_of_york
-			has_variable = supports_house_of_lancaster
+			custom_tooltip = {
+				text = variable_supports_house_of_york_tt
+				has_variable = supports_house_of_york
+			}
+			custom_tooltip = {
+				text = variable_supports_house_of_lancaster_tt
+				has_variable = supports_house_of_lancaster
+			}
 		}
 
 		any_character = {
@@ -10303,8 +10298,14 @@ flavor_eng.107 = {
 
 		NOT = {
 			OR = {
-				has_variable = supports_house_of_york
-				has_variable = supports_house_of_lancaster
+				custom_tooltip = {
+					text = variable_supports_house_of_york_tt
+					has_variable = supports_house_of_york
+				}
+				custom_tooltip = {
+					text = variable_supports_house_of_lancaster_tt
+					has_variable = supports_house_of_lancaster
+				}
 			}
 		}
 
@@ -24590,7 +24591,10 @@ flavor_eng.240 = {
 					owner ?= root
 				}
 			}
-			has_variable = the_iron_bridge
+			custom_tooltip = {
+				text = variable_the_iron_bridge_tt
+				has_variable = the_iron_bridge
+			}
 		}
 
 
@@ -25017,7 +25021,10 @@ flavor_eng.243 = {
 
 		OR = {
 			AND = {
-				has_variable = restoration_comedy_allowed
+				custom_tooltip = {
+					text = variable_restoration_comedy_allowed_tt
+					has_variable = restoration_comedy_allowed
+				}
 				societal_value:traditionalist_vs_innovative >= 0
 			}
 			societal_value:traditionalist_vs_innovative >= 20

@@ -252,7 +252,89 @@
 			is_junior_partner = no
 		}
 	}
-	
+
+	can_lead_tooltip_trigger = {
+		government_type = government_type:monarchy
+		is_revolutionary = no
+		is_subject = no
+		hre_country_fulfills_imperial_religion_requirement = { type = voting }
+		OR = {
+			# Not currently Emperor: ruler must be eligible
+			AND = {
+				custom_tooltip = {
+					text = hre_eligible_via_ruler_context_tt
+					NOT = { is_leader_of_international_organization = scope:recipient }
+				}
+				custom_tooltip = {
+					text = hre_ruler_not_regency_tt
+					has_regent = no
+				}
+				custom_tooltip = {
+					text = hre_has_ruler_tt
+					has_ruler = yes
+				}
+				custom_tooltip = {
+					text = hre_ruler_gender_eligible_tt
+					OR = {
+						ruler ?= { is_female = no }
+						scope:recipient = { modifier:hre_allow_female_emperors = yes }
+					}
+				}
+				custom_tooltip = {
+					text = hre_ruler_not_blocked_tt
+					ruler ?= { modifier:blocked_from_ruling_the_hre = no }
+				}
+				custom_tooltip = {
+					text = hre_ruler_religion_aligns_tt
+					ruler ?= { hre_country_fulfills_imperial_religion_requirement = { type = voting } }
+				}
+			}
+
+			# Already Emperor (or last leader): heir must be eligible (successor check)
+			AND = {
+				custom_tooltip = {
+					text = hre_eligible_via_heir_context_tt
+					OR = {
+						is_leader_of_international_organization = scope:recipient
+						scope:recipient = {
+							international_organization_has_leader = no
+							exists = last_leader_country
+							last_leader_country ?= root
+						}
+					}
+				}
+				custom_tooltip = {
+					text = hre_has_heir_tt
+					has_heir = yes
+				}
+				custom_tooltip = {
+					text = hre_heir_gender_eligible_tt
+					OR = {
+						heir ?= { is_female = no }
+						scope:recipient = { modifier:hre_allow_female_emperors = yes }
+					}
+				}
+				custom_tooltip = {
+					text = hre_heir_not_blocked_tt
+					heir ?= { modifier:blocked_from_ruling_the_hre = no }
+				}
+				custom_tooltip = {
+					text = hre_heir_religion_aligns_tt
+					heir ?= { hre_country_fulfills_imperial_religion_requirement = { type = voting } }
+				}
+			}
+		}
+		trigger_if = {
+			limit = {
+				exists = union
+				union ?= {
+					has_special_status_available = special_status:senior_partner
+				}
+			}
+			is_junior_partner = no
+		}
+	}
+
 	can_join_trigger = {
 		scope:recipient = {
 			international_organization_has_leader = yes
@@ -458,6 +540,19 @@
 					}
 				}
 
+				# Depose extraterritorial circle leaders: a country_type = building entity (e.g. a banking
+				# country such as the Bank of Peruzzi) farms prestige from the threatening_enemies modifier
+				# while permanently weak, pinning itself to the prestige cap and becoming an unbeatable
+				# leader. Clear it so a settled country is elected in the .70 / .71 pass below.
+				every_imperial_circle = {
+					limit = {
+						has_circle_leader = yes
+						NOT = { is_dormant_imperial_circle = yes }
+						circle_leader ?= { country_type = building }
+					}
+					clear_circle_leader = { }
+				}
+
 				# .70 / .71 — Handle leaderless circles: auto-elect or notify Emperor
 				every_imperial_circle = {
 					limit = {
@@ -465,6 +560,8 @@
 						NOT = { is_dormant_imperial_circle = yes }
 					}
 					ordered_circle_member = {
+						# Extraterritorial entities (country_type = building) cannot lead a circle.
+						limit = { NOT = { country_type = building } }
 						order_by = prestige
 						max = 1
 						check_range_bounds = no
@@ -759,21 +856,11 @@
 						# Emperor Abilities
 						add = {
 							desc = "EMPEROR_ABILITIES"
-							add = {
-								value = "leader_country.ruler_or_heir_if_regent.adm"
-								subtract = 50
-								multiply = 0.001
-							}
-							add = {
-								value = "leader_country.ruler_or_heir_if_regent.dip"
-								subtract = 50
-								multiply = 0.001
-							}
-							add = {
-								value = "leader_country.ruler_or_heir_if_regent.mil"
-								subtract = 50
-								multiply = 0.001
-							}
+							value = "leader_country.ruler_or_heir_if_regent.adm"
+							add = "leader_country.ruler_or_heir_if_regent.dip"
+							add = "leader_country.ruler_or_heir_if_regent.mil"
+							subtract = 150
+							multiply = 0.001
 						}
 						#monthly bonus from modifiers
 						add = {
@@ -1027,10 +1114,9 @@
 	
 	ai_issue_voting_bias = {
 		# HRE members lean toward the Emperor's pick when they like the Emperor
-		# and Imperial Authority is high. Applies both to pre-proposal previews
-		# (scope:vote is the policy being weighed by the would-be proposer, who
-		# must be the Emperor in the HRE) and to active votes (scope:vote must
-		# match the policy actually proposed - var:io_law_target).
+		# and Imperial Authority is high. Bias must apply to one candidate at a
+		# time (the proposed one) so the predicted-vote tooltip and the live AI
+		# vote agree, instead of canceling across all candidates during preview.
 		add = {
 			desc = "POLICY_BIAS_VOTE_WITH_EMPEROR"
 			if = {
@@ -1041,7 +1127,10 @@
 					}
 					not = { scope:actor = scope:recipient.leader_country }
 					OR = {
-						scope:recipient = { NOT = { resolution_is_active = resolution:policy_vote } }
+						AND = {
+							exists = scope:previewed_vote
+							scope:previewed_vote = scope:vote
+						}
 						scope:recipient = {
 							has_variable = io_law_target
 							var:io_law_target = scope:vote

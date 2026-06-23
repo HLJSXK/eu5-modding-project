@@ -12,27 +12,7 @@
 	}
 	
 	can_end = {
-		end_reason = {
-			trigger = {
-				custom_tooltip = {
-					text = there_is_no_japanese_emperor_tt
-					international_organization:japanese_shogunate = {
-						"num_countries_with_special_status(special_status:japanese_emperor)" <= 1
-					}
-				}
-			}
-			desc = "emperor_line_extinct"
-		}
-		end_reason = {
-			trigger = {
-				AND = {
-					c:NTC = { has_ruler = yes }
-					c:STC = { has_ruler = yes }
-					c:NTC.ruler = c:STC.ruler
-				}
-			}
-			desc = "courts_unified"
-		}
+		nanbokuchou_end_trigger = yes
 	}
 	
 	visible = {
@@ -129,36 +109,34 @@
 				target = c:STC
 			}
 		}
+		# Single per-member pass: rebuild supporter lists AND cache CB/war target flags.
+		# This pass must complete before any event fires, as nanbokuchou.3 mutates the supporter lists.
 		international_organization:japanese_shogunate = {
 			every_international_organization_member = {
-				limit = {
-					NOR = {
-						tag = NTC
-						tag = STC
-						tag = JAP
-					}
-				}
-				if = {
-					limit = { has_variable = supports_northern_court }
-					add_to_global_variable_list = { name = nanbokuchou_northern_supporters target = this }
-				}
-				if = {
-					limit = { has_variable = supports_southern_court }
-					add_to_global_variable_list = { name = nanbokuchou_southern_supporters target = this }
-				}
 				if = {
 					limit = {
-						NOT = { has_variable = supports_northern_court }
-						NOT = { has_variable = supports_southern_court }
+						NOR = {
+							tag = NTC
+							tag = STC
+							tag = JAP
+						}
 					}
-					add_to_global_variable_list = { name = nanbokuchou_neutral_countries target = this }
+					if = {
+						limit = { has_variable = supports_northern_court }
+						add_to_global_variable_list = { name = nanbokuchou_northern_supporters target = this }
+					}
+					if = {
+						limit = { has_variable = supports_southern_court }
+						add_to_global_variable_list = { name = nanbokuchou_southern_supporters target = this }
+					}
+					if = {
+						limit = {
+							NOT = { has_variable = supports_northern_court }
+							NOT = { has_variable = supports_southern_court }
+						}
+						add_to_global_variable_list = { name = nanbokuchou_neutral_countries target = this }
+					}
 				}
-			}
-		}
-
-		# Cache per-country CB/war target flags to avoid O(N²) checks inside random_list
-		international_organization:japanese_shogunate = {
-			every_international_organization_member = {
 				if = {
 					limit = { is_valid_nanbokuchou_cb_target = yes }
 					set_variable = nanbokuchou_has_valid_cb_target
@@ -176,52 +154,15 @@
 			}
 		}
 
-		random_list = {
-			20 = { #Event for changing sides
-				trigger = { #If there's a clan that hates their current side
-					country_exists = c:NTC
-					country_exists = c:STC
-					international_organization:japanese_shogunate = {
-						any_international_organization_member = {
-							AND = {
-								is_japanese_emperor_or_shogun = no
-								OR = {
-									AND = {
-										has_variable = supports_northern_court
-										OR = {
-											AND = {
-												exists = international_organization:japanese_shogunate.leader_country
-												opinion = {
-													target = international_organization:japanese_shogunate.leader_country
-													value <= -50
-												}
-											}
-											opinion = {	target = c:NTC value <= -50 }
-										}
-										opinion = { target = c:STC value >= 0 }
-									}
-									AND = {
-										has_variable = supports_southern_court
-										opinion = { target = c:STC value <= -50 }
-										OR = {
-											AND = {
-												exists = international_organization:japanese_shogunate.leader_country
-												opinion = {
-													target = international_organization:japanese_shogunate.leader_country
-													value >= 0
-												}
-											}
-											opinion = {	target = c:NTC value >= 0 }
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = {
+		# Per-clan monthly roll:
+		international_organization:japanese_shogunate = {
+			every_international_organization_member = {
+				random_list = {
+					200 = { }
+					20 = { #Event for changing sides
+						trigger = { #If this clan hates its current side
+							country_exists = c:NTC
+							country_exists = c:STC
 							is_japanese_emperor_or_shogun = no
 							OR = {
 								AND = {
@@ -258,74 +199,32 @@
 						}
 						trigger_event_non_silently = nanbokuchou.3
 					}
-				}
-			}
 
-			20 = { #Event for losing purity due to war
-				trigger = {
-					country_exists = c:NTC
-					country_exists = c:STC
-					international_organization:japanese_shogunate = {
-						any_international_organization_member = {
+					20 = { #Event for losing purity due to war
+						trigger = {
+							country_exists = c:NTC
+							country_exists = c:STC
 							at_war = yes
 						}
-					}
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = { at_war = yes }
 						trigger_event_non_silently = nanbokuchou.5
 					}
-				}
-			}
 
-			20 = { #Event for giving cbs
-				trigger = {
-					international_organization:japanese_shogunate = {
-						any_international_organization_member = {
+					20 = { #Event for giving cbs
+						trigger = {
 							has_variable = nanbokuchou_has_valid_cb_target
 						}
-					}
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = { has_variable = nanbokuchou_has_valid_cb_target }
 						trigger_event_non_silently = nanbokuchou.6
 					}
-				}
-			}
 
-			20 = { #Event for starting wars
-				trigger = {
-					international_organization:japanese_shogunate = {
-						any_international_organization_member = {
+					20 = { #Event for starting wars
+						trigger = {
 							has_variable = nanbokuchou_has_valid_war_target
 						}
-					}
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = { has_variable = nanbokuchou_has_valid_war_target }
 						trigger_event_non_silently = nanbokuchou.7
 					}
-				}
-			}
 
-			20 = { #Event for a new line of the imperial line
-				trigger = {
-					international_organization:japanese_shogunate = {
-						any_international_organization_member = {
-							NOT = { tag = NTC }
-							NOT = { tag = STC }
-							has_ruler = yes
-							has_regent = no
-							ruler.dynasty ?= dynasty:yamato_dynasty
-						}
-					}
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = {
+					20 = { #Event for a new line of the imperial line
+						trigger = {
 							NOT = { tag = NTC }
 							NOT = { tag = STC }
 							has_ruler = yes
@@ -334,17 +233,11 @@
 						}
 						trigger_event_non_silently = nanbokuchou.8
 					}
-				}
-			}
 
-			20 = { #Event to avoid stalemate
-				trigger = {
-					years_since_situation_start > 55 #Historically it ended in 1392
-					exists = international_organization:japanese_shogunate.leader_country
-				}
-				international_organization:japanese_shogunate = {
-					random_international_organization_member = {
-						limit = {
+					20 = { #Event to avoid stalemate
+						trigger = {
+							root = { years_since_situation_start > 55 } #Historically it ended in 1392
+							exists = international_organization:japanese_shogunate.leader_country
 							has_special_status_in_international_organization = {
 								type = special_status:japanese_emperor
 								international_organization = international_organization:japanese_shogunate
@@ -354,8 +247,6 @@
 					}
 				}
 			}
-
-			200 = { }
 		}
 	}
 
