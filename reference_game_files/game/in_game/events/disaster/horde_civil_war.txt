@@ -168,20 +168,34 @@ scripted_effect horde_clr_variables = {
 scripted_effect horde_break_fiefdom_or_kill_ruler = {
 	if = {
 		limit = {
-			has_ruler = yes
-			ruler ?= $target$
-			is_subject = yes
-			subject_type ?= {
-				has_overlords_ruler = yes
+			# Do not execute a target who is a victorious pretender who has already ascended the throne
+			NOT = { $killer$ ?= $target$ }
+		}
+		if = {
+			limit = {
+				not = { exists = union }
+				trigger_if = {
+					limit = { is_subject = yes }
+					overlord.ruler ?= {
+						this != $target$
+					}
+				}
+			}
+			kill_character = {
+				target = $target$
+				reason = $reason$
+				killer = $killer$
 			}
 		}
-		change_subject_type = subject_type:vassal
-	}
-	else = {
-		kill_character = {
-			target = $target$
-			reason = $reason$
-			killer = $killer$
+		else = {
+			create_character = {
+				religion = root.religion
+				culture = root.culture
+				estate = estate_type:crown_estate
+				age = 25
+				save_scope_as = target_character
+			}
+			set_new_ruler = scope:target_character
 		}
 	}
 }
@@ -637,6 +651,15 @@ horde_civil_war.8 = {
 	image = "gfx/interface/illustrations/disaster/horde_civil_war.dds"
 	desc = horde_civil_war.8.desc
 	outcome = neutral
+	trigger = {
+		not = { exists = union }
+		trigger_if = {
+			limit = { is_subject = yes }
+			overlord.ruler ?= {
+				this != root.ruler
+			}
+		}
+	}
 	immediate = {
 		save_scope_as = target_country
 		if = {

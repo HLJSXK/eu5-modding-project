@@ -9,5 +9,6 @@
 #	spread_scale_on_control_if_owner_embraced = <scripted value>
 #	spread_embraced_to_capital = <scripted value>
 #	spread_to_market_member = <scripted value>
+#	spread_to_market_center = <scripted value>
 #	spread = <scripted value>	#Speed of the institution spreading
 #}

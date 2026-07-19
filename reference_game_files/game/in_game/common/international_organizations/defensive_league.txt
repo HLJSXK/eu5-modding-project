@@ -53,11 +53,15 @@
 		#can only be in one of these
 		is_subject = no
 		is_rebel_country = no
-		not = { 
+		not = {
 			is_member_of_international_organization_of_type = {
 				type = defensive_league
 			}
 		}
+		# A country cannot join or be invited into a defensive league while it is itself at war.
+		# This prevents forming or expanding a league after a war has already been declared in order
+		# to drag fresh members into the ongoing war.
+		at_war = no
 		trigger_if = {
 			limit = {
 				exists = scope:recipient
@@ -65,10 +69,17 @@
 			scope:recipient = {
 				not = {
 					any_international_organization_member = {
+						save_temporary_scope_as = io_member
 						OR = {
 							has_blocked_treaties = root
 							is_rival_of = root
 							is_enemy_of = root
+							# Same relations floor that alliances enforce (see alliance_can_exist):
+							# opinion must be non-negative in BOTH directions between the joiner and every member.
+							opinion = { target = root value < 0 }
+							root = { opinion = { target = scope:io_member value < 0 } }
+							# No existing member may be at war (can't recruit into an ongoing war).
+							at_war = yes
 						}
 					}
 				}
@@ -80,6 +91,11 @@
 				not = { has_blocked_treaties = root }
 				not = { is_rival_of = root }
 				not = { is_enemy_of = root }
+				# Founding partner must be at peace (see above).
+				at_war = no
+				# Relations floor, both directions (mirrors alliance_can_exist).
+				opinion = { target = root value >= 0 }
+				root = { opinion = { target = scope:actor value >= 0 } }
 			}
 		}
 	}

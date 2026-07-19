@@ -31,6 +31,7 @@
 #   required_peace_treaties = { <scripted peace treaties> } #A set of peace treaties which need to be enforced by either side to end this war in anything but a white peace
 #   required_attacker_peace_treaties = { <scripted peace treaties> } #A set of peace treaties which need to be enforced by the attacker leader to end this war in anything but a white peace
 #   required_defender_peace_treaties = { <scripted peace treaties> } #A set of peace treaties which need to be enforced by the defender leader to end this war in anything but a white peace
+#   ai_wait_with_sending_peace = <trigger> makes ai wait with sending peace unless the war is stalled out (no battles, sieges or there is ticking call for peace), root = sender, scope:recipient = recipient of the offer, scope:war = war
 #}
 #
 #Localization:
