@@ -1,14 +1,10 @@
-# Release 1.3.0 - beta - Game File Changes
+# Release 1.3.10 - Game File Changes
 **Only the following filetypes are included:** txt, gui, yml, asset, shader
  - **M** binaries/checksum.txt
- - **M** caesar_branch.txt
- - **M** caesar_rev.txt
- - **A** clausewitz/loading_screen/localization/cw_core_l_english.yml
- - **A** clausewitz/loading_screen/localization/cw_input_actions_l_english.yml
- - **M** clausewitz_branch.txt
- - **M** clausewitz_rev.txt
  - **M** game/dlc/D008_fate_of_the_phoenix/checksum_manifest.txt
+ - **M** game/dlc/D008_fate_of_the_phoenix/in_game/common/genes/D008_genes_accessories.txt
  - **M** game/dlc/D008_fate_of_the_phoenix/in_game/gfx/map/city_data/byzantium.txt
+ - **M** game/dlc/D008_fate_of_the_phoenix/main_menu/gfx/portraits/accessories/D008_entities.txt
  - **M** game/in_game/common/advances/0_age_of_absolutism.txt
  - **M** game/in_game/common/advances/0_age_of_discovery.txt
  - **M** game/in_game/common/advances/0_age_of_reformation.txt
@@ -17,6 +13,7 @@
  - **M** game/in_game/common/advances/0_age_of_traditions.txt
  - **M** game/in_game/common/advances/1_building_unlocks.txt
  - **M** game/in_game/common/advances/2_army_unlocks.txt
+ - **M** game/in_game/common/advances/2_ship_unlocks.txt
  - **M** game/in_game/common/advances/3_reform_unlocks.txt
  - **M** game/in_game/common/advances/4_choices_adm.txt
  - **M** game/in_game/common/advances/4_choices_dip.txt
@@ -56,12 +53,14 @@
  - **M** game/in_game/common/advances/country_NAV.txt
  - **M** game/in_game/common/advances/country_NED.txt
  - **M** game/in_game/common/advances/country_NOR.txt
+ - **M** game/in_game/common/advances/country_NOV.txt
  - **M** game/in_game/common/advances/country_OMA.txt
  - **M** game/in_game/common/advances/country_ORM.txt
  - **M** game/in_game/common/advances/country_POL.txt
  - **M** game/in_game/common/advances/country_POR.txt
  - **M** game/in_game/common/advances/country_PRO.txt
  - **M** game/in_game/common/advances/country_ROM.txt
+ - **M** game/in_game/common/advances/country_SCA.txt
  - **M** game/in_game/common/advances/country_SCO.txt
  - **M** game/in_game/common/advances/country_SER.txt
  - **M** game/in_game/common/advances/country_SKO.txt
@@ -76,8 +75,11 @@
  - **M** game/in_game/common/advances/country_TWS.txt
  - **M** game/in_game/common/advances/country_USA.txt
  - **M** game/in_game/common/advances/country_VIJ.txt
+ - **M** game/in_game/common/advances/country_YEM.txt
  - **M** game/in_game/common/advances/country_ZAN.txt
+ - **M** game/in_game/common/advances/country_ayu.txt
  - **M** game/in_game/common/advances/country_bos.txt
+ - **A** game/in_game/common/advances/country_bra.txt
  - **M** game/in_game/common/advances/country_byz.txt
  - **M** game/in_game/common/advances/country_chi.txt
  - **M** game/in_game/common/advances/country_cir.txt
@@ -125,6 +127,7 @@
  - **A** game/in_game/common/advances/culture_lombard.txt
  - **M** game/in_game/common/advances/culture_maori.txt
  - **A** game/in_game/common/advances/culture_median.txt
+ - **A** game/in_game/common/advances/culture_neapolitan.txt
  - **A** game/in_game/common/advances/culture_piedmontese.txt
  - **M** game/in_game/common/advances/culture_punjabi.txt
  - **M** game/in_game/common/advances/culture_rajasthani.txt
@@ -147,8 +150,10 @@
  - **M** game/in_game/common/advances/government_theocracy.txt
  - **M** game/in_game/common/advances/japanese_unique.txt
  - **M** game/in_game/common/advances/region_africa.txt
+ - **M** game/in_game/common/advances/region_asia.txt
  - **M** game/in_game/common/advances/region_balkans.txt
  - **M** game/in_game/common/advances/region_east_africa.txt
+ - **A** game/in_game/common/advances/region_iberia.txt
  - **M** game/in_game/common/advances/region_indonesia.txt
  - **M** game/in_game/common/advances/region_italy.txt
  - **M** game/in_game/common/advances/region_north_america.txt
@@ -172,10 +177,12 @@
  - **M** game/in_game/common/artist_types/00_default.txt
  - **M** game/in_game/common/artist_types/readme.txt
  - **M** game/in_game/common/artist_work/00_default.txt
+ - **M** game/in_game/common/attribute_columns/06_country.txt
  - **M** game/in_game/common/attribute_columns/12_war.txt
  - **A** game/in_game/common/attribute_columns/130_bureaucracy_type.txt
  - **M** game/in_game/common/attribute_columns/20_province.txt
  - **M** game/in_game/common/attribute_columns/38_holy_site.txt
+ - **A** game/in_game/common/attribute_columns/63_employment_system.txt
  - **M** game/in_game/common/auto_modifiers/country.txt
  - **M** game/in_game/common/avatars/hindu.txt
  - **M** game/in_game/common/biases/00_opinion_hardcoded.txt
@@ -245,16 +252,34 @@
  - **M** game/in_game/common/cabinet_actions/oma_zanzibar_integration.txt
  - **A** game/in_game/common/cabinet_actions/peasant_labor_rights_action.txt
  - **M** game/in_game/common/cabinet_actions/posolsky.txt
+ - **M** game/in_game/common/cabinet_actions/pru_deal_with_robber_barons.txt
+ - **M** game/in_game/common/cabinet_actions/razryadny.txt
+ - **M** game/in_game/common/cabinet_actions/settle_the_frontier.txt
+ - **M** game/in_game/common/cabinet_actions/study_institutions.txt
  - **A** game/in_game/common/cabinet_actions/tyranny_of_the_capital_action.txt
  - **M** game/in_game/common/casus_belli/01_event_triggered.txt
  - **M** game/in_game/common/casus_belli/D008_restore_roman_borders.txt
  - **A** game/in_game/common/casus_belli/challenge_league_leadership.txt
+ - **M** game/in_game/common/casus_belli/claim_throne.txt
+ - **M** game/in_game/common/casus_belli/conquest.txt
+ - **M** game/in_game/common/casus_belli/crusade_cb.txt
+ - **M** game/in_game/common/casus_belli/deus_vult.txt
+ - **M** game/in_game/common/casus_belli/fabricated_conquest.txt
+ - **M** game/in_game/common/casus_belli/heretic.txt
  - **M** game/in_game/common/casus_belli/high_kingship_subjugate.txt
  - **M** game/in_game/common/casus_belli/imperial_ban.txt
+ - **M** game/in_game/common/casus_belli/imperialism.txt
  - **A** game/in_game/common/casus_belli/italian_wars_secure_italy.txt
+ - **M** game/in_game/common/casus_belli/jihad_cb.txt
+ - **M** game/in_game/common/casus_belli/lat_reconquest_cb.txt
+ - **M** game/in_game/common/casus_belli/make_tributary_cb.txt
+ - **M** game/in_game/common/casus_belli/readme.txt
  - **M** game/in_game/common/casus_belli/religious_superiority.txt
+ - **M** game/in_game/common/casus_belli/sound_toll_exemptions_broken.txt
  - **M** game/in_game/common/casus_belli/timurs_conquests.txt
+ - **M** game/in_game/common/casus_belli/tribal_feud.txt
  - **M** game/in_game/common/casus_belli/union_cbs.txt
+ - **M** game/in_game/common/character_interactions/assign_governor.txt
  - **M** game/in_game/common/character_interactions/assume_fort_command.txt
  - **A** game/in_game/common/character_interactions/dismiss_artist.txt
  - **M** game/in_game/common/character_interactions/favor_heir.txt
@@ -272,9 +297,16 @@
  - **M** game/in_game/common/country_interactions/ask_join_war_for_favors.txt
  - **M** game/in_game/common/country_interactions/break_others_alliance.txt
  - **M** game/in_game/common/country_interactions/break_union.txt
+ - **M** game/in_game/common/country_interactions/bribe_vote.txt
  - **M** game/in_game/common/country_interactions/catholic_interactions.txt
  - **M** game/in_game/common/country_interactions/hre.txt
  - **A** game/in_game/common/country_interactions/imperial_circles.txt
+ - **M** game/in_game/common/country_interactions/improve_cultural_view.txt
+ - **M** game/in_game/common/country_interactions/improve_cultural_view_subject.txt
+ - **M** game/in_game/common/country_interactions/intervene_in_subject_civil_war.txt
+ - **M** game/in_game/common/country_interactions/intervene_in_subject_war.txt
+ - **M** game/in_game/common/country_interactions/intervene_in_union_civil_war.txt
+ - **M** game/in_game/common/country_interactions/invite_artist.txt
  - **A** game/in_game/common/country_interactions/italian_league_sponsor_interactions.txt
  - **A** game/in_game/common/country_interactions/italian_wars_country_interactions.txt
  - **A** game/in_game/common/country_interactions/lend_unit_to_ally.txt
@@ -287,9 +319,11 @@
  - **M** game/in_game/common/country_interactions/propose_ruler.txt
  - **A** game/in_game/common/country_interactions/request_work_of_art_purchase.txt
  - **M** game/in_game/common/country_interactions/rtr_demand_annexation.txt
+ - **M** game/in_game/common/country_interactions/samanta_upgrades.txt
  - **M** game/in_game/common/country_interactions/seize_location_from_subject.txt
  - **M** game/in_game/common/country_interactions/sell_icon.txt
  - **A** game/in_game/common/country_interactions/sell_work_of_art.txt
+ - **M** game/in_game/common/country_interactions/siphon_income.txt
  - **M** game/in_game/common/country_interactions/subject_enforce_peace.txt
  - **M** game/in_game/common/country_interactions/surrender_civil_war.txt
  - **M** game/in_game/common/country_interactions/take_over_loan.txt
@@ -329,34 +363,23 @@
  - **M** game/in_game/common/disasters/ciompi_revolt.txt
  - **M** game/in_game/common/disasters/coup_attempt.txt
  - **M** game/in_game/common/disasters/court_and_country.txt
- - **M** game/in_game/common/disasters/crisis_of_the_chinese_dynasty.txt
  - **M** game/in_game/common/disasters/crisis_of_the_sayfawa_dynasty.txt
  - **M** game/in_game/common/disasters/curse_of_stefan_uros_iii.txt
- - **M** game/in_game/common/disasters/death_of_hayan_wuruk.txt
  - **M** game/in_game/common/disasters/decline_of_empire.txt
- - **M** game/in_game/common/disasters/decline_of_majapahit.txt
  - **M** game/in_game/common/disasters/decline_of_mali.txt
- - **M** game/in_game/common/disasters/dissolution_of_delhi.txt
  - **M** game/in_game/common/disasters/english_civil_war.txt
- - **M** game/in_game/common/disasters/french_wars_religion.txt
- - **M** game/in_game/common/disasters/hook_and_cod_wars.txt
  - **M** game/in_game/common/disasters/horde_civil_war.txt
  - **M** game/in_game/common/disasters/muscovite_succession_war.txt
- - **M** game/in_game/common/disasters/peasants_war.txt
  - **M** game/in_game/common/disasters/reform_society.txt
- - **M** game/in_game/common/disasters/religious_turmoil.txt
- - **M** game/in_game/common/disasters/revolution_disaster.txt
- - **M** game/in_game/common/disasters/revolutionary_chaos.txt
  - **M** game/in_game/common/disasters/rise_of_the_szlachta.txt
- - **M** game/in_game/common/disasters/savonarola.txt
  - **M** game/in_game/common/disasters/sinicization_disaster.txt
- - **M** game/in_game/common/disasters/struggle_for_royal_power.txt
- - **M** game/in_game/common/disasters/succession_crisis.txt
  - **M** game/in_game/common/disasters/time_of_troubles.txt
  - **M** game/in_game/common/disasters/turmoil_in_brandenburg.txt
  - **A** game/in_game/common/disasters/twilight_of_the_tsardom.txt
  - **M** game/in_game/common/disasters/war_of_the_aragonese_union.txt
  - **M** game/in_game/common/disasters/war_of_the_roses.txt
+ - **M** game/in_game/common/diseases/bubonic_plague.txt
+ - **M** game/in_game/common/diseases/great_pestilence.txt
  - **M** game/in_game/common/diseases/influenza.txt
  - **M** game/in_game/common/diseases/smallpox.txt
  - **M** game/in_game/common/diseases/typhus.txt
@@ -371,6 +394,7 @@
  - **M** game/in_game/common/effect_localization/province_effects.txt
  - **M** game/in_game/common/effect_localization/scripted_effects.txt
  - **A** game/in_game/common/effect_localization/situation_effects.txt
+ - **M** game/in_game/common/effect_localization/unit_effects.txt
  - **M** game/in_game/common/effect_localization/war_effects.txt
  - **M** game/in_game/common/estate_privileges/burghers_estate.txt
  - **M** game/in_game/common/estate_privileges/clergy_estate.txt
@@ -383,6 +407,7 @@
  - **M** game/in_game/common/generic_action_ai_lists/culture_list.txt
  - **A** game/in_game/common/generic_action_ai_lists/estate_emergency_list.txt
  - **M** game/in_game/common/generic_action_ai_lists/global_list.txt
+ - **M** game/in_game/common/generic_action_ai_lists/high_kingship_of_ireland_list.txt
  - **A** game/in_game/common/generic_action_ai_lists/hre_circle_actions_list.txt
  - **A** game/in_game/common/generic_action_ai_lists/hre_circle_leader_actions_list.txt
  - **A** game/in_game/common/generic_action_ai_lists/hre_emperor_circle_actions_list.txt
@@ -395,6 +420,8 @@
  - **A** game/in_game/common/generic_action_ai_lists/twilight_of_the_tsardom_list.txt
  - **M** game/in_game/common/generic_actions/D008_fate_of_the_phoenix_actions.txt
  - **M** game/in_game/common/generic_actions/D008_orthodox.txt
+ - **M** game/in_game/common/generic_actions/black_death.txt
+ - **M** game/in_game/common/generic_actions/bureaucracy_actions.txt
  - **M** game/in_game/common/generic_actions/canonization.txt
  - **M** game/in_game/common/generic_actions/colonial_revolution.txt
  - **M** game/in_game/common/generic_actions/columbian_exchange.txt
@@ -403,6 +430,8 @@
  - **M** game/in_game/common/generic_actions/create_province_subject.txt
  - **M** game/in_game/common/generic_actions/culture.txt
  - **A** game/in_game/common/generic_actions/estate_emergency_actions.txt
+ - **M** game/in_game/common/generic_actions/estates.txt
+ - **M** game/in_game/common/generic_actions/explorers.txt
  - **M** game/in_game/common/generic_actions/general_religion.txt
  - **M** game/in_game/common/generic_actions/golden_age_of_piracy.txt
  - **M** game/in_game/common/generic_actions/great_pestilence.txt
@@ -418,6 +447,7 @@
  - **M** game/in_game/common/generic_actions/languages.txt
  - **M** game/in_game/common/generic_actions/lordship_of_ireland.txt
  - **M** game/in_game/common/generic_actions/make_unit_available_for_hire.txt
+ - **M** game/in_game/common/generic_actions/markets.txt
  - **M** game/in_game/common/generic_actions/nahuatl.txt
  - **A** game/in_game/common/generic_actions/negotiate_rebels.txt
  - **M** game/in_game/common/generic_actions/parliament.txt
@@ -438,6 +468,7 @@
  - **A** game/in_game/common/generic_actions/twilight_of_the_tsardom_actions.txt
  - **M** game/in_game/common/generic_actions/war_of_religions.txt
  - **M** game/in_game/common/genes/01_genes_morph.txt
+ - **M** game/in_game/common/genes/05_genes_accessories_headwear.txt
  - **M** game/in_game/common/gods/folk_african.txt
  - **M** game/in_game/common/gods/folk_american.txt
  - **M** game/in_game/common/gods/folk_asian.txt
@@ -463,16 +494,26 @@
  - **M** game/in_game/common/heir_selections/monarchy.txt
  - **M** game/in_game/common/heir_selections/republic.txt
  - **M** game/in_game/common/heir_selections/specialized.txt
+ - **M** game/in_game/common/institution/age_1_traditions_institutions.txt
+ - **M** game/in_game/common/institution/age_2_renaissance_institutions.txt
+ - **M** game/in_game/common/institution/age_3_discovery_institutions.txt
+ - **M** game/in_game/common/institution/age_4_reformation_institutions.txt
+ - **M** game/in_game/common/institution/age_5_absolutism_institutions.txt
+ - **M** game/in_game/common/institution/age_6_revolutions_institutions.txt
+ - **M** game/in_game/common/institution/readme.txt
+ - **M** game/in_game/common/insults/00_insults.txt
  - **M** game/in_game/common/international_organization_land_ownership_rules/hre_land_ownership.txt
  - **M** game/in_game/common/international_organization_land_ownership_rules/readme.txt
  - **M** game/in_game/common/international_organization_payments/hre.txt
  - **A** game/in_game/common/international_organization_payments/italian_league_sponsor_payments.txt
  - **M** game/in_game/common/international_organization_payments/readme.txt
  - **M** game/in_game/common/international_organization_payments/tithe.txt
+ - **M** game/in_game/common/international_organization_special_statuses/hre.txt
  - **A** game/in_game/common/international_organization_special_statuses/italian_leagues.txt
  - **M** game/in_game/common/international_organization_special_statuses/tatar_yoke.txt
  - **M** game/in_game/common/international_organization_special_statuses/union.txt
  - **M** game/in_game/common/international_organizations/autocephalous_patriarchate.txt
+ - **M** game/in_game/common/international_organizations/catholic_church.txt
  - **M** game/in_game/common/international_organizations/coalition.txt
  - **M** game/in_game/common/international_organizations/defensive_league.txt
  - **M** game/in_game/common/international_organizations/foreign_league_balkan.txt
@@ -491,6 +532,7 @@
  - **M** game/in_game/common/international_organizations/lordship_of_ireland.txt
  - **M** game/in_game/common/international_organizations/marriage_union.txt
  - **M** game/in_game/common/international_organizations/middle_kingdom.txt
+ - **M** game/in_game/common/international_organizations/readme.txt
  - **M** game/in_game/common/international_organizations/red_turban_rebels.txt
  - **M** game/in_game/common/international_organizations/sect.txt
  - **M** game/in_game/common/international_organizations/swiss_confederation.txt
@@ -557,11 +599,16 @@
  - **M** game/in_game/common/laws/christian_tenets.txt
  - **M** game/in_game/common/laws/colonial_laws.txt
  - **M** game/in_game/common/laws/io_alliances_law.txt
+ - **M** game/in_game/common/laws/readme.txt
  - **M** game/in_game/common/laws/sects.txt
  - **M** game/in_game/common/laws/sikhism.txt
+ - **M** game/in_game/common/levies/03_discovery_levies.txt
+ - **M** game/in_game/common/levies/04_renaissance_levies.txt
  - **M** game/in_game/common/location_ranks/00_default.txt
  - **M** game/in_game/common/missions/generic_capable_cabinet_mission_pack.txt
  - **M** game/in_game/common/missions/generic_capital_economy_mission_pack.txt
+ - **M** game/in_game/common/missions/generic_infrastructure_mission_pack.txt.txt
+ - **M** game/in_game/common/missions/generic_traditional_economy_mission_pack.txt
  - **A** game/in_game/common/movements/calvinism_movement.txt
  - **A** game/in_game/common/movements/lutheranism_movement.txt
  - **M** game/in_game/common/on_action/_hardcoded.txt
@@ -570,16 +617,20 @@
  - **M** game/in_game/common/on_action/country_yearly.txt
  - **A** game/in_game/common/on_action/estate_changes.txt
  - **M** game/in_game/common/on_action/parliament_monthly_pulse.txt
+ - **M** game/in_game/common/parliament_agendas/03_buildings.txt
  - **A** game/in_game/common/parliament_agendas/04_culture_religion.txt
  - **M** game/in_game/common/parliament_agendas/10_hre_agendas.txt
  - **M** game/in_game/common/parliament_issues/01_country_specific_parliament_issues.txt
+ - **M** game/in_game/common/parliament_issues/02_crown_estate_parliament_issues.txt
  - **M** game/in_game/common/parliament_issues/03_nobles_estate_parliament_issues.txt
+ - **M** game/in_game/common/parliament_issues/04_clergy_estate_parliament_issues.txt
  - **M** game/in_game/common/parliament_issues/05_burghers_estate_parliament_issues.txt
  - **M** game/in_game/common/parliament_issues/06_peasants_estate_parliament_issues.txt
  - **M** game/in_game/common/parliament_issues/07_expansion_parliament_issues.txt
  - **M** game/in_game/common/parliament_issues/10_hre_issues.txt
  - **M** game/in_game/common/peace_treaties/claim_french_throne.txt
  - **A** game/in_game/common/peace_treaties/destroy_autocephalous_patriarchate.txt
+ - **M** game/in_game/common/peace_treaties/disband_kontor.txt
  - **M** game/in_game/common/peace_treaties/dissolve_coalition.txt
  - **M** game/in_game/common/peace_treaties/dissolve_league.txt
  - **M** game/in_game/common/peace_treaties/force_tributary.txt
@@ -589,6 +640,8 @@
  - **M** game/in_game/common/peace_treaties/rtr_rein_in_rebellion.txt
  - **A** game/in_game/common/peace_treaties/scaligeri_peace_treaties.txt
  - **M** game/in_game/common/peace_treaties/sound_toll_exemption.txt
+ - **M** game/in_game/common/peace_treaties/take_over_market_center.txt
+ - **M** game/in_game/common/persistent_dna/custom_characters.txt
  - **M** game/in_game/common/pop_types/00_default.txt
  - **M** game/in_game/common/prices/00_hardcoded.txt
  - **M** game/in_game/common/prices/01_buildings.txt
@@ -617,14 +670,18 @@
  - **M** game/in_game/common/religious_aspects/tengri.txt
  - **M** game/in_game/common/religious_aspects/tonal.txt
  - **M** game/in_game/common/religious_focuses/nahuatl.txt
+ - **M** game/in_game/common/resolutions/fall_of_delhi.txt
  - **M** game/in_game/common/resolutions/high_kingship_election.txt
  - **M** game/in_game/common/resolutions/hre_election.txt
  - **M** game/in_game/common/resolutions/international_organization_election.txt
  - **M** game/in_game/common/resolutions/policy_vote.txt
  - **M** game/in_game/common/resolutions/swiss_election.txt
+ - **M** game/in_game/common/rival_criteria/europe.txt
  - **M** game/in_game/common/script_values/building_caps.txt
  - **M** game/in_game/common/script_values/diplomatic_values.txt
+ - **A** game/in_game/common/script_values/high_kingship_values.txt
  - **M** game/in_game/common/script_values/hre_action_values.txt
+ - **M** game/in_game/common/script_values/institution_spread.txt
  - **M** game/in_game/common/script_values/io_policy.txt
  - **A** game/in_game/common/script_values/rebel_values.txt
  - **M** game/in_game/common/scriptable_hints/scripted_hints.txt
@@ -653,38 +710,33 @@
  - **M** game/in_game/common/scripted_triggers/country_triggers.txt
  - **M** game/in_game/common/scripted_triggers/disaster_triggers.txt
  - **A** game/in_game/common/scripted_triggers/hre_circle_formation_triggers.txt
+ - **A** game/in_game/common/scripted_triggers/institution_triggers.txt
  - **M** game/in_game/common/scripted_triggers/international_organization_triggers.txt
  - **M** game/in_game/common/scripted_triggers/location_triggers.txt
  - **M** game/in_game/common/scripted_triggers/situation_triggers.txt
  - **M** game/in_game/common/scripted_triggers/unit_triggers.txt
  - **M** game/in_game/common/scripted_triggers/war_triggers.txt
  - **M** game/in_game/common/situations/black_death.txt
- - **M** game/in_game/common/situations/colonial_revolution.txt
- - **M** game/in_game/common/situations/columbian_exchange.txt
- - **M** game/in_game/common/situations/council_of_trent.txt
- - **M** game/in_game/common/situations/fall_of_delhi.txt
  - **M** game/in_game/common/situations/golden_age_of_piracy.txt
  - **M** game/in_game/common/situations/great_pestilence.txt
  - **M** game/in_game/common/situations/guelphs_and_ghibellines.txt
- - **M** game/in_game/common/situations/hundred_years_war.txt
  - **M** game/in_game/common/situations/hussite_wars.txt
  - **M** game/in_game/common/situations/italian_wars.txt
- - **M** game/in_game/common/situations/little_ice_age.txt
  - **M** game/in_game/common/situations/nanbokuchou.txt
- - **M** game/in_game/common/situations/red_turban_rebellions.txt
  - **M** game/in_game/common/situations/reformation.txt
  - **M** game/in_game/common/situations/rise_of_the_ottomans.txt
  - **M** game/in_game/common/situations/rise_of_timur.txt
- - **M** game/in_game/common/situations/sengoku.txt
  - **M** game/in_game/common/situations/the_revolution.txt
  - **M** game/in_game/common/situations/treaty_of_tordesillas.txt
  - **M** game/in_game/common/situations/war_of_religions.txt
- - **M** game/in_game/common/situations/western_schism.txt
  - **M** game/in_game/common/societal_values/00_default.txt
  - **M** game/in_game/common/subject_military_stances/00_default.txt
  - **M** game/in_game/common/subject_types/appanage.txt
+ - **M** game/in_game/common/subject_types/colonial_nation.txt
  - **M** game/in_game/common/subject_types/dominion.txt
  - **M** game/in_game/common/subject_types/fiefdom.txt
+ - **M** game/in_game/common/subject_types/hanseatic_member.txt
+ - **M** game/in_game/common/subject_types/hre.txt
  - **M** game/in_game/common/subject_types/march.txt
  - **M** game/in_game/common/subject_types/samanta.txt
  - **M** game/in_game/common/subject_types/state_bank.txt
@@ -692,6 +744,7 @@
  - **M** game/in_game/common/subject_types/tusi.txt
  - **M** game/in_game/common/subject_types/vassal.txt
  - **M** game/in_game/common/tests/age_of_reformation_tests.txt
+ - **M** game/in_game/common/tests/readme.txt
  - **M** game/in_game/common/town_rights/00_traditions.txt
  - **M** game/in_game/common/town_rights/10_country_specific.txt
  - **M** game/in_game/common/town_rights/12_german.txt
@@ -704,6 +757,7 @@
  - **M** game/in_game/common/traits/04_explorer.txt
  - **M** game/in_game/common/traits/06_religious_figure.txt
  - **M** game/in_game/common/traits/07_cabinet.txt
+ - **M** game/in_game/common/traits/08_health.txt
  - **M** game/in_game/common/trigger_localization/character_triggers.txt
  - **M** game/in_game/common/trigger_localization/common_triggers.txt
  - **M** game/in_game/common/trigger_localization/country_triggers.txt
@@ -717,12 +771,17 @@
  - **M** game/in_game/common/trigger_localization/mercenary_triggers.txt
  - **M** game/in_game/common/trigger_localization/rebel_triggers.txt
  - **M** game/in_game/common/trigger_localization/religion_triggers.txt
+ - **M** game/in_game/common/trigger_localization/scope_comparisons.txt
+ - **M** game/in_game/common/trigger_localization/subject_type_triggers.txt
  - **M** game/in_game/common/trigger_localization/war_triggers.txt
  - **M** game/in_game/common/trigger_localization/work_of_art_triggers.txt
  - **M** game/in_game/common/unit_abilities/hussite_tribunal.txt
  - **M** game/in_game/common/unit_abilities/march_to_sound_of_guns.txt
+ - **M** game/in_game/common/unit_abilities/scorch_earth.txt
+ - **M** game/in_game/common/unit_categories/05_army_auxiliary.txt
  - **M** game/in_game/common/unit_categories/13_navy_heavy_ship.txt
  - **M** game/in_game/common/unit_types/00_age_templates_land.txt
+ - **M** game/in_game/common/unit_types/00_age_templates_navy.txt
  - **M** game/in_game/common/unit_types/0_knights.txt
  - **M** game/in_game/common/unit_types/1_uniques_for_age_1_traditions.txt
  - **M** game/in_game/common/unit_types/1_uniques_for_age_2_renaissance.txt
@@ -737,6 +796,7 @@
  - **M** game/in_game/common/unit_types/3_naval_uniques_for_age_3_discovery.txt
  - **M** game/in_game/common/unit_types/3_naval_uniques_for_age_4_reformation.txt
  - **M** game/in_game/common/unit_types/3_naval_uniques_for_age_5_absolutism.txt
+ - **M** game/in_game/common/unit_types/3_naval_uniques_for_age_6_revolutions.txt
  - **M** game/in_game/common/unit_types/3_qizilbash.txt
  - **M** game/in_game/common/unit_types/D008_byzantine_unit_types.txt
  - **M** game/in_game/common/unit_types/a_bedouin_cavalry.txt
@@ -746,6 +806,7 @@
  - **M** game/in_game/common/wargoals/00_default.txt
  - **M** game/in_game/events/DHE/D008_flavor_BYZ.txt
  - **M** game/in_game/events/DHE/flavor_ARA.txt
+ - **M** game/in_game/events/DHE/flavor_BOH.txt
  - **M** game/in_game/events/DHE/flavor_BOS.txt
  - **M** game/in_game/events/DHE/flavor_BUL.txt
  - **M** game/in_game/events/DHE/flavor_BYZ.txt
@@ -756,11 +817,18 @@
  - **M** game/in_game/events/DHE/flavor_ERE.txt
  - **M** game/in_game/events/DHE/flavor_ETH.txt
  - **M** game/in_game/events/DHE/flavor_FRA.txt
+ - **M** game/in_game/events/DHE/flavor_FRA_DAU.txt
+ - **M** game/in_game/events/DHE/flavor_FRA_SCO.txt
  - **M** game/in_game/events/DHE/flavor_GEN.txt
  - **M** game/in_game/events/DHE/flavor_HAB.txt
  - **A** game/in_game/events/DHE/flavor_HAM.txt
+ - **M** game/in_game/events/DHE/flavor_HSA.txt
  - **M** game/in_game/events/DHE/flavor_HUN.txt
+ - **M** game/in_game/events/DHE/flavor_HUN_SER.txt
+ - **M** game/in_game/events/DHE/flavor_IRE.txt
+ - **M** game/in_game/events/DHE/flavor_IRO.txt
  - **M** game/in_game/events/DHE/flavor_JAP.txt
+ - **M** game/in_game/events/DHE/flavor_KBO.txt
  - **M** game/in_game/events/DHE/flavor_KOR.txt
  - **M** game/in_game/events/DHE/flavor_LIT.txt
  - **M** game/in_game/events/DHE/flavor_LUB.txt
@@ -772,21 +840,30 @@
  - **M** game/in_game/events/DHE/flavor_MOR.txt
  - **M** game/in_game/events/DHE/flavor_MOS.txt
  - **M** game/in_game/events/DHE/flavor_NOV.txt
+ - **M** game/in_game/events/DHE/flavor_NUR.txt
+ - **M** game/in_game/events/DHE/flavor_OMA.txt
  - **A** game/in_game/events/DHE/flavor_PIS.txt
+ - **M** game/in_game/events/DHE/flavor_PUE_tribes.txt
  - **M** game/in_game/events/DHE/flavor_RAG.txt
+ - **M** game/in_game/events/DHE/flavor_RUS.txt
  - **M** game/in_game/events/DHE/flavor_SCO.txt
  - **M** game/in_game/events/DHE/flavor_SIE.txt
  - **M** game/in_game/events/DHE/flavor_SWE.txt
  - **M** game/in_game/events/DHE/flavor_TUR.txt
  - **M** game/in_game/events/DHE/flavor_VEN.txt
  - **M** game/in_game/events/DHE/flavor_WLS.txt
+ - **M** game/in_game/events/DHE/flavor_ZAN.txt
  - **M** game/in_game/events/DHE/flavor_ach.txt
  - **M** game/in_game/events/DHE/flavor_ath.txt
  - **M** game/in_game/events/DHE/flavor_ayu.txt
  - **M** game/in_game/events/DHE/flavor_bah.txt
  - **M** game/in_game/events/DHE/flavor_bav.txt
+ - **M** game/in_game/events/DHE/flavor_ben.txt
+ - **M** game/in_game/events/DHE/flavor_bng.txt
  - **M** game/in_game/events/DHE/flavor_brapru.txt
+ - **M** game/in_game/events/DHE/flavor_brapru_teu.txt
  - **M** game/in_game/events/DHE/flavor_brb.txt
+ - **M** game/in_game/events/DHE/flavor_byz_ser.txt
  - **M** game/in_game/events/DHE/flavor_byz_ven.txt
  - **M** game/in_game/events/DHE/flavor_cas_por.txt
  - **M** game/in_game/events/DHE/flavor_cas_rio_salado.txt
@@ -795,8 +872,10 @@
  - **M** game/in_game/events/DHE/flavor_chi_dai.txt
  - **M** game/in_game/events/DHE/flavor_chi_treasure_expedition.txt
  - **M** game/in_game/events/DHE/flavor_dah.txt
+ - **M** game/in_game/events/DHE/flavor_dan.txt
  - **M** game/in_game/events/DHE/flavor_eng_diplomacy.txt
  - **M** game/in_game/events/DHE/flavor_flo.txt
+ - **M** game/in_game/events/DHE/flavor_fra_nrm.txt
  - **M** game/in_game/events/DHE/flavor_geo.txt
  - **M** game/in_game/events/DHE/flavor_grm.txt
  - **M** game/in_game/events/DHE/flavor_hab_tir.txt
@@ -809,12 +888,15 @@
  - **A** game/in_game/events/DHE/flavor_mfa.txt
  - **M** game/in_game/events/DHE/flavor_mlo.txt
  - **M** game/in_game/events/DHE/flavor_mol.txt
+ - **M** game/in_game/events/DHE/flavor_mor_maghrebi_wars.txt
  - **M** game/in_game/events/DHE/flavor_nap.txt
  - **M** game/in_game/events/DHE/flavor_ned.txt
  - **M** game/in_game/events/DHE/flavor_ned_plc.txt
  - **M** game/in_game/events/DHE/flavor_ori.txt
+ - **M** game/in_game/events/DHE/flavor_pap.txt
  - **M** game/in_game/events/DHE/flavor_plc.txt
  - **M** game/in_game/events/DHE/flavor_pol.txt
+ - **M** game/in_game/events/DHE/flavor_pol_teu.txt
  - **M** game/in_game/events/DHE/flavor_por.txt
  - **M** game/in_game/events/DHE/flavor_sale_of_lusatia.txt
  - **M** game/in_game/events/DHE/flavor_ser.txt
@@ -825,18 +907,29 @@
  - **M** game/in_game/events/DHE/flavor_tim.txt
  - **M** game/in_game/events/DHE/flavor_timurid_governor.txt
  - **A** game/in_game/events/DHE/flavor_ver.txt
+ - **M** game/in_game/events/DHE/flavor_vij.txt
+ - **M** game/in_game/events/DHE/flavor_vlt.txt
  - **M** game/in_game/events/DHE/flavor_vol.txt
  - **M** game/in_game/events/DHE/flavor_zaz.txt
  - **M** game/in_game/events/ai_area_conqest_events/hidden_events_for_ai_conquest.txt
  - **M** game/in_game/events/character/artist_events.txt
+ - **M** game/in_game/events/character/consort_events.txt
  - **M** game/in_game/events/character/dynastic.txt
+ - **M** game/in_game/events/character/personality_events.txt
  - **M** game/in_game/events/colonization/colonial_charter.txt
+ - **M** game/in_game/events/colonization/conquistador.txt
  - **A** game/in_game/events/culture/culture_italian.txt
+ - **M** game/in_game/events/culture/culture_japan.txt
  - **M** game/in_game/events/culture/culture_religion_events.txt
  - **M** game/in_game/events/culture/language_events.txt
+ - **M** game/in_game/events/debug/000_johan_debug.txt
+ - **M** game/in_game/events/debug/qa_debug.txt
  - **M** game/in_game/events/diplomacy/diplomacy.txt
  - **M** game/in_game/events/disaster/D008_fate_of_the_phoenix.txt
  - **M** game/in_game/events/disaster/ambrosian_republic.txt
+ - **M** game/in_game/events/disaster/byzantine_succession_crisis.txt
+ - **M** game/in_game/events/disaster/chinese_crisis_events.txt
+ - **M** game/in_game/events/disaster/court_and_country.txt
  - **M** game/in_game/events/disaster/crisis_of_the_sayfawa_dynasty.txt
  - **M** game/in_game/events/disaster/curse_of_stefan_uros_iii.txt
  - **M** game/in_game/events/disaster/death_of_hayan_wuruk.txt
@@ -845,8 +938,11 @@
  - **M** game/in_game/events/disaster/decline_of_mali.txt
  - **M** game/in_game/events/disaster/english_civil_war.txt
  - **M** game/in_game/events/disaster/french_wars_religion.txt
+ - **M** game/in_game/events/disaster/hook_and_cod_wars.txt
  - **M** game/in_game/events/disaster/horde_civil_war.txt
+ - **M** game/in_game/events/disaster/muscovite_succession_war.txt
  - **M** game/in_game/events/disaster/revolution_disaster.txt
+ - **M** game/in_game/events/disaster/rise_of_the_szlachta.txt
  - **M** game/in_game/events/disaster/savonarola.txt
  - **M** game/in_game/events/disaster/sinicization_disaster.txt
  - **M** game/in_game/events/disaster/succession_crisis.txt
@@ -855,21 +951,36 @@
  - **M** game/in_game/events/disaster/war_of_the_roses.txt
  - **M** game/in_game/events/earthquake_events.txt
  - **M** game/in_game/events/economy/banking.txt
+ - **M** game/in_game/events/economy/building_events.txt
+ - **M** game/in_game/events/economy/industrialization_events.txt
  - **A** game/in_game/events/economy/market_decline.txt
  - **M** game/in_game/events/economy/privateers.txt
  - **M** game/in_game/events/free_cities.txt
+ - **M** game/in_game/events/government/devotion_events.txt
+ - **M** game/in_game/events/government/empires.txt
+ - **M** game/in_game/events/government/laws.txt
  - **M** game/in_game/events/government/parliaments.txt
  - **M** game/in_game/events/government/regency_events.txt
  - **M** game/in_game/events/government/societal_values.txt
  - **M** game/in_game/events/government/succession.txt
+ - **M** game/in_game/events/government/town_rights_events.txt
+ - **M** game/in_game/events/hre.txt
  - **A** game/in_game/events/imperial_circles_events.txt
+ - **M** game/in_game/events/institution_events.txt
  - **M** game/in_game/events/mercs.txt
+ - **M** game/in_game/events/missionevents/conquest_mission_events.txt
+ - **M** game/in_game/events/missionevents/generic_mission_events.txt
  - **M** game/in_game/events/pirate_events.txt
  - **M** game/in_game/events/primasgermaniae.txt
  - **M** game/in_game/events/privilege_events.txt
+ - **M** game/in_game/events/random_event.txt
+ - **M** game/in_game/events/rebels.txt
  - **M** game/in_game/events/religion/anglican_events.txt
  - **M** game/in_game/events/religion/hellenism_religion.txt
+ - **M** game/in_game/events/religion/lutheranism_events.txt
  - **M** game/in_game/events/religion/muslim_school_events.txt
+ - **M** game/in_game/events/religion/orthodox_flavor.txt
+ - **M** game/in_game/events/religion/propagate_religion_events.txt
  - **M** game/in_game/events/religion/sikhism.txt
  - **M** game/in_game/events/situations/black_death.txt
  - **M** game/in_game/events/situations/golden_age_of_piracy.txt
@@ -887,6 +998,7 @@
  - **M** game/in_game/events/situations/sengoku.txt
  - **M** game/in_game/events/situations/the_revolution.txt
  - **M** game/in_game/events/situations/war_of_religions.txt
+ - **M** game/in_game/events/situations/western_schism.txt
  - **M** game/in_game/events/wokou_events.txt
  - **M** game/in_game/gfx/graphical_culture_types/00_graphical_culture_types.txt
  - **M** game/in_game/gfx/graphical_culture_types/01_graphical_culture_types_british.txt
@@ -907,6 +1019,7 @@
  - **M** game/in_game/gui/attribute_columns/cabinet_action.gui
  - **M** game/in_game/gui/attribute_columns/character.gui
  - **M** game/in_game/gui/attribute_columns/country.gui
+ - **A** game/in_game/gui/attribute_columns/employment_system.gui
  - **A** game/in_game/gui/attribute_columns/holy_site.gui
  - **M** game/in_game/gui/attribute_columns/location.gui
  - **M** game/in_game/gui/attribute_columns/parliament_type.gui
@@ -917,8 +1030,11 @@
  - **M** game/in_game/gui/build_location_lateralview.gui
  - **M** game/in_game/gui/building_view.gui
  - **M** game/in_game/gui/bureaucracies_lateralview.gui
+ - **M** game/in_game/gui/cd_pop_editor.gui
  - **M** game/in_game/gui/character_header.gui
  - **M** game/in_game/gui/character_lateralview.gui
+ - **M** game/in_game/gui/confirm_insult_popup.gui
+ - **M** game/in_game/gui/confirm_intervene_war_popup.gui
  - **M** game/in_game/gui/confirm_offer_loan_popup.gui
  - **M** game/in_game/gui/context_menu.gui
  - **M** game/in_game/gui/context_menu_types.gui
@@ -936,6 +1052,7 @@
  - **M** game/in_game/gui/diplomacydialogs.gui
  - **M** game/in_game/gui/diseases_lateralview.gui
  - **M** game/in_game/gui/dynasty_tree_lateralview.gui
+ - **M** game/in_game/gui/economic_support.gui
  - **M** game/in_game/gui/economy_lateralview.gui
  - **M** game/in_game/gui/encyclopedia_lateralview.gui
  - **M** game/in_game/gui/end_game_view.gui
@@ -948,6 +1065,7 @@
  - **M** game/in_game/gui/filters/readme.txt
  - **M** game/in_game/gui/food_production_lateralview.gui
  - **M** game/in_game/gui/foreign_country_lateralview.gui
+ - **M** game/in_game/gui/form_new_country.gui
  - **M** game/in_game/gui/game_rules.gui
  - **M** game/in_game/gui/goods_details.gui
  - **M** game/in_game/gui/goods_production_lateralview.gui
@@ -987,7 +1105,9 @@
  - **M** game/in_game/gui/panels/disaster/hook_and_cod_wars.gui
  - **A** game/in_game/gui/panels/disaster/twilight_of_the_tsardom.gui
  - **M** game/in_game/gui/panels/goods/goods_markets.gui
+ - **M** game/in_game/gui/panels/goods/goods_summary.gui
  - **M** game/in_game/gui/panels/left_panel/left_panel.gui
+ - **M** game/in_game/gui/panels/market/market_summary.gui
  - **M** game/in_game/gui/panels/organization/autocephalous_patriarchate.gui
  - **M** game/in_game/gui/panels/organization/candidates.gui
  - **M** game/in_game/gui/panels/organization/catholic_church.gui
@@ -1017,12 +1137,15 @@
  - **M** game/in_game/gui/panels/situation/nanbokuchou.gui
  - **M** game/in_game/gui/panels/situation/red_turban_rebellions.gui
  - **M** game/in_game/gui/panels/situation/reformation.gui
+ - **M** game/in_game/gui/panels/situation/rise_of_timur.gui
  - **M** game/in_game/gui/panels/situation/sengoku.gui
  - **M** game/in_game/gui/panels/situation/war_of_religions.gui
  - **M** game/in_game/gui/panels/trade/trade_overview_possible_trades.gui
+ - **M** game/in_game/gui/panels/trade/trade_summary.gui
  - **M** game/in_game/gui/peace_offer_view.gui
  - **M** game/in_game/gui/people_lateral_view.gui
  - **M** game/in_game/gui/pops_overview.gui
+ - **M** game/in_game/gui/port_editor.gui
  - **M** game/in_game/gui/production_lateralview.gui
  - **M** game/in_game/gui/rebels_details.gui
  - **M** game/in_game/gui/recruit_location_lateralview.gui
@@ -1031,18 +1154,25 @@
  - **M** game/in_game/gui/rename_dialog.gui
  - **M** game/in_game/gui/reorg_window.gui
  - **M** game/in_game/gui/road_builder_lateralview.gui
+ - **A** game/in_game/gui/searchbar.gui
  - **M** game/in_game/gui/seazone_window.gui
+ - **M** game/in_game/gui/select_consort_interaction.gui
  - **M** game/in_game/gui/select_country_diplomacy_lateralview.gui
+ - **M** game/in_game/gui/select_heir_selection.gui
  - **M** game/in_game/gui/select_holy_site.gui
  - **M** game/in_game/gui/select_interaction_cards/government.gui
  - **M** game/in_game/gui/select_interaction_cards/location.gui
+ - **M** game/in_game/gui/select_interaction_target.gui
  - **M** game/in_game/gui/select_interaction_target_widgets.gui
+ - **M** game/in_game/gui/select_lateralview_history.gui
  - **M** game/in_game/gui/select_search_filter.gui
  - **M** game/in_game/gui/select_subject_type_lateralview.gui
  - **M** game/in_game/gui/select_war_to_intervene.gui
  - **M** game/in_game/gui/selected_market_view.gui
  - **M** game/in_game/gui/sell_location_action_view.gui
+ - **M** game/in_game/gui/send_gift.gui
  - **M** game/in_game/gui/setup_condottieri.gui
+ - **M** game/in_game/gui/setup_editor.gui
  - **M** game/in_game/gui/shared/buttons.gui
  - **M** game/in_game/gui/shared/cabinet_cards.gui
  - **M** game/in_game/gui/shared/cards.gui
@@ -1055,11 +1185,13 @@
  - **M** game/in_game/gui/shared/diseases_tooltips.gui
  - **M** game/in_game/gui/shared/economy_tooltips.gui
  - **M** game/in_game/gui/shared/event_tooltips.gui
+ - **M** game/in_game/gui/shared/geography_definitions_tooltips.gui
  - **M** game/in_game/gui/shared/government_tooltips.gui
  - **M** game/in_game/gui/shared/io_tooltips.gui
  - **M** game/in_game/gui/shared/location_tooltips.gui
  - **M** game/in_game/gui/shared/market_tooltips.gui
  - **M** game/in_game/gui/shared/modifiers.gui
+ - **M** game/in_game/gui/shared/plotlines.gui
  - **M** game/in_game/gui/shared/population_tooltip.gui
  - **M** game/in_game/gui/shared/production_method_details.gui
  - **M** game/in_game/gui/shared/production_tooltips.gui
@@ -1077,6 +1209,7 @@
  - **M** game/in_game/gui/shared/unit_tooltips.gui
  - **M** game/in_game/gui/shared/war_tooltips.gui
  - **M** game/in_game/gui/shared/windows.gui
+ - **M** game/in_game/gui/single_unit_detail_window.gui
  - **M** game/in_game/gui/single_unit_window.gui
  - **M** game/in_game/gui/situation_view.gui
  - **M** game/in_game/gui/societal_values_lateralview.gui
@@ -1094,10 +1227,13 @@
  - **M** game/in_game/gui/unit_viewer.gui
  - **M** game/in_game/gui/war_lateralview.gui
  - **M** game/in_game/gui/war_viewer.gui
+ - **M** game/in_game/gui/watchwindow.gui
+ - **M** game/in_game/gui/window_tutorial.gui
  - **M** game/in_game/map_data/location_templates.txt
  - **M** game/in_game/setup/countries/anatolia.txt
  - **M** game/in_game/setup/countries/balkans.txt
  - **M** game/in_game/setup/countries/bengal.txt
+ - **M** game/in_game/setup/countries/british_isles.txt
  - **M** game/in_game/setup/countries/east_asia.txt
  - **M** game/in_game/setup/countries/india.txt
  - **M** game/in_game/setup/countries/italy.txt
@@ -1109,12 +1245,17 @@
  - **M** game/loading_screen/compound_settings.txt
  - **A** game/loading_screen/gfx/images/00_loading_screen_florence.txt
  - **M** game/loading_screen/gfx/scenes/00_loading_screens.txt
+ - **M** game/loading_screen/gui/applicationutils/tools_gui_dialogs.gui
  - **M** game/loading_screen/gui/resign_confirmation_window.gui
  - **M** game/loading_screen/gui/shared/defaults.gui
+ - **M** game/loading_screen/gui/shared/sounds.gui
  - **M** game/loading_screen/gui/textformatting.gui
  - **M** game/loading_screen/localization/english/load_tips_l_english.yml
  - **M** game/loading_screen/settings_layout.txt
  - **M** game/loading_screen/sound/banks/windows/Init.txt
+ - **M** game/loading_screen/sound/banks/windows/sb_music_logic.txt
+ - **M** game/loading_screen/sound/banks/windows/sb_music_media.txt
+ - **M** game/loading_screen/sound/banks/windows/sb_music_media_D008.txt
  - **M** game/loading_screen/sound/banks/windows/sb_ui_logic.txt
  - **M** game/loading_screen/sound/banks/windows/sb_ui_media.txt
  - **M** game/loading_screen/sound/banks/windows/sb_world_logic.txt
@@ -1122,6 +1263,7 @@
  - **M** game/loading_screen/sound/map/ambience/audio_parameter_limits.txt
  - **M** game/loading_screen/sound/map/ambience/sound_alias_bank.txt
  - **M** game/loading_screen/sound/map/ambience/terrain_ambience_layer_default.txt
+ - **M** game/main_menu/common/achievement_groups.txt
  - **M** game/main_menu/common/achievements/standard_achievements.txt
  - **M** game/main_menu/common/coat_of_arms/coat_of_arms/pre_scripted_countries.txt
  - **M** game/main_menu/common/coat_of_arms/coat_of_arms/pre_scripted_countries_formable.txt
@@ -1143,13 +1285,21 @@
  - **M** game/main_menu/common/static_modifiers/location_historical_base_values.txt
  - **M** game/main_menu/common/static_modifiers/province.txt
  - **M** game/main_menu/common/static_modifiers/religion.txt
+ - **M** game/main_menu/common/static_modifiers/subunit.txt
  - **M** game/main_menu/common/static_modifiers/unit.txt
  - **M** game/main_menu/gfx/map/city_data/default.txt
  - **M** game/main_menu/gfx/map/city_data/templates.txt
  - **M** game/main_menu/gfx/map/city_data/walls.txt
  - **M** game/main_menu/gfx/portraits/accessories/clothes.txt
+ - **M** game/main_menu/gfx/portraits/portrait_modifiers/01_headwear.txt
+ - **M** game/main_menu/gfx/portraits/portrait_modifiers/01_headwear_additive.txt
+ - **A** game/main_menu/gfx/portraits/portrait_modifiers/01_headwear_special.txt
+ - **M** game/main_menu/gfx/portraits/portrait_modifiers/01_historical_chr.txt
  - **M** game/main_menu/gui/achievements/jomini_achievements_window.gui
  - **M** game/main_menu/gui/console.gui
+ - **M** game/main_menu/gui/credits_window.gui
+ - **M** game/main_menu/gui/debug/frontend_gui_workbench.gui
+ - **M** game/main_menu/gui/dialogs.gui
  - **M** game/main_menu/gui/early_cooltip.gui
  - **A** game/main_menu/gui/editbox.gui
  - **M** game/main_menu/gui/frontend_loadview.gui
@@ -1164,9 +1314,13 @@
  - **M** game/main_menu/gui/multiplayer_frontend.gui
  - **M** game/main_menu/gui/multiplayer_serverbrowser.gui
  - **M** game/main_menu/gui/notifications/jomini_message.gui
+ - **M** game/main_menu/gui/pdx_account/create_account_window_instanced.gui
  - **M** game/main_menu/gui/pdx_account/legal_docs_viewer_instanced.gui
+ - **M** game/main_menu/gui/pdx_account/login_window_instanced.gui
+ - **M** game/main_menu/gui/pdx_account/pdx_custom_types.gui
  - **M** game/main_menu/gui/report_issue.gui
  - **M** game/main_menu/gui/settings/setting_types.gui
+ - **M** game/main_menu/gui/settings/settings_dialog.gui
  - **M** game/main_menu/gui/shared/advances_tooltips.gui
  - **M** game/main_menu/gui/shared/backgrounds.gui
  - **M** game/main_menu/gui/shared/building_tooltips.gui
@@ -1179,15 +1333,18 @@
  - **M** game/main_menu/gui/shared/main_menu_animation.gui
  - **M** game/main_menu/gui/shared/main_menu_buttons.gui
  - **M** game/main_menu/gui/shared/main_menu_cooltip_types.gui
+ - **M** game/main_menu/gui/shared/main_menu_lists.gui
  - **M** game/main_menu/gui/shared/progressbars.gui
  - **M** game/main_menu/gui/shared/sulla_templates_and_types.gui
  - **M** game/main_menu/gui/shared/textures.gui
+ - **M** game/main_menu/gui/shared/titus_templates_and_types.gui
  - **M** game/main_menu/localization/english/_achievements_l_english.yml
  - **M** game/main_menu/localization/english/_debug_l_english.yml
  - **M** game/main_menu/localization/english/actions_l_english.yml
  - **M** game/main_menu/localization/english/advances_l_english.yml
  - **M** game/main_menu/localization/english/ai_personalities_l_english.yml
  - **M** game/main_menu/localization/english/alerts_l_english.yml
+ - **A** game/main_menu/localization/english/area_preferences_l_english.yml
  - **M** game/main_menu/localization/english/artists_l_english.yml
  - **M** game/main_menu/localization/english/auto_modifiers_l_english.yml
  - **M** game/main_menu/localization/english/buildings_l_english.yml
@@ -1205,6 +1362,7 @@
  - **M** game/main_menu/localization/english/country_names_l_english.yml
  - **M** game/main_menu/localization/english/cultural_and_languages_l_english.yml
  - **M** game/main_menu/localization/english/culture_groups_l_english.yml
+ - **M** game/main_menu/localization/english/declare_war_l_english.yml
  - **M** game/main_menu/localization/english/diplomacy_l_english.yml
  - **M** game/main_menu/localization/english/diplomatic_status_l_english.yml
  - **M** game/main_menu/localization/english/disasters_l_english.yml
@@ -1212,54 +1370,101 @@
  - **M** game/main_menu/localization/english/dlc/d008_fate_of_the_phoenix/D008_flavor_byz_l_english.yml
  - **M** game/main_menu/localization/english/dlc/d008_fate_of_the_phoenix/D008_government_l_english.yml
  - **M** game/main_menu/localization/english/dlc/d008_fate_of_the_phoenix/D008_latinization_vs_hellenization_l_english.yml
+ - **M** game/main_menu/localization/english/dlc/d008_fate_of_the_phoenix/D008_religion_l_english.yml
  - **M** game/main_menu/localization/english/dynasty_names_l_english.yml
  - **M** game/main_menu/localization/english/economy_l_english.yml
  - **M** game/main_menu/localization/english/effects_l_english.yml
  - **M** game/main_menu/localization/english/estate_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ach_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_ara_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ath_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ben_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_brapru_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_bul_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_byz_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_byz_ven_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_cas_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_cas_rio_salado_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_chi_dai_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_chi_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_dan_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_dlh_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_eng_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_eth_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_flo_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_fra_dau_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_fra_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_fra_sco_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_gen_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_geo_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_hab_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_hab_tir_l_english.yml
  - **A** game/main_menu/localization/english/events/DHE/flavor_ham_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_hol_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_hun_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ira_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_iro_iroquois_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_jap_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_kbo_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_khm_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_kni_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_kor_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_lit_l_english.yml
  - **A** game/main_menu/localization/english/events/DHE/flavor_luc_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_maj_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_mam_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_mch_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_mei_l_english.yml
  - **A** game/main_menu/localization/english/events/DHE/flavor_mfa_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_mlo_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_mol_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_mor_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_mos_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_nap_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ned_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_nov_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_oma_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_ori_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_pap_l_english.yml
  - **A** game/main_menu/localization/english/events/DHE/flavor_pis_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_plc_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_pol_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_por_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_pue_tribes_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_rus_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_sale_of_lusatia_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_sco_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_ser_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_sie_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_swe_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_swi_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_teu_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_tim_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_tur_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_ven_l_english.yml
  - **A** game/main_menu/localization/english/events/DHE/flavor_ver_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_vij_l_english.yml
+ - **M** game/main_menu/localization/english/events/DHE/flavor_vol_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_wls_l_english.yml
  - **M** game/main_menu/localization/english/events/DHE/flavor_zan_l_english.yml
  - **M** game/main_menu/localization/english/events/character/artist_events_l_english.yml
  - **A** game/main_menu/localization/english/events/culture/culture_italian_events_l_english.yml
+ - **M** game/main_menu/localization/english/events/diplomacy/grand_embassy_l_english.yml
+ - **M** game/main_menu/localization/english/events/disasters/english_civil_war_l_english.yml
  - **M** game/main_menu/localization/english/events/disasters/savonarola_l_english.yml
+ - **M** game/main_menu/localization/english/events/disasters/sinicization_disaster_l_english.yml
  - **M** game/main_menu/localization/english/events/disasters/turmoil_in_brandenburg_l_english.yml
  - **A** game/main_menu/localization/english/events/disasters/twilight_of_the_tsardom_l_english.yml
  - **M** game/main_menu/localization/english/events/disasters/war_of_the_roses_l_english.yml
  - **M** game/main_menu/localization/english/events/economy/banking_l_english.yml
  - **A** game/main_menu/localization/english/events/economy/market_decline_l_english.yml
+ - **M** game/main_menu/localization/english/events/government/laws_l_english.yml
  - **M** game/main_menu/localization/english/events/government/parliaments_l_english.yml
  - **M** game/main_menu/localization/english/events/government/societal_values_l_english.yml
  - **M** game/main_menu/localization/english/events/government/town_rights_events_l_english.yml
+ - **M** game/main_menu/localization/english/events/hre_events_l_english.yml
  - **M** game/main_menu/localization/english/events/mercs_l_english.yml
+ - **M** game/main_menu/localization/english/events/pirate_events_l_english.yml
  - **M** game/main_menu/localization/english/events/situations/black_death_events_l_english.yml
  - **M** game/main_menu/localization/english/events/situations/guelphs_and_ghibellines_events_l_english.yml
  - **M** game/main_menu/localization/english/events/situations/hundred_years_war_events_l_english.yml
@@ -1267,6 +1472,7 @@
  - **M** game/main_menu/localization/english/events/situations/italian_wars_events_l_english.yml
  - **M** game/main_menu/localization/english/events/situations/reformation_events_l_english.yml
  - **M** game/main_menu/localization/english/events/situations/treaty_of_tordesillas_events_l_english.yml
+ - **M** game/main_menu/localization/english/events/situations/western_schism_events_l_english.yml
  - **M** game/main_menu/localization/english/formable_countries_l_english.yml
  - **M** game/main_menu/localization/english/game_concepts_l_english.yml
  - **M** game/main_menu/localization/english/game_rules_l_english.yml
@@ -1277,6 +1483,7 @@
  - **M** game/main_menu/localization/english/government_reforms_l_english.yml
  - **M** game/main_menu/localization/english/hints_l_english.yml
  - **A** game/main_menu/localization/english/hre_circles_l_english.yml
+ - **M** game/main_menu/localization/english/insults_l_english.yml
  - **M** game/main_menu/localization/english/interfaces_l_english.yml
  - **M** game/main_menu/localization/english/international_organizations_l_english.yml
  - **M** game/main_menu/localization/english/issue_reporter_l_english.yml
@@ -1292,17 +1499,21 @@
  - **M** game/main_menu/localization/english/location_specific_base_modifiers_l_english.yml
  - **M** game/main_menu/localization/english/map_markers_l_english.yml
  - **M** game/main_menu/localization/english/messages_l_english.yml
+ - **M** game/main_menu/localization/english/missions/generic_mission_events_l_english.yml
+ - **M** game/main_menu/localization/english/missions/generic_missions_l_english.yml
  - **M** game/main_menu/localization/english/modifier_types_l_english.yml
  - **M** game/main_menu/localization/english/movements_l_english.yml
  - **M** game/main_menu/localization/english/offer_peace_l_english.yml
  - **M** game/main_menu/localization/english/opinions_l_english.yml
  - **M** game/main_menu/localization/english/outliner_l_english.yml
  - **M** game/main_menu/localization/english/parliament_l_english.yml
+ - **M** game/main_menu/localization/english/player_profiling_l_english.yml
  - **M** game/main_menu/localization/english/rebel_l_english.yml
  - **M** game/main_menu/localization/english/religion_l_english.yml
  - **M** game/main_menu/localization/english/scripted_effects_l_english.yml
  - **M** game/main_menu/localization/english/scripted_geography_names_l_english.yml
  - **M** game/main_menu/localization/english/scripted_relations_l_english.yml
+ - **M** game/main_menu/localization/english/scripted_triggers_l_english.yml
  - **M** game/main_menu/localization/english/settings_l_english.yml
  - **M** game/main_menu/localization/english/situations_l_english.yml
  - **M** game/main_menu/localization/english/static_modifiers_l_english.yml
@@ -1313,8 +1524,10 @@
  - **M** game/main_menu/localization/english/trade_orders_l_english.yml
  - **M** game/main_menu/localization/english/traits_l_english.yml
  - **M** game/main_menu/localization/english/triggers_l_english.yml
+ - **M** game/main_menu/localization/english/unit_abilities_l_english.yml
  - **M** game/main_menu/localization/english/units_l_english.yml
  - **M** game/main_menu/localization/english/war_overview_l_english.yml
+ - **M** game/main_menu/setup/start/03_markets.txt
  - **M** game/main_menu/setup/start/04_dynasties.txt
  - **M** game/main_menu/setup/start/05_characters.txt
  - **M** game/main_menu/setup/start/06_pops.txt
@@ -1323,7 +1536,9 @@
  - **M** game/main_menu/setup/start/11_art.txt
  - **M** game/main_menu/setup/start/15_international_organizations.txt
  - **M** game/main_menu/setup/start/16_wars.txt
+ - **M** game/main_menu/setup/start/19_diseases.txt
  - **M** game/main_menu/setup/start/24_town_rights.txt
  - **M** game/main_menu/setup/start/25_area_preferences.txt
+ - **M** game/main_menu/setup/start/26_ai_personalities.txt
  - **A** game/main_menu/setup/start/27_armies.txt
- - **A** jomini/main_menu/gui/notifications/jomini_text_dialog.gui
+ - **M** jomini/main_menu/gui/pdx_account/create_account_window.gui

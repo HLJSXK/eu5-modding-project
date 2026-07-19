@@ -1,6 +1,7 @@
-# Data Type Documentation 1.3.0-beta
+# Data Type Documentation 1.3
 ## Table of Contents
  * [Types](#types)
+ * [Global Functions](#global-functions)
  * [Global Promotes](#global-promotes)
 ## Notes
 This is just a very basic overview of added and removed data types.
@@ -20,6 +21,7 @@ Changed elements are **not** mentioned here.
 | Added | `CircleActionItem` |
 | Added | `CountryCultureLateralViewArtistItem` |
 | Added | `CreditLateralView` |
+| Added | `DispositionPairWrap` |
 | Added | `EstateActionsLateralView` |
 | Added | `GagCountryItem` |
 | Added | `GagFactionItem` |
@@ -38,7 +40,9 @@ Changed elements are **not** mentioned here.
 | Added | `PaymentPayerPriceWrap` |
 | Added | `QuickBuildingTypeInfo` |
 | Added | `QuickChivalricOrderMembers` |
+| Added | `QuickNotableDispositions` |
 | Added | `QuickTradeOrders` |
+| Added | `QuickTriggerDesc` |
 | Added | `RebelMovementGlue` |
 | Added | `ReformationCountryItem` |
 | Added | `ReformationMovementCountryItem` |
@@ -51,28 +55,19 @@ Changed elements are **not** mentioned here.
 | Added | `UnitAdjustedCount` |
 | Added | `WinterBlockedMarker` |
 | Removed | `MercenaryModifierWrap` |  |
+| Removed | `PlayerPlayStyleItem` |  |
 | Removed | `SelectLoanLateralView` |  |
 
-## Global Promotes
-| Type | Promote | Return Type |
+## Global Functions
+| Type | Function | Return Type |
 |--|--|--|
-| Added | `CHIVALRIC_ORDER` | `ChivalricOrder` |
-| Added | `GetAutoTableWidthFor( Arg0 )` | `AutoTableWidth` |
-| Added | `GetQuickBuildingTypeInfo( Arg0 )` | `QuickBuildingTypeInfo` |
-| Added | `GetQuickChivalricOrderMembers( Arg0 )` | `QuickChivalricOrderMembers` |
-| Added | `GetQuickTradeOrders( Arg0 )` | `QuickTradeOrders` |
-| Added | `GetQuickUnitAdjustedCount( Arg0 )` | `UnitAdjustedCount` |
-| Added | `IMPERIAL_CIRCLE` | `ImperialCircle` |
-| Added | `ImportExportModeGetView` | `ImportExportLateralView` |
-| Added | `StringToIconAndText( Arg0 )` | `IconAndText` |
-| Added | `TARGET_CHIVALRIC_ORDER` | `ChivalricOrder` |
-| Added | `TARGET_IMPERIAL_CIRCLE` | `ImperialCircle` |
 | Added | `AreBuildingsAutoExpand( Arg0 )` | `bool` |
 | Added | `BoolToFrame( Arg0 )` | `int32` |
 | Added | `ChangeReformInGovernmentReformsPerAgeLateralView( Arg0 )` | `void` |
 | Added | `DynTr( Arg0 )` | `CString` |
 | Added | `GameWouldBeIronman` | `bool` |
 | Added | `GetChivalricOrderIcon( Arg0 )` | `[unregistered]` |
+| Added | `GetPauseBannerLabel` | `CString` |
 | Added | `GetRepayAllLoansConditionsForPlayer` | `CString` |
 | Added | `GetRepayAllLoansCostForPlayer` | `CString` |
 | Added | `GetRepayAllLoansDescriptionForPlayer` | `CString` |
@@ -128,19 +123,24 @@ Changed elements are **not** mentioned here.
 | Added | `HasWarWorthIntelOn( Arg0 )` | `bool` |
 | Added | `IsAutoExpand( Arg0 )` | `bool` |
 | Added | `IsAutoExpandRGO( Arg0 )` | `bool` |
+| Added | `IsDispositionMapPerspectivePlayer` | `bool` |
 | Added | `IsPlayerAlliedWithOtherPlayerInWar( Arg0 )` | `bool` |
 | Added | `IsRepayAllLoansEnabledForPlayer` | `bool` |
 | Added | `IsRepayAllPossibleLoansEnabledForPlayer` | `bool` |
+| Added | `ListNotAutomatedMarkets` | `CString` |
 | Added | `MoveCapitalHere( Arg0 )` | `void` |
 | Added | `OnChangedFreeAutomatedTradeCapacity( Arg0 )` | `void` |
 | Added | `OnRepayAllLoansForPlayer` | `void` |
 | Added | `OnRepayAllPossibleLoansForPlayer` | `void` |
 | Added | `OpenMarketTradesTabWithImportExportFilter( Arg0, Arg1 )` | `void` |
+| Added | `PlayUIEffect( Arg0 )` | `void` |
 | Added | `SelectLocationToBuildByKey( Arg0 )` | `void` |
 | Added | `SetIconAndTextFromTextContext( Arg0 )` | `void` |
 | Added | `ShowChivalricOrderName( Arg0 )` | `CString` |
 | Added | `ShowChivalricOrderNameWithNoTooltip( Arg0 )` | `CString` |
 | Added | `ShowCountryAdvancesView` | `void` |
+| Added | `ShowJominiPrivacyPolicy` | `void` |
+| Added | `ShowJominiUserAgreement` | `void` |
 | Added | `ShowSocietyDirectionIcon( Arg0 )` | `CString` |
 | Added | `ShowSocietyDirectionNameWithIcon( Arg0 )` | `CString` |
 | Added | `ToggleAutoExpandBuilding( Arg0 )` | `void` |
@@ -155,6 +155,9 @@ Changed elements are **not** mentioned here.
 | Added | `bond_interest` | `[unregistered]` |
 | Added | `bond_interest_icon` | `[unregistered]` |
 | Added | `bond_interest_with_icon` | `[unregistered]` |
+| Added | `bureaucracy_type` | `[unregistered]` |
+| Added | `bureaucracy_type_icon` | `[unregistered]` |
+| Added | `bureaucracy_type_with_icon` | `[unregistered]` |
 | Added | `central_bank` | `[unregistered]` |
 | Added | `central_bank_icon` | `[unregistered]` |
 | Added | `central_bank_with_icon` | `[unregistered]` |
@@ -173,6 +176,12 @@ Changed elements are **not** mentioned here.
 | Added | `circle_satisfaction` | `[unregistered]` |
 | Added | `circle_satisfaction_icon` | `[unregistered]` |
 | Added | `circle_satisfaction_with_icon` | `[unregistered]` |
+| Added | `conquest` | `[unregistered]` |
+| Added | `conquest_icon` | `[unregistered]` |
+| Added | `conquest_with_icon` | `[unregistered]` |
+| Added | `court_dialect` | `[unregistered]` |
+| Added | `court_dialect_icon` | `[unregistered]` |
+| Added | `court_dialect_with_icon` | `[unregistered]` |
 | Added | `creditworthiness` | `[unregistered]` |
 | Added | `creditworthiness_icon` | `[unregistered]` |
 | Added | `creditworthiness_with_icon` | `[unregistered]` |
@@ -191,6 +200,9 @@ Changed elements are **not** mentioned here.
 | Added | `estate_religions` | `[unregistered]` |
 | Added | `estate_religions_icon` | `[unregistered]` |
 | Added | `estate_religions_with_icon` | `[unregistered]` |
+| Added | `ethnicity` | `[unregistered]` |
+| Added | `ethnicity_icon` | `[unregistered]` |
+| Added | `ethnicity_with_icon` | `[unregistered]` |
 | Added | `gdp_per_capita` | `[unregistered]` |
 | Added | `gdp_per_capita_icon` | `[unregistered]` |
 | Added | `gdp_per_capita_with_icon` | `[unregistered]` |
@@ -200,6 +212,9 @@ Changed elements are **not** mentioned here.
 | Added | `government_bonds` | `[unregistered]` |
 | Added | `government_bonds_icon` | `[unregistered]` |
 | Added | `government_bonds_with_icon` | `[unregistered]` |
+| Added | `graphical_culture` | `[unregistered]` |
+| Added | `graphical_culture_icon` | `[unregistered]` |
+| Added | `graphical_culture_with_icon` | `[unregistered]` |
 | Added | `great_power_points` | `[unregistered]` |
 | Added | `great_power_points_icon` | `[unregistered]` |
 | Added | `great_power_points_short` | `[unregistered]` |
@@ -218,12 +233,18 @@ Changed elements are **not** mentioned here.
 | Added | `imperial_circles` | `[unregistered]` |
 | Added | `imperial_circles_icon` | `[unregistered]` |
 | Added | `imperial_circles_with_icon` | `[unregistered]` |
+| Added | `liturgical_dialect` | `[unregistered]` |
+| Added | `liturgical_dialect_icon` | `[unregistered]` |
+| Added | `liturgical_dialect_with_icon` | `[unregistered]` |
 | Added | `regional_power` | `[unregistered]` |
 | Added | `regional_power_icon` | `[unregistered]` |
 | Added | `regional_power_with_icon` | `[unregistered]` |
 | Added | `regional_powers` | `[unregistered]` |
 | Added | `regional_powers_icon` | `[unregistered]` |
 | Added | `regional_powers_with_icon` | `[unregistered]` |
+| Added | `secondary_culture` | `[unregistered]` |
+| Added | `secondary_culture_icon` | `[unregistered]` |
+| Added | `secondary_culture_with_icon` | `[unregistered]` |
 | Added | `situation_tension` | `[unregistered]` |
 | Added | `situation_tension_icon` | `[unregistered]` |
 | Added | `situation_tension_with_icon` | `[unregistered]` |
@@ -231,6 +252,9 @@ Changed elements are **not** mentioned here.
 | Added | `spy_network_fog_icon` | `[unregistered]` |
 | Added | `spy_network_fog_with_icon` | `[unregistered]` |
 | Added | `unconditionally_surrenders` | `[unregistered]` |
+| Added | `wealth_impact` | `[unregistered]` |
+| Added | `wealth_impact_icon` | `[unregistered]` |
+| Added | `wealth_impact_with_icon` | `[unregistered]` |
 | Removed | `CanCreateMarketInLocation( Arg0 )` | `bool` |
 | Removed | `CanCreateMarketInLocationTooltip( Arg0 )` | `CString` |
 | Removed | `CanDestroyMarketInLocation( Arg0 )` | `bool` |
@@ -238,4 +262,32 @@ Changed elements are **not** mentioned here.
 | Removed | `GetCreateMarketInLocationPrice( Arg0 )` | `CString` |
 | Removed | `OpenFileDirectory( Arg0 )` | `void` |
 | Removed | `ShowMoveCapital( Arg0 )` | `bool` |
+
+## Global Promotes
+| Type | Promote | Return Type |
+|--|--|--|
+| Added | `CHIVALRIC_ORDER` | `` |
+| Added | `CHIVALRIC_ORDER` | `` |
+| Added | `GetAutoTableWidthFor( Arg0 )` | `` |
+| Added | `GetAutoTableWidthFor( Arg0 )` | `` |
+| Added | `GetQuickBuildingTypeInfo( Arg0 )` | `` |
+| Added | `GetQuickBuildingTypeInfo( Arg0 )` | `` |
+| Added | `GetQuickChivalricOrderMembers( Arg0 )` | `` |
+| Added | `GetQuickChivalricOrderMembers( Arg0 )` | `` |
+| Added | `GetQuickNotableDispositions( Arg0 )` | `` |
+| Added | `GetQuickNotableDispositions( Arg0 )` | `` |
+| Added | `GetQuickTradeOrders( Arg0 )` | `` |
+| Added | `GetQuickTradeOrders( Arg0 )` | `` |
+| Added | `GetQuickUnitAdjustedCount( Arg0 )` | `` |
+| Added | `GetQuickUnitAdjustedCount( Arg0 )` | `` |
+| Added | `IMPERIAL_CIRCLE` | `` |
+| Added | `IMPERIAL_CIRCLE` | `` |
+| Added | `ImportExportModeGetView` | `` |
+| Added | `ImportExportModeGetView` | `` |
+| Added | `StringToIconAndText( Arg0 )` | `` |
+| Added | `StringToIconAndText( Arg0 )` | `` |
+| Added | `TARGET_CHIVALRIC_ORDER` | `` |
+| Added | `TARGET_CHIVALRIC_ORDER` | `` |
+| Added | `TARGET_IMPERIAL_CIRCLE` | `` |
+| Added | `TARGET_IMPERIAL_CIRCLE` | `` |
 
