@@ -120,7 +120,7 @@ adm = 2                           # +2 administrative skill (character)
 
 ## Filter Policy
 
-`sync_reference.py` only mirrors `<EU5>/in_game/` and `<EU5>/main_menu/` (loading_screen / dlc / mod are skipped). On top of that:
+`sync_reference.py` mirrors every top-level directory found directly under `<EU5>/game/` (`in_game/`, `main_menu/`, `loading_screen/`, `dlc/`, and any other directory the installed game ships), except `mod/` (installed Steam Workshop mods — other authors' mods plus this project's own deployed build output — not vanilla/official content, so it's excluded by name; see `EXCLUDED_TOP_LEVEL_DIRS` in `sync_reference.py`). On top of that:
 
 **Directory prunes (before walking):**
 - Any directory named `gfx/` is skipped (asset descriptors, not modding scripts).
