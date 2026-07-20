@@ -1,0 +1,245 @@
+﻿# Fire formation events at game start for tags that exist as already-formed countries.
+# Without this, players starting as e.g. Byzantium never get their destiny tree because
+# the formation event (which sets nd_TAG_formed) only fires when the country is formed
+# from an unformed state.
+on_game_start = {
+	effect = {
+		if = {
+			limit = {
+				exists = c:BOH
+				NOT = { c:BOH = { has_variable = nd_boh_formed } }
+			}
+			c:BOH = { trigger_event_non_silently = nd_boh.1 }
+		}
+		# BYZ deliberately NOT in on_game_start: vanilla 1.2 DLC ships the
+		# Byzantine succession crisis disaster + dense early-game content
+		# that makes the BYZ start uniquely about stabilization. Granting
+		# our timed modifier at game start would undercut that. Game-start
+		# BYZ players earn the formation event by reconquering the 3-city
+		# Komnenian core (see on_four_yearly_check_for_script below).
+		if = {
+			limit = {
+				exists = c:CHI
+				NOT = { c:CHI = { has_variable = nd_chi_formed } }
+			}
+			c:CHI = { trigger_event_non_silently = nd_chi.1 }
+		}
+		if = {
+			limit = {
+				exists = c:CSO
+				NOT = { c:CSO = { has_variable = nd_cso_formed } }
+			}
+			c:CSO = { trigger_event_non_silently = nd_cso.1 }
+		}
+		if = {
+			limit = {
+				exists = c:DAH
+				NOT = { c:DAH = { has_variable = nd_dah_formed } }
+			}
+			c:DAH = { trigger_event_non_silently = nd_dah.1 }
+		}
+		if = {
+			limit = {
+				exists = c:DLH
+				NOT = { c:DLH = { has_variable = nd_dlh_formed } }
+			}
+			c:DLH = { trigger_event_non_silently = nd_dlh.1 }
+		}
+		if = {
+			limit = {
+				exists = c:ETH
+				NOT = { c:ETH = { has_variable = nd_eth_formed } }
+			}
+			c:ETH = { trigger_event_non_silently = nd_eth.1 }
+		}
+		if = {
+			limit = {
+				exists = c:FIN
+				NOT = { c:FIN = { has_variable = nd_fin_formed } }
+			}
+			c:FIN = { trigger_event_non_silently = nd_fin.1 }
+		}
+		if = {
+			limit = {
+				exists = c:HAB
+				NOT = { c:HAB = { has_variable = nd_hab_formed } }
+			}
+			c:HAB = { trigger_event_non_silently = nd_hab.1 }
+		}
+		if = {
+			limit = {
+				exists = c:JAP
+				NOT = { c:JAP = { has_variable = nd_jap_formed } }
+			}
+			c:JAP = { trigger_event_non_silently = nd_jap.1 }
+		}
+		if = {
+			limit = {
+				exists = c:KOJ
+				NOT = { c:KOJ = { has_variable = nd_koj_formed } }
+			}
+			c:KOJ = { trigger_event_non_silently = nd_koj.1 }
+		}
+		if = {
+			limit = {
+				exists = c:LAT
+				NOT = { c:LAT = { has_variable = nd_lat_formed } }
+			}
+			c:LAT = { trigger_event_non_silently = nd_lat.1 }
+		}
+		if = {
+			limit = {
+				exists = c:LIV
+				NOT = { c:LIV = { has_variable = nd_liv_formed } }
+			}
+			c:LIV = { trigger_event_non_silently = nd_liv.1 }
+		}
+		if = {
+			limit = {
+				exists = c:MAL
+				NOT = { c:MAL = { has_variable = nd_mal_formed } }
+			}
+			c:MAL = { trigger_event_non_silently = nd_mal.1 }
+		}
+		if = {
+			limit = {
+				exists = c:MGE
+				NOT = { c:MGE = { has_variable = nd_mge_formed } }
+			}
+			c:MGE = { trigger_event_non_silently = nd_mge.1 }
+		}
+		if = {
+			limit = {
+				exists = c:MIR
+				NOT = { c:MIR = { has_variable = nd_mir_formed } }
+			}
+			c:MIR = { trigger_event_non_silently = nd_mir.1 }
+		}
+		if = {
+			limit = {
+				exists = c:MOR
+				NOT = { c:MOR = { has_variable = nd_mor_formed } }
+			}
+			c:MOR = { trigger_event_non_silently = nd_mor.1 }
+		}
+		if = {
+			limit = {
+				exists = c:POL
+				NOT = { c:POL = { has_variable = nd_pol_formed } }
+			}
+			c:POL = { trigger_event_non_silently = nd_pol.1 }
+		}
+		if = {
+			limit = {
+				exists = c:SWI
+				NOT = { c:SWI = { has_variable = nd_swi_formed } }
+			}
+			c:SWI = { trigger_event_non_silently = nd_swi.1 }
+		}
+		if = {
+			limit = {
+				exists = c:TIB
+				NOT = { c:TIB = { has_variable = nd_tib_formed } }
+			}
+			c:TIB = { trigger_event_non_silently = nd_tib.1 }
+		}
+		if = {
+			limit = {
+				exists = c:YUA
+				NOT = { c:YUA = { has_variable = nd_yua_formed } }
+			}
+			c:YUA = { trigger_event_non_silently = nd_yua.1 }
+		}
+
+		# Static-analyzer hook for tooltip-only path variables: trigger the
+		# anchor event (it self-gates with always=no and never fires, but the
+		# engine still evaluates its trigger block and counts variable reads).
+		random_country = {
+			limit = { always = yes }
+			trigger_event_silently = nd_orphan_anchor.1
+		}
+	}
+}
+
+# Danubian Monarchy succession-question chain advancement.
+# The Reich situation's on_monthly used to do this, but coupling chain
+# advancement to situation activity meant that if the situation ended
+# early (strength path: 80% war score vs Emperor), the chain stopped
+# firing. The chain is a SEPARATE internal pressure from the external
+# pariah situation -- it has to run regardless of situation state.
+#
+# Each chain step uses a TIMED variable set in nd_dnm.1: years = 2/5/8.
+# When the timed var has decayed AND the matching _fired guard is unset,
+# the event fires once and the guard is set. Sequential dependency on
+# the previous step's _fired guard means events fire in narrative order
+# even if game time jumps oddly.
+on_country_yearly_pulse = {
+	effect = {
+		if = {
+			limit = {
+				tag = DNM
+				has_variable = nd_dnm_formed
+				NOT = { has_variable = nd_dnm_chain_30_pending }
+				NOT = { has_variable = nd_dnm_chain_30_fired }
+			}
+			hidden_effect = { set_variable = nd_dnm_chain_30_fired }
+			trigger_event_non_silently = nd_dnm.30
+		}
+		if = {
+			limit = {
+				tag = DNM
+				has_variable = nd_dnm_chain_30_fired
+				NOT = { has_variable = nd_dnm_chain_31_pending }
+				NOT = { has_variable = nd_dnm_chain_31_fired }
+			}
+			hidden_effect = { set_variable = nd_dnm_chain_31_fired }
+			trigger_event_non_silently = nd_dnm.31
+		}
+		if = {
+			limit = {
+				tag = DNM
+				has_variable = nd_dnm_chain_31_fired
+				NOT = { has_variable = nd_dnm_chain_32_pending }
+				NOT = { has_variable = nd_dnm_chain_32_fired }
+			}
+			hidden_effect = { set_variable = nd_dnm_chain_32_fired }
+			trigger_event_non_silently = nd_dnm.32
+		}
+	}
+}
+
+# Achievement-triggered formation events for starting+formable overlaps.
+# The country-start player can't use the formable button (you can't form
+# what you already are), so we check four-yearly whether they have reached
+# the formable's imperial-reach allow conditions. When met, fire the
+# formation event chain. Variable check prevents re-firing.
+on_four_yearly_check_for_script = {
+	effect = {
+		# BYZ achievement: 3-city Komnenian core (Constantinople + Athens +
+		# Iznik). Forces game-start BYZ to actually reconquer territory --
+		# meaningful imperial recovery beyond the starting position --
+		# before earning our formation event and content. Preserves the
+		# vanilla 1.2 DLC's stabilization-focused early game.
+		if = {
+			limit = {
+				exists = c:BYZ
+				NOT = { c:BYZ = { has_variable = nd_byz_formed } }
+				c:BYZ = {
+					# Orthodox is the canonical restoration, but d008 lets BYZ
+					# restore Hellenism (the old Roman religion). Accept both so a
+					# Hellenic revival isn't locked out of the formation event;
+					# nd_byz.1 offers a religion-appropriate choice for each.
+					OR = {
+						religion = religion:orthodox
+						religion = religion:hellenism_religion
+					}
+					owns = location:constantinople
+					owns = location:athens
+					owns = location:iznik
+				}
+			}
+			c:BYZ = { trigger_event_non_silently = nd_byz.1 }
+		}
+	}
+}
+

@@ -1,0 +1,1219 @@
+﻿namespace = nd_dnm
+
+# ==========================================================================
+# DANUBIAN MONARCHY -- the Habsburg dilemma made playable.
+#
+# The form_effect (in formable_countries/99_nd_dnm.txt) has ALREADY:
+#   - set nd_dnm_origin_hab / _hun / _boh in hidden_effect
+#   - ejected the country from the Holy Roman Empire
+#   - granted empire rank
+#   - added stability_severe_bonus
+#   - fired this event via trigger_event_non_silently
+#
+# This file owns ONLY the narrative + the founding path choice and the
+# heritage DHE events. It does NOT repeat the HRE exit or the rank grant.
+# ==========================================================================
+
+# ===== FORMATION EVENT =====
+# You have just walked Austria, Bohemia and Hungary out of the Reich and
+# surrendered the imperial crown. The Emperor's electors and the Pope are
+# not pleased -- but that reckoning is a separate Situation. Here the
+# question is what kind of empire the Danube state will be: the sword of
+# Christendom on the Ottoman line, or a single obedient Gesamtmonarchie.
+nd_dnm.1 = {
+	type = country_event
+	title = nd_dnm.1.t
+	desc = nd_dnm.1.d
+	outcome = neutral
+	fire_only_once = yes
+
+	# Path A : Antemurale Christianitatis -- the bulwark of Christendom.
+	# The Militaergrenze, the Grenzer soldier-colonists, the perpetual
+	# Ottoman war. The Danube line is the empire's reason to exist.
+	option = {
+		name = nd_dnm.1.a
+		add_country_modifier = {
+			modifier = nd_dnm_antemurale_christianitatis
+			years = 45
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = belligerent_vs_conciliatory
+			value = societal_value_large_move_to_left
+		}
+		hidden_effect = {
+			set_variable = nd_formed
+			set_variable = nd_dnm_formed
+			set_variable = nd_dnm_path_a
+			# Grace: 10-year window before disasters can fire (was 25).
+			set_variable = { name = nd_dnm_grace value = yes years = 10 }
+			# 50-year backup escape timer for the Reich situation; the
+			# situation's can_end checks for this variable's absence
+			# together with legitimacy/prestige thresholds.
+			set_variable = { name = nd_dnm_pariah_timer value = yes years = 50 }
+			# Succession Question chain: 3 narrative events that fire at
+			# fixed intervals via timed-variable expiry. Each `_pending` var
+			# decays at the year shown; an on_country_yearly_pulse handler
+			# then fires the matching event and sets a `_fired` guard.
+			set_variable = { name = nd_dnm_chain_30_pending value = yes years = 2 }
+			set_variable = { name = nd_dnm_chain_31_pending value = yes years = 5 }
+			set_variable = { name = nd_dnm_chain_32_pending value = yes years = 8 }
+			activate_situation = situation:nd_dnm_reaction_of_the_reich
+		}
+	}
+	# Path B : Gesamtmonarchie -- the total monarchy. The Hofkammer, the
+	# Hofkriegsrat, the Pragmatic Sanction: three crowns welded into one
+	# administrative body answerable to the Vienna court alone.
+	option = {
+		name = nd_dnm.1.b
+		add_country_modifier = {
+			modifier = nd_dnm_gesamtmonarchie
+			years = 45
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = societal_value_large_move_to_left
+		}
+		hidden_effect = {
+			set_variable = nd_formed
+			set_variable = nd_dnm_formed
+			set_variable = nd_dnm_path_b
+			set_variable = { name = nd_dnm_grace value = yes years = 10 }
+			set_variable = { name = nd_dnm_pariah_timer value = yes years = 50 }
+			set_variable = { name = nd_dnm_chain_30_pending value = yes years = 2 }
+			set_variable = { name = nd_dnm_chain_31_pending value = yes years = 5 }
+			set_variable = { name = nd_dnm_chain_32_pending value = yes years = 8 }
+			activate_situation = situation:nd_dnm_reaction_of_the_reich
+		}
+	}
+}
+
+# ===== HERITAGE ADVANCE EVENTS =====
+
+# DHE 2 : The Military Frontier -- the Militaergrenze institutionalized.
+# Serb, Croat and Vlach colonists settled the Sava-Drava-Danube line under
+# hereditary land tenure in exchange for perpetual border service. A
+# standing wall of soldier-farmers, the largest militarized society in
+# early modern Europe.
+nd_dnm.2 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_militaergrenze
+		has_variable = nd_dnm_formed
+	}
+
+	title = nd_dnm.2.t
+	desc = nd_dnm.2.d
+	outcome = neutral
+
+	# Press the line outward -- the Frontier as a spearhead for reconquest.
+	option = {
+		name = nd_dnm.2.a
+		add_country_modifier = {
+			modifier = nd_dnm_frontier_spearhead
+			years = 20
+			mode = add_and_extend
+		}
+	}
+	# Settle the line inward -- the Frontier as a self-sustaining shield.
+	option = {
+		name = nd_dnm.2.b
+		add_country_modifier = {
+			modifier = nd_dnm_frontier_shield
+			years = 20
+			mode = add_and_extend
+		}
+	}
+}
+
+# DHE 3 : Bila Hora -- the White Mountain, 1620. The Bohemian Estates
+# crushed in an afternoon; the Verneuerte Landesordnung re-Catholicized
+# the Crown of Saint Wenceslas, broke the elective monarchy, and made
+# Bohemia a hereditary Habsburg land. The single most consequential day
+# in the composite monarchy's making.
+nd_dnm.3 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_renewed_constitution
+		has_variable = nd_dnm_formed
+	}
+
+	title = nd_dnm.3.t
+	desc = nd_dnm.3.d
+	outcome = neutral
+
+	# Re-Catholicize by patent -- the Bohemian church remade from above.
+	option = {
+		name = nd_dnm.3.a
+		add_country_modifier = {
+			modifier = nd_dnm_verneuerte_ordnung
+			years = 20
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_move_to_left
+		}
+	}
+	# Bind the new nobility to the crown -- loyalty bought with confiscated land.
+	option = {
+		name = nd_dnm.3.b
+		add_country_modifier = {
+			modifier = nd_dnm_loyal_aristocracy
+			years = 20
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = aristocracy_vs_plutocracy
+			value = societal_value_move_to_left
+		}
+	}
+}
+
+# DHE 4 : The Pragmatic Sanction -- 1713/1723. Charles VI's decree that
+# the Habsburg lands descend "indivisibiliter ac inseparabiliter" as one
+# body, ratified crown by crown. For the first time Austria, Bohemia and
+# Hungary were a single legal person. The constitutional spine of the
+# Gesamtmonarchie -- and the document the War of the Austrian Succession
+# would be fought over.
+nd_dnm.4 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_pragmatic_sanction
+		has_variable = nd_dnm_formed
+	}
+
+	title = nd_dnm.4.t
+	desc = nd_dnm.4.d
+	outcome = neutral
+
+	option = {
+		name = nd_dnm.4.a
+		add_country_modifier = {
+			modifier = nd_dnm_indivisible_realm
+			years = 25
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = centralization_vs_decentralization
+			value = societal_value_move_to_left
+		}
+	}
+}
+
+# DHE 5 : The Theresian-Josephine Reforms -- 1749 onward. The loss of
+# Silesia forced Maria Theresa to remake the state: a unified treasury,
+# the Theresianum, the conscription cantons, the directorium. Joseph II
+# pushed further with the Toleranzpatent and a single bureaucratic
+# language. The composite monarchy became, briefly, a machine.
+nd_dnm.5 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_theresian_reforms
+		has_variable = nd_dnm_formed
+	}
+
+	title = nd_dnm.5.t
+	desc = nd_dnm.5.d
+	outcome = neutral
+
+	# The cameralist machine -- a centralized, taxed, drilled state.
+	option = {
+		name = nd_dnm.5.a
+		add_country_modifier = {
+			modifier = nd_dnm_theresian_machine
+			years = 25
+			mode = add_and_extend
+		}
+	}
+	# The Josephine reach -- tolerance, literacy, the enlightened reform.
+	option = {
+		name = nd_dnm.5.b
+		add_country_modifier = {
+			modifier = nd_dnm_josephine_reach
+			years = 25
+			mode = add_and_extend
+		}
+		change_societal_value = {
+			type = traditionalist_vs_innovative
+			value = societal_value_move_to_right
+		}
+	}
+}
+
+# ==========================================================================
+# ===== DESTINY EVENTS =====
+# One DHE per destiny advance. Root + the two stage-1 openers are single
+# acknowledgements; the stage-2 and stage-3 milestones offer a sub-choice
+# of two timed modifiers (a different reading of the same achievement).
+# ==========================================================================
+
+# --- Root: the destiny is opened ---
+nd_dnm.6 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_destiny
+	}
+
+	title = nd_dnm.6.t
+	desc = nd_dnm.6.d
+	outcome = neutral
+
+	option = {
+		name = nd_dnm.6.a
+	}
+}
+
+# --- A1 : The Long Turkish War (single) ---
+nd_dnm.7 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_sava_line
+	}
+
+	title = nd_dnm.7.t
+	desc = nd_dnm.7.d
+	outcome = neutral
+
+	option = {
+		name = nd_dnm.7.a
+	}
+}
+
+# --- A2 : The Drive Into the Balkans (two choices) ---
+nd_dnm.8 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_balkan_drive
+	}
+
+	title = nd_dnm.8.t
+	desc = nd_dnm.8.d
+	outcome = neutral
+
+	# The hard road: storm the Ottoman fortress belt.
+	option = {
+		name = nd_dnm.8.a
+		add_country_modifier = {
+			modifier = nd_dnm_dest_breaker_of_walls
+			years = 15
+			mode = add_and_extend
+		}
+	}
+	# The light road: the Grenzer war of movement and raid.
+	option = {
+		name = nd_dnm.8.b
+		add_country_modifier = {
+			modifier = nd_dnm_dest_grenzer_tide
+			years = 15
+			mode = add_and_extend
+		}
+	}
+}
+
+# --- A3 : The Eastern Crusade (two choices) ---
+nd_dnm.9 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_eastern_crusade
+	}
+
+	title = nd_dnm.9.t
+	desc = nd_dnm.9.d
+	outcome = neutral
+
+	# Crowned the sword of Christendom -- standing across Catholic Europe.
+	option = {
+		name = nd_dnm.9.a
+		add_country_modifier = {
+			modifier = nd_dnm_dest_sword_of_christendom
+			years = 20
+			mode = add_and_extend
+		}
+	}
+	# The conquering host -- an army that lives off the lands it takes.
+	option = {
+		name = nd_dnm.9.b
+		add_country_modifier = {
+			modifier = nd_dnm_dest_conquering_host
+			years = 20
+			mode = add_and_extend
+		}
+	}
+}
+
+# --- B1 : The Cameral Foundation (single) ---
+nd_dnm.10 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_cameral_foundation
+	}
+
+	title = nd_dnm.10.t
+	desc = nd_dnm.10.d
+	outcome = neutral
+
+	option = {
+		name = nd_dnm.10.a
+	}
+}
+
+# --- B2 : The United Treasury (two choices) ---
+nd_dnm.11 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_united_treasury
+	}
+
+	title = nd_dnm.11.t
+	desc = nd_dnm.11.d
+	outcome = neutral
+
+	# The crown fisc: revenue drawn straight into the Hofkammer.
+	option = {
+		name = nd_dnm.11.a
+		add_country_modifier = {
+			modifier = nd_dnm_dest_crown_fisc
+			years = 15
+			mode = add_and_extend
+		}
+	}
+	# The Danube market: the river as one integrated commercial body.
+	option = {
+		name = nd_dnm.11.b
+		add_country_modifier = {
+			modifier = nd_dnm_dest_danube_market
+			years = 15
+			mode = add_and_extend
+		}
+	}
+}
+
+# --- B3 : The Total Monarchy (two choices) ---
+nd_dnm.12 = {
+	type = country_event
+	fire_only_once = yes
+
+	dynamic_historical_event = {
+		tag = DNM
+		from = 1337.1.1
+		to = 1836.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		has_advance = nd_dnm_dest_total_monarchy
+	}
+
+	title = nd_dnm.12.t
+	desc = nd_dnm.12.d
+	outcome = neutral
+
+	# The cameralist hand -- the estates bound into one obedient machine.
+	option = {
+		name = nd_dnm.12.a
+		add_country_modifier = {
+			modifier = nd_dnm_dest_cameralist_hand
+			years = 20
+			mode = add_and_extend
+		}
+	}
+	# The enlightened state -- a literate, surveyed, single-administered realm.
+	option = {
+		name = nd_dnm.12.b
+		add_country_modifier = {
+			modifier = nd_dnm_dest_enlightened_state
+			years = 20
+			mode = add_and_extend
+		}
+	}
+}
+
+# ==========================================================================
+# CRISIS EVENTS (nd_dnm.13-.29) -- authored by the orchestrator alongside
+# the Reaction-of-the-Reich Situation and the two Disasters. Every
+# set_variable / set_global_variable is in hidden_effect (event hygiene);
+# each variable has an nd_dnm_<var>_tt localization key.
+# ==========================================================================
+
+# ----- THE NATIONALITIES QUESTION (disaster nd_dnm_nationalities_question) -
+
+nd_dnm.13 = {                                   # disaster on_start intro
+	type = country_event
+	title = nd_dnm.13.t
+	desc = nd_dnm.13.d
+	outcome = negative
+	fire_only_once = yes
+	option = { name = nd_dnm.13.a }
+}
+
+nd_dnm.14 = {                                   # a crown's diet defies Vienna
+	type = country_event
+	title = nd_dnm.14.t
+	desc = nd_dnm.14.d
+	outcome = neutral
+	option = {                                  # suppress -- buy time, no resolution
+		name = nd_dnm.14.a
+		add_stability = stability_mild_penalty
+	}
+	option = {                                  # concede autonomy -- the fragmentation path
+		name = nd_dnm.14.b
+		hidden_effect = { set_variable = nd_dnm_nq_resolved }
+	}
+}
+
+nd_dnm.15 = {                                   # the Compromise proposed (Ausgleich offer)
+	type = country_event
+	title = nd_dnm.15.t
+	desc = nd_dnm.15.d
+	outcome = neutral
+	option = {                                  # accept -- reachable via Gesamtmonarchie OR estate goodwill
+		name = nd_dnm.15.a
+		trigger = {
+			OR = {
+				has_variable = nd_dnm_path_b
+				AND = { stability >= 0 legitimacy >= 50 }
+			}
+		}
+		hidden_effect = {
+			set_variable = nd_dnm_ausgleich_reached
+			set_variable = nd_dnm_nq_resolved
+		}
+	}
+	option = {                                  # refuse -- the crisis grinds on
+		name = nd_dnm.15.b
+	}
+}
+
+nd_dnm.16 = {                                   # crush the nationalist leagues
+	type = country_event
+	title = nd_dnm.16.t
+	desc = nd_dnm.16.d
+	outcome = neutral
+	option = {                                  # reassert -- only once control is reclaimed
+		name = nd_dnm.16.a
+		trigger = { average_control_in_home_region >= var:nd_dnm_nq_control_target }
+		hidden_effect = {
+			set_variable = nd_dnm_nq_reasserted
+			set_variable = nd_dnm_nq_resolved
+		}
+	}
+	option = { name = nd_dnm.16.b }             # not yet
+}
+
+nd_dnm.17 = {                                   # disaster on_end: the Ausgleich -- Austria-Hungary
+	type = country_event
+	title = nd_dnm.17.t
+	desc = nd_dnm.17.d
+	outcome = positive
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.17.a
+		add_country_modifier = {
+			modifier = nd_dnm_austria_hungary
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			remove_variable = nd_dnm_nq_resolved
+			remove_variable = nd_dnm_ausgleich_reached
+		}
+	}
+}
+
+nd_dnm.18 = {                                   # disaster on_end: centralized reassertion
+	type = country_event
+	title = nd_dnm.18.t
+	desc = nd_dnm.18.d
+	outcome = positive
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.18.a
+		add_country_modifier = {
+			modifier = nd_dnm_centralized_reassertion
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			remove_variable = nd_dnm_nq_resolved
+			remove_variable = nd_dnm_nq_reasserted
+		}
+	}
+}
+
+nd_dnm.19 = {                                   # disaster on_end: fragmentation
+	# Real territory loss, not just a flat debuff. Models a constituent
+	# crown actually breaking away as a sovereign kingdom: try Hungarian
+	# transdanubia first, fall back to Bohemia if Hungary is already gone,
+	# fall back to the modifier alone if neither is owned. Pattern follows
+	# the vanilla flavor_HAB Galicia-Lodomeria release (create_country_from_
+	# location + every_owned_location transfer with core + integration).
+	type = country_event
+	title = nd_dnm.19.t
+	desc = nd_dnm.19.d
+	outcome = negative
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.19.a
+		hidden_effect = {
+			if = {
+				limit = {
+					any_owned_location = { area = area:transdanubia_area }
+				}
+				random_owned_location = {
+					limit = { area = area:transdanubia_area }
+					save_scope_as = nd_dnm_breakaway_location
+				}
+				scope:nd_dnm_breakaway_location = {
+					create_country_from_location = {
+						save_scope_as = nd_dnm_breakaway_country
+						set_country_rank = country_rank:rank_kingdom
+					}
+				}
+				every_owned_location = {
+					limit = { area = area:transdanubia_area }
+					change_location_owner = scope:nd_dnm_breakaway_country
+					add_core = scope:nd_dnm_breakaway_country
+					change_integration_level = core
+				}
+			}
+			else_if = {
+				limit = {
+					any_owned_location = { area = area:bohemia_area }
+				}
+				random_owned_location = {
+					limit = { area = area:bohemia_area }
+					save_scope_as = nd_dnm_breakaway_location
+				}
+				scope:nd_dnm_breakaway_location = {
+					create_country_from_location = {
+						save_scope_as = nd_dnm_breakaway_country
+						set_country_rank = country_rank:rank_kingdom
+					}
+				}
+				every_owned_location = {
+					limit = { area = area:bohemia_area }
+					change_location_owner = scope:nd_dnm_breakaway_country
+					add_core = scope:nd_dnm_breakaway_country
+					change_integration_level = core
+				}
+			}
+		}
+		add_stability = stability_severe_penalty
+		add_country_modifier = {
+			modifier = nd_dnm_fractured_realm
+			years = 30
+			mode = add_and_extend
+		}
+		hidden_effect = { remove_variable = nd_dnm_nq_resolved }
+	}
+}
+
+# ----- THE PRAGMATIC SANCTION (disaster nd_dnm_pragmatic_sanction_crisis) --
+
+nd_dnm.20 = {                                   # disaster on_start: the succession war
+	type = country_event
+	title = nd_dnm.20.t
+	desc = nd_dnm.20.d
+	outcome = negative
+	fire_only_once = yes
+	option = { name = nd_dnm.20.a }
+}
+
+nd_dnm.21 = {                                   # on_end: the sanction vindicated
+	type = country_event
+	title = nd_dnm.21.t
+	desc = nd_dnm.21.d
+	outcome = positive
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.21.a
+		add_legitimacy = legitimacy_extreme_bonus
+		add_country_modifier = {
+			modifier = nd_dnm_sanction_vindicated
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			remove_variable = nd_dnm_ps_resolved
+			remove_variable = nd_dnm_ps_upheld
+		}
+	}
+}
+
+nd_dnm.22 = {                                   # on_end: the sanction broken
+	type = country_event
+	title = nd_dnm.22.t
+	desc = nd_dnm.22.d
+	outcome = negative
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.22.a
+		add_stability = stability_severe_penalty
+		add_country_modifier = {
+			modifier = nd_dnm_sanction_broken
+			years = 30
+			mode = add_and_extend
+		}
+		hidden_effect = { remove_variable = nd_dnm_ps_resolved }
+	}
+}
+
+nd_dnm.23 = {                                   # the cede escape (one of the disaster's three exits)
+	# Repurposed 2026-05-21 as the EXPLICIT capitulation door for a player
+	# who decides the counter mechanic is unwinnable. Picking option B
+	# sets nd_dnm_ps_ceded which the disaster's can_end uses to trigger
+	# the BROKEN exit (nd_dnm.22). Option A is "fight on" -- it ticks the
+	# counter DOWN a little (the war drags, eats legitimacy) but the
+	# disaster continues toward its counter-based resolution.
+	type = country_event
+	title = nd_dnm.23.t
+	desc = nd_dnm.23.d
+	outcome = neutral
+	option = {                                  # resist by arms -- fight on
+		name = nd_dnm.23.a
+		add_stability = stability_mild_penalty
+		change_variable = { name = nd_dnm_crown_confidence add = -3 }
+	}
+	option = {                                  # negotiate terms -- explicit cede
+		name = nd_dnm.23.b
+		add_stability = stability_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+		hidden_effect = { set_variable = nd_dnm_ps_ceded }
+	}
+}
+
+# nd_dnm.24 deleted (2026-05-21): the old "Secure the Succession" event
+# was the RNG-roll Upheld exit. Replaced by the Crown Confidence counter
+# (nd_dnm_crown_confidence reaching nd_dnm_crown_confidence_target = 80
+# via the events below).
+
+# ==========================================================================
+# THE PRAGMATIC SANCTION DISASTER -- counter-mechanic events (nd_dnm.40-.47)
+# Fire from the disaster's on_monthly random_list (25% an event/month, of
+# which agency events are favored ~5:3 over adverse ones).
+#
+# All events that change the counter use `change_variable` on
+# nd_dnm_crown_confidence. Gold costs are scaled to monthly_income_trade_and_tax
+# with a `max` floor (cap value at -N) so a poor DNM still pays a meaningful
+# minimum and a rich DNM pays more. Magnitudes were chosen so a fully-prepped
+# player (starting at +40) needs ~3-4 successful events to reach the +80
+# target, and an un-prepped player needs ~7 (~2-4 years of disaster).
+# ==========================================================================
+
+# nd_dnm.40 -- An Estate Petitions for Loyalty (UP via gold)
+# A magnate offers to swing his county into line for a fee. Three tiers.
+nd_dnm.40 = {
+	type = country_event
+	title = nd_dnm.40.t
+	desc = nd_dnm.40.d
+	outcome = neutral
+	# A : Spare no expense -- 12 months income, floor 100 gold, +15
+	option = {
+		name = nd_dnm.40.a
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -12
+			max = -100
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 15 }
+	}
+	# B : Moderate sum -- 6 months income, floor 50 gold, +7
+	option = {
+		name = nd_dnm.40.b
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -6
+			max = -50
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 7 }
+	}
+	# C : Refuse -- the magnate finds another patron. -3, estate hit.
+	option = {
+		name = nd_dnm.40.c
+		change_variable = { name = nd_dnm_crown_confidence add = -3 }
+		add_estate_satisfaction = {
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_penalty
+		}
+	}
+}
+
+# nd_dnm.41 -- A Foreign Court Considers Recognition (UP via diplomacy)
+# Diplomatic capital cost, not gold. Same three-tier shape.
+nd_dnm.41 = {
+	type = country_event
+	title = nd_dnm.41.t
+	desc = nd_dnm.41.d
+	outcome = neutral
+	# A : Full diplomatic concessions -- big prestige + stability hit, +12
+	# add_diplomatic_reputation doesn't exist as a direct effect in EU5
+	# (dipl rep is a modifier-only stat). Cost expressed as prestige + stab.
+	option = {
+		name = nd_dnm.41.a
+		add_prestige = prestige_severe_penalty
+		add_stability = stability_mild_penalty
+		change_variable = { name = nd_dnm_crown_confidence add = 12 }
+	}
+	# B : Light concessions -- smaller hit, +6
+	option = {
+		name = nd_dnm.41.b
+		add_prestige = prestige_mild_penalty
+		change_variable = { name = nd_dnm_crown_confidence add = 6 }
+	}
+	# C : Refuse -- foreign court does not press but does not help. -3
+	option = {
+		name = nd_dnm.41.c
+		change_variable = { name = nd_dnm_crown_confidence add = -3 }
+	}
+}
+
+# nd_dnm.42 -- A Pretender Rebellion (military choice)
+# Pretender's faction has gathered force in a province.
+nd_dnm.42 = {
+	type = country_event
+	title = nd_dnm.42.t
+	desc = nd_dnm.42.d
+	outcome = neutral
+	# A : Crush by arms -- manpower hit, +12
+	option = {
+		name = nd_dnm.42.a
+		add_manpower = {
+			value = monthly_manpower
+			multiply = -12
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 12 }
+	}
+	# B : Negotiate amnesty -- gold + 1 stab, +5
+	option = {
+		name = nd_dnm.42.b
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -4
+			max = -40
+		}
+		add_stability = stability_mild_penalty
+		change_variable = { name = nd_dnm_crown_confidence add = 5 }
+	}
+	# C : Ignore -- the rebellion gains ground. -8
+	option = {
+		name = nd_dnm.42.c
+		change_variable = { name = nd_dnm_crown_confidence add = -8 }
+	}
+}
+
+# nd_dnm.43 -- The Sanction Tour (active dynastic campaigning)
+# The monarch personally tours the crown lands.
+nd_dnm.43 = {
+	type = country_event
+	title = nd_dnm.43.t
+	desc = nd_dnm.43.d
+	outcome = neutral
+	# A : Lavish tour -- 8 months income (floor 75), +10, small stab bonus
+	option = {
+		name = nd_dnm.43.a
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -8
+			max = -75
+		}
+		add_stability = stability_mild_bonus
+		change_variable = { name = nd_dnm_crown_confidence add = 10 }
+	}
+	# B : Modest tour -- 3 months income (floor 25), +5
+	option = {
+		name = nd_dnm.43.b
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -3
+			max = -25
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 5 }
+	}
+	# C : Skip -- the dynasty stays at Vienna; -2, nobles unhappy
+	option = {
+		name = nd_dnm.43.c
+		change_variable = { name = nd_dnm_crown_confidence add = -2 }
+		add_estate_satisfaction = {
+			type = estate_type:nobles_estate
+			value = estate_satisfaction_weak_penalty
+		}
+	}
+}
+
+# nd_dnm.44 -- A Crown Defects (adverse, mitigable)
+# A constituent crown's diet has declared the Sanction void on its territory.
+nd_dnm.44 = {
+	type = country_event
+	title = nd_dnm.44.t
+	desc = nd_dnm.44.d
+	outcome = negative
+	# A : Send the army -- manpower hit, +6 (turned defection around)
+	option = {
+		name = nd_dnm.44.a
+		add_manpower = {
+			value = monthly_manpower
+			multiply = -15
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 6 }
+	}
+	# B : Pay the diet off -- heavy gold, +3
+	option = {
+		name = nd_dnm.44.b
+		add_gold = {
+			value = monthly_income_trade_and_tax
+			multiply = -10
+			max = -100
+		}
+		change_variable = { name = nd_dnm_crown_confidence add = 3 }
+	}
+	# C : Concede the principle -- -15, lose ground
+	option = {
+		name = nd_dnm.44.c
+		change_variable = { name = nd_dnm_crown_confidence add = -15 }
+		add_legitimacy = legitimacy_mild_penalty
+	}
+}
+
+# nd_dnm.45 -- A Foreign Court Sponsors a Pretender (adverse)
+# A rival power funds a claim against the dynasty.
+nd_dnm.45 = {
+	type = country_event
+	title = nd_dnm.45.t
+	desc = nd_dnm.45.d
+	outcome = negative
+	# A : Diplomatic counter-pressure -- prestige cost, -2 (limited damage)
+	option = {
+		name = nd_dnm.45.a
+		add_prestige = prestige_mild_penalty
+		change_variable = { name = nd_dnm_crown_confidence add = -2 }
+	}
+	# B : Endure -- -10
+	option = {
+		name = nd_dnm.45.b
+		change_variable = { name = nd_dnm_crown_confidence add = -10 }
+	}
+}
+
+# nd_dnm.46 -- The Tide Turns (positive feedback when winning)
+# Fires only when crown_confidence >= 50.
+nd_dnm.46 = {
+	type = country_event
+	title = nd_dnm.46.t
+	desc = nd_dnm.46.d
+	outcome = positive
+	option = {
+		name = nd_dnm.46.a
+		change_variable = { name = nd_dnm_crown_confidence add = 5 }
+		add_legitimacy = legitimacy_mild_bonus
+	}
+}
+
+# nd_dnm.47 -- The Coalition Tightens (negative feedback when losing)
+# Fires only when crown_confidence <= 20.
+nd_dnm.47 = {
+	type = country_event
+	title = nd_dnm.47.t
+	desc = nd_dnm.47.d
+	outcome = negative
+	option = {
+		name = nd_dnm.47.a
+		change_variable = { name = nd_dnm_crown_confidence add = -5 }
+		add_legitimacy = legitimacy_mild_penalty
+	}
+}
+
+# ----- THE REACTION OF THE REICH (situation nd_dnm_reaction_of_the_reich) -
+
+nd_dnm.25 = {                                   # situation on_start: the rupture aftermath (to DNM)
+	type = country_event
+	title = nd_dnm.25.t
+	desc = nd_dnm.25.d
+	outcome = negative
+	fire_only_once = yes
+	option = { name = nd_dnm.25.a }
+}
+
+nd_dnm.26 = {                                   # the affront, seen from the Reich and the Curia
+	type = country_event
+	title = nd_dnm.26.t
+	desc = nd_dnm.26.d
+	outcome = neutral
+	option = { name = nd_dnm.26.a }
+}
+
+nd_dnm.27 = {                                   # situation flavor pressure (to DNM)
+	# Fires occasionally while the Reich pariah is active. Gated by the
+	# situation's on_monthly to skip if nd_dnm_reich_pressure_recent is
+	# already on the country (6-month cooldown), so the 1-year temporary
+	# debuff never silently stacks past one instance. The bite itself is
+	# tiny -- this is texture during the pariah years, not the headline.
+	type = country_event
+	title = nd_dnm.27.t
+	desc = nd_dnm.27.d
+	outcome = negative
+	option = {
+		name = nd_dnm.27.a
+		add_country_modifier = {
+			modifier = nd_dnm_reich_pressure_recent
+			years = 1
+			mode = add_and_extend
+		}
+	}
+}
+
+# nd_dnm.28 deleted (2026-05-21): the old RNG-based reconciliation exit
+# is replaced by the three-path Reich situation can_end (PS resolved /
+# Reich humbled / endurance with stat thresholds). The disaster's counter
+# mechanic is now the primary driver of the legitimacy exit.
+
+nd_dnm.29 = {                                   # situation on_ended: the reaction subsides (to DNM)
+	type = country_event
+	title = nd_dnm.29.t
+	desc = nd_dnm.29.d
+	outcome = positive
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.29.a
+	}
+}
+
+# ==========================================================================
+# THE SUCCESSION QUESTION CHAIN (nd_dnm.30 / .31 / .32)
+# A 3-event narrative arc fired by the Reich situation's on_monthly when
+# the corresponding _pending timer expires (set in nd_dnm.1 with years =
+# 2 / 5 / 8). Each event sets country flags that feed the Pragmatic
+# Sanction disaster's counter on disaster start: a player who fully prepped
+# enters the disaster with up to +40 of the 80-target Crown Confidence.
+# The chain runs DURING grace; the disaster fires shortly AFTER grace
+# (year ~10).
+#
+# Why country variables (not globals): if DNM is conquered and re-formed by
+# a new player, country variables die with the country. Globals would
+# carry over as a free head start they didn't earn.
+# ==========================================================================
+
+# nd_dnm.30 -- The Question of Inheritance.
+# Year 2 post-formation, no choice. Sets nd_dnm_succession_step = 1 and
+# grants the perpetual nd_dnm_succession_anxiety modifier (a quiet drag on
+# legitimacy + nobles satisfaction). This is the "the realm has not yet
+# answered" beat -- it tells the player the chain has begun and the
+# disaster is on its way.
+nd_dnm.30 = {
+	type = country_event
+	title = nd_dnm.30.t
+	desc = nd_dnm.30.d
+	outcome = negative
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.30.a
+		add_country_modifier = {
+			modifier = nd_dnm_succession_anxiety
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			set_variable = { name = nd_dnm_succession_step value = 1 }
+		}
+	}
+}
+
+# nd_dnm.31 -- The Diets Murmur. Year 5 post-formation, 2 choices.
+# Removes the previous chain modifier (anxiety) so the chain is one
+# narrative thread, not a stack. Sets nd_dnm_succession_step = 2.
+# Choice A (rally) sets the country flag nd_dnm_succession_groundwork
+# which seeds the disaster counter with +15 and is read by nd_dnm.24's
+# Upheld trigger as a third OR-clause.
+nd_dnm.31 = {
+	type = country_event
+	title = nd_dnm.31.t
+	desc = nd_dnm.31.d
+	outcome = neutral
+	fire_only_once = yes
+	immediate = {
+		remove_country_modifier = nd_dnm_succession_anxiety
+	}
+	# A : Rally the estates around the dynasty.
+	option = {
+		name = nd_dnm.31.a
+		add_country_modifier = {
+			modifier = nd_dnm_rallying_the_diets
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			set_variable = { name = nd_dnm_succession_step value = 2 }
+			set_variable = nd_dnm_succession_groundwork
+		}
+	}
+	# B : The court will not be hurried.
+	option = {
+		name = nd_dnm.31.b
+		add_country_modifier = {
+			modifier = nd_dnm_royal_silence
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			set_variable = { name = nd_dnm_succession_step value = 2 }
+		}
+	}
+}
+
+# nd_dnm.32 -- The Decree Drafted. Year 8 post-formation, 2 choices.
+# Removes whichever step-2 modifier is present (only one will be).
+# Sets nd_dnm_succession_step = 3, which is what the disaster's can_start
+# polls for to fire imminently. Choice A (ratify NOW) sets the country
+# flag nd_dnm_decree_ratified which seeds the disaster counter with +25
+# and is read by nd_dnm.24's Upheld trigger as a fourth OR-clause.
+nd_dnm.32 = {
+	type = country_event
+	title = nd_dnm.32.t
+	desc = nd_dnm.32.d
+	outcome = neutral
+	fire_only_once = yes
+	immediate = {
+		remove_country_modifier = nd_dnm_rallying_the_diets
+		remove_country_modifier = nd_dnm_royal_silence
+	}
+	# A : Ratify the decree of indivisibility now -- at a one-shot
+	# stability cost from the rush, plus a perpetual buff modifier.
+	option = {
+		name = nd_dnm.32.a
+		add_stability = stability_mild_penalty
+		add_country_modifier = {
+			modifier = nd_dnm_drafting_the_decree
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			set_variable = { name = nd_dnm_succession_step value = 3 }
+			set_variable = nd_dnm_decree_ratified
+		}
+	}
+	# B : The decree can wait for a wiser reign.
+	option = {
+		name = nd_dnm.32.b
+		add_country_modifier = {
+			modifier = nd_dnm_postponed_decree
+			years = -1
+			mode = add_and_extend
+		}
+		hidden_effect = {
+			set_variable = { name = nd_dnm_succession_step value = 3 }
+		}
+	}
+}
+
+# nd_dnm.33 -- The Reich Humbled (Strength path victory).
+# Fired by the situation's on_monthly when DNM achieves >= 80% war score
+# against the HRE leader. The flag is already set in hidden_effect by the
+# situation's on_monthly (so the can_end clause is satisfied next tick);
+# this event is the player-facing flavor confirming the moment.
+nd_dnm.33 = {
+	type = country_event
+	title = nd_dnm.33.t
+	desc = nd_dnm.33.d
+	outcome = positive
+	fire_only_once = yes
+	option = {
+		name = nd_dnm.33.a
+		add_legitimacy = legitimacy_extreme_bonus
+		add_country_modifier = {
+			modifier = nd_dnm_sanction_vindicated
+			years = 20
+			mode = add_and_extend
+		}
+	}
+}

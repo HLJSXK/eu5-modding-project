@@ -15,7 +15,7 @@ This document explains how Prosper or Perish map modes get their icons displayed
 
 ## Overview
 
-The game resolves map mode icons by **ID-based lookup**. When a map mode is defined with ID `pp_fruit_orchard_capacity`, the game:
+The game resolves map mode icons by **ID-based lookup**. When a map mode is defined with ID `pp_farming_village_capacity`, the game:
 
 1. Uses the **map mode ID** to look up the icon file
 2. Uses **localization keys** for the name and legend text
@@ -25,7 +25,7 @@ The game resolves map mode icons by **ID-based lookup**. When a map mode is defi
 flowchart LR
     subgraph definition [Map Mode Definition]
         A[pp_food_map_modes.txt]
-        A -->|"map mode ID"| B[pp_fruit_orchard_capacity]
+        A -->|"map mode ID"| B[pp_farming_village_capacity]
     end
     
     subgraph localization [Localization]
@@ -36,7 +36,7 @@ flowchart LR
     
     subgraph icons [Icon Assets]
         F[main_menu/gfx/interface/icons/map_modes/]
-        F -->|"<id>.dds"| G[pp_fruit_orchard_capacity.dds]
+        F -->|"<id>.dds"| G[pp_farming_village_capacity.dds]
     end
     
     B --> D
@@ -53,9 +53,9 @@ flowchart LR
 Each map mode block’s key is the **map mode ID**:
 
 ```
-pp_fruit_orchard_capacity = {
+pp_farming_village_capacity = {
     legend_key = {
-        desc = "MAPMODE_PP_FRUIT_ORCHARD_CAPACITY"
+        desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY"
         ...
     }
     ...
@@ -66,9 +66,9 @@ pp_fruit_orchard_capacity = {
 
 | Purpose | Key Pattern | Example |
 |---------|-------------|---------|
-| Picker (short name in map mode selector) | `mapmode_<id>_name` | `mapmode_pp_fruit_orchard_capacity_name` |
-| Legend (full description) | `MAPMODE_<ID>` | `MAPMODE_PP_FRUIT_ORCHARD_CAPACITY` |
-| Tooltip (land locations) | `MAPMODE_<ID>_TT_LAND` | `MAPMODE_PP_FRUIT_ORCHARD_CAPACITY_TT_LAND` |
+| Picker (short name in map mode selector) | `mapmode_<id>_name` | `mapmode_pp_farming_village_capacity_name` |
+| Legend (full description) | `MAPMODE_<ID>` | `MAPMODE_PP_FARMING_VILLAGE_CAPACITY` |
+| Tooltip (land locations) | `MAPMODE_<ID>_TT_LAND` | `MAPMODE_PP_FARMING_VILLAGE_CAPACITY_TT_LAND` |
 
 The legend key `MAPMODE_<ID>` uses the ID in uppercase with underscores.
 
@@ -76,7 +76,7 @@ The legend key `MAPMODE_<ID>` uses the ID in uppercase with underscores.
 
 - **Path:** `main_menu/gfx/interface/icons/map_modes/`
 - **Naming:** `<map_mode_id>.dds`
-- **Example:** Map mode `pp_fruit_orchard_capacity` → `pp_fruit_orchard_capacity.dds`
+- **Example:** Map mode `pp_farming_village_capacity` → `pp_farming_village_capacity.dds`
 
 **Format requirements (Paradox Clausewitz engine):**
 
@@ -110,10 +110,8 @@ The legend key `MAPMODE_<ID>` uses the ID in uppercase with underscores.
 
 | Map Mode ID | Expected Icon File | Definition File |
 |-------------|--------------------|-----------------|
-| `pp_fruit_orchard_capacity` | `pp_fruit_orchard_capacity.dds` | pp_food_map_modes.txt |
-| `pp_fishing_village_capacity` | `pp_fishing_village_capacity.dds` | pp_food_map_modes.txt |
-| `pp_sheep_farms_capacity` | `pp_sheep_farms_capacity.dds` | pp_food_map_modes.txt |
 | `pp_farming_village_capacity` | `pp_farming_village_capacity.dds` | pp_food_map_modes.txt |
+| `pp_fishing_village_capacity` | `pp_fishing_village_capacity.dds` | pp_food_map_modes.txt |
 | `pp_forest_village_capacity` | `pp_forest_village_capacity.dds` | pp_food_map_modes.txt |
 | `pp_local_fruit_output_modifier` | `pp_local_fruit_output_modifier.dds` | pp_local_output_modifier_map_modes.txt |
 | `pp_local_fish_output_modifier` | `pp_local_fish_output_modifier.dds` | pp_local_output_modifier_map_modes.txt |
@@ -145,6 +143,9 @@ The legend key `MAPMODE_<ID>` uses the ID in uppercase with underscores.
 | `pp_local_horses_output_modifier` | `pp_local_horses_output_modifier.dds` | pp_local_output_modifier_map_modes.txt |
 | `pp_unemployed_peasants` | `pp_unemployed_peasants.dds` | pp_unemployed_peasants_map_modes.txt |
 | `pp_population_capacity` | `pp_population_capacity.dds` | pp_population_capacity_map_modes.txt |
+| `pp_building_levels` | `pp_building_levels.dds` (copy of vanilla `building_based.dds`) | pp_building_levels_map_modes.txt |
+| `pp_supported_building_levels` | `pp_supported_building_levels.dds` (copy of `pp_building_levels.dds`) | pp_building_levels_map_modes.txt |
+| `pp_building_efficiency` | `pp_building_efficiency.dds` (copy of `pp_building_levels.dds`) | pp_building_levels_map_modes.txt |
 
 ---
 

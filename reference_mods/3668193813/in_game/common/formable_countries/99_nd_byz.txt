@@ -4,7 +4,22 @@
 	rule = historical
 	potential = {
 		culture = { has_culture_group = culture_group:greek_group }
+		# Vanilla parity: Trebizond uses the separate BYZ_trebizond_f path
+		# (15% territory, legitimist claim). Keep the two mutually exclusive.
+		NOT = { has_or_had_tag = TRE }
 	}
+	# Vanilla-equivalent gate for non-BYZ players forming BYZ (Greek
+	# culture, orthodox, owns Constantinople). Vanilla 1.2 has rich
+	# native BYZ content (greek-group advances, byzantium auto_modifier,
+	# succession crisis disaster, D008 cabinet actions); we don't
+	# tighten the formable allow.
+	#
+	# Game-start BYZ players use a SEPARATE achievement gate in
+	# on_four_yearly_check_for_script (3-city Komnenian core: Constantinople +
+	# Athens + Iznik) -- they already start with Constantinople, so the
+	# achievement requires real reconquest. This preserves the DLC's
+	# stabilization-focused early game instead of dropping a timed modifier
+	# into their lap at game start.
 	allow = {
 		religion = religion:orthodox
 		owns = location:constantinople
@@ -33,6 +48,63 @@
 		if = {
 			limit = { country_rank_level < 4 }
 			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+		trigger_event_non_silently = nd_byz.1
+		add_stability = stability_severe_bonus
+	}
+}
+
+# Trebizond legitimist path to restoring Byzantium. Vanilla defines this as a
+# SEPARATE, easier formable (15% territory vs 50%) reflecting the Komnenos
+# dynasty's claim, gated on has_or_had_tag = TRE and BYZ not already existing.
+# Vanilla's form_effect did NOT fire our formation event, so a Trebizond player
+# restoring Byzantium missed the National Destinies formation choice, timed
+# modifier, and destiny tree. This REPLACE copies the vanilla definition (incl.
+# the d008 restore-Roman-borders casus belli) and appends our formation event +
+# stability bonus, matching the standard BYZ_f path. Forming BYZ from another
+# tag is the "vanilla-equivalent effort" path that earns the event immediately;
+# the game-start achievement gate only protects players who START as BYZ.
+REPLACE:BYZ_trebizond_f = {
+	level = 4
+	required_locations_fraction = 0.15
+	rule = historical
+	potential = {
+		has_or_had_tag = TRE
+		culture = { has_culture_group = culture_group:greek_group }
+	}
+	allow = {
+		religion = religion:orthodox
+		owns = location:constantinople
+		NOT = { country_exists = c:BYZ }
+	}
+
+	name = BYZ
+	flag = BYZ
+	adjective = BYZ_ADJ
+	tag = BYZ
+	color = map_BYZ
+
+	regions = {
+		balkan_region
+		anatolia_region
+	}
+	form_effect = {
+		if = {
+			limit = {
+				NOR = {
+					capital = location:constantinople
+					capital = location:rome
+				}
+			}
+			set_capital = location:constantinople
+		}
+		if = {
+			limit = { country_rank_level < 4 }
+			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+		if = {
+			limit = { has_dlc = "d008_fate_of_the_phoenix" }
+			unlock_casus_belli_effect = { type = cb_restore_roman_borders }
 		}
 		trigger_event_non_silently = nd_byz.1
 		add_stability = stability_severe_bonus

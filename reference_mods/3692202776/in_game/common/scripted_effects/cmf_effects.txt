@@ -5,9 +5,72 @@
 # Args: element (flag)
 cmf_register_scripted_gui = {
     hidden_effect = {
+        # Record the scripted GUI as registered this pass so _cmf_prune_stale_action_bar_elements keeps cmf_has_sgui set.
+        add_to_global_variable_list = {
+            name = _cmf_action_bar_live_sguis
+            target = flag:$element$
+        }
         every_country = {
             remove_from_variable_map = { name = cmf_has_sgui key = flag:$element$ }
             add_to_variable_map = { name = cmf_has_sgui key = flag:$element$ value = 1 }
         }
     }
+}
+
+# Mark a mod active for the current game. Idempotent by mod_id.
+# Mods that register CMM settings are marked active automatically.
+# Scope: any
+# Args: mod_id (key)
+cmf_register_mod = {
+    if = {
+        limit = { NOT = { is_target_in_global_variable_list = { name = cmf_active_mod_ids target = flag:$mod_id$ } } }
+        add_to_global_variable_list = {
+            name = cmf_active_mod_ids
+            target = flag:$mod_id$
+        }
+    }
+
+    # Benign warning suppression
+    cmf_suppress = { v = cmf_active_mod_ids }
+    cmf_suppress = { v = $mod_id$ }
+}
+
+# Freeze the game-start active-mod set for later-load checks.
+# Scope: none
+_cmf_capture_game_start_mods = {
+    every_in_global_list = {
+        variable = cmf_active_mod_ids
+        save_scope_as = _cmf_gsm_mod
+        add_to_global_variable_list = {
+            name = cmf_game_start_mod_ids
+            target = scope:_cmf_gsm_mod
+        }
+    }
+    set_global_variable = { name = cmf_game_start_recorded value = yes }
+
+    # Benign warning suppression
+    cmf_suppress = { v = cmf_game_start_mod_ids }
+    cmf_suppress = { v = cmf_game_start_recorded }
+}
+
+# Register a mod for the pre-game lobby banner. Idempotent by mod_id.
+# Scope: any
+# Args: mod_id (key)
+cmf_register_lobby_banner = {
+    cmf_register_mod = { mod_id = $mod_id$ }
+    if = {
+        limit = { NOT = { has_global_variable = $mod_id$_name } }
+        set_global_variable = { name = $mod_id$_name value = flag:$mod_id$_name }
+        set_global_variable = { name = $mod_id$_desc value = flag:$mod_id$_desc }
+    }
+    if = {
+        limit = { NOT = { is_target_in_global_variable_list = { name = cmf_lobby_banner_mod_ids target = flag:$mod_id$ } } }
+        add_to_global_variable_list = {
+            name = cmf_lobby_banner_mod_ids
+            target = flag:$mod_id$
+        }
+    }
+    # Benign warning suppression
+    cmf_suppress = { v = cmf_lobby_banner_mod_ids }
+    cmf_suppress = { v = $mod_id$ }
 }
