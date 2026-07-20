@@ -33,4 +33,4 @@ build.bat sol_standalone
 build.bat all
 ```
 
-Each target deploys to the EU5 game mod folder under its own target name and creates `build\<target>.zip`.
+Each target deploys to the EU5 game mod folder under its own target name. Normal builds do not write archives into the repository `build\` folder.

@@ -31,7 +31,7 @@ For the default stable deployment, run:
 build.bat
 ```
 
-This also creates `build\stable.zip`.
+This mirrors `src\stable\` into the EU5 game mod folder.
 
 For the SOL standalone deployment, run:
 
@@ -39,7 +39,7 @@ For the SOL standalone deployment, run:
 build.bat sol_standalone
 ```
 
-This deploys `src\sol_standalone\` and creates `build\sol_standalone.zip`.
+This mirrors `src\sol_standalone\` into the EU5 game mod folder.
 
 To build both targets, run:
 
@@ -47,26 +47,12 @@ To build both targets, run:
 build.bat all
 ```
 
-For optional upload to Tencent COS (`modsync/packages/<target>.zip`), run:
-
-```cmd
-build.bat all --upload-cos --cos-bucket <bucket-name> --cos-region <region>
-```
-
-Credentials can come from either arguments or environment variables:
-
-- `--cos-secret-id` / `--cos-secret-key`
-- `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`
-
-Bucket and region can also come from environment variables:
-
-- `TENCENT_COS_BUCKET`
-- `TENCENT_COS_REGION`
-
 This mirrors the selected `src/<target>/` into the existing EU5 mod folder with
 `robocopy /MIR` so debug hot reload can keep watching the same target directory:
 
 `C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\<target>`
+
+Builds no longer write archives into the repository `build\` folder.
 
 If write permission is denied, run terminal as Administrator.
 
