@@ -5,10 +5,9 @@ clergy_goods_demand_modifier blocks, then write REPLACE: override files so
 that SOL_goods_weight_values.txt Part 2 is the sole authority.
 
 Usage:
-    conda run -n eu5 --no-capture-output python scripts/gen_goods_demand_overrides.py [--dry-run]
+    $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_goods_demand_overrides.py [--dry-run]
 
-Note: --no-capture-output is required to avoid conda's GBK re-encoding error on
-Chinese Windows when the output contains non-ASCII characters from vanilla files.
+Note: $env:EU5_PYTHON should point to the eu5 environment's python.exe.
 
 Phase A: For each vanilla source listed in FILES, emit only the definitions
          that carry demand modifier blocks, with those blocks removed, prefixed

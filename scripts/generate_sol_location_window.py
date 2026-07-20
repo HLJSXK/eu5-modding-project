@@ -112,7 +112,7 @@ def main() -> int:
         current = TARGET_PATH.read_text(encoding="utf-8-sig")
         if current != generated:
             print(f"[FAIL] Out of date: {TARGET_PATH.relative_to(REPO_ROOT)}")
-            print(f"       Run: python scripts/generate_sol_location_window.py")
+            print(f"       Run: $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/generate_sol_location_window.py")
             return 1
         print(f"[OK] Up to date: {TARGET_PATH.relative_to(REPO_ROOT)}")
         return 0

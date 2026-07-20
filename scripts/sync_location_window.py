@@ -7,7 +7,7 @@ navigational button in the demography shortcuts row, between AverageSatisfaction
 and the expand spacer.
 
 Run after syncing reference_game_files/ to a new EU5 version:
-  conda run -n eu5 python scripts/sync_location_window.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_location_window.py
 """
 
 import sys

@@ -25,7 +25,7 @@ Implementation: delegates to scripts/scarcity/ submodules.
   scarcity/gui_gen.py        — _parse_goods_prices(), gen_goods_gui_override_file()
 
 Usage:
-    conda run -n eu5 python scripts/gen_scarcity.py [--dry-run]
+    $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scarcity.py [--dry-run]
 """
 
 from __future__ import annotations
@@ -98,9 +98,9 @@ def main() -> None:
 
     if not dry:
         print("\nDone. Run next:")
-        print("  conda run -n eu5 python scripts/sync_location_window.py")
-        print("  conda run -n eu5 python scripts/gen_sol_ui.py --target tooltips")
-        print("  conda run -n eu5 python scripts/validate.py --changed")
+        print("  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_location_window.py")
+        print("  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_ui.py --target tooltips")
+        print("  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed")
 
 
 if __name__ == "__main__":

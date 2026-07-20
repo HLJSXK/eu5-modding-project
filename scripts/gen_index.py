@@ -10,8 +10,8 @@ Scans reference and source files and writes flat text indexes to data/index/:
   loc_keys_en.txt       — all English localization keys in src/
 
 Usage:
-  conda run -n eu5 python scripts/gen_index.py
-  conda run -n eu5 python scripts/gen_index.py --verbose
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_index.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_index.py --verbose
 
 Called automatically by gen_brief.py before generating BRIEF.md.
 """

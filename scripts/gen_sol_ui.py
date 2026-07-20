@@ -3,7 +3,7 @@
 gen_sol_ui.py — legacy generator for UI sections that reference substitute groups.
 
 Usage:
-    python scripts/gen_sol_ui.py [--target all|location|tooltips|gls|effects] [--dry-run]
+    $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_ui.py [--target all|location|tooltips|gls|effects] [--dry-run]
 
 Each target rewrites the content between @GEN_BEGIN/@GEN_END anchors in its file:
   location  -> disabled legacy target; use sync_location_window.py instead
@@ -564,7 +564,7 @@ def gen_effects_phase_g(estate: str) -> str:
 def run_location(dry_run: bool) -> None:
     raise SystemExit(
         "ERROR: --target location is legacy-disabled for EU5 1.3.\n"
-        "Run  conda run -n eu5 python scripts/sync_location_window.py  to sync location_window.gui."
+        "Run  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_location_window.py  to sync location_window.gui."
     )
 
 def run_tooltips(dry_run: bool) -> None:

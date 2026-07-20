@@ -4,7 +4,7 @@ Generate docs/knowledge/BRIEF.md from docs/knowledge/*.yaml.
 Run after editing anti_patterns.yaml or valid_enums.yaml.
 
 Usage:
-  python scripts/gen_brief.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
 """
 
 from datetime import date
@@ -98,7 +98,7 @@ def main():
     )
     lines.append(
         "> Edit `docs/knowledge/anti_patterns.yaml`, `valid_enums.yaml`, or `PROJECT_OVERVIEW.md`, "
-        "then run `python scripts/gen_brief.py`.  "
+        "then run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py`.  "
     )
     lines.append(f"> Last updated: {date.today()}")
     lines.append("")
@@ -147,7 +147,7 @@ def main():
     lines.append("- **Mandatory Step 2/3** for: `blockoverride` names, `custom_tooltip` keys, `situation_card_common` structure, `location_rank:*`, modifier names, scripted triggers/effects, localization YAML encoding, GUI expressions")
     lines.append("- **Verification format**: output `**Verification** — Step [2/3], Reference: file:line, Quote: \"exact text\"` before any code")
     lines.append("- **Bug fix rule**: Replace syntax with verified form; do NOT remove the feature")
-    lines.append("- **Pre-test**: Run `python scripts/validate.py --changed` before launching game")
+    lines.append("- **Pre-test**: Run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed` before launching game")
     lines.append("- **Float precision**: EU5 truncates all floats at 5 decimal places; never emit 6+ dp in mod files")
     lines.append("")
 

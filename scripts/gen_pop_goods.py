@@ -8,14 +8,14 @@ negations for all vanilla goods that have them.
 
 Workflow:
   # One-time bootstrap (reads current inject + vanilla -> writes target_demand.csv)
-  conda run -n eu5 python scripts/gen_pop_goods.py --init
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_pop_goods.py --init
 
   # Design loop (edit CSV -> regenerate inject file)
-  conda run -n eu5 python scripts/gen_pop_goods.py
-  conda run -n eu5 python scripts/gen_pop_goods.py --target stable
-  conda run -n eu5 python scripts/gen_pop_goods.py --check
-  conda run -n eu5 python scripts/gen_demand_csv.py
-  conda run -n eu5 python scripts/validate.py --changed
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_pop_goods.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_pop_goods.py --target stable
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_pop_goods.py --check
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_demand_csv.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed
 
 Idempotency guarantee: given the same target_demand.csv and vanilla files, the output
 z_SOL_pop_goods.txt is byte-identical on every run.

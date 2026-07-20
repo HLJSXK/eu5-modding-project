@@ -4,9 +4,9 @@ EU5 Mod Static Validator
 Catches common errors before game loading. Reads docs/knowledge/*.yaml for patterns.
 
 Usage:
-  python scripts/validate.py                   # validate entire src/
-  python scripts/validate.py src/stable/       # validate one directory
-  python scripts/validate.py --changed         # validate only git-changed files
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py                   # validate entire src/
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py src/stable/       # validate one directory
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed         # validate only git-changed files
 """
 
 import json

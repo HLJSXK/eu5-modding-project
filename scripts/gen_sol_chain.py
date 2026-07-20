@@ -3,10 +3,10 @@
 Run the active SOL code-generation chain for one or more deploy targets.
 
 Usage:
-  python scripts/gen_sol_chain.py
-  python scripts/gen_sol_chain.py --target stable
-  python scripts/gen_sol_chain.py --target sol_standalone
-  python scripts/gen_sol_chain.py --check
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target stable
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_standalone
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --check
 """
 
 import argparse

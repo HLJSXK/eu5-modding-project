@@ -6,7 +6,7 @@ Usage:
   1. Edit generate_sol_icon_config.json if needed.
   2. Set PACKY_API_KEY, PACKY_SORA_TOKEN, RIGHT_API_KEY, or OPENAI_API_KEY,
      or put api.api_key in generate_sol_icon.local.json.
-  3. Run: PYTHONUTF8=1 conda run -n eu5 python scripts/generate_sol_icon.py
+  3. Run: $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/generate_sol_icon.py
 
 The output DDS files are intended to be reused by the SOL situation, the SOL
 mapmode, and the location-window SOL button.

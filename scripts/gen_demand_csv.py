@@ -6,8 +6,8 @@ Also optionally rewrites the comment blocks above each INJECT entry in
 z_SOL_pop_goods.txt so they reflect the actual computed net demand values.
 
 Usage:
-  python scripts/gen_demand_csv.py                    # generate CSV only
-  python scripts/gen_demand_csv.py --update-comments  # also rewrite comments
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_demand_csv.py                    # generate CSV only
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_demand_csv.py --update-comments  # also rewrite comments
 """
 
 import csv
