@@ -122,6 +122,14 @@ if /I "%TARGET_SELECTION%"=="stable" (
     goto usage
 )
 
+for %%T in (%BUILD_TARGETS%) do (
+    if /I "%%~T"=="sol_standalone" (
+        echo [INFO] Regenerating SOL standalone location_window.gui...
+        python "%REPO_ROOT%scripts\generate_sol_location_window.py"
+        if errorlevel 1 exit /b 1
+    )
+)
+
 if "%COS_SECRET_ID%"=="" if not "%TENCENT_SECRET_ID%"=="" set "COS_SECRET_ID=%TENCENT_SECRET_ID%"
 if "%COS_SECRET_KEY%"=="" if not "%TENCENT_SECRET_KEY%"=="" set "COS_SECRET_KEY=%TENCENT_SECRET_KEY%"
 

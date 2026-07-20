@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""
+Generate the SOL standalone location window override from the vanilla reference.
+
+The generated file is intentionally vanilla `location_window.gui` plus the two SOL
+touch points needed by the standalone UI:
+  1. use local_sol_total_income for the income display
+  2. add the SOL living-standard tooltip button in the location stat row
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_PATH = REPO_ROOT / "reference_game_files" / "game" / "in_game" / "gui" / "location_window.gui"
+TARGET_PATH = REPO_ROOT / "src" / "sol_standalone" / "in_game" / "gui" / "location_window.gui"
+
+VANILLA_INCOME = 'raw_text = "[Location.GetTotalIncome|g2]@income!"'
+SOL_INCOME = 'raw_text = "[Location.MakeScope.ScriptValue(\'local_sol_total_income\')|g2]@income!"'
+
+BUTTON_ANCHOR_RE = re.compile(
+    r"(?m)^\s*expand = \{\}\s*\n\s*subheader_unified_icon = \{\s*\n"
+    r'\s*visible = "\[HasPopBreakdownIntelOn\(Location\.Self\)\]"'
+)
+
+SOL_BUTTON = """							# SOL standalone insertion: location living-standard tooltip.
+							navigational_button_alt = {
+								size = {38 38}
+
+								blockoverride "icon_texture" {
+									piechart = {
+										parentanchor = center
+										size = { 70% 70% }
+										alwaystransparent = yes
+
+										hbox = {
+											widget = {
+												using = layoutpolicy_expanding
+												icon = {
+													size = { 100% 100% }
+													parentanchor = center
+													name = "stat_sol_living_standard"
+													texture = "gfx/interface/icons/sol/sol_living_standard.dds"
+													texture_density = 2
+												}
+											}
+										}
+										using = bg_circle_piechart
+									}
+								}
+
+								tooltipwidget = {
+									using = StandardofLiving_tooltip
+								}
+							}
+
+"""
+
+
+def generate() -> str:
+    if not SOURCE_PATH.exists():
+        raise FileNotFoundError(f"Reference file not found: {SOURCE_PATH}")
+
+    text = SOURCE_PATH.read_text(encoding="utf-8-sig")
+
+    income_count = text.count(VANILLA_INCOME)
+    if income_count != 1:
+        raise RuntimeError(
+            f"Expected exactly one vanilla income anchor, found {income_count}: {VANILLA_INCOME}"
+        )
+    text = text.replace(VANILLA_INCOME, SOL_INCOME, 1)
+
+    anchor_matches = list(BUTTON_ANCHOR_RE.finditer(text))
+    if len(anchor_matches) != 1:
+        raise RuntimeError(
+            "Expected exactly one SOL button insertion anchor near the migration stat row, "
+            f"found {len(anchor_matches)}."
+        )
+    insert_at = anchor_matches[0].start()
+    text = text[:insert_at] + SOL_BUTTON + text[insert_at:]
+
+    return text
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Return non-zero if the target does not match the generated output.",
+    )
+    args = parser.parse_args()
+
+    generated = generate()
+
+    if args.check:
+        if not TARGET_PATH.exists():
+            print(f"[FAIL] Missing generated target: {TARGET_PATH.relative_to(REPO_ROOT)}")
+            return 1
+        current = TARGET_PATH.read_text(encoding="utf-8-sig")
+        if current != generated:
+            print(f"[FAIL] Out of date: {TARGET_PATH.relative_to(REPO_ROOT)}")
+            print(f"       Run: python scripts/generate_sol_location_window.py")
+            return 1
+        print(f"[OK] Up to date: {TARGET_PATH.relative_to(REPO_ROOT)}")
+        return 0
+
+    TARGET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TARGET_PATH.write_text(generated, encoding="utf-8")
+    print(f"[OK] Generated {TARGET_PATH.relative_to(REPO_ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
