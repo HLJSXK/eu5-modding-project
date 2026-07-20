@@ -4,7 +4,7 @@ This repository now focuses on EU5 mod development only.
 
 ## Scope
 
-- Mod source development (`src/stable`, `src/develop`)
+- Mod source development (`src/stable`, `src/sol_standalone`)
 - Modding knowledge base and design documents
 - Community and vanilla reference files for research
 
@@ -19,13 +19,13 @@ This repository keeps only mod-related content and documentation.
 ## Quick Start (Modding)
 
 1. Clone repository
-2. Use `src/stable/` as baseline for practical balance mods
-3. Use `src/develop/` as reference for the Dynamic Missions system (development paused)
+2. Use `src/stable/` as the full stable mod target
+3. Use `src/sol_standalone/` for the SOL-only standalone target
 4. Read technical docs in `docs/technical/`
 
-## Build / Deploy (Stable)
+## Build / Deploy
 
-For a simple local deployment, run:
+For the default stable deployment, run:
 
 ```cmd
 build.bat
@@ -33,10 +33,24 @@ build.bat
 
 This also creates `build\stable.zip`.
 
-For optional upload to Tencent COS (`modsync/packages/stable.zip`), run:
+For the SOL standalone deployment, run:
 
 ```cmd
-build.bat --upload-cos --cos-bucket <bucket-name> --cos-region <region>
+build.bat sol_standalone
+```
+
+This deploys `src\sol_standalone\` and creates `build\sol_standalone.zip`.
+
+To build both targets, run:
+
+```cmd
+build.bat all
+```
+
+For optional upload to Tencent COS (`modsync/packages/<target>.zip`), run:
+
+```cmd
+build.bat all --upload-cos --cos-bucket <bucket-name> --cos-region <region>
 ```
 
 Credentials can come from either arguments or environment variables:
@@ -49,10 +63,10 @@ Bucket and region can also come from environment variables:
 - `TENCENT_COS_BUCKET`
 - `TENCENT_COS_REGION`
 
-This mirrors `src/stable/` into the existing EU5 mod folder with `robocopy /MIR`
-so debug hot reload can keep watching the same target directory:
+This mirrors the selected `src/<target>/` into the existing EU5 mod folder with
+`robocopy /MIR` so debug hot reload can keep watching the same target directory:
 
-`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\stable`
+`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\<target>`
 
 If write permission is denied, run terminal as Administrator.
 

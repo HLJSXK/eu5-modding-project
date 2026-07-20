@@ -1,108 +1,34 @@
 # Source Files
 
-This directory contains mod source files and templates for the EU5 Modding Project.
+This directory contains deployable EU5 mod source targets.
 
-## Structure
+## Targets
 
 ### `stable/`
 
-The **stable branch** of the EU5 MP mod, based on reference mod **3644897537** (Amalgamation Synergy). This is the primary mod used in MP sessions, providing a well-tested set of gameplay balance tweaks.
+The full stable mod used for MP balance work. It includes the broader gameplay balance package, including SOL, war/economy balance, UI, and supporting systems.
 
-**Features:**
-- **War Mechanics** - Harsher war exhaustion, more impactful occupation
-- **Anti-Snowballing** - Progressive build cost increases, halved base RGO size
-- **Tax Efficiency** - Rebalanced tax efficiency system
-- **Colonial Restrictions** - AI colonization limits, historical colonizer exceptions
-- **Price Rebalancing** - Scaled gold transfers, adjusted diplomatic costs
-- **Little Ice Age** - More forgiving ice age event penalties
+### `sol_standalone/`
 
-**Status:** Active, stable — primary mod for MP sessions.
+Standalone Standard of Living target. It keeps only the SOL income and demand pipeline plus the related UI:
 
-**Usage:**
-1. Copy the `stable/` directory to your EU5 mod folder:
-   ```
-   Documents/Paradox Interactive/Europa Universalis V/mod/
-   ```
-2. Enable in the launcher
+- calibrated pop-demand baseline
+- location income and liquid-funds calculations
+- market unit-spending cache
+- monthly `local_pop_demand` modifier application
+- Global Living Standard situation panel
+- SOL map mode and location tooltip
 
-For detailed documentation, see [stable/README.md](stable/README.md).
+It excludes non-SOL systems from `stable`, including war balance, migration compatibility events, CMM toggles, age escalation, GDP-to-development, diplomacy costs, and difficulty rebalance.
 
-### `develop/`
+## Build
 
-The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system. Development is currently paused.
+From the repository root:
 
-**Features:**
-- **Establish New City Mission** - Multi-stage city development system
-- **Large Research Project Mission** - Research and innovation mechanics
-- **Custom GUI** - Situation panels and interfaces
-- **Full localization** - English and Simplified Chinese
+```cmd
+build.bat stable
+build.bat sol_standalone
+build.bat all
+```
 
-**Status:** Paused (last active 2026-03-31).
-
-For detailed documentation, see the [Dynamic Missions Design](../docs/archive/dynamic_missions/Dynamic_Missions_Design.md) documents.
-
-### Mod Base Choice
-
-For new work, choose one of the maintained bases:
-
-- **`stable/`** for production-ready multiplayer balance changes
-- **`develop/`** for dynamic mission systems and advanced scripted workflows
-
-**Usage:**
-1. Copy either `stable/` or `develop/` to your EU5 mod folder:
-   ```
-   Documents/Paradox Interactive/Europa Universalis V/mod/
-   ```
-2. Rename the copied directory to your mod's name
-3. Modify the files to create your custom mod
-4. Update `.metadata/metadata.json` with your mod's information
-
-## Dual-Mod Strategy
-
-As of 2026-03-31, the project maintains two parallel mods:
-
-| Mod | Directory | Status | Focus |
-|-----|-----------|--------|-------|
-| Stable | `src/stable/` | Active | Game balance (based on ref mod 3644897537) |
-| Develop | `src/develop/` | Paused | Dynamic mission system |
-
-The `stable` mod provides the core MP balance experience, while `develop` is the active feature branch for Dynamic Missions.
-
-## Creating New Mods
-
-When creating a new mod:
-
-1. **Start with stable**: Copy `stable/` as your base for reliable gameplay mods
-2. **Reference develop**: Study `develop/` for complex features
-3. **Follow naming conventions**: Use a consistent prefix for all your files (e.g., `mymod_`)
-4. **Use UTF-8-BOM encoding**: All `.yml` localization files must use UTF-8 with BOM
-5. **Test frequently**: Enable debug mode in EU5 and test after each change
-6. **Document your code**: Add comments explaining complex logic
-
-## Guidelines
-
-- Follow EU5 scripting conventions as documented in `/docs/technical/EU5_Mod_Framework_Guide.md`
-- Reference `/docs/technical/EU5_Mod_Framework_Guide.md` for common patterns
-- Use `stable/` as a clean, maintained starting point
-- Keep your mod files organized by feature or system
-- Test all changes in debug mode before releasing
-
-## Resources
-
-- [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding reference
-- [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical development framework
-- [Stable Mod README](stable/README.md) - Stable mod documentation
-- [Develop Mod README](develop/README.md) - Dynamic missions mod documentation
-- [Dynamic Missions Framework](../docs/archive/dynamic_missions/Dynamic_Missions_Framework_Architecture.md) - Technical architecture (paused)
-
-
-## Community Mod References
-
-For additional learning resources, see the [Community Mod References](../reference_mods/) directory, which contains community mods from Steam Workshop. These mods provide:
-
-- **Real-world examples** of mod structure and organization
-- **Vanilla game variables** and definitions used in actual mods
-- **Code patterns** from successful community mods
-- **Different mod types** - translations, gameplay, UI, mechanics
-
-Browse the [Reference Mods Index](../reference_mods/MOD_INDEX.md) for detailed information about each mod.
+Each target deploys to the EU5 game mod folder under its own target name and creates `build\<target>.zip`.

@@ -1,30 +1,35 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Build/deploy script for stable mod with optional COS upload.
+REM Build/deploy script for mod targets with optional COS upload.
 REM Deployment mirrors files into the existing target root so EU5 debug hot reload
 REM can keep watching the same directory handle.
 REM Default deploy target:
 REM   C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod
 REM
-REM Optional upload destination (fixed object key):
+REM Target archives:
+REM   build\stable.zip
+REM   build\sol_standalone.zip
+REM
+REM Optional upload destinations:
 REM   modsync/packages/stable.zip
+REM   modsync/packages/sol_standalone.zip
 REM
 REM Usage examples:
 REM   build.bat
-REM   build.bat --upload-cos --cos-bucket your-bucket-1250000000 --cos-region ap-shanghai
-REM   build.bat --upload-cos --cos-secret-id xxx --cos-secret-key yyy --cos-bucket bkt-1250000000 --cos-region ap-guangzhou
+REM   build.bat sol_standalone
+REM   build.bat --target sol_standalone
+REM   build.bat --all
+REM   build.bat all --upload-cos --cos-bucket your-bucket-1250000000 --cos-region ap-shanghai
 REM
 REM Credential fallback order:
 REM   1) --cos-secret-id / --cos-secret-key
 REM   2) TENCENT_SECRET_ID / TENCENT_SECRET_KEY environment variables
 
 set "REPO_ROOT=%~dp0"
-set "SOURCE_DIR=%REPO_ROOT%src\stable"
 set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
-set "TARGET_DIR=%TARGET_ROOT%\stable"
 set "BUILD_DIR=%REPO_ROOT%build"
-set "ZIP_PATH=%BUILD_DIR%\stable.zip"
+set "TARGET_SELECTION=stable"
 
 set "UPLOAD_COS=0"
 set "COS_SECRET_ID="
@@ -34,6 +39,33 @@ set "COS_REGION=%TENCENT_COS_REGION%"
 
 :parse_args
 if "%~1"=="" goto args_done
+if /I "%~1"=="stable" (
+    set "TARGET_SELECTION=stable"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="sol_standalone" (
+    set "TARGET_SELECTION=sol_standalone"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="all" (
+    set "TARGET_SELECTION=all"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--target" (
+    if "%~2"=="" goto arg_error
+    set "TARGET_SELECTION=%~2"
+    shift
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--all" (
+    set "TARGET_SELECTION=all"
+    shift
+    goto parse_args
+)
 if /I "%~1"=="--upload-cos" (
     set "UPLOAD_COS=1"
     shift
@@ -79,6 +111,17 @@ goto usage
 
 :args_done
 
+if /I "%TARGET_SELECTION%"=="stable" (
+    set "BUILD_TARGETS=stable"
+) else if /I "%TARGET_SELECTION%"=="sol_standalone" (
+    set "BUILD_TARGETS=sol_standalone"
+) else if /I "%TARGET_SELECTION%"=="all" (
+    set "BUILD_TARGETS=stable sol_standalone"
+) else (
+    echo [ERROR] Unknown target: %TARGET_SELECTION%
+    goto usage
+)
+
 if "%COS_SECRET_ID%"=="" if not "%TENCENT_SECRET_ID%"=="" set "COS_SECRET_ID=%TENCENT_SECRET_ID%"
 if "%COS_SECRET_KEY%"=="" if not "%TENCENT_SECRET_KEY%"=="" set "COS_SECRET_KEY=%TENCENT_SECRET_KEY%"
 
@@ -91,7 +134,7 @@ if "%COS_SECRET_KEY%"=="" if not "%TENCENTCLOUD_SECRET_KEY%"=="" set "COS_SECRET
 echo [INFO] Running static validator on changed files...
 set "PYTHONUTF8=1"
 set "VALIDATE_OUT=%TEMP%\sol_validate_out.txt"
-call conda run --no-capture-output -n eu5 python "%REPO_ROOT%scripts\validate.py" --changed > "!VALIDATE_OUT!" 2>&1
+python "%REPO_ROOT%scripts\validate.py" --changed > "!VALIDATE_OUT!" 2>&1
 set "VALIDATE_RC=!errorlevel!"
 type "!VALIDATE_OUT!"
 del "!VALIDATE_OUT!" 2>nul
@@ -107,11 +150,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%SOURCE_DIR%" (
-    echo [ERROR] Source directory not found: "%SOURCE_DIR%"
-    exit /b 1
-)
-
 if not exist "%TARGET_ROOT%" (
     echo [INFO] Target root not found. Creating: "%TARGET_ROOT%"
     mkdir "%TARGET_ROOT%"
@@ -121,13 +159,43 @@ if not exist "%TARGET_ROOT%" (
     )
 )
 
+if "%UPLOAD_COS%"=="1" (
+    call :prepare_cos_upload
+    if errorlevel 1 exit /b 1
+)
+
+for %%T in (%BUILD_TARGETS%) do (
+    call :deploy_target "%%~T"
+    if errorlevel 1 exit /b 1
+
+    if "%UPLOAD_COS%"=="1" (
+        call :upload_target "%%~T"
+        if errorlevel 1 exit /b 1
+    )
+)
+
+echo [OK] Build completed for: %BUILD_TARGETS%
+exit /b 0
+
+:deploy_target
+setlocal
+set "TARGET_NAME=%~1"
+set "SOURCE_DIR=%REPO_ROOT%src\%TARGET_NAME%"
+set "TARGET_DIR=%TARGET_ROOT%\%TARGET_NAME%"
+set "ZIP_PATH=%BUILD_DIR%\%TARGET_NAME%.zip"
+
+if not exist "%SOURCE_DIR%" (
+    echo [ERROR] Source directory not found: "%SOURCE_DIR%"
+    exit /b 1
+)
+
 echo [INFO] Mirroring "%SOURCE_DIR%" to "%TARGET_DIR%"
 robocopy "%SOURCE_DIR%" "%TARGET_DIR%" /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
 set "ROBOCOPY_RC=!errorlevel!"
 
 REM Robocopy exit code: 0-7 success, 8+ failure
 if !ROBOCOPY_RC! GEQ 8 (
-    echo [ERROR] Copy failed. Robocopy exit code: !ROBOCOPY_RC!
+    echo [ERROR] Copy failed for %TARGET_NAME%. Robocopy exit code: !ROBOCOPY_RC!
     exit /b 1
 )
 cmd /c "exit /b 0"
@@ -142,12 +210,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [OK] Stable mod deployed successfully.
+echo [OK] %TARGET_NAME% deployed successfully.
 echo [OK] Target: "%TARGET_DIR%"
 echo [OK] Archive: "%ZIP_PATH%"
+endlocal
+exit /b 0
 
-if "%UPLOAD_COS%"=="0" exit /b 0
-
+:prepare_cos_upload
 if "%COS_SECRET_ID%"=="" (
     echo [ERROR] COS upload requested but secret id is missing.
     echo         Use --cos-secret-id or set one of:
@@ -189,23 +258,37 @@ if errorlevel 1 (
         exit /b 1
     )
 )
+exit /b 0
 
-echo [INFO] Uploading "%ZIP_PATH%" to COS: modsync/packages/stable.zip
-python "%REPO_ROOT%tools\upload_cos.py" --file "%ZIP_PATH%" --bucket "%COS_BUCKET%" --region "%COS_REGION%" --secret-id "%COS_SECRET_ID%" --secret-key "%COS_SECRET_KEY%" --key "modsync/packages/stable.zip"
+:upload_target
+setlocal
+set "TARGET_NAME=%~1"
+set "ZIP_PATH=%BUILD_DIR%\%TARGET_NAME%.zip"
+set "COS_KEY=modsync/packages/%TARGET_NAME%.zip"
+
+echo [INFO] Uploading "%ZIP_PATH%" to COS: %COS_KEY%
+python "%REPO_ROOT%tools\upload_cos.py" --file "%ZIP_PATH%" --bucket "%COS_BUCKET%" --region "%COS_REGION%" --secret-id "%COS_SECRET_ID%" --secret-key "%COS_SECRET_KEY%" --key "%COS_KEY%"
 if errorlevel 1 (
-    echo [ERROR] COS upload failed.
+    echo [ERROR] COS upload failed for %TARGET_NAME%.
     exit /b 1
 )
 
-echo [OK] COS upload completed: cos://%COS_BUCKET%/modsync/packages/stable.zip
+echo [OK] COS upload completed: cos://%COS_BUCKET%/%COS_KEY%
+endlocal
 exit /b 0
 
 :usage
 echo Usage:
-echo   build.bat [--upload-cos] [--cos-secret-id ID] [--cos-secret-key KEY] [--cos-bucket BUCKET] [--cos-region REGION]
+echo   build.bat [stable^|sol_standalone^|all] [--target TARGET] [--all] [--upload-cos] [--cos-secret-id ID] [--cos-secret-key KEY] [--cos-bucket BUCKET] [--cos-region REGION]
+echo.
+echo Targets:
+echo   stable          Build and deploy src\stable to mod\stable and build\stable.zip.
+echo   sol_standalone  Build and deploy src\sol_standalone to mod\sol_standalone and build\sol_standalone.zip.
+echo   all             Build and deploy both targets.
 echo.
 echo Notes:
-echo   - If --upload-cos is omitted, script only deploys and creates stable.zip.
+echo   - If no target is provided, script builds stable.
+echo   - If --upload-cos is omitted, script only deploys and creates zip archives.
 echo   - Credentials can come from TENCENT_SECRET_ID and TENCENT_SECRET_KEY.
 echo   - Bucket/region can come from TENCENT_COS_BUCKET and TENCENT_COS_REGION.
 exit /b 1
