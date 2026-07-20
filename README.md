@@ -25,6 +25,14 @@ This repository keeps only mod-related content and documentation.
 
 ## Build / Deploy
 
+Generated SOL sources are refreshed automatically before validation/deploy.
+To run the generation chain without deploying:
+
+```cmd
+python scripts\gen_sol_chain.py --target all
+python scripts\gen_sol_chain.py --target all --check
+```
+
 For the default stable deployment, run:
 
 ```cmd

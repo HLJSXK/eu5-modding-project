@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate src/stable/in_game/common/goods/z_SOL_pop_goods.txt from data/target_demand.csv.
+Generate z_SOL_pop_goods.txt for SOL source targets from data/target_demand.csv.
 
 target_demand.csv is the single source of truth for desired net demand per good per pop type.
 This script derives the required demand_add injections and emits wealth_impact_threshold
@@ -12,6 +12,8 @@ Workflow:
 
   # Design loop (edit CSV -> regenerate inject file)
   conda run -n eu5 python scripts/gen_pop_goods.py
+  conda run -n eu5 python scripts/gen_pop_goods.py --target stable
+  conda run -n eu5 python scripts/gen_pop_goods.py --check
   conda run -n eu5 python scripts/gen_demand_csv.py
   conda run -n eu5 python scripts/validate.py --changed
 
@@ -32,11 +34,12 @@ if hasattr(sys.stdout, "reconfigure"):
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SIMULATOR_DIR))
 
-from parser import (  # noqa: E402  (local import after sys.path manipulation)
+from tools.sol_demand_simulator.parser import (  # noqa: E402  (local import after sys.path manipulation)
     EU5_POP_TYPES,
-    INJECT_FILE,
+    INJECT_FILE as DEFAULT_INJECT_FILE,
     VANILLA_GOODS_DIR,
     _collect_brace_block,
     _find_sub_block,
@@ -48,6 +51,9 @@ from parser import (  # noqa: E402  (local import after sys.path manipulation)
 )
 
 TARGET_CSV = REPO_ROOT / "data" / "target_demand.csv"
+TARGET_NAMES = ("stable", "sol_standalone")
+DEFAULT_BOOTSTRAP_TARGET = "stable"
+UTF8_BOM = b"\xef\xbb\xbf"
 
 POP_TYPE_ORDER: List[str] = list(EU5_POP_TYPES)
 # nobles, clergy, burghers, laborers, peasants, soldiers, tribesmen
@@ -80,6 +86,28 @@ FILE_HEADER = """\
 #      compound an already-multiplied value and is not permitted in this mod.
 #      General theme: reduce noble over-representation on military/luxury goods,
 #      spread demand to burghers/clergy, rebalance food multipliers."""
+
+
+def _inject_file_for_target(target: str) -> Path:
+    if target not in TARGET_NAMES:
+        raise ValueError(f"Unknown target: {target}")
+    return REPO_ROOT / "src" / target / "in_game" / "common" / "goods" / "z_SOL_pop_goods.txt"
+
+
+def _resolve_targets(target: str) -> List[str]:
+    if target == "all":
+        return list(TARGET_NAMES)
+    if target in TARGET_NAMES:
+        return [target]
+    raise ValueError(f"Unknown target: {target}")
+
+
+def _has_utf8_bom(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(3) == UTF8_BOM
+    except FileNotFoundError:
+        return False
 
 
 @dataclass
@@ -382,7 +410,7 @@ def _read_inject_dev_thresh(good: str, inject_text: str) -> Optional[float]:
     return float(dev_m.group(1)) if dev_m else None
 
 
-def init_target_csv(output_path: Path, force: bool) -> None:
+def init_target_csv(output_path: Path, force: bool, inject_file: Path = DEFAULT_INJECT_FILE) -> None:
     """
     Bootstrap target_demand.csv from the current inject file and vanilla goods files.
 
@@ -401,8 +429,8 @@ def init_target_csv(output_path: Path, force: bool) -> None:
 
     vanilla_net = _compute_vanilla_net()
     vanilla_thresh = _load_vanilla_thresholds()
-    inject_data = _parse_inject_file(INJECT_FILE)
-    inject_text = _read(INJECT_FILE)
+    inject_data = _parse_inject_file(inject_file)
+    inject_text = _read(inject_file)
 
     ordered = _vanilla_goods_ordered()
     vanilla_goods_set = {name for name, _ in ordered}
@@ -488,13 +516,30 @@ def main() -> None:
         help="Print generated inject file to stdout without writing.",
     )
     ap.add_argument(
+        "--check", action="store_true",
+        help="Return non-zero if generated target files are out of date.",
+    )
+    ap.add_argument(
+        "--target",
+        choices=[*TARGET_NAMES, "all"],
+        default="all",
+        help="Output target to update/check (default: all).",
+    )
+    ap.add_argument(
         "--input", default=str(TARGET_CSV),
         help="Path to target_demand.csv (default: data/target_demand.csv).",
     )
     args = ap.parse_args()
 
     if args.init:
-        init_target_csv(Path(args.input), args.force)
+        bootstrap_target = (
+            DEFAULT_BOOTSTRAP_TARGET if args.target == "all" else args.target
+        )
+        init_target_csv(
+            Path(args.input),
+            args.force,
+            _inject_file_for_target(bootstrap_target),
+        )
         return
 
     input_path = Path(args.input)
@@ -516,8 +561,35 @@ def main() -> None:
         print(content)
         return
 
-    INJECT_FILE.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
-    print(f"[gen_pop_goods] Wrote -> {INJECT_FILE.relative_to(REPO_ROOT)}")
+    targets = _resolve_targets(args.target)
+
+    if args.check:
+        ok = True
+        for target in targets:
+            output_path = _inject_file_for_target(target)
+            if not output_path.exists():
+                print(f"[FAIL] Missing generated target: {output_path.relative_to(REPO_ROOT)}")
+                ok = False
+                continue
+            target_ok = True
+            if not _has_utf8_bom(output_path):
+                print(f"[FAIL] Missing UTF-8 BOM: {output_path.relative_to(REPO_ROOT)}")
+                target_ok = False
+                ok = False
+            current = output_path.read_text(encoding="utf-8-sig")
+            if current != content:
+                print(f"[FAIL] Out of date: {output_path.relative_to(REPO_ROOT)}")
+                target_ok = False
+                ok = False
+            if target_ok:
+                print(f"[OK] Up to date: {output_path.relative_to(REPO_ROOT)}")
+        sys.exit(0 if ok else 1)
+
+    for target in targets:
+        output_path = _inject_file_for_target(target)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
+        print(f"[gen_pop_goods] Wrote -> {output_path.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":

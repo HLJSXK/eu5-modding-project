@@ -1,14 +1,14 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-06-24 (SOL modifier icon wiring)
+> Last updated: 2026-07-20 (SOL codegen chain coverage)
 
 ## Project Identity
 
 - Mod name: **Standard of Living (SOL)**
 - Mod ID: `hades.sol` | Version: `1.1.0` | Target: EU5 `1.*.*`
 - Requires Community Mod Framework v2.*
-- Single active mod source: `src/stable/`
+- Active deploy targets: `src/stable/` and `src/sol_standalone/`
 
 ## Core Features
 
@@ -31,7 +31,7 @@
 ```text
 eu5-modding-project/
 |-- src/
-|   `-- stable/                         active mod source
+|   |-- stable/                         full stable balance mod source
 |       |-- .metadata/                  mod metadata
 |       |-- loading_screen/
 |       |   `-- common/defines/       pop demand performance refresh cap
@@ -67,6 +67,18 @@ eu5-modding-project/
 |           |   |-- modifier_icons/      SOL modifier-type icon mappings
 |           |   `-- static_modifiers/   country, location, province modifiers
 |           `-- localization/
+|   `-- sol_standalone/                 SOL-only deploy target generated from the shared SOL chain where possible
+|       |-- .metadata/                  standalone mod metadata
+|       |-- loading_screen/common/defines/
+|       |-- in_game/
+|       |   |-- common/                 SOL goods, on_actions, resolutions, script values/effects, situation, map mode
+|       |   |-- gfx/map/map_modes/      SOL map mode
+|       |   `-- gui/                    generated location window plus shared SOL panels/tooltips
+|       `-- main_menu/
+|           |-- common/                 SOL modifier icons and static modifiers
+|           |-- gfx/interface/icons/    shared generated SOL icon DDS targets
+|           |-- gui/                    SOL message category
+|           `-- localization/           SOL economy localization
 |-- docs/                              project knowledge, guides, technical notes
 |-- scripts/                           Python codegen + validation
 |-- tools/                             support tooling
@@ -81,9 +93,11 @@ eu5-modding-project/
 
 | Script | When to run | Output |
 |---|---|---|
-| `gen_pop_goods.py` | After editing `target_demand.csv` | `z_SOL_pop_goods.txt` (calibrated demand_add baseline) |
+| `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for `stable`, `sol_standalone`, or both |
+| `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline; supports `--target stable\|sol_standalone\|all`) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
-| `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block |
+| `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block (supports `--target stable\|sol_standalone\|all`) |
+| `generate_sol_location_window.py` | After vanilla `location_window.gui` changes; called by `gen_sol_chain.py` for `sol_standalone`/`all` | `src/sol_standalone/in_game/gui/location_window.gui` |
 | `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
 | `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |
 | `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
@@ -105,8 +119,8 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 ## SOL System Architecture
 
-- **Calibrated demand baseline** - `data/target_demand.csv` drives `src/stable/in_game/common/goods/z_SOL_pop_goods.txt`. These `demand_add` values remain the baseline that the SOL multiplier scales.
-- **Hardcoded unit consumption constants** - `data/demand_price_table.csv` is converted into `src/stable/in_game/common/script_values/SOL_market_unit_consumption_values.txt`, storing net demand quantity for each pop type and good. Duplicate goods that appear in multiple old demand groups are counted once.
+- **Calibrated demand baseline** - `data/target_demand.csv` drives `src/stable/in_game/common/goods/z_SOL_pop_goods.txt` and `src/sol_standalone/in_game/common/goods/z_SOL_pop_goods.txt`. These `demand_add` values remain the baseline that the SOL multiplier scales.
+- **Hardcoded unit consumption constants** - `data/demand_price_table.csv` is converted into each target's `in_game/common/script_values/SOL_market_unit_consumption_values.txt`, storing net demand quantity for each pop type and good. Duplicate goods that appear in multiple old demand groups are counted once.
 - **Yearly market spending maps** - `sol_refresh_market_pop_demand_maps` scans `every_market_in_world`, writes consumed-good counters keyed by market scope, and caches one unit-spending `global_variable_map` per pop type. For each consumed good, spending is computed as hardcoded consumption quantity times `min(market_price(goods), default_price(goods))`, so cheaper goods lower base spending while expensive goods do not inflate it above vanilla base price.
 - **Yearly SOL maintenance caches** - `yearly_country_pulse` calls `sol_update_estate_building_maintenance` to scan every owned land location, cache the five SOL estate building counts, and subtract 1 gold per cached estate building from the matching stratum income. It then refreshes the country-level 1.3.4 poverty-consumption compensation factor; the same cache refresh runs during full GLS initialization after game start/load.
 - **Monthly local demand modifier** - `monthly_country_pulse` calls `sol_update_local_pop_demand_modifiers`, which computes each owned land location's income-closed raw coefficient, multiplies the applied modifier by the cached country poverty-compensation factor, and applies `sol_local_pop_demand_modifier` for one month with `size = var:sol_location_pop_demand_modifier_size`.

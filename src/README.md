@@ -21,7 +21,12 @@ Standalone Standard of Living target. It keeps only the SOL income and demand pi
 
 It excludes non-SOL systems from `stable`, including war balance, migration compatibility events, CMM toggles, age escalation, GDP-to-development, diplomacy costs, and difficulty rebalance.
 
-The standalone `location_window.gui` override is generated from the vanilla reference by `scripts/generate_sol_location_window.py`; build runs this automatically for `sol_standalone` and `all`.
+Generated SOL files are refreshed through `scripts/gen_sol_chain.py`; build runs
+that chain automatically for the selected target before validation/deploy.
+
+The standalone `location_window.gui` override is generated from the vanilla
+reference by `scripts/generate_sol_location_window.py`, which is called by the
+chain for `sol_standalone` and `all`.
 
 ## Build
 

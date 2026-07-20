@@ -69,16 +69,13 @@ if /I "%TARGET_SELECTION%"=="stable" (
     goto usage
 )
 
-for %%T in (%BUILD_TARGETS%) do (
-    if /I "%%~T"=="sol_standalone" (
-        echo [INFO] Regenerating SOL standalone location_window.gui...
-        python "%REPO_ROOT%scripts\generate_sol_location_window.py"
-        if errorlevel 1 exit /b 1
-    )
-)
+set "PYTHONUTF8=1"
+
+echo [INFO] Regenerating SOL generated sources...
+python "%REPO_ROOT%scripts\gen_sol_chain.py" --target "%TARGET_SELECTION%"
+if errorlevel 1 exit /b 1
 
 echo [INFO] Running static validator on changed files...
-set "PYTHONUTF8=1"
 set "VALIDATE_OUT=%TEMP%\sol_validate_out.txt"
 python "%REPO_ROOT%scripts\validate.py" --changed > "!VALIDATE_OUT!" 2>&1
 set "VALIDATE_RC=!errorlevel!"

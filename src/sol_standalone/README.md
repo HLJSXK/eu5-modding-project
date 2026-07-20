@@ -13,12 +13,20 @@ It intentionally excludes the broader stable mod systems such as war balance, mi
 
 ## Generated Files
 
-`in_game/gui/location_window.gui` is generated from the vanilla reference file:
+Run the active SOL generation chain with:
 
 ```cmd
-python scripts/generate_sol_location_window.py
+python scripts/gen_sol_chain.py --target sol_standalone
+python scripts/gen_sol_chain.py --target sol_standalone --check
 ```
 
-The generator copies `reference_game_files/game/in_game/gui/location_window.gui`
-and injects only the SOL income display and living-standard tooltip button.
-`build.bat sol_standalone` and `build.bat all` run this generator automatically.
+Generated standalone files:
+
+- `in_game/common/goods/z_SOL_pop_goods.txt`
+- `in_game/common/script_values/SOL_market_unit_consumption_values.txt`
+- `in_game/gui/location_window.gui`
+
+`location_window.gui` is generated from the vanilla reference file. The generator
+copies `reference_game_files/game/in_game/gui/location_window.gui` and injects
+only the SOL income display and living-standard tooltip button.
+`build.bat sol_standalone` and `build.bat all` run the chain automatically.

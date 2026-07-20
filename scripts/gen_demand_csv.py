@@ -11,8 +11,10 @@ Usage:
 """
 
 import csv
+import io
 import re
 import sys
+import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -21,9 +23,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SIMULATOR_DIR))
 
-from parser import (
+from tools.sol_demand_simulator.parser import (
     INJECT_FILE,
     VANILLA_GOODS_DIR,
     _collect_brace_block,
@@ -41,6 +44,11 @@ OUTPUT_CSV = DATA_DIR / "demand_price_table.csv"
 
 # Raw EU5 pop types — commoners are NOT pre-aggregated here
 POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen"]
+
+
+def _read_text_exact(path: Path) -> str:
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return f.read()
 
 
 # ---------------------------------------------------------------------------
@@ -68,13 +76,19 @@ def compute_demand_table() -> List[Dict]:
     return rows
 
 
+def render_demand_csv(rows: List[Dict]) -> str:
+    fieldnames = ["good", "group", "price"] + POP_TYPE_ORDER
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
 def write_demand_csv(rows: List[Dict], path: Path = OUTPUT_CSV) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = ["good", "group", "price"] + POP_TYPE_ORDER
     with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+        f.write(render_demand_csv(rows))
     print(f"[gen_demand_csv] Wrote {len(rows)} rows → {path.relative_to(REPO_ROOT)}")
 
 
@@ -224,10 +238,37 @@ def update_pop_goods_comments(rows: List[Dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    update_comments = "--update-comments" in sys.argv
+    parser = argparse.ArgumentParser(
+        description="Generate data/demand_price_table.csv from SOL pop goods demand."
+    )
+    parser.add_argument(
+        "--update-comments",
+        action="store_true",
+        help="Also rewrite comment blocks above INJECT entries.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Return non-zero if data/demand_price_table.csv is out of date.",
+    )
+    args = parser.parse_args()
+
     rows = compute_demand_table()
+
+    if args.check:
+        expected = render_demand_csv(rows)
+        if not OUTPUT_CSV.exists():
+            print(f"[FAIL] Missing generated target: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+            sys.exit(1)
+        current = _read_text_exact(OUTPUT_CSV)
+        if current != expected:
+            print(f"[FAIL] Out of date: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+            sys.exit(1)
+        print(f"[OK] Up to date: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+        sys.exit(0)
+
     write_demand_csv(rows)
-    if update_comments:
+    if args.update_comments:
         update_pop_goods_comments(rows)
 
 
