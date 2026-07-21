@@ -33,7 +33,7 @@ Vanilla pop demand is too static for the kind of economy SOL is trying to create
 - Richer locations should be able to consume more.
 - Poorer or overbuilt locations should consume less.
 - Estate savings should influence national spending pressure.
-- Development should continue to matter through the engine's demand divisor.
+- Development must not scale or gate pop demand, so calibrated values remain comparable across locations.
 - Markets should influence base spending, but expensive goods should not inflate the baseline infinitely.
 
 The result is a lighter model that is easier to maintain under the EU5 1.3 engine while still making population demand more dynamic than vanilla.
@@ -43,6 +43,7 @@ The result is a lighter model that is easier to maintain under the EU5 1.3 engin
 ### 1. Calibrated Baseline Demand
 
 SOL recalibrates baseline pop demand for 55 goods through `demand_add` injections.
+It also sets the engine-wide development demand scale to zero and fully negates every vanilla per-good `development_threshold`.
 
 Source flow:
 
@@ -83,7 +84,7 @@ Each cached estate building subtracts 1 gold from the matching stratum's local i
 Every month, each country refreshes its owned land locations. SOL calculates a local final demand scale using:
 
 ```text
-local liquid funds / development-adjusted base spending
+local liquid funds / base spending
 ```
 
 Where:
@@ -91,7 +92,7 @@ Where:
 - Local liquid funds come from total local stratum income after estate-building maintenance.
 - National savings pressure adjusts how much income is treated as available for consumption.
 - Base spending comes from the market-keyed unit spending cache multiplied by local pop counts.
-- Development-adjusted base spending multiplies base spending by `(1 + development / 20)`.
+- Development does not modify this calculation; both the global demand multiplier and per-good development gates are disabled.
 
 The result is applied for one month through:
 

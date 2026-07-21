@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Removed every development-based pop-demand constraint: the engine-wide development multiplier is now zero, all nine vanilla per-good development thresholds are fully negated, PP `victuals` is handled by the compatibility generator, and SOL no longer carries development-adjusted spending through its runtime or UI.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.
 - Updated documentation to reflect the new reference baseline.
 

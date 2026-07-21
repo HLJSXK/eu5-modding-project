@@ -7,7 +7,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -122,7 +122,18 @@ def _parse_injected_demand_add(path: Path, good: str) -> Dict[str, float]:
     return _expand_demand_add(_parse_kv_block(demand_add))
 
 
-def _render_lumber_injection() -> str:
+def _parse_development_threshold(path: Path, good: str) -> Optional[float]:
+    text = _read(path)
+    match = re.search(rf"(?m)^{re.escape(good)}\s*=\s*\{{", text)
+    if not match:
+        raise ValueError(f"{good} definition not found in {path}")
+    brace_start = text.index("{", match.start())
+    block, _end = _collect_brace_block(text, brace_start)
+    threshold = re.search(r"\bdevelopment_threshold\s*=\s*(-?[\d.]+)", block)
+    return float(threshold.group(1)) if threshold else None
+
+
+def _render_goods_injections() -> str:
     inject = _parse_inject_file(STABLE_POP_GOODS).get("lumber")
     if not inject:
         raise ValueError(f"SOL lumber injection not found in {STABLE_POP_GOODS}")
@@ -156,6 +167,17 @@ def _render_lumber_injection() -> str:
             continue
         lines.append(f"\t\t{pop_type} = {_format_float(value)}")
     lines.extend(["\t}", "}", ""])
+
+    victuals_threshold = _parse_development_threshold(PP_VICTUALS_FILE, "victuals")
+    if victuals_threshold is not None:
+        lines.extend([
+            "# PP adds its own development gate to victuals. Negate it so every",
+            "# pop-demand good remains independent of location development.",
+            "INJECT:victuals = {",
+            f"\tdevelopment_threshold = {_format_float(-victuals_threshold)}",
+            "}",
+            "",
+        ])
     return "\n".join(lines)
 
 
@@ -252,7 +274,7 @@ def _render_outputs() -> Dict[Path, str]:
     return {
         VALUES_OUTPUT: _render_values(rows),
         EFFECTS_OUTPUT: _render_effects(rows),
-        LUMBER_OUTPUT: _render_lumber_injection(),
+        LUMBER_OUTPUT: _render_goods_injections(),
         LOCATION_GUI_OUTPUT: _render_gui(
             STABLE_LOCATION_GUI,
             "sol_market_consumes_victuals",

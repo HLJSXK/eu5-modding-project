@@ -6,7 +6,7 @@ Catches common errors before game loading. Reads docs/knowledge/*.yaml for patte
 Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py                   # validate entire src/
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py src/stable/       # validate one directory
-  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed         # validate only git-changed files
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed         # validate git-changed files under src/
 """
 
 import json
@@ -25,6 +25,7 @@ except ImportError:
     sys.exit(1)
 
 REPO_ROOT = Path(__file__).parent.parent
+MOD_SOURCE_DIR = REPO_ROOT / "src"
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 MODIFIER_TYPES_FILE = (
     REPO_ROOT
@@ -86,7 +87,11 @@ def get_changed_files() -> list[Path]:
     paths = []
     for name in names:
         p = REPO_ROOT / name
-        if p.exists() and p.suffix in {".txt", ".gui", ".yml"}:
+        if (
+            p.exists()
+            and MOD_SOURCE_DIR in p.parents
+            and p.suffix in {".txt", ".gui", ".yml"}
+        ):
             paths.append(p)
     return paths
 
@@ -352,7 +357,7 @@ def main():
         for t in targets:
             files.extend(collect_files(REPO_ROOT / t))
     else:
-        files = collect_files(REPO_ROOT / "src")
+        files = collect_files(MOD_SOURCE_DIR)
 
     if not files:
         if ai_report:

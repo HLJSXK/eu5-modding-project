@@ -202,11 +202,17 @@ my_event.1.a.tt: "Tooltip description shown on hover."
 
 In EU5 1.3.11, the goods demand key `upper` applies to `nobles`, `clergy`, `burghers`, `laborers`, and `soldiers`; it does not apply to `peasants` or `tribesmen`. This membership applies to both `demand_add` and `demand_multiply`. Demand calibration tools must expand the group before calculating net vanilla demand, otherwise compensating `demand_add` values for laborers and soldiers will be too high.
 
-### 6.3. Countries
+### 6.3. Pop-Demand Development Controls
+
+EU5 applies development to pop demand through two independent layers. `NPop.DEVELOPMENT_SCALE_ON_DEMAND` is the global multiplier scale; vanilla `0.05` produces a multiplier of `(1 + development / 20)`. Individual goods can also declare `development_threshold`, which prevents their pop demand below that location-development gate.
+
+For a development-independent calibration baseline, both layers must be disabled. Override the define with `NPop = { DEVELOPMENT_SCALE_ON_DEMAND = 0 }`, then use late goods `INJECT` entries whose negative `development_threshold` exactly cancels each loaded positive threshold. Compatibility-mod goods require separate handling; for example, Prosper or Perish adds a threshold to `victuals` even after all vanilla thresholds have been neutralized.
+
+### 6.4. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
 
-### 6.4. Localization
+### 6.5. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
