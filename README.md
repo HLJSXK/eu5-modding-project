@@ -34,13 +34,19 @@ python scripts\gen_sol_chain.py --target all
 python scripts\gen_sol_chain.py --target all --check
 ```
 
-For the default stable deployment, run:
+For the default deployment of stable, SOL standalone, and the SOL / Prosper or
+Perish compact compatibility submod, run:
 
 ```cmd
 build.bat
 ```
 
-This mirrors `src\stable\` into the EU5 game mod folder.
+This regenerates and mirrors all three active targets into the EU5 game mod
+folder. To deploy only the full stable target, run:
+
+```cmd
+build.bat stable
+```
 
 For the SOL standalone deployment, run:
 

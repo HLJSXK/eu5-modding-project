@@ -16,7 +16,7 @@ REM   build.bat --all
 
 set "REPO_ROOT=%~dp0"
 set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
-set "TARGET_SELECTION=stable"
+set "TARGET_SELECTION=all"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -156,7 +156,7 @@ echo   sol_pp_compatibility_submod  Build and deploy the SOL-PP compatibility su
 echo   all             Build and deploy all targets.
 echo.
 echo Notes:
-echo   - If no target is provided, script builds stable.
+echo   - If no target is provided, script builds and deploys all targets.
 echo   - The script only deploys selected targets.
 echo   - The script does not create repository build\ archives.
 exit /b 1
