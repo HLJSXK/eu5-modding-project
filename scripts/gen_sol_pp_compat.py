@@ -444,6 +444,13 @@ def _render_gui(source: Path, variable_map: str, scope: str) -> str:
     weaponry = weaponry_lines[0]
     indent = weaponry[: len(weaponry) - len(weaponry.lstrip())]
     victuals = _victuals_widget(variable_map, scope, indent)
+    spacer = f"{indent}widget = {{ size = {{ 34 30 }} }}"
+    spacer_count = text.count(spacer)
+    if spacer_count != 5:
+        raise ValueError(f"Expected five final-row spacers in {source}, found {spacer_count}")
+    text = text.replace(spacer + "\n", "", 1)
+    if text.count(spacer) != 4:
+        raise ValueError(f"Failed to leave four final-row spacers in {source}")
     return GENERATED_HEADER + _replace_once(text, weaponry, victuals + "\n" + weaponry, "weaponry widget")
 
 
