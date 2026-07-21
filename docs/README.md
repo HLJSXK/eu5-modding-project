@@ -20,6 +20,7 @@ Mod-focused documentation for the EU5 Modding Project.
 
 ### Technical Reference (general EU5 knowledge, dated — not authoritative for syntax)
 
+- [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) — file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
 - [EU5 Modding Knowledge Base](technical/EU5_Modding_Knowledge_Base.md) — Jomini engine overview, scripting, events, localization
 - [EU5 Mod Framework Guide](technical/EU5_Mod_Framework_Guide.md) — community mod patterns, file structure, GUI, complexity tiers
 - [Stable Mod Analysis Report](technical/Stable_Mod_Analysis_Report.md) — Amalgamation Synergy mod breakdown (source for `src/stable/`)

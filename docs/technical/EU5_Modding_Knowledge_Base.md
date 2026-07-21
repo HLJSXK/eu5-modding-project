@@ -102,8 +102,27 @@ The community analysis highlighted several best practices for creating clean, co
 *   **Avoid Overwriting Vanilla Files**: Instead of editing game files directly, create new files with unique names. This prevents conflicts with other mods and game updates.
 *   **Use Prefixes**: Prefixing filenames with a unique identifier (e.g., `my_mod_events.txt`) helps organize files and prevent name collisions.
 *   **Isolate Content**: Keep all mod files within the mod's designated folder. Do not place files in the main game directory.
-*   **Manage Load Order**: For files that must override others, use numbered prefixes (e.g., `00_`, `01_`) to control the order in which the game loads them.
+*   **Manage Load Order**: ASCII filename prefixes (e.g., `00_`, `01_`) control order only where filename order is the applicable tiebreaker. Database operation type takes precedence when `INJECT`/`REPLACE` variants differ; see the compatibility rules below.
 *   **Use Version Control**: Employ tools like Git to track changes, collaborate with others, and revert to previous versions if needed.
+
+### 4.6. Multi-Mod Compatibility and Database Operation Priority
+
+EU5 uses two distinct conflict mechanisms that must not be conflated:
+
+*   **Exact-path file overwrite**: If two sources provide the same relative path and filename, the mod file overrides the base-game/DLC file, and the mod lower in the playlist overrides a mod higher in the playlist. Only the winning file is used.
+*   **Database object edits from different files**: Files load in ASCII order, with parent-directory files before files in subdirectories. When multiple files edit the same top-level object through database keywords, however, the engine processes operation types first and filenames second.
+
+The database operation order, from earliest to latest, is:
+
+```text
+INJECT_OR_CREATE -> REPLACE_OR_CREATE -> TRY_INJECT -> TRY_REPLACE -> INJECT -> REPLACE
+```
+
+Filename order resolves conflicts only between entries using the same operation type. A later-named `REPLACE_OR_CREATE:` cannot beat an earlier-named `REPLACE:`, because all `REPLACE:` operations are processed later. Likewise, an `INJECT:` can be erased by a later processing-stage `REPLACE:` regardless of the files' names.
+
+These keywords work only on top-level objects. `INJECT:` appends script to the object rather than deep-merging nested blocks, most existing trigger/effect fields cannot be merged by injecting a duplicate field, and `INJECT:` on scripted effects or scripted triggers behaves like replacement. Support for these keywords is database-type dependent and must be verified for the target folder.
+
+For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts
 
