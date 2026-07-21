@@ -18,6 +18,11 @@ Mod-focused documentation for the EU5 Modding Project.
 
 - [SOL Rebuild (2026-04-02)](design/Stable_SOL_Rebuild_20260402.md) — Standard of Living system architecture, naming conventions, update pipeline
 
+### Workshop Copy
+
+- Standard of Living: [English](workshop_description_en.txt) | [简体中文](workshop_description_zh.txt)
+- SOL-PP Compatibility Submod: [English](workshop_description_sol_pp_en.txt) | [简体中文](workshop_description_sol_pp_zh.txt)
+
 ### Technical Reference (general EU5 knowledge, dated — not authoritative for syntax)
 
 - [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) — file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
