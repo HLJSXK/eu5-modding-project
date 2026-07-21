@@ -122,6 +122,15 @@ VISIBLE_CMM_SETTINGS = (
     "rwe",
 )
 HIDDEN_CMM_SETTINGS = ("gdp_dev",)
+COMPACT_VICTUALS_TARGET_QUANTITIES = {
+    "nobles": 0.05,
+    "clergy": 0.015,
+    "burghers": 0.035,
+    "laborers": 0.0004,
+    "peasants": 0.0002,
+    "soldiers": 0.0004,
+    "tribesmen": 0.0,
+}
 
 
 def _read(path: Path) -> str:
@@ -180,17 +189,29 @@ def _victuals_row() -> Tuple[str, float, Dict[str, float]]:
     except KeyError as exc:
         raise ValueError(f"victuals definition not found in {PP_VICTUALS_FILE}") from exc
 
-    quantities = {
-        pop_type: victuals["add"][pop_type] * victuals["mult"][pop_type]
-        for pop_type in POP_TYPES
-    }
-    return "victuals", float(victuals["price"]), quantities
+    victuals_price = float(victuals["price"])
+    if victuals_price <= EPSILON:
+        raise ValueError(f"victuals default price must be positive in {PP_VICTUALS_FILE}")
+
+    expected_pop_types = set(POP_TYPES)
+    configured_pop_types = set(COMPACT_VICTUALS_TARGET_QUANTITIES)
+    if configured_pop_types != expected_pop_types:
+        missing = sorted(expected_pop_types - configured_pop_types)
+        extra = sorted(configured_pop_types - expected_pop_types)
+        raise ValueError(f"Invalid compact victuals target keys; missing={missing}, extra={extra}")
+
+    quantities = dict(COMPACT_VICTUALS_TARGET_QUANTITIES)
+    if any(quantity < 0 for quantity in quantities.values()):
+        raise ValueError("Compact victuals target quantities must be non-negative")
+
+    return "victuals", victuals_price, quantities
 
 
 def _compat_good_rows() -> List[Tuple[str, float, Dict[str, float]]]:
     rows: List[Tuple[str, float, Dict[str, float]]] = []
     found_lumber = False
-    for good, price, quantities in _load_good_rows():
+    base_rows = _load_good_rows()
+    for good, price, quantities in base_rows:
         if good == "victuals":
             raise ValueError("Base SOL demand table must not contain PP-only victuals")
         if good == "lumber":
@@ -215,10 +236,16 @@ def _render_values(rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
         1,
     )
     text = text.replace(
-        "# Generated from data/demand_price_table.csv. Each value is net\n",
+        "# Generated from data/demand_price_table.csv. Each value is net\n"
+        "# demand_add quantity for one pop type and one good, with duplicate\n"
+        "# legacy demand-group rows counted once. Yearly market spending\n"
+        "# multiplies these quantities by min(market_price, default_price).\n",
         "# Adds only PP victuals values. Existing SOL values remain owned by the\n"
         "# full SOL mod, and lumber is omitted because PP sets its demand to zero.\n"
-        "# Each value is net\n",
+        "# These values mirror final PP + compatibility pop demand. They are fixed,\n"
+        "# rounded Compact targets chosen from the PP-only victuals/staples ratios.\n"
+        "# Yearly market spending multiplies these quantities by\n"
+        "# min(market_price, default_price).\n",
         1,
     )
     return text
@@ -248,7 +275,9 @@ def _parse_development_threshold(path: Path, good: str) -> Optional[float]:
     return float(threshold.group(1)) if threshold else None
 
 
-def _render_goods_injections() -> str:
+def _render_goods_injections(
+    rows: List[Tuple[str, float, Dict[str, float]]],
+) -> str:
     inject = _parse_inject_file(STABLE_POP_GOODS).get("lumber")
     if not inject:
         raise ValueError(f"SOL lumber injection not found in {STABLE_POP_GOODS}")
@@ -283,16 +312,42 @@ def _render_goods_injections() -> str:
         lines.append(f"\t\t{pop_type} = {_format_float(value)}")
     lines.extend(["\t}", "}", ""])
 
+    victuals_rows = [row for row in rows if row[0] == "victuals"]
+    if len(victuals_rows) != 1:
+        raise ValueError(f"Expected one victuals row, found {len(victuals_rows)}")
+    _good, _price, target_quantities = victuals_rows[0]
+
+    parsed_victuals = _parse_vanilla_goods_file(PP_VICTUALS_FILE).get("victuals")
+    if parsed_victuals is None:
+        raise ValueError(f"victuals definition not found in {PP_VICTUALS_FILE}")
+    native_quantities = {
+        pop_type: parsed_victuals["add"][pop_type] * parsed_victuals["mult"][pop_type]
+        for pop_type in POP_TYPES
+    }
+    victuals_corrections = {
+        pop_type: target_quantities[pop_type] - native_quantities[pop_type]
+        for pop_type in POP_TYPES
+    }
+    for pop_type in POP_TYPES:
+        final = native_quantities[pop_type] + victuals_corrections[pop_type]
+        if abs(final - target_quantities[pop_type]) > EPSILON:
+            raise ValueError(f"victuals demand correction failed for {pop_type}: {final}")
+
+    lines.extend([
+        "# Apply fixed, rounded Compact victuals targets chosen from the PP-only",
+        "# default-price spending ratios versus the six staple goods.",
+        "INJECT:victuals = {",
+    ])
     victuals_threshold = _parse_development_threshold(PP_VICTUALS_FILE, "victuals")
     if victuals_threshold is not None:
-        lines.extend([
-            "# PP adds its own development gate to victuals. Negate it so every",
-            "# pop-demand good remains independent of location development.",
-            "INJECT:victuals = {",
-            f"\tdevelopment_threshold = {_format_float(-victuals_threshold)}",
-            "}",
-            "",
-        ])
+        lines.append(f"\tdevelopment_threshold = {_format_float(-victuals_threshold)}")
+    lines.append("\tdemand_add = {")
+    for pop_type in POP_TYPES:
+        value = victuals_corrections[pop_type]
+        if abs(value) <= EPSILON:
+            continue
+        lines.append(f"\t\t{pop_type} = {_format_float(value)}")
+    lines.extend(["\t}", "}", ""])
     return "\n".join(lines)
 
 
@@ -619,7 +674,7 @@ def _render_outputs() -> Dict[Path, str]:
     return {
         VALUES_OUTPUT: _render_values(rows),
         EFFECTS_OUTPUT: _render_effects(rows),
-        LUMBER_OUTPUT: _render_goods_injections(),
+        LUMBER_OUTPUT: _render_goods_injections(rows),
         LOCATION_GUI_OUTPUT: _render_gui(
             STABLE_LOCATION_GUI,
             "sol_market_consumes_victuals",
