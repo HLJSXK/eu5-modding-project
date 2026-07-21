@@ -43,6 +43,19 @@ GOODS_WEIGHTS_CSV = DATA_DIR / "goods_weights.csv"
 POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen"]
 
 
+def _fmt_comment_number(value: float, show_sign: bool = False) -> str:
+    """Preserve six significant digits without emitting 6+ decimal places."""
+    formatted = f"{value:+.6g}" if show_sign else f"{value:.6g}"
+    mantissa = formatted.split("e", 1)[0]
+    if "." not in mantissa or len(mantissa.rsplit(".", 1)[1]) <= 5:
+        return formatted
+
+    sign = "-" if value < 0 else "+" if show_sign else ""
+    coefficient, exponent = f"{abs(value):.5e}".split("e", 1)
+    coefficient = coefficient.rstrip("0").rstrip(".")
+    return f"{sign}{coefficient}e{int(exponent)}"
+
+
 def _load_good_groups() -> Dict[str, List[str]]:
     groups: Dict[str, List[str]] = {}
     with GOODS_WEIGHTS_CSV.open(encoding="utf-8-sig", newline="") as fh:
@@ -168,7 +181,7 @@ def _build_inject_comment(good: str, dm: Dict) -> str:
             v = vals.get(pt, 0.0)
             if abs(v) < 1e-9:
                 continue
-            parts.append(f"{pt}={v:+.6g}" if show_sign else f"{pt}={v:.6g}")
+            parts.append(f"{pt}={_fmt_comment_number(v, show_sign)}")
         return " | ".join(parts) if parts else None
 
     lines: List[str] = []

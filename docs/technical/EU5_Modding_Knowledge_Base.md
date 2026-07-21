@@ -198,11 +198,15 @@ my_event.1.a: "Option button text"
 my_event.1.a.tt: "Tooltip description shown on hover."
 ```
 
-### 6.2. Countries
+### 6.2. Goods Demand Groups
+
+In EU5 1.3.11, the goods demand key `upper` applies to `nobles`, `clergy`, `burghers`, `laborers`, and `soldiers`; it does not apply to `peasants` or `tribesmen`. This membership applies to both `demand_add` and `demand_multiply`. Demand calibration tools must expand the group before calculating net vanilla demand, otherwise compensating `demand_add` values for laborers and soldiers will be too high.
+
+### 6.3. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
 
-### 6.3. Localization
+### 6.4. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
