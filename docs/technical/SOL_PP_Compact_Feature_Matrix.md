@@ -64,3 +64,8 @@ also hard-disabled, so UI and runtime behavior cannot diverge.
 against the checked-in full SOL and PP references. `scripts/validate.py --changed`
 checks static syntax and project invariants. A combined in-game load and runtime
 log check is still required before claiming runtime compatibility.
+
+The generated scripted-effect layer contains explicit `REPLACE` blocks only for
+`sol_refresh_market_pop_demand_maps` and `gls_accumulate_panel_stats`. Its
+script-value layer adds only the six nonzero PP `victuals` constants, avoiding
+duplicate full-SOL database keys.

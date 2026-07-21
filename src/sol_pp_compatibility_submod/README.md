@@ -34,6 +34,9 @@ are canceled and PP's institution replacement wins.
 
 The demand layer cancels SOL's remaining lumber pop demand, adds PP `victuals`
 to SOL market spending, and overrides both SOL goods-display panels.
+It adds only the new `victuals` script values and explicitly replaces the two
+SOL scripted effects whose market and country aggregation bodies must change;
+unchanged full-SOL database objects are not duplicated.
 
 The compact CMF panel is rebuilt from an explicit whitelist. It exposes only
 settings backed by active compact behavior; the disabled `gdp_dev` setting and
