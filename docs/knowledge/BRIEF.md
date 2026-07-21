@@ -240,10 +240,10 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | `src/stable/in_game/common/script_values/SOL_market_unit_consumption_values.txt` | `scripts/gen_market_unit_consumption.py` |
 | `src/sol_standalone/in_game/common/script_values/SOL_market_unit_consumption_values.txt` | `scripts/gen_market_unit_consumption.py` |
 | `src/sol_standalone/in_game/gui/location_window.gui` | `scripts/generate_sol_location_window.py` |
-| `src/sol_pp_compatibility_submod/in_game/common/goods/zzz_SOL_PP_lumber_demand.txt` | `scripts/gen_sol_pp_compat.py` |
-| `src/sol_pp_compatibility_submod/in_game/common/script_values/SOL_market_unit_consumption_values.txt` | `scripts/gen_sol_pp_compat.py` |
-| `src/sol_pp_compatibility_submod/in_game/common/scripted_effects/A_SOL_economy_effects.txt` | `scripts/gen_sol_pp_compat.py` |
-| `src/sol_pp_compatibility_submod/in_game/gui/SOL_economy_local.gui` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/common/goods/zz_SOL_PP_lumber_demand.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/common/script_values/zz_SOL_market_unit_consumption_values.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/common/scripted_effects/zz_A_SOL_economy_effects.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/gui/zz_SOL_economy_local.gui` | `scripts/gen_sol_pp_compat.py` |
 | `src/sol_pp_compatibility_submod/in_game/gui/panels/situation/global_living_standard.gui` | `scripts/gen_sol_pp_compat.py` |
 | `docs/knowledge/BRIEF.md` | `scripts/gen_brief.py` |
 | `data/demand_price_table.csv` | `scripts/gen_demand_csv.py` |

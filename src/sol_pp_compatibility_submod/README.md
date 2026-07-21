@@ -18,6 +18,10 @@ The submod restores PP's intended Little Ice Age and weather/disaster modifier
 results after SOL, cancels SOL's remaining lumber pop demand, adds PP victuals
 to SOL market spending, and overrides both SOL goods-display panels.
 
+All freely named game-data and GUI files use the `zz_` load-order prefix.
+`gui/panels/situation/global_living_standard.gui` is the sole exception because
+EU5 requires a situation panel filename to match its situation ID exactly.
+
 Generated compatibility files are refreshed with:
 
 ```powershell

@@ -47,10 +47,10 @@ STABLE_EFFECTS = STABLE_ROOT / "in_game" / "common" / "scripted_effects" / "A_SO
 STABLE_LOCATION_GUI = STABLE_ROOT / "in_game" / "gui" / "SOL_economy_local.gui"
 STABLE_SITUATION_GUI = STABLE_ROOT / "in_game" / "gui" / "panels" / "situation" / "global_living_standard.gui"
 
-VALUES_OUTPUT = TARGET_ROOT / "in_game" / "common" / "script_values" / "SOL_market_unit_consumption_values.txt"
-EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "A_SOL_economy_effects.txt"
-LUMBER_OUTPUT = TARGET_ROOT / "in_game" / "common" / "goods" / "zzz_SOL_PP_lumber_demand.txt"
-LOCATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "SOL_economy_local.gui"
+VALUES_OUTPUT = TARGET_ROOT / "in_game" / "common" / "script_values" / "zz_SOL_market_unit_consumption_values.txt"
+EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_A_SOL_economy_effects.txt"
+LUMBER_OUTPUT = TARGET_ROOT / "in_game" / "common" / "goods" / "zz_SOL_PP_lumber_demand.txt"
+LOCATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "zz_SOL_economy_local.gui"
 SITUATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "panels" / "situation" / "global_living_standard.gui"
 
 UTF8_BOM = b"\xef\xbb\xbf"

@@ -32,6 +32,10 @@ SOL files and the checked-in PP reference.
 Generated SOL files are refreshed through `scripts/gen_sol_chain.py`; build runs
 that chain automatically for the selected target before validation/deploy.
 
+Its freely named game-data and GUI files use the `zz_` load-order prefix. The
+`global_living_standard.gui` situation panel keeps its exact filename because
+EU5 binds that file name to the `global_living_standard` situation ID.
+
 The standalone `location_window.gui` override is generated from the vanilla
 reference by `scripts/generate_sol_location_window.py`, which is called by the
 chain for `sol_standalone` and `all`.
