@@ -21,10 +21,10 @@
   pattern: 'category\s*=\s*location'
   only_in_paths: ['auto_modifiers']
   bad: "auto_modifier with category = location (inside auto_modifiers/ file)"
-  correction: "TRY_REPLACE entry in main_menu/common/static_modifiers/ with game_data.category = location"
+  correction: "Use main_menu/common/static_modifiers/: define new objects with game_data.category = location, or use a minimal TRY_INJECT delta when modifying an existing object"
   category: modifier
   scope: location
-  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
+  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-8; reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439"
   notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
 
 - id: sol_demand_add_baseline_must_remain
@@ -399,6 +399,24 @@
   scope: top-level database object
   source: "User-provided EU5 compatibility mechanics note (2026-07-21); docs/technical/EU5_Multi_Mod_Compatibility.md"
   notes: "Documentation-only (no regex lint). Database entries are batched by operation type before filename ordering. Exact-path collisions use a separate whole-file rule: mod over base/DLC, then the lower mod in the playlist. INJECT is top-level append rather than nested deep merge, and scripted effects/triggers treat INJECT like replacement."
+
+- id: static_modifier_full_replace_for_numeric_delta
+  pattern: null
+  bad: "Copying an entire vanilla static modifier into TRY_REPLACE when the intended change is only an additive numeric adjustment"
+  correction: "Use TRY_INJECT with only the difference between the desired final modifier value and the verified vanilla value; omit game_data and unchanged fields"
+  category: compatibility
+  scope: any
+  source: "reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439-455; reference_mods/3613232232/in_game/common/static_modifiers/pp_population_growth_and_food_adjustments.txt:174-177"
+  notes: "Static modifier values accumulate across injected entries. Delta-only injection preserves unrelated vanilla fields and allows other mods to contribute their own modifier deltas. Fields that cannot be neutralized additively still require replacement."
+
+- id: price_full_replace_for_additive_delta
+  pattern: null
+  bad: "Replacing an entire price object when the intended change only adds or subtracts a resource cost, or adds a field absent from vanilla"
+  correction: "Use TRY_INJECT for additive resource-cost deltas and genuinely new fields; retain TRY_REPLACE when changing an existing structural scalar such as min_scale/max_scale"
+  category: compatibility
+  scope: price
+  source: "reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt:2-13; src/stable/in_game/common/prices/A_SOL_economy_prices.txt"
+  notes: "Price resource entries can be incremented with an injected delta. Do not assume every duplicate price field is additive: replacing an existing scaling bound or removing a field still needs a full replacement."
 
 - id: goods_upper_group_includes_workers_1_3_11
   pattern: null

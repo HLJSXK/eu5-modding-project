@@ -33,7 +33,7 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 
 ## Critical EU5 Gotchas
 
-- **Location `auto_modifiers` are NON-FUNCTIONAL** — use `TRY_REPLACE` in `main_menu/common/static_modifiers/` with `game_data = { category = location }` instead
+- **Location `auto_modifiers` are NON-FUNCTIONAL** — use `main_menu/common/static_modifiers/` instead; for existing modifiers prefer a minimal `TRY_INJECT` delta, while new objects need `game_data = { category = location }`
 - **`location_rank` enum** — only 3 valid values: `rural_settlement`, `town`, `city` (EU4 names like `village` cause silent failures)
 - **Localization YAML** — must be UTF-8 BOM (not plain UTF-8); only straight ASCII double-quotes `"` are valid
 - **`custom_tooltip`** — never remove it; dotted suffix format IS valid in event options; verify key format before changing

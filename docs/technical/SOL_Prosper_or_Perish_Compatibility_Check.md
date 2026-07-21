@@ -4,6 +4,10 @@
 > `src/sol_pp_compatibility_submod`，负责清理 LIA/天气灾害 modifier 残差、把 lumber
 > 最终人口需求归零、把 victuals 纳入 SOL 生活水平计算，并覆盖地点与局势商品面板。
 > `stable` 与 `sol_standalone` 本身不再探测 P&P，也不再包含 P&P 专属 UI/数值分支。
+>
+> 2026-07-21 增量注入更新：`stable` 已把静态修正器和可安全累加的价格调整改为
+> 最小 `TRY_INJECT` delta。下文按当前实现区分“被后续 `TRY_REPLACE` 抹除”和
+> “双方 `TRY_INJECT` 累加”两种结果。
 
 日期：2026-07-20
 
@@ -18,9 +22,11 @@
 
 ## 关键加载规则
 
-本次兼容性判断必须先明确一个已知行为：
+本次兼容性判断必须先明确一个已知行为：数据库对象先按操作类型处理，再在相同操作类型内按文件顺序处理。当前顺序为：
 
-**当两个模组对同一个数据库 key 使用 `TRY_REPLACE` 时，最终覆盖关系取决于文件加载顺序；而 common 数据库文件的加载顺序受文件名排序影响。**
+```text
+INJECT_OR_CREATE -> REPLACE_OR_CREATE -> TRY_INJECT -> TRY_REPLACE -> INJECT -> REPLACE
+```
 
 SOL 当前许多会覆盖 vanilla 的文件使用了 `A_` 前缀，例如：
 
@@ -29,11 +35,7 @@ src/stable/main_menu/common/static_modifiers/A_SOL_economy_modifiers.txt
 src/stable/in_game/common/prices/A_SOL_economy_prices.txt
 ```
 
-这会让 SOL 的这些文件较早加载。P&P 的相关文件多为 `pp_...`，排序晚于 `A_SOL_...`。因此在双方都 `TRY_REPLACE` 同一个 key 时，实际结果通常不是随机，也不是需要猜“谁后加载”，而是：
-
-**SOL 的 `TRY_REPLACE` 会先应用，随后被 P&P 的后加载 `TRY_REPLACE` 覆盖。**
-
-这点会显著改变兼容性结论：许多冲突项不是“双方互相不确定覆盖”，而是“默认情况下 SOL 的对应改动会丢失”。
+文件名前缀只在双方操作类型相同时决定顺序。P&P 对 `total_population`、`raised_levies` 和 `embrace_institution` 使用 `TRY_REPLACE`，因此会在 SOL 的 `TRY_INJECT` 之后处理并抹掉对应注入，与 `A_`/`pp_` 文件名无关。双方都使用 `TRY_INJECT` 的 LIA 修正器和道路价格则会依次追加，数值 delta 累加。
 
 ## 总结论
 
@@ -43,7 +45,7 @@ src/stable/in_game/common/prices/A_SOL_economy_prices.txt
 
 但机制上并不兼容。原因有两类：
 
-1. P&P 会在多个同 key `TRY_REPLACE` 上覆盖 SOL 的改动，因为 SOL 的 `A_` 文件先加载。
+1. P&P 的后处理 `TRY_REPLACE` 会抹掉 SOL 对部分同 key 对象的 `TRY_INJECT`；双方都是 `TRY_INJECT` 的对象则会累加。
 2. P&P 新增 `victuals` pop demand，但 SOL 当前的生活水平基础消费计算没有纳入 `victuals`。
 
 因此更准确的结论是：
@@ -74,11 +76,10 @@ SOL 文件：
 src/stable/main_menu/common/static_modifiers/A_SOL_economy_modifiers.txt
 ```
 
-SOL 对 `total_population` 的关键改动包括：
+SOL 当前通过 `TRY_INJECT:total_population` 注入相对 vanilla 的 delta：
 
-- `local_max_rgo_size = 0.020`
-- `free_building_levels = 0.05`
-- 后续 `INJECT:total_population` 追加 `free_building_levels = 0.15`
+- `local_max_rgo_size = -0.005`
+- `free_building_levels = 0.15`
 
 P&P 文件：
 
@@ -91,7 +92,7 @@ P&P 对 `total_population` 的关键改动包括：
 - `local_max_rgo_size = 0.0020`
 - `local_food_capacity = 2.5`
 
-由于 `A_SOL_economy_modifiers.txt` 早于 `pp_location_modifier_adjustments.txt` 加载，最终更可能保留 P&P 的 `TRY_REPLACE:total_population`，而 SOL 的 `total_population` 替换与同文件内后续注入都可能在最终结果中丢失。
+P&P 的 `TRY_REPLACE:total_population` 在 `TRY_INJECT` 批次之后处理，因此会整体抹掉 SOL delta。最终保留 P&P 版本，不取决于双方文件名前缀。
 
 影响：
 
@@ -103,17 +104,17 @@ P&P 对 `total_population` 的关键改动包括：
 
 ### 2. `raised_levies`：SOL 的食物压力会被 P&P 覆盖
 
-SOL 的 `raised_levies`：
+SOL 当前对 `raised_levies` 注入相对 vanilla 的 delta：
 
-- `local_raw_material_output = -0.3`
-- `local_monthly_food_modifier = -0.3`
+- `local_raw_material_output = -0.1`
+- `local_monthly_food_modifier = -0.1`
 
 P&P 的 `raised_levies`：
 
 - `local_production_efficiency = -0.10`
 - `local_raw_material_output = -0.30`
 
-因为 SOL 的 `A_SOL_economy_modifiers.txt` 先加载，P&P 的 `pp_location_modifier_adjustments.txt` 后加载，所以最终大概率保留 P&P 版本。也就是说，SOL 给征召状态追加的 `local_monthly_food_modifier = -0.3` 会丢失。
+由于 P&P 使用 `TRY_REPLACE:raised_levies`，该替换在 SOL 的 `TRY_INJECT` 之后处理，SOL delta 会丢失，最终保留 P&P 版本。
 
 影响：
 
@@ -132,7 +133,7 @@ P&P 的 `raised_levies`：
 
 SOL 的目标是缓和部分 Little Ice Age 与灾害食物惩罚，避免食物危机失控。P&P 则大幅重做食物系统，并对很多天气、灾害、任务修正追加新的作物产出与食物压力逻辑。
 
-由于 SOL 的文件名前缀靠前，涉及同 key `TRY_REPLACE` 的部分默认会先应用，再被 P&P 后续文件覆盖或追加。这意味着 SOL 的 LIA 缓和不应假定仍然完整存在。
+这些 LIA 对象中，SOL 与 P&P 当前主要都使用 `TRY_INJECT`。因此双方 delta 会累加，而不是由后加载文件整体覆盖；这提高了结构兼容性，但未经兼容子模清理时，最终数值仍可能同时包含 SOL 缓和与 P&P 的作物/食物重做，不能直接视为经过平衡的组合。
 
 影响：
 
@@ -165,19 +166,15 @@ reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt
 
 `embrace_institution`：
 
-- SOL：`scaled_gold = 5.0`，并设置 `max_scale = 3000`
-- P&P：`scaled_gold = 15.0`，没有 SOL 的封顶逻辑
+- SOL：用 `TRY_INJECT` 添加 `max_scale = 3000`
+- P&P：用 `TRY_REPLACE` 定义 `scaled_gold = 15.0`、`stability = 50`
+- 结果：P&P 替换在 SOL 注入之后处理，SOL 封顶仍会丢失
 
-道路价格：
-
-- SOL：道路价格上调，但仍相对温和，并带有 SOL 自己的反滚雪球节奏。
-- P&P：道路和基础设施成本更激进，服务于 P&P 的基础设施稀缺设计。
-
-由于 SOL `A_SOL_economy_prices.txt` 先加载，P&P 的 `pp_...` 价格文件后加载，最终结果会更偏向 P&P，而不是 SOL。
+道路价格双方都使用 `TRY_INJECT`，因此会在 vanilla 基础上累加，而不是互相覆盖。按当前文件的 `gold` delta，未加载兼容子模时的合计为：碎石路 50、铺装路 210、现代路 530、铁路 1600。
 
 影响：
 
-- SOL 对道路价格的平衡设定大概率不会成为最终结果。
+- SOL 与 P&P 的道路成本会叠加，可能高于任一模组单独设计的目标。
 - `embrace_institution` 的 SOL 封顶逻辑可能丢失。
 - 兼容补丁需要明确采用 P&P、SOL，还是第三套折中价格。
 
@@ -264,7 +261,7 @@ SOL 也有自己的食物和反滚雪球设计，包括：
 - Little Ice Age 惩罚缓和
 - RGO 和建设成本调整
 
-但考虑到 `A_` 加载前缀，SOL 中通过早加载 `TRY_REPLACE` 写入的部分食物压力或缓和逻辑，在与 P&P 同开时不应默认有效。最终更可能呈现 P&P 的食物系统，再叠加 SOL 未被覆盖的其他国家级自动修正和生活水平需求逻辑。
+由于操作类型不同，SOL 的部分食物 delta 会被 P&P 的 `TRY_REPLACE` 抹掉；双方同为 `TRY_INJECT` 的 LIA/灾害 delta 则会叠加。最终更可能呈现 P&P 的食物系统、双方累加的部分灾害修正，再叠加 SOL 未被覆盖的国家级自动修正和生活水平需求逻辑。
 
 ## 软风险
 
@@ -274,17 +271,11 @@ SOL 也有自己的食物和反滚雪球设计，包括：
 
 2. **版本风险**
 
-   P&P 本地副本标注游戏版本 `1.3.10`，SOL 当前 metadata 标注 `1.3.6`。如果要发布兼容声明，应先同步双方最新版本并用当前游戏版本重新检查。
+   P&P 本地副本标注游戏版本 `1.3.10`，SOL 当前 metadata 标注 `1.3.11`。如果要发布兼容声明，应先同步双方最新版本并用当前游戏版本重新检查。
 
-3. **已有检测钩子但未完成主链兼容**
+3. **基础模组不包含 P&P 检测分支**
 
-   SOL 当前已有：
-
-```text
-sol_pp_victuals_compat_is_on
-```
-
-   这个 trigger 可以检测 P&P 相关全局变量。但当前 SOL 1.3 主需求链没有使用它把 `victuals` 纳入基础消费计算。因此它只是检测钩子，不等于已经兼容 P&P。
+   `stable` 和 `sol_standalone` 不探测 P&P，也不在基础计算链中包含 `victuals`。P&P 专属计算和 UI 由独立的 `src/sol_pp_compatibility_submod` 提供；不加载该子模时，本报告中的机制缺口仍然存在。
 
 ## 建议的兼容补丁方向
 
@@ -297,7 +288,7 @@ sol_pp_victuals_compat_is_on
 - 将 `victuals` 纳入各阶层基础消费支出。
 - 如需在生活水平面板展示商品覆盖情况，也应加入国家 consumed-goods 聚合。
 
-### 2. 用后加载文件合并被 P&P 覆盖的 SOL `TRY_REPLACE`
+### 2. 用兼容子模合并被 P&P 替换或与 P&P 累加的 SOL delta
 
 兼容补丁应最后加载，并重新定义以下 key 的最终形态：
 
@@ -321,7 +312,7 @@ sol_pp_victuals_compat_is_on
 
 - 如果以 P&P 玩法为核心，应优先保留 P&P 更激进的道路与基础设施成本。
 - 如果以 SOL 的反滚雪球但较温和平衡为核心，应保留 SOL 的 capped price 逻辑。
-- 如果要两者混合，需要重新写一套兼容价格，而不是任由 P&P 后加载自然覆盖 SOL。
+- 如果要两者混合，需要重新写一套兼容价格，而不是任由对象替换或 additive delta 自然累加。
 
 ### 4. 检查是否需要关闭或缩放 SOL 食物压力
 
@@ -342,7 +333,7 @@ P&P 已经极大强化食物系统。兼容补丁可以考虑在检测到 P&P �
 4. SOL / P&P Compatibility Patch
 ```
 
-兼容补丁必须最后加载，并且文件名应确保晚于双方相关文件，例如使用 `zz_` 或更明确的后加载前缀。
+兼容补丁应放在双方之后，以确保同路径文件覆盖关系符合预期；对数据库对象还必须选择正确的操作类型。文件名 `zz_` 只在双方使用相同操作类型时决定先后，不能让 `TRY_INJECT` 越过后处理的 `TRY_REPLACE`。
 
 ## 最终判断
 
@@ -350,7 +341,7 @@ P&P 已经极大强化食物系统。兼容补丁可以考虑在检测到 P&P �
 
 理由不是“两者一定会立刻崩溃”，而是：
 
-- SOL 的 `A_` 前缀使其 `TRY_REPLACE` 更早加载，冲突处会被 P&P 后加载文件覆盖。
+- P&P 的 `TRY_REPLACE` 会在 SOL `TRY_INJECT` 之后处理并抹掉对应 delta；双方同为 `TRY_INJECT` 的对象则会累加。
 - P&P 新增的 `victuals` 消费没有进入 SOL 的生活水平计算。
 - 双方在食物、人口、道路、RGO、价格和商品需求上服务于不同平衡目标。
 
@@ -361,6 +352,6 @@ P&P 已经极大强化食物系统。兼容补丁可以考虑在检测到 P&P �
 
 - 已完成静态文件冲突扫描。
 - 已检查 goods、prices、static_modifiers、on_action、scripted triggers/effects 等主要交叉区域。
-- 已根据已知文件加载规则修正结论：SOL 的 `A_` 前缀会让相关 `TRY_REPLACE` 先加载，并在同 key 冲突中被 P&P 后加载文件覆盖。
+- 已按数据库操作优先级修正结论：操作类型先于文件名；`TRY_REPLACE` 会晚于 `TRY_INJECT` 处理，相同 `TRY_INJECT` 则按文件顺序全部追加。
 - 未完成 `validate.py --changed`，此前两次运行分别在 120 秒和 300 秒超时。
 - 未进行游戏内联合加载测试。

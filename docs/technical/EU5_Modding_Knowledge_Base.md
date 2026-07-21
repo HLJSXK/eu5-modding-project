@@ -122,6 +122,10 @@ Filename order resolves conflicts only between entries using the same operation 
 
 These keywords work only on top-level objects. `INJECT:` appends script to the object rather than deep-merging nested blocks, most existing trigger/effect fields cannot be merged by injecting a duplicate field, and `INJECT:` on scripted effects or scripted triggers behaves like replacement. Support for these keywords is database-type dependent and must be verified for the target folder.
 
+For static modifiers, numeric modifier entries are additive. When changing an existing modifier, prefer a `TRY_INJECT:` block containing only `desired final value - verified vanilla value`; omit `game_data` and every unchanged field. This preserves unrelated vanilla updates and lets other mods contribute independent deltas. A vanilla `-0.25` penalty changed to `-0.40`, for example, should inject `-0.15` rather than replace the complete modifier.
+
+Price resource entries such as `gold`, `scaled_gold`, and `government_power` can likewise be adjusted with injected deltas, and fields absent from the base object can be appended directly. Existing structural bounds such as `min_scale` and `max_scale` are not assumed additive: changing those values, removing fields, or rewriting nested logic still requires `TRY_REPLACE:`. Scripted effects and triggers also remain replacement-only in practice.
+
 For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts

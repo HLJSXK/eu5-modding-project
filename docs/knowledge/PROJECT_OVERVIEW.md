@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-07-21 (development-independent pop demand)
+> Last updated: 2026-07-21 (delta-injection compatibility)
 
 ## Project Identity
 
@@ -108,7 +108,7 @@ eu5-modding-project/
 | `generate_sol_location_window.py` | After vanilla `location_window.gui` changes; called by `gen_sol_chain.py` for `sol_standalone`/`all` | `src/sol_standalone/in_game/gui/location_window.gui` |
 | `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
 | `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |
-| `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers |
+| `gen_scaffold.py` | When creating a new EU5 file (event, effect, trigger, modifier, etc.) | Syntactically valid skeleton file with TODO markers; location static-modifier scaffolds emit delta-only `TRY_INJECT` blocks |
 | `sync_reference.py` | After EU5 game updates to a new version | Mirrors reference game files with whitelist and size caps |
 | `validate.py` | Before launching game (`--changed` checks only changed files under `src/`); `--ai-report` for JSON output | Console validation report for anti-patterns, enums, modifiers, SOL baseline, and global_variable_map remove/add writes; exit code indicates pass/fail |
 | `generate_sol_icon.py` | After setting an Images API relay key, or with `--convert-existing-png` for a local source image; add `--overwrite` to refresh existing DDS outputs | Shared SOL icon DDS outputs for `icons/sol/sol_living_standard.dds`, `icons/map_modes/sol_living_standard.dds`, `icons/situations/global_living_standard.dds`, and `icons/modifier_types/sol_living_standard.dds`, plus PNG/metadata under `data/generated_icons/`; uses `dds_image_lib.py` for dependency-free, Clausewitz-compatible PNG/DDS conversion with full mip chains |

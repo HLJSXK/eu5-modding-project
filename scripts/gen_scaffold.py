@@ -126,10 +126,17 @@ def _tpl_scripted_trigger(name: str) -> tuple[str, str, str]:
 
 def _tpl_static_modifier(name: str, category: str) -> tuple[str, str, str]:
     # category: "location" or "country" (default: country)
-    # Reference: A_SOL_economy_modifiers.txt uses TRY_REPLACE for location modifiers
-    prefix = "TRY_REPLACE:" if category == "location" else ""
-    content = f"""{SCAFFOLD_HEADER}
-{prefix}{name} = {{
+    # Existing location modifiers use TRY_INJECT deltas; new country modifiers
+    # are ordinary definitions with their explicit game_data category.
+    if category == "location":
+        content = f"""{SCAFFOLD_HEADER}
+TRY_INJECT:{name} = {{
+\t# TODO: add only the delta from the vanilla modifier.
+}}
+"""
+    else:
+        content = f"""{SCAFFOLD_HEADER}
+{name} = {{
 \tgame_data = {{
 \t\tcategory = {category}
 \t}}
