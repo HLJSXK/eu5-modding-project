@@ -22,9 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(SIMULATOR_DIR))
 
 from tools.sol_demand_simulator.parser import (
     INJECT_FILE,
@@ -37,13 +35,20 @@ from tools.sol_demand_simulator.parser import (
     _read,
     load_demand_matrix,
 )
-from curve_designer import groups_for_good
-
 DATA_DIR = REPO_ROOT / "data"
 OUTPUT_CSV = DATA_DIR / "demand_price_table.csv"
+GOODS_WEIGHTS_CSV = DATA_DIR / "goods_weights.csv"
 
 # Raw EU5 pop types — commoners are NOT pre-aggregated here
 POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen"]
+
+
+def _load_good_groups() -> Dict[str, List[str]]:
+    groups: Dict[str, List[str]] = {}
+    with GOODS_WEIGHTS_CSV.open(encoding="utf-8-sig", newline="") as fh:
+        for row in csv.DictReader(fh):
+            groups.setdefault(row["good"], []).append(row["group"])
+    return groups
 
 
 def _read_text_exact(path: Path) -> str:
@@ -62,10 +67,11 @@ def compute_demand_table() -> List[Dict]:
     group so every group membership is visible in the table.
     """
     dm = load_demand_matrix()
+    good_groups = _load_good_groups()
     rows = []
     for good, entry in sorted(dm.items()):
         demand_cols = {pt: entry.demand_per_pop_type.get(pt, 0.0) for pt in POP_TYPE_ORDER}
-        for group in groups_for_good(good):
+        for group in good_groups.get(good, []):
             row: Dict = {
                 "good":  good,
                 "group": group,

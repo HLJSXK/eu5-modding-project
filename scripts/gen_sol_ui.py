@@ -94,7 +94,7 @@ GOOD_TO_PRIMARY_GROUP: Dict[str, str] = {
         ("household",         ["furniture"]),
         ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
         ("condiments",        ["sugar", "salt", "olives"]),
-        ("luxury_food",       ["wild_game", "victuals", "fruit"]),
+        ("luxury_food",       ["wild_game", "fruit"]),
         ("protein",           ["fish", "livestock"]),
         ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
         ("luxury_drinks",     ["tea", "coffee", "cocoa"]),

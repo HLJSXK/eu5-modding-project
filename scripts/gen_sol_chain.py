@@ -6,6 +6,7 @@ Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target stable
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_standalone
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_pp_compatibility_submod
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --check
 """
 
@@ -19,7 +20,9 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TARGET_NAMES = ("stable", "sol_standalone")
+BASE_TARGET_NAMES = ("stable", "sol_standalone")
+COMPAT_TARGET = "sol_pp_compatibility_submod"
+TARGET_NAMES = (*BASE_TARGET_NAMES, COMPAT_TARGET)
 
 
 def _resolve_targets(target: str) -> list[str]:
@@ -60,16 +63,21 @@ def main() -> None:
     args = parser.parse_args()
 
     targets = _resolve_targets(args.target)
-    target_arg = args.target
     mode_args = ["--check"] if args.check else []
 
-    _run(["scripts/gen_pop_goods.py", "--target", target_arg, *mode_args])
-    _run(["scripts/gen_demand_csv.py", *mode_args])
-    _run(["scripts/gen_market_unit_consumption.py", "--target", target_arg, *mode_args])
+    base_targets = [target for target in targets if target in BASE_TARGET_NAMES]
+    if base_targets:
+        target_arg = "all" if len(base_targets) == len(BASE_TARGET_NAMES) else base_targets[0]
+        _run(["scripts/gen_pop_goods.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_demand_csv.py", *mode_args])
+        _run(["scripts/gen_market_unit_consumption.py", "--target", target_arg, *mode_args])
 
-    if "sol_standalone" in targets:
+    if "sol_standalone" in base_targets:
         location_args = ["--check"] if args.check else []
         _run(["scripts/generate_sol_location_window.py", *location_args])
+
+    if COMPAT_TARGET in targets:
+        _run(["scripts/gen_sol_pp_compat.py", *mode_args])
 
 
 if __name__ == "__main__":

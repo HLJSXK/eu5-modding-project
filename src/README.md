@@ -21,6 +21,14 @@ Standalone Standard of Living target. It keeps only the SOL income and demand pi
 
 It excludes non-SOL systems from `stable`, including war balance, migration compatibility events, CMM toggles, age escalation, GDP-to-development, diplomacy costs, and difficulty rebalance.
 
+### `sol_pp_compatibility_submod/`
+
+Compatibility layer loaded after Prosper or Perish and `stable`. It removes the
+SOL residuals from PP's Little Ice Age/weather handling, zeros final lumber pop
+demand, includes PP victuals in SOL living-standard spending, and overrides the
+location and situation goods panels. It is generated from the current stable
+SOL files and the checked-in PP reference.
+
 Generated SOL files are refreshed through `scripts/gen_sol_chain.py`; build runs
 that chain automatically for the selected target before validation/deploy.
 
@@ -35,6 +43,7 @@ From the repository root:
 ```cmd
 build.bat stable
 build.bat sol_standalone
+build.bat sol_pp_compatibility_submod
 build.bat all
 ```
 

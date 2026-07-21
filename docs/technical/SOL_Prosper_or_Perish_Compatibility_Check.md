@@ -1,5 +1,10 @@
 # SOL 与 Prosper or Perish 兼容性检查
 
+> 2026-07-21 实施更新：本报告描述的是**未加载兼容子模时**的冲突状态。仓库现已新增
+> `src/sol_pp_compatibility_submod`，负责清理 LIA/天气灾害 modifier 残差、把 lumber
+> 最终人口需求归零、把 victuals 纳入 SOL 生活水平计算，并覆盖地点与局势商品面板。
+> `stable` 与 `sol_standalone` 本身不再探测 P&P，也不再包含 P&P 专属 UI/数值分支。
+
 日期：2026-07-20
 
 ## 检查对象
@@ -7,7 +12,7 @@
 - 本模组：`src/stable`，Standard of Living，简称 SOL。
 - 目标模组：`reference_mods/3613232232`，Prosper or Perish，简称 P&P。
 - 本地参考副本信息：P&P 版本 `0.9.0`，标注支持游戏版本 `1.3.10`。
-- SOL 本地 metadata：版本 `1.3.6`，标注支持游戏版本 `1.3.6`。
+- SOL 本地 metadata：版本 `1.3.11`，标注支持游戏版本 `1.3.11`。
 
 本报告基于仓库内 `reference_mods/3613232232` 的静态文件检查。没有进行游戏内联合加载测试，也没有读取联合运行后的 `error.log`。
 
@@ -359,4 +364,3 @@ P&P 已经极大强化食物系统。兼容补丁可以考虑在检测到 P&P �
 - 已根据已知文件加载规则修正结论：SOL 的 `A_` 前缀会让相关 `TRY_REPLACE` 先加载，并在同 key 冲突中被 P&P 后加载文件覆盖。
 - 未完成 `validate.py --changed`，此前两次运行分别在 120 秒和 300 秒超时。
 - 未进行游戏内联合加载测试。
-

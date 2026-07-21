@@ -4,7 +4,7 @@ This repository now focuses on EU5 mod development only.
 
 ## Scope
 
-- Mod source development (`src/stable`, `src/sol_standalone`)
+- Mod source development (`src/stable`, `src/sol_standalone`, `src/sol_pp_compatibility_submod`)
 - Modding knowledge base and design documents
 - Community and vanilla reference files for research
 
@@ -21,7 +21,8 @@ This repository keeps only mod-related content and documentation.
 1. Clone repository
 2. Use `src/stable/` as the full stable mod target
 3. Use `src/sol_standalone/` for the SOL-only standalone target
-4. Read technical docs in `docs/technical/`
+4. Use `src/sol_pp_compatibility_submod/` for the SOL / Prosper or Perish compatibility layer
+5. Read technical docs in `docs/technical/`
 
 ## Build / Deploy
 
@@ -49,7 +50,15 @@ build.bat sol_standalone
 
 This mirrors `src\sol_standalone\` into the EU5 game mod folder.
 
-To build both targets, run:
+For the SOL / Prosper or Perish compatibility submod, run:
+
+```cmd
+build.bat sol_pp_compatibility_submod
+```
+
+This mirrors `src\sol_pp_compatibility_submod\` into the EU5 game mod folder.
+
+To build all targets, run:
 
 ```cmd
 build.bat all

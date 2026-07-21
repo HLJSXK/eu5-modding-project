@@ -45,7 +45,7 @@ GROUP_GOODS: Dict[str, List[str]] = {
     "standard_clothing": ["cloth", "fine_cloth"],
     "intoxicants":      ["wine", "beer", "liquor", "tobacco"],
     "luxury_drinks":    ["tea", "coffee", "wine", "cocoa"],
-    "luxury_food":      ["wild_game", "victuals", "fruit", "fish"],
+    "luxury_food":      ["wild_game", "fruit", "fish"],
     "luxury_goods":     ["fine_cloth", "fur", "porcelain", "lacquerware", "marble", "glass"],
     "protein":          ["fish", "wild_game", "livestock"],
     "spices":           ["saffron", "pepper", "cloves", "chili"],
