@@ -234,6 +234,17 @@ EU5 includes a powerful map editor for modifying the game world. This tool allow
 
 Flags in EU5 are generated dynamically through a scripted coat of arms system, a significant change from the static `.tga` files of EU4. This allows for flags to change based on triggers and game conditions. [12]
 
+### 7.4. CMF/CMM Setting Registration
+
+CMM panel membership is rebuilt from each mod's registration effect. During
+`_cmm_register_group`, CMM clears the group's `cmm_group_setting_keys_*` list
+before registered settings are appended. A compatibility layer can therefore
+hide a removed feature by replacing the mod registration effect and omitting
+that setting ID and callback; the obsolete entry also disappears when an older
+save is loaded. Do not write directly to CMM's internal maps. Independently
+hard-disable the removed gameplay trigger so stale alias variables cannot
+reactivate the feature outside the UI.
+
 ## 8. Best Practices and Resources
 
 *   **Country pulse on_actions merge automatically**: For `monthly_country_pulse` and `yearly_country_pulse`, use the compact style `pulse = { on_actions = { my_dispatcher } }`. Duplicate pulse definitions merge their `on_actions`, so do not copy vanilla or framework entries just to preserve them.

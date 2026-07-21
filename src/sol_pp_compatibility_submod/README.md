@@ -35,6 +35,11 @@ are canceled and PP's institution replacement wins.
 The demand layer cancels SOL's remaining lumber pop demand, adds PP `victuals`
 to SOL market spending, and overrides both SOL goods-display panels.
 
+The compact CMF panel is rebuilt from an explicit whitelist. It exposes only
+settings backed by active compact behavior; the disabled `gdp_dev` setting and
+callback are omitted. CMF clears each group's old setting list during
+registration, so the obsolete entry is also removed from upgraded saves.
+
 All freely named game-data and GUI files use the `zz_` load-order prefix.
 `gui/panels/situation/global_living_standard.gui` is the sole exception because
 EU5 requires a situation panel filename to match its situation ID exactly.

@@ -46,6 +46,18 @@ SOL price changes survive only when PP does not modify the same price object.
 | Four road prices | Generated cleanup subtracts SOL's additive gold delta, leaving vanilla plus PP's delta. |
 | All other SOL price keys | Retained because the checked-in PP reference does not modify those keys. |
 
+## CMF UI Whitelist
+
+The compatibility layer replaces full SOL's `sol_register_cmf_mod` effect. CMF
+rebuilds each group's setting list during registration, so settings omitted by
+the compact registration also disappear when an older save is loaded.
+
+Visible settings: `sol_on`, `sol_map`, `as_on`, `bte`, `ae`, `cts`, `ds`,
+`difficulty`, `ai_pr`, `hw_on`, `iwe`, `hwe`, and `rwe`.
+
+Hidden settings: `gdp_dev`. Its callback is absent and its gameplay trigger is
+also hard-disabled, so UI and runtime behavior cannot diverge.
+
 ## Verification Boundary
 
 `scripts/gen_sol_pp_compat.py --check` verifies generated source consistency

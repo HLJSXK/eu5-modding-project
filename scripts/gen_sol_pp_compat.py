@@ -106,6 +106,22 @@ PP_OWNED_WAR_LOCATION_KEYS = (
     "is_occupied",
     "looted",
 )
+VISIBLE_CMM_SETTINGS = (
+    "sol_on",
+    "sol_map",
+    "as_on",
+    "bte",
+    "ae",
+    "cts",
+    "ds",
+    "difficulty",
+    "ai_pr",
+    "hw_on",
+    "iwe",
+    "hwe",
+    "rwe",
+)
+HIDDEN_CMM_SETTINGS = ("gdp_dev",)
 
 
 def _read(path: Path) -> str:
@@ -565,7 +581,14 @@ def _render_cmm_effects() -> str:
     ):
         _append_callback(lines, setting_id, alias, numeric)
     lines.extend(["\t}", "}", ""])
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    for setting_id in VISIBLE_CMM_SETTINGS:
+        if f"setting_id = {setting_id}" not in rendered:
+            raise ValueError(f"Active compact CMM setting is not registered: {setting_id}")
+    for setting_id in HIDDEN_CMM_SETTINGS:
+        if f"setting_id = {setting_id}" in rendered or f"flag:sol__{setting_id}" in rendered:
+            raise ValueError(f"Disabled compact CMM setting is still visible: {setting_id}")
+    return rendered
 
 
 def _render_disabled_triggers() -> str:
