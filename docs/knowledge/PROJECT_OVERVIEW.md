@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-07-21 (delta-injection compatibility)
+> Last updated: 2026-07-21 (PP-owned compact compatibility)
 
 ## Project Identity
 
@@ -26,7 +26,7 @@
 
 7. **CMF Settings & Migration Support** - Registers CMF settings for SOL pop demand, map coloring, economic balance, base tax efficiency, age escalation, stability discount, diplomatic spending, difficulty tax nerf, GDP-to-development, AI prosperity recovery, and war acceleration sub-features. Built-in after-lobby migration logic notifies human players when loading older saves and triggers full Living Standard cache refreshes on game start/load.
 
-8. **Prosper or Perish Compatibility Submod** - A separate late-loading target removes SOL residuals from PP's Little Ice Age and weather/disaster modifiers, applies a third `lumber` `demand_add` so final pop demand is zero, negates PP's `victuals` development threshold, and replaces SOL's market-spending calculation with zero lumber plus PP's `victuals` demand. It also overrides the location and Living Standard situation goods panels to display `victuals`. Stable and standalone contain no PP-load detection or PP-only UI/value data.
+8. **Prosper or Perish Compact Compatibility Submod** - A separate final-loading target keeps full PP while narrowing full SOL to its income-based demand/UI, compact age construction and city/town costs, low-control construction penalty, base tax/diplomatic/stability rules, difficulty tax adjustments, configurable AI devastation recovery, non-conflicting prices, and selected war/expansion rules. It removes SOL residuals from PP-owned weather, Little Ice Age, base location, road price, blockade, siege, occupation, and looting values; disables SOL GDP-to-development and excluded age fields; preserves PP's zero lumber demand; and adds PP `victuals` to SOL calculations and both goods panels. Stable and standalone contain no PP-load detection or PP-only UI/value data.
 
 ## Directory Structure
 
@@ -101,7 +101,7 @@ eu5-modding-project/
 | Script | When to run | Output |
 |---|---|---|
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all three deploy targets |
-| `gen_sol_pp_compat.py` | After changing SOL demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated lumber/victuals demand, unit-spending, effect, and GUI overrides in `src/sol_pp_compatibility_submod/` |
+| `gen_sol_pp_compat.py` | After changing SOL balance/demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated compact feature cleanup plus lumber/victuals demand, unit-spending, effect, and GUI overrides in `src/sol_pp_compatibility_submod/` |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline plus complete vanilla development-threshold negations; supports `--target stable\|sol_standalone\|all`) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
 | `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block (supports `--target stable\|sol_standalone\|all`) |

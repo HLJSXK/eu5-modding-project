@@ -27,7 +27,7 @@
 
 7. **CMF Settings & Migration Support** - Registers CMF settings for SOL pop demand, map coloring, economic balance, base tax efficiency, age escalation, stability discount, diplomatic spending, difficulty tax nerf, GDP-to-development, AI prosperity recovery, and war acceleration sub-features. Built-in after-lobby migration logic notifies human players when loading older saves and triggers full Living Standard cache refreshes on game start/load.
 
-8. **Prosper or Perish Compatibility Submod** - A separate late-loading target removes SOL residuals from PP's Little Ice Age and weather/disaster modifiers, applies a third `lumber` `demand_add` so final pop demand is zero, negates PP's `victuals` development threshold, and replaces SOL's market-spending calculation with zero lumber plus PP's `victuals` demand. It also overrides the location and Living Standard situation goods panels to display `victuals`. Stable and standalone contain no PP-load detection or PP-only UI/value data.
+8. **Prosper or Perish Compact Compatibility Submod** - A separate final-loading target keeps full PP while narrowing full SOL to its income-based demand/UI, compact age construction and city/town costs, low-control construction penalty, base tax/diplomatic/stability rules, difficulty tax adjustments, configurable AI devastation recovery, non-conflicting prices, and selected war/expansion rules. It removes SOL residuals from PP-owned weather, Little Ice Age, base location, road price, blockade, siege, occupation, and looting values; disables SOL GDP-to-development and excluded age fields; preserves PP's zero lumber demand; and adds PP `victuals` to SOL calculations and both goods panels. Stable and standalone contain no PP-load detection or PP-only UI/value data.
 
 ## Directory Structure
 
@@ -102,7 +102,7 @@ eu5-modding-project/
 | Script | When to run | Output |
 |---|---|---|
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all three deploy targets |
-| `gen_sol_pp_compat.py` | After changing SOL demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated lumber/victuals demand, unit-spending, effect, and GUI overrides in `src/sol_pp_compatibility_submod/` |
+| `gen_sol_pp_compat.py` | After changing SOL balance/demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated compact feature cleanup plus lumber/victuals demand, unit-spending, effect, and GUI overrides in `src/sol_pp_compatibility_submod/` |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline plus complete vanilla development-threshold negations; supports `--target stable\|sol_standalone\|all`) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
 | `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block (supports `--target stable\|sol_standalone\|all`) |
@@ -223,7 +223,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | Script | Input(s) | Output(s) | When to run |
 | --- | --- | --- | --- |
 | `scripts/gen_sol_chain.py` | data/target_demand.csv + vanilla/PP goods | active SOL generated files for all deploy targets | Preferred one-shot SOL generation entry; build.bat runs it automatically |
-| `scripts/gen_sol_pp_compat.py` | stable SOL outputs + PP victuals definition | SOL-PP lumber, spending, effects, and GUI overrides | After changing SOL demand/effects/UI or updating the PP reference; run by gen_sol_chain |
+| `scripts/gen_sol_pp_compat.py` | stable SOL outputs + PP definitions | SOL-PP compact feature, price, demand, effects, and GUI overrides | After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain |
 | `scripts/gen_pop_goods.py` | data/target_demand.csv | src/<target>/.../z_SOL_pop_goods.txt | After editing calibrated demand_add baseline; supports --target stable|sol_standalone|all |
 | `scripts/gen_demand_csv.py` | z_SOL_pop_goods.txt + vanilla goods | data/demand_price_table.csv | After gen_pop_goods.py |
 | `scripts/gen_market_unit_consumption.py` | data/demand_price_table.csv | src/<target>/.../SOL_market_unit_consumption_values.txt + sol_refresh_market_pop_demand_maps | After gen_demand_csv.py or SOL market base-spending logic changes; supports --target stable|sol_standalone|all |
@@ -250,6 +250,10 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | `src/sol_pp_compatibility_submod/in_game/common/scripted_effects/zz_A_SOL_economy_effects.txt` | `scripts/gen_sol_pp_compat.py` |
 | `src/sol_pp_compatibility_submod/in_game/gui/zz_SOL_economy_local.gui` | `scripts/gen_sol_pp_compat.py` |
 | `src/sol_pp_compatibility_submod/in_game/gui/panels/situation/global_living_standard.gui` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/common/auto_modifiers/zz_SOL_PP_compact_economy_auto_modifiers.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/in_game/common/prices/zz_SOL_PP_compact_price_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_static_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_war_overlap_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
 | `docs/knowledge/BRIEF.md` | `scripts/gen_brief.py` |
 | `data/demand_price_table.csv` | `scripts/gen_demand_csv.py` |
 | `data/index/icons.txt` | `scripts/gen_index.py` |
