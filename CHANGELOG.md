@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.
 - Updated documentation to reflect the new reference baseline.
 
+### Fixed
+- Removed the one-shot pending flag from GLS situation startup so the situation can spawn when SOL is added to an existing save or re-enabled after removal.
+
 ## [Mod v1.1.0] - 2026-04-30
 
 ### 替代组 (Substitute Groups)
