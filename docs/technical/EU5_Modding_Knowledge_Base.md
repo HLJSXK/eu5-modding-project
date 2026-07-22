@@ -145,6 +145,13 @@ Some triggers are parsed as simple assignments rather than general comparison ex
 
 A **scope** refers to the specific game object (e.g., a country, a character, a location) that a script is currently focused on. **Scope links** are used to access data from or apply effects to other scopes. For example, `c:FRA.gold` would access the treasury of the country with the tag FRA.
 
+A scripted trigger's valid entry scope is determined by its complete body, not
+by the scope of one nested condition. Vanilla `is_gaelic_clans`, for example,
+starts in pop scope, checks pop culture and foreign-building state, and only
+then follows `owner` to inspect country estate privileges. Calling it directly
+from country scope makes that `owner` link invalid. When the caller already has
+country scope, use the underlying country-valid privilege triggers instead.
+
 ### 5.3. Script Values
 
 Script values are used for mathematical calculations and creating dynamic numerical values. They can be defined as reusable named values in the `common/script_values/` folder or created inline within other scripts. They support a wide range of arithmetic and logical operators. [6]

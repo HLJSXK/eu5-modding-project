@@ -621,7 +621,12 @@ EPBM_FINALIZE = """
 	if = {
 		limit = {
 			country_has_estate = estate_type:tribes_estate
-			NOT = { is_gaelic_clans = yes }
+			NOT = {
+				OR = {
+					has_estate_privilege = estate_privilege:tribes_scotland_gaelic_heritage
+					has_estate_privilege = estate_privilege:autonomous_tribes_scotland_gaelic_heritage
+				}
+			}
 		}
 		set_local_variable = { name = sol_mnt_include_tribes value = 1 }
 		set_local_variable = { name = sol_mnt_power_tribes value = "estate_power(estate_type:tribes_estate)" }
@@ -694,6 +699,8 @@ def _render_epbm_body() -> str:
         raise ValueError("EPBM compatibility rendering changed M&T logic outside instrumentation markers")
     if re.search(r"\bbuilding_category\s*!=", rendered):
         raise ValueError("building_category is a simple-assign trigger; negate it with NOT")
+    if re.search(r"\bis_gaelic_clans\b", rendered):
+        raise ValueError("is_gaelic_clans is pop-scoped; EPBM runs in country scope")
     return rendered
 
 
