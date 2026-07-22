@@ -9,7 +9,7 @@ import re
 import sys
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -80,6 +80,12 @@ EXPECTED_EXCLUDED_GOODS = frozenset({
     "antimony", "bisons", "potash", "printing_type", "zinc",
 })
 EXPECTED_ALL_NEW_GOODS = EXPECTED_DEMAND_GOODS | EXPECTED_EXCLUDED_GOODS
+EXPECTED_WEALTH_THRESHOLD_GOODS = frozenset({
+    "aromatics", "brassware", "cheese", "cosmetics", "ginger", "ornaments",
+    "perfume", "pewterware", "silverware", "soap", "star_anise", "turmeric",
+    "vanilla",
+})
+EXPECTED_DEVELOPMENT_THRESHOLD_GOODS = frozenset()
 
 WORKSHOP_GOODS_FILES = {
     "3745661335": Path("in_game/common/goods/brass_produced_goods.txt"),
@@ -116,6 +122,7 @@ def _load_rows() -> List[Dict[str, object]]:
     seen: set[str] = set()
     expected_columns = {
         "workshop_id", "mod_name", "good", "price", *POP_TYPES, "slaves",
+        "wealth_all", "development_threshold",
     }
     if not raw_rows:
         raise ValueError(f"No JTG rows found in {INPUT_CSV}")
@@ -137,6 +144,16 @@ def _load_rows() -> List[Dict[str, object]]:
         slave_demand = float(raw["slaves"] or 0)
         if slave_demand < 0:
             raise ValueError(f"{good}: slave demand must be non-negative")
+        wealth_all = float(raw["wealth_all"]) if raw["wealth_all"].strip() else None
+        development_threshold = (
+            float(raw["development_threshold"])
+            if raw["development_threshold"].strip()
+            else None
+        )
+        if wealth_all is not None and wealth_all <= EPSILON:
+            raise ValueError(f"{good}: wealth threshold must be positive when present")
+        if development_threshold is not None and development_threshold <= EPSILON:
+            raise ValueError(f"{good}: development threshold must be positive when present")
         rows.append({
             "workshop_id": raw["workshop_id"].strip(),
             "mod_name": raw["mod_name"].strip(),
@@ -144,6 +161,8 @@ def _load_rows() -> List[Dict[str, object]]:
             "price": price,
             "native": native,
             "slaves": slave_demand,
+            "wealth_all": wealth_all,
+            "development_threshold": development_threshold,
         })
 
     actual_goods = set(seen)
@@ -153,6 +172,20 @@ def _load_rows() -> List[Dict[str, object]]:
         raise ValueError(f"Invalid JTG demand-good set; missing={missing}, extra={extra}")
     if set(DEMAND_SCALES) != set(POP_TYPES):
         raise ValueError("JTG demand scales must cover exactly the SOL pop types")
+    wealth_goods = {str(row["good"]) for row in rows if row["wealth_all"] is not None}
+    if wealth_goods != EXPECTED_WEALTH_THRESHOLD_GOODS:
+        missing = sorted(EXPECTED_WEALTH_THRESHOLD_GOODS - wealth_goods)
+        extra = sorted(wealth_goods - EXPECTED_WEALTH_THRESHOLD_GOODS)
+        raise ValueError(f"Invalid JTG wealth-threshold set; missing={missing}, extra={extra}")
+    development_goods = {
+        str(row["good"])
+        for row in rows
+        if row["development_threshold"] is not None
+    }
+    if development_goods != EXPECTED_DEVELOPMENT_THRESHOLD_GOODS:
+        missing = sorted(EXPECTED_DEVELOPMENT_THRESHOLD_GOODS - development_goods)
+        extra = sorted(development_goods - EXPECTED_DEVELOPMENT_THRESHOLD_GOODS)
+        raise ValueError(f"Invalid JTG development-threshold set; missing={missing}, extra={extra}")
     return sorted(rows, key=lambda row: str(row["good"]))
 
 
@@ -209,6 +242,7 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
         GENERATED_HEADER.rstrip(),
         "# Apply SOL's approximate per-stratum scaling to JTG pop demand.",
         "# Targets use clean magnitude-aware steps: 0.01, 0.001, 0.0001, or 0.00001.",
+        "# Every source wealth/development demand threshold is fully negated.",
         "# Slave demand is intentionally left unchanged and is never injected here.",
     ]
     for row in rows:
@@ -220,15 +254,34 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
             f"{pop_type}={_format_float(targets[pop_type])}" for pop_type in POP_TYPES
         )
         lines.append(f"# {target_text}")
-        lines.extend([f"INJECT:{good} = {{", "\tdemand_add = {"])
+        lines.append(f"INJECT:{good} = {{")
+        development_threshold = row["development_threshold"]
+        if development_threshold is not None:
+            lines.append(
+                f"\tdevelopment_threshold = {_format_float(-float(development_threshold))}"
+            )
+        lines.append("\tdemand_add = {")
         for pop_type in POP_TYPES:
             correction = corrections[pop_type]
             if abs(correction) <= EPSILON:
                 continue
             lines.append(f"\t\t{pop_type} = {_format_float(correction)}")
-        lines.extend(["\t}", "}"])
+        lines.append("\t}")
+        wealth_all = row["wealth_all"]
+        if wealth_all is not None:
+            lines.extend([
+                "\twealth_impact_threshold = {",
+                f"\t\tall = {_format_float(-float(wealth_all))}",
+                "\t}",
+            ])
+        lines.append("}")
     lines.append("")
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    if rendered.count("\twealth_impact_threshold = {") != len(EXPECTED_WEALTH_THRESHOLD_GOODS):
+        raise ValueError("Generated goods file does not negate every JTG wealth threshold")
+    if rendered.count("\tdevelopment_threshold = ") != len(EXPECTED_DEVELOPMENT_THRESHOLD_GOODS):
+        raise ValueError("Generated goods file does not negate every JTG development threshold")
+    return rendered
 
 
 def _render_values(rows: List[Dict[str, object]]) -> str:
@@ -422,6 +475,45 @@ def _raw_slave_demand(path: Path, good: str) -> float:
     return float(_parse_kv_block(demand_add).get("slaves", 0.0))
 
 
+def _source_thresholds(
+    path: Path, good: str,
+) -> Tuple[Optional[float], Optional[float]]:
+    text = _read(path)
+    match = re.search(rf"(?m)^(?:INJECT:)?{re.escape(good)}\s*=\s*\{{", text)
+    if not match:
+        raise ValueError(f"{good} block not found in {path}")
+    brace_start = text.index("{", match.start())
+    block, _end = _collect_brace_block(text, brace_start)
+
+    wealth_all: Optional[float] = None
+    wealth_block = _find_sub_block(block, "wealth_impact_threshold")
+    if wealth_block is not None:
+        wealth_fields = _parse_kv_block(wealth_block)
+        unexpected_fields = set(wealth_fields) - {"all"}
+        if unexpected_fields:
+            raise ValueError(
+                f"{good}: unsupported Workshop wealth threshold fields: "
+                f"{sorted(unexpected_fields)}"
+            )
+        if "all" in wealth_fields:
+            wealth_all = float(wealth_fields["all"])
+
+    development_match = re.search(
+        r"\bdevelopment_threshold\s*=\s*(-?(?:\d+(?:\.\d*)?|\.\d+))",
+        block,
+    )
+    development_threshold = (
+        float(development_match.group(1)) if development_match else None
+    )
+    return wealth_all, development_threshold
+
+
+def _optional_number_matches(actual: Optional[float], expected: object) -> bool:
+    if actual is None or expected is None:
+        return actual is None and expected is None
+    return abs(actual - float(expected)) <= EPSILON
+
+
 def _audit_workshop(workshop_root: Path, rows: List[Dict[str, object]]) -> None:
     source_goods: set[str] = set()
     parsed_by_mod: Dict[str, Tuple[Path, Dict[str, Dict[str, object]]]] = {}
@@ -455,6 +547,13 @@ def _audit_workshop(workshop_root: Path, rows: List[Dict[str, object]]) -> None:
                 raise ValueError(f"{good}: Workshop {pop_type} demand differs from CSV")
         if abs(_raw_slave_demand(path, good) - float(row["slaves"])) > EPSILON:
             raise ValueError(f"{good}: Workshop slave demand differs from CSV")
+        source_wealth, source_development = _source_thresholds(path, good)
+        if not _optional_number_matches(source_wealth, row["wealth_all"]):
+            raise ValueError(f"{good}: Workshop wealth threshold differs from CSV")
+        if not _optional_number_matches(
+            source_development, row["development_threshold"]
+        ):
+            raise ValueError(f"{good}: Workshop development threshold differs from CSV")
 
     for good in EXPECTED_EXCLUDED_GOODS:
         matches = [parsed[good] for _path, parsed in parsed_by_mod.values() if good in parsed]

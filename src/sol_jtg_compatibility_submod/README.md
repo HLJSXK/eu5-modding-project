@@ -29,6 +29,11 @@ use 0.01 increments, then smaller values use 0.001, 0.0001, or 0.00001
 increments. This keeps the visible balance values compact without erasing the
 small commoner quantities.
 
+Every `wealth_impact_threshold` supplied by the five JTG mods is fully negated,
+matching SOL's development-independent and income-driven demand model. The
+current JTG sources define no `development_threshold`; the checked-in data and
+Workshop audit track that field so a future JTG gate cannot be missed silently.
+
 Slave demand remains owned by the JTG mods and is not changed. The compatibility
 layer also adds the 22 final quantities to SOL's market unit-spending cache and
 shows all 77 SOL + JTG demand goods in both SOL goods panels.
