@@ -247,6 +247,14 @@ save is loaded. Do not write directly to CMM's internal maps. Independently
 hard-disable the removed gameplay trigger so stale alias variables cannot
 reactivate the feature outside the UI.
 
+Removing a setting also requires removing every remaining read of its alias
+variable. EU5's variable validator only counts setters in reachable, used
+scripted objects; a setter left inside an unused effect or trigger does not
+prevent `Variable '...' is used but is never set`. Compatibility layers should
+prefer exact-path cleanup of obsolete script values and scripted GUIs: keep
+variable-free constant fallbacks where another parsed object still references a
+script value, and keep callbacks only for settings still registered.
+
 ## 8. Best Practices and Resources
 
 *   **Country pulse on_actions merge automatically**: For `monthly_country_pulse` and `yearly_country_pulse`, use the compact style `pulse = { on_actions = { my_dispatcher } }`. Duplicate pulse definitions merge their `on_actions`, so do not copy vanilla or framework entries just to preserve them.

@@ -45,6 +45,9 @@ STABLE_CABINET = (
 STABLE_COLONIAL = (
     STABLE_ROOT / "in_game" / "common" / "generic_actions" / "A_SOL_economy_generic_actions.txt"
 )
+STABLE_CMM_SCRIPTED_GUI = (
+    STABLE_ROOT / "in_game" / "common" / "scripted_guis" / "SOL_cmm_scripted_gui.txt"
+)
 
 MNT_GOODS_ROOT = MNT_ROOT / "in_game" / "common" / "goods"
 MNT_PRICES_ROOT = MNT_ROOT / "in_game" / "common" / "prices"
@@ -69,6 +72,12 @@ EFFECTS_OUTPUT = (
 )
 CMM_OUTPUT = (
     TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_SOL_MnT_cmm_effects.txt"
+)
+CMM_VALUES_OUTPUT = (
+    TARGET_ROOT / "in_game" / "common" / "script_values" / "SOL_cmm_values.txt"
+)
+CMM_SCRIPTED_GUI_OUTPUT = (
+    TARGET_ROOT / "in_game" / "common" / "scripted_guis" / "SOL_cmm_scripted_gui.txt"
 )
 TRIGGERS_OUTPUT = (
     TARGET_ROOT / "in_game" / "common" / "scripted_triggers" / "zz_SOL_MnT_disabled_triggers.txt"
@@ -100,6 +109,13 @@ ALL_POP_TYPES = (*POP_TYPES, "slaves")
 UPPER_TYPES = frozenset(("nobles", "clergy", "burghers", "laborers", "soldiers"))
 COMMONER_TYPES = frozenset(("laborers", "peasants", "soldiers"))
 GRAINS = ("maize", "millet", "rice")
+RETAINED_CMM_SCRIPTED_GUIS = (
+    "sol__sol_map_on_changed",
+    "sol__iwe_on_changed",
+    "sol__hwe_on_changed",
+    "sol__rwe_on_changed",
+)
+REMOVED_CMM_VARIABLES = ("sol_cts", "sol_bte", "sol_ds", "sol_ai_pr", "sol_as_enabled")
 
 
 @dataclass(frozen=True)
@@ -839,6 +855,63 @@ def _render_cmm() -> str:
     return rendered
 
 
+def _render_cmm_values() -> str:
+    rendered = "\n".join(
+        [
+            GENERATED_HEADER.rstrip(),
+            "# M&T removes SOL's economic settings; retain only their original fallback values.",
+            "sol_as_bte_scale = {",
+            "\tvalue = -0.15",
+            "}",
+            "",
+            "sol_as_cts_coeff = {",
+            "\tvalue = 0.1",
+            "}",
+            "",
+            "sol_as_ds_coeff = {",
+            "\tvalue = -0.05",
+            "}",
+            "",
+            "sol_as_ds_cap_factor = {",
+            "\tvalue = used_diplomatic_capacity",
+            "\tmultiply = -0.1",
+            "\tadd = 1",
+            "}",
+            "",
+            "sol_as_ds_scale = {",
+            "\tvalue = sol_as_ds_coeff",
+            "\tmultiply = sol_as_ds_cap_factor",
+            "}",
+            "",
+            "sol_as_ai_pr_scale = {",
+            "\tvalue = 0.005",
+            "}",
+            "",
+        ]
+    )
+    for variable in REMOVED_CMM_VARIABLES:
+        if re.search(rf"\b{re.escape(variable)}\b", rendered):
+            raise ValueError(f"Removed CMM variable survived constant fallback values: {variable}")
+    return rendered
+
+
+def _render_cmm_scripted_guis() -> str:
+    source_blocks = _blocks_in_file(STABLE_CMM_SCRIPTED_GUI)
+    lines = [
+        GENERATED_HEADER.rstrip(),
+        "# Exact-path override: keep only callbacks still registered by the M&T CMM whitelist.",
+    ]
+    for key in RETAINED_CMM_SCRIPTED_GUIS:
+        block = _unique_block(source_blocks, key, "retained SOL CMM scripted GUI")
+        lines.extend(["", f"{key} = {{{block.body}}}"])
+    lines.append("")
+    rendered = "\n".join(lines)
+    for variable in REMOVED_CMM_VARIABLES:
+        if re.search(rf"\b{re.escape(variable)}\b", rendered):
+            raise ValueError(f"Removed CMM variable survived scripted GUI cleanup: {variable}")
+    return rendered
+
+
 def _render_disabled_triggers() -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
@@ -938,6 +1011,8 @@ def _render_outputs() -> Dict[Path, str]:
         VALUES_OUTPUT: values,
         EFFECTS_OUTPUT: _render_effects(refresh),
         CMM_OUTPUT: _render_cmm(),
+        CMM_VALUES_OUTPUT: _render_cmm_values(),
+        CMM_SCRIPTED_GUI_OUTPUT: _render_cmm_scripted_guis(),
         TRIGGERS_OUTPUT: _render_disabled_triggers(),
         PRICES_OUTPUT: _render_authority_objects(
             STABLE_PRICES,

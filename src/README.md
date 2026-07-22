@@ -42,7 +42,9 @@ Final-loading compatibility layer for MEIOU and Taxes and full SOL. M&T owns
 economic balance, goods prices and non-demand fields, production, food, RGO,
 buildings, and estate maintenance. The layer replaces the seven SOL pop-demand
 quantities with M&T-price-scaled values, removes wealth/development gates, and
-keeps SOL's demand accounting and Living Standard UI synchronized.
+keeps SOL's demand accounting and Living Standard UI synchronized. Exact-path
+overrides reduce the SOL CMM values and scripted GUI callbacks to the settings
+that remain active, so discarded economic controls leave no variable warnings.
 
 The generated EPBM replacement preserves M&T's country totals and deductions
 while caching attributable domestic maintenance on the five existing SOL
