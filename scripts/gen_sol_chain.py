@@ -7,6 +7,7 @@ Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target stable
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_standalone
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_pp_compatibility_submod
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target sol_jtg_compatibility_submod
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --check
 """
 
@@ -21,8 +22,11 @@ if hasattr(sys.stdout, "reconfigure"):
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BASE_TARGET_NAMES = ("stable", "sol_standalone")
-COMPAT_TARGET = "sol_pp_compatibility_submod"
-TARGET_NAMES = (*BASE_TARGET_NAMES, COMPAT_TARGET)
+COMPAT_TARGET_NAMES = (
+    "sol_pp_compatibility_submod",
+    "sol_jtg_compatibility_submod",
+)
+TARGET_NAMES = (*BASE_TARGET_NAMES, *COMPAT_TARGET_NAMES)
 
 
 def _resolve_targets(target: str) -> list[str]:
@@ -76,8 +80,11 @@ def main() -> None:
         location_args = ["--check"] if args.check else []
         _run(["scripts/generate_sol_location_window.py", *location_args])
 
-    if COMPAT_TARGET in targets:
+    if "sol_pp_compatibility_submod" in targets:
         _run(["scripts/gen_sol_pp_compat.py", *mode_args])
+
+    if "sol_jtg_compatibility_submod" in targets:
+        _run(["scripts/gen_sol_jtg_compat.py", *mode_args])
 
 
 if __name__ == "__main__":

@@ -36,6 +36,18 @@ Its freely named game-data and GUI files use the `zz_` load-order prefix. The
 `global_living_standard.gui` situation panel keeps its exact filename because
 EU5 binds that file name to the `global_living_standard` situation ID.
 
+### `sol_jtg_compatibility_submod/`
+
+Compatibility layer loaded after all five Just Trade Goods mods and `stable`.
+It applies SOL's approximate per-stratum demand scaling to the 22 new goods with
+direct pop demand, adds their final quantities to SOL's market and country
+spending caches, and rebuilds both goods panels with all 77 demand goods.
+
+The target relies on JTG localization and DDS assets instead of copying them.
+Just Spices must be enabled manually because its metadata ID is empty. This
+target is mutually exclusive with `sol_pp_compatibility_submod` because both
+replace the same two SOL scripted effects.
+
 The standalone `location_window.gui` override is generated from the vanilla
 reference by `scripts/generate_sol_location_window.py`, which is called by the
 chain for `sol_standalone` and `all`.
@@ -48,6 +60,7 @@ From the repository root:
 build.bat stable
 build.bat sol_standalone
 build.bat sol_pp_compatibility_submod
+build.bat sol_jtg_compatibility_submod
 build.bat all
 ```
 
