@@ -4,7 +4,7 @@ This repository now focuses on EU5 mod development only.
 
 ## Scope
 
-- Mod source development (`src/stable`, `src/sol_standalone`, `src/sol_pp_compatibility_submod`, `src/sol_jtg_compatibility_submod`)
+- Mod source development (`src/stable`, `src/sol_standalone`, and compatibility targets under `src/`)
 - Modding knowledge base and design documents
 - Community and vanilla reference files for research
 
@@ -22,8 +22,9 @@ This repository keeps only mod-related content and documentation.
 2. Use `src/stable/` as the full stable mod target
 3. Use `src/sol_standalone/` for the SOL-only standalone target
 4. Use `src/sol_pp_compatibility_submod/` for the SOL / Prosper or Perish compatibility layer
-5. Use `src/sol_jtg_compatibility_submod/` for the SOL / Just Trade Goods compatibility layer
-6. Read technical docs in `docs/technical/`
+5. Use `src/sol_mnt_compatibility_submod/` for the SOL / MEIOU and Taxes compatibility layer
+6. Use `src/sol_jtg_compatibility_submod/` for the SOL / Just Trade Goods compatibility layer
+7. Read technical docs in `docs/technical/`
 
 ## Build / Deploy
 
@@ -35,16 +36,16 @@ python scripts\gen_sol_chain.py --target all
 python scripts\gen_sol_chain.py --target all --check
 ```
 
-For the default deployment of stable, SOL standalone, and both compact
+For the default deployment of stable, SOL standalone, and all compatibility
 compatibility submods, run:
 
 ```cmd
 build.bat
 ```
 
-This regenerates and mirrors all four active targets into the EU5 game mod
-folder. The SOL-PP and SOL-JTG targets may both be installed, but they must not
-be enabled in the same playset because they replace the same SOL effects. To
+This regenerates and mirrors all active targets into the EU5 game mod folder.
+Compatibility targets may be installed together, but only the one matching the
+active overhaul should be enabled because they replace shared SOL effects. To
 deploy only the full stable target, run:
 
 ```cmd
@@ -66,6 +67,14 @@ build.bat sol_pp_compatibility_submod
 ```
 
 This mirrors `src\sol_pp_compatibility_submod\` into the EU5 game mod folder.
+
+For the SOL / MEIOU and Taxes compatibility submod, run:
+
+```cmd
+build.bat sol_mnt_compatibility_submod
+```
+
+This mirrors `src\sol_mnt_compatibility_submod\` into the EU5 game mod folder.
 
 For the SOL / Just Trade Goods compatibility submod, run:
 

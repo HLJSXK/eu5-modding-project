@@ -9,7 +9,7 @@
 - Mod name: **Standard of Living (SOL)**
 - Mod ID: `hades.sol` | Version: `1.3.11` | Target: EU5 `1.3.11`
 - Requires Community Mod Framework v2.*
-- Active deploy targets: `src/stable/`, `src/sol_standalone/`, `src/sol_pp_compatibility_submod/`, and `src/sol_jtg_compatibility_submod/`
+- Active deploy targets: `src/stable/`, `src/sol_standalone/`, `src/sol_pp_compatibility_submod/`, `src/sol_mnt_compatibility_submod/`, and `src/sol_jtg_compatibility_submod/`
 
 ## Core Features
 
@@ -30,6 +30,8 @@
 8. **Prosper or Perish Compact Compatibility Submod** - A separate final-loading target keeps full PP while narrowing full SOL to its income-based demand/UI, compact age construction and city/town costs, low-control construction penalty, base tax/diplomatic/stability rules, difficulty tax adjustments, configurable AI devastation recovery, non-conflicting prices, and selected war/expansion rules. It removes SOL residuals from PP-owned weather, Little Ice Age, base location, road price, blockade, siege, occupation, and looting values; disables SOL GDP-to-development and excluded age fields; preserves PP's zero lumber demand; and adds PP `victuals` to SOL calculations and both goods panels. Compatibility `demand_add` sets rounded Compact `victuals` net-demand targets of 0.05/0.015/0.035/0.0004/0.0002/0.0004 for nobles/clergy/burghers/laborers/peasants/soldiers, chosen from the PP-only spending-ratio comparison. Stable and standalone contain no PP-load detection or PP-only UI/value data.
 
 9. **Just Trade Goods Compact Compatibility Submod** - A separate final-loading target applies SOL-style per-stratum scaling to the 22 direct-demand goods from Just Brass, Just Meat, Just Soap, Just Spices, and Just Cheese. The fixed multipliers are 1.05/0.45/1.75/0.02/0.10/0.025/0 for nobles/clergy/burghers/laborers/peasants/soldiers/tribesmen; scaled targets use clean 0.01/0.001/0.0001/0.00001 steps by magnitude, and slave demand remains unchanged. It adds final JTG quantities to SOL market and country accounting and rebuilds both goods panels with all 77 demand goods using the JTG DDS icons. All five JTG mods are required, and this target is mutually exclusive with the SOL-PP compatibility target because both replace the same two SOL effects.
+
+10. **MEIOU and Taxes Compatibility Submod** - A separate final-loading target makes M&T authoritative for economic balance while retaining SOL demand, Living Standard UI/map, migration, and non-conflicting war/colonial rules. It rebuilds all 55 SOL goods from complete M&T objects, inversely scales the seven SOL pop quantities against M&T prices, equalizes maize/millet/rice, keeps tools laborer demand at 0.0005, preserves M&T slave demand, and removes wealth/development gates. Its marked EPBM replacement leaves M&T country charges unchanged while caching attributable domestic maintenance on SOL's five location variables; foreign, crown, dhimmi, and Gaelic-tribes attribution is excluded by policy.
 
 ## Directory Structure
 
@@ -89,6 +91,11 @@ eu5-modding-project/
 |       |-- in_game/common/              lumber correction and PP-aware SOL calculation overrides
 |       |-- in_game/gui/                 victuals-aware location and situation panel overrides
 |       `-- main_menu/common/            Little Ice Age residual cleanup
+|   `-- sol_mnt_compatibility_submod/    late-loading SOL / MEIOU and Taxes compatibility target
+|       |-- .metadata/                   formal M&T and SOL dependencies
+|       |-- in_game/common/              generated goods, EPBM, cleanup, CMM, war, and colonial overrides
+|       |-- in_game/gui/                 M&T location window plus SOL income and Living Standard entry
+|       `-- main_menu/common/            M&T/vanilla economic static-modifier authority
 |   `-- sol_jtg_compatibility_submod/    late-loading SOL / five-mod JTG compatibility target
 |       |-- .metadata/                   SOL plus four formal JTG dependencies; Just Spices is manual
 |       `-- in_game/                     generated demand, constants, effects, and 77-good GUI overrides
@@ -106,8 +113,9 @@ eu5-modding-project/
 
 | Script | When to run | Output |
 |---|---|---|
-| `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all four deploy targets |
+| `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all five deploy targets |
 | `gen_sol_pp_compat.py` | After changing SOL balance/demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated compact feature cleanup plus lumber correction, fixed rounded victuals demand/accounting, effect, and GUI overrides in `src/sol_pp_compatibility_submod/` |
+| `gen_sol_mnt_compat.py` | After changing SOL demand/effects/UI or updating the M&T reference; called by `gen_sol_chain.py` | Generated M&T-based goods, unit-consumption values, economic authority cleanup, EPBM location caches, CMF/action overrides, and merged location window in `src/sol_mnt_compatibility_submod/` |
 | `gen_sol_jtg_compat.py` | After changing `jtg_pop_demand.csv`, SOL demand/effects/UI, or updating the five JTG Workshop mods; called by `gen_sol_chain.py` | Generated JTG demand corrections, unit-consumption values, two effect replacements, and both 77-good GUI overrides in `src/sol_jtg_compatibility_submod/` |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline plus complete vanilla development-threshold negations; supports `--target stable\|sol_standalone\|all`) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
@@ -138,9 +146,10 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 - **Calibrated demand baseline** - `data/target_demand.csv` drives `src/stable/in_game/common/goods/z_SOL_pop_goods.txt` and `src/sol_standalone/in_game/common/goods/z_SOL_pop_goods.txt`. These `demand_add` values remain the baseline that the SOL multiplier scales. The generator requires exact negation of every vanilla `development_threshold`, while both targets set `NPop.DEVELOPMENT_SCALE_ON_DEMAND = 0`.
 - **Hardcoded unit consumption constants** - `data/demand_price_table.csv` is converted into each target's `in_game/common/script_values/SOL_market_unit_consumption_values.txt`, storing net demand quantity for each pop type and good. Duplicate goods that appear in multiple old demand groups are counted once.
 - **PP compatibility calculation** - The compatibility target uses fixed rounded `victuals` net-demand targets of 0.05/0.015/0.035/0.0004/0.0002/0.0004 for nobles/clergy/burghers/laborers/peasants/soldiers, selected after comparing each stratum's PP-only default-price spending ratio against six staple goods. It injects the positive or negative `demand_add` delta needed to reach those targets, and the same final quantities feed SOL accounting. It negates PP's `victuals` development threshold, forces all lumber quantities to zero, and explicitly `REPLACE`s the two SOL effects that need PP-aware market refresh and country goods aggregation. Existing SOL values/effects remain owned by the full SOL mod instead of being duplicated under later filenames.
+- **M&T compatibility calculation** - The M&T target uses complete M&T goods bodies and replaces only population-demand fields. Seven SOL quantities are inversely scaled by the vanilla/SOL to M&T default-price ratio and rounded to five decimals; maize, millet, and rice are equalized from combined SOL spending, tools laborer demand resolves to 0.0005, M&T slave quantities remain intact, and all wealth/development gates are removed. Matching generated constants and market refresh logic keep SOL accounting aligned with the final goods database.
 - **JTG compatibility calculation** - `data/jtg_pop_demand.csv` records the 22 direct-demand JTG goods. The compatibility generator applies fixed per-stratum SOL multipliers, rounds targets to clean 0.01/0.001/0.0001/0.00001 steps according to magnitude, injects the exact five-decimal deltas, and emits matching unit-consumption constants. It replaces only `sol_refresh_market_pop_demand_maps` and `gls_accumulate_panel_stats`, expands both goods grids from 55 to 77 entries, leaves five demand-free JTG goods and all slave demand untouched, and can audit the CSV against an installed Workshop content root.
 - **Yearly market spending maps** - `sol_refresh_market_pop_demand_maps` scans `every_market_in_world`, writes consumed-good counters keyed by market scope, and caches one unit-spending `global_variable_map` per pop type. For each consumed good, spending is computed as hardcoded consumption quantity times `min(market_price(goods), default_price(goods))`, so cheaper goods lower base spending while expensive goods do not inflate it above vanilla base price.
-- **Yearly SOL maintenance caches** - `yearly_country_pulse` calls `sol_update_estate_building_maintenance` to scan every owned land location, cache the five SOL estate building counts, and subtract 1 gold per cached estate building from the matching stratum income. It then refreshes the country-level 1.3.4 poverty-consumption compensation factor; the same cache refresh runs during full GLS initialization after game start/load.
+- **Yearly SOL maintenance caches** - Normal SOL targets call `sol_update_estate_building_maintenance` to scan every owned land location, cache the five SOL estate building counts, and subtract 1 gold per cached estate building from matching stratum income. In the M&T target that scanner is disabled: M&T's own player-monthly/AI-yearly EPBM calculation writes charge-factor- and estate-power-adjusted domestic location costs into the same five variables without changing M&T country deductions.
 - **Monthly local demand modifier** - `monthly_country_pulse` calls `sol_update_local_pop_demand_modifiers`, which computes each owned land location's income-closed raw coefficient, multiplies the applied modifier by the cached country poverty-compensation factor, and applies `sol_local_pop_demand_modifier` for one month with `size = var:sol_location_pop_demand_modifier_size`.
 - **Income-closed location scale** - Each location sums five gross stratum incomes, subtracts cached estate building maintenance to derive total net stratum income, applies the country's unified savings adjustment `(total savings / total savings target - 1) * 0.25`, and divides liquid funds directly by market-keyed base spending. Commoner base spending remains exact by internally using laborer, peasant, and soldier unit-spending maps. Development does not scale or gate demand. The raw result is used for demand UI display, while the applied `local_pop_demand` value is multiplied by the cached country-level 1.3.4 poverty-consumption compensation factor capped at 2x.
 - **Country-level aggregation** - Location income, savings, base spending, liquid funds, final coefficient, and consumed market goods feed the situation panel and map overlay.
@@ -233,8 +242,9 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 | Script | Input(s) | Output(s) | When to run |
 | --- | --- | --- | --- |
-| `scripts/gen_sol_chain.py` | SOL demand data + vanilla/PP/JTG goods | active SOL generated files for all deploy targets | Preferred one-shot SOL generation entry; build.bat runs it automatically |
+| `scripts/gen_sol_chain.py` | SOL demand data + vanilla/PP/M&T/JTG goods | active SOL generated files for all deploy targets | Preferred one-shot SOL generation entry; build.bat runs it automatically |
 | `scripts/gen_sol_pp_compat.py` | stable SOL outputs + PP definitions | SOL-PP compact feature, price, demand, effects, and GUI overrides | After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain |
+| `scripts/gen_sol_mnt_compat.py` | data/target_demand.csv + stable SOL + M&T definitions | SOL-M&T goods, accounting, EPBM, economic cleanup, actions, and location GUI | After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain |
 | `scripts/gen_sol_jtg_compat.py` | data/jtg_pop_demand.csv + stable SOL outputs | SOL-JTG demand, values, effects, and 77-good GUI overrides | After changing JTG demand data or updating the five JTG mods; run by gen_sol_chain |
 | `scripts/gen_pop_goods.py` | data/target_demand.csv | src/<target>/.../z_SOL_pop_goods.txt | After editing calibrated demand_add baseline; supports --target stable|sol_standalone|all |
 | `scripts/gen_demand_csv.py` | z_SOL_pop_goods.txt + vanilla goods | data/demand_price_table.csv | After gen_pop_goods.py |
@@ -266,6 +276,16 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | `src/sol_pp_compatibility_submod/in_game/common/prices/zz_SOL_PP_compact_price_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
 | `src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_static_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
 | `src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_war_overlap_cleanup.txt` | `scripts/gen_sol_pp_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/goods/zz_SOL_MnT_pop_goods.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/script_values/zz_SOL_MnT_market_unit_consumption_values.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/scripted_effects/zz_SOL_MnT_compat_effects.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/scripted_effects/zz_SOL_MnT_cmm_effects.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/scripted_triggers/zz_SOL_MnT_disabled_triggers.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/prices/zz_SOL_MnT_price_authority.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/cabinet_actions/zz_SOL_MnT_war_cabinet.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/common/generic_actions/zz_SOL_MnT_colonial_actions.txt` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/in_game/gui/location_window.gui` | `scripts/gen_sol_mnt_compat.py` |
+| `src/sol_mnt_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_MnT_economic_static_authority.txt` | `scripts/gen_sol_mnt_compat.py` |
 | `src/sol_jtg_compatibility_submod/in_game/common/goods/zz_SOL_JTG_pop_goods.txt` | `scripts/gen_sol_jtg_compat.py` |
 | `src/sol_jtg_compatibility_submod/in_game/common/script_values/zz_SOL_market_unit_consumption_values.txt` | `scripts/gen_sol_jtg_compat.py` |
 | `src/sol_jtg_compatibility_submod/in_game/common/scripted_effects/zz_A_SOL_economy_effects.txt` | `scripts/gen_sol_jtg_compat.py` |

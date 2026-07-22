@@ -36,6 +36,20 @@ Its freely named game-data and GUI files use the `zz_` load-order prefix. The
 `global_living_standard.gui` situation panel keeps its exact filename because
 EU5 binds that file name to the `global_living_standard` situation ID.
 
+### `sol_mnt_compatibility_submod/`
+
+Final-loading compatibility layer for MEIOU and Taxes and full SOL. M&T owns
+economic balance, goods prices and non-demand fields, production, food, RGO,
+buildings, and estate maintenance. The layer replaces the seven SOL pop-demand
+quantities with M&T-price-scaled values, removes wealth/development gates, and
+keeps SOL's demand accounting and Living Standard UI synchronized.
+
+The generated EPBM replacement preserves M&T's country totals and deductions
+while caching attributable domestic maintenance on the five existing SOL
+location variables. Its `location_window.gui` starts from M&T and adds only the
+SOL income display and Living Standard button. This target is mutually
+exclusive with other SOL compatibility submods.
+
 ### `sol_jtg_compatibility_submod/`
 
 Compatibility layer loaded after all five Just Trade Goods mods and `stable`.
@@ -60,6 +74,7 @@ From the repository root:
 build.bat stable
 build.bat sol_standalone
 build.bat sol_pp_compatibility_submod
+build.bat sol_mnt_compatibility_submod
 build.bat sol_jtg_compatibility_submod
 build.bat all
 ```

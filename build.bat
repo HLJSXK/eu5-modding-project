@@ -11,6 +11,7 @@ REM Usage examples:
 REM   build.bat
 REM   build.bat sol_standalone
 REM   build.bat sol_pp_compatibility_submod
+REM   build.bat sol_mnt_compatibility_submod
 REM   build.bat sol_jtg_compatibility_submod
 REM   build.bat --target sol_standalone
 REM   build.bat --all
@@ -33,6 +34,11 @@ if /I "%~1"=="sol_standalone" (
 )
 if /I "%~1"=="sol_pp_compatibility_submod" (
     set "TARGET_SELECTION=sol_pp_compatibility_submod"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="sol_mnt_compatibility_submod" (
+    set "TARGET_SELECTION=sol_mnt_compatibility_submod"
     shift
     goto parse_args
 )
@@ -76,10 +82,12 @@ if /I "%TARGET_SELECTION%"=="stable" (
     set "BUILD_TARGETS=sol_standalone"
 ) else if /I "%TARGET_SELECTION%"=="sol_pp_compatibility_submod" (
     set "BUILD_TARGETS=sol_pp_compatibility_submod"
+) else if /I "%TARGET_SELECTION%"=="sol_mnt_compatibility_submod" (
+    set "BUILD_TARGETS=sol_mnt_compatibility_submod"
 ) else if /I "%TARGET_SELECTION%"=="sol_jtg_compatibility_submod" (
     set "BUILD_TARGETS=sol_jtg_compatibility_submod"
 ) else if /I "%TARGET_SELECTION%"=="all" (
-    set "BUILD_TARGETS=stable sol_standalone sol_pp_compatibility_submod sol_jtg_compatibility_submod"
+    set "BUILD_TARGETS=stable sol_standalone sol_pp_compatibility_submod sol_mnt_compatibility_submod sol_jtg_compatibility_submod"
 ) else (
     echo [ERROR] Unknown target: %TARGET_SELECTION%
     goto usage
@@ -155,12 +163,13 @@ exit /b 0
 
 :usage
 echo Usage:
-echo   build.bat [stable^|sol_standalone^|sol_pp_compatibility_submod^|sol_jtg_compatibility_submod^|all] [--target TARGET] [--all]
+echo   build.bat [stable^|sol_standalone^|sol_pp_compatibility_submod^|sol_mnt_compatibility_submod^|sol_jtg_compatibility_submod^|all] [--target TARGET] [--all]
 echo.
 echo Targets:
 echo   stable          Build and deploy src\stable to mod\stable.
 echo   sol_standalone  Build and deploy src\sol_standalone to mod\sol_standalone.
 echo   sol_pp_compatibility_submod  Build and deploy the SOL-PP compatibility submod.
+echo   sol_mnt_compatibility_submod Build and deploy the SOL-M&T compatibility submod.
 echo   sol_jtg_compatibility_submod  Build and deploy the SOL-JTG compatibility submod.
 echo   all             Build and deploy all targets.
 echo.
