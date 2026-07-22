@@ -139,6 +139,8 @@ EU5's scripting language revolves around a few core concepts: Triggers, Effects,
 
 Both triggers and effects can be *inline* (for simple operations) or *block* (for more complex logic) and are highly dependent on the current **scope**.
 
+Some triggers are parsed as simple assignments rather than general comparison expressions. For example, `building_category` only accepts `=` in the middle. Negate it with a boolean wrapper—`NOT = { building_category = government_category }`—instead of writing `building_category != government_category`; the latter produces a script-system compile error.
+
 ### 5.2. Scopes and Scope Links
 
 A **scope** refers to the specific game object (e.g., a country, a character, a location) that a script is currently focused on. **Scope links** are used to access data from or apply effects to other scopes. For example, `c:FRA.gold` would access the treasury of the country with the tag FRA.

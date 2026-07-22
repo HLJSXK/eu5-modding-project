@@ -575,7 +575,7 @@ EPBM_SHARED_CACHE = """
 		if = {
 			limit = {
 				local_var:epbm_bldg_cost > 0
-				building_category != government_category
+				NOT = { building_category = government_category }
 			}
 			location = {
 				if = {
@@ -676,6 +676,8 @@ def _render_epbm_body() -> str:
     )
     if _strip_epbm_instrumentation(rendered) != original:
         raise ValueError("EPBM compatibility rendering changed M&T logic outside instrumentation markers")
+    if re.search(r"\bbuilding_category\s*!=", rendered):
+        raise ValueError("building_category is a simple-assign trigger; negate it with NOT")
     return rendered
 
 
