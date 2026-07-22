@@ -2408,11 +2408,6 @@ REPLACE:epbm_calculate_maintenance = {
 			set_variable = { name = sol_mnt_raw_assigned_tribes value = 0 }
 			set_variable = { name = sol_mnt_raw_assigned_dhimmi value = 0 }
 			set_variable = { name = sol_mnt_raw_assigned_cossacks value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_nobles value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_clergy value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_burghers value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_commoners value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_tribesmen value = 0 }
 		}
 	}
 	# SOL_MNT_END location_cache_init
@@ -2431,12 +2426,6 @@ REPLACE:epbm_calculate_maintenance = {
 			epbm_price_building = yes
 
 			if = { limit = { local_var:epbm_bldg_cost > 0 } epbm_route_estate_building_cost = yes }
-			# SOL_MNT_BEGIN estate_building_cache
-			if = {
-				limit = { local_var:epbm_bldg_cost > 0 }
-				sol_mnt_cache_estate_building_cost = yes
-			}
-			# SOL_MNT_END estate_building_cache
 		}
 	}
 
@@ -2575,18 +2564,18 @@ REPLACE:epbm_calculate_maintenance = {
 	}
 }
 
-sol_mnt_cache_estate_building_cost = {
-	epbm_for_each_estate = { effect = sol_mnt_cache_current_estate_building_cost }
-}
-
-sol_mnt_cache_current_estate_building_cost = {
+# Reuse M&T's existing seven-estate dispatch instead of running a second pass.
+REPLACE:epbm_route_to_cur_estate = {
 	if = {
-		limit = {
-			scope:epbm_cur_estate = { estate_type = estate_type:$estate$_estate }
-			location = { owner = scope:sol_mnt_maintenance_country }
+		limit = { scope:epbm_cur_estate = { estate_type = estate_type:$estate$_estate } }
+		change_local_variable = { name = epbm_estate_$estate$ add = local_var:epbm_bldg_cost }
+		# SOL_MNT_BEGIN assigned_location_cache
+		if = {
+			limit = { location = { owner = scope:sol_mnt_maintenance_country } }
+			location = {
+				change_variable = { name = sol_mnt_raw_assigned_$estate$ add = local_var:epbm_bldg_cost }
+			}
 		}
-		location = {
-			change_variable = { name = sol_mnt_raw_assigned_$estate$ add = local_var:epbm_bldg_cost }
-		}
+		# SOL_MNT_END assigned_location_cache
 	}
 }

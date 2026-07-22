@@ -565,23 +565,9 @@ EPBM_INIT = """
 			set_variable = { name = sol_mnt_raw_assigned_tribes value = 0 }
 			set_variable = { name = sol_mnt_raw_assigned_dhimmi value = 0 }
 			set_variable = { name = sol_mnt_raw_assigned_cossacks value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_nobles value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_clergy value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_burghers value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_commoners value = 0 }
-			set_variable = { name = sol_location_estate_building_maintenance_tribesmen value = 0 }
 		}
 	}
 	# SOL_MNT_END location_cache_init
-"""
-
-EPBM_ESTATE_CACHE = """
-			# SOL_MNT_BEGIN estate_building_cache
-			if = {
-				limit = { local_var:epbm_bldg_cost > 0 }
-				sol_mnt_cache_estate_building_cost = yes
-			}
-			# SOL_MNT_END estate_building_cache
 """
 
 EPBM_SHARED_CACHE = """
@@ -668,13 +654,6 @@ def _render_epbm_body() -> str:
         + EPBM_INIT.lstrip("\n"),
         "EPBM initialization",
     )
-    rendered = _replace_once(
-        rendered,
-        "\t\t\tif = { limit = { local_var:epbm_bldg_cost > 0 } epbm_route_estate_building_cost = yes }\n",
-        "\t\t\tif = { limit = { local_var:epbm_bldg_cost > 0 } epbm_route_estate_building_cost = yes }\n"
-        + EPBM_ESTATE_CACHE.lstrip("\n"),
-        "EPBM estate routing",
-    )
     domestic_anchor = (
         "\t\tif = { limit = { local_var:epbm_bldg_cost > 0 } "
         "epbm_route_building_cost = yes }\n"
@@ -700,6 +679,36 @@ def _render_epbm_body() -> str:
     return rendered
 
 
+def _render_estate_route_body() -> str:
+    original = _unique_block(
+        _blocks_in_file(MNT_EPBM),
+        "epbm_route_to_cur_estate",
+        "M&T estate route",
+    ).body
+    anchor = (
+        "\t\tchange_local_variable = { name = epbm_estate_$estate$ "
+        "add = local_var:epbm_bldg_cost }\n"
+    )
+    cache = """		# SOL_MNT_BEGIN assigned_location_cache
+		if = {
+			limit = { location = { owner = scope:sol_mnt_maintenance_country } }
+			location = {
+				change_variable = { name = sol_mnt_raw_assigned_$estate$ add = local_var:epbm_bldg_cost }
+			}
+		}
+		# SOL_MNT_END assigned_location_cache
+"""
+    rendered = _replace_once(
+        original,
+        anchor,
+        anchor + cache,
+        "M&T estate route cost",
+    )
+    if _strip_epbm_instrumentation(rendered) != original:
+        raise ValueError("Estate route rendering changed M&T logic outside instrumentation markers")
+    return rendered
+
+
 def _render_effects(refresh: str) -> str:
     vanilla_effects = _blocks_in_tree(VANILLA_EFFECTS_ROOT)
     change_gold = _unique_block(vanilla_effects, "change_gold_effect", "vanilla scripted effect")
@@ -707,6 +716,7 @@ def _render_effects(refresh: str) -> str:
         vanilla_effects, "change_estate_gold_effect", "vanilla scripted effect"
     )
     epbm_body = _render_epbm_body()
+    estate_route_body = _render_estate_route_body()
     return "\n".join(
         [
             GENERATED_HEADER.rstrip(),
@@ -724,21 +734,8 @@ def _render_effects(refresh: str) -> str:
             "# M&T calculation preserved byte-for-byte outside SOL_MNT marker sections.",
             f"REPLACE:epbm_calculate_maintenance = {{{epbm_body}}}",
             "",
-            "sol_mnt_cache_estate_building_cost = {",
-            "\tepbm_for_each_estate = { effect = sol_mnt_cache_current_estate_building_cost }",
-            "}",
-            "",
-            "sol_mnt_cache_current_estate_building_cost = {",
-            "\tif = {",
-            "\t\tlimit = {",
-            "\t\t\tscope:epbm_cur_estate = { estate_type = estate_type:$estate$_estate }",
-            "\t\t\tlocation = { owner = scope:sol_mnt_maintenance_country }",
-            "\t\t}",
-            "\t\tlocation = {",
-            "\t\t\tchange_variable = { name = sol_mnt_raw_assigned_$estate$ add = local_var:epbm_bldg_cost }",
-            "\t\t}",
-            "\t}",
-            "}",
+            "# Reuse M&T's existing seven-estate dispatch instead of running a second pass.",
+            f"REPLACE:epbm_route_to_cur_estate = {{{estate_route_body}}}",
             "",
         ]
     )
