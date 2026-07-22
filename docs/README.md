@@ -23,6 +23,10 @@ Mod-focused documentation for the EU5 Modding Project.
 - Standard of Living: [English](workshop_description_en.txt) | [简体中文](workshop_description_zh.txt)
 - SOL-PP Compatibility Submod: [English](workshop_description_sol_pp_en.txt) | [简体中文](workshop_description_sol_pp_zh.txt)
 
+### Discord Announcements
+
+- SOL-PP Compatibility Submod: [English](discord_announcement_sol_pp_en.md) | [简体中文](discord_announcement_sol_pp_zh.md)
+
 ### Technical Reference (general EU5 knowledge, dated — not authoritative for syntax)
 
 - [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) — file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
