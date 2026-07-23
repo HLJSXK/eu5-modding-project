@@ -1,0 +1,117 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# ON-ACTION HOOKS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entry points for both the stockpile scaling and slider demand systems.
+#
+# EXECUTION ORDER (within one month):
+#   monthly_country_pulse fires FIRST (per-country scope):
+#     1. Prox cache rebuild (player only, AI yearly)
+#     2. Phase 1 events (.1-.3, .5) - gold computation + accumulation into
+#        market location maps
+#
+#   weather_monthly_pulse fires SECOND (global scope, once):
+#     3. Stockpile scaling - adjusts market capacity modifiers
+#     4. Init check - detects rule disable, version mismatch, or first run;
+#        runs cleanup or full reinit as needed
+#     5. Phase 2 apply - reads this month's accumulated maps, applies demands
+#     6. Swap toggle - alternates demand type pair for next month
+#     7. Orphan cleanup - strips demands from locations no longer market centers
+#     8. RGO productivity - penalizes RGO output when price is below base
+#
+# GAME RULE GATING:
+#   - Every slider-demand codepath checks has_game_rule = dmsd_slider_demand_disabled
+#   - When disabled mid-game: init_check runs cleanup once, sets dmsd_disabled
+#     sentinel, then idles. No further work runs while disabled.
+#   - When re-enabled: dmsd_version is missing (cleanup removed it), so init_check
+#     triggers reinit, clears dmsd_disabled, and the system resumes.
+#
+# Step implementations are in common/scripted_effects/dmsd_monthly_steps.txt.
+
+on_game_start = {
+	on_actions = {
+		dmsd_on_game_start
+	}
+}
+
+weather_monthly_pulse = {
+	on_actions = {
+		dmsd_weather_monthly
+	}
+}
+
+on_raw_material_changed = {
+	on_actions = { dmsd_on_raw_material_changed }
+}
+
+dmsd_on_raw_material_changed = {
+	trigger = { NOT = { has_game_rule = dmsd_rgo_disabled } }
+	effect = { dmsd_rgo_on_raw_material_changed = yes }
+}
+
+dmsd_on_game_start = {
+	effect = {
+		dmsd_update_stockpile_scaling = yes
+		dmsd_init_check_effect = yes
+		dmsd_rgo_init_vm = yes
+		dmsd_rgo_productivity_effect = yes
+	}
+}
+
+dmsd_weather_monthly = {
+	effect = {
+		dmsd_update_stockpile_scaling = yes
+		dmsd_init_check_effect = yes
+		dmsd_phase2_apply_effect = yes
+		dmsd_swap_toggle_effect = yes
+		dmsd_cleanup_orphans_effect = yes
+		dmsd_rgo_productivity_effect = yes
+	}
+}
+
+monthly_country_pulse = {
+	on_actions = {
+		dmsd_prox_cache_player
+		dmsd_monthly_pulse
+	}
+}
+
+yearly_country_pulse = {
+	on_actions = {
+		dmsd_prox_cache_ai
+	}
+}
+
+on_capital_moved = {
+	on_actions = {
+		dmsd_prox_cache_on_capital
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PER-COUNTRY ON-ACTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dmsd_prox_cache_player = {
+	trigger = { is_ai = no NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+	effect = { dmsd_rebuild_prox_cache = yes }
+}
+
+dmsd_prox_cache_ai = {
+	trigger = { is_ai = yes is_real_country = yes NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+	effect = { dmsd_rebuild_prox_cache = yes }
+}
+
+dmsd_prox_cache_on_capital = {
+	trigger = { NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+	effect = { dmsd_rebuild_prox_cache = yes }
+}
+
+dmsd_monthly_pulse = {
+	trigger = { NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+	events = {
+		dmsd_slider_demand.1
+		dmsd_slider_demand.2
+		dmsd_slider_demand.3
+		dmsd_slider_demand.5
+	}
+}

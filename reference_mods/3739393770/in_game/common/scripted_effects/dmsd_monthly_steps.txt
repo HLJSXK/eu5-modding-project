@@ -1,0 +1,246 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# MONTHLY STEP EFFECTS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Called sequentially from weather_monthly_pulse's effect block.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 1: DYNAMIC STOCKPILE SCALING
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sets market stockpile capacity from trade value with sqrt diminishing returns.
+# Base = 250 × sqrt(traded / 2500), then scaled by percentage modifiers from
+# buildings and development (maximum_stockpile_capacity_modifier).
+# Uses dws_ prefix variables (legacy, persisted in existing saves).
+
+dmsd_update_stockpile_scaling = {
+	# Clean up orphaned locations (market center moved)
+	every_in_global_list = {
+		variable = dws_scaled_locations
+		limit = { is_market_center = no }
+		remove_location_modifier = dws_stockpile_scaling
+		remove_location_modifier = dws_stockpile_pct_bonus
+		remove_variable = dws_last_size
+		remove_variable = dws_last_pct_size
+	}
+
+	clear_global_variable_list = dws_scaled_locations
+
+	if = {
+		limit = { NOT = { has_game_rule = dmsd_stockpiles_disabled } }
+
+		every_market_in_world = {
+			location = {
+				# Trade-value base: 250 × sqrt(traded / 2500)
+				set_local_variable = {
+					name = dws_trade_base
+					value = {
+						value = market.total_goods_value_traded
+						divide = 2500
+						pow = 0.5
+						multiply = 250
+					}
+				}
+
+				# Percentage bonus: trade base × pct modifier
+				set_local_variable = {
+					name = dws_pct_bonus
+					value = {
+						value = local_var:dws_trade_base
+						multiply = modifier:maximum_stockpile_capacity_modifier
+					}
+				}
+
+				# Vanilla residual flat capacity (everything except our modifiers)
+				set_local_variable = {
+					name = dws_vanilla_flat
+					value = {
+						value = modifier:maximum_stockpile_capacity
+						if = {
+							limit = { has_variable = dws_last_size has_location_modifier = dws_stockpile_scaling }
+							subtract = var:dws_last_size
+						}
+						if = {
+							limit = { has_variable = dws_last_pct_size has_location_modifier = dws_stockpile_pct_bonus }
+							subtract = var:dws_last_pct_size
+						}
+					}
+				}
+
+				# Base modifier offsets vanilla flat so base total equals trade base
+				set_variable = {
+					name = dws_last_size
+					value = {
+						value = local_var:dws_trade_base
+						subtract = local_var:dws_vanilla_flat
+					}
+				}
+
+				add_location_modifier = {
+					modifier = dws_stockpile_scaling
+					years = -1
+					mode = replace
+					size = { value = var:dws_last_size }
+				}
+
+				# Percentage bonus modifier
+				set_variable = {
+					name = dws_last_pct_size
+					value = local_var:dws_pct_bonus
+				}
+
+				add_location_modifier = {
+					modifier = dws_stockpile_pct_bonus
+					years = -1
+					mode = replace
+					size = { value = var:dws_last_pct_size }
+				}
+
+				add_to_global_variable_list = { name = dws_scaled_locations target = this }
+			}
+		}
+	} else = {
+		every_market_in_world = {
+			location = {
+				if = {
+					limit = { has_location_modifier = dws_stockpile_scaling }
+					remove_location_modifier = dws_stockpile_scaling
+					remove_variable = dws_last_size
+				}
+				if = {
+					limit = { has_location_modifier = dws_stockpile_pct_bonus }
+					remove_location_modifier = dws_stockpile_pct_bonus
+					remove_variable = dws_last_pct_size
+				}
+			}
+		}
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 2: INIT CHECK
+# ═══════════════════════════════════════════════════════════════════════════════
+# Detects: game rule disabled, version mismatch, or first run.
+# When disabled: runs cleanup once, sets dmsd_disabled sentinel, then idles.
+# When re-enabled: dmsd_version is missing (cleanup removed it), triggers
+# reinit which clears dmsd_disabled and rebuilds the system.
+
+dmsd_init_check_effect = {
+	if = {
+		limit = {
+			OR = {
+				AND = {
+					has_game_rule = dmsd_slider_demand_disabled
+					NOT = { has_global_variable = dmsd_disabled }
+				}
+				AND = {
+					NOT = { has_game_rule = dmsd_slider_demand_disabled }
+					OR = {
+						NOT = { has_global_variable = dmsd_version }
+						global_var:dmsd_version < dmsd_version_value
+					}
+				}
+			}
+		}
+		if = {
+			limit = { has_game_rule = dmsd_slider_demand_disabled }
+			dmsd_full_cleanup = yes
+			set_global_variable = dmsd_disabled
+		} else = {
+			if = {
+				limit = { has_global_variable = dmsd_disabled }
+				remove_global_variable = dmsd_disabled
+			}
+			dmsd_full_cleanup = yes
+			dmsd_init_demand_registry = yes
+			random_country = {
+				limit = { is_real_country = yes }
+				every_country = { dmsd_rebuild_prox_cache = yes }
+			}
+		}
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 3: PHASE 2, APPLY ACCUMULATED DEMANDS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reads last month's accumulated maps from market locations, converts gold
+# to demand scale, applies temporary demands. Clears maps after reading.
+# Gated on dmsd_version (system initialized) and rule enabled.
+
+dmsd_phase2_apply_effect = {
+	if = {
+		limit = {
+			has_global_variable = dmsd_version
+			NOT = { has_game_rule = dmsd_slider_demand_disabled }
+		}
+		every_market_in_world = {
+			save_temporary_scope_as = dmsd_mkt
+			location = {
+				add_to_global_variable_list = { name = dmsd_active_locations target = this }
+				dmsd_apply_court = yes
+				dmsd_apply_diplo = yes
+				dmsd_apply_stab = yes
+				dmsd_apply_culture = yes
+			}
+		}
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4: SWAP TOGGLE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Alternates demand type pair (reg1/reg2) each month so remove + add
+# operate on different demand types, avoiding engine update limitations.
+
+dmsd_swap_toggle_effect = {
+	if = {
+		limit = { NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+		if = {
+			limit = { has_global_variable = dmsd_swap }
+			remove_global_variable = dmsd_swap
+		} else = {
+			set_global_variable = dmsd_swap
+		}
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5: ORPHAN CLEANUP
+# ═══════════════════════════════════════════════════════════════════════════════
+# Strips demands from locations that are no longer market centers.
+
+dmsd_cleanup_orphans_effect = {
+	if = {
+		limit = { NOT = { has_game_rule = dmsd_slider_demand_disabled } }
+		every_in_global_list = {
+			variable = dmsd_active_locations
+			limit = { is_market_center = no }
+			market = { save_temporary_scope_as = dmsd_mkt }
+			dmsd_strip_location = yes
+		}
+		clear_global_variable_list = dmsd_active_locations
+	}
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 8: RGO PRODUCTIVITY
+# ═══════════════════════════════════════════════════════════════════════════════
+# Penalizes RGO output when market price is below the good's base price.
+# Dispatches to either the threshold or always-replace variant.
+# Gated on game rule; runs cleanup once when disabled.
+
+dmsd_rgo_productivity_effect = {
+	if = {
+		limit = { has_game_rule = dmsd_rgo_disabled }
+		if = {
+			limit = { NOT = { has_global_variable = dmsd_rgo_cleaned } }
+			dmsd_rgo_full_cleanup = yes
+			set_global_variable = dmsd_rgo_cleaned
+		}
+	} else = {
+		if = {
+			limit = { has_global_variable = dmsd_rgo_cleaned }
+			remove_global_variable = dmsd_rgo_cleaned
+		}
+		dmsd_rgo_update = yes
+	}
+}

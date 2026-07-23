@@ -1,0 +1,48 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# SHARED UTILITY EFFECTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Overwrite a variable map entry. add_to_variable_map silently fails when the
+# key already exists, so we remove first to guarantee the write succeeds.
+# Inspired by the Community Mod Framework's cmf_change_variable_map pattern.
+dmsd_set_variable_map = {
+	remove_from_variable_map = { name = $name$ key = $key$ }
+	add_to_variable_map = { name = $name$ key = $key$ value = $value$ }
+}
+
+# Compute basket cost and per-source display values for one proximity source.
+# Sums (weight × market_price) across all goods in the demand IO, then stores
+# the IO reference, raw gold share, and demand scale on the country's
+# per-source display maps (read by the GUI tooltip drill-downs).
+#
+# Context: location scope (the proximity source), country is prev.
+# Requires local_var:dmsd_disp_io and local_var:dmsd_share to be set.
+# Params: $slider$ - one of court, diplo, cult, stab. Determines which
+#         set of display maps (dmsd_prox_$slider$_io/gold/scale) to write.
+dmsd_compute_source_scale = {
+	market = { save_temporary_scope_as = dmsd_src_mkt }
+	set_local_variable = { name = dmsd_basket_cost value = 0 }
+	set_global_variable = { name = dmsd_io_ref value = local_var:dmsd_disp_io }
+	global_var:dmsd_io_ref = {
+		every_key_in_variable_map = {
+			variable = dmsd_weights
+			save_temporary_scope_as = dmsd_good
+			scope:dmsd_src_mkt = {
+				change_local_variable = {
+					name = dmsd_basket_cost
+					add = { value = "global_var:dmsd_io_ref.variable_map(dmsd_weights|scope:dmsd_good)" multiply = "market_price(scope:dmsd_good)" }
+				}
+			}
+		}
+	}
+	set_local_variable = { name = dmsd_src_scale value = 0 }
+	if = {
+		limit = { local_var:dmsd_basket_cost > 0 }
+		set_local_variable = { name = dmsd_src_scale value = { value = local_var:dmsd_share divide = local_var:dmsd_basket_cost } }
+	}
+	prev = {
+		add_to_variable_map = { name = dmsd_prox_$slider$_io key = scope:dmsd_src value = local_var:dmsd_disp_io }
+		add_to_variable_map = { name = dmsd_prox_$slider$_gold key = scope:dmsd_src value = local_var:dmsd_share }
+		add_to_variable_map = { name = dmsd_prox_$slider$_scale key = scope:dmsd_src value = local_var:dmsd_src_scale }
+	}
+}

@@ -1,0 +1,79 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 2: APPLY COURT DEMAND
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reads the gold map built by Phase 1 accumulation and converts each entry
+# into an actual temporary demand on the market.
+#
+# The map is keyed by demand type (regional or religion variant). Each key's
+# value is the total gold accumulated from all countries routing through this
+# market for that demand type.
+#
+# Demand scale = gold / basket_price, where basket_price = sum of
+# (weight × market_price) across all goods in the demand's IO.
+#
+# The swap system alternates between demand type pairs (reg1/reg2) monthly
+# to work around engine limitations on updating existing temporary demands.
+#
+# Context: location scope (market center), scope:dmsd_mkt = market
+
+dmsd_apply_court = {
+	# Remove last month's demands before applying new ones
+	if = {
+		limit = { has_variable_list = dmsd_court_applied }
+		every_in_list = {
+			variable = dmsd_court_applied
+			save_temporary_scope_as = dmsd_old
+			scope:dmsd_mkt = { remove_temporary_demand = scope:dmsd_old }
+		}
+		clear_variable_list = dmsd_court_applied
+	}
+
+	if = {
+		limit = { has_variable_map = dmsd_court_map }
+		every_key_in_variable_map = {
+			variable = dmsd_court_map
+			save_temporary_scope_as = dmsd_demand
+
+			scope:dmsd_mkt = {
+				# Compute basket price: sum(weight × market_price) for this demand type
+				set_local_variable = { name = dmsd_bp value = 0 }
+				set_global_variable = { name = dmsd_io_ref value = "global_variable_map(dmsd_demand_io|scope:dmsd_demand)" }
+				global_var:dmsd_io_ref = {
+					every_key_in_variable_map = {
+						variable = dmsd_weights
+						save_temporary_scope_as = dmsd_good
+						scope:dmsd_mkt = {
+							change_local_variable = {
+								name = dmsd_bp
+								add = { value = "global_var:dmsd_io_ref.variable_map(dmsd_weights|scope:dmsd_good)" multiply = "market_price(scope:dmsd_good)" }
+							}
+						}
+					}
+				}
+
+				# scale = gold / basket_price, i.e. how many "units" of the basket this gold buys
+				set_local_variable = { name = dmsd_gv value = "location.variable_map(dmsd_court_map|scope:dmsd_demand)" }
+				if = {
+					limit = { local_var:dmsd_bp > 0 local_var:dmsd_gv >= 0.01 }
+					if = {
+						limit = { has_global_variable = dmsd_swap }
+						add_temporary_demand = {
+							type = "global_variable_map(dmsd_demand_swap|scope:dmsd_demand)"
+							months = -1
+							scale = { value = local_var:dmsd_gv divide = local_var:dmsd_bp }
+						}
+						location = { add_to_variable_list = { name = dmsd_court_applied target = "global_variable_map(dmsd_demand_swap|scope:dmsd_demand)" } }
+					} else = {
+						add_temporary_demand = {
+							type = scope:dmsd_demand
+							months = -1
+							scale = { value = local_var:dmsd_gv divide = local_var:dmsd_bp }
+						}
+						location = { add_to_variable_list = { name = dmsd_court_applied target = scope:dmsd_demand } }
+					}
+				}
+			}
+		}
+		clear_variable_map = dmsd_court_map
+	}
+}

@@ -1,0 +1,41 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# PROXIMITY SOURCE CACHE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Scans owned locations for proximity sources (modifier:local_proximity_source)
+# and caches them on the country as a list + weight map. Phase 1 events
+# distribute gold across these sources proportionally.
+#
+# Rebuilt monthly for players, yearly for AI, and on capital move.
+# Countries with no proximity sources fall back to their capital with weight 1.
+
+dmsd_rebuild_prox_cache = {
+	clear_variable_list = dmsd_prox_sources
+	clear_variable_map = dmsd_prox_weights
+	set_variable = { name = dmsd_prox_total value = 0 }
+
+	if = {
+		limit = { is_real_country = yes }
+		every_owned_location = {
+			limit = { modifier:local_proximity_source > 0 }
+			save_temporary_scope_as = dmsd_loc
+			set_local_variable = { name = dmsd_str value = modifier:local_proximity_source }
+			prev = {
+				add_to_variable_list = { name = dmsd_prox_sources target = scope:dmsd_loc }
+				add_to_variable_map = { name = dmsd_prox_weights key = scope:dmsd_loc value = local_var:dmsd_str }
+				change_variable = { name = dmsd_prox_total add = local_var:dmsd_str }
+			}
+		}
+	}
+
+	if = {
+		limit = { NOT = { has_variable_list = dmsd_prox_sources } }
+		capital = {
+			save_temporary_scope_as = dmsd_loc
+			prev = {
+				add_to_variable_list = { name = dmsd_prox_sources target = scope:dmsd_loc }
+				add_to_variable_map = { name = dmsd_prox_weights key = scope:dmsd_loc value = 1 }
+				set_variable = { name = dmsd_prox_total value = 1 }
+			}
+		}
+	}
+}

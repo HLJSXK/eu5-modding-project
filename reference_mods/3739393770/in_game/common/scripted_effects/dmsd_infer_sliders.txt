@@ -1,0 +1,140 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# SLIDER INFERENCE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Court and stability slider spending rates are not exposed to script.
+# court_maintenance/stability_maintenance give the raw slider position but
+# don't account for reduced spending when the benefit is capped.
+#
+# Primary method: infer from the monthly delta in the benefit value minus
+# known non-slider contributions. Plausibility check rejects event noise.
+#
+# Fallback (at cap): when gov_power or stability is at its cap, deltas are
+# zero and inference fails. Instead compute the equilibrium rate: the slider
+# only needs to offset whatever drain exists at the cap.
+#
+# Court: max benefit = +2/month, no natural decay.
+#   At cap: effective = min(slider, -monthly_gov_power / 2); only absorbs drain.
+# Stability: max benefit = +0.5/month, decays toward zero.
+#   At cap: effective = min(slider, -(stability_investment + decay) / 0.5)
+
+@dmsd_court_slider_max = 2
+@dmsd_stab_slider_max = 0.5
+@dmsd_gov_power_cap = 100
+
+dmsd_infer_court_slider = {
+	# Read non-slider monthly contribution for the country's government type
+	set_local_variable = { name = dmsd_gov_monthly value = 0 }
+	if = {
+		limit = { uses_government_power = legitimacy }
+		set_local_variable = { name = dmsd_gov_monthly value = "modifier:monthly_legitimacy" }
+	} else_if = {
+		limit = { uses_government_power = republican_tradition }
+		set_local_variable = { name = dmsd_gov_monthly value = "modifier:monthly_republican_tradition" }
+	} else_if = {
+		limit = { uses_government_power = devotion }
+		set_local_variable = { name = dmsd_gov_monthly value = "modifier:monthly_devotion" }
+	} else_if = {
+		limit = { uses_government_power = horde_unity }
+		set_local_variable = { name = dmsd_gov_monthly value = "modifier:monthly_horde_unity" }
+	} else_if = {
+		limit = { uses_government_power = tribal_cohesion }
+		set_local_variable = { name = dmsd_gov_monthly value = "modifier:monthly_tribal_cohesion" }
+	}
+
+	if = {
+		limit = { has_variable = dmsd_last_gov_power "government_power" < @dmsd_gov_power_cap }
+		# Below cap: normal delta inference
+		set_local_variable = {
+			name = dmsd_court_slider_raw
+			value = {
+				value = "government_power"
+				subtract = var:dmsd_last_gov_power
+				subtract = local_var:dmsd_gov_monthly
+			}
+		}
+		if = {
+			limit = {
+				local_var:dmsd_court_slider_raw >= 0
+				local_var:dmsd_court_slider_raw <= @dmsd_court_slider_max
+			}
+			set_variable = {
+				name = dmsd_court_slider
+				value = { value = local_var:dmsd_court_slider_raw divide = @dmsd_court_slider_max min = 0 max = 1 }
+			}
+		}
+	} else_if = {
+		limit = { "government_power" >= @dmsd_gov_power_cap }
+		# At cap: equilibrium, slider offsets any drain on gov power
+		set_variable = {
+			name = dmsd_court_slider
+			value = {
+				value = local_var:dmsd_gov_monthly
+				multiply = -1
+				divide = @dmsd_court_slider_max
+				min = 0
+				max = "court_maintenance"
+			}
+		}
+	} else = {
+		# No baseline yet; use raw slider trigger until inference kicks in
+		set_variable = { name = dmsd_court_slider value = "court_maintenance" }
+	}
+
+	set_variable = { name = dmsd_last_gov_power value = "government_power" }
+}
+
+dmsd_infer_stab_slider = {
+	if = {
+		limit = { has_variable = dmsd_last_stability "stability" < @dmsd_gov_power_cap }
+		# Below cap: normal delta inference
+		set_local_variable = {
+			name = dmsd_stab_decay
+			value = { value = var:dmsd_last_stability multiply = "modifier:stability_decay" multiply = -1 }
+		}
+		set_local_variable = {
+			name = dmsd_stab_slider_raw
+			value = {
+				value = "stability"
+				subtract = var:dmsd_last_stability
+				subtract = "modifier:stability_investment"
+				subtract = local_var:dmsd_stab_decay
+			}
+		}
+		set_local_variable = {
+			name = dmsd_stab_plausible_max
+			value = { value = @dmsd_stab_slider_max add = "modifier:stability_investment" }
+		}
+		if = {
+			limit = {
+				local_var:dmsd_stab_slider_raw >= 0
+				local_var:dmsd_stab_slider_raw <= local_var:dmsd_stab_plausible_max
+			}
+			set_variable = {
+				name = dmsd_stab_slider
+				value = { value = local_var:dmsd_stab_slider_raw divide = @dmsd_stab_slider_max min = 0 max = 1 }
+			}
+		}
+	} else_if = {
+		limit = { "stability" >= @dmsd_gov_power_cap }
+		# At cap: equilibrium, slider offsets decay and non-slider sources
+		set_local_variable = {
+			name = dmsd_stab_drain
+			value = {
+				value = "modifier:stability_investment"
+				add = { value = "stability" multiply = "modifier:stability_decay" multiply = -1 }
+			}
+		}
+		set_variable = {
+			name = dmsd_stab_slider
+			value = {
+				value = local_var:dmsd_stab_drain
+				multiply = -1
+				divide = @dmsd_stab_slider_max
+				min = 0
+				max = 1
+			}
+		}
+	}
+
+	set_variable = { name = dmsd_last_stability value = "stability" }
+}

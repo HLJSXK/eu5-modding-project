@@ -1,0 +1,257 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 1 ACCUMULATION
+# ═══════════════════════════════════════════════════════════════════════════════
+# Runs per-country during monthly_country_pulse. Distributes each slider's gold
+# across proximity sources, then writes the gold into market location maps
+# keyed by demand type. Phase 2 reads those maps to apply actual demands.
+#
+# Gold flow:
+#   1. Slider gold is split across proximity sources by weight fraction
+#   2. Each source's share goes to its market center's demand map
+#   3. Court splits 50/50 between regional and religion baskets
+#   4. Diplo/Stab/Cult are regional-only (one basket per subcontinent)
+#
+# The market maps accumulate across all countries. Because add_to_variable_map
+# silently fails on existing keys, we read-add-write via dmsd_set_variable_map.
+# This is NOT extractable into a generic helper; variable_map() reads fail
+# when the map name is a $parameter$, so the map name must be literal.
+#
+# Context: country scope
+#   scope:dmsd_rg       = religion group (court only)
+#   local_var:dmsd_gold = total gold for this slider
+#   dmsd_prox_sources   = cached proximity source locations
+#   dmsd_prox_weights   = cached proximity strengths
+#   var:dmsd_prox_total = sum of all proximity weights
+
+dmsd_accumulate_court = {
+	clear_variable_map = dmsd_prox_court_io
+	clear_variable_map = dmsd_prox_court_gold
+	clear_variable_map = dmsd_prox_court_scale
+	every_in_list = {
+		variable = dmsd_prox_sources
+		save_temporary_scope_as = dmsd_src
+		sub_continent = { save_temporary_scope_as = dmsd_sc }
+
+		# Gold share for this source = total gold × (source weight / total weight)
+		set_local_variable = {
+			name = dmsd_share
+			value = {
+				value = local_var:dmsd_gold
+				multiply = "prev.variable_map(dmsd_prox_weights|scope:dmsd_src)"
+				divide = prev.var:dmsd_prox_total
+			}
+		}
+
+		# Resolve which demand variant this source's subcontinent maps to
+		if = {
+			limit = { is_key_in_global_variable_map = { name = dmsd_court_reg1 target = scope:dmsd_sc } }
+			set_local_variable = { name = dmsd_disp_d value = "global_variable_map(dmsd_court_reg1|scope:dmsd_sc)" }
+		} else = {
+			set_local_variable = { name = dmsd_disp_d value = demand:dmsd_court_demand1 }
+		}
+		set_local_variable = { name = dmsd_disp_io value = "global_variable_map(dmsd_demand_io|local_var:dmsd_disp_d)" }
+
+		# Basket cost + per-source display maps (shared helper)
+		dmsd_compute_source_scale = { slider = court }
+
+		# Write gold into the market center's demand map.
+		# Multiple countries write to the same map, so we must read+add+write.
+		market.location = {
+			add_to_global_variable_list = { name = dmsd_active_locations target = this }
+
+			if = {
+				limit = { is_key_in_global_variable_map = { name = dmsd_court_reg1 target = scope:dmsd_sc } }
+				set_local_variable = { name = dmsd_map_key value = "global_variable_map(dmsd_court_reg1|scope:dmsd_sc)" }
+				if = {
+					limit = { is_key_in_global_variable_map = { name = dmsd_court_reg1 target = scope:dmsd_rg } }
+					# Both regional and religion variants, split gold 50/50
+					set_local_variable = { name = dmsd_half value = { value = local_var:dmsd_share divide = 2 } }
+
+					set_local_variable = { name = dmsd_map_val value = local_var:dmsd_half }
+					if = {
+						limit = { is_key_in_variable_map = { name = dmsd_court_map target = local_var:dmsd_map_key } }
+						change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_court_map|local_var:dmsd_map_key)" }
+					}
+					dmsd_set_variable_map = { name = dmsd_court_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+
+					set_local_variable = { name = dmsd_map_key value = "global_variable_map(dmsd_court_reg1|scope:dmsd_rg)" }
+					set_local_variable = { name = dmsd_map_val value = local_var:dmsd_half }
+					if = {
+						limit = { is_key_in_variable_map = { name = dmsd_court_map target = local_var:dmsd_map_key } }
+						change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_court_map|local_var:dmsd_map_key)" }
+					}
+					dmsd_set_variable_map = { name = dmsd_court_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+				} else = {
+					# Regional variant only, full share
+					set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+					if = {
+						limit = { is_key_in_variable_map = { name = dmsd_court_map target = local_var:dmsd_map_key } }
+						change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_court_map|local_var:dmsd_map_key)" }
+					}
+					dmsd_set_variable_map = { name = dmsd_court_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+				}
+			} else = {
+				# No regional variant for this subcontinent, use base demand
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_court_map target = demand:dmsd_court_demand1 } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_court_map|demand:dmsd_court_demand1)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_court_map key = demand:dmsd_court_demand1 value = local_var:dmsd_map_val }
+			}
+		}
+	}
+}
+
+# Diplo, cultural, and stability follow the same structure as court
+# but without the religion split; all gold goes to one regional basket.
+
+dmsd_accumulate_diplo = {
+	clear_variable_map = dmsd_prox_diplo_io
+	clear_variable_map = dmsd_prox_diplo_gold
+	clear_variable_map = dmsd_prox_diplo_scale
+	every_in_list = {
+		variable = dmsd_prox_sources
+		save_temporary_scope_as = dmsd_src
+		sub_continent = { save_temporary_scope_as = dmsd_sc }
+
+		set_local_variable = {
+			name = dmsd_share
+			value = {
+				value = local_var:dmsd_gold
+				multiply = "prev.variable_map(dmsd_prox_weights|scope:dmsd_src)"
+				divide = prev.var:dmsd_prox_total
+			}
+		}
+
+		if = {
+			limit = { is_key_in_global_variable_map = { name = dmsd_diplo_reg1 target = scope:dmsd_sc } }
+			set_local_variable = { name = dmsd_disp_d value = "global_variable_map(dmsd_diplo_reg1|scope:dmsd_sc)" }
+		} else = {
+			set_local_variable = { name = dmsd_disp_d value = demand:dmsd_diplomatic_demand1 }
+		}
+		set_local_variable = { name = dmsd_disp_io value = "global_variable_map(dmsd_demand_io|local_var:dmsd_disp_d)" }
+
+		dmsd_compute_source_scale = { slider = diplo }
+
+		market.location = {
+			if = {
+				limit = { is_key_in_global_variable_map = { name = dmsd_diplo_reg1 target = scope:dmsd_sc } }
+				set_local_variable = { name = dmsd_map_key value = "global_variable_map(dmsd_diplo_reg1|scope:dmsd_sc)" }
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_diplo_map target = local_var:dmsd_map_key } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_diplo_map|local_var:dmsd_map_key)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_diplo_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+			} else = {
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_diplo_map target = demand:dmsd_diplomatic_demand1 } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_diplo_map|demand:dmsd_diplomatic_demand1)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_diplo_map key = demand:dmsd_diplomatic_demand1 value = local_var:dmsd_map_val }
+			}
+		}
+	}
+}
+
+dmsd_accumulate_culture = {
+	clear_variable_map = dmsd_prox_cult_io
+	clear_variable_map = dmsd_prox_cult_gold
+	clear_variable_map = dmsd_prox_cult_scale
+	every_in_list = {
+		variable = dmsd_prox_sources
+		save_temporary_scope_as = dmsd_src
+		sub_continent = { save_temporary_scope_as = dmsd_sc }
+
+		set_local_variable = {
+			name = dmsd_share
+			value = {
+				value = local_var:dmsd_gold
+				multiply = "prev.variable_map(dmsd_prox_weights|scope:dmsd_src)"
+				divide = prev.var:dmsd_prox_total
+			}
+		}
+
+		if = {
+			limit = { is_key_in_global_variable_map = { name = dmsd_cult_reg1 target = scope:dmsd_sc } }
+			set_local_variable = { name = dmsd_disp_d value = "global_variable_map(dmsd_cult_reg1|scope:dmsd_sc)" }
+		} else = {
+			set_local_variable = { name = dmsd_disp_d value = demand:dmsd_cultural_demand1 }
+		}
+		set_local_variable = { name = dmsd_disp_io value = "global_variable_map(dmsd_demand_io|local_var:dmsd_disp_d)" }
+
+		dmsd_compute_source_scale = { slider = cult }
+
+		market.location = {
+			if = {
+				limit = { is_key_in_global_variable_map = { name = dmsd_cult_reg1 target = scope:dmsd_sc } }
+				set_local_variable = { name = dmsd_map_key value = "global_variable_map(dmsd_cult_reg1|scope:dmsd_sc)" }
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_cult_map target = local_var:dmsd_map_key } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_cult_map|local_var:dmsd_map_key)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_cult_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+			} else = {
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_cult_map target = demand:dmsd_cultural_demand1 } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_cult_map|demand:dmsd_cultural_demand1)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_cult_map key = demand:dmsd_cultural_demand1 value = local_var:dmsd_map_val }
+			}
+		}
+	}
+}
+
+dmsd_accumulate_stab = {
+	clear_variable_map = dmsd_prox_stab_io
+	clear_variable_map = dmsd_prox_stab_gold
+	clear_variable_map = dmsd_prox_stab_scale
+	every_in_list = {
+		variable = dmsd_prox_sources
+		save_temporary_scope_as = dmsd_src
+		sub_continent = { save_temporary_scope_as = dmsd_sc }
+
+		set_local_variable = {
+			name = dmsd_share
+			value = {
+				value = local_var:dmsd_gold
+				multiply = "prev.variable_map(dmsd_prox_weights|scope:dmsd_src)"
+				divide = prev.var:dmsd_prox_total
+			}
+		}
+
+		if = {
+			limit = { is_key_in_global_variable_map = { name = dmsd_stab_reg1 target = scope:dmsd_sc } }
+			set_local_variable = { name = dmsd_disp_d value = "global_variable_map(dmsd_stab_reg1|scope:dmsd_sc)" }
+		} else = {
+			set_local_variable = { name = dmsd_disp_d value = demand:dmsd_stability_demand1 }
+		}
+		set_local_variable = { name = dmsd_disp_io value = "global_variable_map(dmsd_demand_io|local_var:dmsd_disp_d)" }
+
+		dmsd_compute_source_scale = { slider = stab }
+
+		market.location = {
+			if = {
+				limit = { is_key_in_global_variable_map = { name = dmsd_stab_reg1 target = scope:dmsd_sc } }
+				set_local_variable = { name = dmsd_map_key value = "global_variable_map(dmsd_stab_reg1|scope:dmsd_sc)" }
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_stab_map target = local_var:dmsd_map_key } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_stab_map|local_var:dmsd_map_key)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_stab_map key = local_var:dmsd_map_key value = local_var:dmsd_map_val }
+			} else = {
+				set_local_variable = { name = dmsd_map_val value = local_var:dmsd_share }
+				if = {
+					limit = { is_key_in_variable_map = { name = dmsd_stab_map target = demand:dmsd_stability_demand1 } }
+					change_local_variable = { name = dmsd_map_val add = "variable_map(dmsd_stab_map|demand:dmsd_stability_demand1)" }
+				}
+				dmsd_set_variable_map = { name = dmsd_stab_map key = demand:dmsd_stability_demand1 value = local_var:dmsd_map_val }
+			}
+		}
+	}
+}

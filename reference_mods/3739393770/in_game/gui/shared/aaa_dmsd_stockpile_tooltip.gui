@@ -1,0 +1,189 @@
+﻿# ═══════════════════════════════════════════════════════════════════════════════
+# STOCKPILE CAPACITY TOOLTIP OVERRIDE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Replaces market_stockpile_capacity template to show:
+#   1. Capacity modifier sources (percentage from buildings/dev)
+#   2. Vanilla modifier breakdown (flat sources, including our two modifiers)
+#   3. Math walkthrough deriving target capacity from trade value
+#
+# File prefixed aaa_ to win first-definition-wins template precedence.
+#
+# Scope: Market (accessed via Market.GetCenterLocation for location data)
+
+template market_stockpile_capacity {
+	ContextualTooltipType = {
+
+		# --- Title icon (base game default) ---
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "gfx/interface/icons/modifier_types/maximum_stockpile_capacity.dds"
+				glow = {
+					name = "drop_shadow"
+					glow_radius = 3
+					color = {0.0 0.0 0.0 1.0}
+					alpha = 0.6
+				}
+			}
+		}
+
+		# --- Title text (base game default) ---
+		blockoverride "title_text" {
+			text = "MAX_STOCKPILE_IN_MARKET_TT_HEADER"
+		}
+
+		# --- Concept link (base game default) ---
+		blockoverride "concept_link" {
+			text = [stockpile|e]
+		}
+
+		# --- Tooltip content ---
+		blockoverride "tooltip_content" {
+
+			# ─── Section 1: Capacity modifier sources (percentage) ───
+			TooltipListBase = {
+				visible = "[GreaterThan_CFixedPoint(Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_stockpile_active'), '(CFixedPoint)0')]"
+
+				TooltipStringPairList = {
+					blockoverride "block_title" {
+						text = "dmsd_tt_capacity_mod_header"
+					}
+					textcontext = "[Market.GetCenterLocation.GetDescriptionFor('maximum_stockpile_capacity_modifier')]"
+				}
+			}
+
+			# ─── Section 2: Vanilla flat modifier breakdown ───
+			TooltipStringPairList = {
+				blockoverride "block_title" {
+					text = "MAX_STOCKPILE_IN_MARKET_TT_LIST"
+				}
+				textcontext = "[Market.GetCenterLocation.GetDescriptionFor('maximum_stockpile_capacity')]"
+			}
+
+			# ─── Section 3: Math walkthrough (only when our modifier is active) ───
+			TooltipListBase = {
+				visible = "[GreaterThan_CFixedPoint(Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_stockpile_active'), '(CFixedPoint)0')]"
+				max_update_rate = 30
+
+				TooltipTableHeader = {
+					blockoverride "tableheader_text" {
+						raw_text = "#T Dynamic Market Scaling#!"
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "Market Traded Value"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "[Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_market_value')|0]@gold!"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "÷ Value Baseline"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "2,500@gold!"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "= Market Ratio"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "[Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_market_ratio')|2]"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					visible = "[GreaterThanOrEqualTo_CFixedPoint(Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_market_ratio'), '(CFixedPoint)1')]"
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "√ Diminishing Returns"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "[Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_diminished_ratio')|2]"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "× Base Capacity"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "250"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "#bold = Trade Value Base#!"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "#bold [Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_trade_base')|0]#!"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "× Capacity Modifiers"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "[Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_capacity_multiplier')|2]"
+						}
+					}
+				}
+
+				TooltipManualTableField = {
+					blockoverride "field_content" {
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							raw_text = "#bold = Target Capacity#!"
+						}
+						text_single = {
+							min_width = 100
+							align = right
+							raw_text = "#bold [Market.GetCenterLocation.MakeScope.ScriptValue('dmsd_tt_stockpile_target')|0]#!"
+						}
+					}
+				}
+			}
+		}
+	}
+}

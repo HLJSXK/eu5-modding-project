@@ -1,0 +1,555 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SPENDING SLIDER TOOLTIP OVERRIDE
+# ═══════════════════════════════════════════════════════════════════════════════
+# Replaces ExpenseSettingTooltip to append a "Slider Demand" breakdown
+# to the court, diplomatic, and stability maintenance slider tooltips.
+#
+# File prefixed aaa_ to win first-definition-wins template precedence.
+#
+# MAINTENANCE NOTE: This is a FULL COPY of the base game ExpenseSettingTooltip.
+# When the base game updates that template, this file must be re-synced.
+# Last synced: vanilla 1.3.10 (2026-07-11).
+# Mod additions are clearly marked with "DMSD ADDITION" comment blocks.
+# Search for those to find mod-added content.
+#
+# The demand breakdown follows a "storyline" format — each step builds on
+# the previous so a reader can follow the reasoning top to bottom:
+#   1. Raw slider cost (what the country spends)
+#   2. Empire Size Inefficiency (why some gold is lost)
+#   3. Effective demand gold (what actually becomes goods demand)
+
+template ExpenseSettingTooltip {
+	ContextualTooltipType = {
+		tooltipmeta = { texture = "[MaintenanceSetting.GetIcon]" game_concept = "[MaintenanceSetting.GetName]" }
+
+		blockoverride "title_text" { text = "EXPENSE_MAINT_TOOLTIP_T" }
+
+		blockoverride "title_icon" { icon = { using = tooltip_title_icon_size texture = "[MaintenanceSetting.GetIcon]" } }
+
+		blockoverride "concept_link" {
+			raw_text = "[AddTextIf(MaintenanceSetting.IsBureaucracy, bureaucracy)|e][AddTextIf(Not(MaintenanceSetting.IsBureaucracy), MaintenanceSetting.GetName)]"
+		}
+		blockoverride "tooltip_content" {
+			# ─── BEGIN BASE GAME CONTENT (synced to vanilla 1.3.10) ─────────────────────────
+
+			TooltipStringPairList = {
+				name = "GetFortsLimitInfo"
+				visible = "[And(MaintenanceSetting.ShowModifier, MaintenanceSetting.IsFort)]"
+				textcontext = "[MaintenanceSetting.GetSettingOwner.GetFortsLimitInfo]"
+			}
+
+			TooltipTextBlock = {
+				name = "EXPENSE_MAINT_TT_TEXT_LONG"
+				visible = "[And(MaintenanceSetting.ShowSlider, Or4(MaintenanceSetting.IsIO, MaintenanceSetting.IsDiplomatic, MaintenanceSetting.IsCourt, MaintenanceSetting.IsCultural))]"
+				blockoverride "text" { text = "EXPENSE_MAINT_TT_TEXT_LONG" }
+			}
+			TooltipTextBlock = {
+				name = "EXPENSE_MAINT_TT_TEXT_LONG_ALT"
+				visible = "[And(MaintenanceSetting.ShowSlider, Not(Or5(MaintenanceSetting.IsIO, MaintenanceSetting.IsDiplomatic, MaintenanceSetting.IsCourt, MaintenanceSetting.IsCultural, MaintenanceSetting.IsBureaucracy)))]"
+				blockoverride "text" { text = "EXPENSE_MAINT_TT_TEXT_LONG_ALT" }
+			}
+			TooltipTextBlock = {
+				name = "EXPENSE_MAINT_TT_TEXT_LONG_BUREAUCRACY"
+				visible = "[And(MaintenanceSetting.ShowSlider, MaintenanceSetting.IsBureaucracy)]"
+				blockoverride "text" { text = "EXPENSE_MAINT_TT_TEXT_LONG_BUREAUCRACY" }
+			}
+
+			TooltipStringPairList = {
+				visible = "[MaintenanceSetting.HasExpenseBenfitAsStringPair]"
+				textcontext = "[MaintenanceSetting.GetExpenseBenefitTooltip]"
+			}
+
+			TooltipTextBlock = {
+				visible = "[And(MaintenanceSetting.HasExpenseBenfitAsText, Not(MaintenanceSetting.IsBureaucracy))]"
+				textcontext = "[MaintenanceSetting.GetExpenseBenefitTooltip]"
+			}
+
+			TooltipStringPairList = {
+				visible = "[MaintenanceSetting.IsArmy]"
+				textcontext = "[MaintenanceSetting.GetArmyMaintenanceInfo]"
+			}
+			TooltipStringPairList = {
+				visible = "[MaintenanceSetting.IsNavy]"
+				textcontext = "[MaintenanceSetting.GetNavyMaintenanceInfo]"
+			}
+
+			TooltipStringPairList = {
+				name = "GetModifierDesc with title"
+				visible = "[MaintenanceSetting.ShowModifierWithTitle]"
+				blockoverride "block_title" { text = "EXPENSE_MAINT_MAX_INVESTMENT_T" }
+				textcontext = "[MaintenanceSetting.GetModifierDesc]"
+			}
+
+			TooltipStringPairList = {
+				name = "GetModifierDesc"
+				visible = "[MaintenanceSetting.ShowModifier]"
+				textcontext = "[MaintenanceSetting.GetModifierDesc]"
+			}
+
+			TooltipStringPairList = {
+				name = "MAINTENANCE_INVESTMENT_MIN_MAX"
+				visible = "[Or3(MaintenanceSetting.IsArmy, MaintenanceSetting.IsNavy, MaintenanceSetting.IsFort)]"
+				textcontext = "MAINTENANCE_INVESTMENT_MIN_MAX"
+			}
+
+			TooltipScrolledBlockList = {
+				name = "GetExpenseBreakdown with title"
+				visible = "[And3(MaintenanceSetting.ShowBreakdown, Not(MaintenanceSetting.IsCultural), Not(MaintenanceSetting.IsBureaucracy))]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
+				blockoverride "block_title" { text = "LIST_TITLE_SOURCES" }
+				textcontext = "[MaintenanceSetting.GetExpenseBreakdown]"
+			}
+
+			TooltipScrolledBlockList = {
+				name = "GetExpenseBreakdown bureaucracy"
+				visible = "[And(MaintenanceSetting.ShowBreakdown, MaintenanceSetting.IsBureaucracy)]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
+				textcontext = "[MaintenanceSetting.GetExpenseBreakdown]"
+			}
+
+			TooltipScrolledBlockList = {
+				visible = "[And(MaintenanceSetting.ShowBreakdown, MaintenanceSetting.IsCultural)]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 600 } }
+				blockoverride "block_title" { text = "LIST_TITLE_SOURCES_CULT" }
+				textcontext = "[MaintenanceSetting.GetExpenseBreakdown]"
+			}
+
+			# DMSD FIX: Vanilla places a GetCourtSpendingCostDetails block here
+			# (TooltipStringPairList, visible IsCourt). Removed — it duplicated
+			# the modifier list already shown by GetModifierDesc above.
+			# Re-verify on each vanilla resync; still absent/duplicative as of 1.3.10.
+
+			TooltipScrolledStringPairList = {
+				name = "GetExpenseBreakdown"
+				visible = "[MaintenanceSetting.IsIO]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 400 } }
+				textcontext = "[MaintenanceSetting.GetExpenseBreakdown]"
+			}
+
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+				name = "GetArmyCostsByDefinition"
+				visible = "[MaintenanceSetting.IsArmy]"
+				blockoverride "block_title" { text = "ARMY_COSTS_GROUPED_BY_SUBUNITDEFINITION_HEADER" }
+				textcontext = "[GetPlayer.GetArmyCostsByDefinition]"
+			}
+
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+				name = "GetArmyCostsByGoods"
+				visible = "[MaintenanceSetting.IsArmy]"
+				blockoverride "block_title" { text = "GOODS_COST_UNIT_MARKET_PRICE" }
+				textcontext = "[GetPlayer.GetArmyGoodsCostImpact]"
+			}
+
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+				name = "GetNavyCostsByDefinition"
+				visible = "[MaintenanceSetting.IsNavy]"
+				blockoverride "block_title" { text = "NAVY_COSTS_GROUPED_BY_SUBUNITDEFINITION_HEADER" }
+				textcontext = "[GetPlayer.GetNavyCostsByDefinition]"
+			}
+
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+				name = "GetNavyCostsByGoods"
+				visible = "[MaintenanceSetting.IsNavy]"
+				blockoverride "block_title" { text = "GOODS_COST_UNIT_MARKET_PRICE" }
+				textcontext = "[GetPlayer.GetNavyGoodsCostImpact]"
+			}
+
+			TooltipScrolledStringPairList = {
+				blockoverride "block_scrollarea" { maximumsize = { -1 200 } }
+				name = "GetBuildingUpkeepCostsByGoods"
+				visible = "[MaintenanceSetting.IsUpkeep]"
+				blockoverride "block_title" { text = "BUILDING_GOODS_UPKEEP_TOTAL_HEADER" }
+				textcontext = "[GetPlayer.GetBuildingUpkeepGoodsCostInfo]"
+			}
+
+			# ─── END BASE GAME CONTENT ───────────────────────────────────────
+
+			# ═════════════════════════════════════════════════════════════════
+			# ═════════════════════════════════════════════════════════════════
+			# ─── MOD EXTENSION POINTS (composable across mods) ───
+			# Each mod defines its own uniquely-named extension template and
+			# merges it in below. When the other mod is absent its name is
+			# undefined and the `using` is a harmless no-op, so DMSD and EPBM
+			# each work alone or together with no shared or third mod.
+			# Each extension is wrapped in an inline vbox so it renders in declared
+			# order (after the base content). A bare block-level `using` hoists to
+			# the top of the list; an inline widget keeps its declared position.
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 10
+				ignoreinvisible = yes
+				using = epbm_expense_extension
+			}
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 10
+				ignoreinvisible = yes
+				using = dmsd_expense_extension
+			}
+		}
+	}
+}
+
+# ═════════════════════════════════════════════════════════════════
+# DMSD demand extension — merged into ExpenseSettingTooltip via `using`
+# ═════════════════════════════════════════════════════════════════
+
+template dmsd_expense_extension {
+	# DMSD ADDITION: Concise demand with hover drill-downs
+	# ═════════════════════════════════════════════════════════════════
+	# Hover efficiency % → per-slider breakdown sub-tooltip
+	# Hover effective demand → goods list sub-tooltip (dmsd_*_goods_tooltip)
+
+	# ─── COURT ───
+	# Uses MaintenanceSetting.GetExpense for the actual gold spent,
+	# which accounts for slider position, efficiency, and benefit capping.
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsCourt, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Cost of Court Goods Demand#!" }
+
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "Gold Spent" }
+			expand = {  }
+			text_single = { raw_text = "[Multiply_CFixedPoint(MaintenanceSetting.GetExpense, '(CFixedPoint)-1')|2]@gold!" }
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "× Spending Efficiency" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "[MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_court_efficiency_pct')|1]%"
+				using = dmsd_court_efficiency_tooltip
+			}
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "#bold = Effective Goods Demand#!" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "#bold [Multiply_CFixedPoint(Multiply_CFixedPoint(MaintenanceSetting.GetExpense, '(CFixedPoint)-1'), MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_court_efficiency'))|2]@gold!#!"
+			}
+		}
+	}
+
+	# ─── COURT PROXIMITY SOURCES ───
+	# Per-location breakdown showing where demand is distributed
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsCourt, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Demand by Proximity Source Last Month#!" }
+
+		TooltipListScrollArea = {
+			blockoverride "block_scrollarea" { maximumsize = { -1 200 } minimumsize = { -1 30 } }
+			blockoverride "scrollarea_content" {
+				vbox = {
+					using = layoutpolicy_expanding
+					datamodel = "[MaintenanceSetting.GetSettingOwner.MakeScope.GetMapKeys('dmsd_prox_court_gold')]"
+
+					item = {
+						TooltipManualTableField = {
+							datacontext = "[Scope.GetLocation]"
+							icon = { size = { 20 20 } texture = "[Location.GetRankIcon]" }
+
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								margin_left = 3
+								raw_text = "[Location.GetName]"
+							}
+
+							expand = {  }
+
+							text_single = {
+								min_width = 60
+								align = right
+								raw_text = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_court_gold', Location.MakeScope).GetValue|2]@gold!"
+
+								tooltipwidget = {
+									ContextualTooltipType = {
+										blockoverride "tooltip_title" {  }
+										blockoverride "tooltip_content" {
+											vbox = {
+												set_parent_dimension_to_minimum = height
+												layoutpolicy_horizontal = expanding
+												spacing = 5
+
+												TooltipListBase = {
+													blockoverride "block_title" { raw_text = "#T [Location.GetSubContinent.GetName] Court Goods#!" }
+													vbox = {
+														using = layoutpolicy_expanding
+														datamodel = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_court_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetMapKeys('dmsd_weights')]"
+
+														item = {
+															TooltipManualTableField = {
+																datacontext = "[Scope.GetGoods]"
+																icon = { size = { 20 20 } texture = "[GetGoodsIcon(Goods.Self)]" }
+
+																text_single = {
+																	layoutpolicy_horizontal = expanding
+																	margin_left = 3
+																	text = "[Goods.GetName]"
+																}
+
+																expand = {  }
+
+																text_single = {
+																	min_width = 40
+																	align = right
+																	raw_text = "[Multiply_CFixedPoint(GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_court_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetVariableFromVariableMap('dmsd_weights', Goods.MakeScope).GetValue, GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_court_scale', Location.MakeScope).GetValue)|2]"
+																}
+															}
+														}
+													}
+												}
+												TooltipListBase = {
+													blockoverride "block_title" { raw_text = "#T [GetPlayer.GetReligion.GetGroup.GetName] Court Goods#!" }
+													vbox = {
+														using = layoutpolicy_expanding
+														datamodel = "[GetPlayer.MakeScope.GetVariable('dmsd_disp_court_rel_io').GetInternationalOrganization.MakeScope.GetMapKeys('dmsd_weights')]"
+
+														item = {
+															TooltipManualTableField = {
+																datacontext = "[Scope.GetGoods]"
+																icon = { size = { 20 20 } texture = "[GetGoodsIcon(Goods.Self)]" }
+
+																text_single = {
+																	layoutpolicy_horizontal = expanding
+																	margin_left = 3
+																	text = "[Goods.GetName]"
+																}
+
+																expand = {  }
+
+																text_single = {
+																	min_width = 40
+																	align = right
+																	raw_text = "[Multiply_CFixedPoint(GetPlayer.MakeScope.GetVariable('dmsd_disp_court_rel_io').GetInternationalOrganization.MakeScope.GetVariableFromVariableMap('dmsd_weights', Goods.MakeScope).GetValue, GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_court_scale', Location.MakeScope).GetValue)|2]"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# ─── DIPLOMATIC ───
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsDiplomatic, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Diplomatic Spending Goods Demand#!" }
+
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "Raw Slider Spending" }
+			expand = {  }
+			text_single = { raw_text = "[MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_diplo_raw')|2]@gold!" }
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "× Spending Efficiency" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "[MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_diplo_efficiency_pct')|1]%"
+				using = dmsd_diplo_efficiency_tooltip
+			}
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "#bold = Effective Goods Demand#!" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "#bold [MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_diplo_eff')|2]@gold!#!"
+			}
+		}
+	}
+
+	# ─── DIPLOMATIC PROXIMITY SOURCES ───
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsDiplomatic, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Demand by Proximity Source Last Month#!" }
+
+		TooltipListScrollArea = {
+			blockoverride "block_scrollarea" { maximumsize = { -1 200 } minimumsize = { -1 30 } }
+			blockoverride "scrollarea_content" {
+				vbox = {
+					using = layoutpolicy_expanding
+					datamodel = "[MaintenanceSetting.GetSettingOwner.MakeScope.GetMapKeys('dmsd_prox_diplo_gold')]"
+
+					item = {
+						TooltipManualTableField = {
+							datacontext = "[Scope.GetLocation]"
+							icon = { size = { 20 20 } texture = "[Location.GetRankIcon]" }
+
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								margin_left = 3
+								raw_text = "[Location.GetName]"
+							}
+
+							expand = {  }
+
+							text_single = {
+								min_width = 60
+								align = right
+								raw_text = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_diplo_gold', Location.MakeScope).GetValue|2]@gold!"
+
+								tooltipwidget = {
+									ContextualTooltipType = {
+										blockoverride "tooltip_title" {  }
+										blockoverride "tooltip_content" {
+											TooltipListBase = {
+												blockoverride "block_title" { raw_text = "#T [Location.GetSubContinent.GetName] Diplomatic Goods#!" }
+												vbox = {
+													using = layoutpolicy_expanding
+													datamodel = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_diplo_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetMapKeys('dmsd_weights')]"
+
+													item = {
+														TooltipManualTableField = {
+															datacontext = "[Scope.GetGoods]"
+															icon = { size = { 20 20 } texture = "[GetGoodsIcon(Goods.Self)]" }
+
+															text_single = {
+																layoutpolicy_horizontal = expanding
+																margin_left = 3
+																text = "[Goods.GetName]"
+															}
+
+															expand = {  }
+
+															text_single = {
+																min_width = 40
+																align = right
+																raw_text = "[Multiply_CFixedPoint(GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_diplo_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetVariableFromVariableMap('dmsd_weights', Goods.MakeScope).GetValue, GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_diplo_scale', Location.MakeScope).GetValue)|2]"
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# ─── CULTURAL ───
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsCultural, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Culture Investment Goods Demand#!" }
+
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "Gold Spent" }
+			expand = {  }
+			text_single = { raw_text = "[Multiply_CFixedPoint(MaintenanceSetting.GetExpense, '(CFixedPoint)-1')|2]@gold!" }
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "× Spending Efficiency" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "[MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_cult_efficiency_pct')|1]%"
+				using = dmsd_cult_efficiency_tooltip
+			}
+		}
+		TooltipManualTableField = {
+			text_single = { layoutpolicy_horizontal = expanding raw_text = "#bold = Effective Goods Demand#!" }
+			expand = {  }
+
+			text_single = {
+				raw_text = "#bold [Multiply_CFixedPoint(Multiply_CFixedPoint(MaintenanceSetting.GetExpense, '(CFixedPoint)-1'), MaintenanceSetting.GetSettingOwner.MakeScope.ScriptValue('dmsd_tt_cult_efficiency'))|2]@gold!#!"
+			}
+		}
+	}
+
+	# ─── CULTURAL PROXIMITY SOURCES ───
+	TooltipListBase = {
+		visible = "[And(MaintenanceSetting.IsCultural, HasGameRuleFlag('dmsd_demand_active'))]"
+		blockoverride "block_title" { raw_text = "#T Demand by Proximity Source Last Month#!" }
+
+		TooltipListScrollArea = {
+			blockoverride "block_scrollarea" { maximumsize = { -1 200 } minimumsize = { -1 30 } }
+			blockoverride "scrollarea_content" {
+				vbox = {
+					using = layoutpolicy_expanding
+					datamodel = "[MaintenanceSetting.GetSettingOwner.MakeScope.GetMapKeys('dmsd_prox_cult_gold')]"
+
+					item = {
+						TooltipManualTableField = {
+							datacontext = "[Scope.GetLocation]"
+							icon = { size = { 20 20 } texture = "[Location.GetRankIcon]" }
+
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								margin_left = 3
+								raw_text = "[Location.GetName]"
+							}
+
+							expand = {  }
+
+							text_single = {
+								min_width = 60
+								align = right
+								raw_text = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_cult_gold', Location.MakeScope).GetValue|2]@gold!"
+
+								tooltipwidget = {
+									ContextualTooltipType = {
+										blockoverride "tooltip_title" {  }
+										blockoverride "tooltip_content" {
+											TooltipListBase = {
+												blockoverride "block_title" { raw_text = "#T [Location.GetSubContinent.GetName] Cultural Goods#!" }
+												vbox = {
+													using = layoutpolicy_expanding
+													datamodel = "[GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_cult_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetMapKeys('dmsd_weights')]"
+
+													item = {
+														TooltipManualTableField = {
+															datacontext = "[Scope.GetGoods]"
+															icon = { size = { 20 20 } texture = "[GetGoodsIcon(Goods.Self)]" }
+
+															text_single = {
+																layoutpolicy_horizontal = expanding
+																margin_left = 3
+																text = "[Goods.GetName]"
+															}
+
+															expand = {  }
+
+															text_single = {
+																min_width = 40
+																align = right
+																raw_text = "[Multiply_CFixedPoint(GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_cult_io', Location.MakeScope).GetInternationalOrganization.MakeScope.GetVariableFromVariableMap('dmsd_weights', Goods.MakeScope).GetValue, GetPlayer.MakeScope.GetVariableFromVariableMap('dmsd_prox_cult_scale', Location.MakeScope).GetValue)|2]"
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# Stability uses its own template — see aaa_dmsd_stability_tooltip.gui
+
+	# ═════════════════════════════════════════════════════════════════
+	# END DMSD ADDITION
+	# ═════════════════════════════════════════════════════════════════
+}
