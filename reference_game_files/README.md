@@ -120,16 +120,17 @@ adm = 2                           # +2 administrative skill (character)
 
 ## Filter Policy
 
-`sync_reference.py` only mirrors `<EU5>/in_game/` and `<EU5>/main_menu/` (loading_screen / dlc / mod are skipped). On top of that:
+`sync_reference.py` mirrors every top-level directory found directly under `<EU5>/game/` (`in_game/`, `main_menu/`, `loading_screen/`, `dlc/`, and any other directory the installed game ships), except `mod/` (installed Steam Workshop mods — other authors' mods plus this project's own deployed build output — not vanilla/official content, so it's excluded by name; see `EXCLUDED_TOP_LEVEL_DIRS` in `sync_reference.py`). On top of that:
 
 **Directory prunes (before walking):**
 - Any directory named `gfx/` is skipped (asset descriptors, not modding scripts).
 - Inside any `localization/` directory, only `english/` and `simp_chinese/` are descended into.
 
 **File-level filters:**
-1. Extension whitelist — `.txt`, `.yml`, `.gui`, `.json`, `.info` only.
-2. Per-file size cap — default **10 MB** (`--max-file-mb`).
-3. Per-leaf-dir size cap — default **30 MB** (`--max-dir-mb`); a single directory whose post-filter, non-recursive size exceeds this is skipped entirely. This is a safety net against unexpected bloat in future game versions.
+1. Binary/media extension blocklist — `.png`, `.dat`, `.mp3`, and similar asset/binary extensions (see `BINARY_EXTENSIONS` in `sync_reference.py`) are dropped without opening the file.
+2. Binary content sniff — any remaining file is read and dropped if a NUL byte appears in its first 8 KB. Everything else is treated as text and kept **regardless of extension**, so small unrecognized text-format files (e.g. `.font`, `.map`, `.csv`, `.settings`, `.guistateset`, `.guianimset`) are not silently dropped just because they weren't anticipated.
+3. Per-file size cap — default **10 MB** (`--max-file-mb`).
+4. Per-leaf-dir size cap — default **30 MB** (`--max-dir-mb`); a single directory whose post-filter, non-recursive size exceeds this is skipped entirely. This is a safety net against unexpected bloat in future game versions.
 
 Sync stats (most recent run) are appended to [`data/sync_reference.log`](../data/sync_reference.log).
 

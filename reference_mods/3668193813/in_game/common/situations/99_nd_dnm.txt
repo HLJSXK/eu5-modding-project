@@ -1,0 +1,226 @@
+﻿# ==========================================================================
+# THE REACTION OF THE REICH
+# Resolution #1: the Situation OWNS every external consequence of forming
+# the Danubian Monarchy. There is no parallel scripted backlash; the
+# formation event nd_dnm.1 only activates this. the_revolution-class: no
+# custom international organization, no forced wars (it must coexist
+# additively with vanilla HRE situations -- Reformation, war_of_religions,
+# guelphs_and_ghibellines), only a pariah modifier + a reacting event
+# chain + three earnable exits.
+#
+# THREE EXITS (any one ends the situation):
+#   1. Legitimacy -- the Pragmatic Sanction succession crisis resolved
+#      (either way; surviving it settles continental recognition).
+#   2. Strength  -- decisively beat the HRE leader to >= 80% war score.
+#   3. Endurance -- the 50-year escape timer expires AND the realm has
+#      built a respected state (legitimacy >= 60, prestige >= 50).
+# Plus the fail-escape (DNM no longer exists), hidden from the panel.
+#
+# can_start = { always = no }: started solely by activate_situation in
+# nd_dnm.1 (vanilla hussite_wars pattern).
+# ==========================================================================
+nd_dnm_reaction_of_the_reich = {
+	monthly_spawn_chance = monthly_spawn_chance_unique
+	hint_tag = hint_nd_dnm_reaction_of_the_reich
+
+	can_start = {
+		always = no
+	}
+
+	# Each clause wraps its country-trigger checks in `any_country = { tag = DNM ... }`.
+	# Reason: the situation's can_end evaluates in SITUATION scope (no implicit
+	# country owner). Bare `has_variable = X` / `legitimacy >= N` etc would either
+	# evaluate against the wrong scope or fall through to a default-true result
+	# (we observed the endurance clause silently going green at game start because
+	# `legitimacy >= 60` and `prestige >= 50` were not being checked against DNM).
+	# any_country with `tag = DNM` explicitly scopes the check to the country
+	# that owns the relevant variables.
+	# 1.3: can_end takes end_reason blocks (trigger + desc), any one of which
+	# ends the situation. Each former custom_tooltip OR-branch becomes one
+	# end_reason; the text key carries over as the desc shown in the panel.
+	can_end = {
+		# Legitimacy path: the succession crisis has been settled.
+		end_reason = {
+			trigger = {
+				any_country = {
+					tag = DNM
+					has_variable = nd_dnm_ps_resolved
+				}
+			}
+			desc = nd_dnm_ps_resolved_end_tt
+		}
+		# Strength path: 80% war score vs HRE leader.
+		end_reason = {
+			trigger = {
+				any_country = {
+					tag = DNM
+					has_variable = nd_dnm_reich_humbled
+				}
+			}
+			desc = nd_dnm_reich_humbled_end_tt
+		}
+		# Endurance path: 50-year timer expired AND respected state.
+		end_reason = {
+			trigger = {
+				any_country = {
+					tag = DNM
+					NOT = { has_variable = nd_dnm_pariah_timer }
+					legitimacy >= 60
+					prestige >= 50
+				}
+			}
+			desc = nd_dnm_pariah_endured_end_tt
+		}
+		# Fail-escape: DNM no longer exists (conquered/disbanded).
+		end_reason = {
+			trigger = {
+				NOT = { any_country = { tag = DNM } }
+			}
+			desc = nd_dnm_dnm_gone_end_tt
+		}
+	}
+
+	# Visible only to countries that would plausibly care about a Central
+	# European rupture: the Danubian apostate itself, the Reich's members,
+	# and any power with a European presence (which covers the Papacy and
+	# the broader continental audience). Mirrors vanilla war_of_religions'
+	# `has_presence_in = continent:europe` gate, widened with explicit
+	# DNM / HRE-member clauses so the directly-involved parties always see
+	# it. Without this the situation showed on every country's map worldwide.
+	visible = {
+		OR = {
+			tag = DNM
+			is_member_of_international_organization = international_organization:hre
+			has_presence_in = continent:europe
+		}
+	}
+
+	on_start = {
+		random_country = {
+			limit = { tag = DNM }
+			add_country_modifier = {
+				modifier = nd_dnm_reich_pariah
+				years = -1
+				mode = add_and_extend
+			}
+			trigger_event_non_silently = nd_dnm.25
+		}
+		# Reich teeth: the HRE leader (Emperor) is granted the imperial-ban
+		# casus belli against DNM. DNM is no longer an HRE member after
+		# formation, which is exactly cb_imperial_ban's target precondition
+		# (see game/in_game/common/casus_belli/imperial_ban.txt). add_casus_belli
+		# bypasses the AI-availability gates and directly hands the CB to
+		# the Emperor: the Reich CAN actually go to war over the rupture,
+		# not just dislike you.
+		#
+		# `leader = { ... }` as a scope change inside `international_organization:hre`
+		# is NOT a valid scope link in EU5 -- the engine logs "Invalid scope types
+		# for event target link, link: leader". Instead, find the emperor via
+		# `random_country = { limit = { is_emperor = yes } }` which is the
+		# documented vanilla pattern (see hre.txt country_interactions).
+		random_country = {
+			limit = { is_emperor = yes }
+			add_casus_belli = {
+				target = c:DNM
+				type = casus_belli:cb_imperial_ban
+			}
+			trigger_event_non_silently = nd_dnm.26
+		}
+		if = {
+			limit = { country_exists = c:PAP }
+			c:PAP = { trigger_event_non_silently = nd_dnm.26 }
+		}
+	}
+
+	# Monthly tick: re-resolve DNM by tag (robust across reloads), then:
+	# Monthly tick: fire occasional flavor pressure (nd_dnm.27) with a
+	# cooldown so its 1-year temporary modifier never silently cumulates
+	# beyond one stack at a time.
+	#
+	# The STRENGTH-path exit is NOT polled here anymore. The old approach
+	# (monthly war_score_versus check via a nested is_emperor lookup) was
+	# fragile -- it depended on save_temporary_scope_as surviving across
+	# scope boundaries and only fired mid-war. It is replaced by an explicit
+	# player-driven peace treaty (common/peace_treaties/99_nd_dnm.txt:
+	# peace_nd_dnm_humble_reich, cost = 80 war score) that sets
+	# nd_dnm_reich_humbled and fires nd_dnm.33 on enforcement.
+	#
+	# The old 3% / 3% RNG branch to nd_dnm.27 / .28 is GONE -- chance-based
+	# exit was lazy gameplay and nd_dnm.28 (random reconciliation) has been
+	# deleted. The disaster's counter mechanic is the legitimacy exit.
+	#
+	# Chain advancement (nd_dnm.30/.31/.32) lives in
+	# common/on_action/99_nd_on_actions.txt's on_country_yearly_pulse so
+	# the chain survives if the situation ends early.
+	on_monthly = {
+		random_country = {
+			limit = {
+				tag = DNM
+				has_country_modifier = nd_dnm_reich_pariah
+			}
+
+			# --- Flavor pressure (gated by cooldown modifier) ---
+			if = {
+				limit = {
+					NOT = { has_country_modifier = nd_dnm_reich_pressure_recent }
+				}
+				random_list = {
+					97 = {}
+					3 = { trigger_event_non_silently = nd_dnm.27 }
+				}
+			}
+		}
+	}
+
+	on_ended = {
+		random_country = {
+			limit = {
+				tag = DNM
+				has_country_modifier = nd_dnm_reich_pariah
+			}
+			remove_country_modifier = nd_dnm_reich_pariah
+			trigger_event_non_silently = nd_dnm.29
+
+			# Safety net: clean up any chain modifiers that may still be
+			# active if the situation ended via strength/endurance before
+			# the disaster fired. The disaster's own on_end has the same
+			# block; remove_country_modifier is idempotent so calling
+			# both is safe.
+			remove_country_modifier = nd_dnm_succession_anxiety
+			remove_country_modifier = nd_dnm_rallying_the_diets
+			remove_country_modifier = nd_dnm_royal_silence
+			remove_country_modifier = nd_dnm_drafting_the_decree
+			remove_country_modifier = nd_dnm_postponed_decree
+			remove_country_modifier = nd_dnm_reich_pressure_recent
+		}
+		# Reconciliation closes the threat fully: the Emperor's imperial-ban
+		# CB on DNM is revoked alongside the pariah debuff. Without this the
+		# CB would sit in the Emperor's pocket forever after a political
+		# settlement -- the diplomatic path would feel hollow.
+		# Uses is_emperor = yes lookup (same pattern as on_start).
+		random_country = {
+			limit = { is_emperor = yes }
+			remove_casus_belli = {
+				target = c:DNM
+				type = casus_belli:cb_imperial_ban
+			}
+		}
+	}
+
+	tooltip = {
+		custom_tooltip = nd_dnm_reaction_of_the_reich_tt
+	}
+
+	map_color = {
+		if = {
+			limit = {
+				has_owner = yes
+				owner = { tag = DNM }
+			}
+			value = owner.country_color
+		}
+		else = {
+			value = define:NMapColors|DEFAULT_COLOR
+		}
+	}
+}

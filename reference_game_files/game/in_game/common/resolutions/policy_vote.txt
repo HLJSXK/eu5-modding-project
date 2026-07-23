@@ -313,7 +313,14 @@
 						}
 						OR = {
 							international_organization_has_policy = root
-							not = { resolution_is_active = resolution:policy_vote }
+							AND = {
+								not = { resolution_is_active = resolution:policy_vote }
+								OR = {
+									not = { exists = scope:previewed_vote }
+									scope:previewed_vote = root
+									international_organization_has_policy = scope:previewed_vote
+								}
+							}
 							AND = {
 								has_variable = io_law_target
 								var:io_law_target = root
@@ -852,14 +859,38 @@
 			}
 			else_if = {
 				limit = {
+					exists = scope:previewed_vote
+					scope:recipient = {
+						NOT = { resolution_is_active = resolution:policy_vote }
+						modifier:forbid_multiple_policies_vote = yes
+						international_organization_has_law = scope:target
+						"law_policy(scope:target)" = scope:vote
+						NOT = { international_organization_has_policy = scope:previewed_vote }
+					}
+				}
+				subtract = {
+					desc = "POLICY_REASON_TO_VOTE_FOR_PREVIEWED_POLICY"
+					value = "scope:previewed_vote.ai_policy_resolution_vote_bias(scope:actor|scope:recipient)"
+				}
+			}
+			else_if = {
+				limit = {
 					scope:recipient = {
 						NOT = { resolution_is_active = resolution:policy_vote }
 						international_organization_has_law = scope:target
 					}
+					OR = {
+						NOT = { exists = scope:previewed_vote }
+						NOT = { scope:recipient = { modifier:forbid_multiple_policies_vote = yes } }
+						scope:recipient = { international_organization_has_policy = scope:previewed_vote }
+					}
 				}
 				scope:target = {
 					ordered_policy_in_law = {
-						limit = { this != scope:vote }
+						limit = {
+							this != scope:vote
+							scope:recipient = { policy_enabled_to_international_organization = prev }
+						}
 						order_by = "ai_policy_resolution_vote_bias(scope:actor|scope:recipient)"
 						max = 1
 						check_range_bounds = no

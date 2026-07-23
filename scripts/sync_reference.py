@@ -19,13 +19,13 @@ directory-level prunes:
                                 non-recursive size exceeds --max-dir-mb.
 
 Run:
-  conda run -n eu5 python scripts/sync_reference.py --dry-run
-  conda run -n eu5 python scripts/sync_reference.py
-  conda run -n eu5 python scripts/sync_reference.py --max-file-mb 8 --max-dir-mb 25
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_reference.py --dry-run
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_reference.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/sync_reference.py --max-file-mb 8 --max-dir-mb 25
 
 After a real (non-dry) sync, you should also run:
-  conda run -n eu5 python scripts/gen_index.py --verbose
-  conda run -n eu5 python scripts/gen_brief.py
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_index.py --verbose
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
 """
 
 import argparse
@@ -308,8 +308,8 @@ def main() -> int:
               skipped["ext"], skipped["size"], skipped_dirs)
     print(f"[log] {LOG_FILE.relative_to(REPO_ROOT)}")
     print("\nNext steps:")
-    print("  conda run -n eu5 python scripts/gen_index.py --verbose")
-    print("  conda run -n eu5 python scripts/gen_brief.py")
+    print("  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_index.py --verbose")
+    print("  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py")
     return 0
 
 

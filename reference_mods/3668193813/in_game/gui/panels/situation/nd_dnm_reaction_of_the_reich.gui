@@ -1,0 +1,301 @@
+﻿# Situation panel for nd_dnm_reaction_of_the_reich.
+#
+# The situation is visible to ALL countries (not just DNM and the Emperor),
+# so the panel uses conditional `visible` blocks to show different content
+# to different perspectives:
+#   - DNM perspective: chain progress, disaster status, current effects
+#   - HRE Emperor perspective: the imperial-ban CB you hold, military stake
+#   - Third-party perspective: informational header + end-requirements
+#
+# Patterns borrowed from:
+#   - hussite_wars.gui (two_countries_header_template, two-line strength card,
+#     situation_header_left/right with a counter readout)
+#   - the_revolution.gui (one-country anchored header, conditional cards)
+#   - middle_kingdom.gui (MakeScope.GetVariable for reading country variables)
+#   - left_panel.gui (InternationalOrganization.IsIOLeaderCountry for emperor check)
+situation_panel = {
+
+	##################################### TOP HEADER #####################################
+	# Left counter: succession chain step (0..3). Right counter: Crown Confidence
+	# from the Pragmatic Sanction disaster (shown as 0/80 if disaster not active).
+
+	blockoverride "situation_header_left" {
+		icon = {
+			size = { 32 32 }
+			texture = "gfx/interface/icons/disasters/decline_of_empire.dds"
+		}
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			text_single = {
+				fontsize = 15
+				text = "nd_dnm_chain_header"
+				default_format = "#subtle_name"
+			}
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				fontsize = 13
+				raw_text = "[GetCountry('DNM').MakeScope.GetVariable('nd_dnm_succession_step').GetValue|0] / 3"
+			}
+		}
+		expand = {}
+	}
+
+	blockoverride "situation_header_right" {
+		expand = {}
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			text_single = {
+				fontsize = 15
+				align = right|nobaseline
+				text = "nd_dnm_confidence_header"
+				default_format = "#subtle_name"
+			}
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				fontsize = 13
+				align = right|nobaseline
+				raw_text = "[GetCountry('DNM').MakeScope.GetVariable('nd_dnm_crown_confidence').GetValue|0] / [GetCountry('DNM').MakeScope.GetVariable('nd_dnm_crown_confidence_target').GetValue|0]"
+			}
+		}
+		icon = {
+			size = { 32 32 }
+			texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
+		}
+	}
+
+	##################################### MAIN IMAGE #####################################
+	# Two-country header: DNM on the left, the current HRE Emperor on the right.
+	# Makes the situation's two-party shape visible at a glance.
+
+	blockoverride "situation_panel_image" {
+		using = two_countries_header_template
+
+		blockoverride "FirstCountryContext" {
+			datacontext = "[GetCountry('DNM')]"
+		}
+
+		blockoverride "SecondCountryContext" {
+			datacontext = "[GetUniqueInternationalOrganization('hre').GetLeaderCountry]"
+		}
+
+		blockoverride "first_character_portrait_anchor" {
+			parentanchor = bottom|left
+		}
+		blockoverride "second_character_portrait_anchor" {
+			parentanchor = bottom|right
+		}
+		blockoverride "character_religion_visibility" {
+			visible = no
+		}
+		blockoverride "character_name_maximumsize" {
+			maximumsize = { 270 -1 }
+		}
+		blockoverride "country_header_extra" {
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = expanding
+				margin = { 10 10 }
+				spacing = 8
+				expand = {}
+			}
+		}
+	}
+
+	##################################### SUBHEADER #####################################
+
+	blockoverride "situation_subheader_content" {}
+
+	##################################### MAIN CONTENT #####################################
+
+	blockoverride "situation_panel_main_content" {
+
+		# CARD 1: Description (always visible).
+		# Explains the situation in general terms with perspective hints.
+		situation_card_expandable = {
+			blockoverride "header_button_onclick" {
+				onclick = "[LateralView.Vars.Toggle( 'situation_toggled' )]"
+			}
+			blockoverride "header_text" {
+				text = "nd_dnm_reaction_of_the_reich_situation_header"
+			}
+			blockoverride "header_icon" {
+				texture = "gfx/interface/icons/disasters/decline_of_empire.dds"
+			}
+			blockoverride "bottom_content" {
+				text_multi = {
+					autoresize = no
+					multiline = yes
+					size = { 400 220 }
+					text = "nd_dnm_reaction_of_the_reich_situation_body"
+				}
+			}
+			blockoverride "visible_hint" {}
+			blockoverride "onaction_hint" {
+				action_tooltip = {
+					title = "OPEN_HINT"
+					on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_nd_dnm_reaction_of_the_reich')]"
+				}
+			}
+			blockoverride "bottom_content_onclick" {
+				visible = "[LateralView.Vars.Exists( 'situation_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_yes" {
+				visible = "[LateralView.Vars.Exists( 'situation_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_not" {
+				visible = "[Not(LateralView.Vars.Exists( 'situation_toggled' ))]"
+			}
+		}
+
+		# CARD 2: End Requirements (always visible).
+		# Three OR clauses with custom_tooltip wrapping for readability.
+		situation_card_expandable = {
+			blockoverride "header_button_onclick" {
+				onclick = "[LateralView.Vars.Toggle( 'requirements_toggled' )]"
+			}
+			blockoverride "header_text" {
+				text = "END_REQUIREMENTS"
+			}
+			blockoverride "header_icon" {
+				texture = "gfx/interface/icons/disasters/end_requirements_green.dds"
+			}
+			blockoverride "bottom_content" {
+				TooltipRequirementsList = {
+					textcontext = "[SituationView.GetActiveSituation.GetSituation.GetEndConditions]"
+				}
+			}
+			blockoverride "visible_hint" {}
+			blockoverride "onaction_hint" {
+				action_tooltip = {
+					title = "OPEN_HINT"
+					on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_nd_dnm_reaction_of_the_reich')]"
+				}
+			}
+			blockoverride "bottom_content_onclick" {
+				visible = "[LateralView.Vars.Exists( 'requirements_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_yes" {
+				visible = "[LateralView.Vars.Exists( 'requirements_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_not" {
+				visible = "[Not(LateralView.Vars.Exists( 'requirements_toggled' ))]"
+			}
+		}
+
+		# CARD 3: Two-party identity / relative strength.
+		# Visible to all -- both DNM and the Emperor will want to know the
+		# military balance, since the strength-path exit hinges on the
+		# DNM-vs-Emperor war-score outcome.
+		situation_fancy_two_line_card = {
+			block "card_datacontext" { }
+
+			# Left: DNM
+			blockoverride "left_flag_properties" {
+				datacontext = "[GetCountry('DNM')]"
+				visible = "[Country.IsValid]"
+			}
+			blockoverride "left_bottom_flag" { }
+			blockoverride "left_top_text" {
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = expanding
+				visible = "[GetCountry('DNM').IsValid]"
+				text = "[GetCountry('DNM').GetName]"
+			}
+			blockoverride "left_bottom_text" {
+				text = "nd_dnm_two_party_dnm_str"
+			}
+
+			# Right: HRE Emperor
+			blockoverride "right_flag_properties" {
+				datacontext = "[GetUniqueInternationalOrganization('hre').GetLeaderCountry]"
+				visible = "[Country.IsValid]"
+			}
+			blockoverride "right_bottom_flag" { }
+			blockoverride "right_top_text" {
+				layoutpolicy_horizontal = expanding
+				layoutpolicy_vertical = expanding
+				visible = "[GetUniqueInternationalOrganization('hre').GetLeaderCountry.IsValid]"
+				text = "[GetUniqueInternationalOrganization('hre').GetLeaderCountry.GetName]"
+			}
+			blockoverride "right_bottom_text" {
+				text = "nd_dnm_two_party_emperor_str"
+			}
+		}
+
+		# CARD 4: DNM perspective card.
+		# Visible only if the viewing player IS DNM (identified by having
+		# the nd_dnm_formed country variable -- only DNM gets this set in
+		# nd_dnm.1's hidden_effect, and the variable dies with the country).
+		# Surfaces actionable per-perspective info: chain modifier active,
+		# disaster status if any, what to do next.
+		situation_card_expandable = {
+			visible = "[SituationView.GetPlayer.MakeScope.GetVariable('nd_dnm_formed').IsSet]"
+
+			blockoverride "header_button_onclick" {
+				onclick = "[LateralView.Vars.Toggle( 'dnm_toggled' )]"
+			}
+			blockoverride "header_text" {
+				text = "nd_dnm_panel_dnm_header"
+			}
+			blockoverride "header_icon" {
+				texture = "gfx/interface/icons/disasters/decline_of_empire.dds"
+			}
+			blockoverride "bottom_content" {
+				text_multi = {
+					autoresize = no
+					multiline = yes
+					size = { 400 240 }
+					text = "nd_dnm_panel_dnm_body"
+				}
+			}
+			blockoverride "visible_hint" {}
+			blockoverride "bottom_content_onclick" {
+				visible = "[LateralView.Vars.Exists( 'dnm_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_yes" {
+				visible = "[LateralView.Vars.Exists( 'dnm_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_not" {
+				visible = "[Not(LateralView.Vars.Exists( 'dnm_toggled' ))]"
+			}
+		}
+
+		# CARD 5: HRE Emperor perspective card.
+		# Visible only if the viewing player IS the HRE Emperor. Surfaces:
+		# the imperial-ban CB they hold, that they can use it to invoke
+		# the Reichsexekution against the apostate, and that the situation
+		# does NOT auto-end on their action -- only DNM's choices end it.
+		situation_card_expandable = {
+			visible = "[GetUniqueInternationalOrganization('hre').IsIOLeaderCountry(SituationView.GetPlayer)]"
+
+			blockoverride "header_button_onclick" {
+				onclick = "[LateralView.Vars.Toggle( 'emperor_toggled' )]"
+			}
+			blockoverride "header_text" {
+				text = "nd_dnm_panel_emperor_header"
+			}
+			blockoverride "header_icon" {
+				texture = "gfx/interface/icons/disasters/decline_of_empire.dds"
+			}
+			blockoverride "bottom_content" {
+				text_multi = {
+					autoresize = no
+					multiline = yes
+					size = { 400 240 }
+					text = "nd_dnm_panel_emperor_body"
+				}
+			}
+			blockoverride "visible_hint" {}
+			blockoverride "bottom_content_onclick" {
+				visible = "[LateralView.Vars.Exists( 'emperor_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_yes" {
+				visible = "[LateralView.Vars.Exists( 'emperor_toggled' )]"
+			}
+			blockoverride "icon_replace_visible_not" {
+				visible = "[Not(LateralView.Vars.Exists( 'emperor_toggled' ))]"
+			}
+		}
+	}
+
+}

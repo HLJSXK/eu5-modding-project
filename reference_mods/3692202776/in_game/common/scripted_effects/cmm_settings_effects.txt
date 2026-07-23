@@ -1,49 +1,309 @@
 ﻿# Register built-in CMM settings.
 # Scope: country
-# Args: none
 _cmm_register_menu_settings = {
-	if = {
-		limit = { has_multiple_players = no }
-		cmm_register_global_bool_setting = {
-			mod_id = cmm_core
-			setting_id = enable_host_only_tools
-			tab_id = general
-			group_id = session
-			default_value = 1
-		}
-	}
-	else = {
-		cmm_register_global_bool_setting = {
-			mod_id = cmm_core
-			setting_id = enable_host_only_tools
-			tab_id = general
-			group_id = session
-			default_value = 0
-		}
+	cmm_register_global_bool_setting = {
+		mod_id = cmf_core
+		setting_id = enable_unrestricted_tools
+		tab_id = general
+		group_id = session
+		default_value = 0
 	}
 
 	# Debug mode is singleplayer-only (console command does not work in multiplayer)
 	if = {
 		limit = { has_multiple_players = no }
 		cmm_register_global_bool_setting = {
-			mod_id = cmm_core
+			mod_id = cmf_core
 			setting_id = enable_debug_mode
 			tab_id = general
 			group_id = session
 			default_value = 0
 		}
 	}
+
+	cmm_register_button_setting = {
+		mod_id = cmf_core
+		setting_id = open_log
+		tab_id = general
+		group_id = session
+	}
+
+	cmm_register_dropdown_setting = {
+		mod_id = cmf_core
+		setting_id = action_bar_position
+		tab_id = action_bar
+		group_id = layout
+		default_index = 3
+		option_count = 3
+	}
+	cmm_set_dropdown_multiselector = { setting = cmf_core__action_bar_position }
 }
 
-# Store the current country as the CMM host country.
+# Register built-in CMM settings whose contents depend on other mods having
+# completed their registration (so cmf_action_bar_elements is fully populated).
+# Called after cmf_on_mod_registration.
 # Scope: country
-# Args: none
-_cmm_mark_host_country = {
-	set_global_variable = { name = cmm_core_host_country value = this }
+_cmm_register_menu_settings_late = {
+	# Mirror the global cmf_action_bar_elements list into a per-country list so
+	# CMM list bool fields can be stored per-country (per-player preference).
+	clear_variable_list = cmf_action_bar_elements_local
+	every_in_global_list = {
+		variable = cmf_action_bar_elements
+		save_scope_as = _cmf_tmp_element
+		root = {
+			add_to_variable_list = {
+				name = cmf_action_bar_elements_local
+				target = scope:_cmf_tmp_element
+			}
+		}
+	}
+
+	# Force the action-bar buttons list to rebuild every registration so newly
+	# added or removed mod elements stay in sync with cmf_action_bar_elements.
+	if = {
+		limit = { has_variable = cmm_list_initialized_cmf_core__action_bar_buttons }
+		remove_variable = cmm_list_initialized_cmf_core__action_bar_buttons
+	}
+
+	cmm_begin_settings_list = {
+		mod_id = cmf_core
+		setting_id = action_bar_buttons
+		tab_id = action_bar
+		is_ordered = 0
+	}
+
+	# Item 1: the mod menu button.
+	cmm_add_settings_list_item = {
+		mod_id = cmf_core
+		setting_id = action_bar_buttons
+		value = flag:cmf_core_mod_menu_button
+		name = cmf_core__action_bar_buttons_mod_menu_item_name
+	}
+
+	# Mod menu name-map entry, and cmf_action_bar_element_name's setter on a path the engine treats as reached; the per-element writes in cmf_add_action_bar_element are not.
+	add_to_global_variable_map = { name = cmf_action_bar_element_name key = flag:cmf_core_mod_menu_button value = flag:cmf_core__action_bar_buttons_mod_menu_item_name }
+
+	every_in_list = {
+		variable = cmf_action_bar_elements_local
+		save_scope_as = cmm_list_staged_item_value
+		root = {
+			_cmm_add_staged_settings_list_item_internal = {
+				mod_id = cmf_core
+				setting_id = action_bar_buttons
+				vt = variable
+			}
+		}
+	}
+
+	cmm_finish_settings_list = {
+		mod_id = cmf_core
+		setting_id = action_bar_buttons
+	}
+
+	cmm_register_list_bool_field = {
+		mod_id = cmf_core
+		setting_id = action_bar_buttons
+		field_id = active
+		default_value = 1
+	}
+
+	cmm_for_each_list_item = {
+		setting = cmf_core__action_bar_buttons
+		effect = _cmm_sync_action_bar_button_active_from_list
+	}
+
+	cmm_for_each_list_item = {
+		setting = cmf_core__action_bar_buttons
+		effect = _cmm_sync_action_bar_button_name_from_element
+	}
+
+	# After all mods register, so containers with only static settings are marked.
+	_cmm_recompute_rollup = yes
 
 	# Benign warning suppression
 	if = {
 		limit = { always = no }
-		cmf_suppress = { v = cmm_core_host_country }
+		cmf_suppress = { v = cmf_action_bar_elements_local }
+		cmf_suppress = { v = cmf_core_mod_menu_button }
+		cmf_suppress = { v = cmf_core__action_bar_buttons_mod_menu_item_name }
+		add_to_global_variable_list = { name = cmf_action_bar_elements target = flag:cmf_core_mod_menu_button }
+	}
+}
+
+# Per-item: write the bool field at slot 1 (the "active" field) to match
+# cmf_action_bar_active_elements membership for this row's element.
+# Called by cmm_for_each_list_item.
+# Scope: country
+# Args:
+# - setting (key): Composite setting key (cmf_core__action_bar_buttons).
+# - i (number): Item ordinal (1-50).
+_cmm_sync_action_bar_button_active_from_list = {
+	if = {
+		limit = {
+			NOT = { $i$ = 1 }
+		}
+		if = {
+			limit = {
+				is_target_in_variable_list = {
+					name = cmf_action_bar_active_elements
+					target = scope:cmm_list_current_item_value
+				}
+			}
+			remove_from_variable_map = { name = cmm key = flag:$setting$_i$i$_f1 }
+			add_to_variable_map = { name = cmm key = flag:$setting$_i$i$_f1 value = 1 }
+		}
+		else = {
+			remove_from_variable_map = { name = cmm key = flag:$setting$_i$i$_f1 }
+			add_to_variable_map = { name = cmm key = flag:$setting$_i$i$_f1 value = 0 }
+		}
+	}
+}
+
+# Per-item: update cmf_action_bar_active_elements membership to match the slot 1
+# bool field value for this row's element. Item 1 is the mod menu and is never
+# in the active list.
+# Called by cmm_for_each_list_item.
+# Scope: country
+# Args:
+# - setting (key): Composite setting key (cmf_core__action_bar_buttons).
+# - i (number): Item ordinal (1-50).
+_cmm_sync_action_bar_active_from_field = {
+	if = {
+		limit = {
+			NOT = { $i$ = 1 }
+		}
+		set_local_variable = { name = cmm_tmp_fk value = flag:$setting$_i$i$_f1 }
+		if = {
+			limit = { "variable_map(cmm|local_var:cmm_tmp_fk)" >= 1 }
+			if = {
+				limit = {
+					NOT = {
+						is_target_in_variable_list = {
+							name = cmf_action_bar_active_elements
+							target = scope:cmm_list_current_item_value
+						}
+					}
+				}
+				add_to_variable_list = {
+					name = cmf_action_bar_active_elements
+					target = scope:cmm_list_current_item_value
+				}
+			}
+		}
+		else = {
+			remove_list_variable = {
+				name = cmf_action_bar_active_elements
+				target = scope:cmm_list_current_item_value
+			}
+		}
+	}
+
+	# Benign warning suppression
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = cmm_tmp_fk }
+	}
+}
+
+# Per-item: set the row label to the element's name key from cmf_action_bar_element_name.
+# Item 1 (the mod menu) keeps its explicit name.
+# Called by cmm_for_each_list_item.
+# Scope: country
+# Args:
+# - setting (key): Composite setting key (cmf_core__action_bar_buttons).
+# - i (number): Item ordinal (1-50).
+_cmm_sync_action_bar_button_name_from_element = {
+	if = {
+		limit = { NOT = { $i$ = 1 } }
+		"global_variable_map(cmf_action_bar_element_name|scope:cmm_list_current_item_value)" = {
+			save_scope_as = _cmf_ab_name_key
+		}
+		set_variable = { name = $setting$_i$i$_name value = scope:_cmf_ab_name_key }
+	}
+}
+
+# Per-item: when iterating the action-bar buttons list, if the current item is
+# the one being toggled (its ordinal matches _cmm_action_bar_change_pos), update
+# cmf_action_bar_active_elements to add or remove that element based on
+# _cmm_action_bar_change_val.
+# Scope: country
+# Args:
+# - setting (key): Composite setting key (cmf_core__action_bar_buttons).
+# - i (number): Item ordinal (1-50).
+_cmm_handle_action_bar_button_change = {
+	if = {
+		limit = {
+			$i$ = var:_cmm_action_bar_change_pos
+			NOT = { $i$ = 1 }
+		}
+		if = {
+			limit = { var:_cmm_action_bar_change_val = 1 }
+			if = {
+				limit = {
+					NOT = {
+						is_target_in_variable_list = {
+							name = cmf_action_bar_active_elements
+							target = scope:cmm_list_current_item_value
+						}
+					}
+				}
+				add_to_variable_list = {
+					name = cmf_action_bar_active_elements
+					target = scope:cmm_list_current_item_value
+				}
+			}
+		}
+		else = {
+			remove_list_variable = {
+				name = cmf_action_bar_active_elements
+				target = scope:cmm_list_current_item_value
+			}
+		}
+	}
+
+	# Accept setting param (unused here)
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $setting$_$i$ }
+	}
+}
+
+# Handle CMM core button callbacks.
+# Scope: country
+_cmm_handle_core_callback = {
+	if = {
+		limit = { var:cmf_callback = flag:cmf_core__open_log }
+		if = {
+			limit = { has_variable = cmf_log_view_open }
+			remove_variable = cmf_log_view_open
+		}
+		else = {
+			set_variable = { name = cmf_log_view_open value = yes }
+		}
+	}
+	else_if = {
+		limit = { var:cmf_callback = flag:cmf_core__action_bar_buttons }
+		cmm_for_each_list_item = {
+			setting = cmf_core__action_bar_buttons
+			effect = _cmm_sync_action_bar_active_from_field
+		}
+	}
+
+	# Benign warning suppression
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = cmf_log_view_open }
+	}
+}
+
+# Store the current country as the CMM host country.
+# Scope: country
+_cmm_mark_host_country = {
+	set_global_variable = { name = cmf_core_host_country value = this }
+
+	# Benign warning suppression
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = cmf_core_host_country }
 	}
 }

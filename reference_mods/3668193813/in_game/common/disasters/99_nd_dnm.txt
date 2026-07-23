@@ -1,0 +1,350 @@
+﻿# ==========================================================================
+# DANUBIAN MONARCHY -- the two existential crises of the composite state.
+#
+# Resolution #6 (non-concurrent): every can_start carries
+# has_any_active_disaster = no, so neither disaster can begin while ANY
+# disaster (including the other DNM one) is active. The empire is besieged,
+# never auto-lost: each can_end is trivially satisfiable (a resolution
+# variable set by the player's own event choices, or a natural recovery).
+#
+# nd_dnm_grace (set by nd_dnm.1 for 10 years) is the post-formation grace
+# period: a freshly forged Danubian state is not bricked the moment it
+# forms (mirrors vanilla decline_of_empire's recently_became_empire guard).
+# Grace was 25 years originally; cut to 10 so the Pragmatic Sanction
+# disaster fires shortly after the 3-event succession chain ends (year 8).
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# THE NATIONALITIES QUESTION
+# The polyglot empire where the ruling culture is a minority. Built on
+# vanilla decline_of_empire's minority/control trigger and
+# rise_of_the_szlachta's snapshot-target + branching-resolution shape.
+# Three historically real exits, set by the player's choices in the
+# monthly events: reassert central authority, the Ausgleich compromise
+# (the "Austria-Hungary" payoff -- resolution #2: it lives ONLY here), or
+# fragmentation.
+# --------------------------------------------------------------------------
+nd_dnm_nationalities_question = {
+	image = "gfx/interface/illustrations/disaster/decline_of_empire.dds"
+
+	monthly_spawn_chance = monthly_spawn_chance_low
+
+	can_start = {
+		tag = DNM
+		custom_tooltip = {
+			text = nd_dnm_disaster_formed_tt
+			has_variable = nd_dnm_formed
+		}
+		custom_tooltip = {
+			text = nd_dnm_disaster_grace_ended_tt
+			NOT = { has_variable = nd_dnm_grace }
+		}
+		has_any_active_disaster = no
+		stability < 0
+		OR = {
+			total_not_tolerated_culture_population > {
+				value = total_population
+				divide = 3
+			}
+			average_control_in_home_region < 0.5
+		}
+	}
+
+	fire_only_once = yes
+
+	can_end = {
+		end_reason = {
+			trigger = { has_variable = nd_dnm_nq_resolved }
+			desc = nd_dnm_nq_resolved_end_tt
+		}
+	}
+
+	modifier = {
+		global_estate_target_satisfaction = larger_permanent_target_satisfaction_penalty
+		monthly_rebel_growth = 0.003
+		bank_interest = 0.05
+		monthly_legitimacy = -0.05
+	}
+
+	on_start = {
+		set_variable = {
+			name = nd_dnm_nq_control_target
+			value = {
+				add = average_control_in_home_region
+				multiply = 1.15
+				min = 0.5
+				max = 0.8
+			}
+		}
+		trigger_event_non_silently = nd_dnm.13
+	}
+
+	on_monthly = {
+		random_list = {
+			6 = { custom_tooltip = an_event_occurs_tt }
+			94 = { custom_tooltip = no_event_occurs_tt }
+		}
+		hidden_effect = {
+			random_list = {
+				93 = {}
+				3 = { trigger_event_silently = nd_dnm.14 }
+				2 = { trigger_event_silently = nd_dnm.15 }
+				2 = { trigger_event_silently = nd_dnm.16 }
+			}
+		}
+	}
+
+	on_end = {
+		remove_variable = nd_dnm_nq_control_target
+		if = {
+			limit = { has_variable = nd_dnm_ausgleich_reached }
+			trigger_event_non_silently = nd_dnm.17
+		}
+		else_if = {
+			limit = { has_variable = nd_dnm_nq_reasserted }
+			trigger_event_non_silently = nd_dnm.18
+		}
+		else = {
+			trigger_event_non_silently = nd_dnm.19
+		}
+	}
+}
+
+# --------------------------------------------------------------------------
+# THE PRAGMATIC SANCTION -- THE WAR OF THE SUCCESSION
+# REDESIGNED 2026-05-21 with a VISIBLE COUNTER (Crown Confidence, 0..80)
+# replacing the old RNG-roll resolution. Modelled on vanilla
+# byzantine_succession_crisis (event variety) and turmoil_in_brandenburg
+# (counter-via-change_variable progression).
+#
+# THREE deterministic exits replace the old 4%/4% monthly dice:
+#   - UPHELD: Crown Confidence reaches the target (80). Player has used
+#     events to push the counter up via gold / military / diplomacy.
+#   - BROKEN (collapse): Crown Confidence falls to -30. Adverse events
+#     and player neglect have torn the dynasty's standing apart.
+#   - BROKEN (ceded): Player chose nd_dnm.23 option B "negotiate terms"
+#     explicitly -- the escape hatch for a player cutting losses.
+#
+# CHAIN PREP SEEDS THE COUNTER:
+#   - nd_dnm_succession_groundwork (from nd_dnm.31.a): +15 starting confidence
+#   - nd_dnm_decree_ratified       (from nd_dnm.32.a): +25 starting confidence
+#   - Full prep (both): +40, so player needs only +40 more from events.
+#   - No prep: starts at 0, needs full +80 from events (~2-4 years).
+#
+# The has_advance = nd_dnm_pragmatic_sanction gate is DROPPED. The
+# succession chain is now the narrative justification for the disaster;
+# the heritage advance (which fires nd_dnm.4 as the positive ratification
+# beat) is orthogonal and need not have been unlocked. Path A players
+# (Antemurale) face the same dynastic question as Path B (Gesamtmonarchie).
+# --------------------------------------------------------------------------
+nd_dnm_pragmatic_sanction_crisis = {
+	image = "gfx/interface/illustrations/disaster/succession_crisis.dds"
+
+	# Conditional spawn chance: low while the chain is still running, then
+	# ultimate-high once the chain has primed it (succession_step >= 3).
+	# This guarantees the disaster fires within months of chain completion
+	# while still allowing an earlier organic firing if the player hits
+	# the historical succession-crisis conditions naturally.
+	monthly_spawn_chance = {
+		value = monthly_spawn_chance_low
+		if = {
+			limit = {
+				has_variable = nd_dnm_succession_step
+				var:nd_dnm_succession_step >= 3
+			}
+			value = monthly_spawn_chance_ultimate_high
+		}
+	}
+
+	can_start = {
+		tag = DNM
+		# Wrap the formed / grace variable checks in custom_tooltip so the
+		# trigger breakdown panel reads as gameplay state, not raw vars.
+		custom_tooltip = {
+			text = nd_dnm_disaster_formed_tt
+			has_variable = nd_dnm_formed
+		}
+		custom_tooltip = {
+			text = nd_dnm_disaster_grace_ended_tt
+			NOT = { has_variable = nd_dnm_grace }
+		}
+		has_any_active_disaster = no
+		government_type = government_type:monarchy
+		OR = {
+			# Chain has primed it -- the Succession Question chain reached
+			# its final step (set by nd_dnm.32 at year 8 post-formation).
+			# Wrapped in custom_tooltip so the trigger breakdown panel shows
+			# friendly text instead of raw variable references.
+			custom_tooltip = {
+				text = nd_dnm_disaster_chain_primed_tt
+				has_variable = nd_dnm_succession_step
+				var:nd_dnm_succession_step >= 3
+			}
+			# Organic path -- still allows the disaster to fire earlier
+			# if the player hits the historical succession conditions.
+			# These render in friendly form natively (the engine knows
+			# how to display has_heir / has_regent / legitimacy).
+			OR = {
+				has_heir = no
+				has_regent = yes
+				legitimacy < 40
+			}
+		}
+	}
+
+	fire_only_once = yes
+
+	# Three deterministic exits. All set nd_dnm_ps_resolved (the Reich
+	# situation's legitimacy-path can_end checks for this variable), so
+	# resolving the disaster ANY way closes both the disaster and the
+	# Reich pariah situation.
+	#
+	# Upheld vs Broken is decided by HOW we exited:
+	#   - counter >= target  -> on_end sets nd_dnm_ps_upheld, fires nd_dnm.21
+	#   - counter <= floor   -> on_end leaves nd_dnm_ps_upheld unset, fires nd_dnm.22
+	#   - player ceded       -> on_end leaves nd_dnm_ps_upheld unset, fires nd_dnm.22
+	# EU5 polls can_end conditions even for INACTIVE disasters (for tooltip
+	# previews etc), so every var:X comparison must be guarded by has_variable
+	# to avoid runtime "Failed to fetch variable" errors when the disaster
+	# hasn't started yet.
+	# Three deterministic exits, each wrapped in custom_tooltip for the
+	# panel's trigger breakdown. The has_variable guards prevent runtime
+	# fetch errors for non-active disasters (log noise reduction).
+	# 1.3: can_end takes end_reason blocks (trigger + desc), any one of which
+	# ends the disaster. Each former custom_tooltip OR-branch becomes one.
+	can_end = {
+		# UPHELD: counter reached the target.
+		end_reason = {
+			trigger = {
+				has_variable = nd_dnm_crown_confidence
+				has_variable = nd_dnm_crown_confidence_target
+				var:nd_dnm_crown_confidence >= var:nd_dnm_crown_confidence_target
+			}
+			desc = nd_dnm_disaster_upheld_end_tt
+		}
+		# BROKEN by collapse: counter fell to the floor.
+		end_reason = {
+			trigger = {
+				has_variable = nd_dnm_crown_confidence
+				var:nd_dnm_crown_confidence <= -30
+			}
+			desc = nd_dnm_disaster_broken_floor_end_tt
+		}
+		# BROKEN by capitulation: player chose to cede in nd_dnm.23.
+		end_reason = {
+			trigger = { has_variable = nd_dnm_ps_ceded }
+			desc = nd_dnm_disaster_ceded_end_tt
+		}
+	}
+
+	modifier = {
+		monthly_pretender_rebel_growth = 0.01
+		global_crown_estate_power = -0.2
+		global_estate_target_satisfaction = larger_permanent_target_satisfaction_penalty
+	}
+
+	on_start = {
+		add_country_modifier = {
+			modifier = ai_succession_disaster_targets
+			years = -1
+			mode = add_and_extend
+		}
+
+		# Initialize the Crown Confidence counter and its target.
+		set_variable = { name = nd_dnm_crown_confidence value = 0 }
+		set_variable = { name = nd_dnm_crown_confidence_target value = 80 }
+
+		# Chain prep flags seed the starting counter -- the chain choices
+		# are now MATERIALLY load-bearing on disaster difficulty.
+		if = {
+			limit = { has_variable = nd_dnm_succession_groundwork }
+			change_variable = { name = nd_dnm_crown_confidence add = 15 }
+		}
+		if = {
+			limit = { has_variable = nd_dnm_decree_ratified }
+			change_variable = { name = nd_dnm_crown_confidence add = 25 }
+		}
+
+		# Mark the disaster's UPHELD flag if the counter already meets the
+		# target at start (e.g. full prep + future content seeding higher).
+		# Currently impossible with max prep at 40 vs target 80, but the
+		# guard is cheap and future-proofs against content additions.
+		if = {
+			limit = { var:nd_dnm_crown_confidence >= var:nd_dnm_crown_confidence_target }
+			set_variable = nd_dnm_ps_upheld
+		}
+
+		trigger_event_non_silently = nd_dnm.20
+	}
+
+	# The disaster's on_end is the canonical cleanup point for:
+	#   (a) the AI-targeting modifier set in on_start,
+	#   (b) the disaster's own state variables,
+	#   (c) ALL chain modifiers from the Succession Question phase (so
+	#       perpetual chain debuffs never outlive the narrative).
+	# nd_dnm_ps_resolved is set here so the Reich situation can see it.
+	on_end = {
+		remove_country_modifier = ai_succession_disaster_targets
+
+		# Disaster state cleanup.
+		remove_variable = nd_dnm_crown_confidence
+		remove_variable = nd_dnm_crown_confidence_target
+
+		# Chain modifier cleanup -- remove_country_modifier is idempotent
+		# (no-op if absent), so listing all five unconditionally is safe.
+		remove_country_modifier = nd_dnm_succession_anxiety
+		remove_country_modifier = nd_dnm_rallying_the_diets
+		remove_country_modifier = nd_dnm_royal_silence
+		remove_country_modifier = nd_dnm_drafting_the_decree
+		remove_country_modifier = nd_dnm_postponed_decree
+
+		# Set the cross-system flag so the Reich situation can end via
+		# the legitimacy path.
+		set_variable = nd_dnm_ps_resolved
+
+		# Fire the appropriate closing event based on outcome.
+		if = {
+			limit = { has_variable = nd_dnm_ps_upheld }
+			trigger_event_non_silently = nd_dnm.21
+		}
+		else = {
+			trigger_event_non_silently = nd_dnm.22
+		}
+	}
+
+	# Monthly event roll. 25% chance of SOMETHING per month (vs vanilla
+	# BYZ's 29%); within that, 4 choice events (push counter UP via cost)
+	# and 2 adverse events (push counter DOWN, sometimes mitigable), plus
+	# the cede escape and two state-conditional flavor events.
+	on_monthly = {
+		random_list = {
+			25 = { custom_tooltip = an_event_occurs_tt }
+			75 = { custom_tooltip = no_event_occurs_tt }
+		}
+		hidden_effect = {
+			random_list = {
+				75 = {}
+				# --- Player agency events (push counter UP via cost) ---
+				3 = { trigger_event_silently = nd_dnm.40 }   # Estate loyalty (gold)
+				3 = { trigger_event_silently = nd_dnm.41 }   # Foreign recognition (diplomacy)
+				3 = { trigger_event_silently = nd_dnm.42 }   # Pretender rebellion (military)
+				3 = { trigger_event_silently = nd_dnm.43 }   # Sanction tour (gold + stab)
+				# --- Adverse events (push counter DOWN) ---
+				3 = { trigger_event_silently = nd_dnm.44 }   # A crown defects (mitigable)
+				3 = { trigger_event_silently = nd_dnm.45 }   # Foreign sponsors pretender
+				# --- Cede escape ---
+				2 = { trigger_event_silently = nd_dnm.23 }
+				# --- High-confidence positive flavor (>= 50) ---
+				2 = {
+					trigger = { var:nd_dnm_crown_confidence >= 50 }
+					trigger_event_silently = nd_dnm.46
+				}
+				# --- Low-confidence pressure (<= 20) ---
+				2 = {
+					trigger = { var:nd_dnm_crown_confidence <= 20 }
+					trigger_event_silently = nd_dnm.47
+				}
+			}
+		}
+	}
+}

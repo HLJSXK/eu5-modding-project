@@ -1,0 +1,149 @@
+﻿### ============================================================
+### SECTION: Monthly Country Pulse
+### ============================================================
+# EU5 1.3 population demand is driven by a location modifier, refreshed monthly.
+# The engine merges on_actions across duplicate pulse definitions, so this file
+# only needs to register SOL's dispatcher.
+
+monthly_country_pulse = {
+	on_actions = {
+		sol_local_pop_demand_monthly_pulse
+	}
+}
+
+sol_local_pop_demand_monthly_pulse = {
+	trigger = {
+		total_population > 0
+		num_locations > 0
+		sol_sol_is_on = yes
+	}
+	effect = {
+		if = {
+			limit = {
+				current_date >= 1337.5.1
+				NOT = { has_variable = sol_country_poverty_compensation_initialized }
+			}
+			sol_update_estate_building_maintenance = yes
+			sol_update_country_poverty_compensation = yes
+		}
+		sol_update_local_pop_demand_modifiers = yes
+	}
+}
+
+### ============================================================
+### SECTION: Yearly Country Pulse
+### ============================================================
+# Dispatches yearly country-scope maintenance and slow SOL caches.
+
+yearly_country_pulse = {
+	on_actions = {
+		gdp_to_development_pulse
+		sol_estate_building_maintenance_yearly_pulse
+	}
+}
+
+sol_estate_building_maintenance_yearly_pulse = {
+	trigger = {
+		total_population > 0
+		num_locations > 0
+		sol_sol_is_on = yes
+	}
+	effect = {
+		sol_update_estate_building_maintenance = yes
+		sol_update_country_poverty_compensation = yes
+	}
+}
+
+### ============================================================
+### SECTION: GDP to Development
+### ============================================================
+# Applies a yearly location modifier sized by local_gdp.
+# Gated by sol_gdp_dev_is_on (CMM toggle).
+
+gdp_to_development_pulse = {
+	trigger = {
+		num_locations > 0
+		sol_as_is_on = yes
+		sol_gdp_dev_is_on = yes
+	}
+	effect = {
+		every_province = {
+			every_location_in_province = {
+				add_location_modifier = {
+					modifier = gdp_to_development_modifier
+					years = 1
+					mode = replace
+					size = local_gdp
+				}
+			}
+		}
+	}
+}
+
+### ============================================================
+### SECTION: Age Escalation (AE) On-Actions
+### ============================================================
+# Age 1 — grant the first AE advance at game start for all countries.
+# Uses on_actions delegation to avoid effect block conflict with vanilla on_game_start.
+
+on_game_start = {
+	on_actions = {
+		sol_ae_game_start
+	}
+}
+
+### ============================================================
+### SECTION: GLS After-Lobby Initialisation
+### ============================================================
+# Full GLS recalculation fired via GUI widget (sol_gls_init_caller),
+# mirroring the migration trigger chain. Fires on both new game and
+# save load after the lobby is dismissed. Scope: none (global).
+
+gls_init_after_lobby = {
+	trigger = { sol_sol_is_on = yes }
+	effect = {
+		gls_recalculate_global_living_standard = yes
+	}
+}
+
+sol_ae_game_start = {
+	effect = {
+		every_country = {
+			trigger_event_non_silently = sol_ae.1
+		}
+	}
+}
+
+# Ages 2–6 — grant the next AE advance when a new age begins.
+# on_new_age fires in country scope; dispatch effect fires exactly one event per transition.
+# sol_ae_is_on gating remains in each event's own trigger block.
+on_new_age = {
+	on_actions = {
+		sol_ae_new_age
+	}
+}
+
+sol_ae_new_age = {
+	effect = {
+		if = {
+			limit = { current_age = age_2_renaissance }
+			trigger_event_non_silently = sol_ae.2
+		}
+		else_if = {
+			limit = { current_age = age_3_discovery }
+			trigger_event_non_silently = sol_ae.3
+		}
+		else_if = {
+			limit = { current_age = age_4_reformation }
+			trigger_event_non_silently = sol_ae.4
+		}
+		else_if = {
+			limit = { current_age = age_5_absolutism }
+			trigger_event_non_silently = sol_ae.5
+		}
+		else_if = {
+			limit = { current_age = age_6_revolutions }
+			trigger_event_non_silently = sol_ae.6
+		}
+	}
+}

@@ -16,68 +16,152 @@
 @data_before_lighting_blend = 			0.5
 @data_after_lighting_blend = 			0.5
 
-# Map modes for food-producing buildings based on static environmental capacity bonuses.
+# Map modes for food-producing building capacity.
+@pp_market_food_price_very_cheap = 0.014
+@pp_market_food_price_cheap = 0.054
+@pp_market_food_price_neutral = 0.12
+@pp_market_food_price_expensive = 0.171
+@pp_market_food_price_severe = 0.462
+@pp_farming_village_capacity_map_cap = 24
+@pp_fishing_village_capacity_map_cap = 9
+@pp_forest_village_capacity_map_cap = 11
 
-pp_fruit_orchard_capacity = {
+pp_market_food_price = {
 	map_color = {
 		if = {
-			limit = { is_ownable = no }
-			value = rgb { 128 128 128 }
+			limit = {
+				has_owner = yes
+				market.food_price < @pp_market_food_price_very_cheap
+			}
+			value = define:NMapColors|MAP_COLOR_MAX
 		}
 		else_if = {
 			limit = {
-				NOT = { has_variable = pp_fruit_orchard_fixed_env_bonus }
+				has_owner = yes
+				market.food_price < @pp_market_food_price_cheap
 			}
-			value = rgb { 0 0 0 }
-		}
-		else_if = {
-			limit = { global_var:pp_fruit_orchard_global_range = 0 }
-			value = rgb { 128 128 128 }
-		}
-		else = {
 			lerp = {
-				max_color = rgb { 0 255 0 }   # Green
-				min_color = rgb { 255 0 0 }   # Red
+				min_color = define:NMapColors|MAP_COLOR_MAX
+				max_color = define:NMapColors|MAP_COLOR_HIGH
 				factor = {
-					value = var:pp_fruit_orchard_fixed_env_bonus
-					subtract = global_var:pp_fruit_orchard_global_min
-					divide = { value = global_var:pp_fruit_orchard_global_range min = 1 }
+					value = market.food_price
+					subtract = @pp_market_food_price_very_cheap
+					divide = 0.04
+					max = 1
+					min = 0
 				}
 			}
 		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				market.food_price < @pp_market_food_price_neutral
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_HIGH
+				max_color = define:NMapColors|MAP_COLOR_MID
+				factor = {
+					value = market.food_price
+					subtract = @pp_market_food_price_cheap
+					divide = 0.066
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				market.food_price < @pp_market_food_price_expensive
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MID
+				max_color = define:NMapColors|MAP_COLOR_LOW
+				factor = {
+					value = market.food_price
+					subtract = @pp_market_food_price_neutral
+					divide = 0.051
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				market.food_price < @pp_market_food_price_severe
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_LOW
+				max_color = define:NMapColors|MAP_COLOR_MIN
+				factor = {
+					value = market.food_price
+					subtract = @pp_market_food_price_expensive
+					divide = 0.291
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { has_owner = yes }
+			value = define:NMapColors|MAP_COLOR_MIN
+		}
+		else = {
+			value = rgb { 128 128 128 }
+		}
 	}
-	
+
 	legend_key = {
-		desc = "MAPMODE_PP_FRUIT_ORCHARD_CAPACITY"
+		desc = "MAPMODE_PP_MARKET_FOOD_PRICE_VERY_CHEAP"
+		color = define:NMapColors|MAP_COLOR_MAX
+	}
+	legend_key = {
+		desc = "MAPMODE_PP_MARKET_FOOD_PRICE_CHEAP"
 		color = define:NMapColors|MAP_COLOR_HIGH
+	}
+	legend_key = {
+		desc = "MAPMODE_PP_MARKET_FOOD_PRICE_NEUTRAL"
+		color = define:NMapColors|MAP_COLOR_MID
+	}
+	legend_key = {
+		desc = "MAPMODE_PP_MARKET_FOOD_PRICE_EXPENSIVE"
+		color = define:NMapColors|MAP_COLOR_LOW
+	}
+	legend_key = {
+		desc = "MAPMODE_PP_MARKET_FOOD_PRICE_SEVERE"
+		color = define:NMapColors|MAP_COLOR_MIN
 	}
 
 	tooltip_key = {
-		if = { limit = { is_ownable = yes } value = MAPMODE_PP_FRUIT_ORCHARD_CAPACITY_TT_LAND }
-		else = { value = MAPMODE_PP_FOOD_CAPACITY_TT_WATER }
+		if = { limit = { has_owner = yes } value = MAPMODE_PP_MARKET_FOOD_PRICE_TT_LAND }
+		else = { value = MAPMODE_PP_MARKET_FOOD_PRICE_TT_WATER }
 	}
-	
-	small_map_names = location
-	medium_map_names = location
-	large_map_names = location
 
-	small_tooltip_context = location
-	medium_tooltip_context = location
-	large_tooltip_context = location
+	small_map_names = market
+	medium_map_names = market
+	large_map_names = market
 
-	fill_in_impassable = yes
+	small_tooltip_context = market
+	medium_tooltip_context = market
+	large_tooltip_context = market
+
+	fill_in_impassable = no
 	enable_snow = no
-	
-	flatmap_behaviour = always
+	enable_water_names = yes
+
+	flatmap_behaviour = Always
 	use_fow = no
-	
-	category = geography
-	index = 1
+
+	category = economy
+	index = 3
 
 	map_markers = {
 		all = no
+		market_marker = yes
+		toll_marker = yes
 	}
-	
+
 	gradient_parameters = {
 		zoom_step = @zoom_step_near
 		gradient_alpha_inside = 	@data_gradient_alpha_inside
@@ -92,8 +176,10 @@ pp_fruit_orchard_capacity = {
 		after_lighting_blend =		@data_after_lighting_blend
 	}
 
-	color_refresh_counters = { TopographyVegetationDatabaseUpdate }
-	color_and_names_refresh_counters = { TopographyVegetationDatabaseUpdate }
+	refresh_colors_on_selection_change = yes
+	color_refresh_counters = { Month }
+	color_and_names_refresh_counters = { MarketReach LocationOwnerChanged }
+	map_lines_mode = ToMarketCenter
 }
 
 pp_fishing_village_capacity = {
@@ -103,113 +189,73 @@ pp_fishing_village_capacity = {
 			value = rgb { 128 128 128 }
 		}
 		else_if = {
-			limit = {
-				NOT = { has_variable = pp_fishing_village_fixed_env_bonus }
-			}
-			value = rgb { 0 0 0 }
-		}
-		else_if = {
-			limit = { global_var:pp_fishing_village_global_range = 0 }
-			value = rgb { 128 128 128 }
-		}
-		else = {
+			limit = { fish_capacity < 1.5 }
 			lerp = {
-				max_color = rgb { 0 255 0 }
-				min_color = rgb { 255 0 0 }
+				min_color = define:NMapColors|MAP_COLOR_MIN
+				max_color = define:NMapColors|MAP_COLOR_LOW
 				factor = {
-					value = var:pp_fishing_village_fixed_env_bonus
-					subtract = global_var:pp_fishing_village_global_min
-					divide = { value = global_var:pp_fishing_village_global_range min = 1 }
+					value = fish_capacity
+					divide = 1.5
+					max = 1
+					min = 0
 				}
 			}
 		}
+		else_if = {
+			limit = { fish_capacity < 3 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_LOW
+				max_color = define:NMapColors|MAP_COLOR_MID
+				factor = {
+					value = fish_capacity
+					subtract = 1.5
+					divide = 1.5
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { fish_capacity < 4.5 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MID
+				max_color = define:NMapColors|MAP_COLOR_HIGH
+				factor = {
+					value = fish_capacity
+					subtract = 3
+					divide = 1.5
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { fish_capacity < @pp_fishing_village_capacity_map_cap }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_HIGH
+				max_color = define:NMapColors|MAP_COLOR_MAX
+				factor = {
+					value = fish_capacity
+					subtract = 4.5
+					divide = 4.5
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else = {
+			value = define:NMapColors|MAP_COLOR_MAX
+		}
 	}
 	
-	legend_key = {
-		desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY"
-		color = define:NMapColors|MAP_COLOR_HIGH
-	}
+	legend_key = { desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY_VERY_LOW" color = define:NMapColors|MAP_COLOR_MIN }
+	legend_key = { desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY_LOW" color = define:NMapColors|MAP_COLOR_LOW }
+	legend_key = { desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY_MEDIUM" color = define:NMapColors|MAP_COLOR_MID }
+	legend_key = { desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY_HIGH" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_FISHING_VILLAGE_CAPACITY_CAPPED" color = define:NMapColors|MAP_COLOR_MAX }
 
 	tooltip_key = {
 		if = { limit = { is_ownable = yes } value = MAPMODE_PP_FISHING_VILLAGE_CAPACITY_TT_LAND }
-		else = { value = MAPMODE_PP_FOOD_CAPACITY_TT_WATER }
-	}
-	
-	small_map_names = location
-	medium_map_names = location
-	large_map_names = location
-
-	small_tooltip_context = location
-	medium_tooltip_context = location
-	large_tooltip_context = location
-
-	fill_in_impassable = yes
-	enable_snow = no
-	
-	flatmap_behaviour = always
-	use_fow = no
-	
-	category = geography
-	index = 1
-
-	map_markers = {
-		all = no
-	}
-	
-	gradient_parameters = {
-		zoom_step = @zoom_step_near
-		gradient_alpha_inside = 	@data_gradient_alpha_inside
-		gradient_alpha_outside = 	@data_gradient_alpha_outside
-		gradient_width = 			@data_gradient_width
-		gradient_color_mult =		@data_gradient_color_mult
-		edge_width = 				@data_edge_width
-		edge_sharpness = 			@data_edge_sharpness
-		edge_alpha = 				@data_edge_alpha
-		edge_color_mult = 			@data_edge_color_mult
-		before_lighting_blend =		@data_before_lighting_blend
-		after_lighting_blend =		@data_after_lighting_blend
-	}
-
-	color_refresh_counters = { TopographyVegetationDatabaseUpdate }
-	color_and_names_refresh_counters = { TopographyVegetationDatabaseUpdate }
-}
-
-pp_sheep_farms_capacity = {
-	map_color = {
-		if = {
-			limit = { is_ownable = no }
-			value = rgb { 128 128 128 }
-		}
-		else_if = {
-			limit = {
-				NOT = { has_variable = pp_sheep_farms_fixed_env_bonus }
-			}
-			value = rgb { 0 0 0 }
-		}
-		else_if = {
-			limit = { global_var:pp_sheep_farms_global_range = 0 }
-			value = rgb { 128 128 128 }
-		}
-		else = {
-			lerp = {
-				max_color = rgb { 0 255 0 }
-				min_color = rgb { 255 0 0 }
-				factor = {
-					value = var:pp_sheep_farms_fixed_env_bonus
-					subtract = global_var:pp_sheep_farms_global_min
-					divide = { value = global_var:pp_sheep_farms_global_range min = 1 }
-				}
-			}
-		}
-	}
-	
-	legend_key = {
-		desc = "MAPMODE_PP_SHEEP_FARMS_CAPACITY"
-		color = define:NMapColors|MAP_COLOR_HIGH
-	}
-
-	tooltip_key = {
-		if = { limit = { is_ownable = yes } value = MAPMODE_PP_SHEEP_FARMS_CAPACITY_TT_LAND }
 		else = { value = MAPMODE_PP_FOOD_CAPACITY_TT_WATER }
 	}
 	
@@ -259,32 +305,70 @@ pp_farming_village_capacity = {
 			value = rgb { 128 128 128 }
 		}
 		else_if = {
-			limit = {
-				NOT = { has_variable = pp_farming_village_fixed_env_bonus }
-			}
-			value = rgb { 0 0 0 }
-		}
-		else_if = {
-			limit = { global_var:pp_farming_village_global_range = 0 }
-			value = rgb { 128 128 128 }
-		}
-		else = {
+			limit = { farm_capacity < 1 }
 			lerp = {
-				max_color = rgb { 0 255 0 }
-				min_color = rgb { 255 0 0 }
+				min_color = define:NMapColors|MAP_COLOR_MIN
+				max_color = define:NMapColors|MAP_COLOR_LOW
 				factor = {
-					value = var:pp_farming_village_fixed_env_bonus
-					subtract = global_var:pp_farming_village_global_min
-					divide = { value = global_var:pp_farming_village_global_range min = 1 }
+					value = farm_capacity
+					divide = 1
+					max = 1
+					min = 0
 				}
 			}
 		}
+		else_if = {
+			limit = { farm_capacity < 4 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_LOW
+				max_color = define:NMapColors|MAP_COLOR_MID
+				factor = {
+					value = farm_capacity
+					subtract = 1
+					divide = 3
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { farm_capacity < 12 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MID
+				max_color = define:NMapColors|MAP_COLOR_HIGH
+				factor = {
+					value = farm_capacity
+					subtract = 4
+					divide = 8
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { farm_capacity < @pp_farming_village_capacity_map_cap }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_HIGH
+				max_color = define:NMapColors|MAP_COLOR_MAX
+				factor = {
+					value = farm_capacity
+					subtract = 12
+					divide = 12
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else = {
+			value = define:NMapColors|MAP_COLOR_MAX
+		}
 	}
 	
-	legend_key = {
-		desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY"
-		color = define:NMapColors|MAP_COLOR_HIGH
-	}
+	legend_key = { desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY_VERY_LOW" color = define:NMapColors|MAP_COLOR_MIN }
+	legend_key = { desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY_LOW" color = define:NMapColors|MAP_COLOR_LOW }
+	legend_key = { desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY_MEDIUM" color = define:NMapColors|MAP_COLOR_MID }
+	legend_key = { desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY_HIGH" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_FARMING_VILLAGE_CAPACITY_CAPPED" color = define:NMapColors|MAP_COLOR_MAX }
 
 	tooltip_key = {
 		if = { limit = { is_ownable = yes } value = MAPMODE_PP_FARMING_VILLAGE_CAPACITY_TT_LAND }
@@ -337,32 +421,70 @@ pp_forest_village_capacity = {
 			value = rgb { 128 128 128 }
 		}
 		else_if = {
-			limit = {
-				NOT = { has_variable = pp_forest_village_fixed_env_bonus }
-			}
-			value = rgb { 0 0 0 }
-		}
-		else_if = {
-			limit = { global_var:pp_forest_village_global_range = 0 }
-			value = rgb { 128 128 128 }
-		}
-		else = {
+			limit = { forest_capacity < 3.3 }
 			lerp = {
-				max_color = rgb { 0 255 0 }
-				min_color = rgb { 255 0 0 }
+				min_color = define:NMapColors|MAP_COLOR_MIN
+				max_color = define:NMapColors|MAP_COLOR_LOW
 				factor = {
-					value = var:pp_forest_village_fixed_env_bonus
-					subtract = global_var:pp_forest_village_global_min
-					divide = { value = global_var:pp_forest_village_global_range min = 1 }
+					value = forest_capacity
+					divide = 3.3
+					max = 1
+					min = 0
 				}
 			}
 		}
+		else_if = {
+			limit = { forest_capacity < 4.4 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_LOW
+				max_color = define:NMapColors|MAP_COLOR_MID
+				factor = {
+					value = forest_capacity
+					subtract = 3.3
+					divide = 1.1
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { forest_capacity < 6.6 }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MID
+				max_color = define:NMapColors|MAP_COLOR_HIGH
+				factor = {
+					value = forest_capacity
+					subtract = 4.4
+					divide = 2.2
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = { forest_capacity < @pp_forest_village_capacity_map_cap }
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_HIGH
+				max_color = define:NMapColors|MAP_COLOR_MAX
+				factor = {
+					value = forest_capacity
+					subtract = 6.6
+					divide = 4.4
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else = {
+			value = define:NMapColors|MAP_COLOR_MAX
+		}
 	}
 	
-	legend_key = {
-		desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY"
-		color = define:NMapColors|MAP_COLOR_HIGH
-	}
+	legend_key = { desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY_VERY_LOW" color = define:NMapColors|MAP_COLOR_MIN }
+	legend_key = { desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY_LOW" color = define:NMapColors|MAP_COLOR_LOW }
+	legend_key = { desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY_MEDIUM" color = define:NMapColors|MAP_COLOR_MID }
+	legend_key = { desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY_HIGH" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_FOREST_VILLAGE_CAPACITY_CAPPED" color = define:NMapColors|MAP_COLOR_MAX }
 
 	tooltip_key = {
 		if = { limit = { is_ownable = yes } value = MAPMODE_PP_FOREST_VILLAGE_CAPACITY_TT_LAND }

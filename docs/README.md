@@ -18,11 +18,24 @@ Mod-focused documentation for the EU5 Modding Project.
 
 - [SOL Rebuild (2026-04-02)](design/Stable_SOL_Rebuild_20260402.md) — Standard of Living system architecture, naming conventions, update pipeline
 
+### Workshop Copy
+
+- Standard of Living: [English](workshop_description_en.txt) | [简体中文](workshop_description_zh.txt)
+- SOL-PP Compatibility Submod: [English](workshop_description_sol_pp_en.txt) | [简体中文](workshop_description_sol_pp_zh.txt)
+
+### Discord Announcements
+
+- SOL-PP Compatibility Submod: [English](discord_announcement_sol_pp_en.md) | [简体中文](discord_announcement_sol_pp_zh.md)
+
 ### Technical Reference (general EU5 knowledge, dated — not authoritative for syntax)
 
+- [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) — file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
 - [EU5 Modding Knowledge Base](technical/EU5_Modding_Knowledge_Base.md) — Jomini engine overview, scripting, events, localization
 - [EU5 Mod Framework Guide](technical/EU5_Mod_Framework_Guide.md) — community mod patterns, file structure, GUI, complexity tiers
 - [Stable Mod Analysis Report](technical/Stable_Mod_Analysis_Report.md) — Amalgamation Synergy mod breakdown (source for `src/stable/`)
+- [SOL-M&T Compatibility Check](technical/SOL_MEIOU_and_Taxes_Compatibility_Check.md) — static conflict and EPBM audit
+- [SOL-M&T Demand Audit](technical/SOL_MEIOU_and_Taxes_Pop_Demand_Audit.md) — vanilla/SOL/M&T demand comparison
+- [SOL-M&T Feature Matrix](technical/SOL_MnT_Compatibility_Feature_Matrix.md) — implemented authority, demand, maintenance, and validation contract
 
 ## Archive
 

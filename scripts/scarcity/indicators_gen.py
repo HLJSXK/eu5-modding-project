@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 from ._data import (
     SHORTAGE_TIERS, SURPLUS_TIERS,
-    INDICATOR_GROUPS, COMPAT_GOODS, GOOD_TO_IND_GROUP, IND_GROUP_SIZE,
+    INDICATOR_GROUPS, GOOD_TO_IND_GROUP, IND_GROUP_SIZE,
     DEMAND_GROUPS, DEMAND_GROUP_SIZE,
     ABSENT_SUFFIX,
     _good_list_name,
@@ -54,7 +54,6 @@ def _list_check(good: str, suffix: str, scope_prefix: str = "market") -> str:
 
 
 def _gen_good_indicators(good: str) -> List[str]:
-    is_compat = good in COMPAT_GOODS
     ind_grp = GOOD_TO_IND_GROUP[good]
     lines: List[str] = []
 
@@ -62,34 +61,21 @@ def _gen_good_indicators(good: str) -> List[str]:
     lines.append(f"    value = 0")
     for i, (suffix, _t, _w, _d) in enumerate(SHORTAGE_TIERS):
         kw = "if" if i == 0 else "else_if"
-        if is_compat:
-            lines += [
-                f"    {kw} = {{ limit = {{ sol_pp_victuals_compat_is_on = yes {_list_check(good, suffix)} }} value = {3 - i} }}",
-            ]
-        else:
-            lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = {3 - i} }}")
+        lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = {3 - i} }}")
     lines.append("}")
 
     lines.append(f"sol_good_{good}_surplus_tier = {{")
     lines.append(f"    value = 0")
     for i, (suffix, _t, _w, _d) in enumerate(SURPLUS_TIERS):
         kw = "if" if i == 0 else "else_if"
-        if is_compat:
-            lines += [
-                f"    {kw} = {{ limit = {{ sol_pp_victuals_compat_is_on = yes {_list_check(good, suffix)} }} value = {3 - i} }}",
-            ]
-        else:
-            lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = {3 - i} }}")
+        lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = {3 - i} }}")
     lines.append("}")
 
     lines.append(f"sol_good_{good}_scarce = {{")
     lines.append(f"    value = 0")
     for i, (suffix, _t, _w, _d) in enumerate(SHORTAGE_TIERS):
         kw = "if" if i == 0 else "else_if"
-        if is_compat:
-            lines.append(f"    {kw} = {{ limit = {{ sol_pp_victuals_compat_is_on = yes {_list_check(good, suffix)} }} value = 1 }}")
-        else:
-            lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = 1 }}")
+        lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} value = 1 }}")
     lines.append("}")
 
     lines.append(f"sol_good_{good}_absent = {{")
@@ -97,96 +83,32 @@ def _gen_good_indicators(good: str) -> List[str]:
     lines.append(f"    if = {{ limit = {{ {_list_check(good, ABSENT_SUFFIX)} }} value = 1 }}")
     lines.append("}")
 
-    if is_compat:
-        lines += [
-            f"sol_weight_indicator_{good} = {{",
-            f"    value = 0",
-            f"    if = {{",
-            f"        limit = {{ sol_pp_victuals_compat_is_on = yes }}",
-            f"        add = 1",
-        ]
-        first_adj = True
-        for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
-            kw = "if" if first_adj else "else_if"
-            first_adj = False
-            delta = weight - 1.0
-            lines.append(f"        {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
-        lines += ["    }", "}"]
-    else:
-        lines.append(f"sol_weight_indicator_{good} = {{")
-        lines.append(f"    value = 1")
-        first_adj = True
-        for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
-            kw = "if" if first_adj else "else_if"
-            first_adj = False
-            delta = weight - 1.0
-            lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
-        lines.append("}")
+    lines.append(f"sol_weight_indicator_{good} = {{")
+    lines.append(f"    value = 1")
+    first_adj = True
+    for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
+        kw = "if" if first_adj else "else_if"
+        first_adj = False
+        delta = weight - 1.0
+        lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
+    lines.append("}")
 
     grp_weight = f"sol_{ind_grp}_base_total_weight"
     n = DEMAND_GROUP_SIZE.get(ind_grp, IND_GROUP_SIZE[ind_grp])
-    if is_compat:
-        lines += [
-            f"sol_demand_share_{good} = {{",
-            f"    value = 0",
-            f"    if = {{",
-            f"        limit = {{ sol_pp_victuals_compat_is_on = yes }}",
-            f"        add = 1",
-        ]
-        first_adj = True
-        for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
-            kw = "if" if first_adj else "else_if"
-            first_adj = False
-            delta = weight - 1.0
-            lines.append(f"        {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
-        lines += [
-            f"    }}",
-            f"    divide = {grp_weight}",
-            f"    multiply = 100",
-            f"}}",
-        ]
-    else:
-        lines.append(f"sol_demand_share_{good} = {{")
-        lines.append(f"    value = sol_weight_indicator_{good}")
-        lines.append(f"    divide = {grp_weight}")
-        lines.append(f"    multiply = 100")
-        lines.append("}")
+    lines.append(f"sol_demand_share_{good} = {{")
+    lines.append(f"    value = sol_weight_indicator_{good}")
+    lines.append(f"    divide = {grp_weight}")
+    lines.append(f"    multiply = 100")
+    lines.append("}")
 
-    if is_compat:
-        lines += [
-            f"sol_demand_share_offset_{good}_compat = {{",
-            f"    value = 0",
-            f"    if = {{ limit = {{ sol_pp_victuals_compat_is_on = yes }} value = 1 }}",
-            f"}}",
-            f"sol_demand_share_offset_{good} = {{",
-            f"    value = 0",
-            f"    if = {{",
-            f"        limit = {{ sol_pp_victuals_compat_is_on = yes }}",
-            f"        add = 1",
-        ]
-        first_adj = True
-        for suffix, _t, weight, _d in SHORTAGE_TIERS + SURPLUS_TIERS:
-            kw = "if" if first_adj else "else_if"
-            first_adj = False
-            delta = weight - 1.0
-            lines.append(f"        {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {delta} }}")
-        lines += [
-            f"    }}",
-            f"    multiply = {n}",
-            f"    divide = {grp_weight}",
-            f"    add = -1",
-            f"    multiply = sol_demand_share_offset_{good}_compat",
-            f"}}",
-        ]
-    else:
-        lines += [
-            f"sol_demand_share_offset_{good} = {{",
-            f"    value = sol_weight_indicator_{good}",
-            f"    multiply = {n}",
-            f"    divide = {grp_weight}",
-            f"    add = -1",
-            f"}}",
-        ]
+    lines += [
+        f"sol_demand_share_offset_{good} = {{",
+        f"    value = sol_weight_indicator_{good}",
+        f"    multiply = {n}",
+        f"    divide = {grp_weight}",
+        f"    add = -1",
+        f"}}",
+    ]
 
     return lines
 
@@ -197,33 +119,17 @@ def _gen_group_base_total_weight(grp: str, goods: List[str], prices: dict) -> Li
     for good in goods:
         price = prices.get(good, 1.0)
         price_factor = round(price / avg_price, 5)
-        is_compat = good in COMPAT_GOODS
-        if is_compat:
-            lines.append(f"    if = {{ limit = {{ sol_pp_victuals_compat_is_on = yes }}")
-            first = True
-            for suffix, _t, weight, _d in SHORTAGE_TIERS:
-                kw = "if" if first else "else_if"
-                first = False
-                contrib = round(weight * price_factor, 5)
-                lines.append(f"        {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
-            for suffix, _t, weight, _d in SURPLUS_TIERS:
-                contrib = round(weight * price_factor, 5)
-                lines.append(f"        else_if = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
-            normal_contrib = round(1.0 * price_factor, 5)
-            lines.append(f"        else = {{ add = {normal_contrib} }}")
-            lines.append(f"    }}")
-        else:
-            first = True
-            for suffix, _t, weight, _d in SHORTAGE_TIERS:
-                kw = "if" if first else "else_if"
-                first = False
-                contrib = round(weight * price_factor, 5)
-                lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
-            for suffix, _t, weight, _d in SURPLUS_TIERS:
-                contrib = round(weight * price_factor, 5)
-                lines.append(f"    else_if = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
-            normal_contrib = round(1.0 * price_factor, 5)
-            lines.append(f"    else = {{ add = {normal_contrib} }}")
+        first = True
+        for suffix, _t, weight, _d in SHORTAGE_TIERS:
+            kw = "if" if first else "else_if"
+            first = False
+            contrib = round(weight * price_factor, 5)
+            lines.append(f"    {kw} = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
+        for suffix, _t, weight, _d in SURPLUS_TIERS:
+            contrib = round(weight * price_factor, 5)
+            lines.append(f"    else_if = {{ limit = {{ {_list_check(good, suffix)} }} add = {contrib} }}")
+        normal_contrib = round(1.0 * price_factor, 5)
+        lines.append(f"    else = {{ add = {normal_contrib} }}")
     lines += ["    min = 0.001", "}"]
     return lines
 

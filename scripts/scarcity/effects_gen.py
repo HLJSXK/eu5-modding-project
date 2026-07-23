@@ -8,7 +8,7 @@ from typing import Dict, List
 
 from ._data import (
     SHORTAGE_TIERS, SURPLUS_TIERS, ALL_TIER_SUFFIXES,
-    COMPAT_GOODS, INDICATOR_GROUPS,
+    INDICATOR_GROUPS,
     ALL_GOODS, GOOD_TO_IND_GROUP, IND_GROUP_SIZE,
     TIER_EXACT_FACTORS, ABSENT_SUFFIX, ABSENT_FACTOR,
     ROOT,
@@ -75,7 +75,6 @@ def _load_alpha_averages() -> Dict[str, Dict[str, float]]:
 def _gen_good_effects(good: str) -> str:
     """Generate the per-market tier assignment block for one good."""
     lines: List[str] = []
-    is_compat = good in COMPAT_GOODS
     indent = "        "  # 8 spaces (inside every_market_in_world)
 
     lines.append(f"{indent}# {good}")
@@ -83,27 +82,15 @@ def _gen_good_effects(good: str) -> str:
     # Step 1: Remove from all tier lists
     for suffix in ALL_TIER_SUFFIXES:
         lst = _good_list_name(good, suffix)
-        if is_compat:
-            lines += [
-                f"{indent}if = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        sol_pp_victuals_compat_is_on = yes",
-                f"{indent}        has_global_variable_list = {lst}",
-                f"{indent}        is_target_in_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}    }}",
-                f"{indent}    remove_list_global_variable = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
-        else:
-            lines += [
-                f"{indent}if = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        has_global_variable_list = {lst}",
-                f"{indent}        is_target_in_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}    }}",
-                f"{indent}    remove_list_global_variable = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
+        lines += [
+            f"{indent}if = {{",
+            f"{indent}    limit = {{",
+            f"{indent}        has_global_variable_list = {lst}",
+            f"{indent}        is_target_in_global_variable_list = {{ name = {lst} target = this }}",
+            f"{indent}    }}",
+            f"{indent}    remove_list_global_variable = {{ name = {lst} target = this }}",
+            f"{indent}}}",
+        ]
 
     # Step 2: Add to correct tier via if/else_if chain
     first = True
@@ -113,64 +100,35 @@ def _gen_good_effects(good: str) -> str:
         first = False
         price_cmp = f'"market_price(goods:{good})"'
         def_price = f'"default_price(goods:{good})"'
-        if is_compat:
-            lines += [
-                f"{indent}{kw} = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        sol_pp_victuals_compat_is_on = yes",
-                f"{indent}        {price_cmp} > {{",
-                f"{indent}            value = {def_price}",
-                f"{indent}            multiply = {threshold}",
-                f"{indent}        }}",
-                f"{indent}    }}",
-                f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
-        else:
-            lines += [
-                f"{indent}{kw} = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        {price_cmp} > {{",
-                f"{indent}            value = {def_price}",
-                f"{indent}            multiply = {threshold}",
-                f"{indent}        }}",
-                f"{indent}    }}",
-                f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
+        lines += [
+            f"{indent}{kw} = {{",
+            f"{indent}    limit = {{",
+            f"{indent}        {price_cmp} > {{",
+            f"{indent}            value = {def_price}",
+            f"{indent}            multiply = {threshold}",
+            f"{indent}        }}",
+            f"{indent}    }}",
+            f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
+            f"{indent}}}",
+        ]
 
     for suffix, threshold, _weight, _desc in SURPLUS_TIERS:
         lst = _good_list_name(good, suffix)
         price_cmp = f'"market_price(goods:{good})"'
         def_price = f'"default_price(goods:{good})"'
-        if is_compat:
-            lines += [
-                f"{indent}else_if = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        sol_pp_victuals_compat_is_on = yes",
-                f"{indent}        {price_cmp} < {{",
-                f"{indent}            value = {def_price}",
-                f"{indent}            multiply = {threshold}",
-                f"{indent}        }}",
-                f"{indent}    }}",
-                f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
-        else:
-            lines += [
-                f"{indent}else_if = {{",
-                f"{indent}    limit = {{",
-                f"{indent}        {price_cmp} < {{",
-                f"{indent}            value = {def_price}",
-                f"{indent}            multiply = {threshold}",
-                f"{indent}        }}",
-                f"{indent}    }}",
-                f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
-                f"{indent}}}",
-            ]
+        lines += [
+            f"{indent}else_if = {{",
+            f"{indent}    limit = {{",
+            f"{indent}        {price_cmp} < {{",
+            f"{indent}            value = {def_price}",
+            f"{indent}            multiply = {threshold}",
+            f"{indent}        }}",
+            f"{indent}    }}",
+            f"{indent}    add_to_global_variable_list = {{ name = {lst} target = this }}",
+            f"{indent}}}",
+        ]
 
     # Absent: good is neither produced nor traded at this market.
-    # No sol_pp_victuals_compat_is_on guard — availability is independent of compat toggle.
     lst = _good_list_name(good, ABSENT_SUFFIX)
     lines += [
         f"{indent}else_if = {{",

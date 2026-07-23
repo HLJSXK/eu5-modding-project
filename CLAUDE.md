@@ -33,11 +33,11 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 
 ## Critical EU5 Gotchas
 
-- **Location `auto_modifiers` are NON-FUNCTIONAL** — use `TRY_REPLACE` in `main_menu/common/static_modifiers/` with `game_data = { category = location }` instead
+- **Location `auto_modifiers` are NON-FUNCTIONAL** — use `main_menu/common/static_modifiers/` instead; for existing modifiers prefer a minimal `TRY_INJECT` delta, while new objects need `game_data = { category = location }`
 - **`location_rank` enum** — only 3 valid values: `rural_settlement`, `town`, `city` (EU4 names like `village` cause silent failures)
 - **Localization YAML** — must be UTF-8 BOM (not plain UTF-8); only straight ASCII double-quotes `"` are valid
 - **`custom_tooltip`** — never remove it; dotted suffix format IS valid in event options; verify key format before changing
-- **Pre-test validation** — run `python scripts/validate.py --changed` before launching the game
+- **Pre-test validation** — run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed` before launching the game
 
 ## GUI Icon Display Rule
 
@@ -80,7 +80,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 `import sys` must also be present (add it if not already there). This is mandatory because Claude's Bash tool and Stop hooks run scripts via a non-TTY pipe; Python then falls back to the system locale encoding (GBK on Chinese Windows), causing `UnicodeEncodeError` for any non-ASCII output.
 
-Also, always run scripts via `PYTHONUTF8=1 conda run -n eu5 python scripts/...` — never bare `python`. The `PYTHONUTF8=1` prefix is mandatory: on Chinese Windows the conda wrapper itself (not just the script) fails with `UnicodeEncodeError: 'gbk'` when printing script output through a non-TTY pipe.
+Also, always run scripts by directly invoking the `eu5` environment's `python.exe`, with UTF-8 enabled. In PowerShell, set `$env:EU5_PYTHON` to the absolute path of the `eu5` env's `python.exe` (for example, a `...\envs\eu5\python.exe` path), then run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/...`. Do not use `conda run`; it is unstable in this project. Do not use bare `python` unless the active shell already resolves it to the `eu5` environment's `python.exe`.
 
 ## Path Mapping
 
@@ -102,7 +102,7 @@ When triggered, do ALL of:
 1. Add an entry to `docs/knowledge/anti_patterns.yaml` (copy the format of existing entries).
 2. Add a row to the "Documented Violations" table in `docs/guides/AI_Tool_Workflow_Prompt.md`.
 3. Update `docs/technical/EU5_Modding_Knowledge_Base.md` if the pattern is broadly applicable.
-4. Run `python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
+4. Run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
 
 For minor discoveries (single modifier name, single typo fix), steps 1 and 4 only.
 
@@ -137,4 +137,4 @@ Do NOT update for:
 
 ### After updating
 
-Run `PYTHONUTF8=1 conda run -n eu5 python scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
+Run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.

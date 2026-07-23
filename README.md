@@ -4,7 +4,7 @@ This repository now focuses on EU5 mod development only.
 
 ## Scope
 
-- Mod source development (`src/stable`, `src/develop`)
+- Mod source development (`src/stable`, `src/sol_standalone`, and compatibility targets under `src/`)
 - Modding knowledge base and design documents
 - Community and vanilla reference files for research
 
@@ -19,40 +19,83 @@ This repository keeps only mod-related content and documentation.
 ## Quick Start (Modding)
 
 1. Clone repository
-2. Use `src/stable/` as baseline for practical balance mods
-3. Use `src/develop/` as reference for the Dynamic Missions system (development paused)
-4. Read technical docs in `docs/technical/`
+2. Use `src/stable/` as the full stable mod target
+3. Use `src/sol_standalone/` for the SOL-only standalone target
+4. Use `src/sol_pp_compatibility_submod/` for the SOL / Prosper or Perish compatibility layer
+5. Use `src/sol_mnt_compatibility_submod/` for the SOL / MEIOU and Taxes compatibility layer
+6. Use `src/sol_jtg_compatibility_submod/` for the SOL / Just Trade Goods compatibility layer
+7. Read technical docs in `docs/technical/`
 
-## Build / Deploy (Stable)
+## Build / Deploy
 
-For a simple local deployment, run:
+Generated SOL sources are refreshed automatically before validation/deploy.
+To run the generation chain without deploying:
+
+```cmd
+python scripts\gen_sol_chain.py --target all
+python scripts\gen_sol_chain.py --target all --check
+```
+
+For the default deployment of stable, SOL standalone, and all compatibility
+compatibility submods, run:
 
 ```cmd
 build.bat
 ```
 
-This also creates `build\stable.zip`.
-
-For optional upload to Tencent COS (`modsync/packages/stable.zip`), run:
+This regenerates and mirrors all active targets into the EU5 game mod folder.
+Compatibility targets may be installed together, but only the one matching the
+active overhaul should be enabled because they replace shared SOL effects. To
+deploy only the full stable target, run:
 
 ```cmd
-build.bat --upload-cos --cos-bucket <bucket-name> --cos-region <region>
+build.bat stable
 ```
 
-Credentials can come from either arguments or environment variables:
+For the SOL standalone deployment, run:
 
-- `--cos-secret-id` / `--cos-secret-key`
-- `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`
+```cmd
+build.bat sol_standalone
+```
 
-Bucket and region can also come from environment variables:
+This mirrors `src\sol_standalone\` into the EU5 game mod folder.
 
-- `TENCENT_COS_BUCKET`
-- `TENCENT_COS_REGION`
+For the SOL / Prosper or Perish compatibility submod, run:
 
-This mirrors `src/stable/` into the existing EU5 mod folder with `robocopy /MIR`
-so debug hot reload can keep watching the same target directory:
+```cmd
+build.bat sol_pp_compatibility_submod
+```
 
-`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\stable`
+This mirrors `src\sol_pp_compatibility_submod\` into the EU5 game mod folder.
+
+For the SOL / MEIOU and Taxes compatibility submod, run:
+
+```cmd
+build.bat sol_mnt_compatibility_submod
+```
+
+This mirrors `src\sol_mnt_compatibility_submod\` into the EU5 game mod folder.
+
+For the SOL / Just Trade Goods compatibility submod, run:
+
+```cmd
+build.bat sol_jtg_compatibility_submod
+```
+
+This mirrors `src\sol_jtg_compatibility_submod\` into the EU5 game mod folder.
+
+To build all targets, run:
+
+```cmd
+build.bat all
+```
+
+This mirrors the selected `src/<target>/` into the existing EU5 mod folder with
+`robocopy /MIR` so debug hot reload can keep watching the same target directory:
+
+`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod\<target>`
+
+Builds no longer write archives into the repository `build\` folder.
 
 If write permission is denied, run terminal as Administrator.
 

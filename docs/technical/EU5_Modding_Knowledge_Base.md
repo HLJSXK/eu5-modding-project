@@ -102,8 +102,31 @@ The community analysis highlighted several best practices for creating clean, co
 *   **Avoid Overwriting Vanilla Files**: Instead of editing game files directly, create new files with unique names. This prevents conflicts with other mods and game updates.
 *   **Use Prefixes**: Prefixing filenames with a unique identifier (e.g., `my_mod_events.txt`) helps organize files and prevent name collisions.
 *   **Isolate Content**: Keep all mod files within the mod's designated folder. Do not place files in the main game directory.
-*   **Manage Load Order**: For files that must override others, use numbered prefixes (e.g., `00_`, `01_`) to control the order in which the game loads them.
+*   **Manage Load Order**: ASCII filename prefixes (e.g., `00_`, `01_`) control order only where filename order is the applicable tiebreaker. Database operation type takes precedence when `INJECT`/`REPLACE` variants differ; see the compatibility rules below.
 *   **Use Version Control**: Employ tools like Git to track changes, collaborate with others, and revert to previous versions if needed.
+
+### 4.6. Multi-Mod Compatibility and Database Operation Priority
+
+EU5 uses two distinct conflict mechanisms that must not be conflated:
+
+*   **Exact-path file overwrite**: If two sources provide the same relative path and filename, the mod file overrides the base-game/DLC file, and the mod lower in the playlist overrides a mod higher in the playlist. Only the winning file is used.
+*   **Database object edits from different files**: Files load in ASCII order, with parent-directory files before files in subdirectories. When multiple files edit the same top-level object through database keywords, however, the engine processes operation types first and filenames second.
+
+The database operation order, from earliest to latest, is:
+
+```text
+INJECT_OR_CREATE -> REPLACE_OR_CREATE -> TRY_INJECT -> TRY_REPLACE -> INJECT -> REPLACE
+```
+
+Filename order resolves conflicts only between entries using the same operation type. A later-named `REPLACE_OR_CREATE:` cannot beat an earlier-named `REPLACE:`, because all `REPLACE:` operations are processed later. Likewise, an `INJECT:` can be erased by a later processing-stage `REPLACE:` regardless of the files' names.
+
+These keywords work only on top-level objects. `INJECT:` appends script to the object rather than deep-merging nested blocks. Appending a second singleton trigger section such as `allow = { ... }` produces `Trigger section already read earlier`; replace the verified complete object instead. Plain duplicate scripted-effect definitions are rejected with `Duplicated key ... will not be created`, even from a later `zz_` file, so changed effects need an explicit `REPLACE:`. `INJECT:` on scripted effects or scripted triggers behaves like replacement. Support for these keywords is database-type dependent and must be verified for the target folder.
+
+For static modifiers, numeric modifier entries are additive. When changing an existing modifier, prefer a `TRY_INJECT:` block containing only `desired final value - verified vanilla value`; omit `game_data` and every unchanged field. This preserves unrelated vanilla updates and lets other mods contribute independent deltas. A vanilla `-0.25` penalty changed to `-0.40`, for example, should inject `-0.15` rather than replace the complete modifier.
+
+Price resource entries such as `gold`, `scaled_gold`, and `government_power` can likewise be adjusted with injected deltas, and fields absent from the base object can be appended directly. Existing structural bounds such as `min_scale` and `max_scale` are not assumed additive: changing those values, removing fields, or rewriting nested logic still requires `TRY_REPLACE:`. Scripted effects and triggers also remain replacement-only in practice.
+
+For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts
 
@@ -116,9 +139,18 @@ EU5's scripting language revolves around a few core concepts: Triggers, Effects,
 
 Both triggers and effects can be *inline* (for simple operations) or *block* (for more complex logic) and are highly dependent on the current **scope**.
 
+Some triggers are parsed as simple assignments rather than general comparison expressions. For example, `building_category` only accepts `=` in the middle. Negate it with a boolean wrapper—`NOT = { building_category = government_category }`—instead of writing `building_category != government_category`; the latter produces a script-system compile error.
+
 ### 5.2. Scopes and Scope Links
 
 A **scope** refers to the specific game object (e.g., a country, a character, a location) that a script is currently focused on. **Scope links** are used to access data from or apply effects to other scopes. For example, `c:FRA.gold` would access the treasury of the country with the tag FRA.
+
+A scripted trigger's valid entry scope is determined by its complete body, not
+by the scope of one nested condition. Vanilla `is_gaelic_clans`, for example,
+starts in pop scope, checks pop culture and foreign-building state, and only
+then follows `owner` to inspect country estate privileges. Calling it directly
+from country scope makes that `owner` link invalid. When the caller already has
+country scope, use the underlying country-valid privilege triggers instead.
 
 ### 5.3. Script Values
 
@@ -179,11 +211,21 @@ my_event.1.a: "Option button text"
 my_event.1.a.tt: "Tooltip description shown on hover."
 ```
 
-### 6.2. Countries
+### 6.2. Goods Demand Groups
+
+In EU5 1.3.11, the goods demand key `upper` applies to `nobles`, `clergy`, `burghers`, `laborers`, and `soldiers`; it does not apply to `peasants` or `tribesmen`. This membership applies to both `demand_add` and `demand_multiply`. Demand calibration tools must expand the group before calculating net vanilla demand, otherwise compensating `demand_add` values for laborers and soldiers will be too high.
+
+### 6.3. Pop-Demand Development Controls
+
+EU5 applies development to pop demand through two independent layers. `NPop.DEVELOPMENT_SCALE_ON_DEMAND` is the global multiplier scale; vanilla `0.05` produces a multiplier of `(1 + development / 20)`. Individual goods can also declare `development_threshold`, which prevents their pop demand below that location-development gate.
+
+For a development-independent calibration baseline, both layers must be disabled. Override the define with `NPop = { DEVELOPMENT_SCALE_ON_DEMAND = 0 }`, then use late goods `INJECT` entries whose negative `development_threshold` exactly cancels each loaded positive threshold. Compatibility-mod goods require separate handling; for example, Prosper or Perish adds a threshold to `victuals` even after all vanilla thresholds have been neutralized.
+
+### 6.4. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
 
-### 6.3. Localization
+### 6.5. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
@@ -201,6 +243,25 @@ EU5 includes a powerful map editor for modifying the game world. This tool allow
 
 Flags in EU5 are generated dynamically through a scripted coat of arms system, a significant change from the static `.tga` files of EU4. This allows for flags to change based on triggers and game conditions. [12]
 
+### 7.4. CMF/CMM Setting Registration
+
+CMM panel membership is rebuilt from each mod's registration effect. During
+`_cmm_register_group`, CMM clears the group's `cmm_group_setting_keys_*` list
+before registered settings are appended. A compatibility layer can therefore
+hide a removed feature by replacing the mod registration effect and omitting
+that setting ID and callback; the obsolete entry also disappears when an older
+save is loaded. Do not write directly to CMM's internal maps. Independently
+hard-disable the removed gameplay trigger so stale alias variables cannot
+reactivate the feature outside the UI.
+
+Removing a setting also requires removing every remaining read of its alias
+variable. EU5's variable validator only counts setters in reachable, used
+scripted objects; a setter left inside an unused effect or trigger does not
+prevent `Variable '...' is used but is never set`. Compatibility layers should
+prefer exact-path cleanup of obsolete script values and scripted GUIs: keep
+variable-free constant fallbacks where another parsed object still references a
+script value, and keep callbacks only for settings still registered.
+
 ## 8. Best Practices and Resources
 
 *   **Country pulse on_actions merge automatically**: For `monthly_country_pulse` and `yearly_country_pulse`, use the compact style `pulse = { on_actions = { my_dispatcher } }`. Duplicate pulse definitions merge their `on_actions`, so do not copy vanilla or framework entries just to preserve them.
@@ -209,7 +270,7 @@ Flags in EU5 are generated dynamically through a scripted coat of arms system, a
 *   **Market-keyed caches**: Market scopes do not support direct persistent `set_variable` / `change_variable` storage, but they can be used as keys in `global_variable_map`. For data whose identity is the market, update the map with `remove_from_global_variable_map = { name = cache key = scope:market_cache }` followed by `add_to_global_variable_map = { name = cache key = scope:market_cache value = ... }`, then read it back with `global_variable_map(cache|scope:market_cache)` in script or `GetVariableFromGlobalVariableMap('cache', Market.MakeScope)` in GUI. `add_to_global_variable_map` is insert-only: if the key already exists, the old value is silently kept. Do not store SOL market data on the market center location as an artificial cache owner.
 *   **Market POP demand triggers**: `demands_goods_by_pops = goods:<good>` is a shortage trigger, not a generic consumed-good test. When a script already has the market scope cached, check the good scope instead: `goods:<good> = { is_demanded_in_market_by_pops = scope:<market> }`.
 *   **GUI-only display caches**: Jomini's unused-variable validation does not count GUI/localization-only reads of scope variables or `global_variable_map` entries. Use `global_variable_map` when keyed storage is the right model, but also read the scope variable or map name in a live script path. For display-only map flags, a local-variable counter or no-op script-side read using `global_variable_map(name|scope:key)` is enough.
-*   **Situation panel mapmode selection**: Situation definitions can define data-map coloring (`is_data_map`, `map_color`, `tooltip`, `legend_key`) and script setup via `on_start`, but the references do not expose a situation-side field for selecting a separate custom mapmode. To select a custom mapmode when the panel opens, add a zero-size `widget` to the relevant `situation_panel`, gate it with `LateralView.IsShown` so visibility flips on each reopen, and in a `_show` state call `on_start = "[GetMapMode('<mapmode>').SetMapMode]"`. Do not rely on `datacontext = "[GetMapMode('<mapmode>')]"` plus `on_start = "[MapMode.SetMapMode]"`; `state.on_start` does not inherit that datacontext and logs a missing MapMode context error.
+*   **Situation panel mapmode selection**: Situation definitions can define data-map coloring (`is_data_map`, `map_color`, `tooltip`, `legend_key`) and script setup via `on_start`, but the references do not expose a situation-side field for selecting a separate custom mapmode. Add a zero-size `widget` directly to the situation-specific `situation_panel`; in a state with `trigger_on_create = yes`, call `on_start = "[PdxGuiWidget.PushMapModeOverride('<mapmode>')]"`. A situation child can be instantiated after its parent is already visible, so `_show` is not a reliable construction callback. The widget-owned override is removed with the widget when that panel is left, restoring the prior mapmode instead of globally forcing the default mapmode. Vanilla GUI uses `PushMapModeOverride` without explicit `PopMapModeOverride`, confirming that cleanup is tied to the widget lifecycle.
 *   **Modifier icons**: Modifier tooltip and modifier-row icons are resolved through `main_menu/common/modifier_icons/*.txt`, with blocks like `local_pop_demand = { positive = "gfx/..." negative = "gfx/..." }`. Do not try to put icon fields on `add_location_modifier` or the static modifier block. For a custom static modifier, map the static modifier id; only map the contained modifier type if that key is not already defined by vanilla or another loaded mod. Duplicate `modifier_icons` keys are rejected with `Duplicated key ... will not be created`.
 *   **Mapmode DDS icons**: `MapMode.GetIcon` resolves custom mapmode art by ID from `main_menu/gfx/interface/icons/map_modes/<map_mode_id>.dds`. Match reference DDS exports closely: DXT5 is fine, but include a full mip chain down to 1x1 and a Clausewitz-style 2D DDS header with `dwDepth = 1`; direct GUI texture widgets may tolerate incomplete mips, while the mapmode icon resolver may not.
 *   **Mapmode default pinning**: Do not add `pinned_by_default = yes/no` to `in_game/gfx/map/map_modes/*.txt` definitions unless a current official schema verifies that field. EU5 1.3.4 exposes `MapMode.IsMapModePinnedByDefault` to GUI, but `pinned_by_default = yes` in SOL's custom mapmode produced `Malformed token: yes` during file load. Keep `category` and `index` for discoverability and let the UI/user handle pin state.

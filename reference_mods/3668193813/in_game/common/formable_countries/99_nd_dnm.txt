@@ -1,0 +1,194 @@
+﻿# Danubian Monarchy (DNM) -- the Habsburg dilemma made playable.
+#
+# A brand-new formable, NOT a vanilla wrapper. Formable from HAB (Austria),
+# HUN (Hungary), or BOH (Bohemia) via the shared-tag + origin-variable
+# pattern (cf. nd_rom_byz, which keys advances off nd_rom_byz_formed). After
+# the tag switches to DNM the engine no longer knows which crown you came
+# from, so form_effect records it in nd_dnm_origin_* for the creator's
+# formation event and the destiny/disaster chains to read.
+#
+# Forming this is an irreversible strategic fork: it EJECTS you from the
+# Holy Roman Empire and grants empire rank in the same effect. HRE members
+# are engine-blocked from empire rank (international_organization/hre.txt:
+# "block_from_change_to_empire_rank = yes"), so the HRE exit must precede /
+# accompany the rank change. You surrender the imperial crown to forge a
+# centralized multi-ethnic Danube state. No time gate -- pacing comes from
+# the work of unioning/absorbing two great powers, never a date check.
+DNM_f = {
+
+	level = 4
+	required_locations_fraction = 0.5
+	rule = plausible
+
+	capital_required = no
+	potential_requires_own = yes
+
+	# Habsburg sphere only: ruling Habsburg dynasty, OR you are / once were
+	# any of the three constituent crowns. Catholic is mandatory (the
+	# Danubian Monarchy is the Catholic dynastic counter-project to a
+	# Protestant-fractured Reich).
+	potential = {
+		religion = religion:catholic
+		OR = {
+			ruler = { dynasty = dynasty:habsburg_dynasty }
+			has_or_had_tag = HAB
+			has_or_had_tag = HUN
+			has_or_had_tag = BOH
+		}
+	}
+
+	# No time gate at all. You must directly OWN Vienna (the imperial seat,
+	# regardless of origin) AND own your origin crown's capital. The other
+	# two crowns are each satisfied symmetrically by: you are them / they no
+	# longer exist / they are your subject or personal-union junior (you
+	# senior). is_subject_or_below_of covers vassals AND PU juniors -- no
+	# forced annexation (annexation kills the Ausgleich payoff).
+	allow = {
+		religion = religion:catholic
+		country_rank = country_rank:rank_kingdom
+
+		# The imperial seat is always required, whatever your origin.
+		owns = location:vienna
+
+		# Your origin crown's capital. Vienna is already required above
+		# unconditionally, so the HAB origin branch is just the origin
+		# check (no second `owns = location:vienna`, which double-listed
+		# Vienna in the public Atlas "must own" panel).
+		OR = {
+			OR = { has_or_had_tag = HAB tag = HAB }
+			AND = {
+				OR = { has_or_had_tag = HUN tag = HUN }
+				owns = location:buda
+			}
+			AND = {
+				OR = { has_or_had_tag = BOH tag = BOH }
+				owns = location:prague
+			}
+		}
+
+		# Austrian crown (Vienna): you / gone / your subject / your PU junior.
+		trigger_if = {
+			limit = {
+				country_exists = c:HAB
+				this != c:HAB
+			}
+			custom_tooltip = {
+				text = DNM_f_trigger_hab
+				OR = {
+					tag = HAB
+					has_or_had_tag = HAB
+					NOT = { country_exists = c:HAB }
+					c:HAB = { is_subject_or_below_of = root }
+				}
+			}
+		}
+
+		# Hungarian crown (Buda): you / gone / your subject / your PU junior.
+		trigger_if = {
+			limit = {
+				country_exists = c:HUN
+				this != c:HUN
+			}
+			custom_tooltip = {
+				text = DNM_f_trigger_hun
+				OR = {
+					tag = HUN
+					has_or_had_tag = HUN
+					NOT = { country_exists = c:HUN }
+					c:HUN = { is_subject_or_below_of = root }
+				}
+			}
+		}
+
+		# Bohemian crown (Prague): you / gone / your subject / your PU junior.
+		trigger_if = {
+			limit = {
+				country_exists = c:BOH
+				this != c:BOH
+			}
+			custom_tooltip = {
+				text = DNM_f_trigger_boh
+				OR = {
+					tag = BOH
+					has_or_had_tag = BOH
+					NOT = { country_exists = c:BOH }
+					c:BOH = { is_subject_or_below_of = root }
+				}
+			}
+		}
+	}
+
+	name = DNM
+	flag = DNM
+	adjective = DNM_ADJ
+	tag = DNM
+	color = map_DNM
+
+	# Danubian pool: Austrian hereditary lands + Bohemian crown +
+	# Hungarian crown. 0.5 fraction over this 16-area pool.
+	areas = {
+		# Austrian hereditary lands
+		austria_area          # Lower Austria (Vienna)
+		upper_austria_area    # Upper Austria
+		styria_area           # Styria
+		carinthia_area        # Carinthia
+		slovenia_area         # Carniola
+		tirol_area            # Tyrol and Trentino
+		# Bohemian crown
+		bohemia_area          # Bohemia (Prague)
+		moravia_area          # Moravia
+		silesia_area          # Silesia
+		# Hungarian crown
+		transdanubia_area     # Transdanubia (Buda)
+		north_alfold_area     # North Alfold
+		south_alfold_area     # South Alfold
+		slovakia_area         # Upper Hungary / Slovakia
+		transylvania_area     # Transylvania
+		croatia_area          # Croatia
+		slavonia_area         # Slavonia
+	}
+
+	form_effect = {
+		# Record the origin crown so the formation event, destiny tree,
+		# and disaster chains can branch on it after the tag switch.
+		# Wrapped in hidden_effect: form_effect renders a confirmation
+		# tooltip and a bare set_variable would clutter it.
+		hidden_effect = {
+			if = {
+				limit = { OR = { tag = HUN has_or_had_tag = HUN } }
+				set_variable = nd_dnm_origin_hun
+			}
+			else_if = {
+				limit = { OR = { tag = BOH has_or_had_tag = BOH } }
+				set_variable = nd_dnm_origin_boh
+			}
+			else = {
+				set_variable = nd_dnm_origin_hab
+			}
+		}
+
+		# THE FORMATION COST: leave the Holy Roman Empire. HRE members are
+		# engine-blocked from empire rank, so this must happen before the
+		# rank change. Surrendering the imperial crown is the difficulty.
+		if = {
+			limit = { is_member_of_international_organization = international_organization:hre }
+			every_owned_location = {
+				limit = { is_owned_by_international_organization = international_organization:hre }
+				remove_from_international_organization = international_organization:hre
+			}
+			international_organization:hre = {
+				remove_country_from_international_organization = root
+			}
+		}
+
+		# Grant empire rank in the same effect (only possible now that we
+		# are outside the HRE).
+		if = {
+			limit = { country_rank_level < 4 }
+			set_country_rank_effect = { rank = country_rank:rank_empire }
+		}
+
+		trigger_event_non_silently = nd_dnm.1
+		add_stability = stability_severe_bonus
+	}
+}

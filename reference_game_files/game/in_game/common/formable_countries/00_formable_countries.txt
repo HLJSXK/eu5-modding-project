@@ -342,60 +342,127 @@ IRE_f = {
 	required_locations_fraction = 0.75
 	rule = historical
 
+	# Generic path. Mutually exclusive with the two IO variants: only shows when the country
+	# belongs to neither the High Kingship nor the Lordship of Ireland.
 	potential = {
 		OR = {
 			culture = { has_culture_group = culture_group:hibernian_group }
 			tag = PLE
 		}
+		NOT = { is_member_of_international_organization_of_type = { type = high_kingship } }
+		NOT = { is_member_of_international_organization = international_organization:lordship_of_ireland }
 	}
 
 	allow = {
-		OR = {
-			AND = {
-				#allow if they're the leader of a high_kingship in the Ireland region
-				is_member_of_international_organization_of_type = { type = high_kingship }
-				any_international_organizations_member_of = {
-					count = all
-					filter = {
-						international_organization_type = international_organization_type:high_kingship
-						has_variable = high_kingship_region
-						var:high_kingship_region = region:ireland_region
-					}
-					leader_country ?= root
-				}
-			}
-			custom_tooltip = {
-				text = neither_highkingship_nor_lordship_exist_tt
-				NOT = {
-					any_international_organization = {
-						OR = {
-							international_organization_type = international_organization_type:lordship_of_ireland
-							international_organization_type = international_organization_type:high_kingship
-						}
-					}
-				}
-			}
-			custom_tooltip = {
-				#allow if they're the sole remaining member of the Ireland High Kingship
-				text = IRE_f_sole_high_kingship_tt
-				is_member_of_international_organization_of_type = { type = high_kingship }
-				any_international_organizations_member_of = {
-					count = all
-					filter = {
-						international_organization_type = international_organization_type:high_kingship
-						has_variable = high_kingship_region
-						var:high_kingship_region = region:ireland_region
-					}
-					total_members = 1
-				}
-			}
-		}
 		custom_tooltip = {
-			text = IRE_f_lordship_tt
-			not = { is_member_of_international_organization = international_organization:lordship_of_ireland }
+			text = neither_highkingship_nor_lordship_exist_tt
+			NOT = {
+				any_international_organization = {
+					OR = {
+						international_organization_type = international_organization_type:lordship_of_ireland
+						international_organization_type = international_organization_type:high_kingship
+					}
+				}
+			}
 		}
 	}
-	
+
+	name = IRE
+	flag = IRE
+	adjective = IRE_ADJ
+	tag = IRE
+	color = map_IRE
+
+	regions = {
+		ireland_region
+	}
+	form_effect = {
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}
+	}
+}
+
+IRE_high_kingship_f = {
+
+	level = 2
+	required_locations_fraction = 0.5
+	rule = historical
+
+	capital_required = no
+	potential_requires_own = no
+
+	# Shown only to High Kingship members. The leader-of-the-IO check lives in allow.
+	potential = {
+		is_member_of_international_organization_of_type = { type = high_kingship }
+	}
+
+	allow = {
+		custom_tooltip = {
+			text = IRE_high_kingship_f_leader_tt
+			any_international_organizations_member_of = {
+				count = all
+				filter = {
+					international_organization_type = international_organization_type:high_kingship
+					has_variable = high_kingship_region
+					var:high_kingship_region = region:ireland_region
+				}
+				leader_country ?= root
+			}
+		}
+	}
+
+	name = IRE
+	flag = IRE
+	adjective = IRE_ADJ
+	tag = IRE
+	color = map_IRE
+
+	regions = {
+		ireland_region
+	}
+	form_effect = {
+		# Leave the High Kingship before rank change to avoid block_from_change_to_kingdom_rank
+		every_international_organizations_member_of = {
+			limit = {
+				international_organization_type = international_organization_type:high_kingship
+				has_variable = high_kingship_region
+				var:high_kingship_region = region:ireland_region
+			}
+			remove_country_from_international_organization = root
+		}
+
+		if = {
+			limit = { country_rank_level < 3 }
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}
+	}
+}
+
+IRE_lordship_of_ireland_f = {
+
+	level = 2
+	required_locations_fraction = 0.5
+	rule = historical
+
+	capital_required = no
+	potential_requires_own = no
+
+	potential = {
+		is_member_of_international_organization = international_organization:lordship_of_ireland
+	}
+
+	# You are the Lord of Ireland — the Anglo-Norman path to a sovereign Irish kingdom.
+	allow = {
+		custom_tooltip = {
+			text = IRE_lordship_of_ireland_f_leader_tt
+			international_organization:lordship_of_ireland = {
+				leader_country ?= root
+			}
+		}
+	}
+
 	name = IRE
 	flag = IRE
 	adjective = IRE_ADJ
@@ -411,24 +478,10 @@ IRE_f = {
 			destroy_international_organization = { target = international_organization:lordship_of_ireland }
 		}
 
-		# Leave the High Kingship before rank change to avoid block_from_change_to_kingdom_rank
-		if = {
-			limit = { is_member_of_international_organization_of_type = { type = high_kingship } }
-			every_international_organizations_member_of = {
-				limit = {
-					international_organization_type = international_organization_type:high_kingship
-					has_variable = high_kingship_region
-					var:high_kingship_region = region:ireland_region
-				}
-				remove_country_from_international_organization = root
-			}
-		}
-
 		if = {
 			limit = { country_rank_level < 3 }
 			set_country_rank_effect = { rank = country_rank:rank_kingdom }
 		}
-
 	}
 }
 
@@ -1051,7 +1104,12 @@ SAR_f = {
 		sardinia_area
 	}
 	form_effect = {
-		set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		if = {
+			limit = {
+				NOT = { is_member_of_international_organization = international_organization:hre }
+			}
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}
 	}
 }
 
@@ -1081,7 +1139,12 @@ SAR_piedmont_f = {
 		piemonte_area
 	}
 	form_effect = {
-		set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		if = {
+			limit = {
+				NOT = { is_member_of_international_organization = international_organization:hre }
+			}
+			set_country_rank_effect = { rank = country_rank:rank_kingdom }
+		}
 	}
 }
 
@@ -4781,7 +4844,7 @@ PON_f = {
 }
 
 TUR_f = {
-	level = 3
+	level = 4
 	rule = historical
 
 	potential = {

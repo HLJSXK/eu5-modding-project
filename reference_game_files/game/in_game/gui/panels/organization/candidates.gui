@@ -199,17 +199,28 @@ types OrganizationPanel
 										size = { 97% 72 }
 										parentanchor = hcenter
 										using = layoutpolicy_expanding
-										datacontext = "[LeaderCandidate.GetCandidate.GetGovernment.GetRulerOrRegent]"
-										# size = { 40 40 }
+										# Character scope = who would actually take the throne: the heir if this candidate
+										# is the sitting High King, otherwise their ruler. Drives the portrait ([Character]).
+										datacontext = "[LeaderCandidate.GetProspectiveRuler]"
 										datacontext = "[LeaderCandidate.GetCandidate]"
 
 										blockoverride "character_header_left_extra" {
 											country_flag_very_small = {
+												size = { 45 30 }
 												datacontext = "[LeaderCandidate.GetCandidate]"
 											}
 										}
 										blockoverride "name_highlight" {}
-										blockoverride "character_entry_name_sort_by_highlight" {}
+										# "(Us)" in white next to the name when this candidate is the player.
+										blockoverride "character_entry_name_sort_by_highlight" {
+											text_single = {
+												visible = "[LeaderCandidate.GetCandidate.IsPlayer]"
+												autoresize = yes
+												margin_left = 6
+												default_format = "#color_white"
+												raw_text = "(Us)"
+											}
+										}
 										
 										blockoverride "character_getreligion_icon" {
 											visible = no 
@@ -218,11 +229,18 @@ types OrganizationPanel
 											visible = no
 										}
 
-										blockoverride "portrait_datacontext" {
-											datacontext = "[LeaderCandidate.GetCandidate.GetGovernment.GetRulerOrRegent]"
-										}
-
 										blockoverride "character_gettraits_datamodel" {}
+
+										blockoverride "character_name_text" {
+											raw_text = "[LeaderCandidate.GetCandidate.GetLongNameWithNoTooltip]"
+										}
+										blockoverride "character_abilities_visible" {
+											visible = no
+										}
+										blockoverride "artist_abilities_visible" {
+											visible = no
+										}
+										blockoverride "bottom_content_divider" {}
 	
 										# datacontext = "[LeaderCandidate.GetCandidate.GetGovernment.GetRulerOrRegent]"
 										# size = { 40 40 }
@@ -249,43 +267,125 @@ types OrganizationPanel
 														fontsize = 14
 													}
 
+													# Only the votes-in-favor count is colored — green once at/above the win
+													# threshold, red while below. The "/total" stays the default color.
 													text_single = {
 														minimumsize = {80 15}
 														autoresize = no
 														size = { -1 15}
 														fontsize = 12
 														align = right|nobaseline
-														raw_text = "[LeaderCandidate.GetVotesAmount|0]/[InternationalOrganizationsView.GetTotalVotes|0]"
+														visible = "[GreaterThanOrEqualTo_CFixedPoint(LeaderCandidate.GetVotesAmount, InternationalOrganizationsView.GetVotesNeededToWin)]"
+														raw_text = "#G [LeaderCandidate.GetVotesAmount|0]#!/[InternationalOrganizationsView.GetTotalVotes|0]"
 													}
-												}
+													text_single = {
+														minimumsize = {80 15}
+														autoresize = no
+														size = { -1 15}
+														fontsize = 12
+														align = right|nobaseline
+														visible = "[LessThan_CFixedPoint(LeaderCandidate.GetVotesAmount, InternationalOrganizationsView.GetVotesNeededToWin)]"
+														raw_text = "#R [LeaderCandidate.GetVotesAmount|0]#!/[InternationalOrganizationsView.GetTotalVotes|0]"
+													}
+}
 
-												icon = {
+												# Far-right vote button: casts the player's vote directly for THIS candidate
+												# (sets the resolution 'vote' target), unlike the header button's chooser. The
+												# action's own enabled state greys it out when the player cannot vote for them.
+												header_action_button_left = {
 													size = { 32 32 }
-													texture = "gfx/interface/icons/institutions/legalism.dds"
-													texture_density = 2
-													# using = overlay_color_light_blue
-													alpha = 1
+													blockoverride "button_icon_stretch_sprite" {}
+													blockoverride "header_button_frame_inner" { visible = no }
+													blockoverride "header_button_icon_size" { size = { 32 32 } }
+													blockoverride "header_button_text_layout" {}
+													blockoverride "icon_overlay" {}
+													blockoverride "icon_texture" {
+														texture = "gfx/interface/icons/institutions/legalism.dds"
+													}
+													name = "candidate vote button"
+													title = "IO_VOTE_FOR_CANDIDATE_BUTTON"
+													description = "vote_in_election_desc"
+													actor = "[InternationalOrganizationsView.GetPlayer]"
+													parameter = {
+														parameter_name = "recipient"
+														parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+													}
+													parameter = {
+														parameter_name = "vote"
+														parameter_value = "[LeaderCandidate.GetCandidate]"
+													}
+													left_action = { action_name = "[InternationalOrganizationsView.GetInternationalOrganization.GetLeadershipElectionResolution.GetKey]" }
 												}
 											}
 										}
 
+										# Drop the (now-empty) trait widget for this panel so the voter flags can take the
+										# full lower-row width, then render them in the right slot — the slot that actually
+										# lays out (the trait slot's inner hbox has no layoutpolicy and starves its child).
+										# With the trait widget gone, this is the only expanding child, so it fills the row.
+										# Fixed-size items (no auto-sizing vbox) keep the flowcontainer out of the resize
+										# loop that previously overflowed the stack.
+										blockoverride "character_entry_bottom_traits" {}
 										blockoverride "bottom_content_extra_right" {
 											widget = {
 												layoutpolicy_horizontal = expanding
-												size = { -1 30 }
-	
+												size = { -1 34 }
+
 												flowcontainer = {
 													parentanchor = right|vcenter
-													position = {-3 0}
+													position = { -3 0 }
+													spacing = 4
 													datamodel = "[DataModelFirst(LeaderCandidate.GetVoters, '(int32)13' )]"
-	
+
 													item = {
-														country_flag_very_small = {
-															blockoverride "tooltip" {
-																tooltip_enabled = "[Country.IsValid]"
-																tagtooltip_enabled = no
+														widget = {
+															size = { 32 34 }
+															country_flag_very_small = {
+																size = { 30 20 }
+																parentanchor = top|hcenter
+																blockoverride "tooltip" {
+																	tooltip_enabled = "[Country.IsValid]"
+																	tagtooltip_enabled = no
+																	tooltipwidget = {
+																		using = IOVotingReasonsTooltip
+																	}
+																}
+															}
+															# how many votes this voter carries for the candidate. Hovering the number shows the
+															# vote-weight breakdown (as elsewhere); the player's own vote is colored green.
+															widget = {
+																parentanchor = bottom|hcenter
+																size = { 30 13 }
+																using = bg_text_mask_container_dark_blue
 																tooltipwidget = {
-																	using = IOVotingReasonsTooltip
+																	ContextualTooltipType = {
+																		blockoverride "title_text" {
+																			text = "VOTE_NUMBER"
+																		}
+																		blockoverride "tooltip_content" {
+																			TooltipStringPairList = {
+																				textcontext = "[InternationalOrganizationsView.GetVotesForVoterBreakdown(Country.Self)]"
+																			}
+																		}
+																	}
+																}
+																text_single = {
+																	size = { 30 13 }
+																	autoresize = no
+																	align = center|nobaseline
+																	fontsize = 10
+																	visible = "[Country.IsPlayer]"
+																	default_format = "#color_green"
+																	raw_text = "[InternationalOrganizationsView.GetVotesForVoter(Country.Self)|0]"
+																}
+																text_single = {
+																	size = { 30 13 }
+																	autoresize = no
+																	align = center|nobaseline
+																	fontsize = 10
+																	visible = "[Not(Country.IsPlayer)]"
+																	default_format = "#color_white"
+																	raw_text = "[InternationalOrganizationsView.GetVotesForVoter(Country.Self)|0]"
 																}
 															}
 														}

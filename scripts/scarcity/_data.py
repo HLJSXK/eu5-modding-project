@@ -42,7 +42,7 @@ INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
     ("household",         ["furniture"]),
     ("staple",            ["wheat", "rice", "millet", "maize", "potato", "legumes"]),
     ("condiments",        ["sugar", "salt", "olives"]),
-    ("luxury_food",       ["wild_game", "victuals", "fruit"]),  # wild_game primary here; secondary in DEMAND_GROUPS protein
+    ("luxury_food",       ["wild_game", "fruit"]),  # wild_game primary here; secondary in DEMAND_GROUPS protein
     ("protein",           ["fish", "livestock"]),               # fish primary here; secondary in DEMAND_GROUPS luxury_food
     ("intoxicants",       ["wine", "beer", "liquor", "tobacco"]),
     ("luxury_drinks",     ["tea", "coffee", "cocoa"]),
@@ -55,8 +55,6 @@ INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
     ("mounts",            ["horses", "elephants"]),
     ("knowledge",         ["paper", "books"]),                  # paper primary here; secondary in DEMAND_GROUPS household
 ]
-
-COMPAT_GOODS = frozenset(["victuals"])
 
 GOOD_TO_IND_GROUP = {g: grp for grp, goods in INDICATOR_GROUPS for g in goods}
 IND_GROUP_SIZE    = {grp: len(goods) for grp, goods in INDICATOR_GROUPS}
@@ -87,7 +85,7 @@ DEMAND_GROUPS: List[Tuple[str, List[str]]] = [
     ("luxury_drinks",     ["tea", "coffee",
                            "wine",     # secondary (primary: intoxicants)
                            "cocoa"]),
-    ("luxury_food",       ["wild_game", "victuals", "fruit",
+    ("luxury_food",       ["wild_game", "fruit",
                            "fish"      # secondary (primary: protein)
                            ]),
     ("luxury_goods",      ["fine_cloth",  # secondary (primary: standard_clothing)
@@ -124,7 +122,7 @@ GOOD_NAMES_ZH: dict = {
     "potato": "土豆", "legumes": "豆类", "olives": "橄榄", "fruit": "水果",
     "fish": "鱼类", "wild_game": "野味", "livestock": "牲畜",
     "horses": "马匹", "elephants": "大象", "weaponry": "武器", "firearms": "火器",
-    "coal": "煤炭", "salt": "盐", "victuals": "口粮",
+    "coal": "煤炭", "salt": "盐",
     "lumber": "木材", "masonry": "砖石", "tools": "工具", "pottery": "陶器",
     "furniture": "家具", "porcelain": "瓷器", "lacquerware": "漆器",
     "marble": "大理石", "glass": "玻璃",
@@ -143,7 +141,7 @@ GOOD_NAMES_EN: dict = {
     "potato": "Potato", "legumes": "Legumes", "olives": "Olives", "fruit": "Fruit",
     "fish": "Fish", "wild_game": "Wild Game", "livestock": "Livestock",
     "horses": "Horses", "elephants": "Elephants", "weaponry": "Weaponry", "firearms": "Firearms",
-    "coal": "Coal", "salt": "Salt", "victuals": "Victuals",
+    "coal": "Coal", "salt": "Salt",
     "lumber": "Lumber", "masonry": "Masonry", "tools": "Tools", "pottery": "Pottery",
     "furniture": "Furniture", "porcelain": "Porcelain", "lacquerware": "Lacquerware",
     "marble": "Marble", "glass": "Glass",

@@ -1,6 +1,7 @@
 ﻿# Map mode for population capacity per location.
-# Green = high capacity, Red = low capacity.
-# Uses modifier:local_population_capacity (in 1k), scaled 0–500 for factor (0-1).
+# Fixed full-range sequential scale: red = low, yellow = middle, green = high,
+# pale/cyan = high end. Uncolonized ownable land is included.
+# Uses the engine's final Population Capacity value for the location.
 
 @zoom_step_near = 2
 @data_gradient_alpha_inside = 1
@@ -13,8 +14,21 @@
 @data_edge_color_mult = 0
 @data_before_lighting_blend = 0.5
 @data_after_lighting_blend = 0.5
+@pp_population_capacity_very_low = 20
+@pp_population_capacity_low = 40
+@pp_population_capacity_middle = 60
+@pp_population_capacity_high = 80
+@pp_population_capacity_strong = 100
+@pp_population_capacity_very_strong = 125
+@pp_population_capacity_exceptional = 155
+@pp_population_capacity_cap = 200
+@pp_population_growth_negative_cap = -0.007
+@pp_population_growth_negative_mid = -0.002
+@pp_population_growth_neutral_low = -0.0005
+@pp_population_growth_neutral_high = 0.0005
+@pp_population_growth_positive_mid = 0.00375
 
-# ~0.9% monthly local growth modifier (script fraction) — full gradient + stripe threshold (tune with balance).
+# ~0.9% monthly local growth modifier (script fraction); stripe marks values at or above the display cap.
 @pp_population_growth_cap_stripe = 0.009
 
 pp_population_capacity = {
@@ -24,22 +38,145 @@ pp_population_capacity = {
 			value = rgb { 128 128 128 }
 		}
 		else_if = {
-			limit = { has_owner = yes }
+			limit = {
+				location_max_population < @pp_population_capacity_very_low
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MIN
+				max_color = define:NMapColors|MAP_COLOR_LOW
+				factor = {
+					value = location_max_population
+					divide = @pp_population_capacity_very_low
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_low
+			}
 			lerp = {
 				min_color = define:NMapColors|MAP_COLOR_LOW
+				max_color = define:NMapColors|MAP_COLOR_MID
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_very_low
+					divide = 20
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_middle
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MID
 				max_color = define:NMapColors|MAP_COLOR_HIGH
 				factor = {
-					value = modifier:local_population_capacity
-					divide = 500
+					value = location_max_population
+					subtract = @pp_population_capacity_low
+					divide = 20
 					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_high
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_HIGH
+				max_color = define:NMapColors|MAP_COLOR_MAX
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_middle
+					divide = 20
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_strong
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_MAX
+				max_color = define:NMapColors|MAP_COLOR_TOP
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_high
+					divide = 20
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_very_strong
+			}
+			lerp = {
+				min_color = define:NMapColors|MAP_COLOR_TOP
+				max_color = rgb { 245 245 245 }
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_strong
+					divide = 25
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_exceptional
+			}
+			lerp = {
+				min_color = rgb { 245 245 245 }
+				max_color = rgb { 170 235 255 }
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_very_strong
+					divide = 30
+					max = 1
+					min = 0
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				location_max_population < @pp_population_capacity_cap
+			}
+			lerp = {
+				min_color = rgb { 170 235 255 }
+				max_color = rgb { 70 210 255 }
+				factor = {
+					value = location_max_population
+					subtract = @pp_population_capacity_exceptional
+					divide = 45
+					max = 1
+					min = 0
 				}
 			}
 		}
 		else = {
-			value = rgb { 128 128 128 }
+			value = rgb { 70 210 255 }
 		}
 	}
-	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_0_20" color = define:NMapColors|MAP_COLOR_MIN }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_20_40" color = define:NMapColors|MAP_COLOR_LOW }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_40_60" color = define:NMapColors|MAP_COLOR_MID }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_60_80" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_80_100" color = define:NMapColors|MAP_COLOR_MAX }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_100_125" color = define:NMapColors|MAP_COLOR_TOP }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_125_155" color = rgb { 245 245 245 } }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_RANGE_155_200" color = rgb { 170 235 255 } }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_CAPACITY_CAPPED" color = rgb { 70 210 255 } }
 	tooltip_key = {
 		if = { limit = { is_land = yes } value = MAPMODE_PP_POPULATION_CAPACITY_TT_LAND }
 		else = { value = MAPMODE_PP_POPULATION_CAPACITY_TT_WATER }
@@ -75,8 +212,8 @@ pp_population_capacity = {
 }
 
 # Map mode for local population growth modifier per location.
-# Heatmap: 0 to ~0.9% (0.009) uses the full gradient; negatives clamp to red.
-# Stripes (secondary): local modifier at/above ~0.9%, same idea as vanilla Population stripes for over-cap.
+# Diverging traffic-light heatmap for local population growth: red = negative, yellow = near zero, green = positive.
+# Stripes (secondary): local modifier at or above the display cap first, then starving locations.
 
 pp_population_growth = {
 	map_color = {
@@ -86,15 +223,72 @@ pp_population_growth = {
 		}
 		else_if = {
 			limit = { has_owner = yes }
-			lerp = {
-				min_color = define:NMapColors|MAP_COLOR_LOW
-				max_color = define:NMapColors|MAP_COLOR_HIGH
-				factor = {
-					value = modifier:local_population_growth
-					divide = @pp_population_growth_cap_stripe
-					max = 1
-					min = 0
+			if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_negative_cap }
+				value = define:NMapColors|MAP_COLOR_MIN
+			}
+			else_if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_negative_mid }
+				lerp = {
+					min_color = define:NMapColors|MAP_COLOR_MIN
+					max_color = define:NMapColors|MAP_COLOR_LOW
+					factor = {
+						value = modifier:local_population_growth
+						add = 0.007
+						divide = 0.005
+						max = 1
+						min = 0
+					}
 				}
+			}
+			else_if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_neutral_low }
+				lerp = {
+					min_color = define:NMapColors|MAP_COLOR_LOW
+					max_color = define:NMapColors|MAP_COLOR_MID
+					factor = {
+						value = modifier:local_population_growth
+						add = 0.002
+						divide = 0.0015
+						max = 1
+						min = 0
+					}
+				}
+			}
+			else_if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_neutral_high }
+				value = define:NMapColors|MAP_COLOR_MID
+			}
+			else_if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_positive_mid }
+				lerp = {
+					min_color = define:NMapColors|MAP_COLOR_MID
+					max_color = define:NMapColors|MAP_COLOR_HIGH
+					factor = {
+						value = modifier:local_population_growth
+						subtract = 0.0005
+						divide = 0.00325
+						max = 1
+						min = 0
+					}
+				}
+			}
+			else_if = {
+				limit = { modifier:local_population_growth < @pp_population_growth_cap_stripe }
+				lerp = {
+					min_color = define:NMapColors|MAP_COLOR_HIGH
+					max_color = define:NMapColors|MAP_COLOR_MAX
+					factor = {
+						value = modifier:local_population_growth
+						subtract = @pp_population_growth_positive_mid
+						divide = 0.00525
+						max = 1
+						min = 0
+					}
+				}
+			}
+			else = {
+				value = define:NMapColors|MAP_COLOR_MAX
 			}
 		}
 		else = {
@@ -109,8 +303,20 @@ pp_population_growth = {
 			}
 			value = rgb { 35 35 42 }
 		}
+		else_if = {
+			limit = {
+				has_owner = yes
+				province = { is_starving = yes }
+			}
+			value = define:NMapColors|POPULATION_STARVING_COLOR_STRIPE
+		}
 	}
-	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_EXTREME_DEFICIT" color = define:NMapColors|MAP_COLOR_MIN }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_DEFICIT" color = define:NMapColors|MAP_COLOR_LOW }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_NEUTRAL" color = define:NMapColors|MAP_COLOR_MID }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_GOOD" color = define:NMapColors|MAP_COLOR_HIGH }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_EXCEPTIONAL" color = define:NMapColors|MAP_COLOR_MAX }
+	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_STARVING" color = define:NMapColors|POPULATION_STARVING_COLOR_STRIPE }
 	legend_key = { desc = "MAPMODE_PP_POPULATION_GROWTH_STRIPE" color = rgb { 35 35 42 } }
 	tooltip_key = {
 		if = { limit = { is_land = yes } value = MAPMODE_PP_POPULATION_GROWTH_TT_LAND }

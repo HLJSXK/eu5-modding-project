@@ -1,0 +1,333 @@
+﻿##############################
+# Dalriada -- Historical Gaelic Institutions (revived)
+##############################
+# Five neo-traditional offices of the restored Dal Riata. Real institutions
+# of the Gaelic and Insular world (Senchus fer nAlban, Brehon law, the
+# Council of the Isles at Finlaggan, buannacht quartering, and the Columban
+# paruchia of Iona), reconstituted by the revived sea-kingdom.
+#
+# The auto_modifier grants 2 slots at formation; the capital adds 1 more,
+# so the player picks 3 of these 5 institutions to maintain. Each picks
+# a distinct estate alignment and gameplay axis:
+#
+#  - Senchus fer nAlban       (naval levy of the Cenela; crown / peasants)
+#  - Brehon Law Court         (hereditary jurists of customary law; clergy + nobles / crown)
+#  - Council of the Isles     (Finlaggan parliament of clan chiefs; nobles + clergy / crown)
+#  - Buannacht Quartering     (gallowglass billeting on tuath; nobles / peasants)
+#  - Paruchia of Iona         (Columban monastic federation; clergy / nobles)
+##############################
+
+# 1. Senchus fer nAlban -- the 7th-century census of households obliged to
+# furnish two seven-benched ships per twenty hearths to the over-king.
+# Revived as the levy register that translates the kingdom's island-and-
+# coast geography into permanent naval manpower. Working: more galleys
+# in the muster, a confident maritime presence. Decaying: the cenela
+# bicker over their share, peasants bear the rowing-tax without recompense.
+senchus_fer_nalban_bureaucracy = {
+	implementation_price = price:implement_bureaucracy_price
+	maintenance_price = price:maintain_bureaucracy_price
+	removal_price = price:remove_bureaucracy_price
+
+	potential = {
+		has_or_had_tag = DRD
+		has_game_rule = nd_bureaucracies_enabled
+	}
+
+	# The naval levy is meaningful only with a coast and a galley tradition.
+	# The Dal Riata heartland of Kintyre, the council seat at Islay, and the
+	# Antrim coast on the Irish side were the muster's geographic anchors.
+	allow = {
+		OR = {
+			owns = location:islay
+			owns = location:kintyre
+			owns = location:dunluce
+		}
+	}
+
+	estates_that_like = {
+		crown_estate
+	}
+	estates_that_dislike = {
+		peasants_estate
+	}
+
+	# Standing institutional reach: while the muster register is kept, the
+	# naval levy can be raised even from outside the heartland.
+	neutral_modifier = {
+		always_allow_navy_levies = yes
+	}
+
+	# Working as designed: the cenela honour the ship-quotas of the
+	# Senchus, the over-king's birlinn fleet sails on call, and the
+	# kingdom's prestige rests visibly on its sails.
+	positive_modifier = {
+		scale = { value = scope:maintenance }
+		global_navy_levy_size_modifier = 0.10
+		global_maritime_presence_modifier = 0.10
+		monthly_navy_tradition = 0.05
+	}
+
+	# Decaying: the muster falls into arrears, naval discipline collapses,
+	# and the rowing-burden falls visibly on the small tenants whose
+	# households were originally meant to share it.
+	negative_modifier = {
+		scale = {
+			value = 1
+			subtract = scope:maintenance
+		}
+		navy_tradition_decay = 0.002
+		peasants_estate_target_satisfaction = small_permanent_target_satisfaction_penalty
+	}
+}
+
+# 2. Brehon Law Court -- the breitheamh, hereditary jurists trained for
+# years in the Senchus Mor, who arbitrated disputes seated beneath the
+# open sky according to customary law rather than royal decree. Loved
+# by the learned class and tolerated by the chiefs whose disputes they
+# settled; resented by any centralising monarch who wishes the king's
+# court to be the only court.
+brehon_law_court_bureaucracy = {
+	implementation_price = price:implement_bureaucracy_price
+	maintenance_price = price:maintain_bureaucracy_price
+	removal_price = price:remove_bureaucracy_price
+	# Hereditary office of a learned class: harder to dismantle.
+	removal_price_modifier = {
+		value = country_economical_base
+		multiply = 0.004
+	}
+
+	potential = {
+		has_or_had_tag = DRD
+		has_game_rule = nd_bureaucracies_enabled
+	}
+
+	# Brehon authority operates wherever Gaelic is the language of the realm.
+	allow = {
+		culture.language = language:gaelic_language
+	}
+
+	estates_that_like = {
+		clergy_estate
+		nobles_estate
+	}
+	estates_that_dislike = {
+		crown_estate
+	}
+
+	# The court of the breitheamh sits parallel to the king's court; while
+	# it operates, the kingdom's customary tolerance is wider but the
+	# crown cannot run the cabinet without the learned estate.
+	neutral_modifier = {
+		clergy_estate_allowed_in_cabinet = yes
+		tolerance_own = 1
+	}
+
+	# Working as designed: customary arbitration absorbs grievances that
+	# would otherwise become rebellion, the Senchus Mor preserves the
+	# cohesion of the kin-groups, and clan disputes are settled in court
+	# rather than feud.
+	positive_modifier = {
+		scale = { value = scope:maintenance }
+		pop_join_rebel_threshold = -0.05
+		clergy_estate_target_satisfaction = small_permanent_target_satisfaction
+		cultural_tradition = 0.05
+	}
+
+	# Decaying: brehon families turn their offices into rent-seeking,
+	# legitimacy of royal decree erodes against parallel customary rulings,
+	# and the king's writ runs short of the local court's reach.
+	negative_modifier = {
+		scale = {
+			value = 1
+			subtract = scope:maintenance
+		}
+		monthly_legitimacy = -0.05
+		legislative_efficiency = -0.10
+	}
+}
+
+# 3. Council of the Isles -- Comhairle nan Eilean, the parliament that met
+# on Eilean na Comhairle at Finlaggan on Islay during the lordship's
+# centuries (c.1336-1493). Composed of four great nobles, four lesser
+# thanes, and four kinsmen of Clan Donald, presided over by the lord
+# himself. Strong restraint on royal power; in exchange, the chiefs
+# raise serious diplomatic and military weight on the kingdom's behalf.
+council_of_the_isles_bureaucracy = {
+	implementation_price = price:implement_bureaucracy_price
+	maintenance_price = price:maintain_bureaucracy_price
+	removal_price = price:remove_bureaucracy_price
+
+	potential = {
+		has_or_had_tag = DRD
+		has_game_rule = nd_bureaucracies_enabled
+	}
+
+	# The council historically met at Finlaggan on Islay; in the lordship's
+	# later years it also gathered at Ardtornish on Morvern. The institution
+	# can be revived only where one of these council seats lies in our hands.
+	allow = {
+		OR = {
+			owns = location:islay
+			owns = location:ardtornish
+		}
+	}
+
+	estates_that_like = {
+		nobles_estate
+		clergy_estate
+	}
+	estates_that_dislike = {
+		crown_estate
+	}
+
+	# A standing Finlaggan parliament: the realm gains a permanent
+	# representative organ even when the king would rather rule alone.
+	neutral_modifier = {
+		allow_estate_parliament = yes
+	}
+
+	# Working as designed: the council deliberates in good faith, the chiefs
+	# shoulder the kingdom's diplomatic and military business, and the
+	# parliament's debates are productive rather than obstructive.
+	positive_modifier = {
+		scale = { value = scope:maintenance }
+		parliament_base_support = 0.10
+		diplomatic_capacity = 1
+		nobles_estate_target_satisfaction = small_permanent_target_satisfaction
+	}
+
+	# Decaying: the chiefs deadlock on every measure, dynastic factions
+	# inside Clan Donald paralyse the council's agenda, and royal authority
+	# leaks into separatist intrigue.
+	negative_modifier = {
+		scale = {
+			value = 1
+			subtract = scope:maintenance
+		}
+		legislative_efficiency = -0.15
+		global_separatism = 0.10
+	}
+}
+
+# 4. Buannacht Quartering -- the late-medieval Gaelic system whereby
+# gallowglass and household troops (the "bonaghts") were quartered on the
+# tuath at the lord's word. Coinnmheadh in the Brehon corpus; "coyne and
+# livery" in the Anglo-Norman sources. The single most important tax of
+# late-medieval Ireland and the Western Highlands. Loved by the chiefs
+# whose retinues it fed; ruinous for the peasantry it fed off of.
+buannacht_quartering_bureaucracy = {
+	implementation_price = price:implement_bureaucracy_price
+	maintenance_price = price:maintain_bureaucracy_price
+	removal_price = price:remove_bureaucracy_price
+
+	potential = {
+		has_or_had_tag = DRD
+		has_game_rule = nd_bureaucracies_enabled
+	}
+
+	allow = {
+	}
+
+	estates_that_like = {
+		nobles_estate
+	}
+	estates_that_dislike = {
+		peasants_estate
+	}
+
+	# Quartering troops on the people is permanent infrastructure: the
+	# realm's host is kept on a war footing without paying it from the
+	# treasury, but at the structural cost of a smaller civilian base.
+	neutral_modifier = {
+		global_pop_food_consumption = 0.05
+	}
+
+	# Working as designed: the chiefs' household soldiery is fed and
+	# clothed by the country, the levy refills quickly between musters,
+	# and a strong military lord can demand the cess at will.
+	positive_modifier = {
+		scale = { value = scope:maintenance }
+		global_levy_size_modifier = 0.10
+		levy_recovery_modifier = 0.10
+		nobles_estate_target_satisfaction = small_permanent_target_satisfaction
+	}
+
+	# Decaying: the gallowglass become the law in their billets, the
+	# countryside is eaten bare, and the unrest the abuse causes spreads
+	# into open rebellion in the very tuatha that owe the cess.
+	negative_modifier = {
+		scale = {
+			value = 1
+			subtract = scope:maintenance
+		}
+		peasants_estate_target_satisfaction = small_permanent_target_satisfaction_penalty
+		monthly_rebel_growth = 0.0005
+		stability_decay = 0.00025
+	}
+}
+
+# 5. Paruchia of Iona -- the federation of monasteries founded from Iona
+# under the abbatial succession of Columba (Colum Cille), stretching
+# across Argyll, the Hebrides, and northern Ireland. The paruchia did
+# not take the territorial diocesan form of Roman Christianity; it was
+# a personal-and-monastic network through which scholarship, illuminated
+# manuscripts, and ecclesiastical authority flowed back to Iona itself.
+paruchia_of_iona_bureaucracy = {
+	implementation_price = price:implement_bureaucracy_price
+	maintenance_price = price:maintain_bureaucracy_price
+	removal_price = price:remove_bureaucracy_price
+
+	potential = {
+		has_or_had_tag = DRD
+		has_game_rule = nd_bureaucracies_enabled
+	}
+
+	# Iona is part of the Isle of Mull; the wider familia also reached
+	# south to Islay and Kintyre. The paruchia can revive only where one
+	# of its great houses still answers to us.
+	allow = {
+		OR = {
+			owns = location:mull
+			owns = location:islay
+			owns = location:kintyre
+		}
+	}
+
+	estates_that_like = {
+		clergy_estate
+	}
+	estates_that_dislike = {
+		nobles_estate
+	}
+
+	# A monastic federation reaches further than its territory: the
+	# kingdom's cultural prestige draws on Iona's standing across the
+	# wider Gaelic world.
+	neutral_modifier = {
+		cultural_influence = 0.10
+	}
+
+	# Working as designed: scriptoria copy the books, scholar-monks roam
+	# the sea-roads on peregrinatio, and Iona's federation forms a single
+	# network of learning under the abbot's seal.
+	positive_modifier = {
+		scale = { value = scope:maintenance }
+		global_clergy_max_literacy = 10
+		monthly_devotion = 0.03
+		global_pop_assimilation_speed_modifier = 0.10
+	}
+
+	# Decaying: the paruchia turns into hereditary lay-abbacies (the
+	# coarbs and erenaghs of late Gaelic Ireland), the great houses of
+	# the abbey are seized by lay families, and the chiefs who hold
+	# those abbacies look on the throne as their inferior.
+	negative_modifier = {
+		scale = {
+			value = 1
+			subtract = scope:maintenance
+		}
+		nobles_estate_target_satisfaction = small_permanent_target_satisfaction_penalty
+		global_separatism = 0.05
+		stability_decay = 0.00025
+	}
+}

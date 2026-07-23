@@ -6,13 +6,15 @@ Also optionally rewrites the comment blocks above each INJECT entry in
 z_SOL_pop_goods.txt so they reflect the actual computed net demand values.
 
 Usage:
-  python scripts/gen_demand_csv.py                    # generate CSV only
-  python scripts/gen_demand_csv.py --update-comments  # also rewrite comments
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_demand_csv.py                    # generate CSV only
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_demand_csv.py --update-comments  # also rewrite comments
 """
 
 import csv
+import io
 import re
 import sys
+import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -20,10 +22,9 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SIMULATOR_DIR = REPO_ROOT / "tools" / "sol_demand_simulator"
-sys.path.insert(0, str(SIMULATOR_DIR))
+sys.path.insert(0, str(REPO_ROOT))
 
-from parser import (
+from tools.sol_demand_simulator.parser import (
     INJECT_FILE,
     VANILLA_GOODS_DIR,
     _collect_brace_block,
@@ -34,13 +35,38 @@ from parser import (
     _read,
     load_demand_matrix,
 )
-from curve_designer import groups_for_good
-
 DATA_DIR = REPO_ROOT / "data"
 OUTPUT_CSV = DATA_DIR / "demand_price_table.csv"
+GOODS_WEIGHTS_CSV = DATA_DIR / "goods_weights.csv"
 
 # Raw EU5 pop types — commoners are NOT pre-aggregated here
 POP_TYPE_ORDER: List[str] = ["nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen"]
+
+
+def _fmt_comment_number(value: float, show_sign: bool = False) -> str:
+    """Preserve six significant digits without emitting 6+ decimal places."""
+    formatted = f"{value:+.6g}" if show_sign else f"{value:.6g}"
+    mantissa = formatted.split("e", 1)[0]
+    if "." not in mantissa or len(mantissa.rsplit(".", 1)[1]) <= 5:
+        return formatted
+
+    sign = "-" if value < 0 else "+" if show_sign else ""
+    coefficient, exponent = f"{abs(value):.5e}".split("e", 1)
+    coefficient = coefficient.rstrip("0").rstrip(".")
+    return f"{sign}{coefficient}e{int(exponent)}"
+
+
+def _load_good_groups() -> Dict[str, List[str]]:
+    groups: Dict[str, List[str]] = {}
+    with GOODS_WEIGHTS_CSV.open(encoding="utf-8-sig", newline="") as fh:
+        for row in csv.DictReader(fh):
+            groups.setdefault(row["good"], []).append(row["group"])
+    return groups
+
+
+def _read_text_exact(path: Path) -> str:
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return f.read()
 
 
 # ---------------------------------------------------------------------------
@@ -54,10 +80,11 @@ def compute_demand_table() -> List[Dict]:
     group so every group membership is visible in the table.
     """
     dm = load_demand_matrix()
+    good_groups = _load_good_groups()
     rows = []
     for good, entry in sorted(dm.items()):
         demand_cols = {pt: entry.demand_per_pop_type.get(pt, 0.0) for pt in POP_TYPE_ORDER}
-        for group in groups_for_good(good):
+        for group in good_groups.get(good, []):
             row: Dict = {
                 "good":  good,
                 "group": group,
@@ -68,13 +95,19 @@ def compute_demand_table() -> List[Dict]:
     return rows
 
 
+def render_demand_csv(rows: List[Dict]) -> str:
+    fieldnames = ["good", "group", "price"] + POP_TYPE_ORDER
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
 def write_demand_csv(rows: List[Dict], path: Path = OUTPUT_CSV) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = ["good", "group", "price"] + POP_TYPE_ORDER
     with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+        f.write(render_demand_csv(rows))
     print(f"[gen_demand_csv] Wrote {len(rows)} rows → {path.relative_to(REPO_ROOT)}")
 
 
@@ -148,7 +181,7 @@ def _build_inject_comment(good: str, dm: Dict) -> str:
             v = vals.get(pt, 0.0)
             if abs(v) < 1e-9:
                 continue
-            parts.append(f"{pt}={v:+.6g}" if show_sign else f"{pt}={v:.6g}")
+            parts.append(f"{pt}={_fmt_comment_number(v, show_sign)}")
         return " | ".join(parts) if parts else None
 
     lines: List[str] = []
@@ -224,10 +257,37 @@ def update_pop_goods_comments(rows: List[Dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    update_comments = "--update-comments" in sys.argv
+    parser = argparse.ArgumentParser(
+        description="Generate data/demand_price_table.csv from SOL pop goods demand."
+    )
+    parser.add_argument(
+        "--update-comments",
+        action="store_true",
+        help="Also rewrite comment blocks above INJECT entries.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Return non-zero if data/demand_price_table.csv is out of date.",
+    )
+    args = parser.parse_args()
+
     rows = compute_demand_table()
+
+    if args.check:
+        expected = render_demand_csv(rows)
+        if not OUTPUT_CSV.exists():
+            print(f"[FAIL] Missing generated target: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+            sys.exit(1)
+        current = _read_text_exact(OUTPUT_CSV)
+        if current != expected:
+            print(f"[FAIL] Out of date: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+            sys.exit(1)
+        print(f"[OK] Up to date: {OUTPUT_CSV.relative_to(REPO_ROOT)}")
+        sys.exit(0)
+
     write_demand_csv(rows)
-    if update_comments:
+    if args.update_comments:
         update_pop_goods_comments(rows)
 
 

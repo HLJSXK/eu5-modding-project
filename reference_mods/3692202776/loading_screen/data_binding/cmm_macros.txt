@@ -8,6 +8,14 @@ macro = {
     replace_with = "Player.MakeScope.GetVariable(Name)"
 }
 
+# Args: Name (string)
+# Returns: variable
+macro = {
+	description = "Country variable accessor"
+	definition = "CMMGlobalVar(Name)"
+	replace_with = "GetGlobalVariable(Name)"
+}
+
 # Args: Prefix (string), Key (string)
 # Returns: variable
 macro = {
@@ -38,14 +46,6 @@ macro = {
     description = "Metadata int accessor"
     definition = "CMMMetadataInt(Prefix,Key)"
     replace_with = "FixedPointToInt(CMMMetadataValue(Prefix, Key))"
-}
-
-# Args: Prefix (string), Key (string)
-# Returns: boolean
-macro = {
-    description = "True when one metadata key is set"
-    definition = "CMMMetadataIsSet(Prefix,Key)"
-    replace_with = "CMMMetadataVar(Prefix, Key).IsSet"
 }
 
 # Args: Value (value)
@@ -91,9 +91,25 @@ macro = {
 # Args: Key (string), Suffix (string)
 # Returns: string
 macro = {
+	description = "Localization lookup for one runtime global key plus suffix"
+	definition = "CMMLocalizedGlobalSuffix(Key,Suffix)"
+	replace_with = "CMMGlobalVar(Concatenate(Key, Suffix)).GetFlagName"
+}
+
+# Args: Key (string), Suffix (string)
+# Returns: string
+macro = {
     description = "Localized text for one runtime key plus suffix"
     definition = "CMMLocalizedSuffixText(Key,Suffix)"
     replace_with = "AddTextIf(CMMHasLocalizedSuffixText(Key, Suffix), CMMLocalizedSuffix(Key, Suffix))"
+}
+
+# Args: Key (string), Suffix (string)
+# Returns: string
+macro = {
+	description = "Localized text for one runtime key plus suffix"
+	definition = "CMMLocalizedGlobalSuffixText(Key,Suffix)"
+	replace_with = "AddTextIf(CMMHasLocalizedGlobalSuffixText(Key, Suffix), CMMLocalizedGlobalSuffix(Key, Suffix))"
 }
 
 # Args: Key (string), Suffix (string)
@@ -102,6 +118,15 @@ macro = {
     description = "True when localized text exists for one runtime key plus suffix"
     definition = "CMMHasLocalizedSuffixText(Key,Suffix)"
     replace_with = "And(CMMVar(Concatenate(Key, Suffix)).IsSet, Not(EqualTo_string(CMMLocalizedSuffix(Key, Suffix), Concatenate(Key, Suffix))))"
+}
+
+
+# Args: Key (string), Suffix (string)
+# Returns: boolean
+macro = {
+	description = "True when localized text exists for one runtime key plus suffix"
+	definition = "CMMHasLocalizedGlobalSuffixText(Key,Suffix)"
+	replace_with = "And(CMMGlobalVar(Concatenate(Key, Suffix)).IsSet, Not(EqualTo_string(CMMLocalizedGlobalSuffix(Key, Suffix), Concatenate(Key, Suffix))))"
 }
 
 # Args: Index (int32)
@@ -193,6 +218,14 @@ macro = {
 }
 
 # Args: Name (string)
+# Returns: none
+macro = {
+    description = "Execute one scripted GUI callback with the selected mod as mod scope"
+    definition = "CMMExecuteGuiWithSelectedMod(Name)"
+    replace_with = "GetScriptedGui(Name).Execute(GuiScope.SetRoot(GetPlayer.MakeScope).AddScope('mod', MakeScopeFlag(GetVariableSystem.Get('cmm_selected_mod'))).End)"
+}
+
+# Args: Name (string)
 # Returns: boolean
 macro = {
     description = "True when one scripted GUI callback is shown"
@@ -214,4 +247,97 @@ macro = {
     description = "True when one mod id and tab key match the current selection"
     definition = "CMMMatchesSelectedModAndTab(ModId,TabKey)"
     replace_with = "And(CMMSelectedHasValue('cmm_selected_mod', ModId), CMMSelectedHasValue('cmm_selected_tab', TabKey))"
+}
+
+# Returns: boolean
+macro = {
+    description = "True once the action bar registration pass has reconciled saved elements this session"
+    definition = "CMFActionBarSynced"
+    replace_with = "GetVariableFromGlobalVariableMap('cmf_action_bar_synced', MakeScopeFlag('cmf_action_bar_synced')).IsSet"
+}
+
+# Args: Index (int32)
+# Returns: scope
+macro = {
+    description = "Construct a flag scope key for a log entry index"
+    definition = "CMFLogKey(Index)"
+    replace_with = "MakeScopeFlag(Concatenate('cmf_log_', ToString_int32(Index)))"
+}
+
+# Args: Index (int32)
+# Returns: country
+macro = {
+    description = "Actor country for a log entry by datamodel index"
+    definition = "CMFLogActorCountry(Index)"
+    replace_with = "GetVariableFromGlobalVariableMap('cmf_log_actor', CMFLogKey(Index)).GetCountry"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Localized action text for a log entry by datamodel index"
+    definition = "CMFLogAction(Index)"
+    replace_with = "Localize(GetVariableFromGlobalVariableMap('cmf_log_action', CMFLogKey(Index)).GetFlagName)"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when arg mode is scope-based (1) for a log entry"
+    definition = "CMFLogIsScopeArgs(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)1')"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when arg1 is present on a log entry"
+    definition = "CMFLogHasArg1(Index)"
+    replace_with = "Not(EqualTo_string(GetVariableFromGlobalVariableMap('cmf_log_arg1', CMFLogKey(Index)).GetFlagName, '_cmf_log_no_arg'))"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when arg2 is present on a log entry"
+    definition = "CMFLogHasArg2(Index)"
+    replace_with = "Not(EqualTo_string(GetVariableFromGlobalVariableMap('cmf_log_arg2', CMFLogKey(Index)).GetFlagName, '_cmf_log_no_arg'))"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Resolved arg1 text for a log entry (flag localization or country name)"
+    definition = "CMFLogArg1Name(Index)"
+    replace_with = "Select_CString(CMFLogIsScopeArgs(Index), GetVariableFromGlobalVariableMap('cmf_log_arg1', CMFLogKey(Index)).GetCountry.GetName, Localize(GetVariableFromGlobalVariableMap('cmf_log_arg1', CMFLogKey(Index)).GetFlagName))"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Resolved arg2 text for a log entry (flag localization or country name)"
+    definition = "CMFLogArg2Name(Index)"
+    replace_with = "Select_CString(CMFLogIsScopeArgs(Index), GetVariableFromGlobalVariableMap('cmf_log_arg2', CMFLogKey(Index)).GetCountry.GetName, Localize(GetVariableFromGlobalVariableMap('cmf_log_arg2', CMFLogKey(Index)).GetFlagName))"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Full formatted log entry text: [arg1?] action [arg2?]"
+    definition = "CMFLogEntryText(Index)"
+    replace_with = "Concatenate(AddTextIf(CMFLogHasArg1(Index), Concatenate(CMFLogArg1Name(Index), ' ')), Concatenate(CMFLogAction(Index), AddTextIf(CMFLogHasArg2(Index), Concatenate(' ', CMFLogArg2Name(Index)))))"
+}
+
+# Returns: boolean
+macro = {
+    description = "True when at least one log entry exists"
+    definition = "CMFLogHasEntries"
+    replace_with = "GreaterThan_CFixedPoint(GetGlobalVariable('cmf_log_count').GetValue, '(CFixedPoint)0')"
+}
+
+# Returns: int32
+macro = {
+    description = "Number of log entries for DataModelRepeatedItem"
+    definition = "CMFLogCount"
+    replace_with = "FixedPointToInt(GetGlobalVariable('cmf_log_count').GetValue)"
 }

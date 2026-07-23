@@ -450,14 +450,21 @@ ask_burghers_for_loan = {
 		}
 	}
 
-	# Burghers must have enough gold to make the grant worthwhile. BURGHER_GRANT_MIN_TRANSFER
-	# is also the C++ floor — the effect refuses to pay out anything smaller, so the gate keeps
-	# the action from appearing actionable when it would no-op in execution.
+	# Burghers must have enough gold to make the grant worthwhile. The C++ effect first caps the
+	# transfer at BURGHER_GRANT_MAX_FRACTION of the pool, THEN refuses to pay out anything below the
+	# BURGHER_GRANT_MIN_TRANSFER floor. So the break-even pool is MIN_TRANSFER / MAX_FRACTION
+	# (5.0 / 0.5 = 10.0): below it the capped amount falls under the floor and the grant no-ops to
+	# 0.00. Gating directly on MIN_TRANSFER (the old behavior) let pools of 5-10 pass the gate yet
+	# still transfer nothing. Deriving the threshold from both defines keeps the gate synced if
+	# either is retuned.
 	allow = {
 		scope:actor = {
 			any_estate = {
 				estate_type = estate_type:burghers_estate
-				estate_gold >= "define:NEconomy|BURGHER_GRANT_MIN_TRANSFER"
+				estate_gold >= {
+					value = "define:NEconomy|BURGHER_GRANT_MIN_TRANSFER"
+					divide = "define:NEconomy|BURGHER_GRANT_MAX_FRACTION"
+				}
 			}
 		}
 	}

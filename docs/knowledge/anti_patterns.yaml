@@ -15,16 +15,16 @@
 #   notes     : one-line explanation of why the bad form fails
 #
 # To add a new entry: append a YAML dict with all fields, then run:
-#   python scripts/gen_brief.py
+#   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
 
 - id: location_auto_modifier_nonfunctional
   pattern: 'category\s*=\s*location'
   only_in_paths: ['auto_modifiers']
   bad: "auto_modifier with category = location (inside auto_modifiers/ file)"
-  correction: "TRY_REPLACE entry in main_menu/common/static_modifiers/ with game_data.category = location"
+  correction: "Use main_menu/common/static_modifiers/: define new objects with game_data.category = location, or use a minimal TRY_INJECT delta when modifying an existing object"
   category: modifier
   scope: location
-  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-6"
+  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-8; reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439"
   notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
 
 - id: sol_demand_add_baseline_must_remain
@@ -320,12 +320,12 @@
 
 - id: situation_custom_mapmode_not_script_field
   pattern: null
-  bad: "Adding map_mode = <tag> or using trigger_on_create on a reusable situation panel to force a separate custom mapmode"
-  correction: "Keep is_data_map/map_color for the situation data map. To auto-select a separate mapmode when a situation panel opens, add a zero-size GUI widget inside the situation_panel, gate it with LateralView.IsShown so the visible expression flips on each reopen, and call on_start = \"[GetMapMode('<tag>').SetMapMode]\" from a _show state."
+  bad: "Adding map_mode = <tag> to a situation definition or using a child widget's _show state when the child is created already visible"
+  correction: "Keep is_data_map/map_color for the situation data map. For a separate custom mapmode, add a zero-size widget inside the situation_panel and use a trigger_on_create state whose on_start calls \"[PdxGuiWidget.PushMapModeOverride('<tag>')]\". The widget-scoped override is removed when the situation-specific panel widget is destroyed."
   category: gui
   scope: any
-  source: "reference_game_files/game/in_game/common/situations/readme.txt:12-18; reference_official_defines/docs/data_types_uncategorized.txt:72079; src/stable/in_game/gui/SOL_migration_caller.gui:21-31; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
-  notes: "Situation script supports setup effects and data-map coloring, but no verified custom mapmode field. trigger_on_create is one-shot for widget lifetime; _show retriggers when LateralView.IsShown flips on each reopen. Mapmode selection is a MapMode GUI action; direct chained action expressions are valid in state on_start."
+  source: "reference_game_files/game/in_game/common/situations/readme.txt:12-18; reference_official_defines/docs/data_types_gui.txt:5872-5882; src/stable/in_game/gui/SOL_migration_caller.gui:35-50; reference_game_files/game/in_game/gui/shared/population_tooltip.gui:9-13"
+  notes: "Situation script exposes data-map coloring but no verified field selecting a separate custom mapmode. A dynamically instantiated situation child can start already visible, so _show never runs; trigger_on_create handles that case. Vanilla PushMapModeOverride callers do not manually PopMapModeOverride because the override belongs to the PdxGuiWidget lifecycle."
 
 - id: gui_state_on_start_does_not_inherit_datacontext
   pattern: 'state\s*=\s*\{[^{}]*\btrigger_on_create\s*=\s*yes[^{}]*\bon_start\s*=\s*"\[MapMode\.SetMapMode\]"'
@@ -336,6 +336,15 @@
   scope: any
   source: "EU5 error.log: No context supplied, wanted context of type 'MapMode' for 'MapMode.SetMapMode'; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
   notes: "trigger_on_create state actions do not inherit the widget's datacontext for method dispatch. The action expression must create or receive the required object itself."
+
+- id: situation_custom_mapmode_visibility_states
+  pattern: null
+  bad: "Using _show/_hide plus global SetMapMode/SetDefaultMapMode to manage a mapmode for a dynamically instantiated situation panel"
+  correction: "Use trigger_on_create with PdxGuiWidget.PushMapModeOverride on a zero-size child of the situation-specific panel. This fires when the child is created already visible and ties cleanup to that widget's destruction."
+  category: gui
+  scope: any
+  source: "In-game SOL panel test (2026-07-22): _show did not enter sol_living_standard; src/stable/in_game/gui/SOL_migration_caller.gui:35-50; reference_official_defines/docs/data_types_gui.txt:5872-5882"
+  notes: "_show only runs after an existing widget changes from hidden to shown. It is not a construction callback, so it misses a situation child created after its parent is already shown. A global SetDefaultMapMode cleanup can also discard the player's prior mapmode instead of restoring the overridden mode."
 
 - id: yearly_january_pulse_spike
   pattern: ''
@@ -390,3 +399,102 @@
   scope: any
   source: "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt:1864 — engine error: 'Unknown effect limit at ... :1864' from jomini_effect.cpp:556"
   notes: "Scope-transition blocks (location={}, country={}, etc.) are NOT loops — the engine does not recognise 'limit' there. Use 'if = { limit = { ... } }' for conditional execution inside a scope hop."
+
+- id: database_operation_priority_ignored
+  pattern: null
+  bad: "Using a later filename, a zz_ prefix, or a lower playlist position as a universal way to make any INJECT/REPLACE database edit win"
+  correction: "Separate exact-path file overwrites from database object edits. For object edits, compare operation type first (INJECT_OR_CREATE -> REPLACE_OR_CREATE -> TRY_INJECT -> TRY_REPLACE -> INJECT -> REPLACE), then use filename order only when the operation types are identical."
+  category: compatibility
+  scope: top-level database object
+  source: "User-provided EU5 compatibility mechanics note (2026-07-21); docs/technical/EU5_Multi_Mod_Compatibility.md"
+  notes: "Documentation-only (no regex lint). Database entries are batched by operation type before filename ordering. Exact-path collisions use a separate whole-file rule: mod over base/DLC, then the lower mod in the playlist. INJECT is top-level append rather than nested deep merge, and scripted effects/triggers treat INJECT like replacement."
+
+- id: static_modifier_full_replace_for_numeric_delta
+  pattern: null
+  bad: "Copying an entire vanilla static modifier into TRY_REPLACE when the intended change is only an additive numeric adjustment"
+  correction: "Use TRY_INJECT with only the difference between the desired final modifier value and the verified vanilla value; omit game_data and unchanged fields"
+  category: compatibility
+  scope: any
+  source: "reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439-455; reference_mods/3613232232/in_game/common/static_modifiers/pp_population_growth_and_food_adjustments.txt:174-177"
+  notes: "Static modifier values accumulate across injected entries. Delta-only injection preserves unrelated vanilla fields and allows other mods to contribute their own modifier deltas. Fields that cannot be neutralized additively still require replacement."
+
+- id: price_full_replace_for_additive_delta
+  pattern: null
+  bad: "Replacing an entire price object when the intended change only adds or subtracts a resource cost, or adds a field absent from vanilla"
+  correction: "Use TRY_INJECT for additive resource-cost deltas and genuinely new fields; retain TRY_REPLACE when changing an existing structural scalar such as min_scale/max_scale"
+  category: compatibility
+  scope: price
+  source: "reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt:2-13; src/stable/in_game/common/prices/A_SOL_economy_prices.txt"
+  notes: "Price resource entries can be incremented with an injected delta. Do not assume every duplicate price field is additive: replacing an existing scaling bound or removing a field still needs a full replacement."
+
+- id: goods_upper_group_includes_workers_1_3_11
+  pattern: null
+  bad: "Expanding the goods demand group key 'upper' to nobles, clergy, and burghers only"
+  correction: "In EU5 1.3.11, expand 'upper' to nobles, clergy, burghers, laborers, and soldiers for both demand_add and demand_multiply. Peasants and tribesmen remain outside the group."
+  category: goods
+  scope: pop
+  source: "user-reported engine behavior (2026-07-21); tools/sol_demand_simulator/parser.py"
+  notes: "Documentation-only (no regex lint). Any calibrated demand_add injection must be regenerated after applying the expanded group to vanilla demand, otherwise laborer and soldier injections are computed from an understated vanilla net demand."
+
+- id: pop_demand_development_controls_left_active
+  pattern: null
+  bad: "Calibrating pop demand while leaving either NPop.DEVELOPMENT_SCALE_ON_DEMAND or per-good development_threshold values active"
+  correction: "Treat them as two independent controls. Set NPop.DEVELOPMENT_SCALE_ON_DEMAND = 0 to remove the engine-wide multiplier, and fully negate every goods development_threshold with a late INJECT so vanilla + inject = 0. Compatibility goods such as PP victuals need their own negation."
+  category: goods
+  scope: pop
+  source: "reference_game_files/game/loading_screen/common/defines/00_defines.txt:1599; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:292,425,538; reference_game_files/game/in_game/common/goods/02_produced_goods.txt:21,91,143,228,251,345; reference_mods/3613232232/in_game/common/goods/pp_goods_victuals.txt:32"
+  notes: "Documentation-only (no regex lint). DEVELOPMENT_SCALE_ON_DEMAND = 0 removes the universal (1 + development * scale) multiplier but does not clear goods gates. Conversely, negating every development_threshold does not remove the universal multiplier. Both layers must be disabled for development-independent demand calibration."
+
+- id: cmm_disabled_setting_left_registered
+  pattern: null
+  bad: "Leaving a disabled feature in the mod's CMM registration effect, or directly mutating CMM internal maps to hide a stale setting from old saves"
+  correction: "Replace the mod registration effect and omit disabled settings and callbacks. CMM's _cmm_register_group clears each group's setting-key list during every registration cycle, so omitted settings disappear from both new games and upgraded saves. Hard-disable the gameplay trigger separately for defense in depth."
+  category: framework
+  scope: country
+  source: "reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_effects.txt:198-199"
+  notes: "Documentation-only (no regex lint). Localization and unused scripted GUI definitions do not create a visible setting; CMM panel visibility is driven by the rebuilt per-group registration list."
+
+- id: scripted_effect_duplicate_without_replace
+  pattern: null
+  bad: "Defining an existing scripted effect again in a later or zz_-prefixed file without a REPLACE operation"
+  correction: "Emit REPLACE:<effect_name> for each scripted effect whose body must change. Prefer outputting only changed effects instead of copying the whole source file."
+  category: compatibility
+  scope: scripted_effect
+  source: "runtime error.log (2026-07-21): 'Duplicated key sol_refresh_market_pop_demand_maps will not be created from file: common/scripted_effects/zz_A_SOL_economy_effects.txt'"
+  notes: "A later filename does not turn a plain duplicate definition into an override. The engine keeps the original effect and rejects the duplicate, so compatibility-only branches never run."
+
+- id: inject_duplicate_nested_trigger_section
+  pattern: null
+  bad: "TRY_INJECT on an existing database object with a second nested trigger section such as allow = { ... }"
+  correction: "Copy the verified complete source object and use REPLACE when nested logic must change; preserve every required sibling field from the source."
+  category: compatibility
+  scope: top-level database object
+  source: "runtime error.log (2026-07-21): 'Trigger section already read earlier: allow' in common/cabinet_actions/A_SOL_war_cabinet_actions.txt"
+  notes: "Database injection appends top-level content and does not deep-merge nested trigger blocks. A duplicate singleton section is rejected by that database parser."
+
+- id: simple_assign_trigger_not_equal_operator
+  pattern: '\bbuilding_category\s*!='
+  bad: "Using != with the simple-assign building_category trigger"
+  correction: "Wrap the equality trigger in NOT, for example: NOT = { building_category = government_category }"
+  category: trigger
+  scope: any
+  source: "reference_mods/3735059838/in_game/common/scripted_effects/epbm_calculate.txt:32; runtime error.log (2026-07-22): 'building_category trigger [ Trigger is simple assign, but used a symbol other than = in the middle ]'"
+  notes: "Simple-assign triggers accept only = in the middle. Boolean negation belongs in a NOT block; != makes the scripted effect fail to compile."
+
+- id: removed_setting_leaves_unset_variable_reads
+  pattern: null
+  bad: "Removing a CMM setting and its active alias setter while leaving script values, triggers, or scripted GUIs that read the alias variable"
+  correction: "Remove or exact-path override every residual reader; retain variable-free constant fallbacks for referenced script values and only the scripted GUI callbacks that remain registered"
+  category: framework
+  scope: global
+  source: "runtime error.log (2026-07-22): Variable 'sol_cts' is used but is never set. Setting it in an unused scripted trigger or effect does not count"
+  notes: "The engine's variable analysis ignores setters that only occur in unreachable or unused scripted objects. Dummy setters do not cleanly retire a setting; remove the readers instead."
+
+- id: scripted_trigger_called_from_wrong_entry_scope
+  pattern: null
+  bad: "Calling a scripted trigger from a scope it does not support because one of its internal scope links happens to reach the desired object"
+  correction: "Verify the scripted trigger's entry scope from its complete body. Call it only from that scope, or replace it with equivalent triggers valid in the current scope"
+  category: scope
+  scope: any
+  source: "reference_game_files/game/in_game/common/scripted_triggers/pop_triggers.txt:28-39; runtime error.log (2026-07-22): owner trigger wrong scope country from is_gaelic_clans called by epbm_calculate"
+  notes: "is_gaelic_clans starts with pop-only culture and foreign-building checks and then follows owner to country. Calling it directly from country makes its owner link invalid even though the nested privilege checks are country-scoped."

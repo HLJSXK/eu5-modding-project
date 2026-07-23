@@ -6,13 +6,13 @@ Templates are derived verbatim from confirmed vanilla/mod examples (3-step rule,
 Each output file has a # AUTO_SCAFFOLD_FROM header and TODO markers for fields to fill in.
 
 Usage:
-  conda run -n eu5 python scripts/gen_scaffold.py --type event     --name SOL_my_event
-  conda run -n eu5 python scripts/gen_scaffold.py --type scripted_effect  --name SOL_my_effect
-  conda run -n eu5 python scripts/gen_scaffold.py --type scripted_trigger --name SOL_my_trigger
-  conda run -n eu5 python scripts/gen_scaffold.py --type static_modifier  --name SOL_my_mod --category location
-  conda run -n eu5 python scripts/gen_scaffold.py --type on_action  --name my_hook
-  conda run -n eu5 python scripts/gen_scaffold.py --type situation  --name SOL_my_situation
-  conda run -n eu5 python scripts/gen_scaffold.py --type localization --name SOL_MY_KEY
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type event     --name SOL_my_event
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type scripted_effect  --name SOL_my_effect
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type scripted_trigger --name SOL_my_trigger
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type static_modifier  --name SOL_my_mod --category location
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type on_action  --name my_hook
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type situation  --name SOL_my_situation
+  $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_scaffold.py --type localization --name SOL_MY_KEY
 
   --out   Output directory (default: stdout / dry run)
   --dry   Print scaffold to stdout without writing a file
@@ -126,10 +126,17 @@ def _tpl_scripted_trigger(name: str) -> tuple[str, str, str]:
 
 def _tpl_static_modifier(name: str, category: str) -> tuple[str, str, str]:
     # category: "location" or "country" (default: country)
-    # Reference: A_SOL_economy_modifiers.txt uses TRY_REPLACE for location modifiers
-    prefix = "TRY_REPLACE:" if category == "location" else ""
-    content = f"""{SCAFFOLD_HEADER}
-{prefix}{name} = {{
+    # Existing location modifiers use TRY_INJECT deltas; new country modifiers
+    # are ordinary definitions with their explicit game_data category.
+    if category == "location":
+        content = f"""{SCAFFOLD_HEADER}
+TRY_INJECT:{name} = {{
+\t# TODO: add only the delta from the vanilla modifier.
+}}
+"""
+    else:
+        content = f"""{SCAFFOLD_HEADER}
+{name} = {{
 \tgame_data = {{
 \t\tcategory = {category}
 \t}}
@@ -241,7 +248,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content, encoding=encoding)
     print(f"[OK] Scaffold written: {out_path.relative_to(REPO_ROOT)}")
-    print(f"     Fill in TODO markers, then run: conda run -n eu5 python scripts/validate.py --changed")
+    print(f"     Fill in TODO markers, then run: $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/validate.py --changed")
 
 
 if __name__ == "__main__":

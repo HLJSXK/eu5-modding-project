@@ -34,7 +34,7 @@ EU5_POP_TYPES: List[str] = [
 EU5_POP_TYPES_SET = frozenset(EU5_POP_TYPES)
 
 # Group keywords → which EU5 pop types they expand to
-UPPER_TYPES = frozenset(["nobles", "clergy", "burghers"])  # soldiers does NOT have upper = yes
+UPPER_TYPES = frozenset(["nobles", "clergy", "burghers", "laborers", "soldiers"])
 
 # Simulator strata → underlying EU5 pop types
 STRATA_TO_POP_TYPES: Dict[str, List[str]] = {

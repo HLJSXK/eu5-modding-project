@@ -4,9 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Added the SOL-JTG compact compatibility target for Just Brass, Just Meat, Just Soap, Just Spices, and Just Cheese. It applies SOL-style per-stratum demand scaling with clean magnitude-aware rounding to 22 new goods, fully negates their source wealth/development demand gates, and includes them in SOL market accounting and both goods panels.
+
 ### Changed
+- Removed every development-based pop-demand constraint: the engine-wide development multiplier is now zero, all nine vanilla per-good development thresholds are fully negated, PP `victuals` is handled by the compatibility generator, and SOL no longer carries development-adjusted spending through its runtime or UI.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.
 - Updated documentation to reflect the new reference baseline.
+
+### Fixed
+- Removed the one-shot pending flag from GLS situation startup so the situation can spawn when SOL is added to an existing save or re-enabled after removal.
 
 ## [Mod v1.1.0] - 2026-04-30
 

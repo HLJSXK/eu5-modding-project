@@ -1,108 +1,84 @@
 # Source Files
 
-This directory contains mod source files and templates for the EU5 Modding Project.
+This directory contains deployable EU5 mod source targets.
 
-## Structure
+## Targets
 
 ### `stable/`
 
-The **stable branch** of the EU5 MP mod, based on reference mod **3644897537** (Amalgamation Synergy). This is the primary mod used in MP sessions, providing a well-tested set of gameplay balance tweaks.
+The full stable mod used for MP balance work. It includes the broader gameplay balance package, including SOL, war/economy balance, UI, and supporting systems.
 
-**Features:**
-- **War Mechanics** - Harsher war exhaustion, more impactful occupation
-- **Anti-Snowballing** - Progressive build cost increases, halved base RGO size
-- **Tax Efficiency** - Rebalanced tax efficiency system
-- **Colonial Restrictions** - AI colonization limits, historical colonizer exceptions
-- **Price Rebalancing** - Scaled gold transfers, adjusted diplomatic costs
-- **Little Ice Age** - More forgiving ice age event penalties
+### `sol_standalone/`
 
-**Status:** Active, stable — primary mod for MP sessions.
+Standalone Standard of Living target. It keeps only the SOL income and demand pipeline plus the related UI:
 
-**Usage:**
-1. Copy the `stable/` directory to your EU5 mod folder:
-   ```
-   Documents/Paradox Interactive/Europa Universalis V/mod/
-   ```
-2. Enable in the launcher
+- calibrated pop-demand baseline
+- location income and liquid-funds calculations
+- market unit-spending cache
+- monthly `local_pop_demand` modifier application
+- Global Living Standard situation panel
+- SOL map mode and location tooltip
 
-For detailed documentation, see [stable/README.md](stable/README.md).
+It excludes non-SOL systems from `stable`, including war balance, migration compatibility events, CMM toggles, age escalation, GDP-to-development, diplomacy costs, and difficulty rebalance.
 
-### `develop/`
+### `sol_pp_compatibility_submod/`
 
-The **development branch** of the EU5 MP mod, formerly known as `dynamic_missions`. This mod implements a dynamic mission system. Development is currently paused.
+Compatibility layer loaded after Prosper or Perish and `stable`. It removes the
+SOL residuals from PP's Little Ice Age/weather handling, zeros final lumber pop
+demand, includes PP victuals in SOL living-standard spending, and overrides the
+location and situation goods panels. It is generated from the current stable
+SOL files and the checked-in PP reference.
 
-**Features:**
-- **Establish New City Mission** - Multi-stage city development system
-- **Large Research Project Mission** - Research and innovation mechanics
-- **Custom GUI** - Situation panels and interfaces
-- **Full localization** - English and Simplified Chinese
+Generated SOL files are refreshed through `scripts/gen_sol_chain.py`; build runs
+that chain automatically for the selected target before validation/deploy.
 
-**Status:** Paused (last active 2026-03-31).
+Its freely named game-data and GUI files use the `zz_` load-order prefix. The
+`global_living_standard.gui` situation panel keeps its exact filename because
+EU5 binds that file name to the `global_living_standard` situation ID.
 
-For detailed documentation, see the [Dynamic Missions Design](../docs/archive/dynamic_missions/Dynamic_Missions_Design.md) documents.
+### `sol_mnt_compatibility_submod/`
 
-### Mod Base Choice
+Final-loading compatibility layer for MEIOU and Taxes and full SOL. M&T owns
+economic balance, goods prices and non-demand fields, production, food, RGO,
+buildings, and estate maintenance. The layer replaces the seven SOL pop-demand
+quantities with M&T-price-scaled values, removes wealth/development gates, and
+keeps SOL's demand accounting and Living Standard UI synchronized. Exact-path
+overrides reduce the SOL CMM values and scripted GUI callbacks to the settings
+that remain active, so discarded economic controls leave no variable warnings.
 
-For new work, choose one of the maintained bases:
+The generated EPBM replacement preserves M&T's country totals and deductions
+while caching attributable domestic maintenance on the five existing SOL
+location variables. Its `location_window.gui` starts from M&T and adds only the
+SOL income display and Living Standard button. This target is mutually
+exclusive with other SOL compatibility submods.
 
-- **`stable/`** for production-ready multiplayer balance changes
-- **`develop/`** for dynamic mission systems and advanced scripted workflows
+### `sol_jtg_compatibility_submod/`
 
-**Usage:**
-1. Copy either `stable/` or `develop/` to your EU5 mod folder:
-   ```
-   Documents/Paradox Interactive/Europa Universalis V/mod/
-   ```
-2. Rename the copied directory to your mod's name
-3. Modify the files to create your custom mod
-4. Update `.metadata/metadata.json` with your mod's information
+Compatibility layer loaded after all five Just Trade Goods mods and `stable`.
+It applies SOL's approximate per-stratum demand scaling to the 22 new goods with
+direct pop demand, adds their final quantities to SOL's market and country
+spending caches, and rebuilds both goods panels with all 77 demand goods.
 
-## Dual-Mod Strategy
+The target relies on JTG localization and DDS assets instead of copying them.
+Just Spices must be enabled manually because its metadata ID is empty. This
+target is mutually exclusive with `sol_pp_compatibility_submod` because both
+replace the same two SOL scripted effects.
 
-As of 2026-03-31, the project maintains two parallel mods:
+The standalone `location_window.gui` override is generated from the vanilla
+reference by `scripts/generate_sol_location_window.py`, which is called by the
+chain for `sol_standalone` and `all`.
 
-| Mod | Directory | Status | Focus |
-|-----|-----------|--------|-------|
-| Stable | `src/stable/` | Active | Game balance (based on ref mod 3644897537) |
-| Develop | `src/develop/` | Paused | Dynamic mission system |
+## Build
 
-The `stable` mod provides the core MP balance experience, while `develop` is the active feature branch for Dynamic Missions.
+From the repository root:
 
-## Creating New Mods
+```cmd
+build.bat stable
+build.bat sol_standalone
+build.bat sol_pp_compatibility_submod
+build.bat sol_mnt_compatibility_submod
+build.bat sol_jtg_compatibility_submod
+build.bat all
+```
 
-When creating a new mod:
-
-1. **Start with stable**: Copy `stable/` as your base for reliable gameplay mods
-2. **Reference develop**: Study `develop/` for complex features
-3. **Follow naming conventions**: Use a consistent prefix for all your files (e.g., `mymod_`)
-4. **Use UTF-8-BOM encoding**: All `.yml` localization files must use UTF-8 with BOM
-5. **Test frequently**: Enable debug mode in EU5 and test after each change
-6. **Document your code**: Add comments explaining complex logic
-
-## Guidelines
-
-- Follow EU5 scripting conventions as documented in `/docs/technical/EU5_Mod_Framework_Guide.md`
-- Reference `/docs/technical/EU5_Mod_Framework_Guide.md` for common patterns
-- Use `stable/` as a clean, maintained starting point
-- Keep your mod files organized by feature or system
-- Test all changes in debug mode before releasing
-
-## Resources
-
-- [EU5 Modding Knowledge Base](../docs/technical/EU5_Modding_Knowledge_Base.md) - Comprehensive modding reference
-- [EU5 Mod Framework Guide](../docs/technical/EU5_Mod_Framework_Guide.md) - Practical development framework
-- [Stable Mod README](stable/README.md) - Stable mod documentation
-- [Develop Mod README](develop/README.md) - Dynamic missions mod documentation
-- [Dynamic Missions Framework](../docs/archive/dynamic_missions/Dynamic_Missions_Framework_Architecture.md) - Technical architecture (paused)
-
-
-## Community Mod References
-
-For additional learning resources, see the [Community Mod References](../reference_mods/) directory, which contains community mods from Steam Workshop. These mods provide:
-
-- **Real-world examples** of mod structure and organization
-- **Vanilla game variables** and definitions used in actual mods
-- **Code patterns** from successful community mods
-- **Different mod types** - translations, gameplay, UI, mechanics
-
-Browse the [Reference Mods Index](../reference_mods/MOD_INDEX.md) for detailed information about each mod.
+Each target deploys to the EU5 game mod folder under its own target name. Normal builds do not write archives into the repository `build\` folder.
