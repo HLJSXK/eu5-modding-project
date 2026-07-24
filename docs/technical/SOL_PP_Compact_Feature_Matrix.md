@@ -1,6 +1,6 @@
 # SOL-PP Compact Feature Matrix
 
-Date: 2026-07-21
+Date: 2026-07-24
 
 ## Stack Contract
 
@@ -43,7 +43,7 @@ SOL price changes survive only when PP does not modify the same price object.
 | Price | Resolution |
 | --- | --- |
 | `embrace_institution` | PP's later `TRY_REPLACE` remains final. |
-| Four road prices | Generated cleanup subtracts SOL's additive gold delta, leaving vanilla plus PP's delta. |
+| Four road prices | No compatibility price file is emitted. Within the shared `TRY_INJECT` operation type, `pp_road_gold_adjustments.txt` loads after `A_SOL_economy_prices.txt`, so PP's repeated `gold` fields replace SOL's. |
 | All other SOL price keys | Retained because the checked-in PP reference does not modify those keys. |
 
 ## CMF UI Whitelist

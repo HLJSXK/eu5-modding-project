@@ -30,7 +30,9 @@ Little Ice Age rebalance, and the food, RGO, and prosperity portions of age
 escalation. PP also owns the
 shared blockade, siege, occupation, and looting location modifiers: their SOL
 deltas are canceled. PP owns shared price values as well, so SOL's road deltas
-are canceled and PP's institution replacement wins.
+are not cleaned up by this submod: repeated price scalars replace instead of
+adding, and `pp_road_gold_adjustments.txt` loads after
+`A_SOL_economy_prices.txt`. PP's institution replacement wins as well.
 
 The demand layer cancels SOL's remaining lumber pop demand, adds PP `victuals`
 to SOL market spending, and overrides both SOL goods-display panels.

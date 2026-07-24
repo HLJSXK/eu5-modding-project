@@ -61,7 +61,6 @@ SITUATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "panels" / "situation" 
 AUTO_MODIFIERS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "auto_modifiers" / "zz_SOL_PP_compact_economy_auto_modifiers.txt"
 CMM_EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_SOL_PP_compact_cmm_effects.txt"
 CMM_TRIGGERS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_triggers" / "zz_SOL_PP_compact_disabled_triggers.txt"
-PRICE_CLEANUP_OUTPUT = TARGET_ROOT / "in_game" / "common" / "prices" / "zz_SOL_PP_compact_price_cleanup.txt"
 STATIC_CLEANUP_OUTPUT = TARGET_ROOT / "main_menu" / "common" / "static_modifiers" / "zz_SOL_PP_compact_static_cleanup.txt"
 WAR_OVERLAP_CLEANUP_OUTPUT = TARGET_ROOT / "main_menu" / "common" / "static_modifiers" / "zz_SOL_PP_compact_war_overlap_cleanup.txt"
 WEATHER_OUTPUT = TARGET_ROOT / "in_game" / "common" / "static_modifiers" / "zz_SOL_PP_weather_modifiers.txt"
@@ -169,6 +168,20 @@ def _numeric_fields(path: Path, key: str) -> List[Tuple[str, float]]:
 def _field_value(path: Path, key: str, field: str) -> Optional[float]:
     values = dict(_numeric_fields(path, key))
     return values.get(field)
+
+
+def _validate_pp_road_price_ownership() -> None:
+    if STABLE_PRICES.name >= PP_ROAD_PRICES.name:
+        raise ValueError(
+            "SOL road prices must load before PP road prices within TRY_INJECT: "
+            f"{STABLE_PRICES.name} >= {PP_ROAD_PRICES.name}"
+        )
+
+    for path in (STABLE_PRICES, PP_ROAD_PRICES):
+        text = _read(path)
+        for key in ROAD_PRICE_KEYS:
+            if not re.search(rf"(?m)^TRY_INJECT:{re.escape(key)}\s*=\s*\{{", text):
+                raise ValueError(f"Expected TRY_INJECT:{key} in {path}")
 
 
 def _render_inverse_injections(path: Path, keys: Tuple[str, ...], purpose: str) -> str:
@@ -517,29 +530,6 @@ def _render_static_cleanup() -> str:
     return "\n".join(lines)
 
 
-def _render_price_cleanup() -> str:
-    lines = [
-        GENERATED_HEADER.rstrip(),
-        "# PP owns shared road prices in the compact stack. Cancel only SOL's",
-        "# additive road deltas, leaving vanilla plus PP's deltas as the final values.",
-    ]
-    for key in ROAD_PRICE_KEYS:
-        pp_fields = dict(_numeric_fields(PP_ROAD_PRICES, key))
-        if "gold" not in pp_fields:
-            raise ValueError(f"PP gold delta missing for {key} in {PP_ROAD_PRICES}")
-        sol_gold = _field_value(STABLE_PRICES, key, "gold")
-        if sol_gold is None:
-            raise ValueError(f"SOL gold delta missing for {key} in {STABLE_PRICES}")
-        lines.extend([
-            "",
-            f"TRY_INJECT:{key} = {{",
-            f"\tgold = {_format_float(-sol_gold)}",
-            "}",
-        ])
-    lines.append("")
-    return "\n".join(lines)
-
-
 def _append_bool_setting(
     lines: List[str], setting_id: str, tab_id: str, group_id: str,
     alias: str, add_scripted_gui: bool = True,
@@ -677,6 +667,10 @@ REPLACE:sol_gdp_dev_is_on = {
 
 
 def _render_outputs() -> Dict[Path, str]:
+    # Repeated price scalar fields replace earlier values rather than adding.
+    # PP therefore owns roads through same-operation filename order; no compact
+    # price cleanup file must be generated.
+    _validate_pp_road_price_ownership()
     rows = _compat_good_rows()
     return {
         VALUES_OUTPUT: _render_values(rows),
@@ -695,7 +689,6 @@ def _render_outputs() -> Dict[Path, str]:
         AUTO_MODIFIERS_OUTPUT: _render_auto_modifiers(),
         CMM_EFFECTS_OUTPUT: _render_cmm_effects(),
         CMM_TRIGGERS_OUTPUT: _render_disabled_triggers(),
-        PRICE_CLEANUP_OUTPUT: _render_price_cleanup(),
         STATIC_CLEANUP_OUTPUT: _render_static_cleanup(),
         WAR_OVERLAP_CLEANUP_OUTPUT: _render_inverse_injections(
             STABLE_WAR_STATIC_MODIFIERS,

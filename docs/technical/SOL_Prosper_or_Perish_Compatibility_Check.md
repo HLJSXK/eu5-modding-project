@@ -5,9 +5,10 @@
 > 最终人口需求归零、把 victuals 纳入 SOL 生活水平计算，并覆盖地点与局势商品面板。
 > `stable` 与 `sol_standalone` 本身不再探测 P&P，也不再包含 P&P 专属 UI/数值分支。
 >
-> 2026-07-21 增量注入更新：`stable` 已把静态修正器和可安全累加的价格调整改为
-> 最小 `TRY_INJECT` delta。下文按当前实现区分“被后续 `TRY_REPLACE` 抹除”和
-> “双方 `TRY_INJECT` 累加”两种结果。
+> 2026-07-24 价格注入更正：价格对象中重复的 `gold` 等标量字段并不累加，后加载
+> 的字段会替代前值。SOL 的 `A_SOL_economy_prices.txt` 早于 P&P 的
+> `pp_road_gold_adjustments.txt`，因此 P&P 自然拥有最终道路价格；兼容子模不得再用
+> 负数注入尝试抵消 SOL，否则负值会成为最终价格并在运行时把费用钳制为 0。
 
 日期：2026-07-20
 
@@ -35,7 +36,7 @@ src/stable/main_menu/common/static_modifiers/A_SOL_economy_modifiers.txt
 src/stable/in_game/common/prices/A_SOL_economy_prices.txt
 ```
 
-文件名前缀只在双方操作类型相同时决定顺序。P&P 对 `total_population`、`raised_levies` 和 `embrace_institution` 使用 `TRY_REPLACE`，因此会在 SOL 的 `TRY_INJECT` 之后处理并抹掉对应注入，与 `A_`/`pp_` 文件名无关。双方都使用 `TRY_INJECT` 的 LIA 修正器和道路价格则会依次追加，数值 delta 累加。
+文件名前缀只在双方操作类型相同时决定顺序。P&P 对 `total_population`、`raised_levies` 和 `embrace_institution` 使用 `TRY_REPLACE`，因此会在 SOL 的 `TRY_INJECT` 之后处理并抹掉对应注入，与 `A_`/`pp_` 文件名无关。双方都使用 `TRY_INJECT` 时仍需按数据类型判断：LIA 静态修正器的数值 delta 会累加；道路价格中重复的 `gold` 标量则由后加载字段替代前值。
 
 ## 总结论
 
@@ -45,7 +46,7 @@ src/stable/in_game/common/prices/A_SOL_economy_prices.txt
 
 但机制上并不兼容。原因有两类：
 
-1. P&P 的后处理 `TRY_REPLACE` 会抹掉 SOL 对部分同 key 对象的 `TRY_INJECT`；双方都是 `TRY_INJECT` 的对象则会累加。
+1. P&P 的后处理 `TRY_REPLACE` 会抹掉 SOL 对部分同 key 对象的 `TRY_INJECT`；双方都是 `TRY_INJECT` 时，静态修正器数值可累加，但价格对象的重复标量字段由后值替代。
 2. P&P 新增 `victuals` pop demand，但 SOL 当前的生活水平基础消费计算没有纳入 `victuals`。
 
 因此更准确的结论是：
@@ -170,13 +171,13 @@ reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt
 - P&P：用 `TRY_REPLACE` 定义 `scaled_gold = 15.0`、`stability = 50`
 - 结果：P&P 替换在 SOL 注入之后处理，SOL 封顶仍会丢失
 
-道路价格双方都使用 `TRY_INJECT`，因此会在 vanilla 基础上累加，而不是互相覆盖。按当前文件的 `gold` delta，未加载兼容子模时的合计为：碎石路 50、铺装路 210、现代路 530、铁路 1600。
+道路价格双方都使用 `TRY_INJECT`，但价格对象中的重复 `gold` 字段不是加法。由于 `A_SOL_economy_prices.txt` 先加载、`pp_road_gold_adjustments.txt` 后加载，P&P 的字面值成为最终值：碎石路 30、铺装路 160、现代路 380、铁路 1100。
 
 影响：
 
-- SOL 与 P&P 的道路成本会叠加，可能高于任一模组单独设计的目标。
+- 道路价格由 P&P 的后加载字段自然接管，不需要兼容子模再写价格清理文件。
 - `embrace_institution` 的 SOL 封顶逻辑可能丢失。
-- 兼容补丁需要明确采用 P&P、SOL，还是第三套折中价格。
+- 如果未来需要第三套折中道路价格，应写经过验证的最终对象；不能用负 `TRY_INJECT` 抵消前值。
 
 ### 5. 商品需求与商品属性大范围重叠
 
@@ -308,11 +309,11 @@ SOL 也有自己的食物和反滚雪球设计，包括：
 
 ### 3. 明确价格设计归属
 
-道路价格和 `embrace_institution` 必须明确采用哪套设计：
+当前 compact 方案的价格归属如下：
 
-- 如果以 P&P 玩法为核心，应优先保留 P&P 更激进的道路与基础设施成本。
-- 如果以 SOL 的反滚雪球但较温和平衡为核心，应保留 SOL 的 capped price 逻辑。
-- 如果要两者混合，需要重新写一套兼容价格，而不是任由对象替换或 additive delta 自然累加。
+- 道路价格由 P&P 的后加载 `TRY_INJECT` 字段接管，兼容子模不生成道路价格文件。
+- `embrace_institution` 仍由 P&P 的 `TRY_REPLACE` 接管。
+- 如果以后要混合两套道路价格，应明确写最终值；不能把重复 price 标量当作 additive delta。
 
 ### 4. 检查是否需要关闭或缩放 SOL 食物压力
 
