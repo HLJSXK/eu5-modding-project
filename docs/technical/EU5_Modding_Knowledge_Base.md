@@ -254,6 +254,15 @@ save is loaded. Do not write directly to CMM's internal maps. Independently
 hard-disable the removed gameplay trigger so stale alias variables cannot
 reactivate the feature outside the UI.
 
+When a compatibility layer changes a legacy feature from enabled/hidden to an
+explicit default-off opt-in, do not reuse the old setting ID. CMM applies
+`default_value` only when the setting's variable-map key does not already
+exist, so an upgraded save can retain the legacy value. Register a fresh
+compatibility-specific setting ID with `default_value = 0`, omit the old ID,
+sync the new setting to the existing gameplay alias, and require that alias in
+the compatibility trigger. This preserves old-save defaults without directly
+rewriting CMM's internal maps.
+
 Removing a setting also requires removing every remaining read of its alias
 variable. EU5's variable validator only counts setters in reachable, used
 scripted objects; a setter left inside an unused effect or trigger does not

@@ -61,6 +61,23 @@ SITUATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "panels" / "situation" 
 AUTO_MODIFIERS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "auto_modifiers" / "zz_SOL_PP_compact_economy_auto_modifiers.txt"
 CMM_EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_SOL_PP_compact_cmm_effects.txt"
 CMM_TRIGGERS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_triggers" / "zz_SOL_PP_compact_disabled_triggers.txt"
+CMM_SCRIPTED_GUI_OUTPUT = (
+    TARGET_ROOT
+    / "in_game"
+    / "common"
+    / "scripted_guis"
+    / "zz_SOL_PP_compact_cmm_scripted_gui.txt"
+)
+ENGLISH_CMM_LOC_OUTPUT = (
+    TARGET_ROOT / "main_menu" / "localization" / "english" / "SOL_PP_cmm_l_english.yml"
+)
+CHINESE_CMM_LOC_OUTPUT = (
+    TARGET_ROOT
+    / "main_menu"
+    / "localization"
+    / "simp_chinese"
+    / "SOL_PP_cmm_l_simp_chinese.yml"
+)
 STATIC_CLEANUP_OUTPUT = TARGET_ROOT / "main_menu" / "common" / "static_modifiers" / "zz_SOL_PP_compact_static_cleanup.txt"
 WAR_OVERLAP_CLEANUP_OUTPUT = TARGET_ROOT / "main_menu" / "common" / "static_modifiers" / "zz_SOL_PP_compact_war_overlap_cleanup.txt"
 WEATHER_OUTPUT = TARGET_ROOT / "in_game" / "common" / "static_modifiers" / "zz_SOL_PP_weather_modifiers.txt"
@@ -114,6 +131,7 @@ VISIBLE_CMM_SETTINGS = (
     "cts",
     "ds",
     "difficulty",
+    "pp_gdp_dev",
     "ai_pr",
     "hw_on",
     "iwe",
@@ -532,7 +550,7 @@ def _render_static_cleanup() -> str:
 
 def _append_bool_setting(
     lines: List[str], setting_id: str, tab_id: str, group_id: str,
-    alias: str, add_scripted_gui: bool = True,
+    alias: str, add_scripted_gui: bool = True, default_value: int = 1,
 ) -> None:
     lines.extend([
         "\tcmm_register_global_bool_setting = {",
@@ -540,8 +558,10 @@ def _append_bool_setting(
         f"\t\tsetting_id = {setting_id}",
         f"\t\ttab_id = {tab_id}",
         f"\t\tgroup_id = {group_id}",
-        "\t\tdefault_value = 1",
+        f"\t\tdefault_value = {default_value}",
         "\t}",
+    ])
+    lines.extend([
         "\tcmm_sync_bool_alias = {",
         f"\t\tsetting = sol__{setting_id}",
         f"\t\talias = {alias}",
@@ -611,7 +631,20 @@ def _render_cmm_effects() -> str:
 
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# Replace full SOL registration with the compact PP-compatible feature set.",
+        "# Keep PP-compatible defaults while allowing explicit CMF opt-in for GDP-to-development.",
+        "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
+        "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
+        "\tset_global_variable = { name = sol_as_enabled value = yes }",
+        "\tset_global_variable = { name = sol_ae_enabled value = yes }",
+        "\tset_global_variable = { name = sol_difficulty_enabled value = yes }",
+        "\tremove_global_variable = sol_gdp_dev_enabled",
+        "\tset_global_variable = { name = sol_hw_enabled value = yes }",
+        "\tset_global_variable = { name = sol_iwe_enabled value = yes }",
+        "\tset_global_variable = { name = sol_hwe_enabled value = yes }",
+        "\tset_global_variable = { name = sol_rwe_enabled value = yes }",
+        "}",
+        "",
         "REPLACE:sol_register_cmf_mod = {",
     ]
     _append_bool_setting(lines, "sol_on", "feat", "sol", "sol_sol_on_enabled", False)
@@ -622,6 +655,14 @@ def _render_cmm_effects() -> str:
     _append_slider_setting(lines, "cts", "sol_cts", "-5", "-20", "0", "1")
     _append_slider_setting(lines, "ds", "sol_ds", "-5", "-20", "0", "1")
     _append_bool_setting(lines, "difficulty", "feat", "as", "sol_difficulty_enabled")
+    _append_bool_setting(
+        lines,
+        "pp_gdp_dev",
+        "feat",
+        "as",
+        "sol_gdp_dev_enabled",
+        default_value=0,
+    )
     _append_slider_setting(lines, "ai_pr", "sol_ai_pr", "0.5", "0", "2", "0.1")
     _append_bool_setting(lines, "hw_on", "feat", "hw", "sol_hw_enabled", False)
     _append_bool_setting(lines, "iwe", "feat", "hw", "sol_iwe_enabled")
@@ -639,6 +680,7 @@ def _render_cmm_effects() -> str:
         ("cts", "sol_cts", True),
         ("ds", "sol_ds", True),
         ("difficulty", "sol_difficulty_enabled", False),
+        ("pp_gdp_dev", "sol_gdp_dev_enabled", False),
         ("ai_pr", "sol_ai_pr", True),
         ("hw_on", "sol_hw_enabled", False),
         ("iwe", "sol_iwe_enabled", False),
@@ -658,12 +700,54 @@ def _render_cmm_effects() -> str:
 
 
 def _render_disabled_triggers() -> str:
-    return GENERATED_HEADER + """# Removed compact features remain hard-disabled even for old saves that still
-# contain their former CMF alias variables.
+    return GENERATED_HEADER + """# GDP-to-development remains off without CMF and defaults off in CMF, but can
+# be explicitly enabled by the player after accepting the PP overlap.
 REPLACE:sol_gdp_dev_is_on = {
-\talways = no
+\tAND = {
+\t\thas_global_variable_map = cmm
+\t\tsol_as_is_on = yes
+\t\thas_global_variable = sol_gdp_dev_enabled
+\t}
 }
 """
+
+
+def _render_cmm_scripted_gui() -> str:
+    return GENERATED_HEADER + """sol__pp_gdp_dev_on_changed = {
+\tscope = country
+
+\tis_shown = {
+\t\thas_global_variable = sol_as_enabled
+\t}
+\teffect = { }
+}
+"""
+
+
+def _render_cmm_localization(language: str) -> str:
+    if language == "english":
+        name = "Enable SOL GDP-to-development with PP?"
+        description = (
+            "Off by default. Enables SOL GDP-to-development on top of Prosper or Perish, "
+            "which may alter PP's development balance."
+        )
+    elif language == "simp_chinese":
+        name = "启用SOL GDP转化发展度（PP兼容）？"
+        description = (
+            "默认关闭。开启后会在Prosper or Perish之上启用SOL的GDP转化发展度，"
+            "可能改变PP的发展度平衡。"
+        )
+    else:
+        raise ValueError(f"Unsupported localization language: {language}")
+    return "\n".join(
+        [
+            f"l_{language}:",
+            f' sol__pp_gdp_dev_name: "{name}"',
+            f' sol__pp_gdp_dev_desc: "{description}"',
+            ' sol__pp_gdp_dev: "sol__pp_gdp_dev"',
+            "",
+        ]
+    )
 
 
 def _render_outputs() -> Dict[Path, str]:
@@ -689,6 +773,9 @@ def _render_outputs() -> Dict[Path, str]:
         AUTO_MODIFIERS_OUTPUT: _render_auto_modifiers(),
         CMM_EFFECTS_OUTPUT: _render_cmm_effects(),
         CMM_TRIGGERS_OUTPUT: _render_disabled_triggers(),
+        CMM_SCRIPTED_GUI_OUTPUT: _render_cmm_scripted_gui(),
+        ENGLISH_CMM_LOC_OUTPUT: _render_cmm_localization("english"),
+        CHINESE_CMM_LOC_OUTPUT: _render_cmm_localization("simp_chinese"),
         STATIC_CLEANUP_OUTPUT: _render_static_cleanup(),
         WAR_OVERLAP_CLEANUP_OUTPUT: _render_inverse_injections(
             STABLE_WAR_STATIC_MODIFIERS,

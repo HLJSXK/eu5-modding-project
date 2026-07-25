@@ -48,6 +48,9 @@ STABLE_COLONIAL = (
 STABLE_CMM_SCRIPTED_GUI = (
     STABLE_ROOT / "in_game" / "common" / "scripted_guis" / "SOL_cmm_scripted_gui.txt"
 )
+STABLE_CMM_VALUES = (
+    STABLE_ROOT / "in_game" / "common" / "script_values" / "SOL_cmm_values.txt"
+)
 
 MNT_GOODS_ROOT = MNT_ROOT / "in_game" / "common" / "goods"
 MNT_PRICES_ROOT = MNT_ROOT / "in_game" / "common" / "prices"
@@ -82,6 +85,16 @@ CMM_SCRIPTED_GUI_OUTPUT = (
 TRIGGERS_OUTPUT = (
     TARGET_ROOT / "in_game" / "common" / "scripted_triggers" / "zz_SOL_MnT_disabled_triggers.txt"
 )
+ENGLISH_CMM_LOC_OUTPUT = (
+    TARGET_ROOT / "main_menu" / "localization" / "english" / "SOL_MnT_cmm_l_english.yml"
+)
+CHINESE_CMM_LOC_OUTPUT = (
+    TARGET_ROOT
+    / "main_menu"
+    / "localization"
+    / "simp_chinese"
+    / "SOL_MnT_cmm_l_simp_chinese.yml"
+)
 PRICES_OUTPUT = TARGET_ROOT / "in_game" / "common" / "prices" / "zz_SOL_MnT_price_authority.txt"
 STATIC_OUTPUT = (
     TARGET_ROOT
@@ -109,13 +122,6 @@ ALL_POP_TYPES = (*POP_TYPES, "slaves")
 UPPER_TYPES = frozenset(("nobles", "clergy", "burghers", "laborers", "soldiers"))
 COMMONER_TYPES = frozenset(("laborers", "peasants", "soldiers"))
 GRAINS = ("maize", "millet", "rice")
-RETAINED_CMM_SCRIPTED_GUIS = (
-    "sol__sol_map_on_changed",
-    "sol__iwe_on_changed",
-    "sol__hwe_on_changed",
-    "sol__rwe_on_changed",
-)
-REMOVED_CMM_VARIABLES = ("sol_cts", "sol_bte", "sol_ds", "sol_ai_pr", "sol_as_enabled")
 
 
 @dataclass(frozen=True)
@@ -772,6 +778,7 @@ def _append_bool_setting(
     group_id: str,
     alias: str,
     add_scripted_gui: bool = True,
+    default_value: int = 1,
 ) -> None:
     lines.extend(
         [
@@ -780,8 +787,12 @@ def _append_bool_setting(
             f"\t\tsetting_id = {setting_id}",
             "\t\ttab_id = feat",
             f"\t\tgroup_id = {group_id}",
-            "\t\tdefault_value = 1",
+            f"\t\tdefault_value = {default_value}",
             "\t}",
+        ]
+    )
+    lines.extend(
+        [
             "\tcmm_sync_bool_alias = {",
             f"\t\tsetting = sol__{setting_id}",
             f"\t\talias = {alias}",
@@ -800,11 +811,48 @@ def _append_bool_setting(
     lines.append("")
 
 
-def _append_callback(lines: List[str], setting_id: str, alias: str) -> None:
+def _append_slider_setting(
+    lines: List[str],
+    setting_id: str,
+    alias: str,
+    default: str,
+    minimum: str,
+    maximum: str,
+    step: str,
+) -> None:
+    lines.extend(
+        [
+            "\tcmm_register_global_slider_setting = {",
+            "\t\tmod_id = sol",
+            f"\t\tsetting_id = {setting_id}",
+            "\t\ttab_id = feat",
+            "\t\tgroup_id = as",
+            f"\t\tdefault_value = {default}",
+            f"\t\tmin_value = {minimum}",
+            f"\t\tmax_value = {maximum}",
+            f"\t\tstep_value = {step}",
+            "\t}",
+            "\tcmm_sync_setting_alias = {",
+            f"\t\tsetting = sol__{setting_id}",
+            f"\t\talias = {alias}",
+            "\t}",
+            "\tcmm_add_scripted_gui = {",
+            "\t\tmod_id = sol",
+            f"\t\tsetting_id = {setting_id}",
+            "\t}",
+            "",
+        ]
+    )
+
+
+def _append_callback(
+    lines: List[str], setting_id: str, alias: str, numeric: bool = False
+) -> None:
+    sync_effect = "cmm_sync_setting_alias" if numeric else "cmm_sync_bool_alias"
     lines.extend(
         [
             f"\t\tflag:sol__{setting_id} = {{",
-            "\t\t\tcmm_sync_bool_alias = {",
+            f"\t\t\t{sync_effect} = {{",
             f"\t\t\t\tsetting = sol__{setting_id}",
             f"\t\t\t\talias = {alias}",
             "\t\t\t}",
@@ -825,11 +873,40 @@ def _append_callback(lines: List[str], setting_id: str, alias: str) -> None:
 def _render_cmm() -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# M&T stack exposes only SOL demand/map and non-economic war settings.",
+        "# Keep M&T economic authority by default while allowing explicit CMF opt-in",
+        "# to SOL's trigger-gated economic balance systems.",
+        "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
+        "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
+        "\tremove_global_variable = sol_as_enabled",
+        "\tset_global_variable = { name = sol_ae_enabled value = yes }",
+        "\tset_global_variable = { name = sol_difficulty_enabled value = yes }",
+        "\tset_global_variable = { name = sol_gdp_dev_enabled value = yes }",
+        "\tset_global_variable = { name = sol_hw_enabled value = yes }",
+        "\tset_global_variable = { name = sol_iwe_enabled value = yes }",
+        "\tset_global_variable = { name = sol_hwe_enabled value = yes }",
+        "\tset_global_variable = { name = sol_rwe_enabled value = yes }",
+        "}",
+        "",
         "REPLACE:sol_register_cmf_mod = {",
     ]
     _append_bool_setting(lines, "sol_on", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "sol", "sol_sol_map_enabled")
+    _append_bool_setting(
+        lines,
+        "mnt_as_on",
+        "as",
+        "sol_as_enabled",
+        False,
+        default_value=0,
+    )
+    _append_slider_setting(lines, "bte", "sol_bte", "-15", "-30", "30", "1")
+    _append_bool_setting(lines, "ae", "as", "sol_ae_enabled")
+    _append_slider_setting(lines, "cts", "sol_cts", "-5", "-20", "0", "1")
+    _append_slider_setting(lines, "ds", "sol_ds", "-5", "-20", "0", "1")
+    _append_bool_setting(lines, "difficulty", "as", "sol_difficulty_enabled")
+    _append_bool_setting(lines, "gdp_dev", "as", "sol_gdp_dev_enabled")
+    _append_slider_setting(lines, "ai_pr", "sol_ai_pr", "0.5", "0", "2", "0.1")
     _append_bool_setting(lines, "hw_on", "hw", "sol_hw_enabled", False)
     _append_bool_setting(lines, "iwe", "hw", "sol_iwe_enabled")
     _append_bool_setting(lines, "hwe", "hw", "sol_hwe_enabled")
@@ -845,89 +922,114 @@ def _render_cmm() -> str:
             "\t\ttrigger = var:cmf_callback",
         ]
     )
-    for setting_id, alias in (
-        ("sol_on", "sol_sol_on_enabled"),
-        ("sol_map", "sol_sol_map_enabled"),
-        ("hw_on", "sol_hw_enabled"),
-        ("iwe", "sol_iwe_enabled"),
-        ("hwe", "sol_hwe_enabled"),
-        ("rwe", "sol_rwe_enabled"),
+    for setting_id, alias, numeric in (
+        ("sol_on", "sol_sol_on_enabled", False),
+        ("sol_map", "sol_sol_map_enabled", False),
+        ("mnt_as_on", "sol_as_enabled", False),
+        ("bte", "sol_bte", True),
+        ("ae", "sol_ae_enabled", False),
+        ("cts", "sol_cts", True),
+        ("ds", "sol_ds", True),
+        ("difficulty", "sol_difficulty_enabled", False),
+        ("gdp_dev", "sol_gdp_dev_enabled", False),
+        ("ai_pr", "sol_ai_pr", True),
+        ("hw_on", "sol_hw_enabled", False),
+        ("iwe", "sol_iwe_enabled", False),
+        ("hwe", "sol_hwe_enabled", False),
+        ("rwe", "sol_rwe_enabled", False),
     ):
-        _append_callback(lines, setting_id, alias)
+        _append_callback(lines, setting_id, alias, numeric)
     lines.extend(["\t}", "}", ""])
     rendered = "\n".join(lines)
-    for forbidden in ("as_on", "bte", "ae", "cts", "ds", "difficulty", "gdp_dev", "ai_pr"):
-        if f"setting_id = {forbidden}" in rendered:
-            raise ValueError(f"Economic CMF setting survived M&T whitelist: {forbidden}")
+    for required in (
+        "mnt_as_on", "bte", "ae", "cts", "ds", "difficulty", "gdp_dev", "ai_pr"
+    ):
+        if f"setting_id = {required}" not in rendered:
+            raise ValueError(f"Opt-in M&T CMF setting is not registered: {required}")
+    if "setting_id = as_on" in rendered or "flag:sol__as_on" in rendered:
+        raise ValueError("Legacy M&T economic master setting is still registered")
     return rendered
 
 
 def _render_cmm_values() -> str:
-    rendered = "\n".join(
+    return "\n".join(
         [
             GENERATED_HEADER.rstrip(),
-            "# M&T removes SOL's economic settings; retain only their original fallback values.",
-            "sol_as_bte_scale = {",
-            "\tvalue = -0.15",
-            "}",
-            "",
-            "sol_as_cts_coeff = {",
-            "\tvalue = 0.1",
-            "}",
-            "",
-            "sol_as_ds_coeff = {",
-            "\tvalue = -0.05",
-            "}",
-            "",
-            "sol_as_ds_cap_factor = {",
-            "\tvalue = used_diplomatic_capacity",
-            "\tmultiply = -0.1",
-            "\tadd = 1",
-            "}",
-            "",
-            "sol_as_ds_scale = {",
-            "\tvalue = sol_as_ds_coeff",
-            "\tmultiply = sol_as_ds_cap_factor",
-            "}",
-            "",
-            "sol_as_ai_pr_scale = {",
-            "\tvalue = 0.005",
-            "}",
+            "# Exact-path override: restore CMF-adjustable SOL economic values for opt-in use.",
+            _read(STABLE_CMM_VALUES).rstrip(),
             "",
         ]
     )
-    for variable in REMOVED_CMM_VARIABLES:
-        if re.search(rf"\b{re.escape(variable)}\b", rendered):
-            raise ValueError(f"Removed CMM variable survived constant fallback values: {variable}")
-    return rendered
 
 
 def _render_cmm_scripted_guis() -> str:
-    source_blocks = _blocks_in_file(STABLE_CMM_SCRIPTED_GUI)
-    lines = [
-        GENERATED_HEADER.rstrip(),
-        "# Exact-path override: keep only callbacks still registered by the M&T CMM whitelist.",
-    ]
-    for key in RETAINED_CMM_SCRIPTED_GUIS:
-        block = _unique_block(source_blocks, key, "retained SOL CMM scripted GUI")
-        lines.extend(["", f"{key} = {{{block.body}}}"])
-    lines.append("")
-    rendered = "\n".join(lines)
-    for variable in REMOVED_CMM_VARIABLES:
-        if re.search(rf"\b{re.escape(variable)}\b", rendered):
-            raise ValueError(f"Removed CMM variable survived scripted GUI cleanup: {variable}")
-    return rendered
+    return "\n".join(
+        [
+            GENERATED_HEADER.rstrip(),
+            "# Exact-path override: restore callbacks for the opt-in SOL economic settings.",
+            _read(STABLE_CMM_SCRIPTED_GUI).rstrip(),
+            "",
+        ]
+    )
 
 
 def _render_disabled_triggers() -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# Old-save aliases cannot reactivate removed SOL economic balance systems.",
+        "# SOL economic balance remains off without CMF and defaults off in CMF.",
+        "# Once the player enables the master setting, the original subfeature gates apply.",
+        "",
+        "REPLACE:sol_as_is_on = {",
+        "\tAND = {",
+        "\t\thas_global_variable_map = cmm",
+        "\t\thas_global_variable = sol_as_enabled",
+        "\t}",
+        "}",
     ]
-    for trigger in ("sol_as_is_on", "sol_ae_is_on", "sol_difficulty_is_on", "sol_gdp_dev_is_on"):
-        lines.extend(["", f"REPLACE:{trigger} = {{", "\talways = no", "}"])
+    for trigger, alias in (
+        ("sol_ae_is_on", "sol_ae_enabled"),
+        ("sol_difficulty_is_on", "sol_difficulty_enabled"),
+        ("sol_gdp_dev_is_on", "sol_gdp_dev_enabled"),
+    ):
+        lines.extend(
+            [
+                "",
+                f"REPLACE:{trigger} = {{",
+                "\tAND = {",
+                "\t\tsol_as_is_on = yes",
+                f"\t\thas_global_variable = {alias}",
+                "\t}",
+                "}",
+            ]
+        )
     lines.append("")
     return "\n".join(lines)
+
+
+def _render_cmm_localization(language: str) -> str:
+    if language == "english":
+        name = "Enable SOL Economic Balance with M&T?"
+        description = (
+            "Off by default. Enables SOL's trigger-gated economic settings on top of "
+            "MEIOU and Taxes; M&T still owns generated goods, prices, and static modifiers."
+        )
+    elif language == "simp_chinese":
+        name = "启用SOL经济平衡（M&T兼容）？"
+        description = (
+            "默认关闭。开启后会在MEIOU and Taxes之上启用SOL中由开关控制的经济功能；"
+            "生成商品、价格和静态修正仍由M&T负责。"
+        )
+    else:
+        raise ValueError(f"Unsupported localization language: {language}")
+    return "\n".join(
+        [
+            f"l_{language}:",
+            f' sol__mnt_as_on_name: "{name}"',
+            f' sol__mnt_as_on_desc: "{description}"',
+            ' sol__mnt_as_on: "sol__mnt_as_on"',
+            "",
+        ]
+    )
 
 
 def _render_decoupled_action(path: Path, key: str, purpose: str) -> str:
@@ -1021,6 +1123,8 @@ def _render_outputs() -> Dict[Path, str]:
         CMM_VALUES_OUTPUT: _render_cmm_values(),
         CMM_SCRIPTED_GUI_OUTPUT: _render_cmm_scripted_guis(),
         TRIGGERS_OUTPUT: _render_disabled_triggers(),
+        ENGLISH_CMM_LOC_OUTPUT: _render_cmm_localization("english"),
+        CHINESE_CMM_LOC_OUTPUT: _render_cmm_localization("simp_chinese"),
         PRICES_OUTPUT: _render_authority_objects(
             STABLE_PRICES,
             VANILLA_PRICES_ROOT,
