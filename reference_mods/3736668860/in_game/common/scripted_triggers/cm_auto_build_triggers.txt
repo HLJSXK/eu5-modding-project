@@ -1,0 +1,177 @@
+﻿# Generic triggers for auto-building
+
+# Shared gold-threshold check. Expects scope:cm_country. Callers supply the script value to compare against.
+cm_check_country_gold_above = {
+	scope:cm_country.gold > $threshold$
+}
+
+# Root is the location. Expects $target$ = a building_type.
+# True if the building type has no instance here OR the existing instance isn't at its max level
+# AND has no level already under construction. Use for multi-level buildings to avoid queuing
+# construction beyond the cap or double-queueing while a level is still being built.
+cm_location_building_type_is_not_at_max_level = {
+	$target$ = { save_temporary_scope_as = cm_target_building_type_for_max_check }
+	trigger_if = { limit = { has_building = $target$ }
+		"building(scope:cm_target_building_type_for_max_check|owner)" = {
+			is_at_max_level = no
+			building_levels_under_construction = 0
+		}
+	}
+}
+
+# Root is the location
+cm_check_location_meets_min_market_access = {
+	market_access > 0
+}
+
+# Root is the location. True when laborers staff the location now or fill within a year via promotion (capped by source pops).
+cm_check_location_has_laborers_available_or_will_be = {
+	0 <= { value = cm_location_laborers_available add = { value = cm_combined_pop_promotion_speed_for_laborers multiply = 12 max = cm_location_laborers_promotion_source_pool } }
+}
+
+# Root is the location. True when peasants staff the location now or fill within a year via promotion (capped by source pops).
+cm_check_location_has_peasants_available_or_will_be = {
+	0 <= { value = cm_location_peasants_available add = { value = cm_combined_pop_promotion_speed_for_peasants multiply = 12 max = cm_location_peasants_promotion_source_pool } }
+}
+
+# Root is the location. Expects the building type as target and scope country. True when location has enough RGO/lumber levels for this building type: sawmill needs RGO or lumber_mill >= required; windmill/local_smelters need RGO >= required.
+# Non-RGO buildings always pass via the fallback.
+cm_auto_build_check_rgo_level_requirement_met = {
+	switch = { trigger = $target$
+		building_type:sawmill = { cm_auto_build_check_rgo_level_requirement_met_sawmill = yes }
+		building_type:windmill = { cm_auto_build_check_rgo_level_requirement_met_windmill = yes }
+		building_type:local_smelters = { cm_auto_build_check_rgo_level_requirement_met_local_smelters = yes }
+		fallback = { always = yes }
+	}
+}
+
+# Root is the location, also expects the scope country
+cm_auto_build_check_rgo_level_requirement_met_sawmill = {
+	OR = {
+		AND = { raw_material = goods:lumber cm_modifier_rgo_level >= "scope:cm_country.variable_map(cm_min_rgos_by_building_type|building_type:sawmill)" }
+		AND = { has_building = building_type:lumber_mill "building(building_type:lumber_mill|owner)" = { building_level >= "scope:cm_country.variable_map(cm_min_rgos_by_building_type|building_type:sawmill)" } }
+		"scope:cm_country.variable_map(cm_min_rgos_by_building_type|building_type:sawmill)" = 0
+	}
+}
+
+# Root is the location, also expects the scope country
+cm_auto_build_check_rgo_level_requirement_met_windmill = {
+	AND = {
+		OR = {
+			raw_material = goods:wheat
+			raw_material = goods:millet
+			raw_material = goods:rice
+		}
+		cm_modifier_rgo_level >= "scope:cm_country.variable_map(cm_min_rgos_by_building_type|building_type:windmill)"
+	}
+}
+
+# Root is the location, also expects the scope country
+cm_auto_build_check_rgo_level_requirement_met_local_smelters = {
+	AND = {
+		OR = {
+			raw_material = goods:iron
+			raw_material = goods:copper
+			raw_material = goods:tin
+			raw_material = goods:lead
+		}
+		cm_modifier_rgo_level >= "scope:cm_country.variable_map(cm_min_rgos_by_building_type|building_type:local_smelters)"
+	}
+}
+
+# --- Generic auto-build trigger chain ---
+# These replace the old per-building trigger files. All building-specific
+# logic is resolved dynamically via engine triggers and precomputed maps.
+
+# Expects scopes: building_type, country. Root is the location.
+cm_location_can_auto_build = {
+	cm_auto_build_will_auto_build = { target = scope:cm_building_type }
+	cm_location_has_no_auto_build_chain_predecessor = yes
+}
+
+# Expects scope:cm_country, with cm_auto_build_chain_predecessors populated by cm_auto_build_resolve_building_type, and scope:cm_location.
+# True when the location has none of the resolved building type's obsolete predecessor tiers.
+cm_location_has_no_auto_build_chain_predecessor = {
+	scope:cm_country = {
+		NOT = {
+			any_in_list = {
+				variable = cm_auto_build_chain_predecessors
+				scope:cm_location = { has_building = prev }
+			}
+		}
+	}
+}
+
+# Root is the location. Expects the building type as a target, also expects the scope country.
+cm_auto_build_will_auto_build = {
+	scope:cm_country = { cm_should_pause_auto_expand = no }
+	save_temporary_scope_as = cm_location
+	# Auto-build only constructs one level per location. Multi-level upgrades
+	# are handled by the auto-expand-buildings feature.
+	NOT = { has_building = $target$ }
+	cm_location_allowed_to_build = { target = $target$ }
+	cm_auto_build_check_meets_minimum_control = { target = $target$ }
+	cm_auto_build_check_meets_minimum_market_price_impact = { target = $target$ }
+	cm_location_has_enough_pops_available = yes
+	cm_auto_build_check_rgo_level_requirement_met = { target = $target$ }
+	cm_check_location_meets_min_market_access = yes
+}
+
+# Root is the location. Expects the building type as a target, also expects the scope country.
+# Uses can_build_building to check all placement prerequisites such as tech, location rank, terrain, and culture.
+# Foreign-only building types with is_foreign = yes, such as hanseatic_kontor and fondaco, are excluded:
+# can_build_building does not filter them out, but auto-expanding them in owned locations is not supported.
+cm_location_allowed_to_build = {
+	scope:cm_country = { save_temporary_scope_as = actor }
+	$target$ = { is_foreign = no }
+	can_build_building = $target$
+	scope:cm_country = { can_build_building = $target$ }
+}
+
+# Expects scopes: country, location
+# Expects param: target => building_type
+cm_auto_build_check_meets_minimum_control = {
+	scope:cm_location.max_control >= $target$.cm_get_minimum_control_for_auto_build
+}
+
+# Expects scopes: country, location
+# Expects param: target => building_type
+# The 0.005 added is a 0.5% tolerance so that a setting of -33% matches a cost
+# adjustment of -32.5%, avoiding float-rounding misses at the boundary.
+cm_auto_build_check_meets_minimum_market_price_impact = {
+	OR = {
+		$target$ = { save_temporary_scope_as = cm_building_type cm_get_standard_construction_demand_total = 0 }
+		$target$ = { cm_get_standard_construction_cost_adjustment_for_building_type <= { value = cm_get_minimum_market_price_impact_for_auto_build add = 0.005 } }
+	}
+}
+
+# --- Auto Build Capital triggers ---
+# Root is the capital location. Expects scope:cm_building_type, scope:cm_country.
+# Reads min_discount from the per-feature priority list field
+# cm_priority_min_discount keyed on flag:cm_feature_auto_build_capital.
+# Allows multi-level capital buildings such as chancery to be queued up to their cap:
+# cm_location_building_type_is_not_at_max_level passes when the building doesn't
+# exist yet OR exists below max with no level currently under construction.
+cm_capital_location_can_auto_build = {
+	scope:cm_country = { cm_should_pause_auto_expand = no }
+	save_temporary_scope_as = cm_location
+	cm_location_building_type_is_not_at_max_level = { target = scope:cm_building_type }
+	cm_location_allowed_to_build = { target = scope:cm_building_type }
+	cm_location_has_enough_pops_available = yes
+	cm_check_location_meets_min_market_access = yes
+	cm_capital_meets_min_discount = yes
+	cm_get_open_build_queue_slots > 0
+}
+
+# Expects scopes: country, location, building_type.
+# Discount setting is read from the priority list's per-feature min_discount field.
+# Demand-only buildings with zero standard construction demand always pass.
+# 0.005 tolerance matches the auto_build_list discount check so a -33% slider
+# accepts a -32.5% real cost adjustment without float-rounding misses.
+cm_capital_meets_min_discount = {
+	OR = {
+		scope:cm_building_type = { save_temporary_scope_as = cm_building_type cm_get_standard_construction_demand_total = 0 }
+		scope:cm_building_type = { cm_get_standard_construction_cost_adjustment_for_building_type <= { value = cm_get_min_discount_for_auto_build_capital add = 0.005 } }
+	}
+}
+

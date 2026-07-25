@@ -1,0 +1,570 @@
+﻿# Custom CMM integration code not managed by the visual editor.
+# Called after the visual-editor-managed cm_register_cmf_mod completes.
+
+# Post-registration: apply metric bounds, override default values, and build lookup tables.
+# Scope: country
+cm_cmm_post_registration = {
+	cm_apply_expand_metric_bounds = yes
+
+	# early_council_hall, minting_office, and settlement_building build regardless of control, since they raise control and population.
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = auto_build_list field_id = min_control item = 1 value = 0 }
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = auto_build_list field_id = min_control item = 2 value = 0 }
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = auto_build_list field_id = min_control item = 3 value = 0 }
+
+	# Auto-expand buildings and RGOs start enabled; auto-build capital builds regardless of construction material prices.
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = priority_list field_id = enabled item = 1 value = 1 }
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = priority_list field_id = enabled item = 2 value = 1 }
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = priority_list field_id = min_discount item = 7 value = 33 }
+
+	# Gold and Silver are excluded from rural-to-town urbanization by default.
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = auto_urbanize_ignore_list field_id = ignored item = 1 value = 1 }
+	cmm_set_list_field_default_for_item = { mod_id = cm setting_id = auto_urbanize_ignore_list field_id = ignored item = 2 value = 1 }
+
+	cm_repair_expand_thresholds = yes
+
+	# Build lookup tables from CMM list fields
+	cm_rebuild_priority_lookups = yes
+	cm_rebuild_auto_build_lookups = yes
+	cm_rebuild_auto_food_lookups = yes
+	cm_rebuild_auto_urbanize_lookups = yes
+	cm_rebuild_auto_town_rights_lookups = yes
+
+	# Hide buildings whose advance hasn't been researched yet
+	cm_update_auto_build_list_visibility = yes
+	# Hide town rights whose potential doesn't pass for this country
+	cm_update_auto_town_rights_list_visibility = yes
+	# Hide food goods and ignore-list goods the country doesn't produce
+	cm_update_auto_food_list_visibility = yes
+	cm_update_auto_urbanize_ignore_list_visibility = yes
+}
+
+# Rebuild priority feature lookup tables from CMM list field data.
+# Called on registration and on every setting change.
+# Scope: country
+cm_rebuild_priority_lookups = {
+	if = {
+		limit = { NOT = { has_variable_list = cmm_list_items_cm__priority_list } }
+	}
+	else = {
+
+	# Ordered features list for monthly pulse iteration in priority order.
+	cmm_build_list_ordered_values = { setting = cm__priority_list list_name = cm_priority_features_list }
+
+	# Gate threshold by feature, numeric field slot 1, direct values.
+	cmm_build_list_field_map = { setting = cm__priority_list field_slot = 1 map_name = cm_priority_min_profit multiply = 1 }
+
+	# Min discount by feature, numeric field slot 2, CMM -33..33 -> -0.33..0.33.
+	cmm_build_list_field_map = { setting = cm__priority_list field_slot = 2 map_name = cm_priority_min_discount multiply = 0.01 }
+
+	# Enabled features, bool field slot 3.
+	cmm_build_list_bool_list = { setting = cm__priority_list field_slot = 3 list_name = cm_priority_features_enabled }
+
+	} # end guard
+}
+
+# Re-register the threshold field with the active metric's bounds and localization.
+# Called on registration and on metric change.
+# Scope: country
+cm_apply_expand_metric_bounds = {
+	if = {
+		limit = {
+			OR = {
+				NOT = { exists = var:cm_expand_metric }
+				var:cm_expand_metric <= 2
+			}
+		}
+		cmm_register_list_numeric_field = {
+			mod_id = cm
+			setting_id = priority_list
+			field_id = min_profit
+			default_value = 0
+			min_value = 0
+			max_value = 15
+			step_value = 0.1
+		}
+	}
+	else = {
+		cmm_register_list_numeric_field = {
+			mod_id = cm
+			setting_id = priority_list
+			field_id = min_profit
+			default_value = 0
+			min_value = 0
+			max_value = 100
+			step_value = 1
+		}
+	}
+	cmm_set_list_field_format = { mod_id = cm setting_id = priority_list field_id = min_profit }
+	# The metric-change path doesn't reset the loc keys.
+	if = {
+		limit = {
+			exists = var:cm_expand_metric
+			var:cm_expand_metric = 2
+		}
+		cmm_set_list_field_localization = {
+			mod_id = cm
+			setting_id = priority_list
+			field_id = min_profit
+			name = cm__priority_list__min_profit_profit_name
+			root = cm__priority_list__min_profit
+		}
+	}
+	else_if = {
+		limit = {
+			exists = var:cm_expand_metric
+			var:cm_expand_metric >= 3
+		}
+		cmm_set_list_field_localization = {
+			mod_id = cm
+			setting_id = priority_list
+			field_id = min_profit
+			name = cm__priority_list__min_profit_roi_name
+			root = cm__priority_list__min_profit_roi
+		}
+	}
+	else = {
+		cmm_set_list_field_localization = {
+			mod_id = cm
+			setting_id = priority_list
+			field_id = min_profit
+			name = cm__priority_list__min_profit_name
+			root = cm__priority_list__min_profit
+		}
+	}
+}
+
+# Copy the live threshold column into metric $m$'s memory variables.
+# Reads go through local variables; an inline variable_map lookup as an effect
+# value resolves to empty. Unreadable entries are stored as 0.
+# Scope: country
+cm_save_expand_thresholds = {
+	set_variable = { name = cm_expand_threshold_buildings_m$m$ value = 0 }
+	if = {
+		limit = { is_key_in_variable_map = { name = cmm target = flag:cm__priority_list_i1_f1 } }
+		set_local_variable = { name = cm_tmp_field_key value = flag:cm__priority_list_i1_f1 }
+		set_local_variable = { name = cm_tmp_read value = "variable_map(cmm|local_var:cm_tmp_field_key)" }
+		if = {
+			limit = {
+				trigger_if = {
+					limit = { exists = local_var:cm_tmp_read }
+					local_var:cm_tmp_read >= 0
+				}
+				trigger_else = {
+					always = no
+				}
+			}
+			set_variable = { name = cm_expand_threshold_buildings_m$m$ value = local_var:cm_tmp_read }
+		}
+	}
+	set_variable = { name = cm_expand_threshold_rgos_m$m$ value = 0 }
+	if = {
+		limit = { is_key_in_variable_map = { name = cmm target = flag:cm__priority_list_i2_f1 } }
+		set_local_variable = { name = cm_tmp_field_key value = flag:cm__priority_list_i2_f1 }
+		set_local_variable = { name = cm_tmp_read2 value = "variable_map(cmm|local_var:cm_tmp_field_key)" }
+		if = {
+			limit = {
+				trigger_if = {
+					limit = { exists = local_var:cm_tmp_read2 }
+					local_var:cm_tmp_read2 >= 0
+				}
+				trigger_else = {
+					always = no
+				}
+			}
+			set_variable = { name = cm_expand_threshold_rgos_m$m$ value = local_var:cm_tmp_read2 }
+		}
+	}
+
+	# Benign warning suppression
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = cm_tmp_field_key }
+	}
+}
+
+# Copy metric $m$'s memory variables into the live threshold column. Missing
+# entries load as 0.
+# Scope: country
+cm_load_expand_thresholds = {
+	remove_from_variable_map = { name = cmm key = flag:cm__priority_list_i1_f1 }
+	if = {
+		limit = { exists = var:cm_expand_threshold_buildings_m$m$ }
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i1_f1 value = var:cm_expand_threshold_buildings_m$m$ }
+	}
+	else = {
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i1_f1 value = 0 }
+	}
+	remove_from_variable_map = { name = cmm key = flag:cm__priority_list_i2_f1 }
+	if = {
+		limit = { exists = var:cm_expand_threshold_rgos_m$m$ }
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i2_f1 value = var:cm_expand_threshold_rgos_m$m$ }
+	}
+	else = {
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i2_f1 value = 0 }
+	}
+}
+
+# Copy metric $m$'s threshold memory from scope:old_country.
+# Scope: country
+cm_copy_expand_thresholds = {
+	if = {
+		limit = { scope:old_country = { exists = var:cm_expand_threshold_buildings_m$m$ } }
+		set_variable = { name = cm_expand_threshold_buildings_m$m$ value = scope:old_country.var:cm_expand_threshold_buildings_m$m$ }
+	}
+	if = {
+		limit = { scope:old_country = { exists = var:cm_expand_threshold_rgos_m$m$ } }
+		set_variable = { name = cm_expand_threshold_rgos_m$m$ value = scope:old_country.var:cm_expand_threshold_rgos_m$m$ }
+	}
+}
+
+# Restore 0 in the live threshold column where an entry is unreadable.
+# Scope: country
+cm_repair_expand_thresholds = {
+	set_local_variable = { name = cm_tmp_field_key value = flag:cm__priority_list_i1_f1 }
+	set_local_variable = { name = cm_tmp_read value = "variable_map(cmm|local_var:cm_tmp_field_key)" }
+	if = {
+		limit = {
+			trigger_if = {
+				limit = { exists = local_var:cm_tmp_read }
+				NOT = { local_var:cm_tmp_read >= 0 }
+			}
+			trigger_else = {
+				always = yes
+			}
+		}
+		remove_from_variable_map = { name = cmm key = flag:cm__priority_list_i1_f1 }
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i1_f1 value = 0 }
+	}
+	set_local_variable = { name = cm_tmp_field_key value = flag:cm__priority_list_i2_f1 }
+	set_local_variable = { name = cm_tmp_read2 value = "variable_map(cmm|local_var:cm_tmp_field_key)" }
+	if = {
+		limit = {
+			trigger_if = {
+				limit = { exists = local_var:cm_tmp_read2 }
+				NOT = { local_var:cm_tmp_read2 >= 0 }
+			}
+			trigger_else = {
+				always = yes
+			}
+		}
+		remove_from_variable_map = { name = cmm key = flag:cm__priority_list_i2_f1 }
+		add_to_variable_map = { name = cmm key = flag:cm__priority_list_i2_f1 value = 0 }
+	}
+}
+
+# Per-metric threshold memory: each metric keeps its own per-feature column values.
+# var:cm_expand_metric still holds the outgoing metric when this runs; the cmm map
+# already holds the incoming one.
+# Scope: country
+cm_apply_expand_metric_change = {
+	set_local_variable = { name = cm_tmp_incoming_metric value = "variable_map(cmm|flag:cm__expand_metric)" }
+	set_local_variable = { name = cm_tmp_metric_changed value = 0 }
+	if = {
+		limit = { NOT = { local_var:cm_tmp_incoming_metric = var:cm_expand_metric } }
+		set_local_variable = { name = cm_tmp_metric_changed value = 1 }
+		switch = {
+			trigger = var:cm_expand_metric
+			1 = { cm_save_expand_thresholds = { m = 1 } }
+			2 = { cm_save_expand_thresholds = { m = 2 } }
+			3 = { cm_save_expand_thresholds = { m = 3 } }
+			4 = { cm_save_expand_thresholds = { m = 4 } }
+		}
+	}
+	cmm_sync_setting_alias = {
+		setting = cm__expand_metric
+		alias = cm_expand_metric
+	}
+	cm_apply_expand_metric_bounds = yes
+	if = {
+		limit = { local_var:cm_tmp_metric_changed = 1 }
+		switch = {
+			trigger = var:cm_expand_metric
+			1 = { cm_load_expand_thresholds = { m = 1 } }
+			2 = { cm_load_expand_thresholds = { m = 2 } }
+			3 = { cm_load_expand_thresholds = { m = 3 } }
+			4 = { cm_load_expand_thresholds = { m = 4 } }
+		}
+		cm_rebuild_priority_lookups = yes
+	}
+}
+
+cm_toggle_priority_feature = {
+	clear_variable_list = cm_priority_desired_enabled
+	every_in_list = {
+		variable = cm_priority_features_enabled
+		save_scope_as = cm_desired_feature
+		root = { add_to_variable_list = { name = cm_priority_desired_enabled target = scope:cm_desired_feature } }
+	}
+	if = {
+		limit = { is_target_in_variable_list = { name = cm_priority_desired_enabled target = flag:$feature$ } }
+		remove_list_variable = { name = cm_priority_desired_enabled target = flag:$feature$ }
+	}
+	else = {
+		add_to_variable_list = { name = cm_priority_desired_enabled target = flag:$feature$ }
+	}
+	cmm_for_each_list_item = {
+		setting = cm__priority_list
+		effect = cm_apply_priority_desired_item
+	}
+	cm_rebuild_priority_lookups = yes
+	clear_variable_list = cm_priority_desired_enabled
+}
+
+cm_apply_priority_desired_item = {
+	if = {
+		limit = { is_target_in_variable_list = { name = cm_priority_desired_enabled target = scope:cmm_list_current_item_value } }
+		remove_from_variable_map = { name = cmm key = flag:$setting$_i$i$_f3 }
+		add_to_variable_map = { name = cmm key = flag:$setting$_i$i$_f3 value = 1 }
+	}
+	else = {
+		remove_from_variable_map = { name = cmm key = flag:$setting$_i$i$_f3 }
+		add_to_variable_map = { name = cmm key = flag:$setting$_i$i$_f3 value = 0 }
+	}
+	if = { limit = { always = no } cmf_suppress = { v = $setting$_$i$ } }
+}
+
+# Rebuild all lookup tables from CMM list field data.
+# Called on registration and on every setting change.
+# Scope: country
+cm_rebuild_auto_build_lookups = {
+	# Guard: skip if CMM list data doesn't exist yet; first registration may not have completed.
+	if = {
+		limit = { NOT = { has_variable_list = cmm_list_items_cm__auto_build_list } }
+		# List not initialized yet - lookups will be built on next registration cycle
+	}
+	else = {
+
+	# Ordered building types list for monthly pulse iteration in priority order.
+	cmm_build_list_ordered_values = { setting = cm__auto_build_list list_name = cm_auto_build_building_types_list }
+
+	# Enabled building types, bool field slot 1.
+	cmm_build_list_bool_list = { setting = cm__auto_build_list field_slot = 1 list_name = cm_auto_build_building_types_enabled }
+
+	# Subjects-enabled building types, bool field slot 2.
+	cmm_build_list_bool_list = { setting = cm__auto_build_list field_slot = 2 list_name = cm_auto_build_building_types_in_subjects_enabled }
+
+	# Min control by building type, numeric field slot 3, CMM 0-100 -> 0-1.
+	cmm_build_list_field_map = { setting = cm__auto_build_list field_slot = 3 map_name = cm_min_control_by_building_type multiply = 0.01 }
+
+	# Min discount by building type, numeric field slot 4, CMM -33..33 -> -0.33..0.33.
+	cmm_build_list_field_map = { setting = cm__auto_build_list field_slot = 4 map_name = cm_min_discount_by_building_type multiply = 0.01 }
+
+	# Min RGOs by building type, numeric field slot 5, direct values.
+	cmm_build_list_field_map = { setting = cm__auto_build_list field_slot = 5 map_name = cm_min_rgos_by_building_type multiply = 1 }
+
+	} # end guard
+}
+
+# Rebuild auto-urbanize ignore list lookup from CMM list field data.
+# Called on registration and on every setting change.
+# Scope: country
+cm_rebuild_auto_urbanize_lookups = {
+	if = {
+		limit = { NOT = { has_variable_list = cmm_list_items_cm__auto_urbanize_ignore_list } }
+	}
+	else = {
+
+	# Goods marked ignored, bool field slot 1.
+	cmm_build_list_bool_list = { setting = cm__auto_urbanize_ignore_list field_slot = 1 list_name = cm_auto_urbanize_ignored_rgo_goods }
+
+	} # end guard
+}
+
+# Rebuild auto town rights lookup tables from CMM list field data.
+# Called on registration and on every setting change.
+# Scope: country
+cm_rebuild_auto_town_rights_lookups = {
+	if = {
+		limit = { NOT = { has_variable_list = cmm_list_items_cm__auto_town_rights_list } }
+	}
+	else = {
+
+	# Ordered town rights list for monthly pulse iteration in priority order.
+	cmm_build_list_ordered_values = { setting = cm__auto_town_rights_list list_name = cm_auto_town_rights_list }
+
+	# Enabled town rights, bool field slot 1.
+	cmm_build_list_bool_list = { setting = cm__auto_town_rights_list field_slot = 1 list_name = cm_auto_town_rights_enabled }
+
+	} # end guard
+}
+
+# Rebuild all food auto-build lookup tables from CMM list field data.
+# Called on registration and on every setting change.
+# Scope: country
+cm_rebuild_auto_food_lookups = {
+	if = {
+		limit = { NOT = { has_variable_list = cmm_list_items_cm__auto_food_list } }
+	}
+	else = {
+
+	# Ordered food RGO types list for daily tick iteration in priority order.
+	cmm_build_list_ordered_values = { setting = cm__auto_food_list list_name = cm_auto_food_rgo_types_list }
+
+	# Enabled food RGO types, bool field slot 2, after data column.
+	cmm_build_list_bool_list = { setting = cm__auto_food_list field_slot = 2 list_name = cm_auto_food_rgo_types_enabled }
+
+	# River-only food RGO types, bool field slot 3.
+	cmm_build_list_bool_list = { setting = cm__auto_food_list field_slot = 3 list_name = cm_auto_food_rgo_types_river_only }
+
+	# Subjects-enabled food RGO types, bool field slot 4.
+	cmm_build_list_bool_list = { setting = cm__auto_food_list field_slot = 4 list_name = cm_auto_food_rgo_types_in_subjects_enabled }
+
+	} # end guard
+}
+
+# Hide/show auto-build list rows based on whether the building's advance is researched.
+# Scope: country
+cm_update_auto_build_list_visibility = {
+	if = {
+		limit = { has_variable_list = cmm_list_items_cm__auto_build_list }
+		cmm_for_each_list_item = {
+			setting = cm__auto_build_list
+			effect = cm_auto_build_list_update_visibility_item
+		}
+	}
+}
+
+# Callback for cmm_for_each_list_item. Shows or hides item $i$ based on advance status.
+# $i$ = item position in the list. $setting$ = composite key. scope:cmm_list_current_item_value = building_type.
+# Root: country
+cm_auto_build_list_update_visibility_item = {
+	if = {
+		limit = { can_build_building = scope:cmm_list_current_item_value }
+		cmm_show_list_item = { mod_id = cm setting_id = auto_build_list item = $i$ }
+	}
+	else = {
+		cmm_hide_list_item = { mod_id = cm setting_id = auto_build_list item = $i$ }
+	}
+
+	# Accept $setting$ param from cmm_for_each_list_item, unused here.
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $setting$_$i$ }
+	}
+}
+
+# Hide/show auto town rights list rows based on whether the country can currently
+# grant the right: basic advance researched, plus the right's potential block passes.
+# Scope: country
+cm_update_auto_town_rights_list_visibility = {
+	if = {
+		limit = { has_variable_list = cmm_list_items_cm__auto_town_rights_list }
+		cmm_for_each_list_item = {
+			setting = cm__auto_town_rights_list
+			effect = cm_auto_town_rights_list_update_visibility_item
+		}
+	}
+}
+
+# Callback for cmm_for_each_list_item. Shows or hides item $i$ based on the right's
+# country-level prerequisites.
+# Root: country
+cm_auto_town_rights_list_update_visibility_item = {
+	scope:cmm_list_current_item_value = { save_scope_as = cm_town_right }
+	if = {
+		limit = {
+			modifier:can_grant_town_rights = yes
+			cm_auto_town_rights_potential_passes = yes
+		}
+		cmm_show_list_item = { mod_id = cm setting_id = auto_town_rights_list item = $i$ }
+	}
+	else = {
+		cmm_hide_list_item = { mod_id = cm setting_id = auto_town_rights_list item = $i$ }
+	}
+
+	# Accept $setting$ param from cmm_for_each_list_item, unused here.
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $setting$_$i$ }
+	}
+}
+
+# Hide/show auto-food list rows based on whether the country produces the food good.
+# Scope: country
+cm_update_auto_food_list_visibility = {
+	if = {
+		limit = { has_variable_list = cmm_list_items_cm__auto_food_list }
+		cmm_for_each_list_item = {
+			setting = cm__auto_food_list
+			effect = cm_auto_food_list_update_visibility_item
+		}
+	}
+}
+
+# Callback for cmm_for_each_list_item. Shows or hides item $i$ based on whether the
+# country owns a location producing the good. scope:cmm_list_current_item_value = goods.
+# Root: country
+cm_auto_food_list_update_visibility_item = {
+	if = {
+		limit = { any_owned_location = { raw_material = scope:cmm_list_current_item_value } }
+		cmm_show_list_item = { mod_id = cm setting_id = auto_food_list item = $i$ }
+	}
+	else = {
+		cmm_hide_list_item = { mod_id = cm setting_id = auto_food_list item = $i$ }
+	}
+
+	# Accept $setting$ param from cmm_for_each_list_item, unused here.
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $setting$_$i$ }
+	}
+}
+
+# Hide/show auto-urbanize ignore list rows based on whether the country produces the good.
+# Scope: country
+cm_update_auto_urbanize_ignore_list_visibility = {
+	if = {
+		limit = { has_variable_list = cmm_list_items_cm__auto_urbanize_ignore_list }
+		cmm_for_each_list_item = {
+			setting = cm__auto_urbanize_ignore_list
+			effect = cm_auto_urbanize_ignore_list_update_visibility_item
+		}
+	}
+}
+
+# Callback for cmm_for_each_list_item. Shows or hides item $i$ based on whether the
+# country owns a location producing the good. scope:cmm_list_current_item_value = goods.
+# Root: country
+cm_auto_urbanize_ignore_list_update_visibility_item = {
+	if = {
+		limit = { any_owned_location = { raw_material = scope:cmm_list_current_item_value } }
+		cmm_show_list_item = { mod_id = cm setting_id = auto_urbanize_ignore_list item = $i$ }
+	}
+	else = {
+		cmm_hide_list_item = { mod_id = cm setting_id = auto_urbanize_ignore_list item = $i$ }
+	}
+
+	# Accept $setting$ param from cmm_for_each_list_item, unused here.
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $setting$_$i$ }
+	}
+}
+
+# CMM-specific warning suppression for lookup tables built from CMM list fields.
+_cm_cmm_suppress_warnings = {
+	if = {
+		limit = { always = no }
+		# CMM-derived lookup maps, set at runtime by cmm_build_list_* utilities.
+		cmf_suppress = { v = cm_min_control_by_building_type }
+		cmf_suppress = { v = cm_min_discount_by_building_type }
+		cmf_suppress = { v = cm_min_rgos_by_building_type }
+		# Priority list lookup tables
+		cmf_suppress = { v = cm_priority_features_list }
+		cmf_suppress = { v = cm_priority_features_enabled }
+		cmf_suppress = { v = cm_priority_desired_enabled }
+		cmf_suppress = { v = cm_priority_min_profit }
+		cmf_suppress = { v = cm_priority_min_discount }
+		cmf_suppress = { v = cmm_list_item_hidden }
+		# Food auto-build lookup lists
+		cmf_suppress = { v = cm_auto_food_rgo_types_list }
+		cmf_suppress = { v = cm_auto_food_rgo_types_enabled }
+		cmf_suppress = { v = cm_auto_food_rgo_types_river_only }
+		cmf_suppress = { v = cm_auto_food_rgo_types_in_subjects_enabled }
+		# Auto-urbanize ignore list
+		cmf_suppress = { v = cm_auto_urbanize_ignored_rgo_goods }
+		# Auto town rights lookup lists
+		cmf_suppress = { v = cm_auto_town_rights_list }
+		cmf_suppress = { v = cm_auto_town_rights_enabled }
+	}
+}

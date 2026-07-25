@@ -1,0 +1,486 @@
+﻿# Gates the construction-queue window's pass-1 driver. Root is the player.
+# Set by the dispatcher when the monthly staging queued anything; cleared by cm_q_end_cycle.
+cm_should_construct = {
+	is_shown = {
+		exists = var:cm_should_construct
+	}
+}
+
+# Gates the construction-queue window's fire driver. Root is the player.
+# Set by cm_q_sync_check once every approved entry is verified instantiated.
+cm_q_fire_approved_gate = {
+	is_shown = {
+		exists = var:cm_q_fire_approved
+	}
+}
+
+# Ends the cycle after the fire pass. Root is the player.
+cm_q_end_cycle = {
+	effect = {
+		cm_q_reset_cycle_state = yes
+	}
+}
+
+# Instantiation probe for an approved entry: the round loop triggers it on every approved
+# item widget, so a marked type proves its widget exists. Root is the location.
+cm_q_probe_build = {
+	saved_scopes = { cm_building_type }
+	is_valid = {
+		always = yes
+	}
+	effect = {
+		if = {
+			limit = { NOT = { is_target_in_variable_list = { name = cm_q_seen_build_types target = scope:cm_building_type } } }
+			add_to_variable_list = { name = cm_q_seen_build_types target = scope:cm_building_type }
+		}
+	}
+}
+
+cm_q_probe_upgrade = {
+	saved_scopes = { cm_building_type }
+	is_valid = {
+		always = yes
+	}
+	effect = {
+		if = {
+			limit = { NOT = { is_target_in_variable_list = { name = cm_q_seen_upgrade_types target = scope:cm_building_type } } }
+			add_to_variable_list = { name = cm_q_seen_upgrade_types target = scope:cm_building_type }
+		}
+	}
+}
+
+# Per-round completion check for the construct window's loop. Root is the player.
+# Arms the fire pass once every executor has run (processed >= staged) and every approved
+# entry's widget is verified by its probe mark. A cycle making no instantiation progress
+# for 8 straight rounds fires whatever is verified instead of dropping the month.
+cm_q_sync_check = {
+	is_valid = {
+		always = yes
+	}
+	effect = {
+		if = {
+			limit = { NOT = { exists = var:cm_q_fire_approved } }
+			save_scope_as = cm_q_chk_country
+			set_local_variable = { name = cm_q_chk_all_seen value = 1 }
+			set_local_variable = { name = cm_q_chk_any value = 0 }
+			set_variable = { name = cm_q_seen_count value = 0 }
+			if = {
+				limit = { var:cm_q_processed >= var:cm_q_staged }
+				every_in_list = {
+					variable = cm_q_approved_build_locations
+					save_scope_as = cm_q_chk_loc
+					scope:cm_q_chk_loc = {
+						every_in_list = {
+							variable = cm_q_approved_build_types
+							save_scope_as = cm_q_chk_type
+							scope:cm_q_chk_country = { set_local_variable = { name = cm_q_chk_any value = 1 } }
+							if = {
+								limit = { scope:cm_q_chk_loc = { is_target_in_variable_list = { name = cm_q_seen_build_types target = scope:cm_q_chk_type } } }
+								scope:cm_q_chk_country = { change_variable = { name = cm_q_seen_count add = 1 } }
+							} else = {
+								scope:cm_q_chk_country = { set_local_variable = { name = cm_q_chk_all_seen value = 0 } }
+							}
+						}
+					}
+				}
+				every_in_list = {
+					variable = cm_q_approved_upgrade_locations
+					save_scope_as = cm_q_chk_loc
+					scope:cm_q_chk_loc = {
+						every_in_list = {
+							variable = cm_q_approved_upgrade_types
+							save_scope_as = cm_q_chk_type
+							scope:cm_q_chk_country = { set_local_variable = { name = cm_q_chk_any value = 1 } }
+							if = {
+								limit = { scope:cm_q_chk_loc = { is_target_in_variable_list = { name = cm_q_seen_upgrade_types target = scope:cm_q_chk_type } } }
+								scope:cm_q_chk_country = { change_variable = { name = cm_q_seen_count add = 1 } }
+							} else = {
+								scope:cm_q_chk_country = { set_local_variable = { name = cm_q_chk_all_seen value = 0 } }
+							}
+						}
+					}
+				}
+			}
+			if = {
+				limit = {
+					var:cm_q_processed >= var:cm_q_staged
+					local_var:cm_q_chk_all_seen = 1
+				}
+				if = {
+					limit = { local_var:cm_q_chk_any = 1 }
+					set_variable = { name = cm_q_fire_approved value = yes }
+				} else = {
+					cm_q_reset_cycle_state = yes
+				}
+			} else = {
+				# Stall watchdog: progress is executor completions plus verified approved entries.
+				set_variable = { name = cm_q_progress_now value = var:cm_q_processed }
+				change_variable = { name = cm_q_progress_now add = var:cm_q_seen_count }
+				if = {
+					limit = { var:cm_q_progress_now > var:cm_q_progress_last }
+					set_variable = { name = cm_q_progress_last value = var:cm_q_progress_now }
+					set_variable = { name = cm_q_stall_rounds value = 0 }
+				} else = {
+					change_variable = { name = cm_q_stall_rounds add = 1 }
+					if = {
+						# 8 stalled rounds is about 2.4s with zero instantiation progress.
+						limit = { var:cm_q_stall_rounds >= 8 }
+						cmf_log = { action = cm_log_cycle_gave_up }
+						# The fire pass cannot reach an unverified upgrade; unwind its in-progress
+						# markers or a fort would stay blocked from re-staging.
+						every_in_list = {
+							variable = cm_q_approved_upgrade_locations
+							save_scope_as = cm_q_chk_loc
+							scope:cm_q_chk_loc = {
+								every_in_list = {
+									variable = cm_q_approved_upgrade_types
+									save_scope_as = cm_q_chk_type
+									if = {
+										limit = { NOT = { scope:cm_q_chk_loc = { is_target_in_variable_list = { name = cm_q_seen_upgrade_types target = scope:cm_q_chk_type } } } }
+										scope:cm_q_chk_loc = {
+											remove_list_variable = { name = cm_upgrade_in_progress target = scope:cm_q_chk_type }
+											remove_from_variable_map = { name = cm_upgrade_in_progress_targets key = scope:cm_q_chk_type }
+										}
+									}
+								}
+							}
+						}
+						set_variable = { name = cm_q_fire_approved value = yes }
+					}
+				}
+			}
+		}
+	}
+}
+
+# Root is the player
+cm_should_building_type_section_show = {
+	is_shown = {
+		has_global_variable = cm_process_buildings
+		OR = {
+			NOT = { has_global_variable_map = cm_building_type_processed }
+			AND = {
+				has_global_variable_map = cm_building_type_processed
+				global_variable_map_size = { name = cm_building_type_processed value < global_var:cm_building_types_to_process_count }
+			}
+		}
+	}
+}
+
+# Root is the country
+cm_building_type_section_buildings_init = {
+	saved_scopes = { cm_building_type is_producing is_multiple_levels is_fort pop_type upgrade_type }
+	effect = {
+		# debug_log = "CM: Initializing buildings [TopScope.sBuildingType('building_type').GetNameWithNoTooltip]"
+
+		# Set the which type of building this should be treated as
+		if = { limit = { AND = { scope:cm_is_producing = yes scope:cm_is_multiple_levels = yes } }
+			add_to_global_variable_map = { name = cm_building_type_to_is_production_building key = scope:cm_building_type value = 1 }
+			if = { limit = { scope:cm_is_fort = yes }
+				# debug_log = "CM: Building: [TopScope.sBuildingType('building_type').GetNameWithNoTooltip] is_production_building: yes is_fort: yes"
+			} else = {
+				# debug_log = "CM: Building: [TopScope.sBuildingType('building_type').GetNameWithNoTooltip] is_production_building: yes is_fort: no"
+			}
+		} else = {
+			add_to_global_variable_map = { name = cm_building_type_to_is_production_building key = scope:cm_building_type value = 0 }
+		}
+		# Set if this building type is a fort for discount purposes
+		if = { limit = { scope:cm_is_fort = yes }
+			add_to_global_variable_map = { name = cm_building_type_to_is_fort key = scope:cm_building_type value = 1 }
+		} else = {
+			add_to_global_variable_map = { name = cm_building_type_to_is_fort key = scope:cm_building_type value = 0 }
+		}
+		# Set the pop type employed by this building type
+		if = { limit = { exists = scope:cm_pop_type }
+			add_to_global_variable_map = { name = cm_building_type_to_pop_type key = scope:cm_building_type value = scope:cm_pop_type }
+		}
+
+		# Set the building type that this building upgrades into if there is one
+		if = { limit = { exists = scope:cm_upgrade_type }
+			add_to_global_variable_map = { name = cm_building_type_to_upgrade_type key = scope:cm_building_type value = scope:cm_upgrade_type }
+	  }
+
+		# Set that this building type has been processed
+		add_to_global_variable_map = { name = cm_building_type_processed key = scope:cm_building_type value = 1 }
+
+		# Check if all buildings have been classified
+		if = { limit = { AND = {
+			has_global_variable = cm_process_buildings
+			has_global_variable_map = cm_building_type_processed
+			global_variable_map_size = { name = cm_building_type_processed value >= global_var:cm_building_types_to_process_count }
+		} }
+			remove_global_variable = cm_process_buildings
+		}
+	}
+}
+
+cm_construction_demand = {
+	saved_scopes = { cm_building_type cm_good amount }
+	effect = {
+		# debug_log = "CM: Non-standard building type construction demand: [TopScope.sBuildingType('building_type').GetNameWithNoTooltip] [TopScope.sGoods('good').GetNameWithNoTooltip]"
+		switch = { trigger = scope:cm_good
+			goods:books = {
+				remove_from_global_variable_map = { name = cm_construction_demand_books key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_books key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:clay = {
+				remove_from_global_variable_map = { name = cm_construction_demand_clay key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_clay key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:cloth = {
+				remove_from_global_variable_map = { name = cm_construction_demand_cloth key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_cloth key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:copper = {
+				remove_from_global_variable_map = { name = cm_construction_demand_copper key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_copper key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:fine_cloth = {
+				remove_from_global_variable_map = { name = cm_construction_demand_fine_cloth key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_fine_cloth key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:firearms = {
+				remove_from_global_variable_map = { name = cm_construction_demand_firearms key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_firearms key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:glass = {
+				remove_from_global_variable_map = { name = cm_construction_demand_glass key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_glass key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:goods_gold = {
+				remove_from_global_variable_map = { name = cm_construction_demand_goods_gold key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_goods_gold key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:horses = {
+				remove_from_global_variable_map = { name = cm_construction_demand_horses key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_horses key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:jewelry = {
+				remove_from_global_variable_map = { name = cm_construction_demand_jewelry key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_jewelry key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:leather = {
+				remove_from_global_variable_map = { name = cm_construction_demand_leather key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_leather key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:liquor = {
+				remove_from_global_variable_map = { name = cm_construction_demand_liquor key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_liquor key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:livestock = {
+				remove_from_global_variable_map = { name = cm_construction_demand_livestock key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_livestock key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:lumber = {
+				remove_from_global_variable_map = { name = cm_construction_demand_lumber key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_lumber key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:marble = {
+				remove_from_global_variable_map = { name = cm_construction_demand_marble key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_marble key = scope:cm_building_type value = scope:cm_amount }
+			}
+			goods:masonry = {
+				remove_from_global_variable_map = { name = cm_construction_demand_masonry key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_masonry key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:naval_supplies = {
+				remove_from_global_variable_map = { name = cm_construction_demand_naval_supplies key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_naval_supplies key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:paper = {
+				remove_from_global_variable_map = { name = cm_construction_demand_paper key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_paper key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:salt = {
+				remove_from_global_variable_map = { name = cm_construction_demand_salt key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_salt key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:sand = {
+				remove_from_global_variable_map = { name = cm_construction_demand_sand key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_sand key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:silver = {
+				remove_from_global_variable_map = { name = cm_construction_demand_silver key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_silver key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:steel = {
+				remove_from_global_variable_map = { name = cm_construction_demand_steel key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_steel key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:stone = {
+				remove_from_global_variable_map = { name = cm_construction_demand_stone key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_stone key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:tin = {
+				remove_from_global_variable_map = { name = cm_construction_demand_tin key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_tin key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:tools = {
+				remove_from_global_variable_map = { name = cm_construction_demand_tools key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_tools key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:weaponry = {
+				remove_from_global_variable_map = { name = cm_construction_demand_weaponry key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_weaponry key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:wheat = {
+				remove_from_global_variable_map = { name = cm_construction_demand_wheat key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_wheat key = scope:cm_building_type value = scope:cm_amount }
+			}
+      goods:wool = {
+				remove_from_global_variable_map = { name = cm_construction_demand_wool key = scope:cm_building_type }
+				add_to_global_variable_map = { name = cm_construction_demand_wool key = scope:cm_building_type value = scope:cm_amount }
+			}
+		}
+	}
+}
+
+cm_produced_good = {
+	saved_scopes = { cm_building_type produced_good }
+	effect = {
+		add_to_global_variable_map = { name = cm_building_type_to_produced_good key = scope:cm_building_type value = scope:cm_produced_good }
+		switch = { trigger = scope:cm_produced_good
+			goods:books = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_books is_key_in_global_variable_map = { name = cm_construction_demand_books target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:clay = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_clay is_key_in_global_variable_map = { name = cm_construction_demand_clay target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:cloth = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_cloth is_key_in_global_variable_map = { name = cm_construction_demand_cloth target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:copper = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_copper is_key_in_global_variable_map = { name = cm_construction_demand_copper target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:fine_cloth = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_fine_cloth is_key_in_global_variable_map = { name = cm_construction_demand_fine_cloth target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:firearms = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_firearms is_key_in_global_variable_map = { name = cm_construction_demand_firearms target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:glass = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_glass is_key_in_global_variable_map = { name = cm_construction_demand_glass target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:goods_gold = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_goods_gold is_key_in_global_variable_map = { name = cm_construction_demand_goods_gold target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:horses = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_horses is_key_in_global_variable_map = { name = cm_construction_demand_horses target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:jewelry = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_jewelry is_key_in_global_variable_map = { name = cm_construction_demand_jewelry target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:leather = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_leather is_key_in_global_variable_map = { name = cm_construction_demand_leather target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:liquor = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_liquor is_key_in_global_variable_map = { name = cm_construction_demand_liquor target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:livestock = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_livestock is_key_in_global_variable_map = { name = cm_construction_demand_livestock target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:lumber = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_lumber is_key_in_global_variable_map = { name = cm_construction_demand_lumber target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:marble = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_marble is_key_in_global_variable_map = { name = cm_construction_demand_marble target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:masonry = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_masonry is_key_in_global_variable_map = { name = cm_construction_demand_masonry target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:naval_supplies = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_naval_supplies is_key_in_global_variable_map = { name = cm_construction_demand_naval_supplies target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:paper = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_paper is_key_in_global_variable_map = { name = cm_construction_demand_paper target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:salt = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_salt is_key_in_global_variable_map = { name = cm_construction_demand_salt target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:sand = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_sand is_key_in_global_variable_map = { name = cm_construction_demand_sand target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:silver = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_silver is_key_in_global_variable_map = { name = cm_construction_demand_silver target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:steel = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_steel is_key_in_global_variable_map = { name = cm_construction_demand_steel target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:stone = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_stone is_key_in_global_variable_map = { name = cm_construction_demand_stone target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:tin = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_tin is_key_in_global_variable_map = { name = cm_construction_demand_tin target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:tools = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_tools is_key_in_global_variable_map = { name = cm_construction_demand_tools target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:weaponry = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_weaponry is_key_in_global_variable_map = { name = cm_construction_demand_weaponry target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:wheat = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_wheat is_key_in_global_variable_map = { name = cm_construction_demand_wheat target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+			goods:wool = {
+				if = { limit = { has_global_variable_map = cm_construction_demand_wool is_key_in_global_variable_map = { name = cm_construction_demand_wool target = scope:cm_building_type } }
+					add_to_global_variable_map = { name = cm_building_type_produces_own_construction_good key = scope:cm_building_type value = 1 }
+				}
+			}
+		}
+	}
+}
+
