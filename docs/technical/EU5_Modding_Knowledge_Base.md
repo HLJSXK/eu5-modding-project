@@ -235,11 +235,17 @@ EU5 applies development to pop demand through two independent layers. `NPop.DEVE
 
 For a development-independent calibration baseline, both layers must be disabled. Override the define with `NPop = { DEVELOPMENT_SCALE_ON_DEMAND = 0 }`, then use late goods `INJECT` entries whose negative `development_threshold` exactly cancels each loaded positive threshold. Compatibility-mod goods require separate handling; for example, Prosper or Perish adds a threshold to `victuals` even after all vanilla thresholds have been neutralized.
 
-### 6.4. Countries
+### 6.4. Pop-Needs Income Scale
+
+Runtime testing shows that `NPop.POP_NEEDS_INCOME_SCALE` multiplies the expenditure charged to pops when they buy needs goods. Vanilla sets it to `1.33`, so a nominal goods basket costs the purchasing stratum 33% more than the goods prices imply. This is an independent purchase-side surcharge, not a demand-quantity or development multiplier.
+
+An income-closed demand system must override it with `NPop = { POP_NEEDS_INCOME_SCALE = 1 }`; otherwise measured stratum income and nominal basket costs cannot balance. Apply the override in every base deploy target that can run independently. Compatibility submods that require the full SOL target inherit its define and do not need a duplicate.
+
+### 6.5. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
 
-### 6.5. Localization
+### 6.6. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
