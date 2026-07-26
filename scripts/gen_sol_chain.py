@@ -2,6 +2,8 @@
 """
 Run the active SOL code-generation chain for one or more deploy targets.
 
+Update mode also stamps the selected metadata versions from the local date.
+
 Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py --target stable
@@ -70,6 +72,9 @@ def main() -> None:
 
     targets = _resolve_targets(args.target)
     mode_args = ["--check"] if args.check else []
+
+    if not args.check:
+        _run(["scripts/update_mod_version.py", "--target", args.target])
 
     base_targets = [target for target in targets if target in BASE_TARGET_NAMES]
     if base_targets:

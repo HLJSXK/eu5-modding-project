@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Built the Glorp UI version of `location_window.gui` directly into the main SOL target without adding runtime dependencies. SOL vendors the required extracted vanilla types and its own zoom-button type, removes external Construction Manager automation calls, and adds the SOL income display and Living Standard tooltip button on top.
 
 ### Changed
+- Changed all SOL release targets to date-based `YYMMDD` mod versions, stamped automatically by the build workflow while keeping the EU5 compatibility version separate.
 - Removed every development-based pop-demand constraint: the engine-wide development multiplier is now zero, all nine vanilla per-good development thresholds are fully negated, PP `victuals` is handled by the compatibility generator, and SOL no longer carries development-adjusted spending through its runtime or UI.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.
 - Updated documentation to reflect the new reference baseline.

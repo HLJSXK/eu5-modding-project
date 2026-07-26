@@ -29,6 +29,7 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 
 # Codegen script map: (script, inputs, outputs, when_to_run)
 CODEGEN_SCRIPTS = [
+    ("update_mod_version.py", "local date or explicit --date", "selected src/<target>/.metadata/metadata.json version fields", "Run automatically by build.bat before deployment; supports --target and --check"),
     ("gen_sol_chain.py",  "SOL demand data + vanilla/PP/M&T/JTG goods + Glorp UI", "active SOL generated files for all deploy targets", "Preferred one-shot SOL generation entry; build.bat runs it automatically"),
     ("gen_sol_pp_compat.py", "stable SOL outputs + PP definitions", "SOL-PP compact feature, demand, effects, and GUI overrides; validates PP road-price filename ownership", "After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain"),
     ("gen_sol_mnt_compat.py", "data/target_demand.csv + stable SOL + M&T definitions", "SOL-M&T goods, accounting, EPBM, CMM residual cleanup, actions, and location GUI", "After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain"),

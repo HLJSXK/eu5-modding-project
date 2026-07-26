@@ -29,6 +29,11 @@ This repository keeps only mod-related content and documentation.
 
 ## Build / Deploy
 
+Mod release versions use the local calendar date in six-digit `YYMMDD` form
+(for example, `260726` for 2026-07-26). `build.bat` stamps the selected
+target metadata automatically before generation and deployment. This is
+independent of `supported_game_version`, which continues to track EU5.
+
 Generated SOL sources are refreshed automatically before validation/deploy.
 To run the generation chain without deploying:
 

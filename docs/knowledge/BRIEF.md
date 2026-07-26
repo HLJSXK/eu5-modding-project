@@ -7,7 +7,8 @@
 ## Project Identity
 
 - Mod name: **Standard of Living (SOL)**
-- Mod ID: `hades.sol` | Version: `1.3.11` | Target: EU5 `1.3.11`
+- Mod ID: `hades.sol` | Version: `260726` | Target: EU5 `1.3.11`
+- Release versions use `YYMMDD`; `build.bat` stamps the selected target from the local date while `supported_game_version` remains independent
 - Requires Community Mod Framework v2.*; the Glorp UI location window is copied into SOL rather than declared as a runtime dependency
 - Active deploy targets: `src/stable/`, `src/sol_standalone/`, `src/sol_pp_compatibility_submod/`, `src/sol_mnt_compatibility_submod/`, and `src/sol_jtg_compatibility_submod/`
 
@@ -117,6 +118,7 @@ eu5-modding-project/
 
 | Script | When to run | Output |
 |---|---|---|
+| `update_mod_version.py` | Automatically before every `build.bat` deployment; may also be run manually with `--target` and `--date` | Selected target metadata `version` fields in `YYMMDD` form |
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all five deploy targets |
 | `gen_sol_pp_compat.py` | After changing SOL balance/demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated compact feature cleanup plus lumber correction, fixed rounded victuals demand/accounting, effect/GUI overrides, and the default-off PP GDP-to-development CMF opt-in with localization; also verifies that PP's road-price file still wins by same-operation filename order |
 | `gen_sol_mnt_compat.py` | After changing SOL demand/effects/UI or updating the M&T reference; called by `gen_sol_chain.py` | Generated M&T-based goods, unit-consumption values, economic authority, EPBM location caches, CMF/action overrides, merged location window, and the default-off SOL economic opt-in settings/value callbacks with localization in `src/sol_mnt_compatibility_submod/` |
@@ -254,6 +256,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 | Script | Input(s) | Output(s) | When to run |
 | --- | --- | --- | --- |
+| `scripts/update_mod_version.py` | local date or explicit --date | selected src/<target>/.metadata/metadata.json version fields | Run automatically by build.bat before deployment; supports --target and --check |
 | `scripts/gen_sol_chain.py` | SOL demand data + vanilla/PP/M&T/JTG goods + Glorp UI | active SOL generated files for all deploy targets | Preferred one-shot SOL generation entry; build.bat runs it automatically |
 | `scripts/gen_sol_pp_compat.py` | stable SOL outputs + PP definitions | SOL-PP compact feature, demand, effects, and GUI overrides; validates PP road-price filename ownership | After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain |
 | `scripts/gen_sol_mnt_compat.py` | data/target_demand.csv + stable SOL + M&T definitions | SOL-M&T goods, accounting, EPBM, CMM residual cleanup, actions, and location GUI | After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain |

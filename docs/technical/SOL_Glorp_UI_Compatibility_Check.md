@@ -4,7 +4,7 @@ Audit date: 2026-07-26
 
 ## Scope
 
-- Standard of Living `1.3.11` (`hades.sol`)
+- Standard of Living `260726` (`hades.sol`)
 - Workshop `3736668860`: Construction Manager `2.2.11`
 - Workshop `3601047146`: Glorp UI `1.3.10.1`
 
