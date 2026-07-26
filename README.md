@@ -24,7 +24,8 @@ This repository keeps only mod-related content and documentation.
 4. Use `src/sol_pp_compatibility_submod/` for the SOL / Prosper or Perish compatibility layer
 5. Use `src/sol_mnt_compatibility_submod/` for the SOL / MEIOU and Taxes compatibility layer
 6. Use `src/sol_jtg_compatibility_submod/` for the SOL / Just Trade Goods compatibility layer
-7. Read technical docs in `docs/technical/`
+7. The full `stable` target contains a self-contained Glorp UI-based location window; Glorp UI and Construction Manager are not required
+8. Read technical docs in `docs/technical/`
 
 ## Build / Deploy
 

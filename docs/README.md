@@ -36,6 +36,7 @@ Mod-focused documentation for the EU5 Modding Project.
 - [SOL-M&T Compatibility Check](technical/SOL_MEIOU_and_Taxes_Compatibility_Check.md) — static conflict and EPBM audit
 - [SOL-M&T Demand Audit](technical/SOL_MEIOU_and_Taxes_Pop_Demand_Audit.md) — vanilla/SOL/M&T demand comparison
 - [SOL-M&T Feature Matrix](technical/SOL_MnT_Compatibility_Feature_Matrix.md) — implemented authority, demand, maintenance, and validation contract
+- [SOL / Construction Manager / Glorp UI Compatibility Check](technical/SOL_Glorp_UI_Compatibility_Check.md) — location-window conflict audit and built-in integration strategy
 
 ## Archive
 

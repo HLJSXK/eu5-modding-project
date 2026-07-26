@@ -112,6 +112,20 @@ EU5 uses two distinct conflict mechanisms that must not be conflated:
 *   **Exact-path file overwrite**: If two sources provide the same relative path and filename, the mod file overrides the base-game/DLC file, and the mod lower in the playlist overrides a mod higher in the playlist. Only the winning file is used.
 *   **Database object edits from different files**: Files load in ASCII order, with parent-directory files before files in subdirectories. When multiple files edit the same top-level object through database keywords, however, the engine processes operation types first and filenames second.
 
+For a whole-file GUI compatibility patch, the merge base must be the final
+downstream owner, not automatically vanilla. Audit every mod that provides the
+same relative path and read dependency metadata before merging. If UI mod B
+depends on UI mod A and B's file already contains A's hooks, start from B's
+file, add the third mod's minimal changes, and load the compatibility layer
+last. Starting from vanilla would make the compatibility file syntactically
+valid while silently deleting both B's layout and A's integrated controls.
+If the merged result is intended to be Built-in rather than dependency-based,
+source provenance must not be confused with runtime ownership: copy required
+support files, rename shared custom types to a mod-owned namespace, and remove
+external widgets, scripted-GUI calls, map modes, and assets that are not also
+being internalized. A whole-file copy that still references the source mods is
+not self-contained.
+
 The database operation order, from earliest to latest, is:
 
 ```text

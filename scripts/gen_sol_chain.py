@@ -82,6 +82,10 @@ def main() -> None:
         location_args = ["--check"] if args.check else []
         _run(["scripts/generate_sol_location_window.py", *location_args])
 
+    if "stable" in base_targets:
+        location_args = ["--check"] if args.check else []
+        _run(["scripts/sync_location_window.py", *location_args])
+
     if "sol_pp_compatibility_submod" in targets:
         _run(["scripts/gen_sol_pp_compat.py", *mode_args])
 
@@ -90,6 +94,7 @@ def main() -> None:
 
     if "sol_jtg_compatibility_submod" in targets:
         _run(["scripts/gen_sol_jtg_compat.py", *mode_args])
+
 
 
 if __name__ == "__main__":
