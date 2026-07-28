@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-07-26 (date-based release version management)
+> Last updated: 2026-07-28 (temporary local-variable cleanup generation)
 
 ## Project Identity
 
@@ -125,7 +125,7 @@ eu5-modding-project/
 | `sync_location_window.py` | After updating the Glorp UI reference; called by `gen_sol_chain.py` for `stable`/`all` | Exact Glorp stable location window plus one SOL tooltip button, together with unchanged extracted vanilla type support |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline plus complete vanilla development-threshold negations; supports `--target stable\|sol_standalone\|all`) |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |
-| `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block (supports `--target stable\|sol_standalone\|all`) |
+| `gen_market_unit_consumption.py` | After `gen_demand_csv.py`, or after changing SOL market base-spending logic | `src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt`; `sol_refresh_market_pop_demand_maps` block with generated cleanup for every market-local scratch variable (supports `--target stable\|sol_standalone\|all`) |
 | `generate_sol_location_window.py` | After vanilla `location_window.gui` changes; called by `gen_sol_chain.py` for `sol_standalone`/`all` | `src/sol_standalone/in_game/gui/location_window.gui` |
 | `gen_brief.py` | After editing `*.yaml` or `PROJECT_OVERVIEW.md` | `docs/knowledge/BRIEF.md` (also calls `gen_index.py` automatically) |
 | `gen_index.py` | Called by `gen_brief.py`; or run manually after structural changes | `data/index/` symbol indexes (icons, triggers, effects, modifiers, loc keys) |

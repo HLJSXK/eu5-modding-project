@@ -56,6 +56,7 @@ MNT_GOODS_ROOT = MNT_ROOT / "in_game" / "common" / "goods"
 MNT_PRICES_ROOT = MNT_ROOT / "in_game" / "common" / "prices"
 MNT_STATIC_ROOT = MNT_ROOT / "main_menu" / "common" / "static_modifiers"
 MNT_EPBM = MNT_ROOT / "in_game" / "common" / "scripted_effects" / "epbm_calculate.txt"
+MNT_EPBM_EFFECTS = MNT_ROOT / "in_game" / "common" / "scripted_effects" / "epbm_effects.txt"
 MNT_LOCATION_GUI = MNT_ROOT / "in_game" / "gui" / "location_window.gui"
 
 VANILLA_PRICES_ROOT = VANILLA_ROOT / "in_game" / "common" / "prices"
@@ -671,6 +672,24 @@ EPBM_FINALIZE = """
 	# SOL_MNT_END location_cache_finalize
 """
 
+EPBM_CLEANUP = """
+	# SOL_MNT_BEGIN local_variable_cleanup
+	epbm_for_each_estate = { effect = sol_mnt_cleanup_epbm_estate_local_variable }
+	remove_local_variable = epbm_total_cost
+	remove_local_variable = epbm_crown_total_cost
+	remove_local_variable = epbm_shared_fraction
+	remove_local_variable = epbm_bldg_cost
+	remove_local_variable = sol_mnt_charge_factor
+	remove_local_variable = sol_mnt_power_nobles
+	remove_local_variable = sol_mnt_power_clergy
+	remove_local_variable = sol_mnt_power_burghers
+	remove_local_variable = sol_mnt_power_peasants
+	remove_local_variable = sol_mnt_power_tribes
+	remove_local_variable = sol_mnt_power_cossacks
+	remove_local_variable = sol_mnt_include_tribes
+	# SOL_MNT_END local_variable_cleanup
+"""
+
 
 def _render_epbm_body() -> str:
     original = _unique_block(_blocks_in_file(MNT_EPBM), "epbm_calculate_maintenance", "M&T EPBM").body
@@ -701,13 +720,29 @@ def _render_epbm_body() -> str:
         "\tepbm_add_estate_building_costs = yes\n" + EPBM_FINALIZE.lstrip("\n"),
         "EPBM finalization",
     )
-    if _strip_epbm_instrumentation(rendered) != original:
+    rendered = rendered.rstrip() + EPBM_CLEANUP + "\n"
+    if _strip_epbm_instrumentation(rendered).rstrip() != original.rstrip():
         raise ValueError("EPBM compatibility rendering changed M&T logic outside instrumentation markers")
     if re.search(r"\bbuilding_category\s*!=", rendered):
         raise ValueError("building_category is a simple-assign trigger; negate it with NOT")
     if re.search(r"\bis_gaelic_clans\b", rendered):
         raise ValueError("is_gaelic_clans is pop-scoped; EPBM runs in country scope")
     return rendered
+
+
+def _with_local_cleanup(body: str, names: Sequence[str]) -> str:
+    lines = [body.rstrip(), ""]
+    lines.extend(f"\tremove_local_variable = {name}" for name in names)
+    return "\n".join(lines) + "\n"
+
+
+def _render_epbm_helper_with_cleanup(
+    source: Path,
+    key: str,
+    names: Sequence[str],
+) -> str:
+    original = _unique_block(_blocks_in_file(source), key, "M&T EPBM helper").body
+    return _with_local_cleanup(original, names)
 
 
 def _render_estate_route_body() -> str:
@@ -748,6 +783,21 @@ def _render_effects(refresh: str) -> str:
     )
     epbm_body = _render_epbm_body()
     estate_route_body = _render_estate_route_body()
+    price_body = _render_epbm_helper_with_cleanup(
+        MNT_EPBM,
+        "epbm_price_building",
+        ("epbm_per_level", "epbm_price", "epbm_qty", "epbm_loc_access", "epbm_bldg_eff"),
+    )
+    set_pay_body = _render_epbm_helper_with_cleanup(
+        MNT_EPBM_EFFECTS,
+        "epbm_set_pay_from_power",
+        ("est",),
+    )
+    compute_scale_body = _render_epbm_helper_with_cleanup(
+        MNT_EPBM_EFFECTS,
+        "epbm_compute_modifier_scale",
+        ("est",),
+    )
     return "\n".join(
         [
             GENERATED_HEADER.rstrip(),
@@ -764,6 +814,17 @@ def _render_effects(refresh: str) -> str:
             "",
             "# M&T calculation preserved byte-for-byte outside SOL_MNT marker sections.",
             f"REPLACE:epbm_calculate_maintenance = {{{epbm_body}}}",
+            "",
+            "# Clear helper-local calculations while retaining epbm_bldg_cost for the parent pass.",
+            f"REPLACE:epbm_price_building = {{{price_body}}}",
+            "",
+            f"REPLACE:epbm_set_pay_from_power = {{{set_pay_body}}}",
+            "",
+            f"REPLACE:epbm_compute_modifier_scale = {{{compute_scale_body}}}",
+            "",
+            "sol_mnt_cleanup_epbm_estate_local_variable = {",
+            "\tremove_local_variable = epbm_estate_$estate$",
+            "}",
             "",
             "# Reuse M&T's existing seven-estate dispatch instead of running a second pass.",
             f"REPLACE:epbm_route_to_cur_estate = {{{estate_route_body}}}",

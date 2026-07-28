@@ -268,6 +268,35 @@ def check_global_variable_map_updates(path: Path, content: str) -> None:
         previous_meaningful_effect = effect
 
 
+_LOCAL_VARIABLE_EFFECT_RE = re.compile(
+    r"\b(?P<op>set_local_variable|change_local_variable|remove_local_variable)"
+    r"\s*=\s*(?:\{\s*name\s*=\s*)?(?P<name>[A-Za-z0-9_$]+)",
+    re.MULTILINE,
+)
+
+
+def check_local_variable_cleanup(path: Path, content: str) -> None:
+    """Require every local scratch variable written in a file to be removed."""
+    code = re.sub(r"#[^\n]*", "", content)
+    writes: dict[str, int] = {}
+    removed: set[str] = set()
+
+    for match in _LOCAL_VARIABLE_EFFECT_RE.finditer(code):
+        name = match.group("name")
+        if match.group("op") == "remove_local_variable":
+            removed.add(name)
+        else:
+            writes.setdefault(name, match.start())
+
+    for name, start in sorted(writes.items()):
+        if name not in removed:
+            line_num = code[:start].count("\n") + 1
+            issues.append(
+                f"[LOCAL_VARIABLE] {path.relative_to(REPO_ROOT)}:{line_num} -- "
+                f"temporary local variable '{name}' is written but never removed"
+            )
+
+
 def check_loc_coverage() -> None:
     """Verify every key in English localization also exists in simp_chinese."""
     en_dir = REPO_ROOT / "src" / "stable" / "main_menu" / "localization" / "english"
@@ -386,6 +415,7 @@ def main():
         check_modifier_names(path, content, modifier_whitelist)
         check_inject_demand_multiply(path, content)
         check_global_variable_map_updates(path, content)
+        check_local_variable_cleanup(path, content)
 
     # File-independent checks
     check_loc_coverage()

@@ -139,6 +139,7 @@ def _consuming_pop_types(quantities: Dict[str, float]) -> List[str]:
 
 
 def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
+    local_names = [f"sol_market_{pop_type}_unit_spending" for pop_type in POP_TYPES]
     lines: List[str] = [
         "sol_refresh_market_pop_demand_maps = {",
         "\t# Global scope. Refresh per-market unit spending and market-keyed goods counters.",
@@ -155,6 +156,12 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
         pop_types = _consuming_pop_types(quantities)
         if not pop_types:
             continue
+        local_names.extend(
+            [
+                f"sol_market_effective_price_{good}",
+                f"sol_market_consumes_{good}_count",
+            ]
+        )
 
         lines.extend(
             [
@@ -193,6 +200,10 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
                 f"\t\tadd_to_global_variable_map = {{ name = sol_market_unit_spending_{pop_type} key = scope:sol_market_cache value = local_var:sol_market_{pop_type}_unit_spending }}",
             ]
         )
+    lines.append("")
+    lines.append("\t\t# Local variables persist beyond this recurring market pass; clear all scratch values.")
+    for name in local_names:
+        lines.append(f"\t\tremove_local_variable = {name}")
     lines.extend(
         [
             "\t}",
