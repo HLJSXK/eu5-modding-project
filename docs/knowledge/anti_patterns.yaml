@@ -517,6 +517,15 @@
   source: "reference_mods/3601047146/.metadata/metadata.json; reference_mods/3601047146/in_game/gui/location_window.gui:2256-2260,7884-7895,8069-8094"
   notes: "Glorp UI depends on Construction Manager and its source window contains CM hooks plus a separately extracted vanilla type file. SOL's Built-in form uses Glorp as the visual base, vendors the required type support, renames the shared zoom type, and strips CM-only runtime references instead of forcing either external mod as a dependency."
 
+- id: monthly_savings_pressure_recomputed_for_ai
+  pattern: null
+  bad: "Calling gls_compute_savings_pressure unconditionally for every country (including AI) from the global situation's on_monthly, and again calling gls_compute_panel_display (which itself just re-runs gls_compute_savings_pressure) from gls_full_refresh_country right after sol_update_local_pop_demand_modifiers already refreshed it"
+  correction: "Gate gls_compute_savings_pressure in the situation on_monthly behind is_human = yes (AI never reads gls_savings_pressure_adjustment for panel display; the value that actually affects gameplay is recomputed monthly per-country by sol_update_local_pop_demand_modifiers via monthly_country_pulse). Drop the gls_compute_panel_display call from gls_full_refresh_country since sol_update_local_pop_demand_modifiers in the same effect chain already refreshed the identical cache."
+  category: scope
+  scope: country
+  source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:22-27; src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:2762-2779,2787-2790,3525-3532 (mirrored in src/sol_standalone)"
+  notes: "Documentation-only (no regex lint). gls_compute_savings_pressure only writes owner.var:gls_savings_pressure_adjustment, which sol_compute_location_pop_demand reads for the applied SOL modifier. For AI countries that cache is overwritten every month anyway by their own monthly_country_pulse tick before it can be consumed for display, so the situation's every-country every-month call was pure O(N_countries) waste. Same redundancy pattern as yearly_january_pulse_spike but on the monthly cadence; found during a 2026-07-28 review of monthly-tick computation cost."
+
 - id: pop_needs_income_scale_left_vanilla
   pattern: null
   bad: "Calibrating strata income and pop demand while leaving NPop.POP_NEEDS_INCOME_SCALE at the vanilla value of 1.33"
