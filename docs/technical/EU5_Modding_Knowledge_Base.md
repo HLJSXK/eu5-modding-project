@@ -291,6 +291,20 @@ prefer exact-path cleanup of obsolete script values and scripted GUIs: keep
 variable-free constant fallbacks where another parsed object still references a
 script value, and keep callbacks only for settings still registered.
 
+### 7.5. CMF Global Mod Log
+
+CMF also exposes a shared country-scoped action log for audit trails and
+host-tool reporting. The public effects are `cmf_log`,
+`cmf_log_with_args`, `cmf_log_with_scope_arg`, `cmf_log_with_scope_args`, and
+`cmf_clear_log`; the actor is always the current country scope. Log entries are
+stored in global variable maps keyed by `cmf_log_0` through `cmf_log_199`, and
+the GUI reads them through `CMFLogCount`, `CMFLogActorCountry`, and
+`CMFLogEntryText`. `cmf_log_with_args` expects localization-key flags, while
+the scope variants require saved country scopes in `cmf_log_arg1` and/or
+`cmf_log_arg2`. The clear button is hidden in multiplayer. See
+[CMF Mod Log Reference](CMF_Mod_Log_Reference.md) for the full note and
+examples.
+
 ## 8. Best Practices and Resources
 
 *   **Country pulse on_actions merge automatically**: For `monthly_country_pulse` and `yearly_country_pulse`, use the compact style `pulse = { on_actions = { my_dispatcher } }`. Duplicate pulse definitions merge their `on_actions`, so do not copy vanilla or framework entries just to preserve them.
