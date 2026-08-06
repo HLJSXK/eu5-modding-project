@@ -250,9 +250,9 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | --- | --- | --- | --- |
 | GUI Icons (`@xxx!`) | 364 | `data/index/icons.txt` | Use `@name!` in raw_text/text fields and YAML values |
 | Scripted Triggers | 512 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
-| Scripted Effects | 509 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
+| Scripted Effects | 517 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2394 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 213 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 235 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 
