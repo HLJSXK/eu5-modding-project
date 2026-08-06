@@ -2761,16 +2761,643 @@ sol_compute_location_pop_demand = {
 		set_variable = { name = sol_location_raw_demand_scale value = { value = var:sol_location_liquid_funds divide = var:sol_location_base_total_spending min = 0 } }
 	}
 	set_variable = { name = sol_location_final_demand_scale value = var:sol_location_raw_demand_scale }
+	set_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }
+	set_variable = { name = sol_location_anchor_score_nobles value = 0 }
+	set_variable = { name = sol_location_anchor_score_clergy value = 0 }
+	set_variable = { name = sol_location_anchor_score_burghers value = 0 }
+	set_variable = { name = sol_location_anchor_score_commoners value = 0 }
+	set_variable = { name = sol_location_anchor_score_tribesmen value = 0 }
+	if = {
+		limit = { var:sol_location_base_total_spending > 0 }
+		set_variable = { name = sol_location_anchor_score_nobles value = { value = var:sol_location_nobles_base_spending multiply = var:sol_location_nobles_base_spending divide = var:sol_location_base_total_spending } }
+		set_variable = { name = sol_location_anchor_score_clergy value = { value = var:sol_location_clergy_base_spending multiply = var:sol_location_clergy_base_spending divide = var:sol_location_base_total_spending } }
+		set_variable = { name = sol_location_anchor_score_burghers value = { value = var:sol_location_burghers_base_spending multiply = var:sol_location_burghers_base_spending divide = var:sol_location_base_total_spending } }
+		set_variable = { name = sol_location_anchor_score_commoners value = { value = var:sol_location_commoners_base_spending multiply = var:sol_location_commoners_base_spending divide = var:sol_location_base_total_spending } }
+		set_variable = { name = sol_location_anchor_score_tribesmen value = { value = var:sol_location_tribesmen_base_spending multiply = var:sol_location_tribesmen_base_spending divide = var:sol_location_base_total_spending } }
+	}
 }
 
-sol_update_local_pop_demand_modifiers = {
-	# root = country. Monthly pulse refreshes savings pressure and applies raw location demand.
-	gls_compute_savings_pressure = yes
+sol_country_demand_abs = {
+	set_variable = { name = $target$ value = var:$source$ }
+	if = { limit = { var:$target$ < 0 } change_variable = { name = $target$ multiply = -1 } }
+}
+
+sol_country_demand_eliminate_cell = {
+	set_variable = { name = sol_demand_cell_adjustment value = { value = var:sol_m_$pivot$_$col$ multiply = var:sol_demand_elimination_factor } }
+	change_variable = { name = sol_m_$row$_$col$ subtract = var:sol_demand_cell_adjustment }
+}
+
+sol_country_demand_eliminate_rhs = {
+	set_variable = { name = sol_demand_rhs_adjustment value = { value = var:sol_b_$pivot$ multiply = var:sol_demand_elimination_factor } }
+	change_variable = { name = sol_b_$row$ subtract = var:sol_demand_rhs_adjustment }
+}
+
+sol_country_demand_eliminate_row = {
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		set_variable = { name = sol_demand_elimination_factor value = { value = var:sol_m_$row$_$pivot$ divide = var:sol_m_$pivot$_$pivot$ } }
+		sol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 1 }
+		sol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 2 }
+		sol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 3 }
+		sol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 4 }
+		sol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 5 }
+		sol_country_demand_eliminate_rhs = { pivot = $pivot$ row = $row$ }
+	}
+}
+
+sol_country_demand_check_pivot = {
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		sol_country_demand_abs = { source = sol_m_$pivot$_$pivot$ target = sol_pivot_abs_$pivot$ }
+		if = {
+			limit = { var:sol_pivot_abs_$pivot$ <= 0.00001 }
+			set_variable = { name = sol_country_demand_solve_status value = -1 }
+			set_variable = { name = sol_country_demand_failure_pivot value = $pivot$ }
+			set_variable = { name = sol_country_demand_failure_pivot_value value = var:sol_m_$pivot$_$pivot$ }
+		}
+	}
+}
+
+sol_country_demand_backsolve_cell = {
+	set_variable = { name = sol_demand_rhs_adjustment value = { value = var:sol_m_$row$_$col$ multiply = var:sol_delta_$col$ } }
+	change_variable = { name = sol_delta_$row$ subtract = var:sol_demand_rhs_adjustment }
+}
+
+sol_country_demand_backsolve_row = {
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		set_variable = { name = sol_delta_$row$ value = var:sol_b_$row$ }
+		sol_country_demand_backsolve_cell = { row = $row$ col = 5 }
+		sol_country_demand_backsolve_cell = { row = $row$ col = 4 }
+		sol_country_demand_backsolve_cell = { row = $row$ col = 3 }
+		sol_country_demand_backsolve_cell = { row = $row$ col = 2 }
+		sol_country_demand_backsolve_cell = { row = $row$ col = 1 }
+		set_variable = { name = sol_delta_$row$ value = { value = var:sol_delta_$row$ divide = var:sol_m_$row$_$row$ } }
+	}
+}
+
+sol_country_demand_select_anchor = {
+	ordered_owned_location = {
+		limit = {
+			is_land = yes
+			var:$score$ > 0.00001
+			NOT = { has_variable = sol_demand_anchor_selected }
+		}
+		order_by = var:$score$
+		max = 1
+		check_range_bounds = no
+		save_scope_as = sol_demand_selected_anchor
+		set_variable = { name = sol_demand_anchor_selected value = 1 }
+		owner = {
+			set_variable = { name = sol_demand_anchor_$anchor$ value = scope:sol_demand_selected_anchor }
+			change_variable = { name = sol_country_demand_anchor_count add = 1 }
+		}
+	}
+}
+
+sol_country_demand_fill_anchor_column = {
+	var:sol_demand_anchor_$anchor$ = { save_scope_as = sol_demand_anchor_scope_$anchor$ }
+	set_variable = { name = sol_m_1_$col$ value = scope:sol_demand_anchor_scope_$anchor$.var:sol_location_nobles_base_spending }
+	set_variable = { name = sol_m_2_$col$ value = scope:sol_demand_anchor_scope_$anchor$.var:sol_location_clergy_base_spending }
+	set_variable = { name = sol_m_3_$col$ value = scope:sol_demand_anchor_scope_$anchor$.var:sol_location_burghers_base_spending }
+	set_variable = { name = sol_m_4_$col$ value = scope:sol_demand_anchor_scope_$anchor$.var:sol_location_commoners_base_spending }
+	set_variable = { name = sol_m_5_$col$ value = scope:sol_demand_anchor_scope_$anchor$.var:sol_location_tribesmen_base_spending }
+}
+
+sol_country_demand_clear_matrix = {
+	set_variable = { name = sol_m_1_1 value = 0 }
+	set_variable = { name = sol_m_1_2 value = 0 }
+	set_variable = { name = sol_m_1_3 value = 0 }
+	set_variable = { name = sol_m_1_4 value = 0 }
+	set_variable = { name = sol_m_1_5 value = 0 }
+	set_variable = { name = sol_m_2_1 value = 0 }
+	set_variable = { name = sol_m_2_2 value = 0 }
+	set_variable = { name = sol_m_2_3 value = 0 }
+	set_variable = { name = sol_m_2_4 value = 0 }
+	set_variable = { name = sol_m_2_5 value = 0 }
+	set_variable = { name = sol_m_3_1 value = 0 }
+	set_variable = { name = sol_m_3_2 value = 0 }
+	set_variable = { name = sol_m_3_3 value = 0 }
+	set_variable = { name = sol_m_3_4 value = 0 }
+	set_variable = { name = sol_m_3_5 value = 0 }
+	set_variable = { name = sol_m_4_1 value = 0 }
+	set_variable = { name = sol_m_4_2 value = 0 }
+	set_variable = { name = sol_m_4_3 value = 0 }
+	set_variable = { name = sol_m_4_4 value = 0 }
+	set_variable = { name = sol_m_4_5 value = 0 }
+	set_variable = { name = sol_m_5_1 value = 0 }
+	set_variable = { name = sol_m_5_2 value = 0 }
+	set_variable = { name = sol_m_5_3 value = 0 }
+	set_variable = { name = sol_m_5_4 value = 0 }
+	set_variable = { name = sol_m_5_5 value = 0 }
+	set_variable = { name = sol_b_1 value = { value = var:sol_country_demand_target_nobles subtract = var:sol_country_baseline_spending_nobles } }
+	set_variable = { name = sol_b_2 value = { value = var:sol_country_demand_target_clergy subtract = var:sol_country_baseline_spending_clergy } }
+	set_variable = { name = sol_b_3 value = { value = var:sol_country_demand_target_burghers subtract = var:sol_country_baseline_spending_burghers } }
+	set_variable = { name = sol_b_4 value = { value = var:sol_country_demand_target_commoners subtract = var:sol_country_baseline_spending_commoners } }
+	set_variable = { name = sol_b_5 value = { value = var:sol_country_demand_target_tribesmen subtract = var:sol_country_baseline_spending_tribesmen } }
+	set_variable = { name = sol_delta_1 value = 0 }
+	set_variable = { name = sol_delta_2 value = 0 }
+	set_variable = { name = sol_delta_3 value = 0 }
+	set_variable = { name = sol_delta_4 value = 0 }
+	set_variable = { name = sol_delta_5 value = 0 }
+}
+
+sol_country_demand_solve_4 = {
+	set_variable = { name = sol_country_demand_solver_size value = 4 }
+	set_variable = { name = sol_country_demand_solve_status value = 1 }
+	sol_country_demand_clear_matrix = yes
+	sol_country_demand_fill_anchor_column = { anchor = 1 col = 1 }
+	sol_country_demand_fill_anchor_column = { anchor = 2 col = 2 }
+	sol_country_demand_fill_anchor_column = { anchor = 3 col = 3 }
+	sol_country_demand_fill_anchor_column = { anchor = 4 col = 4 }
+	sol_country_demand_check_pivot = { pivot = 1 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 2 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 3 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 4 }
+	sol_country_demand_check_pivot = { pivot = 2 }
+	sol_country_demand_eliminate_row = { pivot = 2 row = 3 }
+	sol_country_demand_eliminate_row = { pivot = 2 row = 4 }
+	sol_country_demand_check_pivot = { pivot = 3 }
+	sol_country_demand_eliminate_row = { pivot = 3 row = 4 }
+	sol_country_demand_check_pivot = { pivot = 4 }
+	sol_country_demand_backsolve_row = { row = 4 }
+	sol_country_demand_backsolve_row = { row = 3 }
+	sol_country_demand_backsolve_row = { row = 2 }
+	sol_country_demand_backsolve_row = { row = 1 }
+}
+
+sol_country_demand_solve_5 = {
+	set_variable = { name = sol_country_demand_solver_size value = 5 }
+	set_variable = { name = sol_country_demand_solve_status value = 1 }
+	sol_country_demand_clear_matrix = yes
+	sol_country_demand_fill_anchor_column = { anchor = 1 col = 1 }
+	sol_country_demand_fill_anchor_column = { anchor = 2 col = 2 }
+	sol_country_demand_fill_anchor_column = { anchor = 3 col = 3 }
+	sol_country_demand_fill_anchor_column = { anchor = 4 col = 4 }
+	sol_country_demand_fill_anchor_column = { anchor = 5 col = 5 }
+	sol_country_demand_check_pivot = { pivot = 1 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 2 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 3 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 4 }
+	sol_country_demand_eliminate_row = { pivot = 1 row = 5 }
+	sol_country_demand_check_pivot = { pivot = 2 }
+	sol_country_demand_eliminate_row = { pivot = 2 row = 3 }
+	sol_country_demand_eliminate_row = { pivot = 2 row = 4 }
+	sol_country_demand_eliminate_row = { pivot = 2 row = 5 }
+	sol_country_demand_check_pivot = { pivot = 3 }
+	sol_country_demand_eliminate_row = { pivot = 3 row = 4 }
+	sol_country_demand_eliminate_row = { pivot = 3 row = 5 }
+	sol_country_demand_check_pivot = { pivot = 4 }
+	sol_country_demand_eliminate_row = { pivot = 4 row = 5 }
+	sol_country_demand_check_pivot = { pivot = 5 }
+	sol_country_demand_backsolve_row = { row = 5 }
+	sol_country_demand_backsolve_row = { row = 4 }
+	sol_country_demand_backsolve_row = { row = 3 }
+	sol_country_demand_backsolve_row = { row = 2 }
+	sol_country_demand_backsolve_row = { row = 1 }
+}
+
+sol_country_demand_validate_anchor = {
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		var:sol_demand_anchor_$anchor$ = { save_scope_as = sol_demand_validation_anchor_$anchor$ }
+		set_variable = { name = sol_candidate_scale_$anchor$ value = { value = scope:sol_demand_validation_anchor_$anchor$.var:sol_location_raw_demand_scale add = var:sol_delta_$anchor$ } }
+		if = {
+			limit = { var:sol_candidate_scale_$anchor$ < 0 }
+			set_variable = { name = sol_country_demand_solve_status value = -2 }
+			set_variable = { name = sol_country_demand_failure_anchor value = $anchor$ }
+			set_variable = { name = sol_country_demand_failure_anchor_scope value = scope:sol_demand_validation_anchor_$anchor$ }
+			set_variable = { name = sol_country_demand_failure_raw value = scope:sol_demand_validation_anchor_$anchor$.var:sol_location_raw_demand_scale }
+			set_variable = { name = sol_country_demand_failure_delta value = var:sol_delta_$anchor$ }
+			set_variable = { name = sol_country_demand_failure_candidate value = var:sol_candidate_scale_$anchor$ }
+		}
+		if = {
+			limit = { var:sol_candidate_scale_$anchor$ > 20 }
+			set_variable = { name = sol_country_demand_solve_status value = -3 }
+			set_variable = { name = sol_country_demand_failure_anchor value = $anchor$ }
+			set_variable = { name = sol_country_demand_failure_anchor_scope value = scope:sol_demand_validation_anchor_$anchor$ }
+			set_variable = { name = sol_country_demand_failure_raw value = scope:sol_demand_validation_anchor_$anchor$.var:sol_location_raw_demand_scale }
+			set_variable = { name = sol_country_demand_failure_delta value = var:sol_delta_$anchor$ }
+			set_variable = { name = sol_country_demand_failure_candidate value = var:sol_candidate_scale_$anchor$ }
+		}
+		sol_country_demand_abs = { source = sol_delta_$anchor$ target = sol_delta_abs_$anchor$ }
+		if = { limit = { var:sol_delta_abs_$anchor$ > var:sol_country_demand_max_adjustment } set_variable = { name = sol_country_demand_max_adjustment value = var:sol_delta_abs_$anchor$ } }
+	}
+}
+
+sol_country_demand_apply_anchor = {
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		var:sol_demand_anchor_$anchor$ = {
+			set_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_raw_demand_scale add = owner.var:sol_delta_$anchor$ min = 0 } }
+			set_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }
+		}
+	}
+}
+
+sol_country_demand_finalize_diagnostics = {
+	set_variable = { name = sol_country_solved_spending_nobles value = 0 }
+	set_variable = { name = sol_country_solved_spending_clergy value = 0 }
+	set_variable = { name = sol_country_solved_spending_burghers value = 0 }
+	set_variable = { name = sol_country_solved_spending_commoners value = 0 }
+	set_variable = { name = sol_country_solved_spending_tribesmen value = 0 }
 	if = {
 		limit = { num_locations > 0 }
 		every_owned_location = {
 			limit = { is_land = yes }
+			save_scope_as = sol_demand_diagnostic_location
+			owner = {
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_diagnostic_location.var:sol_location_nobles_base_spending multiply = scope:sol_demand_diagnostic_location.var:sol_location_final_demand_scale } }
+				change_variable = { name = sol_country_solved_spending_nobles add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_diagnostic_location.var:sol_location_clergy_base_spending multiply = scope:sol_demand_diagnostic_location.var:sol_location_final_demand_scale } }
+				change_variable = { name = sol_country_solved_spending_clergy add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_diagnostic_location.var:sol_location_burghers_base_spending multiply = scope:sol_demand_diagnostic_location.var:sol_location_final_demand_scale } }
+				change_variable = { name = sol_country_solved_spending_burghers add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_diagnostic_location.var:sol_location_commoners_base_spending multiply = scope:sol_demand_diagnostic_location.var:sol_location_final_demand_scale } }
+				change_variable = { name = sol_country_solved_spending_commoners add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_diagnostic_location.var:sol_location_tribesmen_base_spending multiply = scope:sol_demand_diagnostic_location.var:sol_location_final_demand_scale } }
+				change_variable = { name = sol_country_solved_spending_tribesmen add = var:sol_demand_scaled_tmp }
+			}
+		}
+	}
+	set_variable = { name = sol_country_demand_error_nobles value = { value = var:sol_country_solved_spending_nobles subtract = var:sol_country_demand_target_nobles } }
+	set_variable = { name = sol_country_demand_error_clergy value = { value = var:sol_country_solved_spending_clergy subtract = var:sol_country_demand_target_clergy } }
+	set_variable = { name = sol_country_demand_error_burghers value = { value = var:sol_country_solved_spending_burghers subtract = var:sol_country_demand_target_burghers } }
+	set_variable = { name = sol_country_demand_error_commoners value = { value = var:sol_country_solved_spending_commoners subtract = var:sol_country_demand_target_commoners } }
+	set_variable = { name = sol_country_demand_error_tribesmen value = { value = var:sol_country_solved_spending_tribesmen subtract = var:sol_country_demand_target_tribesmen } }
+}
+
+sol_country_demand_prepare_log_anchor = {
+	if = {
+		limit = { has_variable = sol_demand_anchor_$anchor$ }
+		var:sol_demand_anchor_$anchor$ = { save_scope_as = sol_country_demand_log_anchor_scope_$anchor$ }
+		set_variable = { name = sol_candidate_scale_$anchor$ value = { value = scope:sol_country_demand_log_anchor_scope_$anchor$.var:sol_location_raw_demand_scale add = var:sol_delta_$anchor$ } }
+	}
+}
+
+sol_country_demand_log_clear_entry = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_status key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_solver_size key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_count key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_max_adjustment key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_anchor key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_anchor_scope key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_pivot key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_pivot_value key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_raw key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_delta key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_candidate key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_nobles key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_clergy key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_burghers key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_commoners key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_tribesmen key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_nobles key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_clergy key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_burghers key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_commoners key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_tribesmen key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_nobles key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_clergy key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_burghers key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_commoners key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_tribesmen key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_5 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_5 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_5 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_5 key = scope:_cmf_log_key }
+}
+
+sol_country_demand_log_store_anchor = {
+	if = {
+		limit = { has_variable = sol_demand_anchor_$anchor$ }
+		var:sol_demand_anchor_$anchor$ = { save_scope_as = sol_country_demand_log_store_anchor_scope_$anchor$ }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_$anchor$ key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_anchor_$anchor$ key = scope:_cmf_log_key value = scope:sol_country_demand_log_store_anchor_scope_$anchor$ }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_$anchor$ key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_anchor_raw_$anchor$ key = scope:_cmf_log_key value = scope:sol_country_demand_log_store_anchor_scope_$anchor$.var:sol_location_raw_demand_scale }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_$anchor$ key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_anchor_delta_$anchor$ key = scope:_cmf_log_key value = var:sol_delta_$anchor$ }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_$anchor$ key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_$anchor$ key = scope:_cmf_log_key value = var:sol_candidate_scale_$anchor$ }
+	}
+}
+
+sol_country_demand_log_store_common = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_status key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_status key = scope:_cmf_log_key value = var:sol_country_demand_solve_status }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_solver_size key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_solver_size key = scope:_cmf_log_key value = var:sol_country_demand_solver_size }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_count key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_anchor_count key = scope:_cmf_log_key value = var:sol_country_demand_anchor_count }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_max_adjustment key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_max_adjustment key = scope:_cmf_log_key value = var:sol_country_demand_max_adjustment }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_anchor key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_anchor key = scope:_cmf_log_key value = var:sol_country_demand_failure_anchor }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_pivot key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_pivot key = scope:_cmf_log_key value = var:sol_country_demand_failure_pivot }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_pivot_value key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_pivot_value key = scope:_cmf_log_key value = var:sol_country_demand_failure_pivot_value }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_raw key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_raw key = scope:_cmf_log_key value = var:sol_country_demand_failure_raw }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_delta key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_delta key = scope:_cmf_log_key value = var:sol_country_demand_failure_delta }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_candidate key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_candidate key = scope:_cmf_log_key value = var:sol_country_demand_failure_candidate }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_nobles key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_base_nobles key = scope:_cmf_log_key value = var:sol_country_base_spending_nobles }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_clergy key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_base_clergy key = scope:_cmf_log_key value = var:sol_country_base_spending_clergy }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_burghers key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_base_burghers key = scope:_cmf_log_key value = var:sol_country_base_spending_burghers }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_commoners key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_base_commoners key = scope:_cmf_log_key value = var:sol_country_base_spending_commoners }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_base_tribesmen key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_base_tribesmen key = scope:_cmf_log_key value = var:sol_country_base_spending_tribesmen }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_nobles key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_target_nobles key = scope:_cmf_log_key value = var:sol_country_demand_target_nobles }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_clergy key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_target_clergy key = scope:_cmf_log_key value = var:sol_country_demand_target_clergy }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_burghers key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_target_burghers key = scope:_cmf_log_key value = var:sol_country_demand_target_burghers }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_commoners key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_target_commoners key = scope:_cmf_log_key value = var:sol_country_demand_target_commoners }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_target_tribesmen key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_target_tribesmen key = scope:_cmf_log_key value = var:sol_country_demand_target_tribesmen }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_nobles key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_error_nobles key = scope:_cmf_log_key value = var:sol_country_demand_error_nobles }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_clergy key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_error_clergy key = scope:_cmf_log_key value = var:sol_country_demand_error_clergy }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_burghers key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_error_burghers key = scope:_cmf_log_key value = var:sol_country_demand_error_burghers }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_commoners key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_error_commoners key = scope:_cmf_log_key value = var:sol_country_demand_error_commoners }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_error_tribesmen key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_error_tribesmen key = scope:_cmf_log_key value = var:sol_country_demand_error_tribesmen }
+	if = {
+		limit = { has_variable = sol_country_demand_failure_anchor_scope }
+		var:sol_country_demand_failure_anchor_scope = { save_scope_as = sol_country_demand_log_failure_anchor_scope }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_anchor_scope key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_failure_anchor_scope key = scope:_cmf_log_key value = scope:sol_country_demand_log_failure_anchor_scope }
+	}
+}
+
+sol_country_demand_cmf_log = {
+	save_scope_as = _cmf_log_actor
+
+	if = {
+		limit = { NOT = { has_global_variable = cmf_log_count } }
+		set_global_variable = { name = cmf_log_count value = 0 }
+	}
+
+	if = {
+		limit = { global_var:cmf_log_count < 200 }
+		_cmf_log_select_key = yes
+		sol_country_demand_log_clear_entry = yes
+		sol_country_demand_log_store_common = yes
+		sol_country_demand_log_store_anchor = { anchor = 1 }
+		sol_country_demand_log_store_anchor = { anchor = 2 }
+		sol_country_demand_log_store_anchor = { anchor = 3 }
+		sol_country_demand_log_store_anchor = { anchor = 4 }
+		sol_country_demand_log_store_anchor = { anchor = 5 }
+		remove_from_global_variable_map = { name = cmf_log_action key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = cmf_log_action key = scope:_cmf_log_key value = flag:$action$ }
+		remove_from_global_variable_map = { name = cmf_log_actor key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = cmf_log_actor key = scope:_cmf_log_key value = scope:_cmf_log_actor }
+		remove_from_global_variable_map = { name = cmf_log_arg_mode key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = cmf_log_arg_mode key = scope:_cmf_log_key value = 0 }
+		remove_from_global_variable_map = { name = cmf_log_arg1 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = cmf_log_arg1 key = scope:_cmf_log_key value = flag:_cmf_log_no_arg }
+		remove_from_global_variable_map = { name = cmf_log_arg2 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = cmf_log_arg2 key = scope:_cmf_log_key value = flag:$detail$ }
+		change_global_variable = { name = cmf_log_count add = 1 }
+	}
+
+	if = {
+		limit = { always = no }
+		cmf_suppress = { v = $action$ }
+		cmf_suppress = { v = $detail$ }
+	}
+}
+
+sol_country_demand_log_refresh = {
+	sol_country_demand_prepare_log_anchor = { anchor = 1 }
+	sol_country_demand_prepare_log_anchor = { anchor = 2 }
+	sol_country_demand_prepare_log_anchor = { anchor = 3 }
+	sol_country_demand_prepare_log_anchor = { anchor = 4 }
+	sol_country_demand_prepare_log_anchor = { anchor = 5 }
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		if = {
+			limit = { var:sol_country_demand_solver_size >= 5 }
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_REFRESH_SUCCESS_5 detail = CMF_LOG_SOL_DEMAND_DETAIL_ANCHORS_5 }
+		}
+		else = {
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_REFRESH_SUCCESS_4 detail = CMF_LOG_SOL_DEMAND_DETAIL_ANCHORS_4 }
+		}
+	}
+	else_if = {
+		limit = { var:sol_country_demand_solve_status = -1 }
+		if = {
+			limit = { var:sol_country_demand_solver_size >= 5 }
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_SINGULAR detail = CMF_LOG_SOL_DEMAND_DETAIL_SINGULAR_5 }
+		}
+		else = {
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_SINGULAR detail = CMF_LOG_SOL_DEMAND_DETAIL_SINGULAR_4 }
+		}
+	}
+	else_if = {
+		limit = { var:sol_country_demand_solve_status = -2 }
+		if = {
+			limit = { var:sol_country_demand_solver_size >= 5 }
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_NEGATIVE detail = CMF_LOG_SOL_DEMAND_DETAIL_SCALE_FALLBACK_5 }
+		}
+		else = {
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_NEGATIVE detail = CMF_LOG_SOL_DEMAND_DETAIL_SCALE_FALLBACK_4 }
+		}
+	}
+	else_if = {
+		limit = { var:sol_country_demand_solve_status = -3 }
+		if = {
+			limit = { var:sol_country_demand_solver_size >= 5 }
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_TOO_HIGH detail = CMF_LOG_SOL_DEMAND_DETAIL_SCALE_FALLBACK_5 }
+		}
+		else = {
+			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_TOO_HIGH detail = CMF_LOG_SOL_DEMAND_DETAIL_SCALE_FALLBACK_4 }
+		}
+	}
+	else_if = {
+		limit = { var:sol_country_demand_solve_status = -4 }
+		sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_ANCHORS detail = CMF_LOG_SOL_DEMAND_DETAIL_COUNTS }
+	}
+	else_if = {
+		limit = { var:sol_country_demand_solve_status = -5 }
+		sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_NO_BASE detail = CMF_LOG_SOL_DEMAND_DETAIL_COUNTS }
+	}
+	else = {
+		sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_NO_LOCATIONS detail = CMF_LOG_SOL_DEMAND_DETAIL_COUNTS }
+	}
+}
+
+sol_solve_country_pop_demand = {
+	# root = country. Builds location caches, solves country-stratum closure, and writes final location scales.
+	gls_compute_savings_pressure = yes
+	set_variable = { name = sol_country_demand_solve_status value = 0 }
+	set_variable = { name = sol_country_demand_solver_size value = 0 }
+	set_variable = { name = sol_country_demand_anchor_count value = 0 }
+	set_variable = { name = sol_country_demand_max_adjustment value = 0 }
+	remove_variable = sol_demand_anchor_1
+	remove_variable = sol_demand_anchor_2
+	remove_variable = sol_demand_anchor_3
+	remove_variable = sol_demand_anchor_4
+	remove_variable = sol_demand_anchor_5
+	remove_variable = sol_country_demand_failure_anchor_scope
+	set_variable = { name = sol_country_demand_failure_anchor value = 0 }
+	set_variable = { name = sol_country_demand_failure_pivot value = 0 }
+	set_variable = { name = sol_country_demand_failure_pivot_value value = 0 }
+	set_variable = { name = sol_country_demand_failure_raw value = 0 }
+	set_variable = { name = sol_country_demand_failure_delta value = 0 }
+	set_variable = { name = sol_country_demand_failure_candidate value = 0 }
+	set_variable = { name = sol_delta_1 value = 0 }
+	set_variable = { name = sol_delta_2 value = 0 }
+	set_variable = { name = sol_delta_3 value = 0 }
+	set_variable = { name = sol_delta_4 value = 0 }
+	set_variable = { name = sol_delta_5 value = 0 }
+	set_variable = { name = sol_candidate_scale_1 value = 0 }
+	set_variable = { name = sol_candidate_scale_2 value = 0 }
+	set_variable = { name = sol_candidate_scale_3 value = 0 }
+	set_variable = { name = sol_candidate_scale_4 value = 0 }
+	set_variable = { name = sol_candidate_scale_5 value = 0 }
+	set_variable = { name = sol_country_demand_target_nobles value = 0 }
+	set_variable = { name = sol_country_demand_target_clergy value = 0 }
+	set_variable = { name = sol_country_demand_target_burghers value = 0 }
+	set_variable = { name = sol_country_demand_target_commoners value = 0 }
+	set_variable = { name = sol_country_demand_target_tribesmen value = 0 }
+	set_variable = { name = sol_country_base_spending_nobles value = 0 }
+	set_variable = { name = sol_country_base_spending_clergy value = 0 }
+	set_variable = { name = sol_country_base_spending_burghers value = 0 }
+	set_variable = { name = sol_country_base_spending_commoners value = 0 }
+	set_variable = { name = sol_country_base_spending_tribesmen value = 0 }
+	set_variable = { name = sol_country_baseline_spending_nobles value = 0 }
+	set_variable = { name = sol_country_baseline_spending_clergy value = 0 }
+	set_variable = { name = sol_country_baseline_spending_burghers value = 0 }
+	set_variable = { name = sol_country_baseline_spending_commoners value = 0 }
+	set_variable = { name = sol_country_baseline_spending_tribesmen value = 0 }
+	cmf_log = { action = CMF_LOG_SOL_DEMAND_REFRESH_START }
+	if = {
+		limit = { num_locations > 0 }
+		every_owned_location = {
+			limit = { is_land = yes }
+			remove_variable = sol_demand_anchor_selected
 			sol_compute_location_pop_demand = yes
+			save_scope_as = sol_demand_cached_location
+			owner = {
+				change_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }
+				change_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }
+				change_variable = { name = sol_country_demand_target_burghers add = scope:sol_demand_cached_location.var:sol_location_burghers_liquid_funds }
+				change_variable = { name = sol_country_demand_target_commoners add = scope:sol_demand_cached_location.var:sol_location_commoners_liquid_funds }
+				change_variable = { name = sol_country_demand_target_tribesmen add = scope:sol_demand_cached_location.var:sol_location_tribesmen_liquid_funds }
+				change_variable = { name = sol_country_base_spending_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_base_spending }
+				change_variable = { name = sol_country_base_spending_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_base_spending }
+				change_variable = { name = sol_country_base_spending_burghers add = scope:sol_demand_cached_location.var:sol_location_burghers_base_spending }
+				change_variable = { name = sol_country_base_spending_commoners add = scope:sol_demand_cached_location.var:sol_location_commoners_base_spending }
+				change_variable = { name = sol_country_base_spending_tribesmen add = scope:sol_demand_cached_location.var:sol_location_tribesmen_base_spending }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_nobles_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }
+				change_variable = { name = sol_country_baseline_spending_nobles add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_clergy_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }
+				change_variable = { name = sol_country_baseline_spending_clergy add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_burghers_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }
+				change_variable = { name = sol_country_baseline_spending_burghers add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_commoners_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }
+				change_variable = { name = sol_country_baseline_spending_commoners add = var:sol_demand_scaled_tmp }
+				set_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_tribesmen_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }
+				change_variable = { name = sol_country_baseline_spending_tribesmen add = var:sol_demand_scaled_tmp }
+			}
+		}
+	}
+	if = {
+		limit = {
+			var:sol_country_base_spending_nobles > 0.00001
+			var:sol_country_base_spending_clergy > 0.00001
+			var:sol_country_base_spending_burghers > 0.00001
+			var:sol_country_base_spending_commoners > 0.00001
+		}
+		sol_country_demand_select_anchor = { anchor = 1 score = sol_location_anchor_score_nobles }
+		sol_country_demand_select_anchor = { anchor = 2 score = sol_location_anchor_score_clergy }
+		sol_country_demand_select_anchor = { anchor = 3 score = sol_location_anchor_score_burghers }
+		sol_country_demand_select_anchor = { anchor = 4 score = sol_location_anchor_score_commoners }
+		if = {
+			limit = { var:sol_country_base_spending_tribesmen > 0.00001 }
+			sol_country_demand_select_anchor = { anchor = 5 score = sol_location_anchor_score_tribesmen }
+			if = {
+				limit = {
+					has_variable = sol_demand_anchor_1
+					has_variable = sol_demand_anchor_2
+					has_variable = sol_demand_anchor_3
+					has_variable = sol_demand_anchor_4
+					has_variable = sol_demand_anchor_5
+				}
+				sol_country_demand_solve_5 = yes
+			}
+			else = { set_variable = { name = sol_country_demand_solve_status value = -4 } }
+		}
+		else = {
+			if = {
+				limit = {
+					has_variable = sol_demand_anchor_1
+					has_variable = sol_demand_anchor_2
+					has_variable = sol_demand_anchor_3
+					has_variable = sol_demand_anchor_4
+				}
+				sol_country_demand_solve_4 = yes
+			}
+			else = { set_variable = { name = sol_country_demand_solve_status value = -4 } }
+		}
+	}
+	else = { set_variable = { name = sol_country_demand_solve_status value = -5 } }
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		sol_country_demand_validate_anchor = { anchor = 1 }
+		sol_country_demand_validate_anchor = { anchor = 2 }
+		sol_country_demand_validate_anchor = { anchor = 3 }
+		sol_country_demand_validate_anchor = { anchor = 4 }
+		if = { limit = { var:sol_country_demand_solver_size >= 5 } sol_country_demand_validate_anchor = { anchor = 5 } }
+	}
+	if = {
+		limit = { var:sol_country_demand_solve_status = 1 }
+		sol_country_demand_apply_anchor = { anchor = 1 }
+		sol_country_demand_apply_anchor = { anchor = 2 }
+		sol_country_demand_apply_anchor = { anchor = 3 }
+		sol_country_demand_apply_anchor = { anchor = 4 }
+		if = { limit = { var:sol_country_demand_solver_size >= 5 } sol_country_demand_apply_anchor = { anchor = 5 } }
+	}
+	sol_country_demand_finalize_diagnostics = yes
+	sol_country_demand_log_refresh = yes
+}
+
+sol_update_local_pop_demand_modifiers = {
+	# root = country. Monthly pulse solves final country-stratum demand scales, then applies them by location.
+	sol_solve_country_pop_demand = yes
+	if = {
+		limit = { num_locations > 0 }
+		every_owned_location = {
+			limit = { is_land = yes }
 			add_location_modifier = {
 				modifier = sol_local_pop_demand_modifier
 				months = 1
@@ -2783,17 +3410,18 @@ sol_update_local_pop_demand_modifiers = {
 
 gls_update_location_map = {
 	# root = country. Rebuild display caches without waiting for pulse order.
-	gls_compute_savings_pressure = yes
-	if = { limit = { num_locations > 0 } every_owned_location = { limit = { is_land = yes } sol_compute_location_pop_demand = yes } }
+	sol_solve_country_pop_demand = yes
 }
 
 gls_compute_panel_display = {
 	# root = country. Kept as the situation GUI entry point.
-	gls_compute_savings_pressure = yes
+	if = { limit = { NOT = { has_variable = sol_country_demand_solve_status } } sol_solve_country_pop_demand = yes }
+	else = { gls_compute_savings_pressure = yes }
 }
 
 gls_accumulate_panel_stats = {
-	# root = country. National version of the location demand calculation.
+	# root = country. Reads the final location demand cache for country GUI diagnostics.
+	if = { limit = { NOT = { has_variable = sol_country_demand_solve_status } } sol_solve_country_pop_demand = yes }
 	set_variable = { name = gls_location_count value = 0 }
 	set_variable = { name = gls_location_scale_sum value = 0 }
 	set_variable = { name = gls_country_wealth value = 0 }
@@ -3493,7 +4121,6 @@ gls_accumulate_panel_stats = {
 		limit = { num_locations > 0 }
 		every_owned_location = {
 			limit = { is_land = yes }
-			sol_compute_location_pop_demand = yes
 			save_scope_as = gls_cached_location
 			owner = {
 				change_variable = { name = gls_location_count add = 1 }
@@ -3523,6 +4150,7 @@ gls_accumulate_panel_stats = {
 		}
 	}
 	if = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_location_avg_scale value = { add = var:gls_location_scale_sum divide = var:gls_location_count } } }
+	if = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_final_demand_scale_avg value = var:gls_country_location_avg_scale } }
 	if = { limit = { var:gls_country_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_base_spending min = 0 } } }
 }
 
