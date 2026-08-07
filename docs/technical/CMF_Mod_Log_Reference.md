@@ -41,6 +41,13 @@ performed the action.
 - For custom text args, define a loc key explicitly.
 - For dynamic countries, save them into `scope:cmf_log_arg1` /
   `scope:cmf_log_arg2` before calling the scope variants.
+- The actor and localized action text share one displayed row. Keep each entry
+  to one concept and at most four dynamic values, with compact labels.
+- Split only essential wide vectors into short rows. Omit secondary diagnostic
+  fields instead of packing an unreadable profile or equation into one entry.
+- Calculate diagnostic arithmetic with `set_variable` before a keyed map write.
+  `add_to_global_variable_map.value` accepts `var:<temporary>`, not an inline
+  `{ value/divide/min }` block; remove the temporary after the write.
 
 ## Sources
 

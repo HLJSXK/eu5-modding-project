@@ -1,7 +1,8 @@
 # SOL 国家级阶层需求闭合模型（实现说明与原始设计 memo）
 
-> Created: 2026-08-05  
-> Status: implemented in `stable` and `sol_standalone` as a four-class aggregate solve using absolute local stratum purity. Legacy anchor-location notes below are retained as the original design memo.
+> Created: 2026-08-05
+> Updated: 2026-08-07
+> Status: implemented in `stable` and `sol_standalone` as a balanced four-class aggregate solve using relative local stratum structure. Legacy anchor-location notes below are retained as the original design memo.
 
 ## 0. 当前实现
 
@@ -16,27 +17,68 @@
 - 生成目标: `src/sol_standalone/...` 的对应文件
 - 兼容层复查: `scripts/gen_sol_pp_compat.py`, `scripts/gen_sol_jtg_compat.py`, `scripts/gen_sol_mnt_compat.py`
 
-### 0.2 执行顺序
+### 0.2 平衡分类
 
-1. `sol_compute_location_pop_demand` 先计算并缓存地点的原始系数 `raw = liquid_funds / base_spending`，同时令 `final = raw`，因此任何后续失败天然保留 raw。
-2. 每个基础支出大于 `0.00001` 的地点计算四维绝对支出占比 `(nobles, clergy, burghers, commoners + tribesmen)`，按最大占比分类；精确平局固定按贵族、教士、市民、下层处理。基础支出不足的地点使用类 0，不进入矩阵并继续使用 raw。
-3. 对四类聚合基础支出，构造 `M[e,c] = sum base_spending[e] in class c`，并直接求解 `M * class_coefficient = target`。
-4. 求解前要求四类均存在且有基础支出，并要求每列主对角支出大于 `0.00001` 且不小于该列任一交叉阶层支出；高斯消元期间继续检查每个主元。
-5. 求解后要求四个类系数均在 `[0, 20]`，并按原始矩阵验证每行残差不超过 `0.01 + RHS * 0.001`。
-6. 成功时，同类所有地点使用对应的 `sol_country_class_coefficient_1..4`；失败时不调用类应用效果，因此所有地点保留 raw。当前 country driver 不再自动回退到锚点法。
-7. `raw`、类系数和 `final` 保持独立语义；类路径不复用 `sol_delta_1..4`，也不要求四个系数同号变化或总和为 0。
+`sol_compute_location_pop_demand` 先计算并缓存地点原始系数 `raw = liquid_funds / base_spending`，同时令 `final = raw`。基础支出不超过 `0.00001` 的地点使用类 0，不参与分类和矩阵，任何失败也都天然保留 raw。
 
-### 0.3 CMF Action Log
+对有效地点 `i` 和阶层 `e`，先计算地点份额 `p[i,e]` 与全国份额 `mu[e]`：
 
-人类国家的调试日志按多行记录国家 scope、类别数与基础支出、全国结构、各类 raw 均值和范围、类内聚合结构、原始 4×4 矩阵、四行 RHS、四个类系数、每行残差和最终误差。失败时另记触发类别、主元、对角/最大交叉支撑或残差/容差，并明确说明 final 保留 raw。遗留锚点日志仍分别显示 raw、delta、candidate，避免和类系数混用。
+```text
+p[i,e] = location_base[i,e] / location_base_total[i]
+mu[e]  = country_base[e] / country_base_total
+```
 
-### 0.4 验证门槛
+分类亲和分数使用相对全国结构，而不是比较四阶层的绝对权力：
 
-- 纯基向量输入应形成近似对角矩阵并得到稳定正系数。
-- 混合地点只按地点自身绝对占比最大项分类，不受全国稀有度放大影响；数量不均匀本身不是失败条件。
-- 缺类、方向支撑不足、主元奇异、负系数、系数超过 20 或残差超限都必须保留 raw 并记录独立原因。
+```text
+normalizer[e] = max(mu[e], 0.02)
+affinity[i,e] = clamp((p[i,e] - mu[e]) / normalizer[e], -3, 3)
+```
+
+因此一个下层绝对占比很低、但明显高于本国平均值的地点，仍可成为下层类候选；贵族在全国普遍占优本身不再把全国地点都压入贵族类。
+
+第一遍地点扫描记录最高亲和项作为 `structural class`，并把最高分与第二高分之差记为 `confidence`。第二遍通过 `ordered_owned_location` 按 confidence 从高到低处理地点，先固定结构最鲜明的地点；该全量循环必须显式设置 `max = 100000`，因为 `ordered_*` 省略 `max` 时只返回默认的单个结果，并不表示无限遍历。四类的目标基础支出均为：
+
+```text
+target_class_base = country_base_total / 4
+```
+
+地点进入候选类 `c` 时使用动态分数：
+
+```text
+balanced_score[i,c] = affinity[i,c]
+                      - 1.5 * current_class_base[c] / target_class_base
+```
+
+选中类后立即累计该地点的全部基础支出，后续地点便会倾向欠载类。精确平局仍固定为贵族、教士、市民、下层。该方法只增加一次地点扫描，目标是让四类基础支出接近各 25%，同时保留足够大的相对结构差异；它不再追求不符合游戏实际的对角矩阵。
+
+### 0.3 聚合与求解
+
+1. 对最终四类聚合基础支出，构造 `M[e,c] = sum base_spending[e] in class c`，求解 `M * class_coefficient = target`。
+2. 求解只要求四类存在且各自具有足够基础支出，不再要求某类的目标阶层绝对支出高于该类所有交叉阶层。
+3. 高斯消元前按全国对应阶层基础支出逐行预处理：`A[e,c] = M[e,c] / country_base[e]`，`b[e] = target[e] / country_base[e]`。这是等价行变换，不改变系数解；归一化主元阈值为 `0.0001`，避免贵族与小体量阶层的量级差掩盖病态矩阵。
+4. 求解后要求四个类系数均在 `[0, 20]`，并仍按原始未归一化矩阵验证每行残差不超过 `0.01 + RHS * 0.001`。
+5. 成功时，同类地点使用对应的 `sol_country_class_coefficient_1..4`；失败时不调用类应用效果，所有地点保留 raw。country driver 不自动回退到遗留锚点法。
+6. `raw`、类系数和 `final` 保持独立语义；类路径不复用 `sol_delta_1..4`，也不要求四个系数同号变化或总和为 0。
+
+### 0.4 CMF Action Log
+
+人类国家的 CMF 调试日志会同时记录分类质量、负载均衡和求解质量。每条日志只表达一个概念并最多显示四个动态值；必要的宽向量拆成短行，次要字段不挤入同一行：
+
+- 全国结构；每类地点数/base/系数；四类共同的 25% base 目标、平衡权重、最大单地点 base 及其相对目标倍数。
+- 未平衡的 structural class 数量；四维亲和分数范围拆成贵/教与市/下两行；全国 confidence 数量/均值/最小/最大。
+- 每类 base share、相对 25% 偏差、signature margin 和原 structural preference 保留率。
+- 每类一个最高亲和代表地点，只显示地点名及 base/亲和/confidence。
+- 原始和按行归一化 4×4 矩阵各按四值行输出；方程行只显示 lhs/rhs/residual，另记 RHS、主元、类系数和最终误差。
+- 失败时明确记录缺类、奇异主元、负系数、系数超过 20 或残差/容差，并说明 final 保留 raw。遗留锚点日志仍分别显示 raw、delta、candidate，避免和类系数混用。
+
+### 0.5 验证门槛
+
+- 四类 base share 应尽可能接近 `0.25`；超大单地点可能造成不可消除的离散偏差，必须由最大地点/类目标倍数解释。
+- 四类的目标 signature margin 是诊断值，可以为负；分类区分度不足应通过实测 Log 调整权重，而不是恢复绝对对角硬门槛。
+- 缺类、主元奇异、负系数、系数超过 20 或残差超限都必须保留 raw 并记录独立原因。当前类求解状态码为 `-1/-2/-3/-4/-5/-7`，旧的方向不足 `-6` 已移除。
 - 月度 modifier、面板和日志必须区分 raw 与 final，并读取同一套 final coefficient cache。
-- 生成后检查 stable、standalone 以及三个兼容目标仍同步使用新的 helper 和缓存。
+- 生成后检查 stable、standalone 和三个兼容目标；后者只覆盖各自需要改写的效果，完整分类 helper 继续由其 SOL 依赖提供。
 
 下文第 1-10 节保留原数学 memo，作为锚点法和约束求解的理论依据。
 

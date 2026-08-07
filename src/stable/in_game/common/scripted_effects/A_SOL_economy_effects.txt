@@ -2792,36 +2792,82 @@ sol_compute_location_pop_demand = {
 	}
 }
 
-sol_location_assign_demand_class = {
-	# Fixed basis order for exact ties: nobles, clergy, burghers, lower.
-	# Class 0 keeps negligible-base locations on their raw coefficient.
-	set_variable = { name = sol_location_demand_class value = 0 }
-	set_variable = { name = sol_location_demand_class_score value = 0 }
-	set_variable = { name = sol_location_demand_class_score_candidate value = 0 }
+sol_location_demand_clip_class_score = {
+	if = { limit = { var:$score$ > 3 } set_variable = { name = $score$ value = 3 } }
+	if = { limit = { var:$score$ < -3 } set_variable = { name = $score$ value = -3 } }
+}
+
+sol_location_demand_consider_structural_class = {
 	if = {
-		limit = {
-			var:sol_location_base_total_spending > 0.00001
-		}
-		set_variable = { name = sol_location_demand_class value = 1 }
-		set_variable = { name = sol_location_demand_class_score value = var:sol_location_share_nobles }
-		set_variable = { name = sol_location_demand_class_score_candidate value = var:sol_location_share_clergy }
-		if = {
-			limit = { var:sol_location_demand_class_score_candidate > var:sol_location_demand_class_score }
-			set_variable = { name = sol_location_demand_class value = 2 }
-			set_variable = { name = sol_location_demand_class_score value = var:sol_location_demand_class_score_candidate }
-		}
-		set_variable = { name = sol_location_demand_class_score_candidate value = var:sol_location_share_burghers }
-		if = {
-			limit = { var:sol_location_demand_class_score_candidate > var:sol_location_demand_class_score }
-			set_variable = { name = sol_location_demand_class value = 3 }
-			set_variable = { name = sol_location_demand_class_score value = var:sol_location_demand_class_score_candidate }
-		}
-		set_variable = { name = sol_location_demand_class_score_candidate value = var:sol_location_share_lower }
-		if = {
-			limit = { var:sol_location_demand_class_score_candidate > var:sol_location_demand_class_score }
-			set_variable = { name = sol_location_demand_class value = 4 }
-			set_variable = { name = sol_location_demand_class_score value = var:sol_location_demand_class_score_candidate }
-		}
+		limit = { var:$score$ > var:sol_location_demand_structural_best_score }
+		set_variable = { name = sol_location_demand_structural_second_score value = var:sol_location_demand_structural_best_score }
+		set_variable = { name = sol_location_demand_structural_best_score value = var:$score$ }
+		set_variable = { name = sol_location_demand_structural_class value = $class$ }
+	}
+	else_if = {
+		limit = { var:$score$ > var:sol_location_demand_structural_second_score }
+		set_variable = { name = sol_location_demand_structural_second_score value = var:$score$ }
+	}
+}
+
+sol_location_prepare_demand_class_scores = {
+	# Scores measure relative over-representation against the country structure.
+	# The country normalizers have a 0.02 floor and scores are capped to [-3, 3].
+	set_variable = { name = sol_location_demand_class value = 0 }
+	set_variable = { name = sol_location_demand_structural_class value = 0 }
+	set_variable = { name = sol_location_demand_structural_best_score value = -3.1 }
+	set_variable = { name = sol_location_demand_structural_second_score value = -3.1 }
+	set_variable = { name = sol_location_demand_class_confidence value = 0 }
+	set_variable = { name = sol_location_demand_score_nobles value = 0 }
+	set_variable = { name = sol_location_demand_score_clergy value = 0 }
+	set_variable = { name = sol_location_demand_score_burghers value = 0 }
+	set_variable = { name = sol_location_demand_score_lower value = 0 }
+	if = {
+		limit = { var:sol_location_base_total_spending > 0.00001 }
+		set_variable = { name = sol_location_demand_score_nobles value = { value = var:sol_location_share_nobles subtract = owner.var:sol_country_share_nobles divide = owner.var:sol_country_class_normalizer_nobles } }
+		set_variable = { name = sol_location_demand_score_clergy value = { value = var:sol_location_share_clergy subtract = owner.var:sol_country_share_clergy divide = owner.var:sol_country_class_normalizer_clergy } }
+		set_variable = { name = sol_location_demand_score_burghers value = { value = var:sol_location_share_burghers subtract = owner.var:sol_country_share_burghers divide = owner.var:sol_country_class_normalizer_burghers } }
+		set_variable = { name = sol_location_demand_score_lower value = { value = var:sol_location_share_lower subtract = owner.var:sol_country_share_lower divide = owner.var:sol_country_class_normalizer_lower } }
+		sol_location_demand_clip_class_score = { score = sol_location_demand_score_nobles }
+		sol_location_demand_clip_class_score = { score = sol_location_demand_score_clergy }
+		sol_location_demand_clip_class_score = { score = sol_location_demand_score_burghers }
+		sol_location_demand_clip_class_score = { score = sol_location_demand_score_lower }
+		sol_location_demand_consider_structural_class = { class = 1 score = sol_location_demand_score_nobles }
+		sol_location_demand_consider_structural_class = { class = 2 score = sol_location_demand_score_clergy }
+		sol_location_demand_consider_structural_class = { class = 3 score = sol_location_demand_score_burghers }
+		sol_location_demand_consider_structural_class = { class = 4 score = sol_location_demand_score_lower }
+		set_variable = { name = sol_location_demand_class_confidence value = { value = var:sol_location_demand_structural_best_score subtract = var:sol_location_demand_structural_second_score min = 0 } }
+	}
+}
+
+sol_location_demand_consider_balanced_class = {
+	set_variable = { name = sol_location_demand_class_penalty_candidate value = { value = owner.var:sol_country_class_base_total_$class$ divide = owner.var:sol_country_class_target_base multiply = owner.var:sol_country_class_balance_weight } }
+	set_variable = { name = sol_location_demand_class_score_candidate value = { value = var:$score$ subtract = var:sol_location_demand_class_penalty_candidate } }
+	if = {
+		limit = { var:sol_location_demand_class_score_candidate > var:sol_location_demand_class_score }
+		set_variable = { name = sol_location_demand_class value = $class$ }
+		set_variable = { name = sol_location_demand_class_score value = var:sol_location_demand_class_score_candidate }
+		set_variable = { name = sol_location_demand_class_selected_affinity value = var:$score$ }
+		set_variable = { name = sol_location_demand_class_selected_penalty value = var:sol_location_demand_class_penalty_candidate }
+	}
+}
+
+sol_location_assign_demand_class = {
+	# High-confidence locations are processed first by the country driver.
+	# Each candidate loses balance_weight * current_class_base / target_base.
+	# Fixed basis order for exact ties: nobles, clergy, burghers, lower.
+	set_variable = { name = sol_location_demand_class value = 0 }
+	set_variable = { name = sol_location_demand_class_score value = -999 }
+	set_variable = { name = sol_location_demand_class_score_candidate value = 0 }
+	set_variable = { name = sol_location_demand_class_penalty_candidate value = 0 }
+	set_variable = { name = sol_location_demand_class_selected_affinity value = 0 }
+	set_variable = { name = sol_location_demand_class_selected_penalty value = 0 }
+	if = {
+		limit = { var:sol_location_base_total_spending > 0.00001 }
+		sol_location_demand_consider_balanced_class = { class = 1 score = sol_location_demand_score_nobles }
+		sol_location_demand_consider_balanced_class = { class = 2 score = sol_location_demand_score_clergy }
+		sol_location_demand_consider_balanced_class = { class = 3 score = sol_location_demand_score_burghers }
+		sol_location_demand_consider_balanced_class = { class = 4 score = sol_location_demand_score_lower }
 	}
 }
 
@@ -2858,7 +2904,8 @@ sol_country_demand_check_pivot = {
 		limit = { var:sol_country_demand_solve_status = 1 }
 		sol_country_demand_abs = { source = sol_m_$pivot$_$pivot$ target = sol_pivot_abs_$pivot$ }
 		if = {
-			limit = { var:sol_pivot_abs_$pivot$ <= 0.00001 }
+			# Class rows are normalized to nationwide stratum base, so this is a relative threshold.
+			limit = { var:sol_pivot_abs_$pivot$ <= 0.0001 }
 			set_variable = { name = sol_country_demand_solve_status value = -1 }
 			set_variable = { name = sol_country_demand_failure_pivot value = $pivot$ }
 			set_variable = { name = sol_country_demand_failure_pivot_value value = var:sol_m_$pivot$_$pivot$ }
@@ -3077,10 +3124,12 @@ sol_country_demand_solve_classes = {
 	set_variable = { name = sol_b_3 value = var:sol_country_demand_rhs_burghers }
 	set_variable = { name = sol_b_4 value = var:sol_country_demand_rhs_lower }
 	sol_country_demand_fill_class_matrix = yes
-	sol_country_demand_validate_class_direction = { class = 1 diag = sol_country_class_base_spending_nobles_1 cross_1 = sol_country_class_base_spending_clergy_1 cross_2 = sol_country_class_base_spending_burghers_1 cross_3 = sol_country_class_base_lower_1 }
-	sol_country_demand_validate_class_direction = { class = 2 diag = sol_country_class_base_spending_clergy_2 cross_1 = sol_country_class_base_spending_nobles_2 cross_2 = sol_country_class_base_spending_burghers_2 cross_3 = sol_country_class_base_lower_2 }
-	sol_country_demand_validate_class_direction = { class = 3 diag = sol_country_class_base_spending_burghers_3 cross_1 = sol_country_class_base_spending_nobles_3 cross_2 = sol_country_class_base_spending_clergy_3 cross_3 = sol_country_class_base_lower_3 }
-	sol_country_demand_validate_class_direction = { class = 4 diag = sol_country_class_base_lower_4 cross_1 = sol_country_class_base_spending_nobles_4 cross_2 = sol_country_class_base_spending_clergy_4 cross_3 = sol_country_class_base_spending_burghers_4 }
+	sol_country_demand_measure_class_profile = { class = 1 signature = sol_country_class_score_nobles_1 cross_1 = sol_country_class_score_clergy_1 cross_2 = sol_country_class_score_burghers_1 cross_3 = sol_country_class_score_lower_1 }
+	sol_country_demand_measure_class_profile = { class = 2 signature = sol_country_class_score_clergy_2 cross_1 = sol_country_class_score_nobles_2 cross_2 = sol_country_class_score_burghers_2 cross_3 = sol_country_class_score_lower_2 }
+	sol_country_demand_measure_class_profile = { class = 3 signature = sol_country_class_score_burghers_3 cross_1 = sol_country_class_score_nobles_3 cross_2 = sol_country_class_score_clergy_3 cross_3 = sol_country_class_score_lower_3 }
+	sol_country_demand_measure_class_profile = { class = 4 signature = sol_country_class_score_lower_4 cross_1 = sol_country_class_score_nobles_4 cross_2 = sol_country_class_score_clergy_4 cross_3 = sol_country_class_score_burghers_4 }
+	# Row scaling is an exact preconditioner: it changes neither k nor the raw residual equation.
+	sol_country_demand_normalize_working_class_matrix = yes
 	sol_country_demand_check_pivot = { pivot = 1 }
 	sol_country_demand_eliminate_row = { pivot = 1 row = 2 }
 	sol_country_demand_eliminate_row = { pivot = 1 row = 3 }
@@ -3159,6 +3208,69 @@ sol_country_demand_fill_class_matrix = {
 	sol_country_demand_fill_class_column = { class = 3 col = 3 }
 	sol_country_demand_fill_class_column = { class = 4 col = 4 }
 	sol_country_demand_cache_original_matrix = yes
+	sol_country_demand_cache_normalized_class_matrix = yes
+}
+
+sol_country_demand_accumulate_score_diagnostics = {
+	if = {
+		limit = { scope:sol_demand_cached_location.var:sol_location_base_total_spending > 0.00001 }
+		change_variable = { name = sol_country_classified_location_count add = 1 }
+		change_variable = { name = sol_country_class_confidence_total add = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_class_confidence < var:sol_country_class_confidence_min } set_variable = { name = sol_country_class_confidence_min value = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_class_confidence > var:sol_country_class_confidence_max } set_variable = { name = sol_country_class_confidence_max value = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_base_total_spending > var:sol_country_class_max_location_base } set_variable = { name = sol_country_class_max_location_base value = scope:sol_demand_cached_location.var:sol_location_base_total_spending } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_nobles < var:sol_country_class_score_min_nobles } set_variable = { name = sol_country_class_score_min_nobles value = scope:sol_demand_cached_location.var:sol_location_demand_score_nobles } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_nobles > var:sol_country_class_score_max_nobles } set_variable = { name = sol_country_class_score_max_nobles value = scope:sol_demand_cached_location.var:sol_location_demand_score_nobles } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_clergy < var:sol_country_class_score_min_clergy } set_variable = { name = sol_country_class_score_min_clergy value = scope:sol_demand_cached_location.var:sol_location_demand_score_clergy } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_clergy > var:sol_country_class_score_max_clergy } set_variable = { name = sol_country_class_score_max_clergy value = scope:sol_demand_cached_location.var:sol_location_demand_score_clergy } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_burghers < var:sol_country_class_score_min_burghers } set_variable = { name = sol_country_class_score_min_burghers value = scope:sol_demand_cached_location.var:sol_location_demand_score_burghers } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_burghers > var:sol_country_class_score_max_burghers } set_variable = { name = sol_country_class_score_max_burghers value = scope:sol_demand_cached_location.var:sol_location_demand_score_burghers } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_lower < var:sol_country_class_score_min_lower } set_variable = { name = sol_country_class_score_min_lower value = scope:sol_demand_cached_location.var:sol_location_demand_score_lower } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_score_lower > var:sol_country_class_score_max_lower } set_variable = { name = sol_country_class_score_max_lower value = scope:sol_demand_cached_location.var:sol_location_demand_score_lower } }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = 1 } change_variable = { name = sol_country_structural_class_count_1 add = 1 } }
+		else_if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = 2 } change_variable = { name = sol_country_structural_class_count_2 add = 1 } }
+		else_if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = 3 } change_variable = { name = sol_country_structural_class_count_3 add = 1 } }
+		else_if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = 4 } change_variable = { name = sol_country_structural_class_count_4 add = 1 } }
+	}
+}
+
+sol_country_demand_cache_normalized_class_row = {
+	set_variable = { name = sol_normalized_m_$row$_1 value = 0 }
+	set_variable = { name = sol_normalized_m_$row$_2 value = 0 }
+	set_variable = { name = sol_normalized_m_$row$_3 value = 0 }
+	set_variable = { name = sol_normalized_m_$row$_4 value = 0 }
+	if = {
+		limit = { var:$scale$ > 0.00001 }
+		set_variable = { name = sol_normalized_m_$row$_1 value = { value = var:sol_original_m_$row$_1 divide = var:$scale$ } }
+		set_variable = { name = sol_normalized_m_$row$_2 value = { value = var:sol_original_m_$row$_2 divide = var:$scale$ } }
+		set_variable = { name = sol_normalized_m_$row$_3 value = { value = var:sol_original_m_$row$_3 divide = var:$scale$ } }
+		set_variable = { name = sol_normalized_m_$row$_4 value = { value = var:sol_original_m_$row$_4 divide = var:$scale$ } }
+	}
+}
+
+sol_country_demand_cache_normalized_class_matrix = {
+	sol_country_demand_cache_normalized_class_row = { row = 1 scale = sol_country_base_spending_nobles }
+	sol_country_demand_cache_normalized_class_row = { row = 2 scale = sol_country_base_spending_clergy }
+	sol_country_demand_cache_normalized_class_row = { row = 3 scale = sol_country_base_spending_burghers }
+	sol_country_demand_cache_normalized_class_row = { row = 4 scale = sol_country_base_spending_lower }
+}
+
+sol_country_demand_normalize_working_class_row = {
+	if = {
+		limit = { var:$scale$ > 0.00001 }
+		set_variable = { name = sol_m_$row$_1 value = { value = var:sol_m_$row$_1 divide = var:$scale$ } }
+		set_variable = { name = sol_m_$row$_2 value = { value = var:sol_m_$row$_2 divide = var:$scale$ } }
+		set_variable = { name = sol_m_$row$_3 value = { value = var:sol_m_$row$_3 divide = var:$scale$ } }
+		set_variable = { name = sol_m_$row$_4 value = { value = var:sol_m_$row$_4 divide = var:$scale$ } }
+		set_variable = { name = sol_b_$row$ value = { value = var:sol_b_$row$ divide = var:$scale$ } }
+	}
+}
+
+sol_country_demand_normalize_working_class_matrix = {
+	sol_country_demand_normalize_working_class_row = { row = 1 scale = sol_country_base_spending_nobles }
+	sol_country_demand_normalize_working_class_row = { row = 2 scale = sol_country_base_spending_clergy }
+	sol_country_demand_normalize_working_class_row = { row = 3 scale = sol_country_base_spending_burghers }
+	sol_country_demand_normalize_working_class_row = { row = 4 scale = sol_country_base_spending_lower }
 }
 
 sol_country_demand_accumulate_class = {
@@ -3170,6 +3282,10 @@ sol_country_demand_accumulate_class = {
 		change_variable = { name = sol_country_class_count_$class$ add = 1 }
 		change_variable = { name = sol_country_class_raw_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale }
 		change_variable = { name = sol_country_class_base_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_base_total_spending }
+		change_variable = { name = sol_country_class_affinity_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }
+		change_variable = { name = sol_country_class_penalty_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_penalty }
+		change_variable = { name = sol_country_class_confidence_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence }
+		if = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = $class$ } change_variable = { name = sol_country_class_structural_match_count_$class$ add = 1 } }
 		change_variable = { name = sol_country_class_base_spending_nobles_$class$ add = scope:sol_demand_cached_location.var:sol_location_nobles_base_spending }
 		change_variable = { name = sol_country_class_base_spending_clergy_$class$ add = scope:sol_demand_cached_location.var:sol_location_clergy_base_spending }
 		change_variable = { name = sol_country_class_base_spending_burghers_$class$ add = scope:sol_demand_cached_location.var:sol_location_burghers_base_spending }
@@ -3184,6 +3300,20 @@ sol_country_demand_accumulate_class = {
 		if = {
 			limit = { scope:sol_demand_cached_location.var:sol_location_raw_demand_scale > var:sol_country_class_max_raw_$class$ }
 			set_variable = { name = sol_country_class_max_raw_$class$ value = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale }
+		}
+		if = {
+			limit = { scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity < var:sol_country_class_min_affinity_$class$ }
+			set_variable = { name = sol_country_class_min_affinity_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }
+		}
+		if = {
+			limit = { scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity > var:sol_country_class_max_affinity_$class$ }
+			set_variable = { name = sol_country_class_max_affinity_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }
+			set_variable = { name = sol_country_class_example_$class$ value = scope:sol_demand_cached_location }
+			set_variable = { name = sol_country_class_example_base_$class$ value = scope:sol_demand_cached_location.var:sol_location_base_total_spending }
+			set_variable = { name = sol_country_class_example_affinity_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }
+			set_variable = { name = sol_country_class_example_penalty_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_penalty }
+			set_variable = { name = sol_country_class_example_confidence_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence }
+			set_variable = { name = sol_country_class_example_structural_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_structural_class }
 		}
 	}
 }
@@ -3208,25 +3338,40 @@ sol_country_demand_validate_class = {
 	}
 }
 
-sol_country_demand_validate_class_direction = {
-	set_variable = { name = sol_country_class_diagonal_$class$ value = var:$diag$ }
-	set_variable = { name = sol_country_class_cross_max_$class$ value = var:$cross_1$ }
-	if = { limit = { var:$cross_2$ > var:sol_country_class_cross_max_$class$ } set_variable = { name = sol_country_class_cross_max_$class$ value = var:$cross_2$ } }
-	if = { limit = { var:$cross_3$ > var:sol_country_class_cross_max_$class$ } set_variable = { name = sol_country_class_cross_max_$class$ value = var:$cross_3$ } }
+sol_country_demand_measure_class_profile = {
+	set_variable = { name = sol_country_class_score_nobles_$class$ value = 0 }
+	set_variable = { name = sol_country_class_score_clergy_$class$ value = 0 }
+	set_variable = { name = sol_country_class_score_burghers_$class$ value = 0 }
+	set_variable = { name = sol_country_class_score_lower_$class$ value = 0 }
+	set_variable = { name = sol_country_class_signature_$class$ value = 0 }
+	set_variable = { name = sol_country_class_cross_score_$class$ value = 0 }
+	set_variable = { name = sol_country_class_signature_margin_$class$ value = 0 }
+	set_variable = { name = sol_country_class_base_share_$class$ value = 0 }
+	set_variable = { name = sol_country_class_base_deviation_$class$ value = 0 }
+	set_variable = { name = sol_country_class_affinity_avg_$class$ value = 0 }
+	set_variable = { name = sol_country_class_penalty_avg_$class$ value = 0 }
+	set_variable = { name = sol_country_class_confidence_avg_$class$ value = 0 }
+	set_variable = { name = sol_country_class_structural_match_rate_$class$ value = 0 }
+	if = { limit = { var:sol_country_base_spending_total > 0.00001 } set_variable = { name = sol_country_class_base_share_$class$ value = { value = var:sol_country_class_base_total_$class$ divide = var:sol_country_base_spending_total } } }
+	if = { limit = { var:sol_country_class_target_base > 0.00001 } set_variable = { name = sol_country_class_base_deviation_$class$ value = { value = var:sol_country_class_base_total_$class$ subtract = var:sol_country_class_target_base divide = var:sol_country_class_target_base } } }
 	if = {
-		limit = {
-			var:sol_country_demand_solve_status = 1
-			OR = {
-				var:$diag$ <= 0.00001
-				var:$diag$ < var:$cross_1$
-				var:$diag$ < var:$cross_2$
-				var:$diag$ < var:$cross_3$
-			}
-		}
-		set_variable = { name = sol_country_demand_solve_status value = -6 }
-		set_variable = { name = sol_country_demand_failure_class value = $class$ }
-		set_variable = { name = sol_country_demand_failure_class_diagonal value = var:$diag$ }
-		set_variable = { name = sol_country_demand_failure_class_cross value = var:sol_country_class_cross_max_$class$ }
+		limit = { var:sol_country_class_count_$class$ > 0 }
+		set_variable = { name = sol_country_class_affinity_avg_$class$ value = { value = var:sol_country_class_affinity_total_$class$ divide = var:sol_country_class_count_$class$ } }
+		set_variable = { name = sol_country_class_penalty_avg_$class$ value = { value = var:sol_country_class_penalty_total_$class$ divide = var:sol_country_class_count_$class$ } }
+		set_variable = { name = sol_country_class_confidence_avg_$class$ value = { value = var:sol_country_class_confidence_total_$class$ divide = var:sol_country_class_count_$class$ } }
+		set_variable = { name = sol_country_class_structural_match_rate_$class$ value = { value = var:sol_country_class_structural_match_count_$class$ divide = var:sol_country_class_count_$class$ } }
+	}
+	if = {
+		limit = { var:sol_country_class_base_total_$class$ > 0.00001 }
+		set_variable = { name = sol_country_class_score_nobles_$class$ value = { value = var:sol_country_class_base_spending_nobles_$class$ divide = var:sol_country_class_base_total_$class$ subtract = var:sol_country_share_nobles divide = var:sol_country_class_normalizer_nobles } }
+		set_variable = { name = sol_country_class_score_clergy_$class$ value = { value = var:sol_country_class_base_spending_clergy_$class$ divide = var:sol_country_class_base_total_$class$ subtract = var:sol_country_share_clergy divide = var:sol_country_class_normalizer_clergy } }
+		set_variable = { name = sol_country_class_score_burghers_$class$ value = { value = var:sol_country_class_base_spending_burghers_$class$ divide = var:sol_country_class_base_total_$class$ subtract = var:sol_country_share_burghers divide = var:sol_country_class_normalizer_burghers } }
+		set_variable = { name = sol_country_class_score_lower_$class$ value = { value = var:sol_country_class_base_lower_$class$ divide = var:sol_country_class_base_total_$class$ subtract = var:sol_country_share_lower divide = var:sol_country_class_normalizer_lower } }
+		set_variable = { name = sol_country_class_signature_$class$ value = var:$signature$ }
+		set_variable = { name = sol_country_class_cross_score_$class$ value = var:$cross_1$ }
+		if = { limit = { var:$cross_2$ > var:sol_country_class_cross_score_$class$ } set_variable = { name = sol_country_class_cross_score_$class$ value = var:$cross_2$ } }
+		if = { limit = { var:$cross_3$ > var:sol_country_class_cross_score_$class$ } set_variable = { name = sol_country_class_cross_score_$class$ value = var:$cross_3$ } }
+		set_variable = { name = sol_country_class_signature_margin_$class$ value = { value = var:sol_country_class_signature_$class$ subtract = var:sol_country_class_cross_score_$class$ } }
 	}
 }
 
@@ -3407,6 +3552,7 @@ sol_country_demand_log_clear_equation = {
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_lhs_3 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_lhs_4 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_lhs_5 key = scope:_cmf_log_key }
+	sol_country_demand_log_clear_balanced_equation = yes
 }
 
 sol_country_demand_log_store_equation = {
@@ -3470,6 +3616,7 @@ sol_country_demand_log_store_equation = {
 	add_to_global_variable_map = { name = sol_cmf_demand_log_lhs_4 key = scope:_cmf_log_key value = var:sol_country_demand_lhs_4 }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_lhs_5 key = scope:_cmf_log_key }
 	add_to_global_variable_map = { name = sol_cmf_demand_log_lhs_5 key = scope:_cmf_log_key value = var:sol_country_demand_lhs_5 }
+	sol_country_demand_log_store_balanced_equation = yes
 }
 
 sol_country_demand_log_clear_entry = {
@@ -3486,8 +3633,6 @@ sol_country_demand_log_clear_entry = {
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_candidate key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_coeff key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_diagonal key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_cross key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_row key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_residual key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_tolerance key = scope:_cmf_log_key }
@@ -3536,6 +3681,7 @@ sol_country_demand_log_clear_entry = {
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_3 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_4 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_candidate_5 key = scope:_cmf_log_key }
+	sol_country_demand_log_clear_balanced_common = yes
 	sol_country_demand_log_clear_class = yes
 }
 
@@ -3580,18 +3726,11 @@ sol_country_demand_log_clear_class = {
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_coefficient_2 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_coefficient_3 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_coefficient_4 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_1 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_2 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_3 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_4 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_1 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_2 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_3 key = scope:_cmf_log_key }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_4 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_residual_1 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_residual_2 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_residual_3 key = scope:_cmf_log_key }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_residual_4 key = scope:_cmf_log_key }
+	sol_country_demand_log_clear_balanced_class = yes
 }
 
 sol_country_demand_log_store_anchor = {
@@ -3617,30 +3756,33 @@ sol_country_demand_log_store_class = {
 		}
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_count_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_count_$class$ key = scope:_cmf_log_key value = var:sol_country_class_count_$class$ }
+		set_variable = { name = sol_country_demand_log_calculated_value value = { value = var:sol_country_class_raw_total_$class$ divide = var:sol_country_class_count_$class$ min = 0 } }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_raw_avg_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_raw_avg_$class$ key = scope:_cmf_log_key value = { value = var:sol_country_class_raw_total_$class$ divide = var:sol_country_class_count_$class$ min = 0 } }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_raw_avg_$class$ key = scope:_cmf_log_key value = var:sol_country_demand_log_calculated_value }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_min_raw_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_min_raw_$class$ key = scope:_cmf_log_key value = var:sol_country_class_min_raw_$class$ }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_max_raw_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_max_raw_$class$ key = scope:_cmf_log_key value = var:sol_country_class_max_raw_$class$ }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_total_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_base_total_$class$ key = scope:_cmf_log_key value = var:sol_country_class_base_total_$class$ }
+		set_variable = { name = sol_country_demand_log_calculated_value value = { value = var:sol_country_class_base_spending_nobles_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_share_nobles_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_nobles_$class$ key = scope:_cmf_log_key value = { value = var:sol_country_class_base_spending_nobles_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_nobles_$class$ key = scope:_cmf_log_key value = var:sol_country_demand_log_calculated_value }
+		set_variable = { name = sol_country_demand_log_calculated_value value = { value = var:sol_country_class_base_spending_clergy_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_share_clergy_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_clergy_$class$ key = scope:_cmf_log_key value = { value = var:sol_country_class_base_spending_clergy_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_clergy_$class$ key = scope:_cmf_log_key value = var:sol_country_demand_log_calculated_value }
+		set_variable = { name = sol_country_demand_log_calculated_value value = { value = var:sol_country_class_base_spending_burghers_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_share_burghers_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_burghers_$class$ key = scope:_cmf_log_key value = { value = var:sol_country_class_base_spending_burghers_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_burghers_$class$ key = scope:_cmf_log_key value = var:sol_country_demand_log_calculated_value }
+		set_variable = { name = sol_country_demand_log_calculated_value value = { value = var:sol_country_class_base_lower_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_share_lower_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_lower_$class$ key = scope:_cmf_log_key value = { value = var:sol_country_class_base_lower_$class$ divide = var:sol_country_class_base_total_$class$ min = 0 } }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_share_lower_$class$ key = scope:_cmf_log_key value = var:sol_country_demand_log_calculated_value }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_coefficient_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_coefficient_$class$ key = scope:_cmf_log_key value = var:sol_country_class_coefficient_$class$ }
-		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_diagonal_$class$ key = scope:_cmf_log_key value = var:sol_country_class_diagonal_$class$ }
-		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_$class$ key = scope:_cmf_log_key }
-		add_to_global_variable_map = { name = sol_cmf_demand_log_class_cross_$class$ key = scope:_cmf_log_key value = var:sol_country_class_cross_max_$class$ }
 		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_residual_$class$ key = scope:_cmf_log_key }
 		add_to_global_variable_map = { name = sol_cmf_demand_log_class_residual_$class$ key = scope:_cmf_log_key value = var:sol_country_class_residual_$class$ }
+		sol_country_demand_log_store_balanced_class = { class = $class$ }
+		remove_variable = sol_country_demand_log_calculated_value
 	}
 }
 
@@ -3669,10 +3811,6 @@ sol_country_demand_log_store_common = {
 	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_class key = scope:_cmf_log_key value = var:sol_country_demand_failure_class }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_coeff key = scope:_cmf_log_key }
 	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_class_coeff key = scope:_cmf_log_key value = var:sol_country_demand_failure_class_coeff }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_diagonal key = scope:_cmf_log_key }
-	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_class_diagonal key = scope:_cmf_log_key value = var:sol_country_demand_failure_class_diagonal }
-	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_class_cross key = scope:_cmf_log_key }
-	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_class_cross key = scope:_cmf_log_key value = var:sol_country_demand_failure_class_cross }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_row key = scope:_cmf_log_key }
 	add_to_global_variable_map = { name = sol_cmf_demand_log_failure_row key = scope:_cmf_log_key value = var:sol_country_demand_failure_row }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_failure_residual key = scope:_cmf_log_key }
@@ -3735,6 +3873,7 @@ sol_country_demand_log_store_common = {
 	add_to_global_variable_map = { name = sol_cmf_demand_log_rhs_tribesmen key = scope:_cmf_log_key value = var:sol_country_demand_rhs_tribesmen }
 	remove_from_global_variable_map = { name = sol_cmf_demand_log_rhs_lower key = scope:_cmf_log_key }
 	add_to_global_variable_map = { name = sol_cmf_demand_log_rhs_lower key = scope:_cmf_log_key value = var:sol_country_demand_rhs_lower }
+	sol_country_demand_log_store_balanced_common = yes
 	sol_country_demand_log_store_equation = yes
 	if = {
 		limit = { has_variable = sol_country_demand_failure_anchor_scope }
@@ -3802,23 +3941,43 @@ sol_country_demand_log_anchor_rows = {
 
 sol_country_demand_log_class_rows = {
 	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_MATRIX }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_COEFFICIENTS }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_SUPPORT }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_N_HEAD }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_COEFFICIENTS_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_BALANCE_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_STRUCTURAL_COUNTS_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_SCORE_RANGES_UPPER }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_SCORE_RANGES_LOWER }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_CONFIDENCE_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_PIVOTS_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_N_HEAD_SHORT }
 	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_N_SHARE }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_C_HEAD }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_N_PROFILE_SHORT }
+	if = { limit = { has_variable = sol_country_class_example_1 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_N_EXAMPLE_SHORT } }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_C_HEAD_SHORT }
 	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_C_SHARE }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_B_HEAD }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_C_PROFILE_SHORT }
+	if = { limit = { has_variable = sol_country_class_example_2 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_C_EXAMPLE_SHORT } }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_B_HEAD_SHORT }
 	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_B_SHARE }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_L_HEAD }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_B_PROFILE_SHORT }
+	if = { limit = { has_variable = sol_country_class_example_3 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_B_EXAMPLE_SHORT } }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_L_HEAD_SHORT }
 	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_L_SHARE }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_L_PROFILE_SHORT }
+	if = { limit = { has_variable = sol_country_class_example_4 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_L_EXAMPLE_SHORT } }
 }
 
 sol_country_demand_log_class_equation_rows = {
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_NOBLES }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_CLERGY }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_BURGHERS }
-	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_LOWER }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_NOBLES_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_CLERGY_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_BURGHERS_SHORT }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_EQUATION_LOWER_SHORT }
+}
+
+sol_country_demand_log_class_normalized_equation_rows = {
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_NOBLES }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_CLERGY }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_BURGHERS }
+	sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_NORMALIZED_LOWER }
 }
 
 sol_country_demand_log_final_error_rows = {
@@ -3865,6 +4024,7 @@ sol_country_demand_log_refresh = {
 				sol_country_demand_log_class_rows = yes
 				sol_country_demand_log_rhs_rows = yes
 				sol_country_demand_log_class_equation_rows = yes
+				sol_country_demand_log_class_normalized_equation_rows = yes
 				sol_country_demand_log_final_error_rows = yes
 			}
 			else = {
@@ -3902,10 +4062,6 @@ sol_country_demand_log_refresh = {
 				limit = { var:sol_country_demand_solve_status = -5 }
 				sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_NO_BASE detail = _cmf_log_no_arg }
 			}
-			else_if = {
-				limit = { var:sol_country_demand_solve_status = -6 }
-				sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_CLASS_DIRECTION detail = _cmf_log_no_arg }
-			}
 			else = {
 				sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_CLASS_RESIDUAL detail = _cmf_log_no_arg }
 			}
@@ -3913,12 +4069,12 @@ sol_country_demand_log_refresh = {
 			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_COUNTRY }
 			if = { limit = { var:sol_country_demand_solve_status = -1 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_PIVOT_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_PIVOT } }
 			else_if = { limit = { var:sol_country_demand_solve_status = -4 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_FAILURE_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_MISSING } }
-			else_if = { limit = { var:sol_country_demand_solve_status = -6 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_FAILURE_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_DIRECTION } }
 			else_if = { limit = { var:sol_country_demand_solve_status = -7 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_FAILURE_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_RESIDUAL } }
 			else_if = { limit = { OR = { var:sol_country_demand_solve_status = -2 var:sol_country_demand_solve_status = -3 } } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_FAILURE_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_CLASS_FAILURE } }
 			sol_country_demand_log_class_rows = yes
 			sol_country_demand_log_rhs_rows = yes
 			sol_country_demand_log_class_equation_rows = yes
+			sol_country_demand_log_class_normalized_equation_rows = yes
 			sol_country_demand_log_final_error_rows = yes
 		}
 		else_if = {
@@ -3980,6 +4136,277 @@ sol_country_demand_log_refresh = {
 	}
 }
 
+sol_country_demand_log_clear_balanced_common = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_target_base key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_balance_weight key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_classified_location_count key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_min key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_max key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_max_location_base key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_max_location_target_ratio key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_nobles key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_nobles key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_clergy key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_clergy key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_burghers key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_burghers key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_lower key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_lower key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_4 key = scope:_cmf_log_key }
+}
+
+sol_country_demand_log_store_balanced_common = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_target_base key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_target_base key = scope:_cmf_log_key value = var:sol_country_class_target_base }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_balance_weight key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_balance_weight key = scope:_cmf_log_key value = var:sol_country_class_balance_weight }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_classified_location_count key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_classified_location_count key = scope:_cmf_log_key value = var:sol_country_classified_location_count }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg key = scope:_cmf_log_key value = var:sol_country_class_confidence_avg }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_min key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_confidence_min key = scope:_cmf_log_key value = var:sol_country_class_confidence_min }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_max key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_confidence_max key = scope:_cmf_log_key value = var:sol_country_class_confidence_max }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_max_location_base key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_max_location_base key = scope:_cmf_log_key value = var:sol_country_class_max_location_base }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_max_location_target_ratio key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_max_location_target_ratio key = scope:_cmf_log_key value = var:sol_country_class_max_location_target_ratio }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_nobles key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_min_nobles key = scope:_cmf_log_key value = var:sol_country_class_score_min_nobles }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_nobles key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_max_nobles key = scope:_cmf_log_key value = var:sol_country_class_score_max_nobles }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_clergy key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_min_clergy key = scope:_cmf_log_key value = var:sol_country_class_score_min_clergy }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_clergy key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_max_clergy key = scope:_cmf_log_key value = var:sol_country_class_score_max_clergy }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_burghers key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_min_burghers key = scope:_cmf_log_key value = var:sol_country_class_score_min_burghers }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_burghers key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_max_burghers key = scope:_cmf_log_key value = var:sol_country_class_score_max_burghers }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_min_lower key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_min_lower key = scope:_cmf_log_key value = var:sol_country_class_score_min_lower }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_max_lower key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_max_lower key = scope:_cmf_log_key value = var:sol_country_class_score_max_lower }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_1 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_1 key = scope:_cmf_log_key value = var:sol_country_structural_class_count_1 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_2 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_2 key = scope:_cmf_log_key value = var:sol_country_structural_class_count_2 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_3 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_3 key = scope:_cmf_log_key value = var:sol_country_structural_class_count_3 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_4 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_structural_class_count_4 key = scope:_cmf_log_key value = var:sol_country_structural_class_count_4 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_1 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_pivot_1 key = scope:_cmf_log_key value = var:sol_pivot_abs_1 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_2 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_pivot_2 key = scope:_cmf_log_key value = var:sol_pivot_abs_2 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_3 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_pivot_3 key = scope:_cmf_log_key value = var:sol_pivot_abs_3 }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_pivot_4 key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_pivot_4 key = scope:_cmf_log_key value = var:sol_pivot_abs_4 }
+}
+
+sol_country_demand_log_clear_balanced_class = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_share_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_share_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_share_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_share_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_base_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_base_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_base_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_base_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_4 key = scope:_cmf_log_key }
+}
+
+sol_country_demand_log_store_balanced_class = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_share_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_base_share_$class$ key = scope:_cmf_log_key value = var:sol_country_class_base_share_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_base_deviation_$class$ key = scope:_cmf_log_key value = var:sol_country_class_base_deviation_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_affinity_avg_$class$ key = scope:_cmf_log_key value = var:sol_country_class_affinity_avg_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_affinity_min_$class$ key = scope:_cmf_log_key value = var:sol_country_class_min_affinity_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_affinity_max_$class$ key = scope:_cmf_log_key value = var:sol_country_class_max_affinity_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_penalty_avg_$class$ key = scope:_cmf_log_key value = var:sol_country_class_penalty_avg_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_confidence_avg_$class$ key = scope:_cmf_log_key value = var:sol_country_class_confidence_avg_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_structural_match_rate_$class$ key = scope:_cmf_log_key value = var:sol_country_class_structural_match_rate_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_nobles_$class$ key = scope:_cmf_log_key value = var:sol_country_class_score_nobles_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_clergy_$class$ key = scope:_cmf_log_key value = var:sol_country_class_score_clergy_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_burghers_$class$ key = scope:_cmf_log_key value = var:sol_country_class_score_burghers_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_score_lower_$class$ key = scope:_cmf_log_key value = var:sol_country_class_score_lower_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_signature_$class$ key = scope:_cmf_log_key value = var:sol_country_class_signature_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_cross_score_$class$ key = scope:_cmf_log_key value = var:sol_country_class_cross_score_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_signature_margin_$class$ key = scope:_cmf_log_key value = var:sol_country_class_signature_margin_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_base_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_base_$class$ key = scope:_cmf_log_key value = var:sol_country_class_example_base_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_affinity_$class$ key = scope:_cmf_log_key value = var:sol_country_class_example_affinity_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_penalty_$class$ key = scope:_cmf_log_key value = var:sol_country_class_example_penalty_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_confidence_$class$ key = scope:_cmf_log_key value = var:sol_country_class_example_confidence_$class$ }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_$class$ key = scope:_cmf_log_key }
+	add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_structural_$class$ key = scope:_cmf_log_key value = var:sol_country_class_example_structural_$class$ }
+	if = {
+		limit = { has_variable = sol_country_class_example_$class$ }
+		var:sol_country_class_example_$class$ = { save_scope_as = sol_country_demand_log_class_example_$class$ }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_class_example_$class$ key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_class_example_$class$ key = scope:_cmf_log_key value = scope:sol_country_demand_log_class_example_$class$ }
+	}
+}
+
+sol_country_demand_log_clear_balanced_equation = {
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_4 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_1 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_2 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_3 key = scope:_cmf_log_key }
+	remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_4 key = scope:_cmf_log_key }
+}
+
+sol_country_demand_log_store_balanced_equation = {
+	if = {
+		limit = { var:sol_country_demand_solve_mode = 1 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_1 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_1 key = scope:_cmf_log_key value = var:sol_normalized_m_1_1 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_2 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_2 key = scope:_cmf_log_key value = var:sol_normalized_m_1_2 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_3 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_3 key = scope:_cmf_log_key value = var:sol_normalized_m_1_3 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_4 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_1_4 key = scope:_cmf_log_key value = var:sol_normalized_m_1_4 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_1 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_1 key = scope:_cmf_log_key value = var:sol_normalized_m_2_1 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_2 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_2 key = scope:_cmf_log_key value = var:sol_normalized_m_2_2 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_3 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_3 key = scope:_cmf_log_key value = var:sol_normalized_m_2_3 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_4 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_2_4 key = scope:_cmf_log_key value = var:sol_normalized_m_2_4 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_1 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_1 key = scope:_cmf_log_key value = var:sol_normalized_m_3_1 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_2 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_2 key = scope:_cmf_log_key value = var:sol_normalized_m_3_2 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_3 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_3 key = scope:_cmf_log_key value = var:sol_normalized_m_3_3 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_4 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_3_4 key = scope:_cmf_log_key value = var:sol_normalized_m_3_4 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_1 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_1 key = scope:_cmf_log_key value = var:sol_normalized_m_4_1 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_2 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_2 key = scope:_cmf_log_key value = var:sol_normalized_m_4_2 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_3 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_3 key = scope:_cmf_log_key value = var:sol_normalized_m_4_3 }
+		remove_from_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_4 key = scope:_cmf_log_key }
+		add_to_global_variable_map = { name = sol_cmf_demand_log_normalized_matrix_4_4 key = scope:_cmf_log_key value = var:sol_normalized_m_4_4 }
+	}
+}
+
 sol_solve_country_pop_demand = {
 	# root = country. Builds location caches, solves country-stratum closure, and writes final location scales.
 	gls_compute_savings_pressure = yes
@@ -3997,8 +4424,6 @@ sol_solve_country_pop_demand = {
 	set_variable = { name = sol_country_demand_failure_anchor value = 0 }
 	set_variable = { name = sol_country_demand_failure_class value = 0 }
 	set_variable = { name = sol_country_demand_failure_class_coeff value = 0 }
-	set_variable = { name = sol_country_demand_failure_class_diagonal value = 0 }
-	set_variable = { name = sol_country_demand_failure_class_cross value = 0 }
 	set_variable = { name = sol_country_demand_failure_row value = 0 }
 	set_variable = { name = sol_country_demand_failure_residual value = 0 }
 	set_variable = { name = sol_country_demand_failure_tolerance value = 0 }
@@ -4016,14 +4441,6 @@ sol_solve_country_pop_demand = {
 	set_variable = { name = sol_country_class_coefficient_2 value = 0 }
 	set_variable = { name = sol_country_class_coefficient_3 value = 0 }
 	set_variable = { name = sol_country_class_coefficient_4 value = 0 }
-	set_variable = { name = sol_country_class_diagonal_1 value = 0 }
-	set_variable = { name = sol_country_class_diagonal_2 value = 0 }
-	set_variable = { name = sol_country_class_diagonal_3 value = 0 }
-	set_variable = { name = sol_country_class_diagonal_4 value = 0 }
-	set_variable = { name = sol_country_class_cross_max_1 value = 0 }
-	set_variable = { name = sol_country_class_cross_max_2 value = 0 }
-	set_variable = { name = sol_country_class_cross_max_3 value = 0 }
-	set_variable = { name = sol_country_class_cross_max_4 value = 0 }
 	set_variable = { name = sol_country_class_residual_1 value = 0 }
 	set_variable = { name = sol_country_class_residual_2 value = 0 }
 	set_variable = { name = sol_country_class_residual_3 value = 0 }
@@ -4059,6 +4476,35 @@ sol_solve_country_pop_demand = {
 	set_variable = { name = sol_country_share_clergy value = 0 }
 	set_variable = { name = sol_country_share_burghers value = 0 }
 	set_variable = { name = sol_country_share_lower value = 0 }
+	set_variable = { name = sol_country_class_normalizer_nobles value = 0.02 }
+	set_variable = { name = sol_country_class_normalizer_clergy value = 0.02 }
+	set_variable = { name = sol_country_class_normalizer_burghers value = 0.02 }
+	set_variable = { name = sol_country_class_normalizer_lower value = 0.02 }
+	set_variable = { name = sol_country_class_target_base value = 0 }
+	set_variable = { name = sol_country_class_balance_weight value = 1.5 }
+	set_variable = { name = sol_country_classified_location_count value = 0 }
+	set_variable = { name = sol_country_class_confidence_total value = 0 }
+	set_variable = { name = sol_country_class_confidence_avg value = 0 }
+	set_variable = { name = sol_country_class_confidence_min value = 999999 }
+	set_variable = { name = sol_country_class_confidence_max value = 0 }
+	set_variable = { name = sol_country_class_max_location_base value = 0 }
+	set_variable = { name = sol_country_class_max_location_target_ratio value = 0 }
+	set_variable = { name = sol_country_class_score_min_nobles value = 999999 }
+	set_variable = { name = sol_country_class_score_max_nobles value = -999999 }
+	set_variable = { name = sol_country_class_score_min_clergy value = 999999 }
+	set_variable = { name = sol_country_class_score_max_clergy value = -999999 }
+	set_variable = { name = sol_country_class_score_min_burghers value = 999999 }
+	set_variable = { name = sol_country_class_score_max_burghers value = -999999 }
+	set_variable = { name = sol_country_class_score_min_lower value = 999999 }
+	set_variable = { name = sol_country_class_score_max_lower value = -999999 }
+	set_variable = { name = sol_country_structural_class_count_1 value = 0 }
+	set_variable = { name = sol_country_structural_class_count_2 value = 0 }
+	set_variable = { name = sol_country_structural_class_count_3 value = 0 }
+	set_variable = { name = sol_country_structural_class_count_4 value = 0 }
+	set_variable = { name = sol_pivot_abs_1 value = 0 }
+	set_variable = { name = sol_pivot_abs_2 value = 0 }
+	set_variable = { name = sol_pivot_abs_3 value = 0 }
+	set_variable = { name = sol_pivot_abs_4 value = 0 }
 	set_variable = { name = sol_country_baseline_spending_nobles value = 0 }
 	set_variable = { name = sol_country_baseline_spending_clergy value = 0 }
 	set_variable = { name = sol_country_baseline_spending_burghers value = 0 }
@@ -4083,6 +4529,22 @@ sol_solve_country_pop_demand = {
 	set_variable = { name = sol_country_class_raw_total_2 value = 0 }
 	set_variable = { name = sol_country_class_raw_total_3 value = 0 }
 	set_variable = { name = sol_country_class_raw_total_4 value = 0 }
+	set_variable = { name = sol_country_class_affinity_total_1 value = 0 }
+	set_variable = { name = sol_country_class_affinity_total_2 value = 0 }
+	set_variable = { name = sol_country_class_affinity_total_3 value = 0 }
+	set_variable = { name = sol_country_class_affinity_total_4 value = 0 }
+	set_variable = { name = sol_country_class_penalty_total_1 value = 0 }
+	set_variable = { name = sol_country_class_penalty_total_2 value = 0 }
+	set_variable = { name = sol_country_class_penalty_total_3 value = 0 }
+	set_variable = { name = sol_country_class_penalty_total_4 value = 0 }
+	set_variable = { name = sol_country_class_confidence_total_1 value = 0 }
+	set_variable = { name = sol_country_class_confidence_total_2 value = 0 }
+	set_variable = { name = sol_country_class_confidence_total_3 value = 0 }
+	set_variable = { name = sol_country_class_confidence_total_4 value = 0 }
+	set_variable = { name = sol_country_class_structural_match_count_1 value = 0 }
+	set_variable = { name = sol_country_class_structural_match_count_2 value = 0 }
+	set_variable = { name = sol_country_class_structural_match_count_3 value = 0 }
+	set_variable = { name = sol_country_class_structural_match_count_4 value = 0 }
 	set_variable = { name = sol_country_class_base_spending_nobles_1 value = 0 }
 	set_variable = { name = sol_country_class_base_spending_nobles_2 value = 0 }
 	set_variable = { name = sol_country_class_base_spending_nobles_3 value = 0 }
@@ -4115,6 +4577,18 @@ sol_solve_country_pop_demand = {
 	set_variable = { name = sol_country_class_max_raw_2 value = 0 }
 	set_variable = { name = sol_country_class_max_raw_3 value = 0 }
 	set_variable = { name = sol_country_class_max_raw_4 value = 0 }
+	set_variable = { name = sol_country_class_min_affinity_1 value = 999999 }
+	set_variable = { name = sol_country_class_min_affinity_2 value = 999999 }
+	set_variable = { name = sol_country_class_min_affinity_3 value = 999999 }
+	set_variable = { name = sol_country_class_min_affinity_4 value = 999999 }
+	set_variable = { name = sol_country_class_max_affinity_1 value = -999999 }
+	set_variable = { name = sol_country_class_max_affinity_2 value = -999999 }
+	set_variable = { name = sol_country_class_max_affinity_3 value = -999999 }
+	set_variable = { name = sol_country_class_max_affinity_4 value = -999999 }
+	remove_variable = sol_country_class_example_1
+	remove_variable = sol_country_class_example_2
+	remove_variable = sol_country_class_example_3
+	remove_variable = sol_country_class_example_4
 	if = {
 		limit = { is_human = yes }
 		cmf_log = { action = CMF_LOG_SOL_DEMAND_REFRESH_START }
@@ -4166,13 +4640,34 @@ sol_solve_country_pop_demand = {
 		set_variable = { name = sol_country_share_clergy value = { value = var:sol_country_base_spending_clergy divide = var:sol_country_base_spending_total min = 0 } }
 		set_variable = { name = sol_country_share_burghers value = { value = var:sol_country_base_spending_burghers divide = var:sol_country_base_spending_total min = 0 } }
 		set_variable = { name = sol_country_share_lower value = { value = var:sol_country_base_spending_lower divide = var:sol_country_base_spending_total min = 0 } }
+		set_variable = { name = sol_country_class_target_base value = { value = var:sol_country_base_spending_total divide = 4 } }
+		set_variable = { name = sol_country_class_normalizer_nobles value = var:sol_country_share_nobles }
+		set_variable = { name = sol_country_class_normalizer_clergy value = var:sol_country_share_clergy }
+		set_variable = { name = sol_country_class_normalizer_burghers value = var:sol_country_share_burghers }
+		set_variable = { name = sol_country_class_normalizer_lower value = var:sol_country_share_lower }
+		if = { limit = { var:sol_country_class_normalizer_nobles < 0.02 } set_variable = { name = sol_country_class_normalizer_nobles value = 0.02 } }
+		if = { limit = { var:sol_country_class_normalizer_clergy < 0.02 } set_variable = { name = sol_country_class_normalizer_clergy value = 0.02 } }
+		if = { limit = { var:sol_country_class_normalizer_burghers < 0.02 } set_variable = { name = sol_country_class_normalizer_burghers value = 0.02 } }
+		if = { limit = { var:sol_country_class_normalizer_lower < 0.02 } set_variable = { name = sol_country_class_normalizer_lower value = 0.02 } }
 	}
 	if = {
 		limit = { num_locations > 0 var:sol_country_base_spending_total > 0.00001 }
 		every_owned_location = {
 			limit = { is_land = yes }
+			sol_location_prepare_demand_class_scores = yes
 			save_scope_as = sol_demand_cached_location
+			owner = { sol_country_demand_accumulate_score_diagnostics = yes }
+		}
+		if = { limit = { var:sol_country_classified_location_count > 0 } set_variable = { name = sol_country_class_confidence_avg value = { value = var:sol_country_class_confidence_total divide = var:sol_country_classified_location_count } } }
+		if = { limit = { var:sol_country_class_target_base > 0.00001 } set_variable = { name = sol_country_class_max_location_target_ratio value = { value = var:sol_country_class_max_location_base divide = var:sol_country_class_target_base } } }
+		ordered_owned_location = {
+			limit = { is_land = yes var:sol_location_base_total_spending > 0.00001 }
+			order_by = var:sol_location_demand_class_confidence
+			# ordered_* defaults to a single result; an explicit high max is required for the full pass.
+			max = 100000
+			check_range_bounds = no
 			sol_location_assign_demand_class = yes
+			save_scope_as = sol_demand_cached_location
 			owner = {
 				sol_country_demand_accumulate_class = { class = 1 }
 				sol_country_demand_accumulate_class = { class = 2 }
@@ -4180,6 +4675,20 @@ sol_solve_country_pop_demand = {
 				sol_country_demand_accumulate_class = { class = 4 }
 			}
 		}
+	}
+	if = {
+		limit = { var:sol_country_classified_location_count <= 0 }
+		# Keep no-base diagnostics explicit instead of leaking initialization sentinels.
+		set_variable = { name = sol_country_class_confidence_min value = 0 }
+		set_variable = { name = sol_country_class_confidence_max value = 0 }
+		set_variable = { name = sol_country_class_score_min_nobles value = 0 }
+		set_variable = { name = sol_country_class_score_max_nobles value = 0 }
+		set_variable = { name = sol_country_class_score_min_clergy value = 0 }
+		set_variable = { name = sol_country_class_score_max_clergy value = 0 }
+		set_variable = { name = sol_country_class_score_min_burghers value = 0 }
+		set_variable = { name = sol_country_class_score_max_burghers value = 0 }
+		set_variable = { name = sol_country_class_score_min_lower value = 0 }
+		set_variable = { name = sol_country_class_score_max_lower value = 0 }
 	}
 	set_variable = { name = sol_country_demand_anchor_count value = 0 }
 	if = { limit = { var:sol_country_class_count_1 > 0 } change_variable = { name = sol_country_demand_anchor_count add = 1 } }
@@ -4190,11 +4699,11 @@ sol_solve_country_pop_demand = {
 		limit = { var:sol_country_base_spending_total > 0.00001 }
 		sol_country_demand_clear_matrix = yes
 		sol_country_demand_fill_class_matrix = yes
-		# Cache class support before a missing-class fallback is decided.
-		sol_country_demand_validate_class_direction = { class = 1 diag = sol_country_class_base_spending_nobles_1 cross_1 = sol_country_class_base_spending_clergy_1 cross_2 = sol_country_class_base_spending_burghers_1 cross_3 = sol_country_class_base_lower_1 }
-		sol_country_demand_validate_class_direction = { class = 2 diag = sol_country_class_base_spending_clergy_2 cross_1 = sol_country_class_base_spending_nobles_2 cross_2 = sol_country_class_base_spending_burghers_2 cross_3 = sol_country_class_base_lower_2 }
-		sol_country_demand_validate_class_direction = { class = 3 diag = sol_country_class_base_spending_burghers_3 cross_1 = sol_country_class_base_spending_nobles_3 cross_2 = sol_country_class_base_spending_clergy_3 cross_3 = sol_country_class_base_lower_3 }
-		sol_country_demand_validate_class_direction = { class = 4 diag = sol_country_class_base_lower_4 cross_1 = sol_country_class_base_spending_nobles_4 cross_2 = sol_country_class_base_spending_clergy_4 cross_3 = sol_country_class_base_spending_burghers_4 }
+		# Cache normalized structure and relative signatures even if a class is missing.
+		sol_country_demand_measure_class_profile = { class = 1 signature = sol_country_class_score_nobles_1 cross_1 = sol_country_class_score_clergy_1 cross_2 = sol_country_class_score_burghers_1 cross_3 = sol_country_class_score_lower_1 }
+		sol_country_demand_measure_class_profile = { class = 2 signature = sol_country_class_score_clergy_2 cross_1 = sol_country_class_score_nobles_2 cross_2 = sol_country_class_score_burghers_2 cross_3 = sol_country_class_score_lower_2 }
+		sol_country_demand_measure_class_profile = { class = 3 signature = sol_country_class_score_burghers_3 cross_1 = sol_country_class_score_nobles_3 cross_2 = sol_country_class_score_clergy_3 cross_3 = sol_country_class_score_lower_3 }
+		sol_country_demand_measure_class_profile = { class = 4 signature = sol_country_class_score_lower_4 cross_1 = sol_country_class_score_nobles_4 cross_2 = sol_country_class_score_clergy_4 cross_3 = sol_country_class_score_burghers_4 }
 	}
 	if = {
 		limit = { num_locations > 0 var:sol_country_base_spending_total <= 0.00001 }
