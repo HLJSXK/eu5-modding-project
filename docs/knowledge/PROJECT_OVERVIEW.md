@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-08-07 (negative-pressure-biased raw-factor demand solve)
+> Last updated: 2026-08-07 (EU5 debug-save population parser)
 
 ## Project Identity
 
@@ -106,6 +106,8 @@ eu5-modding-project/
 |-- docs/                              project knowledge, guides, technical notes
 |-- scripts/                           Python codegen + validation
 |-- tools/                             support tooling
+|   |-- eu5_save_parser/               targeted debug-save population/SOL cache parser and CSV exporter
+|   `-- sol_demand_simulator/          legacy interactive demand simulator
 |-- data/                              calibration CSVs, generated indexes, and legacy simulator data
 |-- assets/                            images and media
 |-- reference_game_files/              vanilla EU5 references
@@ -136,6 +138,12 @@ eu5-modding-project/
 | `generate_sol_icon.py` | After setting an Images API relay key, or with `--convert-existing-png` for a local source image; add `--overwrite` to refresh existing DDS outputs | Shared SOL icon DDS outputs for `icons/sol/sol_living_standard.dds`, `icons/map_modes/sol_living_standard.dds`, `icons/situations/global_living_standard.dds`, and `icons/modifier_types/sol_living_standard.dds`, plus PNG/metadata under `data/generated_icons/`; uses `dds_image_lib.py` for dependency-free, Clausewitz-compatible PNG/DDS conversion with full mip chains |
 
 The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `engel_export.py`, or `gen_goods_demand_overrides.py`; those tools are retained only as legacy/reference helpers unless explicitly revived.
+
+## Tool Reference
+
+| Tool | When to run | Output |
+|---|---|---|
+| `python -m tools.eu5_save_parser` | On an uncompressed text save produced with EU5 debug mode when calibrating or auditing the location-class compensation model | Memory-maps the save and extracts only metadata, country tags and solver caches, population records, location/population links, and decoded `sol_location_*` caches; writes analysis-ready location and country CSVs, a diagnostic manifest, and an optional population-group CSV under `data/save_analysis/` by default |
 
 ## Data Files
 
