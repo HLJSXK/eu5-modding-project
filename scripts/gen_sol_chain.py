@@ -82,6 +82,7 @@ def main() -> None:
         _run(["scripts/gen_pop_goods.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_demand_csv.py", *mode_args])
         _run(["scripts/gen_market_unit_consumption.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_economy_effects.py", "--target", target_arg, *mode_args])
 
     if "sol_standalone" in base_targets:
         location_args = ["--check"] if args.check else []

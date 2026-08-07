@@ -1,7 +1,7 @@
 # SOL 国家级阶层需求闭合模型 (实施计划)
 
 > Created: 2026-08-05  
-> Status: implementation plan, not yet implemented
+> Status: implemented in `stable` and `sol_standalone` as a 4-class aggregate solve using relative stratum-share overrepresentation. Legacy anchor-location notes below are retained as the original design memo.
 
 ## 0. 实施计划
 
@@ -9,11 +9,11 @@
 
 ### 0.1 改动范围
 
-- 主逻辑: `src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt`
+- 主逻辑源: `scripts/sol_economy_effects_source.py`; 生成目标为 `src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt` 和 `src/sol_standalone/in_game/common/scripted_effects/A_SOL_economy_effects.txt`
 - 显示值: `src/stable/in_game/common/script_values/SOL_economy_values.txt`
 - 面板: `src/stable/in_game/gui/panels/situation/global_living_standard.gui`
 - 触发: `src/stable/in_game/common/on_action/SOL_economy_on_actions.txt` 和 `src/stable/in_game/common/situations/SOL_economy_situation.txt`
-- 同步目标: `src/sol_standalone/...` 的对应文件
+- 生成目标: `src/sol_standalone/...` 的对应文件
 - 兼容层复查: `scripts/gen_sol_pp_compat.py`, `scripts/gen_sol_jtg_compat.py`, `scripts/gen_sol_mnt_compat.py`
 
 ### 0.2 执行顺序

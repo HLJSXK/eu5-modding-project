@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Generate SOL market unit-consumption constants and the yearly market spending
-refresh block.
+Generate SOL market unit-consumption constants.
 
 Inputs:
   data/demand_price_table.csv
 
 Outputs:
   src/<target>/in_game/common/script_values/SOL_market_unit_consumption_values.txt
-  sol_refresh_market_pop_demand_maps block in src/<target>/.../A_SOL_economy_effects.txt
+
+The yearly sol_refresh_market_pop_demand_maps effect block is rendered by
+_generate_refresh_block() and consumed by gen_sol_economy_effects.py.
 """
 
 import argparse
@@ -38,13 +39,12 @@ def _resolve_targets(target: str) -> List[str]:
     raise ValueError(f"Unknown target: {target}")
 
 
-def _target_paths(target: str) -> Tuple[Path, Path]:
+def _target_values_path(target: str) -> Path:
     if target not in TARGET_NAMES:
         raise ValueError(f"Unknown target: {target}")
     target_root = REPO_ROOT / "src" / target / "in_game" / "common"
     values_output = target_root / "script_values" / "SOL_market_unit_consumption_values.txt"
-    effects_file = target_root / "scripted_effects" / "A_SOL_economy_effects.txt"
-    return values_output, effects_file
+    return values_output
 
 
 def _write_utf8_bom(path: Path, text: str) -> None:
@@ -237,19 +237,6 @@ def _find_effect_block(text: str) -> Tuple[int, int]:
     return block_start, block_end
 
 
-def _replace_effect_block(effects_file: Path, new_block: str) -> None:
-    text = effects_file.read_text(encoding="utf-8-sig")
-    block_start, block_end = _find_effect_block(text)
-    updated = text[:block_start] + new_block + text[block_end:]
-    _write_utf8_bom(effects_file, updated)
-
-
-def _effect_block_matches(effects_file: Path, new_block: str) -> bool:
-    text = effects_file.read_text(encoding="utf-8-sig")
-    block_start, block_end = _find_effect_block(text)
-    return text[block_start:block_end] == new_block
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate SOL market unit consumption outputs."
@@ -269,13 +256,12 @@ def main() -> None:
 
     good_rows = _load_good_rows()
     values_text = _generate_values(good_rows)
-    refresh_block = _generate_refresh_block(good_rows)
     targets = _resolve_targets(args.target)
 
     if args.check:
         ok = True
         for target in targets:
-            values_output, effects_file = _target_paths(target)
+            values_output = _target_values_path(target)
             if not values_output.exists():
                 print(f"[FAIL] Missing generated target: {values_output.relative_to(REPO_ROOT)}")
                 ok = False
@@ -291,46 +277,13 @@ def main() -> None:
                     ok = False
                 if values_ok:
                     print(f"[OK] Up to date: {values_output.relative_to(REPO_ROOT)}")
-
-            if not effects_file.exists():
-                print(f"[FAIL] Missing generated block target: {effects_file.relative_to(REPO_ROOT)}")
-                ok = False
-                continue
-            effects_ok = True
-            if not _has_utf8_bom(effects_file):
-                print(f"[FAIL] Missing UTF-8 BOM: {effects_file.relative_to(REPO_ROOT)}")
-                effects_ok = False
-                ok = False
-            try:
-                block_ok = _effect_block_matches(effects_file, refresh_block)
-            except ValueError as exc:
-                print(f"[FAIL] {effects_file.relative_to(REPO_ROOT)}: {exc}")
-                ok = False
-                continue
-            if not block_ok:
-                print(
-                    "[FAIL] Out of date: "
-                    f"{effects_file.relative_to(REPO_ROOT)}::sol_refresh_market_pop_demand_maps"
-                )
-                effects_ok = False
-                ok = False
-            if effects_ok:
-                print(
-                    "[OK] Up to date: "
-                    f"{effects_file.relative_to(REPO_ROOT)}::sol_refresh_market_pop_demand_maps"
-                )
         sys.exit(0 if ok else 1)
 
     for target in targets:
-        values_output, effects_file = _target_paths(target)
+        values_output = _target_values_path(target)
         values_output.parent.mkdir(parents=True, exist_ok=True)
         _write_utf8_bom(values_output, values_text)
-        _replace_effect_block(effects_file, refresh_block)
         print(f"[gen_market_unit_consumption] Wrote {values_output.relative_to(REPO_ROOT)}")
-        print(
-            "[gen_market_unit_consumption] Updated sol_refresh_market_pop_demand_maps in "
-            f"{effects_file.relative_to(REPO_ROOT)}"
-        )
 
 
 if __name__ == "__main__":
