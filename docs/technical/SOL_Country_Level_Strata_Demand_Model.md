@@ -1,11 +1,11 @@
-# SOL 国家级阶层需求闭合模型 (实施计划)
+# SOL 国家级阶层需求闭合模型（实现说明与原始设计 memo）
 
 > Created: 2026-08-05  
-> Status: implemented in `stable` and `sol_standalone` as a 4-class aggregate solve using relative stratum-share overrepresentation. Legacy anchor-location notes below are retained as the original design memo.
+> Status: implemented in `stable` and `sol_standalone` as a four-class aggregate solve using absolute local stratum purity. Legacy anchor-location notes below are retained as the original design memo.
 
-## 0. 实施计划
+## 0. 当前实现
 
-这份文档前半段保留原始数学 memo，后半段先落成工程计划。核心原则只有一条: **先把求解拆成可缓存、可回退、可记录的 country-scoped 流程，再去谈精确平衡**。
+当前运行时不再从少量锚点地点硬解修正量，而是在贵族、教士、市民、下层四个类别组成的类空间中求解。类系数是直接应用的最终系数，和遗留锚点路径的 `raw + delta` 语义完全分开。
 
 ### 0.1 改动范围
 
@@ -18,38 +18,25 @@
 
 ### 0.2 执行顺序
 
-1. 保留 `sol_compute_location_pop_demand` 作为地点缓存构建器，不在这里直接做全局求解。
-2. 新增一个 country-scoped solve helper，复用 `gls_accumulate_panel_stats` 的扫描，把 `Y_e`、`C_{e,l}`、`k_l^(0)` 一次性收齐。
-3. 引入锚点集合 `J`，用“结构差异优先 + 贴近 `k^(0)=1` + 规模软权重”的方式挑选；年度或结构失效时重选，月度只复用既有锚点。
-4. 只解锚点子系统，`rank` 不足、条件数过差或非负约束失败时回退到 `k^(0)`。
-5. 把最终 `k_l` 写回按 location key 的缓存，再由月度 `add_location_modifier` 读取。
-6. `gls_compute_panel_display` 和 `gls_accumulate_panel_stats` 只读取最终缓存，不再重算第二套口径。
-7. `gls_country_sol_all`、`gls_country_location_avg_scale` 保留作诊断，不充当新解本身。
-8. `SOL_GUI_ROW_FINAL_COEFF` 应该读取新的 solved coefficient；旧的 aggregate ratio 只保留作对照，不要再冒充主结果。
+1. `sol_compute_location_pop_demand` 先计算并缓存地点的原始系数 `raw = liquid_funds / base_spending`，同时令 `final = raw`，因此任何后续失败天然保留 raw。
+2. 每个基础支出大于 `0.00001` 的地点计算四维绝对支出占比 `(nobles, clergy, burghers, commoners + tribesmen)`，按最大占比分类；精确平局固定按贵族、教士、市民、下层处理。基础支出不足的地点使用类 0，不进入矩阵并继续使用 raw。
+3. 对四类聚合基础支出，构造 `M[e,c] = sum base_spending[e] in class c`，并直接求解 `M * class_coefficient = target`。
+4. 求解前要求四类均存在且有基础支出，并要求每列主对角支出大于 `0.00001` 且不小于该列任一交叉阶层支出；高斯消元期间继续检查每个主元。
+5. 求解后要求四个类系数均在 `[0, 20]`，并按原始矩阵验证每行残差不超过 `0.01 + RHS * 0.001`。
+6. 成功时，同类所有地点使用对应的 `sol_country_class_coefficient_1..4`；失败时不调用类应用效果，因此所有地点保留 raw。当前 country driver 不再自动回退到锚点法。
+7. `raw`、类系数和 `final` 保持独立语义；类路径不复用 `sol_delta_1..4`，也不要求四个系数同号变化或总和为 0。
 
 ### 0.3 CMF Action Log
 
-CMF 的 action log 只负责阶段标记和分支说明，精确数值继续放在现有 `sol_*` / `gls_*` 缓存里，面板和调试值负责显示数值。
-
-| Planned key | When | Meaning |
-| --- | --- | --- |
-| `sol_country_demand_refresh` | 求解开始 | 本次刷新原因、国家 scope、是否是月度脉冲 |
-| `sol_country_demand_anchor` | 锚点固定后 | 本次使用的锚点策略、候选规模、锚点类别和条件数档位 |
-| `sol_country_demand_result` | 成功写回后 | 解已落地，面板与月度路径可以复用 |
-| `sol_country_demand_fallback` | 求解失败时 | 回退原因: rank 不足、负值、缺缓存等 |
-
-- 用 `cmf_log` / `cmf_log_with_args` 即可，不必把日志当成第二套数值存储。
-- 只在显式 debug reset、加载刷新或受控的人类国家刷新时清空日志，别在每个月度 tick 清空。
-- 锚点日志只记摘要，不记整套浮点细节；需要精确值时，仍然读 `gls_*` 调试缓存。
-- 所有写回值和调试值都要按 EU5 的 5 dp 精度处理，别让引擎自己截断。
+人类国家的调试日志按多行记录国家 scope、类别数与基础支出、全国结构、各类 raw 均值和范围、类内聚合结构、原始 4×4 矩阵、四行 RHS、四个类系数、每行残差和最终误差。失败时另记触发类别、主元、对角/最大交叉支撑或残差/容差，并明确说明 final 保留 raw。遗留锚点日志仍分别显示 raw、delta、candidate，避免和类系数混用。
 
 ### 0.4 验证门槛
 
-- 每次刷新后，检查 `sum_l k_l * C_{e,l}` 与 `Y_e` 是否在 5 dp 内一致。
-- 检查 `k_l >= 0`，若不满足必须记录 fallback。
-- 检查 `max |k_l - 1|` 和 `cond(C_J)` 是否落在可接受区间；太偏的锚点集先换，不要强行用。
-- 检查月度路径和面板路径是否读到同一套 final coefficient cache。
-- 检查 PP / JTG 兼容输出是否还保留新的 helper 调用和新的 cache 名。
+- 纯基向量输入应形成近似对角矩阵并得到稳定正系数。
+- 混合地点只按地点自身绝对占比最大项分类，不受全国稀有度放大影响；数量不均匀本身不是失败条件。
+- 缺类、方向支撑不足、主元奇异、负系数、系数超过 20 或残差超限都必须保留 raw 并记录独立原因。
+- 月度 modifier、面板和日志必须区分 raw 与 final，并读取同一套 final coefficient cache。
+- 生成后检查 stable、standalone 以及三个兼容目标仍同步使用新的 helper 和缓存。
 
 下文第 1-10 节保留原数学 memo，作为锚点法和约束求解的理论依据。
 
