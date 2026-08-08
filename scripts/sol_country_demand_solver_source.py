@@ -24,7 +24,7 @@ from sol_economy_effects_source import (  # noqa: E402
 _TOP_LEVEL_EFFECT = re.compile(r"^([A-Za-z0-9_]+) = \{$")
 
 # These effects implement the country linear space itself: the old exact
-# diagnostic, KKT/Gaussian primitives, active-set candidates, and selection.
+# diagnostic, KKT/reduced Gaussian primitives, active-set candidates, and selection.
 # Matrix aggregation and location application deliberately remain in A_....
 _SOLVER_EFFECTS = frozenset(
     {
@@ -52,7 +52,10 @@ _SOLVER_EFFECTS = frozenset(
         "sol_country_demand_validate_class_residual",
         "sol_country_demand_check_kkt_pivot",
         "sol_country_demand_solve_kkt_5",
+        "sol_country_demand_solve_reduced_3",
+        "sol_country_demand_solve_reduced_4",
         "sol_country_demand_approx_reset_kkt",
+        "sol_country_demand_approx_reset_diagnostics",
         "sol_country_demand_approx_prepare_country",
         "sol_country_demand_approx_prepare_strategy",
         "sol_country_demand_approx_assess",
