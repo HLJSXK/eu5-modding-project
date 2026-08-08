@@ -366,7 +366,7 @@ def _approximation_scales(
 
     if strategy == "balanced_l2":
         return [
-            _error_scale(raw[index], target[index], epsilon)
+            max(abs(raw[index]), abs(target[index]), epsilon)
             for index in range(4)
         ]
     if strategy == "improvement_l2" or strategy == "minimax_ratio":
@@ -402,6 +402,7 @@ def _solve_weighted_total_constrained_nonnegative(
             exact=True,
             total_error=0.0,
             selection_objective=0.0,
+            strategy=strategy,
         )
 
     columns = tuple(

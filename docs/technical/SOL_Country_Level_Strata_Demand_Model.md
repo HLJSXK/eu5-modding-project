@@ -1,8 +1,8 @@
 # SOL 国家级阶层需求闭合模型（实现说明与原始设计 memo）
 
 > Created: 2026-08-05
-> Updated: 2026-08-07
-> Status: implemented in `stable` and `sol_standalone` as a balanced four-class aggregate solve using relative local stratum structure. Legacy anchor-location notes below are retained as the original design memo.
+> Updated: 2026-08-08
+> Status: implemented in `stable` and `sol_standalone` as a four-stratum, hard-total, nonnegative approximation. The old exact 4x4 result is retained only as diagnostic status; raw fallback is used when the four-stratum gate rejects every candidate.
 
 ## 0. 当前实现
 
@@ -10,7 +10,8 @@
 
 ### 0.1 改动范围
 
-- 主逻辑源: `scripts/sol_economy_effects_source.py`; 生成目标为 `src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt` 和 `src/sol_standalone/in_game/common/scripted_effects/A_SOL_economy_effects.txt`
+- 地点级聚合源: `scripts/sol_economy_effects_source.py`; 生成目标为 `src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt` 和 `src/sol_standalone/in_game/common/scripted_effects/A_SOL_economy_effects.txt`
+- 国家级线性空间源: `scripts/sol_country_demand_solver_source.py`; 生成目标为对应目录的 `B_SOL_country_demand_solver.txt`。A 文件只保留 raw 计算、地点分类、国家矩阵聚合、诊断和 modifier 应用，B 文件独占精确诊断、KKT/高斯消元、五种候选、gate 和策略选择。Jomini effect 是全局命名空间，因此跨文件调用契约不变。
 - 显示值: `src/stable/in_game/common/script_values/SOL_economy_values.txt`
 - 面板: `src/stable/in_game/gui/panels/situation/global_living_standard.gui`
 - 触发: `src/stable/in_game/common/on_action/SOL_economy_on_actions.txt` 和 `src/stable/in_game/common/situations/SOL_economy_situation.txt`
@@ -52,7 +53,27 @@ balanced_score[i,c] = affinity[i,c]
 
 选中类后立即累计该地点的全部基础支出，后续地点便会倾向欠载类。精确平局仍固定为贵族、教士、市民、下层。该方法只增加一次地点扫描，目标是让四类基础支出接近各 25%，同时保留足够大的相对结构差异；它不再追求不符合游戏实际的对角矩阵。
 
-### 0.3 聚合与求解
+### 0.3 当前近似求解器
+
+运行时把 `commoners + tribesmen` 聚合为 lower，保留原始 raw 系数、国家矩阵和地点 modifier 语义。`sol_country_demand_solve_mode = 3`、`sol_country_demand_solver_size = 5` 表示固定 5x5 KKT 求解；`sol_country_demand_exact_status` 只保存旧精确 4x4 诊断。
+
+四个硬总额 L2 候选按 `balanced_l2`、`improvement_l2`、`target_l2`、`absolute_l2` 仍保留给玩家国家作完整比较；AI 运行时采用 `improvement_l2` 快路径。候选调用只对实际存在的矩阵列展开：`k` 个非空阶层列最多遍历 `2^k - 1` 个 active class 集合；当 `k = 4` 时跳过四个 singleton 集合。`minimax_ratio` 只对 `is_human = yes` 的玩家国家运行，并使用同一 active-set 预筛。非 active 因素用单位行固定为 0。KKT 总额行满足 `sum(M * factor) = sum(target)`，行尺度分别为：
+
+```text
+balanced_l2    max(abs(raw), abs(target), epsilon)
+improvement_l2 max(abs(raw-target), epsilon)
+minimax_ratio  max(abs(raw-target), epsilon)
+target_l2      max(abs(target), epsilon)
+absolute_l2    1
+```
+
+负因素、奇异主元、硬总额残差和数值残差不合格的候选丢弃；`[-epsilon, 0)` 只钳制到 0。玩家国家的 `minimax_ratio` 运行时入口使用固定有限顶点展开，顶点边界来自总额等式、四行正负残差边界和 active 因素边界。AI 的策略 5 gate 缓存保持初始化值 0，不参与最终选择。
+
+候选必须通过四阶层 gate：四个 raw 绝对误差都大于 `0.00001`，且每层改善量都大于 `max(0.00001, raw_abs_error * 1e-9)`。通过 gate 的候选按平均改善比、平均绝对改善、目标函数和固定策略顺序决胜；没有候选通过时 `sol_country_demand_selected_strategy = 0`，因素为 1，最终保持 `raw_fallback`。缺失类别只让对应矩阵列为空，不再直接阻断尝试。
+
+成功选择的因素继续写入 `sol_country_class_coefficient_1..4`，地点最终系数仍为 `raw * class_factor`，不增加上限。CMF 日志同时记录策略、gate、精确诊断状态、候选统计、因素、四阶层最终误差和硬总额残差。
+
+### 0.4 聚合与求解（历史精确路径）
 
 1. 对最终四类聚合基础支出，构造 `M[e,c] = sum base_spending[e] in class c`，求解 `M * class_coefficient = target`。
 2. 求解只要求四类存在且各自具有足够基础支出，不再要求某类的目标阶层绝对支出高于该类所有交叉阶层。
@@ -72,12 +93,13 @@ balanced_score[i,c] = affinity[i,c]
 - 原始和按行归一化 4×4 矩阵各按四值行输出；方程行只显示 lhs/rhs/residual，另记 RHS、主元、类系数和最终误差。
 - 失败时明确记录缺类、奇异主元、负系数、系数超过 20 或残差/容差，并说明 final 保留 raw。遗留锚点日志仍分别显示 raw、delta、candidate，避免和类系数混用。
 
-### 0.5 验证门槛
+### 0.5 运行时 gate 与失败状态
 
 - 四类 base share 应尽可能接近 `0.25`；超大单地点可能造成不可消除的离散偏差，必须由最大地点/类目标倍数解释。
 - 四类的目标 signature margin 是诊断值，可以为负；分类区分度不足应通过实测 Log 调整权重，而不是恢复绝对对角硬门槛。
-- 缺类、主元奇异、负系数、系数超过 20 或残差超限都必须保留 raw 并记录独立原因。当前类求解状态码为 `-1/-2/-3/-4/-5/-7`，旧的方向不足 `-6` 已移除。
-- 月度 modifier、面板和日志必须区分 raw 与 final，并读取同一套 final coefficient cache。
+- 旧 4x4 路径的缺类、奇异主元、负系数和行残差状态只写入 `sol_country_demand_exact_status`。近似候选不设系数上限；其 pivot、非负性、KKT 数值残差、硬总额残差和 minimax 可行性检查失败即丢弃。
+- gate 只有在四个 raw 绝对误差都大于 `0.00001` 且四个改善量都超过 `max(0.00001, raw_abs_error * 1e-9)` 时才通过。选中策略编号为 `1..5`；所有候选 gate 失败时编号为 `0`，四个类系数写回 `1`，最终地点系数保持 `raw_fallback`。
+- 缺失类别只产生空矩阵列，仍允许其它可用列参与近似；最终是否应用完全由四阶层 gate 决定。月度 modifier、面板和日志必须区分 raw 与 final，并读取同一套 final coefficient cache。
 - 生成后检查 stable、standalone 和三个兼容目标；后者只覆盖各自需要改写的效果，完整分类 helper 继续由其 SOL 依赖提供。
 
 ### 0.6 2026-08-07 实测经验与下一步判据
@@ -322,73 +344,65 @@ C_{e,l} ~= beta_e * p_{e,l} / sigma_{e,l} * 1 / omega_l
 
 ---
 
-## 9. 建议的实现路线：锚点地点法
+## 9. 运行时复杂度与文件边界
 
-运行时不要直接解 `n` 维系统，而是只在 `m` 个锚点地点上做修正。其余地点保持当前基线 `k^(0)`，这样求解规模固定，随地点数增长的只是一次残差汇总，而不是方程求解本身。
+当前运行时已经不是锚点地点法。地点级逻辑在 A 文件中完成：对 `n` 个地点进行 raw 计算、结构评分、按 confidence 排序和一次或数次线性扫描；随后把四阶层支出聚合成固定的 4×4 国家矩阵。国家级线性空间求解在 B 文件中完成，A 通过全局 effect 调用它。
 
-### 9.1 选锚点
+### 9.1 渐进复杂度
 
-- 先过滤候选：只看 `owned land` 地点，且 `B_l > eps`、`F_l > eps`、有效阶层数足够。没有实际支出贡献的点不要拿来当锚点。
-- 再做结构归一化：`u_l = C_{:,l} / sum_e C_{e,l}`。锚点比较的是“阶层结构方向”，不是单纯城市大小。
-- 再看结构覆盖，再看规模质量。结构覆盖优先于绝对量，但规模权重仍要保留为 soft weight，避免过小地点把 `k` 推得太跳。
-- 推荐 greedy 选法：先挑一个 `k_l^(0)` 接近 1 且结构独特的种子，再反复加入与已选集合角距离最大的候选，直到凑满 `m` 个。
-- 类别上尽量覆盖不同结构：首都、港口/商贸、工业城、普通农区、边疆混合地带。不要把 `m` 个锚点都选成同一种高人口大城市。
-- 如果有多个候选同样接近，优先选 `k_l^(0)` 更接近 1、`B_l` 更稳定、`control` 更高的点。锚点越接近基线，最终解通常越不需要大幅摆动。
-- 锚点集可以在年度刷新时重选；月度只复用已经选好的 `J`。如果国家结构变化很大，或者 `cond(C_J)` / `max |k-1|` 变差，再提前重选一次。
-- 锚点筛选不要做全量两两比较；候选打分必须是对当前已选集合的增量评估，避免把问题抬成 `O(n^2)`。
-- 如果国家很大，先构造固定大小 shortlist（例如 `4m` 或 `8m`），再从 shortlist 里做最终 greedy 选择。这样筛选仍然是线性扫描加小常数修正，而不是全局密集比较。
+- confidence 排序为 `O(n log n)`。
+- raw、分类、矩阵聚合和最终地点 modifier 应用为 `O(n)`；常数阶层维度不随地点数增长。
+- 四种 L2 候选以及玩家专用的 minimax 顶点求解只涉及 4 个因子加 1 个总额乘子，因此相对 `n` 是 `O(1)`。
+- 总体按地点数记为 `O(n log n) + O(n) + O(1)`，所以渐进上仍由排序项决定。
 
-可执行的打分可以写成：
+### 9.2 游戏内实际成本
 
-```text
-score(l | J) = diversity(l, J) * quality(l) * weight(l)
-```
+“仍是 `O(n log n)`”不能直接理解为“只多了一次轻量排序”。每次月度刷新执行的固定候选工作为：
 
-其中：
+- 旧路径每个有效 AI 国家：4 个 L2 策略 × 15 个 active class 集合 = 60 次 5×5 KKT 求解；
+- 新路径先做 raw gate 与 `k <= 1` 预筛；AI 只跑 `improvement_l2`，最多 `2^k - 1` 次，`k = 4` 时为 11 次；
+- 新路径每个有效玩家国家仍运行四种 L2，并加 `minimax_ratio` 的有限顶点，但同样按实际非空列和 singleton 规则过滤；
 
-- `diversity(l, J)`：与当前锚点集合的最小角距离，越像“另一种结构”越高。
-- `quality(l)`：`k_l^(0)` 越接近 1 越高，表示这个点不需要用很激烈的系数纠偏。
-- `weight(l)`：`B_l` 的软权重，建议用 `log(1 + B_l)` 一类的平滑形式，避免超大城市把结果完全主导。
+普通单人世界刷新因此不再为 AI 展开三种低收益 L2 策略，也不为小矩阵展开空列集合。玩家国家仍保留最稳健的 minimax 诊断和选择能力；A/B 拆分只负责组织边界，不改变单个候选的运行成本。
 
-### 9.2 只解锚点
+### 9.3 `world_current` 标量操作核算
 
-把未知量写成：
+按一次加、减、乘、除或绝对值为一次标量操作，赋值、比较、effect 分发和 scope 查找不计入。旧路径在 `world_current` 的 1,504 个有效国家上展开 90,240 个 L2 候选；新路径按 raw gate、`k` 和 AI 快路径筛选后，AI 只保留 `improvement_l2`，`k = 4` 时跳过 singleton。离线回放得到 5,092 个 L2 候选调用，L2 KKT/残差/评估约 1,258,748 次标量操作；按表中同一计数模型计算，这是旧 L2 核心的 9.26%，即约降为原来的 1/10.8。玩家 HUN 的完整策略和 minimax 只增加固定小项。
 
-```text
-k = k^(0) + S_J δ_J
-```
+| 项目 | 旧路径操作数 | 新路径/说明 |
+| --- | ---: | --- |
+| 国家/策略预处理（含缓存） | 1,126,680 | raw gate 仍为每国常数预处理；AI 仅准备 `improvement_l2` |
+| L2 KKT、残差与候选评估 | 13,589,448 | **约 1,258,748**（5,092 候选调用） |
+| HUN minimax 顶点 | 134,674 | 玩家专用；同样跳过四个 singleton active set |
+| 旧 4×4 精确诊断（仅诊断） | 126,743 | 不变，仍只记录到 `exact_status` |
+| **旧路径合计** | **14,977,545** | 新总量还包括分类排序与上述固定诊断项 |
 
-其中 `S_J` 是只在锚点地点上非零的选择矩阵。于是主系统变成：
+交接时的 21,505,653 是上一版全策略路径的整体基线；本轮新数字只把 L2 候选核心单独列出，便于和预筛/策略快路径对照，不能把新列误读为完整月度刷新总量。
 
-```text
-C S_J δ_J = Y - C k^(0)
-```
+### 9.4 近似准确度对照
 
-实际实现时也可以直接写成：
+在三个拥有有效 SOL runtime cache 的真实存档上重放，共 3,152 个国家。
+完整五策略包含四种硬总额 L2 和 `minimax_ratio`；完整四 L2 不包含
+minimax；优化 AI 路径只运行 `improvement_l2`，并应用 `k <= 1` 预筛以及
+`k = 4` singleton 过滤。
 
-```text
-C_J k_J = Y - sum_{l\notin J} C_{:,l} k_l^(0)
-```
+| 路径 | gate 接受 | 四阶层平均最终绝对误差 | 归一化绝对误差 | 平均改善比 |
+| --- | ---: | ---: | ---: | ---: |
+| 完整五策略 | 1,262 | 11.154344 | 0.306309 | 0.152543 |
+| 完整四种 L2 | 846 | 11.446637 | 0.309147 | 0.143097 |
+| 优化 AI 路径 | 778 | 11.743938 | 0.311253 | 0.137007 |
 
-然后只求 `k_J`。由于 `|J| = m`，这个子问题是唯一解或小规模带约束解，不再出现 `n` 维运行时求解。
+上述全体国家均值包含 `raw_fallback`，因此同时反映了覆盖率和拟合质量。
+在优化路径与完整路径都接受的 778 个国家中，完整五策略的平均绝对误差
+为 `5.785510`，优化路径为 `5.792492`，仅增加 `0.12%`；相对完整四种
+L2 的增加为 `0.11%`。对应平均改善比从 `0.559222`/`0.559112` 降至
+`0.555071`，下降不到 `0.8%`。
 
-这一步真正关心的不是“是否能解”，而是“解出来的 `k_J` 是否温和”。如果求得的锚点系数明显偏离 1，通常说明锚点集合选得不够像一个好的基底，而不是该直接把系数硬推过去。
-
-### 9.3 约束与回退
-
-- 若 `det(C_J)` 接近 0 或 `cond(C_J)` 太高，就先换一组锚点，而不是强行继续。
-- 若 `k_J` 的 spread 太大，或者有明显负值，就把这组锚点标记为“结构不合格”，再尝试下一组。
-- 若需要 `k_l >= 0`，就在锚点子系统上做非负投影或小规模约束优化；但这应该是最后一层修正，不是锚点选择的默认依赖。
-- 若约束无解，回退到当前基线 `k^(0)`，避免把运行时搞成“硬求解器崩溃”。
-- 如果有效阶层数少于 `m`，就按 `rank(C)` 退化成更小的锚点集。
-
-### 9.4 复杂度
-
-- 解算部分固定为 `O(m^3)`，这不是瓶颈。
-- 锚点筛选应当是 `O(nm)` 或 `O(nK)` 级别的一次性扫描，其中 `K` 是固定 shortlist 常数；不要写成 `O(n^2)`。
-- 由于 `m` 只有 4/5 左右，`O(nm)` 实际上就是线性开销，且可以和现有 `gls_accumulate_panel_stats` / `sol_update_local_pop_demand_modifiers` 的国家-地点遍历合并。
-- 年度重选锚点时才承担这笔额外扫描；月度只复用缓存中的 `J`，所以摊到月度后几乎就是常数。
-- 如果后续仍然担心大国性能，就把 shortlist 和锚点诊断缓存下来，只在 `cond(C_J)` 或 `max |k-1|` 超阈值时重建。
+active-set 过滤本身几乎没有精度代价：`improvement_l2` 保留全部集合时
+接受 780 个国家，过滤 singleton 后接受 778 个；归一化误差只从
+`0.311126` 变为 `0.311253`。完整五策略比优化路径多出的 484 个接受中，
+416 个只依赖 minimax，68 个依赖另外三种 L2；这是 AI 端有意放弃的覆盖，
+不是已接受国家的拟合误差大幅恶化。
 
 ---
 

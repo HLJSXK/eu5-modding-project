@@ -7,6 +7,7 @@ text files are read at runtime.
 
 from __future__ import annotations
 
+import itertools
 import sys
 from dataclasses import dataclass
 from typing import Callable, List, Sequence
@@ -32,6 +33,516 @@ class ScriptWriter:
 
     def render(self) -> str:
         return "\n".join(self.lines).strip() + "\n"
+
+
+def _emit_country_approximation_runtime_lines() -> list[str]:
+    """Generate the fixed-size runtime KKT approximation machinery.
+
+    The game script language has no matrix/list primitives, so the small
+    four-class problem is expanded here.  Each active-set block still uses
+    the same five-by-five Gaussian solver and the same candidate assessor.
+    """
+
+    lines: list[str] = [
+        "",
+        "sol_country_demand_check_kkt_pivot = {",
+        "\tif = {",
+        "\t\tlimit = { var:sol_country_demand_solve_status = 1 }",
+        "\t\tsol_country_demand_abs = { source = sol_m_$pivot$_$pivot$ target = sol_kkt_pivot_abs_$pivot$ }",
+        "\t\tif = {",
+        "\t\t\tlimit = { var:sol_kkt_pivot_abs_$pivot$ <= 0.00001 }",
+        "\t\t\tset_variable = { name = sol_country_demand_solve_status value = -1 }",
+        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot value = $pivot$ }",
+        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot_value value = var:sol_m_$pivot$_$pivot$ }",
+        "\t\t}",
+        "\t}",
+        "}",
+        "",
+        "sol_country_demand_solve_kkt_5 = {",
+        "\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
+        "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
+    ]
+    for pivot in range(1, 6):
+        lines.append(f"\tsol_country_demand_check_kkt_pivot = {{ pivot = {pivot} }}")
+        for row in range(pivot + 1, 6):
+            lines.append(
+                f"\tsol_country_demand_eliminate_row = {{ pivot = {pivot} row = {row} }}"
+            )
+    # The generic legacy backsolve helper visits all five columns.  KKT rows
+    # are upper triangular here, so expand the actual triangular backsolve and
+    # avoid both stale lower-column deltas and redundant arithmetic.
+    lines.extend([
+        "\tif = {",
+        "\t\tlimit = { var:sol_country_demand_solve_status = 1 }",
+    ])
+    for row in range(5, 0, -1):
+        lines.append(f"\t\tset_variable = {{ name = sol_delta_{row} value = var:sol_b_{row} }}")
+        for col in range(5, row, -1):
+            lines.append(f"\t\tsol_country_demand_backsolve_cell = {{ row = {row} col = {col} }}")
+        lines.append(f"\t\tset_variable = {{ name = sol_delta_{row} value = {{ value = var:sol_delta_{row} divide = var:sol_m_{row}_{row} }} }}")
+    lines.extend(["\t}"])
+    lines.extend(["}", ""])
+
+    lines.extend([
+        "sol_country_demand_approx_reset_kkt = {",
+    ])
+    for row in range(1, 6):
+        for col in range(1, 6):
+            lines.append(f"\tset_variable = {{ name = sol_m_{row}_{col} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_b_{row} value = 0 }}")
+    lines.extend(["}", ""])
+
+    # Country-level values shared by every strategy and candidate.  The
+    # fourth runtime row is commoners + tribesmen, matching the existing
+    # class solve.
+    lines.extend([
+        "sol_country_demand_approx_prepare_country = {",
+        "\tset_variable = { name = sol_approx_target_1 value = var:sol_country_demand_target_nobles }",
+        "\tset_variable = { name = sol_approx_target_2 value = var:sol_country_demand_target_clergy }",
+        "\tset_variable = { name = sol_approx_target_3 value = var:sol_country_demand_target_burghers }",
+        "\tset_variable = { name = sol_approx_target_4 value = var:sol_country_demand_target_lower }",
+        "\tset_variable = { name = sol_approx_raw_1 value = var:sol_country_baseline_spending_nobles }",
+        "\tset_variable = { name = sol_approx_raw_2 value = var:sol_country_baseline_spending_clergy }",
+        "\tset_variable = { name = sol_approx_raw_3 value = var:sol_country_baseline_spending_burghers }",
+        "\tset_variable = { name = sol_approx_raw_4 value = var:sol_country_baseline_lower }",
+        "\tset_variable = { name = sol_approx_total_target value = { value = var:sol_approx_target_1 add = var:sol_approx_target_2 add = var:sol_approx_target_3 add = var:sol_approx_target_4 } }",
+        "\tset_variable = { name = sol_approx_raw_total_actual value = { value = var:sol_approx_raw_1 add = var:sol_approx_raw_2 add = var:sol_approx_raw_3 add = var:sol_approx_raw_4 } }",
+        "\tset_variable = { name = sol_country_demand_raw_total_residual value = { value = var:sol_approx_raw_total_actual subtract = var:sol_approx_total_target } }",
+        "\tset_variable = { name = sol_approx_total_scale value = var:sol_approx_total_target }",
+        "\tif = { limit = { var:sol_approx_total_scale < 0 } change_variable = { name = sol_approx_total_scale multiply = -1 } }",
+        "\tif = { limit = { var:sol_approx_total_scale < 0.00001 } set_variable = { name = sol_approx_total_scale value = 0.00001 } }",
+        "\tset_variable = { name = sol_country_demand_gate_possible value = 1 }",
+    ])
+    for row in range(1, 5):
+        lines.extend([
+            f"\tsol_country_demand_abs = {{ source = sol_approx_raw_{row} target = sol_approx_raw_abs_{row} }}",
+            f"\tset_variable = {{ name = sol_approx_cached_raw_error_{row} value = {{ value = var:sol_approx_raw_{row} subtract = var:sol_approx_target_{row} }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_cached_raw_error_{row} < 0 }} change_variable = {{ name = sol_approx_cached_raw_error_{row} multiply = -1 }} }}",
+            f"\tset_variable = {{ name = sol_approx_cached_gate_tolerance_{row} value = 0.00001 }}",
+            f"\tset_variable = {{ name = sol_approx_cached_gate_scale_{row} value = var:sol_approx_cached_raw_error_{row} }}",
+            f"\tchange_variable = {{ name = sol_approx_cached_gate_scale_{row} multiply = 0.001 }}",
+            f"\tchange_variable = {{ name = sol_approx_cached_gate_scale_{row} multiply = 0.001 }}",
+            f"\tchange_variable = {{ name = sol_approx_cached_gate_scale_{row} multiply = 0.001 }}",
+            f"\tif = {{ limit = {{ var:sol_approx_cached_gate_scale_{row} > var:sol_approx_cached_gate_tolerance_{row} }} set_variable = {{ name = sol_approx_cached_gate_tolerance_{row} value = var:sol_approx_cached_gate_scale_{row} }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_cached_raw_error_{row} <= 0.00001 }} set_variable = {{ name = sol_country_demand_gate_possible value = 0 }} }}",
+        ])
+    lines.extend([
+        "\tset_variable = { name = sol_approx_cached_total_tolerance value = { value = var:sol_approx_total_target multiply = 0.00001 } }",
+        "\tif = { limit = { var:sol_approx_cached_total_tolerance < 0.00001 } set_variable = { name = sol_approx_cached_total_tolerance value = 0.00001 } }",
+        "}",
+        "",
+        "sol_country_demand_approx_prepare_strategy = {",
+    ])
+    for row in range(1, 5):
+        lines.append(f"\tset_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }}")
+    lines.extend([
+        "\tif = {",
+        "\t\tlimit = { $strategy$ = 1 }",
+    ])
+    for row in range(1, 5):
+        lines.extend([
+            f"\t\tif = {{ limit = {{ var:sol_approx_raw_abs_{row} > var:sol_approx_scale_{row} }} set_variable = {{ name = sol_approx_scale_{row} value = var:sol_approx_raw_abs_{row} }} }}",
+            f"\t\tsol_country_demand_abs = {{ source = sol_approx_target_{row} target = sol_approx_target_abs_{row} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_target_abs_{row} > var:sol_approx_scale_{row} }} set_variable = {{ name = sol_approx_scale_{row} value = var:sol_approx_target_abs_{row} }} }}",
+        ])
+    lines.extend(["\t}", "\telse_if = {", "\t\tlimit = { $strategy$ = 2 }"])
+    for row in range(1, 5):
+        lines.extend([
+            f"\t\tset_variable = {{ name = sol_approx_scale_{row} value = {{ value = var:sol_approx_raw_{row} subtract = var:sol_approx_target_{row} }} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0 }} change_variable = {{ name = sol_approx_scale_{row} multiply = -1 }} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0.00001 }} set_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }} }}",
+        ])
+    lines.extend(["\t}", "\telse_if = {", "\t\tlimit = { $strategy$ = 3 }"])
+    for row in range(1, 5):
+        lines.extend([
+            f"\t\tsol_country_demand_abs = {{ source = sol_approx_target_{row} target = sol_approx_scale_{row} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0.00001 }} set_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }} }}",
+        ])
+    lines.extend(["\t}", "\telse_if = {", "\t\tlimit = { $strategy$ = 4 }"])
+    for row in range(1, 5):
+        lines.append(f"\t\tset_variable = {{ name = sol_approx_scale_{row} value = 1 }}")
+    lines.extend(["\t}", "\telse = {"])
+    for row in range(1, 5):
+        lines.extend([
+            f"\t\tset_variable = {{ name = sol_approx_scale_{row} value = {{ value = var:sol_approx_raw_{row} subtract = var:sol_approx_target_{row} }} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0 }} change_variable = {{ name = sol_approx_scale_{row} multiply = -1 }} }}",
+            f"\t\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0.00001 }} set_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }} }}",
+        ])
+    lines.append("\t}")
+
+    for col in range(1, 5):
+        lines.extend([
+            f"\tset_variable = {{ name = sol_approx_a_1_{col} value = {{ value = var:sol_original_m_1_{col} divide = var:sol_approx_scale_1 }} }}",
+            f"\tset_variable = {{ name = sol_approx_a_2_{col} value = {{ value = var:sol_original_m_2_{col} divide = var:sol_approx_scale_2 }} }}",
+            f"\tset_variable = {{ name = sol_approx_a_3_{col} value = {{ value = var:sol_original_m_3_{col} divide = var:sol_approx_scale_3 }} }}",
+            f"\tset_variable = {{ name = sol_approx_a_4_{col} value = {{ value = var:sol_original_m_4_{col} divide = var:sol_approx_scale_4 }} }}",
+        ])
+    for row in range(1, 5):
+        lines.append(f"\tset_variable = {{ name = sol_approx_y_{row} value = {{ value = var:sol_approx_target_{row} divide = var:sol_approx_scale_{row} }} }}")
+    for left in range(1, 5):
+        for right in range(1, 5):
+            terms = [f"var:sol_approx_a_{row}_{left} multiply = var:sol_approx_a_{row}_{right}" for row in range(1, 5)]
+            lines.append(f"\tset_variable = {{ name = sol_approx_g_{left}_{right} value = {{ value = {terms[0].split(' multiply = ')[0]} multiply = {terms[0].split(' multiply = ')[1]} }} }}")
+            for term in terms[1:]:
+                a, b = term.split(" multiply = ")
+                lines.append(f"\tchange_variable = {{ name = sol_approx_g_{left}_{right} add = {{ value = {a} multiply = {b} }} }}")
+    for col in range(1, 5):
+        lines.append(f"\tset_variable = {{ name = sol_approx_p_{col} value = {{ value = var:sol_approx_a_1_{col} multiply = var:sol_approx_y_1 }} }}")
+        for row in range(2, 5):
+            lines.append(f"\tchange_variable = {{ name = sol_approx_p_{col} add = {{ value = var:sol_approx_a_{row}_{col} multiply = var:sol_approx_y_{row} }} }}")
+        lines.append(f"\tset_variable = {{ name = sol_approx_c_{col} value = {{ value = var:sol_original_m_1_{col} add = var:sol_original_m_2_{col} add = var:sol_original_m_3_{col} add = var:sol_original_m_4_{col} divide = var:sol_approx_total_scale }} }}")
+    lines.extend(["}", ""])
+
+    # Candidate assessor: all numeric checks, four-stratum gate and per-
+    # strategy best-candidate cache live in one place.
+    lines.extend([
+        "sol_country_demand_approx_assess = {",
+        "\tset_variable = { name = sol_approx_candidate_valid value = 1 }",
+        "\tset_variable = { name = sol_approx_reject_reason value = 0 }",
+        "\tif = { limit = { var:sol_country_demand_solve_status = -1 } set_variable = { name = sol_approx_reject_reason value = 1 } }",
+        "\tif = { limit = { var:sol_country_demand_solve_status != 1 var:sol_country_demand_solve_status != -1 } set_variable = { name = sol_approx_reject_reason value = 3 } }",
+        "\tif = { limit = { var:sol_country_demand_solve_status != 1 } set_variable = { name = sol_approx_candidate_valid value = 0 } }",
+    ])
+    for col in range(1, 5):
+        lines.extend([
+            f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 var:sol_delta_{col} < -0.00001 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} set_variable = {{ name = sol_approx_reject_reason value = 2 }} }}",
+            f"\tif = {{ limit = {{ var:sol_delta_{col} < 0 }} set_variable = {{ name = sol_delta_{col} value = 0 }} }}",
+        ])
+    for row in range(1, 5):
+        mrow = 4 if row == 4 else row
+        if row == 4:
+            lines.append("\tset_variable = { name = sol_approx_prediction_4 value = { value = var:sol_original_m_4_1 multiply = var:sol_delta_1 } }")
+        else:
+            pred = f"var:sol_original_m_{mrow}_1 multiply = var:sol_delta_1"
+            lines.append(f"\tset_variable = {{ name = sol_approx_prediction_{row} value = {{ value = {pred} }} }}")
+        for col in range(2, 5):
+            if row == 4:
+                term = f"{{ value = var:sol_original_m_4_{col} multiply = var:sol_delta_{col} }}"
+            else:
+                term = f"{{ value = var:sol_original_m_{row}_{col} multiply = var:sol_delta_{col} }}"
+            lines.append(f"\tchange_variable = {{ name = sol_approx_prediction_{row} add = {term} }}")
+    lines.extend([
+        "\tset_variable = { name = sol_approx_total_actual value = { value = var:sol_approx_prediction_1 add = var:sol_approx_prediction_2 add = var:sol_approx_prediction_3 add = var:sol_approx_prediction_4 } }",
+        "\tset_variable = { name = sol_approx_candidate_total_residual value = { value = var:sol_approx_total_actual subtract = var:sol_approx_total_target } }",
+        "\tsol_country_demand_abs = { source = sol_approx_candidate_total_residual target = sol_approx_candidate_total_residual_abs }",
+        "\tset_variable = { name = sol_approx_total_tolerance value = var:sol_approx_cached_total_tolerance }",
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 var:sol_approx_candidate_total_residual_abs > var:sol_approx_total_tolerance } set_variable = { name = sol_approx_candidate_valid value = 0 } set_variable = { name = sol_approx_reject_reason value = 4 } }",
+        "\tset_variable = { name = sol_approx_gate value = 1 }",
+        "\tset_variable = { name = sol_approx_objective value = 0 }",
+        "\tset_variable = { name = sol_approx_average_ratio value = 0 }",
+        "\tset_variable = { name = sol_approx_average_absolute value = 0 }",
+    ])
+    for row in range(1, 5):
+        lines.extend([
+            f"\tset_variable = {{ name = sol_approx_prediction_error value = {{ value = var:sol_approx_prediction_{row} subtract = var:sol_approx_target_{row} }} }}",
+            f"\tsol_country_demand_abs = {{ source = sol_approx_prediction_error target = sol_approx_candidate_abs_error_{row} }}",
+            f"\tset_variable = {{ name = sol_approx_raw_error_{row} value = var:sol_approx_cached_raw_error_{row} }}",
+            f"\tset_variable = {{ name = sol_approx_improvement_{row} value = {{ value = var:sol_approx_raw_error_{row} subtract = var:sol_approx_candidate_abs_error_{row} }} }}",
+            f"\tchange_variable = {{ name = sol_approx_average_absolute add = var:sol_approx_improvement_{row} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_raw_error_{row} <= 0.00001 }} set_variable = {{ name = sol_approx_gate value = 0 }} }}",
+            f"\tset_variable = {{ name = sol_approx_gate_tolerance value = var:sol_approx_cached_gate_tolerance_{row} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_improvement_{row} <= var:sol_approx_gate_tolerance }} set_variable = {{ name = sol_approx_gate value = 0 }} }}",
+            f"\tset_variable = {{ name = sol_approx_ratio_{row} value = 0 }}",
+            f"\tif = {{ limit = {{ var:sol_approx_raw_error_{row} > 0.00001 }} set_variable = {{ name = sol_approx_ratio_{row} value = {{ value = var:sol_approx_improvement_{row} divide = var:sol_approx_raw_error_{row} }} }} }}",
+            f"\tchange_variable = {{ name = sol_approx_average_ratio add = var:sol_approx_ratio_{row} }}",
+            f"\tset_variable = {{ name = sol_approx_error_ratio_{row} value = {{ value = var:sol_approx_candidate_abs_error_{row} divide = var:sol_approx_scale_{row} }} }}",
+        ])
+        lines.append(f"\tif = {{ limit = {{ $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_approx_objective }} set_variable = {{ name = sol_approx_objective value = var:sol_approx_error_ratio_{row} }} }}")
+        lines.append(f"\tif = {{ limit = {{ $strategy$ != 5 }} change_variable = {{ name = sol_approx_objective add = {{ value = var:sol_approx_error_ratio_{row} multiply = var:sol_approx_error_ratio_{row} }} }} }}")
+    lines.extend([
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_delta_5 < -0.00001 } set_variable = { name = sol_approx_candidate_valid value = 0 } set_variable = { name = sol_approx_reject_reason value = 5 } }",
+    ])
+    for row in range(1, 5):
+        lines.append(f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_delta_5 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} set_variable = {{ name = sol_approx_reject_reason value = 5 }} }}")
+    lines.extend([
+        "\tset_variable = { name = sol_approx_average_ratio value = { value = var:sol_approx_average_ratio divide = 4 } }",
+        "\tset_variable = { name = sol_approx_average_absolute value = { value = var:sol_approx_average_absolute divide = 4 } }",
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 }",
+        "\t\tchange_variable = { name = sol_country_demand_candidate_count add = 1 }",
+        "\t\tchange_variable = { name = sol_country_demand_strategy_candidate_count_$strategy$ add = 1 }",
+        "\t\tif = { limit = { var:sol_approx_objective < var:sol_country_demand_strategy_best_objective_$strategy$ }",
+    ])
+    for field, source in (
+        ("factor_1", "sol_delta_1"), ("factor_2", "sol_delta_2"),
+        ("factor_3", "sol_delta_3"), ("factor_4", "sol_delta_4"),
+        ("prediction_1", "sol_approx_prediction_1"), ("prediction_2", "sol_approx_prediction_2"),
+        ("prediction_3", "sol_approx_prediction_3"), ("prediction_4", "sol_approx_prediction_4"),
+        ("improvement_1", "sol_approx_improvement_1"), ("improvement_2", "sol_approx_improvement_2"),
+        ("improvement_3", "sol_approx_improvement_3"), ("improvement_4", "sol_approx_improvement_4"),
+        ("objective", "sol_approx_objective"), ("gate", "sol_approx_gate"),
+        ("average_ratio", "sol_approx_average_ratio"),
+        ("average_absolute", "sol_approx_average_absolute"),
+        ("total_residual", "sol_approx_candidate_total_residual"),
+    ):
+        lines.append(f"\t\t\tset_variable = {{ name = sol_country_demand_strategy_best_{field}_$strategy$ value = var:{source} }}")
+    lines.extend([
+        "\t\t\tset_variable = { name = sol_country_demand_strategy_best_valid_count_$strategy$ value = 1 }",
+        "\t\t}",
+    ])
+    for row in range(1, 5):
+        lines.append(
+            f"\t\tif = {{ limit = {{ OR = {{ var:sol_approx_raw_error_{row} <= 0.00001 var:sol_approx_improvement_{row} <= var:sol_approx_cached_gate_tolerance_{row} }} }} change_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_$strategy$ add = 1 }} }}"
+        )
+    lines.extend([
+        "\t\tif = {",
+        "\t\t\tlimit = { var:sol_approx_gate = 1 }",
+        "\t\t\tchange_variable = { name = sol_country_demand_candidate_gate_count add = 1 }",
+        "\t\t\tchange_variable = { name = sol_country_demand_strategy_gate_count_$strategy$ add = 1 }",
+        "\t\t\tif = { limit = { var:sol_approx_objective < var:sol_country_demand_strategy_objective_$strategy$ }",
+    ])
+    for field, source in (
+        ("factor_1", "sol_delta_1"), ("factor_2", "sol_delta_2"),
+        ("factor_3", "sol_delta_3"), ("factor_4", "sol_delta_4"),
+        ("objective", "sol_approx_objective"), ("gate", "sol_approx_gate"),
+        ("average_ratio", "sol_approx_average_ratio"),
+        ("average_absolute", "sol_approx_average_absolute"),
+        ("total_residual", "sol_approx_candidate_total_residual"),
+    ):
+        lines.append(f"\t\t\tset_variable = {{ name = sol_country_demand_strategy_{field}_$strategy$ value = var:{source} }}")
+    lines.extend([
+        "\t\t\t}",
+        "\t\t}",
+        "\t}",
+        "\telse = {",
+    ])
+    for reason, suffix in ((1, "singular"), (2, "negative"), (3, "kkt"), (4, "total"), (5, "minimax")):
+        lines.append(
+            f"\t\tif = {{ limit = {{ var:sol_approx_reject_reason = {reason} }} change_variable = {{ name = sol_country_demand_strategy_reject_{suffix}_$strategy$ add = 1 }} }}"
+        )
+    lines.extend(["\t}", "}", ""])
+
+    masks = [mask for mask in range(1, 16)]
+
+    def append_mask_limit(mask: int, *, skip_singletons_when_full: bool = True) -> None:
+        """Guard a candidate call by the classes that actually have columns.
+
+        A zero matrix column cannot produce a distinct feasible factor.  The
+        guard therefore removes empty-column active sets at runtime while the
+        generated candidate definitions remain available for diagnostics and
+        compatibility.  For four non-empty classes, singleton sets are also
+        skipped: the three-save replay found only two gated wins from this
+        branch, while it accounts for a material share of fixed solver work.
+        """
+
+        active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
+        conditions = [
+            f"var:sol_country_class_count_{index} > 0" for index in active
+        ]
+        if skip_singletons_when_full and len(active) == 1:
+            conditions.append("var:sol_country_demand_anchor_count < 4")
+        lines.append("\tif = {")
+        lines.append(f"\t\tlimit = {{ {' '.join(conditions)} }}")
+
+    def close_mask_limit() -> None:
+        lines.append("\t}")
+
+    def append_l2_candidate(strategy: int, mask: int) -> None:
+        active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
+        lines.append(f"sol_country_demand_approx_candidate_{strategy}_{mask} = {{")
+        lines.append("\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
+        lines.append(f"\tchange_variable = {{ name = sol_country_demand_strategy_attempt_count_{strategy} add = 1 }}")
+        lines.append("\tsol_country_demand_approx_reset_kkt = yes")
+        for row in active:
+            for col in active:
+                lines.append(f"\tset_variable = {{ name = sol_m_{row}_{col} value = var:sol_approx_g_{row}_{col} }}")
+            lines.append(f"\tset_variable = {{ name = sol_m_{row}_5 value = var:sol_approx_c_{row} }}")
+            lines.append(f"\tset_variable = {{ name = sol_b_{row} value = var:sol_approx_p_{row} }}")
+        for row in range(1, 5):
+            if row not in active:
+                lines.append(f"\tset_variable = {{ name = sol_m_{row}_{row} value = 1 }}")
+        for col in active:
+            lines.append(f"\tset_variable = {{ name = sol_m_5_{col} value = var:sol_approx_c_{col} }}")
+        lines.append("\tset_variable = { name = sol_b_5 value = 1 }")
+        lines.append("\tsol_country_demand_solve_kkt_5 = yes")
+        lines.append("\tif = {")
+        lines.append("\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
+        for row in active:
+            first = active[0]
+            lines.append("\t\tif = {")
+            lines.append("\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
+            lines.append(f"\t\t\tset_variable = {{ name = sol_approx_numerical_lhs value = {{ value = var:sol_approx_g_{row}_{first} multiply = var:sol_delta_{first} }} }}")
+            for col in active[1:]:
+                lines.append(f"\t\t\tchange_variable = {{ name = sol_approx_numerical_lhs add = {{ value = var:sol_approx_g_{row}_{col} multiply = var:sol_delta_{col} }} }}")
+            lines.append(f"\t\t\tchange_variable = {{ name = sol_approx_numerical_lhs add = {{ value = var:sol_approx_c_{row} multiply = var:sol_delta_5 }} }}")
+            lines.append(f"\t\t\tset_variable = {{ name = sol_approx_numerical_residual value = {{ value = var:sol_approx_numerical_lhs subtract = var:sol_approx_p_{row} }} }}")
+            lines.append("\t\t\tsol_country_demand_abs = { source = sol_approx_numerical_residual target = sol_approx_numerical_residual_abs }")
+            lines.append(f"\t\t\tsol_country_demand_abs = {{ source = sol_approx_p_{row} target = sol_approx_numerical_tolerance }}")
+            lines.append("\t\t\tchange_variable = { name = sol_approx_numerical_tolerance multiply = 0.00001 }")
+            lines.append("\t\t\tif = { limit = { var:sol_approx_numerical_tolerance < 0.00001 } set_variable = { name = sol_approx_numerical_tolerance value = 0.00001 } }")
+            lines.append("\t\t\tif = { limit = { var:sol_approx_numerical_residual_abs > var:sol_approx_numerical_tolerance } set_variable = { name = sol_country_demand_solve_status value = -6 } }")
+            lines.append("\t\t}")
+        lines.append("\t\tif = {")
+        lines.append("\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
+        lines.append(f"\t\t\tsol_country_demand_approx_assess = {{ strategy = {strategy} }}")
+        lines.append("\t\t}")
+        lines.append("\t}")
+        lines.append("}")
+
+    def append_minimax_vertex(
+        mask: int,
+        vertex: int,
+        boundaries: tuple[tuple[str, int, int], ...],
+    ) -> None:
+        active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
+        lines.append(f"sol_country_demand_minimax_vertex_{mask}_{vertex} = {{")
+        lines.append("\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
+        lines.append("\tchange_variable = { name = sol_country_demand_strategy_attempt_count_5 add = 1 }")
+        lines.append("\tsol_country_demand_approx_reset_kkt = yes")
+        equation = 1
+        for col in range(1, 5):
+            if col not in active:
+                lines.append(f"\tset_variable = {{ name = sol_m_{equation}_{col} value = 1 }}")
+                equation += 1
+        for kind, index, sign in boundaries:
+            if kind == "factor":
+                lines.append(f"\tset_variable = {{ name = sol_m_{equation}_{index} value = 1 }}")
+                lines.append(f"\tset_variable = {{ name = sol_b_{equation} value = 0 }}")
+            else:
+                for col in active:
+                    lines.append(f"\tset_variable = {{ name = sol_m_{equation}_{col} value = var:sol_original_m_{index}_{col} }}")
+                if sign < 0:
+                    lines.append(f"\tset_variable = {{ name = sol_m_{equation}_5 value = {{ value = var:sol_approx_scale_{index} multiply = -1 }} }}")
+                else:
+                    lines.append(f"\tset_variable = {{ name = sol_m_{equation}_5 value = var:sol_approx_scale_{index} }}")
+                lines.append(f"\tset_variable = {{ name = sol_b_{equation} value = var:sol_approx_target_{index} }}")
+            equation += 1
+        for col in active:
+            lines.append(f"\tset_variable = {{ name = sol_m_5_{col} value = var:sol_approx_c_{col} }}")
+        lines.append("\tset_variable = { name = sol_b_5 value = 1 }")
+        lines.append("\tsol_country_demand_solve_kkt_5 = yes")
+        lines.append("\tif = {")
+        lines.append("\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
+        lines.append("\t\tsol_country_demand_approx_assess = { strategy = 5 }")
+        lines.append("\t}")
+        lines.append("}")
+
+    for strategy in range(1, 6):
+        if strategy < 5:
+            for mask in masks:
+                append_l2_candidate(strategy, mask)
+        else:
+            lines.append("# Minimax vertices enumerate the finite LP boundary set for each active class subset.")
+            for mask in masks:
+                active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
+                boundary_set = [
+                    ("residual", row, sign)
+                    for row in range(1, 5)
+                    for sign in (-1, 1)
+                ] + [("factor", col, 0) for col in active]
+                for vertex, selected in enumerate(itertools.combinations(boundary_set, len(active)), start=1):
+                    append_minimax_vertex(mask, vertex, selected)
+        lines.append("")
+        if strategy == 5:
+            lines.append("sol_country_demand_minimax_vertex_enumeration = {")
+            lines.append("\t# Finite vertices: total equality, signed row residual boundaries, and active factor boundaries.")
+            for mask in masks:
+                active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
+                boundary_count = 8 + len(active)
+                vertex_count = sum(1 for _ in itertools.combinations(range(boundary_count), len(active)))
+                for vertex in range(1, vertex_count + 1):
+                    append_mask_limit(mask)
+                    lines.append(f"\t\tsol_country_demand_minimax_vertex_{mask}_{vertex} = yes")
+                    close_mask_limit()
+            lines.append("}")
+            lines.append("")
+        lines.append(f"sol_country_demand_run_strategy_{strategy} = {{")
+        lines.append(f"\tsol_country_demand_approx_prepare_strategy = {{ strategy = {strategy} }}")
+        if strategy == 5:
+            lines.append("\tsol_country_demand_minimax_vertex_enumeration = yes")
+        else:
+            for mask in masks:
+                append_mask_limit(mask)
+                lines.append(f"\t\tsol_country_demand_approx_candidate_{strategy}_{mask} = yes")
+                close_mask_limit()
+        lines.append("}")
+        lines.append("")
+
+    lines.extend([
+        "sol_country_demand_select_approx_strategy = {",
+        "\tset_variable = { name = sol_country_demand_selected_strategy value = $strategy$ }",
+        "\tset_variable = { name = sol_country_demand_selected_average_ratio value = var:sol_country_demand_strategy_average_ratio_$strategy$ }",
+        "\tset_variable = { name = sol_country_demand_selected_average_absolute value = var:sol_country_demand_strategy_average_absolute_$strategy$ }",
+        "\tset_variable = { name = sol_country_demand_selected_objective value = var:sol_country_demand_strategy_objective_$strategy$ }",
+        "\tset_variable = { name = sol_country_demand_total_residual value = var:sol_country_demand_strategy_total_residual_$strategy$ }",
+        "}",
+        "",
+        "sol_country_demand_solve_approximation = {",
+        "\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
+        "\tset_variable = { name = sol_country_demand_solve_mode value = 3 }",
+        "\tset_variable = { name = sol_country_demand_selected_strategy value = 0 }",
+        "\tset_variable = { name = sol_country_demand_gate_passed value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_gate_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_attempt_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
+        "\tset_variable = { name = sol_country_demand_approx_reason value = 0 }",
+        "\tset_variable = { name = sol_country_demand_selected_objective value = 999999 }",
+        "\tset_variable = { name = sol_country_demand_selected_average_ratio value = -999999 }",
+        "\tset_variable = { name = sol_country_demand_selected_average_absolute value = -999999 }",
+        "\tset_variable = { name = sol_country_demand_total_residual value = -999999 }",
+    ])
+    for strategy in range(1, 6):
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_attempt_count_{strategy} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_candidate_count_{strategy} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_count_{strategy} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_objective_{strategy} value = 999999 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_{strategy} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_average_ratio_{strategy} value = -999999 }}")
+        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_average_absolute_{strategy} value = -999999 }}")
+    lines.extend([
+        "\tsol_country_demand_approx_prepare_country = yes",
+        "\t# The hard gate and matrix rank are constant-cost prefilters.",
+        "\t# AI uses the improvement-normalized fast path; players retain",
+        "\t# the full strategy comparison and minimax diagnostics.",
+        "\tif = {",
+        "\t\tlimit = { var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 1 }",
+        "\t\tif = {",
+        "\t\t\tlimit = { is_human = yes }",
+        "\t\t\tsol_country_demand_run_strategy_1 = yes",
+        "\t\t\tsol_country_demand_run_strategy_2 = yes",
+        "\t\t\tsol_country_demand_run_strategy_3 = yes",
+        "\t\t\tsol_country_demand_run_strategy_4 = yes",
+        "\t\t\tsol_country_demand_run_strategy_5 = yes",
+        "\t\t}",
+        "\t\telse = { sol_country_demand_run_strategy_2 = yes }",
+        "\t}",
+    ])
+    lines.extend([
+        "\t# Keep a compact reason code so a raw fallback is actionable in CMF.",
+        "\tif = { limit = { var:sol_country_demand_gate_possible = 0 } set_variable = { name = sol_country_demand_approx_reason value = 1 } }",
+        "\telse_if = { limit = { var:sol_country_demand_anchor_count <= 1 } set_variable = { name = sol_country_demand_approx_reason value = 2 } }",
+        "\telse_if = { limit = { var:sol_country_demand_candidate_attempt_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 3 } }",
+        "\telse_if = { limit = { var:sol_country_demand_candidate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 4 } }",
+        "\telse_if = { limit = { var:sol_country_demand_candidate_gate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 5 } }",
+    ])
+    # Deterministic lexicographic winner: ratio, absolute gain, objective;
+    # strategy order remains the final tie breaker because strategies run 1..5.
+    for strategy in range(1, 6):
+        lines.extend([
+            "\tif = {",
+            f"\t\tlimit = {{ var:sol_country_demand_strategy_gate_{strategy} = 1 }}",
+            f"\t\tif = {{ limit = {{ var:sol_country_demand_strategy_average_ratio_{strategy} > var:sol_country_demand_selected_average_ratio }} sol_country_demand_select_approx_strategy = {{ strategy = {strategy} }} }}",
+            f"\t\telse_if = {{ limit = {{ var:sol_country_demand_strategy_average_ratio_{strategy} = var:sol_country_demand_selected_average_ratio }}",
+            f"\t\t\tif = {{ limit = {{ var:sol_country_demand_strategy_average_absolute_{strategy} > var:sol_country_demand_selected_average_absolute }} sol_country_demand_select_approx_strategy = {{ strategy = {strategy} }} }}",
+            f"\t\t\telse_if = {{ limit = {{ var:sol_country_demand_strategy_average_absolute_{strategy} = var:sol_country_demand_selected_average_absolute var:sol_country_demand_strategy_objective_{strategy} < var:sol_country_demand_selected_objective }} sol_country_demand_select_approx_strategy = {{ strategy = {strategy} }} }}",
+            "\t\t}",
+            "\t}",
+        ])
+    for strategy in range(1, 6):
+        for col in range(1, 5):
+            lines.append(f"\tif = {{ limit = {{ var:sol_country_demand_selected_strategy = {strategy} }} set_variable = {{ name = sol_country_class_coefficient_{col} value = var:sol_country_demand_strategy_factor_{col}_{strategy} }} }}")
+    lines.extend([
+        "\tif = { limit = { var:sol_country_demand_selected_strategy > 0 } set_variable = { name = sol_country_demand_gate_passed value = 1 } }",
+        "\telse = {",
+        "\t\tset_variable = { name = sol_country_class_coefficient_1 value = 1 }",
+        "\t\tset_variable = { name = sol_country_class_coefficient_2 value = 1 }",
+        "\t\tset_variable = { name = sol_country_class_coefficient_3 value = 1 }",
+        "\t\tset_variable = { name = sol_country_class_coefficient_4 value = 1 }",
+        "\t\tset_variable = { name = sol_country_demand_solve_status value = -8 }",
+        "\t}",
+        "}",
+    ])
+    return lines
 
 
 def emit_section_01_stable_gold_transfer_scaling(writer: ScriptWriter) -> None:
@@ -1029,6 +1540,7 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\t}",
         "}",
     ])
+    writer.extend(_emit_country_approximation_runtime_lines())
 
 def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
     writer.extend([
@@ -1080,6 +1592,15 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_validate_class_residual = { row = 2 rhs = sol_country_demand_rhs_clergy }",
         "\t\tsol_country_demand_validate_class_residual = { row = 3 rhs = sol_country_demand_rhs_burghers }",
         "\t\tsol_country_demand_validate_class_residual = { row = 4 rhs = sol_country_demand_rhs_lower }",
+        "\t}",
+        "\telse_if = {",
+        "\t\tlimit = { var:sol_country_demand_solve_mode = 3 }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_nobles value = var:sol_country_demand_target_nobles }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_clergy value = var:sol_country_demand_target_clergy }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_burghers value = var:sol_country_demand_target_burghers }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_commoners value = var:sol_country_demand_target_commoners }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_tribesmen value = var:sol_country_demand_target_tribesmen }",
+        "\t\tset_variable = { name = sol_country_demand_rhs_lower value = var:sol_country_demand_target_lower }",
         "\t}",
         "\telse = {",
         "\t\tset_variable = { name = sol_country_demand_rhs_nobles value = { value = var:sol_country_demand_target_nobles subtract = var:sol_country_baseline_spending_nobles } }",
@@ -1433,6 +1954,24 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_status key = scope:_cmf_log_key value = var:sol_country_demand_solve_status }",
         "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_solver_size key = scope:_cmf_log_key }",
         "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_solver_size key = scope:_cmf_log_key value = var:sol_country_demand_solver_size }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_exact_status key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_exact_status key = scope:_cmf_log_key value = var:sol_country_demand_exact_status }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_selected_strategy key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_selected_strategy key = scope:_cmf_log_key value = var:sol_country_demand_selected_strategy }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_gate_passed key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_gate_passed key = scope:_cmf_log_key value = var:sol_country_demand_gate_passed }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_candidate_count key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_candidate_count key = scope:_cmf_log_key value = var:sol_country_demand_candidate_count }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_candidate_gate_count key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_candidate_gate_count key = scope:_cmf_log_key value = var:sol_country_demand_candidate_gate_count }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_selected_objective key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_selected_objective key = scope:_cmf_log_key value = var:sol_country_demand_selected_objective }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_selected_average_ratio key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_selected_average_ratio key = scope:_cmf_log_key value = var:sol_country_demand_selected_average_ratio }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_selected_average_absolute key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_selected_average_absolute key = scope:_cmf_log_key value = var:sol_country_demand_selected_average_absolute }",
+        "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_total_residual key = scope:_cmf_log_key }",
+        "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_total_residual key = scope:_cmf_log_key value = var:sol_country_demand_total_residual }",
         "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_anchor_count key = scope:_cmf_log_key }",
         "\tadd_to_global_variable_map = { name = sol_cmf_demand_log_anchor_count key = scope:_cmf_log_key value = var:sol_country_demand_anchor_count }",
         "\tremove_from_global_variable_map = { name = sol_cmf_demand_log_max_adjustment key = scope:_cmf_log_key }",
@@ -1547,7 +2086,7 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_log_store_anchor = { anchor = 4 }",
         "\t\tsol_country_demand_log_store_anchor = { anchor = 5 }",
         "\t\tif = {",
-        "\t\t\tlimit = { var:sol_country_demand_solve_mode = 1 }",
+        "\t\t\tlimit = { OR = { var:sol_country_demand_solve_mode = 1 var:sol_country_demand_solve_mode = 3 } }",
         "\t\t\tsol_country_demand_log_store_class = { class = 1 }",
         "\t\t\tsol_country_demand_log_store_class = { class = 2 }",
         "\t\t\tsol_country_demand_log_store_class = { class = 3 }",
@@ -1650,6 +2189,19 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_TARGET_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_TARGET_LOWER }",
         "}",
         "",
+        "sol_country_demand_log_approx_rows = {",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STATUS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STATUS }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_PREFILTER_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_PREFILTER }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_REASON_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_REASON }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_RAW_TOTAL_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_RAW_TOTAL }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_METRICS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_METRICS }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_1 }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_2 }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_3 }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_4 }",
+        "\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_STRATEGY_5 }",
+        "}",
+        "",
         "sol_country_demand_log_refresh = {",
         "\tif = {",
         "\t\tlimit = { is_human = yes }",
@@ -1659,6 +2211,26 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_prepare_log_anchor = { anchor = 4 }",
         "\t\tsol_country_demand_prepare_log_anchor = { anchor = 5 }",
         "\t\tif = {",
+        "\t\t\tlimit = { var:sol_country_demand_solve_mode = 3 var:sol_country_demand_selected_strategy > 0 }",
+        "\t\t\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_REFRESH_SUCCESS_APPROX detail = _cmf_log_no_arg }",
+        "\t\t\tsol_country_demand_log_approx_rows = yes",
+        "\t\t\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_FACTORS_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_FACTORS }",
+        "\t\t\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_TOTAL_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_TOTAL }",
+        "\t\t\tsol_country_demand_log_count_rows = yes",
+        "\t\t\tsol_country_demand_log_class_equation_rows = yes",
+        "\t\t\tsol_country_demand_log_final_error_rows = yes",
+        "\t\t}",
+        "\t\telse_if = {",
+        "\t\t\tlimit = { var:sol_country_demand_solve_mode = 3 var:sol_country_demand_selected_strategy = 0 }",
+        "\t\t\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_FALLBACK_RAW detail = _cmf_log_no_arg }",
+        "\t\t\tsol_country_demand_log_approx_rows = yes",
+        "\t\t\tsol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_TOTAL_ACTION detail = CMF_LOG_SOL_DEMAND_DETAIL_APPROX_TOTAL }",
+        "\t\t\tsol_country_demand_log_count_rows = yes",
+        "\t\t\tsol_country_demand_log_class_rows = yes",
+        "\t\t\tsol_country_demand_log_class_equation_rows = yes",
+        "\t\t\tsol_country_demand_log_final_error_rows = yes",
+        "\t\t}",
+        "\t\telse_if = {",
         "\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }",
         "\t\t\tif = {",
         "\t\t\t\tlimit = { var:sol_country_demand_solve_mode = 1 }",
@@ -1782,6 +2354,7 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
     ])
 
     balanced_common_maps = [
+        ("solve_mode", "sol_country_demand_solve_mode"),
         ("class_target_base", "sol_country_class_target_base"),
         ("class_capacity_floor", "sol_country_class_capacity_floor"),
         ("class_target_capacity_1", "sol_country_class_target_capacity_1"),
@@ -1815,7 +2388,27 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         ("class_pivot_2", "sol_pivot_abs_2"),
         ("class_pivot_3", "sol_pivot_abs_3"),
         ("class_pivot_4", "sol_pivot_abs_4"),
+        ("exact_status", "sol_country_demand_exact_status"),
+        ("selected_strategy", "sol_country_demand_selected_strategy"),
+        ("gate_passed", "sol_country_demand_gate_passed"),
+        ("gate_possible", "sol_country_demand_gate_possible"),
+        ("approx_reason", "sol_country_demand_approx_reason"),
+        ("candidate_attempt_count", "sol_country_demand_candidate_attempt_count"),
+        ("candidate_count", "sol_country_demand_candidate_count"),
+        ("candidate_gate_count", "sol_country_demand_candidate_gate_count"),
+        ("selected_objective", "sol_country_demand_selected_objective"),
+        ("selected_average_ratio", "sol_country_demand_selected_average_ratio"),
+        ("selected_average_absolute", "sol_country_demand_selected_average_absolute"),
+        ("total_residual", "sol_country_demand_total_residual"),
+        ("raw_total_residual", "sol_country_demand_raw_total_residual"),
     ]
+    for strategy in range(1, 6):
+        balanced_common_maps.extend([
+            (f"strategy_attempt_count_{strategy}", f"sol_country_demand_strategy_attempt_count_{strategy}"),
+            (f"strategy_candidate_count_{strategy}", f"sol_country_demand_strategy_candidate_count_{strategy}"),
+            (f"strategy_gate_count_{strategy}", f"sol_country_demand_strategy_gate_count_{strategy}"),
+            (f"strategy_objective_{strategy}", f"sol_country_demand_strategy_objective_{strategy}"),
+        ])
     writer.extend(["", "sol_country_demand_log_clear_balanced_common = {"])
     for map_suffix, _ in balanced_common_maps:
         writer.line(f"\tremove_from_global_variable_map = {{ name = sol_cmf_demand_log_{map_suffix} key = scope:_cmf_log_key }}")
@@ -1889,6 +2482,39 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_demand_solve_status value = 0 }",
         "\tset_variable = { name = sol_country_demand_solver_size value = 0 }",
         "\tset_variable = { name = sol_country_demand_solve_mode value = 0 }",
+        "\tset_variable = { name = sol_country_demand_exact_status value = 0 }",
+        "\tset_variable = { name = sol_country_demand_selected_strategy value = 0 }",
+        "\tset_variable = { name = sol_country_demand_gate_passed value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_gate_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_candidate_attempt_count value = 0 }",
+        "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
+        "\tset_variable = { name = sol_country_demand_approx_reason value = 0 }",
+        "\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
+        "\tset_variable = { name = sol_country_demand_selected_average_ratio value = 0 }",
+        "\tset_variable = { name = sol_country_demand_selected_average_absolute value = 0 }",
+        "\tset_variable = { name = sol_country_demand_total_residual value = 0 }",
+        "\tset_variable = { name = sol_country_demand_raw_total_residual value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_attempt_count_1 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_attempt_count_2 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_attempt_count_3 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_attempt_count_4 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_attempt_count_5 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_candidate_count_1 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_candidate_count_2 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_candidate_count_3 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_candidate_count_4 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_candidate_count_5 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_gate_count_1 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_gate_count_2 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_gate_count_3 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_gate_count_4 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_gate_count_5 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_objective_1 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_objective_2 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_objective_3 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_objective_4 value = 0 }",
+        "\tset_variable = { name = sol_country_demand_strategy_objective_5 value = 0 }",
         "\tset_variable = { name = sol_country_demand_anchor_count value = 0 }",
         "\tset_variable = { name = sol_country_demand_max_adjustment value = 0 }",
         "\tremove_variable = sol_demand_anchor_1",
@@ -2273,39 +2899,20 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t}",
         "\tif = {",
         "\t\tlimit = { num_locations > 0 var:sol_country_base_spending_total <= 0.00001 }",
-        "\t\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
-        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 1 }",
+        "\t\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
+        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 3 }",
         "\t\tset_variable = { name = sol_country_demand_solve_status value = -5 }",
-        "\t}",
-        "\telse_if = {",
-        "\t\tlimit = {",
-        "\t\t\tnum_locations > 0",
-        "\t\t\tvar:sol_country_base_spending_total > 0.00001",
-        "\t\t\tOR = {",
-        "\t\t\t\tvar:sol_country_class_count_1 <= 0",
-        "\t\t\t\tvar:sol_country_class_count_2 <= 0",
-        "\t\t\t\tvar:sol_country_class_count_3 <= 0",
-        "\t\t\t\tvar:sol_country_class_count_4 <= 0",
-        "\t\t\t\tvar:sol_country_class_baseline_total_1 <= 0.00001",
-        "\t\t\t\tvar:sol_country_class_baseline_total_2 <= 0.00001",
-        "\t\t\t\tvar:sol_country_class_baseline_total_3 <= 0.00001",
-        "\t\t\t\tvar:sol_country_class_baseline_total_4 <= 0.00001",
-        "\t\t\t}",
-        "\t\t}",
-        "\t\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
-        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 1 }",
-        "\t\tset_variable = { name = sol_country_demand_solve_status value = -4 }",
-        "\t\tif = { limit = { OR = { var:sol_country_class_count_1 <= 0 var:sol_country_class_baseline_total_1 <= 0.00001 } } set_variable = { name = sol_country_demand_failure_class value = 1 } }",
-        "\t\telse_if = { limit = { OR = { var:sol_country_class_count_2 <= 0 var:sol_country_class_baseline_total_2 <= 0.00001 } } set_variable = { name = sol_country_demand_failure_class value = 2 } }",
-        "\t\telse_if = { limit = { OR = { var:sol_country_class_count_3 <= 0 var:sol_country_class_baseline_total_3 <= 0.00001 } } set_variable = { name = sol_country_demand_failure_class value = 3 } }",
-        "\t\telse = { set_variable = { name = sol_country_demand_failure_class value = 4 } }",
+        "\t\tset_variable = { name = sol_country_demand_exact_status value = -5 }",
+        "\t\tset_variable = { name = sol_country_demand_approx_reason value = 6 }",
         "\t}",
         "\telse_if = {",
         "\t\tlimit = { num_locations > 0 var:sol_country_base_spending_total > 0.00001 }",
         "\t\tsol_country_demand_solve_classes = yes",
+        "\t\tset_variable = { name = sol_country_demand_exact_status value = var:sol_country_demand_solve_status }",
+        "\t\tsol_country_demand_solve_approximation = yes",
         "\t}",
         "\tif = {",
-        "\t\tlimit = { var:sol_country_demand_solve_status = 1 num_locations > 0 }",
+        "\t\tlimit = { var:sol_country_demand_selected_strategy > 0 num_locations > 0 }",
         "\t\tevery_owned_location = {",
         "\t\t\tlimit = { is_land = yes }",
         "\t\t\tsol_country_demand_apply_class = { class = 1 }",
@@ -3858,7 +4465,11 @@ STATIC_EMITTERS: Sequence[tuple[str, Callable[[ScriptWriter], None]]] = (
 )
 
 
-def render_static_sections(target: str, refresh_block: str) -> str:
+def render_static_sections(
+    target: str,
+    refresh_block: str,
+    country_demand_aggregation: str,
+) -> str:
     if target not in {"stable", "sol_standalone"}:
         raise ValueError(f"Unknown target: {target}")
 
@@ -3869,6 +4480,9 @@ def render_static_sections(target: str, refresh_block: str) -> str:
         if name == "50_panel_stats_stable" and target != "stable":
             continue
         if name == "50_panel_stats_standalone" and target != "sol_standalone":
+            continue
+        if name == "30_country_demand_math":
+            sections.append(country_demand_aggregation.strip())
             continue
         section_writer = ScriptWriter()
         emitter(section_writer)

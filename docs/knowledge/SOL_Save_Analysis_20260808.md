@@ -44,6 +44,21 @@ The two comparison exports are `data/save_analysis/world_current/` (the full
 1337 save; `hungary_current` is only its HUN-filtered export) and
 `data/save_analysis/SP_*_1743_04_01_88fc7852-139e-4d28-930f-561566e0605e/`.
 
+The four actual save files under `data/saves/` are:
+
+```text
+SP_HUN_1337_06_02_b2142032-299d-480c-8f30-0b7d5f61a94c.eu5
+SP_观察者_1386_03_07_1f28d785-cf65-4299-a25e-c135576a50f9.eu5
+SP_观察者_1536_09_21_636b7b0a-0c01-4efe-9354-76a0d4bbae9b.eu5
+SP_观察者_1743_04_01_88fc7852-139e-4d28-930f-561566e0605e.eu5
+```
+
+The 1536 export contains 623 countries and 28,573 location records but zero
+`sol_location_*` runtime caches (`countries_with_sol_variables = 0`). It is
+therefore usable for population/location-size composition only, not for an
+honest active-set or gate replay. The other three exports contain valid SOL
+runtime data.
+
 ## Definitions That Matter
 
 - `valid_location_count` is the number of exported locations for which both
@@ -91,6 +106,29 @@ infeasible exact systems.
 
 ## Country-Size Effect
 
+The solver-relevant non-empty class-column distribution in the three valid
+exports is:
+
+| Save | `k=1` | `k=2` | `k=3` | `k=4` |
+| --- | ---: | ---: | ---: | ---: |
+| 1337 HUN | 572 | 284 | 278 | 370 |
+| 1386 | 324 | 169 | 184 | 382 |
+| 1743 | 119 | 80 | 111 | 279 |
+
+There were no gated acceptances among 1,015 `k=1` countries. `k=2` is not a
+safe hard-fallback class: 57 countries still passed the four-stratum gate.
+This is why the runtime skips only `k <= 1`, not every country with fewer than
+four locations.
+
+Across the same three exports, the current four-L2 replay selected every one
+of the 15 masks at least once. The most frequent masks were `3/4` (205),
+`2/3/4` (170), `2/3` (100), `1/3/4` (96), full `1/2/3/4` (66), `2/4` (56),
+`1/2/3` (53), and `1/2/4` (26). Singleton masks together accounted for only
+24 of 846 accepted results; removing them only when `k=4` preserved the
+high-value pair/triple structure while removing a disproportionate amount of
+fixed candidate work. A static whitelist of only the common 8 masks retained
+about 92.6% of acceptances but was less accurate than the rank-aware rule.
+
 Hard-total, four-stratum gate pass rate by `valid_location_count`:
 
 | Valid locations | 1337 | 1386 | 1743 |
@@ -108,6 +146,41 @@ practical bottleneck. The increasing overall pass rate over time is partly a
 composition effect: later saves have fewer one-location countries and more
 large countries. The within-bin trend is also generally upward, so the effect
 is not only composition.
+
+## Optimized Runtime Accuracy
+
+The optimized runtime path was replayed on the same three exports with valid
+SOL runtime data (3,152 analyzed countries). The full five-strategy path means
+all four hard-total L2 strategies plus `minimax_ratio`; the full-L2 path means
+the four L2 strategies without minimax. The optimized AI path uses only
+`improvement_l2`, skips `k <= 1`, and removes singleton active sets only when
+`k = 4`.
+
+| Path | Gate accepts | Mean final absolute error | Mean normalized absolute error | Mean improvement ratio |
+| --- | ---: | ---: | ---: | ---: |
+| Full five strategies | 1,262 | 11.154344 | 0.306309 | 0.152543 |
+| Full four L2 strategies | 846 | 11.446637 | 0.309147 | 0.143097 |
+| Optimized AI path | 778 | 11.743938 | 0.311253 | 0.137007 |
+
+The all-country means include raw-fallback countries, so they combine coverage
+and fit quality. Among the 778 countries accepted by both the optimized path
+and a full path, the result is nearly unchanged:
+
+- versus full five strategies, mean four-stratum absolute error rises from
+  `5.785510` to `5.792492` (`+0.12%`), while mean improvement ratio changes
+  from `0.559222` to `0.555071`;
+- versus full four L2 strategies, mean absolute error rises from `5.786058` to
+  `5.792492` (`+0.11%`), and mean improvement ratio changes from `0.559112` to
+  `0.555071`.
+
+The active-set reduction itself is effectively lossless. Running
+`improvement_l2` over all active sets accepted 780 countries; applying the
+`k = 4` singleton filter accepted 778. The two rejected cases fall back to raw,
+and the mean normalized error changes only from `0.311126` to `0.311253`.
+The larger coverage difference from the full five-strategy path is therefore
+mostly intentional minimax removal for AI: 416 of its 484 additional accepts
+are countries accepted only by minimax, while 68 are accepts from the other
+three L2 strategies.
 
 ## Total-Constraint Experiment
 
@@ -178,18 +251,28 @@ strategies are available. Do not remove the gate for gameplay.
   addresses class-structure mismatch rather than lost national expenditure.
 - Classification sorts locations by confidence and is `O(n log n)` because of
   that ordering, followed by an `O(n)` assignment/matrix pass. The weighted
-  solver has four variables and enumerates at most 15 non-empty active class
-  sets, so its dimension is constant with respect to the number of locations.
-  `minimax_ratio` enumerates residual-boundary active systems (up to roughly
-  714 small systems per country) and is the main constant-factor cost. Earlier
-  tests found it gives the best country coverage, while classification remains
-  the practical large-country bottleneck.
+  solver has four variables and enumerates a constant number of active class
+  sets. The offline analyzer still evaluates all five strategies for every
+  country so cross-country coverage remains comparable. Runtime first rejects
+  raw-gate-impossible and rank-1 matrices; AI then uses only `improvement_l2`
+  over actual non-empty subsets, skipping singleton subsets at `k=4`. Players
+  retain all four L2 strategies and the finite minimax vertices. On the three
+  valid exports, this fast path retained 778 of 846 baseline four-L2 gated
+  acceptances (92.0%); the `world_current` replay used 5,092 L2 candidate
+  calls and about 1.26 million scalar operations, versus 90,240 calls and
+  13.59 million operations on the former AI path (9.26%, about 1/10.8).
 - Runtime classification must give `ordered_owned_location` an explicit
   `max = 100000`; an omitted max silently leaves most locations unassigned.
   CMF logs should contain one concept and at most four dynamic values per row.
   For `add_to_global_variable_map`, calculate into a temporary variable first,
   write the scalar map value, then remove the temporary variable; inline math
   blocks are invalid there.
+- The previous exact scalar-operation accounting for `world_current` was
+  14,977,545 (1,504 valid countries, 90,240 L2 candidates, and 1,461 HUN
+  minimax vertices). The new replay isolates the L2 core because the
+  classification sort, exact diagnostic, and player-only minimax remain
+  separate costs. It measures 5,092 L2 calls and approximately 1,258,748
+  scalar operations after the rank/raw-gate/AI-strategy/active-set filters.
 
 ## Practical Next Steps
 
