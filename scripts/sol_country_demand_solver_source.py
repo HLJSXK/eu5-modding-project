@@ -61,6 +61,7 @@ _SOLVER_EFFECTS = frozenset(
         "sol_country_demand_approx_assess",
         "sol_country_demand_select_approx_strategy",
         "sol_country_demand_solve_approximation",
+        "sol_country_demand_run_fast_proportional",
         "sol_country_demand_minimax_vertex_enumeration",
     }
 )
