@@ -6,6 +6,13 @@ This document records the save-converter experiments and conclusions from the
 2026-08-08 session. It is an empirical supplement to the implementation notes
 in `tools/eu5_save_parser/README.md` and `docs/knowledge/PROJECT_OVERVIEW.md`.
 
+Terminology note: “four-stratum” in this handoff means the four-dimensional
+runtime error/gate vector (`nobles`, `clergy`, `burghers`, `lower`). It does not
+mean four equal 25% capacity buckets. The equal-capacity classifier is retired
+from beta; current capacity allocation is driven by a 1% per-class anchor and
+negative-pressure pool as documented in
+`docs/technical/SOL_Country_Level_Strata_Demand_Model.md`.
+
 ## Reproduction
 
 Use the project's `eu5` environment, not the base Anaconda interpreter:

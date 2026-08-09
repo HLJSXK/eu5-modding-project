@@ -11,6 +11,21 @@
 - Requires Community Mod Framework v2.*; the Glorp UI location window is copied into SOL rather than declared as a runtime dependency
 - Active deploy targets: `src/stable/`, `src/sol_standalone/`, `src/sol_pp_compatibility_submod/`, `src/sol_mnt_compatibility_submod/`, and `src/sol_jtg_compatibility_submod/`
 
+## Branch Boundary (2026-08-09)
+
+`main` is the reference for the shipped location-level income=expense system:
+one monthly pass computes each location's raw coefficient, applies the legacy
+country poverty factor, and writes the location modifier. It has no country
+matrix or KKT solver. `beta` is a development branch for the not-yet-shipped
+country-level system. Its country classifier, matrix aggregation, exact
+diagnostic, prefilters, approximation candidates, gate, and final coefficient
+application are beta-only work and must not be described as part of the stable
+location-level algorithm. The four-way equal-capacity (`country_total / 4`)
+classifier is retired; the beta classifier uses a 1% per-class anchor and
+negative-pressure capacity allocation instead. See
+`docs/technical/SOL_Country_Level_Strata_Demand_Model.md` for the module and
+performance boundary.
+
 ## Core Features
 
 1. **Standard of Living (SOL) System** *(primary feature)* - Recalibrates baseline `demand_add` for 55 goods in `z_SOL_pop_goods.txt`, disables the engine-wide development demand multiplier, fully negates all nine vanilla per-good development thresholds, and sets `NPop.POP_NEEDS_INCOME_SCALE = 1` so strata pay the nominal cost of purchased goods instead of vanilla's 33% surcharge. It then applies a monthly location-level `local_pop_demand` modifier from `monthly_country_pulse`. The monthly coefficient is closed at country scope: local stratum income, estate-building maintenance, capped unified country savings pressure, local pop counts, and market-keyed base spending feed a four-class country solve. Locations are classified by nobles, clergy, burghers, or lower-strata relative over-representation against their own country's structure, with lower = commoners + tribesmen. High-confidence locations are assigned first; every class receives a deliberately tiny 1% raw-spending anchor, while the remaining 96% is directed toward strata whose raw spending exceeds their national target, proportional to that downward-compensation pressure. The class matrix is weighted by each location's raw coefficient and solved for nonnegative factors that multiply rather than replace location raw, preserving within-class local variation; positive factors have no gameplay cap, and raw is retained only when no hard-total candidate passes the strict four-stratum improvement gate. Detailed CMF logs expose structural preferences, negative pressures, dynamic capacity targets, relative profiles, exemplars, raw-weighted and normalized matrices, exact diagnostics, selected strategies, candidate counts, factors, final errors, and total residuals. Successful final coefficients are written back into each location cache for both display and the applied modifier. EU5 1.3.4 poverty-consumption reduction is left to the engine, so no country-level compensation factor is applied; the demand UI keeps showing the raw SOL target and the map keeps showing actual per-capita liquid funds. Yearly market scans cache one-unit pop spending per market using `min(market_price, default_price)`. The old substitute-goods, scarcity-tier, per-stratum Engel, and per-good redistribution chain is retired in EU5 1.3. The system feeds the Living Standard situation panel, its Black Death-style situation data map, the separate economy-category Living Standard mapmode with panel-scoped auto-selection and reset, and location GUI.
