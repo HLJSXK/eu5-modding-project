@@ -36,7 +36,7 @@ class ScriptWriter:
 
 
 def _emit_country_approximation_runtime_lines() -> list[str]:
-    """Generate the fixed-size runtime KKT approximation machinery.
+    """Generate the fixed-size runtime approximation machinery.
 
     The game script language has no matrix/list primitives, so the small
     four-class problem is expanded here.  The exact diagnostic retains its
@@ -203,7 +203,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tset_variable = { name = sol_approx_total_scale value = var:sol_approx_total_target }",
         "\tif = { limit = { var:sol_approx_total_scale < 0 } change_variable = { name = sol_approx_total_scale multiply = -1 } }",
         "\tif = { limit = { var:sol_approx_total_scale < 0.00001 } set_variable = { name = sol_approx_total_scale value = 0.00001 } }",
-        "\tset_variable = { name = sol_country_demand_gate_possible value = 1 }",
+        "\t# Wide gate prefilter: an estimate is useful when at least one raw row has error.",
+        "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
+        "\tset_variable = { name = sol_approx_cached_worst_row value = 1 }",
+        "\tset_variable = { name = sol_approx_cached_worst_raw_error value = 0 }",
     ])
     for row in range(1, 5):
         lines.extend([
@@ -216,7 +219,8 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             f"\tchange_variable = {{ name = sol_approx_cached_gate_scale_{row} multiply = 0.001 }}",
             f"\tchange_variable = {{ name = sol_approx_cached_gate_scale_{row} multiply = 0.001 }}",
             f"\tif = {{ limit = {{ var:sol_approx_cached_gate_scale_{row} > var:sol_approx_cached_gate_tolerance_{row} }} set_variable = {{ name = sol_approx_cached_gate_tolerance_{row} value = var:sol_approx_cached_gate_scale_{row} }} }}",
-            f"\tif = {{ limit = {{ var:sol_approx_cached_raw_error_{row} <= 0.00001 }} set_variable = {{ name = sol_country_demand_gate_possible value = 0 }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_cached_raw_error_{row} > 0.00001 }} set_variable = {{ name = sol_country_demand_gate_possible value = 1 }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_cached_raw_error_{row} > var:sol_approx_cached_worst_raw_error }} set_variable = {{ name = sol_approx_cached_worst_raw_error value = var:sol_approx_cached_raw_error_{row} }} set_variable = {{ name = sol_approx_cached_worst_row value = {row} }} }}",
         ])
     lines.extend([
         "\tset_variable = { name = sol_approx_cached_total_tolerance value = { value = var:sol_approx_total_target multiply = 0.00001 } }",
@@ -369,7 +373,8 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tsol_country_demand_abs = { source = sol_approx_candidate_total_residual target = sol_approx_candidate_total_residual_abs }",
         "\tset_variable = { name = sol_approx_total_tolerance value = var:sol_approx_cached_total_tolerance }",
         "\tif = { limit = { var:sol_approx_candidate_valid = 1 var:sol_approx_candidate_total_residual_abs > var:sol_approx_total_tolerance } set_variable = { name = sol_approx_candidate_valid value = 0 } set_variable = { name = sol_approx_reject_reason value = 4 } }",
-        "\tset_variable = { name = sol_approx_gate value = 1 }",
+        "\t# Wide gate: only the worst raw row may not worsen, and mean improvement ratio must be positive.",
+        "\tset_variable = { name = sol_approx_gate value = 0 }",
         "\tset_variable = { name = sol_approx_objective value = 0 }",
         "\tset_variable = { name = sol_approx_average_ratio value = 0 }",
         "\tset_variable = { name = sol_approx_average_absolute value = 0 }",
@@ -381,9 +386,7 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             f"\tset_variable = {{ name = sol_approx_raw_error_{row} value = var:sol_approx_cached_raw_error_{row} }}",
             f"\tset_variable = {{ name = sol_approx_improvement_{row} value = {{ value = var:sol_approx_raw_error_{row} subtract = var:sol_approx_candidate_abs_error_{row} }} }}",
             f"\tchange_variable = {{ name = sol_approx_average_absolute add = var:sol_approx_improvement_{row} }}",
-            f"\tif = {{ limit = {{ var:sol_approx_raw_error_{row} <= 0.00001 }} set_variable = {{ name = sol_approx_gate value = 0 }} }}",
             f"\tset_variable = {{ name = sol_approx_gate_tolerance value = var:sol_approx_cached_gate_tolerance_{row} }}",
-            f"\tif = {{ limit = {{ var:sol_approx_improvement_{row} <= var:sol_approx_gate_tolerance }} set_variable = {{ name = sol_approx_gate value = 0 }} }}",
             f"\tset_variable = {{ name = sol_approx_ratio_{row} value = 0 }}",
             f"\tif = {{ limit = {{ var:sol_approx_raw_error_{row} > 0.00001 }} set_variable = {{ name = sol_approx_ratio_{row} value = {{ value = var:sol_approx_improvement_{row} divide = var:sol_approx_raw_error_{row} }} }} }}",
             f"\tchange_variable = {{ name = sol_approx_average_ratio add = var:sol_approx_ratio_{row} }}",
@@ -399,6 +402,14 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     lines.extend([
         "\tset_variable = { name = sol_approx_average_ratio value = { value = var:sol_approx_average_ratio divide = 4 } }",
         "\tset_variable = { name = sol_approx_average_absolute value = { value = var:sol_approx_average_absolute divide = 4 } }",
+        "\tset_variable = { name = sol_approx_worst_improvement value = 0 }",
+        "\tset_variable = { name = sol_approx_worst_tolerance value = 0.00001 }",
+        "\tif = { limit = { var:sol_approx_cached_worst_row = 1 } set_variable = { name = sol_approx_worst_improvement value = var:sol_approx_improvement_1 } set_variable = { name = sol_approx_worst_tolerance value = var:sol_approx_cached_gate_tolerance_1 } }",
+        "\tif = { limit = { var:sol_approx_cached_worst_row = 2 } set_variable = { name = sol_approx_worst_improvement value = var:sol_approx_improvement_2 } set_variable = { name = sol_approx_worst_tolerance value = var:sol_approx_cached_gate_tolerance_2 } }",
+        "\tif = { limit = { var:sol_approx_cached_worst_row = 3 } set_variable = { name = sol_approx_worst_improvement value = var:sol_approx_improvement_3 } set_variable = { name = sol_approx_worst_tolerance value = var:sol_approx_cached_gate_tolerance_3 } }",
+        "\tif = { limit = { var:sol_approx_cached_worst_row = 4 } set_variable = { name = sol_approx_worst_improvement value = var:sol_approx_improvement_4 } set_variable = { name = sol_approx_worst_tolerance value = var:sol_approx_cached_gate_tolerance_4 } }",
+        "\tset_variable = { name = sol_approx_worst_gate_margin value = { value = var:sol_approx_worst_improvement add = var:sol_approx_worst_tolerance } }",
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 var:sol_approx_average_ratio > 0 var:sol_approx_worst_gate_margin >= 0 } set_variable = { name = sol_approx_gate value = 1 } }",
         "\t}",
         "\t}",
         "\tif = { limit = { var:sol_approx_candidate_valid = 1 }",
@@ -425,7 +436,7 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     ])
     for row in range(1, 5):
         lines.append(
-            f"\t\tif = {{ limit = {{ OR = {{ var:sol_approx_raw_error_{row} <= 0.00001 var:sol_approx_improvement_{row} <= var:sol_approx_cached_gate_tolerance_{row} }} }} change_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_$strategy$ add = 1 }} }}"
+            f"\t\tif = {{ limit = {{ var:sol_approx_cached_worst_row = {row} var:sol_approx_worst_gate_margin < 0 }} change_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_$strategy$ add = 1 }} }}"
         )
     lines.extend([
         "\t\tif = {",
@@ -856,12 +867,12 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         ):
             lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_{field}_{strategy} value = 0 }}")
     lines.extend([
-        "\tsol_country_demand_approx_prepare_country = yes",
-        "\t# The hard gate and matrix rank are constant-cost prefilters.",
-        "\t# AI uses the improvement-normalized fast path; players retain",
-        "\t# the full strategy comparison and minimax diagnostics.",
+        "\tif = { limit = { var:sol_country_demand_exact_status != 1 } sol_country_demand_approx_prepare_country = yes }",
+        "\t# Exact success is adopted directly; only exact failures reach approximation.",
+        "\t# The wide gate protects the worst raw row and requires positive mean gain.",
+        "\t# AI uses the proportional-fast path; players retain all five estimators.",
         "\tif = {",
-        "\t\tlimit = { var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 1 }",
+        "\t\tlimit = { var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
         "\t\tif = {",
         "\t\t\tlimit = { is_human = yes }",
         "\t\t\tsol_country_demand_run_strategy_1 = yes",
@@ -876,7 +887,7 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     lines.extend([
         "\t# Keep a compact reason code so a raw fallback is actionable in CMF.",
         "\tif = { limit = { var:sol_country_demand_gate_possible = 0 } set_variable = { name = sol_country_demand_approx_reason value = 1 } }",
-        "\telse_if = { limit = { var:sol_country_demand_anchor_count <= 1 } set_variable = { name = sol_country_demand_approx_reason value = 2 } }",
+        "\telse_if = { limit = { var:sol_country_demand_anchor_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 2 } }",
         "\telse_if = { limit = { var:sol_country_demand_candidate_attempt_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 3 } }",
         "\telse_if = { limit = { var:sol_country_demand_candidate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 4 } }",
         "\telse_if = { limit = { var:sol_country_demand_candidate_gate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 5 } }",
@@ -898,7 +909,20 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         for col in range(1, 5):
             lines.append(f"\tif = {{ limit = {{ var:sol_country_demand_selected_strategy = {strategy} }} set_variable = {{ name = sol_country_class_coefficient_{col} value = var:sol_country_demand_strategy_factor_{col}_{strategy} }} }}")
     lines.extend([
-        "\tif = { limit = { var:sol_country_demand_selected_strategy > 0 } set_variable = { name = sol_country_demand_gate_passed value = 1 } }",
+        "\tif = {",
+        "\t\tlimit = { var:sol_country_demand_exact_status = 1 }",
+        "\t\t# Exact factors are already validated; adopt them without approximation or gate filtering.",
+        "\t\tset_variable = { name = sol_country_demand_selected_strategy value = 7 }",
+        "\t\tset_variable = { name = sol_country_demand_gate_passed value = 1 }",
+        "\t\tset_variable = { name = sol_country_demand_approx_reason value = 0 }",
+        "\t\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
+        "\t\tset_variable = { name = sol_country_demand_selected_average_ratio value = 1 }",
+        "\t\tset_variable = { name = sol_country_demand_selected_average_absolute value = 0 }",
+        "\t\tset_variable = { name = sol_country_demand_total_residual value = 0 }",
+        "\t\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
+        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 1 }",
+        "\t}",
+        "\telse_if = { limit = { var:sol_country_demand_selected_strategy > 0 } set_variable = { name = sol_country_demand_gate_passed value = 1 } }",
         "\telse = {",
         "\t\tset_variable = { name = sol_country_class_coefficient_1 value = 1 }",
         "\t\tset_variable = { name = sol_country_class_coefficient_2 value = 1 }",

@@ -33,13 +33,17 @@ negative_pool = 0.96
 balance_weight = 0.05
 ```
 
-Default analysis replays the current classifier, enforces the strict
-four-stratum gate, and uses five hard-total nonnegative candidates:
+Default analysis replays the current classifier, uses exact-first resolution,
+and enforces the wide gate (the worst raw-error stratum may not worsen beyond
+tolerance and mean improvement ratio must be positive). Exact-feasible
+countries are reported as direct exact results; exact failures use five
+hard-total nonnegative player candidates:
 `balanced_l2`, `improvement_l2`, `target_l2`, `absolute_l2`, and
 `minimax_ratio`. `--relax-total-constraint` adds
 `improvement_free_total` and soft-total penalties `0.01`, `0.1`, and `1`.
-It is diagnostic only; the default five strategies and gate are unchanged
-without the flag.
+It is diagnostic only; `--role ai` replaces the five candidates with the
+runtime-matching `proportional_fast` path, and `--always-approximate` disables
+the exact-first short circuit for performance comparison.
 
 The complete output for the new save is under:
 
@@ -79,8 +83,9 @@ runtime data.
   `-epsilon`; the game cannot use negative compensation, so it is infeasible.
 - `singular` means the exact four-class system cannot be inverted. A country
   can have all four classes and still be singular or nearly indistinguishable.
-- The strict approximation gate requires all four strata to reduce absolute
-  target error by more than the comparison tolerance. It does not require the
+- The wide approximation gate protects only the raw-error worst stratum from
+  worsening beyond tolerance and requires a positive mean improvement ratio.
+  It does not require all four strata to improve, and it does not require the
   signed four-stratum errors to sum to zero.
 - Candidate selection is separate from the gate: passing candidates are
   ranked by mean improvement ratio, then mean absolute improvement, then the
@@ -259,11 +264,11 @@ strategies are available. Do not remove the gate for gameplay.
 - Classification sorts locations by confidence and is `O(n log n)` because of
   that ordering, followed by an `O(n)` assignment/matrix pass. The weighted
   solver has four variables and enumerates a constant number of active class
-  sets. The offline analyzer still evaluates all five strategies for every
-  country so cross-country coverage remains comparable. Runtime first rejects
-  raw-gate-impossible and rank-1 matrices; AI then uses only `improvement_l2`
-  over actual non-empty subsets, skipping singleton subsets at `k=4`. Players
-  retain all four L2 strategies and the finite minimax vertices. On the three
+  sets. The offline analyzer now supports exact-first role-specific replay:
+  `--role ai` runs `proportional_fast`, while `--role player` runs all five
+  estimators. Runtime adopts exact-feasible factors directly; exact failures
+  use the wide worst-row/mean-gain gate and role-specific approximation path.
+  Players retain all four L2 strategies and the finite minimax vertices. On the three
   valid exports, this fast path retained 778 of 846 baseline four-L2 gated
   acceptances (92.0%); the `world_current` replay used 5,092 L2 candidate
   calls and about 1.26 million scalar operations, versus 90,240 calls and

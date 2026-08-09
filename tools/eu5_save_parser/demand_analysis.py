@@ -37,6 +37,7 @@ APPROXIMATION_STRATEGIES = (
     "absolute_l2",
     "minimax_ratio",
 )
+FAST_STRATEGY = "proportional_fast"
 RELAXED_TOTAL_STRATEGIES = (
     "improvement_free_total",
     "improvement_soft_total_0.01",
@@ -353,6 +354,66 @@ def solve_direct_exact(
         active_classes=(0, 1, 2, 3),
         exact=exact,
         total_error=sum(prediction) - sum(target),
+    )
+
+
+def solve_proportional_fast(
+    matrix: Sequence[Sequence[float]],
+    target: Sequence[float],
+    raw: Sequence[float],
+    counts: Sequence[int],
+    *,
+    epsilon: float = DEFAULT_EPSILON,
+) -> Solution:
+    """Mirror the AI runtime's diagonal correction and hard-total scale.
+
+    Each non-empty class receives one Jacobi-style correction from its own
+    diagonal matrix entry.  The resulting factors are normalized once against
+    the country hard-total target; no active-set or linear-system enumeration
+    is performed.
+    """
+
+    active = tuple(index for index, count in enumerate(counts) if count > 0)
+    if not active:
+        return Solution(status="no_nonempty_class", strategy=FAST_STRATEGY)
+    column_totals = [
+        sum(matrix[row][column] for row in range(4)) for column in range(4)
+    ]
+    active_total = sum(column_totals[column] for column in active)
+    if active_total <= epsilon:
+        return Solution(status="zero_active_total", strategy=FAST_STRATEGY)
+
+    weights = [0.0] * 4
+    for column in active:
+        weight = 1.0
+        diagonal = matrix[column][column]
+        if diagonal > epsilon:
+            weight = 1.0 + (target[column] - raw[column]) / diagonal
+        weights[column] = max(0.0, weight)
+    pre_total = sum(
+        column_totals[column] * weights[column] for column in active
+    )
+    if pre_total <= epsilon:
+        return Solution(status="zero_fast_total", strategy=FAST_STRATEGY)
+    hard_scale = sum(target) / pre_total
+    factors = tuple(weights[column] * hard_scale for column in range(4))
+    prediction = tuple(
+        sum(matrix[row][column] * factors[column] for column in range(4))
+        for row in range(4)
+    )
+    exact = all(
+        abs(prediction[index] - target[index])
+        <= _residual_tolerance(target[index])
+        for index in range(4)
+    )
+    return Solution(
+        status="feasible",
+        factors=factors,
+        prediction=prediction,
+        active_classes=active,
+        exact=exact,
+        total_error=sum(prediction) - sum(target),
+        strategy=FAST_STRATEGY,
     )
 
 
@@ -783,7 +844,7 @@ def _assess_candidate(
     *,
     epsilon: float,
 ) -> Solution:
-    """Apply the hard four-stratum improvement gate to a candidate."""
+    """Apply the wide gate: worst raw row may not worsen, mean gain > 0."""
 
     if solution.prediction is None:
         return solution
@@ -792,28 +853,26 @@ def _assess_candidate(
         - abs(solution.prediction[index] - target[index])
         for index in range(4)
     ]
-    tolerances = [
-        max(epsilon, abs(raw[index] - target[index]) * 1e-9)
-        for index in range(4)
-    ]
-    gate_passed = all(
-        improvement > tolerance
-        for improvement, tolerance in zip(improvements, tolerances)
-    )
+    raw_errors = [abs(raw[index] - target[index]) for index in range(4)]
+    worst_index = max(range(4), key=lambda index: raw_errors[index])
+    worst_tolerance = max(epsilon, raw_errors[worst_index] * 1e-9)
     ratios = []
     for index in range(4):
         raw_error = abs(raw[index] - target[index])
-        scale = (
-            raw_error
+        ratios.append(
+            improvements[index] / raw_error
             if raw_error > epsilon
-            else _error_scale(raw[index], target[index], epsilon)
+            else 0.0
         )
-        ratios.append(improvements[index] / scale)
+    average_ratio = sum(ratios) / 4
+    gate_passed = (
+        improvements[worst_index] >= -worst_tolerance
+        and average_ratio > 0
+    )
     return replace(
         solution,
-        gate_passed=gate_passed
-        and all(abs(raw[index] - target[index]) > epsilon for index in range(4)),
-        average_improvement_ratio=sum(ratios) / 4,
+        gate_passed=gate_passed,
+        average_improvement_ratio=average_ratio,
         average_abs_improvement=sum(improvements) / 4,
     )
 
@@ -843,6 +902,25 @@ def choose_accepted_approximation(
         )
         for strategy in APPROXIMATION_STRATEGIES
     }
+    return _select_accepted_candidates(
+        candidates,
+        enforce_gate=enforce_gate,
+        strategy_order=APPROXIMATION_STRATEGIES,
+        raw=raw,
+        target=target,
+    )
+
+
+def _select_accepted_candidates(
+    candidates: Mapping[str, Solution],
+    *,
+    enforce_gate: bool,
+    strategy_order: Sequence[str],
+    raw: Sequence[float],
+    target: Sequence[float],
+) -> tuple[Solution, dict[str, Solution]]:
+    """Select the best gated candidate using the runtime tie-break order."""
+
     accepted = [
         solution
         for solution in candidates.values()
@@ -870,7 +948,7 @@ def choose_accepted_approximation(
                     else math.inf,
                     12,
                 ),
-                -APPROXIMATION_STRATEGIES.index(solution.strategy),
+                -strategy_order.index(solution.strategy),
             ),
         )
         return selected, candidates
@@ -945,9 +1023,17 @@ def analyze_country(
     *,
     use_saved_classes: bool = False,
     enforce_approximation_gate: bool = True,
+    exact_first: bool = True,
+    role: str = "player",
     epsilon: float = DEFAULT_EPSILON,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     """Return one country row and four independently evaluated rows."""
+
+    if role not in {"player", "ai"}:
+        raise ValueError("role must be 'player' or 'ai'")
+    candidate_strategy_names = (
+        (FAST_STRATEGY,) if role == "ai" else APPROXIMATION_STRATEGIES
+    )
 
     if not locations:
         country_row = {
@@ -959,6 +1045,7 @@ def analyze_country(
             "classification_source": (
                 "saved" if use_saved_classes else "simulated"
             ),
+            "approximation_role": role,
         }
         return country_row, []
 
@@ -979,13 +1066,74 @@ def analyze_country(
         counts,
         epsilon=epsilon,
     )
-    approximate, approximation_candidates = choose_accepted_approximation(
-        matrix,
-        country.target,
-        country.baseline,
-        enforce_gate=enforce_approximation_gate,
-        epsilon=epsilon,
-    )
+    if exact_first and direct.exact:
+        assessed_exact = _assess_candidate(
+            direct,
+            country.target,
+            country.baseline,
+            epsilon=epsilon,
+        )
+        approximate = replace(
+            assessed_exact,
+            status="exact_direct",
+            strategy="exact",
+            gate_passed=True,
+        )
+        approximation_candidates = {
+            strategy: Solution(status="skipped_exact", strategy=strategy)
+            for strategy in candidate_strategy_names
+        }
+    else:
+        raw_has_error = any(
+            abs(raw_value - target_value) > epsilon
+            for raw_value, target_value in zip(
+                country.baseline, country.target
+            )
+        )
+        if not raw_has_error:
+            approximate = Solution(
+                status=(
+                    "gate_rejected"
+                    if enforce_approximation_gate
+                    else "no_candidate"
+                ),
+                factors=(1.0, 1.0, 1.0, 1.0),
+                prediction=tuple(country.baseline),
+                total_error=sum(country.baseline) - sum(country.target),
+                strategy="raw_fallback",
+            )
+            approximation_candidates = {
+                strategy: Solution(status="no_candidate", strategy=strategy)
+                for strategy in candidate_strategy_names
+            }
+        elif role == "ai":
+            fast = _assess_candidate(
+                solve_proportional_fast(
+                    matrix,
+                    country.target,
+                    country.baseline,
+                    counts,
+                    epsilon=epsilon,
+                ),
+                country.target,
+                country.baseline,
+                epsilon=epsilon,
+            )
+            approximate, approximation_candidates = _select_accepted_candidates(
+                {FAST_STRATEGY: fast},
+                enforce_gate=enforce_approximation_gate,
+                strategy_order=(FAST_STRATEGY,),
+                raw=country.baseline,
+                target=country.target,
+            )
+        else:
+            approximate, approximation_candidates = choose_accepted_approximation(
+                matrix,
+                country.target,
+                country.baseline,
+                enforce_gate=enforce_approximation_gate,
+                epsilon=epsilon,
+            )
 
     target_total = sum(country.target)
     total_error_scale = max(abs(target_total), epsilon)
@@ -996,6 +1144,7 @@ def analyze_country(
         "valid_location_count": len(locations),
         "analysis_status": "analyzed",
         "classification_source": "saved" if use_saved_classes else "simulated",
+        "approximation_role": role,
         "raw_total": sum(country.baseline),
         "target_total": target_total,
         "raw_total_error": sum(country.baseline) - sum(country.target),
@@ -1027,7 +1176,7 @@ def analyze_country(
         ),
     }
 
-    for strategy in APPROXIMATION_STRATEGIES:
+    for strategy in candidate_strategy_names:
         candidate = approximation_candidates[strategy]
         prefix = f"candidate_{strategy}_"
         country_row[f"{prefix}status"] = candidate.status
@@ -1248,19 +1397,21 @@ def summarize_strata(
 
 def summarize_approximation_strategies(
     country_rows: Sequence[Mapping[str, object]],
+    strategies: Sequence[str] = APPROXIMATION_STRATEGIES,
 ) -> list[dict[str, object]]:
-    """Compare candidate strategies after the four-stratum hard gate."""
+    """Compare candidate strategies after the wide improvement gate."""
 
     analyzed = [
         row for row in country_rows if row.get("analysis_status") == "analyzed"
     ]
     result: list[dict[str, object]] = []
-    for strategy in APPROXIMATION_STRATEGIES:
+    for strategy in strategies:
         prefix = f"candidate_{strategy}_"
         candidate_rows = [
             row
             for row in analyzed
-            if row.get(f"{prefix}status") not in (None, "no_candidate")
+            if row.get(f"{prefix}status")
+            not in (None, "no_candidate", "skipped_exact")
         ]
         accepted = [
             row for row in candidate_rows if row.get(f"{prefix}gate_passed")
@@ -1419,9 +1570,17 @@ def run_analysis(
     country_tags: set[str] | None = None,
     use_saved_classes: bool = False,
     enforce_approximation_gate: bool = True,
+    exact_first: bool = True,
+    role: str = "player",
     epsilon: float = DEFAULT_EPSILON,
 ) -> tuple[Path, Path, Path, Path, Path]:
     """Analyze one parser export and write detailed strategy comparisons."""
+
+    if role not in {"player", "ai"}:
+        raise ValueError("role must be 'player' or 'ai'")
+    strategy_names = (
+        (FAST_STRATEGY,) if role == "ai" else APPROXIMATION_STRATEGIES
+    )
 
     countries, locations = _read_inputs(
         analysis_directory, country_tags=country_tags, epsilon=epsilon
@@ -1437,6 +1596,8 @@ def run_analysis(
             parameters,
             use_saved_classes=use_saved_classes,
             enforce_approximation_gate=enforce_approximation_gate,
+            exact_first=exact_first,
+            role=role,
             epsilon=epsilon,
         )
         country_rows.append(country_row)
@@ -1449,7 +1610,8 @@ def run_analysis(
         raise ValueError("no countries with valid SOL location data were found")
     summary_rows = summarize_strata(stratum_rows)
     strategy_summary_rows = summarize_approximation_strategies(
-        country_rows
+        country_rows,
+        strategies=(FAST_STRATEGY,) if role == "ai" else APPROXIMATION_STRATEGIES,
     )
     country_output = output_directory / "demand_country_results.csv"
     stratum_output = output_directory / "demand_stratum_results.csv"
@@ -1472,10 +1634,11 @@ def run_analysis(
         "countries_analyzed": len(analyzed_country_rows),
         "stratum_rows": len(stratum_rows),
         "approximation": (
-            f"{len(APPROXIMATION_STRATEGIES)} nonnegative candidates; "
+            f"{len(strategy_names)} nonnegative candidates; "
             "candidates are ranked by mean improvement ratio"
         ),
-        "approximation_strategies": list(APPROXIMATION_STRATEGIES),
+        "approximation_role": role,
+        "approximation_strategies": list(strategy_names),
         "total_constraint": (
             "hard equality for total-constrained strategies; relaxed-total "
             "strategies use a soft penalty"
@@ -1487,11 +1650,12 @@ def run_analysis(
         ),
         "approximation_gate_enforced": enforce_approximation_gate,
         "approximation_gate": (
-            "every stratum must reduce absolute target error by more than "
-            "the numeric comparison tolerance"
+            "the worst raw-error stratum may not worsen beyond tolerance and "
+            "the mean improvement ratio must be positive"
             if enforce_approximation_gate
             else "disabled for this diagnostic run"
         ),
+        "exact_first": exact_first,
         "reporting": (
             "raw, approximate, and exact errors are reported separately "
             "for nobles, clergy, burghers, and lower"
@@ -1573,7 +1737,24 @@ def _arguments() -> argparse.Namespace:
         action="store_true",
         help=(
             "diagnostic mode: rank candidates even when one or more strata "
-            "worsen; the default keeps the hard four-stratum gate"
+            "worsen; the default uses the wide worst-row/mean-gain gate"
+        ),
+    )
+    parser.add_argument(
+        "--always-approximate",
+        action="store_true",
+        help=(
+            "diagnostic benchmark mode: run approximation even when the "
+            "exact solve is feasible"
+        ),
+    )
+    parser.add_argument(
+        "--role",
+        choices=("player", "ai"),
+        default="player",
+        help=(
+            "approximation path to benchmark after exact failure: player "
+            "runs four L2 strategies plus minimax; ai runs proportional_fast"
         ),
     )
     parser.add_argument(
@@ -1627,6 +1808,8 @@ def main() -> int:
             country_tags={tag.upper() for tag in args.country} or None,
             use_saved_classes=args.use_saved_classes,
             enforce_approximation_gate=not args.disable_four_stratum_gate,
+            exact_first=not args.always_approximate,
+            role=args.role,
         )
     except (OSError, ValueError, KeyError) as error:
         print(f"error: {error}", file=sys.stderr)
