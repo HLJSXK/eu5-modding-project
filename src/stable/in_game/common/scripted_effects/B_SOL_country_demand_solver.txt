@@ -96452,18 +96452,23 @@ sol_country_demand_solve_approximation = {
 	if = { limit = { var:sol_country_demand_exact_status != 1 } sol_country_demand_approx_prepare_country = yes }
 	# Exact success is adopted directly; only exact failures reach approximation.
 	# The wide gate protects the worst raw row and requires positive mean gain.
-	# AI uses the proportional-fast path; players retain all five estimators.
+	# CMF independently controls exact, L2/Fast, and minimax paths for AI and players.
 	if = {
 		limit = { var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }
 		if = {
 			limit = { is_human = yes }
-			sol_country_demand_run_strategy_1 = yes
-			sol_country_demand_run_strategy_2 = yes
-			sol_country_demand_run_strategy_3 = yes
-			sol_country_demand_run_strategy_4 = yes
-			sol_country_demand_run_strategy_5 = yes
+			if = { limit = { OR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_solver_human_l2_enabled } }
+				sol_country_demand_run_strategy_1 = yes
+				sol_country_demand_run_strategy_2 = yes
+				sol_country_demand_run_strategy_3 = yes
+				sol_country_demand_run_strategy_4 = yes
+			}
+			if = { limit = { has_global_variable_map = cmm has_global_variable = sol_solver_human_minimax_enabled } sol_country_demand_run_strategy_5 = yes }
 		}
-		else = { sol_country_demand_run_fast_proportional = yes }
+		else = {
+			if = { limit = { OR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_solver_ai_l2_enabled } } sol_country_demand_run_fast_proportional = yes }
+			if = { limit = { has_global_variable_map = cmm has_global_variable = sol_solver_ai_minimax_enabled } sol_country_demand_run_strategy_5 = yes }
+		}
 	}
 	# Keep a compact reason code so a raw fallback is actionable in CMF.
 	if = { limit = { var:sol_country_demand_gate_possible = 0 } set_variable = { name = sol_country_demand_approx_reason value = 1 } }
