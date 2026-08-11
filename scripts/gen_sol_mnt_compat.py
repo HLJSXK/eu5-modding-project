@@ -948,14 +948,14 @@ def _render_cmm() -> str:
         "\tset_global_variable = { name = sol_iwe_enabled value = yes }",
         "\tset_global_variable = { name = sol_hwe_enabled value = yes }",
         "\tset_global_variable = { name = sol_rwe_enabled value = yes }",
-        "\tset_global_variable = { name = sol_solver_ai_prepare_enabled value = yes }",
-        "\tset_global_variable = { name = sol_solver_ai_exact_enabled value = yes }",
-        "\tset_global_variable = { name = sol_solver_ai_l2_enabled value = yes }",
+        "\tremove_global_variable = sol_solver_ai_prepare_enabled",
+        "\tremove_global_variable = sol_solver_ai_exact_enabled",
+        "\tremove_global_variable = sol_solver_ai_l2_enabled",
         "\tremove_global_variable = sol_solver_ai_minimax_enabled",
         "\tset_global_variable = { name = sol_solver_human_prepare_enabled value = yes }",
         "\tset_global_variable = { name = sol_solver_human_exact_enabled value = yes }",
         "\tset_global_variable = { name = sol_solver_human_l2_enabled value = yes }",
-        "\tremove_global_variable = sol_solver_human_minimax_enabled",
+        "\tset_global_variable = { name = sol_solver_human_minimax_enabled value = yes }",
         "}",
         "",
         "REPLACE:sol_register_cmf_mod = {",
@@ -981,14 +981,14 @@ def _render_cmm() -> str:
     _append_bool_setting(lines, "iwe", "hw", "sol_iwe_enabled")
     _append_bool_setting(lines, "hwe", "hw", "sol_hwe_enabled")
     _append_bool_setting(lines, "rwe", "hw", "sol_rwe_enabled")
-    _append_bool_setting(lines, "solver_ai_prepare", "country_solver", "sol_solver_ai_prepare_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_ai_exact", "country_solver", "sol_solver_ai_exact_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_ai_l2", "country_solver", "sol_solver_ai_l2_enabled", False, tab_id="solver")
+    _append_bool_setting(lines, "solver_ai_prepare", "country_solver", "sol_solver_ai_prepare_enabled", False, default_value=0, tab_id="solver")
+    _append_bool_setting(lines, "solver_ai_exact", "country_solver", "sol_solver_ai_exact_enabled", False, default_value=0, tab_id="solver")
+    _append_bool_setting(lines, "solver_ai_l2", "country_solver", "sol_solver_ai_l2_enabled", False, default_value=0, tab_id="solver")
     _append_bool_setting(lines, "solver_ai_minimax", "country_solver", "sol_solver_ai_minimax_enabled", False, default_value=0, tab_id="solver")
     _append_bool_setting(lines, "solver_human_prepare", "country_solver", "sol_solver_human_prepare_enabled", False, tab_id="solver")
     _append_bool_setting(lines, "solver_human_exact", "country_solver", "sol_solver_human_exact_enabled", False, tab_id="solver")
     _append_bool_setting(lines, "solver_human_l2", "country_solver", "sol_solver_human_l2_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_human_minimax", "country_solver", "sol_solver_human_minimax_enabled", False, default_value=0, tab_id="solver")
+    _append_bool_setting(lines, "solver_human_minimax", "country_solver", "sol_solver_human_minimax_enabled", False, default_value=1, tab_id="solver")
     if lines[-1] == "":
         lines.pop()
     lines.extend(
