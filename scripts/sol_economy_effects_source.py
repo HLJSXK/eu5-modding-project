@@ -280,8 +280,7 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     ])
     for col in range(1, 5):
         lines.extend([
-            f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 var:sol_delta_{col} < -0.00001 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} }}",
-            f"\tif = {{ limit = {{ var:sol_delta_{col} < 0 }} set_variable = {{ name = sol_delta_{col} value = 0 }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 var:sol_delta_{col} < 0 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} }}",
         ])
     lines.append("\tif = { limit = { var:sol_approx_candidate_valid = 1 }")
     for row in range(1, 5):
@@ -606,7 +605,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         lines.append("\t\tset_variable = { name = sol_reduced_total_remaining value = var:sol_approx_total_target }")
         for column in range(1, 4):
             lines.append(
-                f"\t\tset_variable = {{ name = sol_delta_{column} value = {{ value = var:sol_country_class_coefficient_{column} min = 0 }} }}"
+                f"\t\tif = {{ limit = {{ var:sol_country_class_coefficient_{column} < 0 }} set_variable = {{ name = sol_country_demand_solve_status value = -1 }} }}"
+            )
+            lines.append(
+                f"\t\tset_variable = {{ name = sol_delta_{column} value = var:sol_country_class_coefficient_{column} }}"
             )
             lines.append(
                 f"\t\tset_variable = {{ name = sol_reduced_total_term value = {{ value = var:sol_approx_total_col_{column} multiply = var:sol_delta_{column} }} }}"
@@ -1428,7 +1430,7 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "sol_country_demand_apply_class = {",
         "\tif = {",
         "\t\tlimit = { var:sol_location_demand_class = $class$ }",
-        "\t\tset_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_raw_demand_scale multiply = owner.var:sol_country_class_coefficient_$class$ min = 0 } }",
+        "\t\tset_variable = { name = sol_location_final_demand_scale value = { value = var:sol_location_raw_demand_scale multiply = owner.var:sol_country_class_coefficient_$class$ } }",
         "\t\tset_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }",
         "\t}",
         "}",
