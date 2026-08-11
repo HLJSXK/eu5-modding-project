@@ -16,6 +16,17 @@ sol_local_pop_demand_monthly_pulse = {
 		total_population > 0
 		num_locations > 0
 		sol_sol_is_on = yes
+		# Run monthly for:
+		# 1. All human-controlled countries (always monthly, regardless of CMF setting)
+		# 2. AI countries when reduced frequency is NOT enabled (default behavior)
+		# When reduced frequency IS enabled, AI countries use the yearly pulse instead.
+		OR = {
+			is_human = yes
+			AND = {
+				is_ai = yes
+				NOT = { has_global_variable = sol_ai_reduced_freq_enabled }
+			}
+		}
 	}
 	effect = {
 		# Prime the yearly estate-building maintenance cache once on start/load.
@@ -40,6 +51,39 @@ yearly_country_pulse = {
 	on_actions = {
 		gdp_to_development_pulse
 		sol_estate_building_maintenance_yearly_pulse
+		sol_ai_yearly_pop_demand_pulse
+	}
+}
+
+sol_ai_yearly_pop_demand_pulse = {
+	# This pulse only runs for AI countries when the "Reduce AI calculation frequency" CMF setting is enabled.
+	# It replicates the logic of sol_update_local_pop_demand_modifiers, but with 1-year modifier duration
+	# instead of 1-month, reducing the calculation frequency from monthly to yearly (on anniversary date).
+	# Human countries are never affected by this setting and always calculate monthly.
+	trigger = {
+		total_population > 0
+		num_locations > 0
+		sol_sol_is_on = yes
+		is_ai = yes
+		has_global_variable = sol_ai_reduced_freq_enabled
+	}
+	effect = {
+		# Calculate country-level demand coefficients (same as monthly pulse)
+		sol_solve_country_pop_demand = yes
+
+		# Apply modifiers with 1-year duration (vs 1-month in monthly pulse)
+		if = {
+			limit = { num_locations > 0 }
+			every_owned_location = {
+				limit = { is_land = yes }
+				add_location_modifier = {
+					modifier = sol_local_pop_demand_modifier
+					years = 1
+					mode = replace
+					size = var:sol_location_pop_demand_modifier_size
+				}
+			}
+		}
 	}
 }
 

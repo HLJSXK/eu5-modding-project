@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-08-11 (CMF solver defaults: AI raw-only, human full access; minimal one-line CMF solver log)
+> Last updated: 2026-08-11 (CMF solver defaults: AI raw-only, human full access; minimal one-line CMF solver log; AI reduced frequency option added)
 
 ## Project Identity
 
@@ -42,7 +42,7 @@ performance boundary.
 
 6. **Colonial & Diplomatic Restrictions** - AI generally requires more than 500 tax base to create colonial charters; historical colonizers are exempt, and colonial nations can colonize only in their capital region. The player is not restricted by this rule. Asking another country to join a war costs 30 favors.
 
-7. **CMF Settings & Migration Support** - Registers CMF settings for SOL pop demand, map coloring, economic balance, base tax efficiency, age escalation, stability discount, diplomatic spending, difficulty tax nerf, GDP-to-development, AI prosperity recovery, and war acceleration sub-features. Built-in after-lobby migration logic notifies human players when loading older saves and triggers full Living Standard cache refreshes on game start/load.
+7. **CMF Settings & Migration Support** - Registers CMF settings for SOL pop demand, AI calculation frequency reduction, map coloring, economic balance, base tax efficiency, age escalation, stability discount, diplomatic spending, difficulty tax nerf, GDP-to-development, AI prosperity recovery, and war acceleration sub-features. The AI reduced frequency option (default OFF) makes AI countries recalculate demand coefficients and apply modifiers once per year on their anniversary date instead of monthly, while human countries remain unaffected. Built-in after-lobby migration logic notifies human players when loading older saves and triggers full Living Standard cache refreshes on game start/load.
 
 8. **Prosper or Perish Compact Compatibility Submod** - A separate final-loading target keeps full PP while narrowing full SOL to its income-based demand/UI, compact age construction and city/town costs, low-control construction penalty, base tax/diplomatic/stability rules, difficulty tax adjustments, configurable AI devastation recovery, non-conflicting prices, and selected war/expansion rules. It removes SOL residuals from PP-owned weather, Little Ice Age, base location, blockade, siege, occupation, and looting values; lets PP's later same-operation price file naturally replace SOL's repeated road-price fields; keeps SOL GDP-to-development disabled by default but exposes a compatibility-specific CMF opt-in; excludes non-compact age fields; preserves PP's zero lumber demand; and adds PP `victuals` to SOL calculations and both goods panels. Compatibility `demand_add` sets rounded Compact `victuals` net-demand targets of 0.05/0.015/0.035/0.0004/0.0002/0.0004 for nobles/clergy/burghers/laborers/peasants/soldiers, chosen from the PP-only spending-ratio comparison. Stable and standalone contain no PP-load detection or PP-only UI/value data.
 
