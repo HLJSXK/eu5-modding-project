@@ -39,10 +39,9 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     """Generate the fixed-size runtime approximation machinery.
 
     The game script language has no matrix/list primitives, so the small
-    four-class problem is expanded here.  The exact diagnostic retains its
-    five-by-five Gaussian solver; hard-total approximation candidates eliminate
-    that equation and use fixed three-by-three or four-by-four systems with
-    the same candidate assessor.
+    four-class problem is expanded here. Hard-total approximation candidates
+    eliminate the total equation and use fixed three-by-three or four-by-four
+    systems with the same candidate assessor.
     """
 
     lines: list[str] = [
@@ -54,36 +53,11 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\t\tif = {",
         "\t\t\tlimit = { var:sol_kkt_pivot_abs_$pivot$ <= 0.00001 }",
         "\t\t\tset_variable = { name = sol_country_demand_solve_status value = -1 }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot value = $pivot$ }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot_value value = var:sol_m_$pivot$_$pivot$ }",
         "\t\t}",
         "\t}",
         "}",
         "",
-        "sol_country_demand_solve_kkt_5 = {",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
-        "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
     ]
-    for pivot in range(1, 6):
-        lines.append(f"\tsol_country_demand_check_kkt_pivot = {{ pivot = {pivot} }}")
-        for row in range(pivot + 1, 6):
-            lines.append(
-                f"\tsol_country_demand_eliminate_row = {{ pivot = {pivot} row = {row} }}"
-            )
-    # The generic legacy backsolve helper visits all five columns.  KKT rows
-    # are upper triangular here, so expand the actual triangular backsolve and
-    # avoid both stale lower-column deltas and redundant arithmetic.
-    lines.extend([
-        "\tif = {",
-        "\t\tlimit = { var:sol_country_demand_solve_status = 1 }",
-    ])
-    for row in range(5, 0, -1):
-        lines.append(f"\t\tset_variable = {{ name = sol_delta_{row} value = var:sol_b_{row} }}")
-        for col in range(5, row, -1):
-            lines.append(f"\t\tsol_country_demand_backsolve_cell = {{ row = {row} col = {col} }}")
-        lines.append(f"\t\tset_variable = {{ name = sol_delta_{row} value = {{ value = var:sol_delta_{row} divide = var:sol_m_{row}_{row} }} }}")
-    lines.extend(["\t}"])
-    lines.extend(["}", ""])
 
     # Reduced L2 systems eliminate the hard-total multiplier.  The candidate
     # builder uses up to three free factors and reconstructs the anchor factor
@@ -91,7 +65,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     # the same five-decimal units used by the final prediction check.
     lines.extend([
         "sol_country_demand_solve_reduced_3 = {",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 3 }",
         "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
         "\tsol_country_demand_check_kkt_pivot = { pivot = 1 }",
         "\tsol_country_demand_eliminate_row = { pivot = 1 row = 2 }",
@@ -116,7 +89,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
 
     lines.extend([
         "sol_country_demand_solve_reduced_4 = {",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
         "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
         "\tsol_country_demand_check_kkt_pivot = { pivot = 1 }",
         "\tsol_country_demand_eliminate_row = { pivot = 1 row = 2 }",
@@ -151,30 +123,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     lines.extend([
         "sol_country_demand_approx_reset_kkt = {",
     ])
-    for row in range(1, 6):
-        for col in range(1, 6):
+    for row in range(1, 5):
+        for col in range(1, 5):
             lines.append(f"\tset_variable = {{ name = sol_m_{row}_{col} value = 0 }}")
         lines.append(f"\tset_variable = {{ name = sol_b_{row} value = 0 }}")
-    lines.extend(["}", ""])
-
-    lines.append("sol_country_demand_approx_reset_diagnostics = {")
-    for strategy in range(1, 7):
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_valid_count_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_objective_{strategy} value = 999999 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_gate_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_average_ratio_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_average_absolute_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_total_residual_{strategy} value = 0 }}")
-        for suffix in ("singular", "negative", "kkt", "total", "minimax"):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_reject_{suffix}_{strategy} value = 0 }}")
-        for row in range(1, 5):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_{strategy} value = 0 }}")
-        for field in (
-            "factor_1", "factor_2", "factor_3", "factor_4",
-            "prediction_1", "prediction_2", "prediction_3", "prediction_4",
-            "improvement_1", "improvement_2", "improvement_3", "improvement_4",
-        ):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_{field}_{strategy} value = 0 }}")
     lines.extend(["}", ""])
 
     # Keep unnormalised column totals for the reduced hard-total solve.
@@ -194,15 +146,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tset_variable = { name = sol_approx_raw_3 value = var:sol_country_baseline_spending_burghers }",
         "\tset_variable = { name = sol_approx_raw_4 value = var:sol_country_baseline_lower }",
         "\tset_variable = { name = sol_approx_total_target value = { value = var:sol_approx_target_1 add = var:sol_approx_target_2 add = var:sol_approx_target_3 add = var:sol_approx_target_4 } }",
-        "\tset_variable = { name = sol_approx_raw_total_actual value = { value = var:sol_approx_raw_1 add = var:sol_approx_raw_2 add = var:sol_approx_raw_3 add = var:sol_approx_raw_4 } }",
-        "\tset_variable = { name = sol_country_demand_raw_total_residual value = { value = var:sol_approx_raw_total_actual subtract = var:sol_approx_total_target } }",
         "\tset_variable = { name = sol_approx_total_col_1 value = { value = var:sol_original_m_1_1 add = var:sol_original_m_2_1 add = var:sol_original_m_3_1 add = var:sol_original_m_4_1 } }",
         "\tset_variable = { name = sol_approx_total_col_2 value = { value = var:sol_original_m_1_2 add = var:sol_original_m_2_2 add = var:sol_original_m_3_2 add = var:sol_original_m_4_2 } }",
         "\tset_variable = { name = sol_approx_total_col_3 value = { value = var:sol_original_m_1_3 add = var:sol_original_m_2_3 add = var:sol_original_m_3_3 add = var:sol_original_m_4_3 } }",
         "\tset_variable = { name = sol_approx_total_col_4 value = { value = var:sol_original_m_1_4 add = var:sol_original_m_2_4 add = var:sol_original_m_3_4 add = var:sol_original_m_4_4 } }",
-        "\tset_variable = { name = sol_approx_total_scale value = var:sol_approx_total_target }",
-        "\tif = { limit = { var:sol_approx_total_scale < 0 } change_variable = { name = sol_approx_total_scale multiply = -1 } }",
-        "\tif = { limit = { var:sol_approx_total_scale < 0.00001 } set_variable = { name = sol_approx_total_scale value = 0.00001 } }",
         "\t# Wide gate prefilter: an estimate is useful when at least one raw row has error.",
         "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
         "\tset_variable = { name = sol_approx_cached_worst_row value = 1 }",
@@ -229,8 +176,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "",
         "sol_country_demand_run_fast_proportional = {",
         "\t# AI path: one diagonal/Jacobi correction plus hard-total normalization; no active-set enumeration or linear solve.",
-        "\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }",
-        "\tchange_variable = { name = sol_country_demand_strategy_attempt_count_6 add = 1 }",
         "\tset_variable = { name = sol_fast_active_column_total value = 0 }",
         "\tset_variable = { name = sol_fast_pre_total value = 0 }",
     ])
@@ -323,18 +268,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         ])
     for row in range(1, 5):
         lines.append(f"\tset_variable = {{ name = sol_approx_y_{row} value = {{ value = var:sol_approx_target_{row} divide = var:sol_approx_scale_{row} }} }}")
-    for left in range(1, 5):
-        for right in range(1, 5):
-            terms = [f"var:sol_approx_a_{row}_{left} multiply = var:sol_approx_a_{row}_{right}" for row in range(1, 5)]
-            lines.append(f"\tset_variable = {{ name = sol_approx_g_{left}_{right} value = {{ value = {terms[0].split(' multiply = ')[0]} multiply = {terms[0].split(' multiply = ')[1]} }} }}")
-            for term in terms[1:]:
-                a, b = term.split(" multiply = ")
-                lines.append(f"\tchange_variable = {{ name = sol_approx_g_{left}_{right} add = {{ value = {a} multiply = {b} }} }}")
-    for col in range(1, 5):
-        lines.append(f"\tset_variable = {{ name = sol_approx_p_{col} value = {{ value = var:sol_approx_a_1_{col} multiply = var:sol_approx_y_1 }} }}")
-        for row in range(2, 5):
-            lines.append(f"\tchange_variable = {{ name = sol_approx_p_{col} add = {{ value = var:sol_approx_a_{row}_{col} multiply = var:sol_approx_y_{row} }} }}")
-        lines.append(f"\tset_variable = {{ name = sol_approx_c_{col} value = {{ value = var:sol_original_m_1_{col} add = var:sol_original_m_2_{col} add = var:sol_original_m_3_{col} add = var:sol_original_m_4_{col} divide = var:sol_approx_total_scale }} }}")
     lines.extend(["}", ""])
 
     # Candidate assessor: all numeric checks, four-stratum gate and per-
@@ -342,15 +275,12 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     lines.extend([
         "sol_country_demand_approx_assess = {",
         "\tset_variable = { name = sol_approx_candidate_valid value = 1 }",
-        "\tset_variable = { name = sol_approx_reject_reason value = 0 }",
-        "\tif = { limit = { var:sol_country_demand_solve_status = -1 } set_variable = { name = sol_approx_reject_reason value = 1 } }",
-        "\tif = { limit = { var:sol_country_demand_solve_status != 1 var:sol_country_demand_solve_status != -1 } set_variable = { name = sol_approx_reject_reason value = 3 } }",
         "\tif = { limit = { var:sol_country_demand_solve_status != 1 } set_variable = { name = sol_approx_candidate_valid value = 0 } }",
         "\tif = { limit = { var:sol_country_demand_solve_status = 1 }",
     ])
     for col in range(1, 5):
         lines.extend([
-            f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 var:sol_delta_{col} < -0.00001 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} set_variable = {{ name = sol_approx_reject_reason value = 2 }} }}",
+            f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 var:sol_delta_{col} < -0.00001 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} }}",
             f"\tif = {{ limit = {{ var:sol_delta_{col} < 0 }} set_variable = {{ name = sol_delta_{col} value = 0 }} }}",
         ])
     lines.append("\tif = { limit = { var:sol_approx_candidate_valid = 1 }")
@@ -372,7 +302,7 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tset_variable = { name = sol_approx_candidate_total_residual value = { value = var:sol_approx_total_actual subtract = var:sol_approx_total_target } }",
         "\tsol_country_demand_abs = { source = sol_approx_candidate_total_residual target = sol_approx_candidate_total_residual_abs }",
         "\tset_variable = { name = sol_approx_total_tolerance value = var:sol_approx_cached_total_tolerance }",
-        "\tif = { limit = { var:sol_approx_candidate_valid = 1 var:sol_approx_candidate_total_residual_abs > var:sol_approx_total_tolerance } set_variable = { name = sol_approx_candidate_valid value = 0 } set_variable = { name = sol_approx_reject_reason value = 4 } }",
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 var:sol_approx_candidate_total_residual_abs > var:sol_approx_total_tolerance } set_variable = { name = sol_approx_candidate_valid value = 0 } }",
         "\t# Wide gate: only the worst raw row may not worsen, and mean improvement ratio must be positive.",
         "\tset_variable = { name = sol_approx_gate value = 0 }",
         "\tset_variable = { name = sol_approx_objective value = 0 }",
@@ -386,7 +316,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             f"\tset_variable = {{ name = sol_approx_raw_error_{row} value = var:sol_approx_cached_raw_error_{row} }}",
             f"\tset_variable = {{ name = sol_approx_improvement_{row} value = {{ value = var:sol_approx_raw_error_{row} subtract = var:sol_approx_candidate_abs_error_{row} }} }}",
             f"\tchange_variable = {{ name = sol_approx_average_absolute add = var:sol_approx_improvement_{row} }}",
-            f"\tset_variable = {{ name = sol_approx_gate_tolerance value = var:sol_approx_cached_gate_tolerance_{row} }}",
             f"\tset_variable = {{ name = sol_approx_ratio_{row} value = 0 }}",
             f"\tif = {{ limit = {{ var:sol_approx_raw_error_{row} > 0.00001 }} set_variable = {{ name = sol_approx_ratio_{row} value = {{ value = var:sol_approx_improvement_{row} divide = var:sol_approx_raw_error_{row} }} }} }}",
             f"\tchange_variable = {{ name = sol_approx_average_ratio add = var:sol_approx_ratio_{row} }}",
@@ -395,10 +324,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         lines.append(f"\tif = {{ limit = {{ $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_approx_objective }} set_variable = {{ name = sol_approx_objective value = var:sol_approx_error_ratio_{row} }} }}")
         lines.append(f"\tif = {{ limit = {{ $strategy$ != 5 }} change_variable = {{ name = sol_approx_objective add = {{ value = var:sol_approx_error_ratio_{row} multiply = var:sol_approx_error_ratio_{row} }} }} }}")
     lines.extend([
-        "\tif = { limit = { var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_delta_5 < -0.00001 } set_variable = { name = sol_approx_candidate_valid value = 0 } set_variable = { name = sol_approx_reject_reason value = 5 } }",
+        "\tif = { limit = { var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_delta_5 < -0.00001 } set_variable = { name = sol_approx_candidate_valid value = 0 } }",
     ])
     for row in range(1, 5):
-        lines.append(f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_delta_5 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} set_variable = {{ name = sol_approx_reject_reason value = 5 }} }}")
+        lines.append(f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_delta_5 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} }}")
     lines.extend([
         "\tset_variable = { name = sol_approx_average_ratio value = { value = var:sol_approx_average_ratio divide = 4 } }",
         "\tset_variable = { name = sol_approx_average_absolute value = { value = var:sol_approx_average_absolute divide = 4 } }",
@@ -413,36 +342,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\t}",
         "\t}",
         "\tif = { limit = { var:sol_approx_candidate_valid = 1 }",
-        "\t\tchange_variable = { name = sol_country_demand_candidate_count add = 1 }",
-        "\t\tchange_variable = { name = sol_country_demand_strategy_candidate_count_$strategy$ add = 1 }",
-        "\t\tif = { limit = { var:sol_approx_objective < var:sol_country_demand_strategy_best_objective_$strategy$ }",
     ])
-    for field, source in (
-        ("factor_1", "sol_delta_1"), ("factor_2", "sol_delta_2"),
-        ("factor_3", "sol_delta_3"), ("factor_4", "sol_delta_4"),
-        ("prediction_1", "sol_approx_prediction_1"), ("prediction_2", "sol_approx_prediction_2"),
-        ("prediction_3", "sol_approx_prediction_3"), ("prediction_4", "sol_approx_prediction_4"),
-        ("improvement_1", "sol_approx_improvement_1"), ("improvement_2", "sol_approx_improvement_2"),
-        ("improvement_3", "sol_approx_improvement_3"), ("improvement_4", "sol_approx_improvement_4"),
-        ("objective", "sol_approx_objective"), ("gate", "sol_approx_gate"),
-        ("average_ratio", "sol_approx_average_ratio"),
-        ("average_absolute", "sol_approx_average_absolute"),
-        ("total_residual", "sol_approx_candidate_total_residual"),
-    ):
-        lines.append(f"\t\t\tset_variable = {{ name = sol_country_demand_strategy_best_{field}_$strategy$ value = var:{source} }}")
-    lines.extend([
-        "\t\t\tset_variable = { name = sol_country_demand_strategy_best_valid_count_$strategy$ value = 1 }",
-        "\t\t}",
-    ])
-    for row in range(1, 5):
-        lines.append(
-            f"\t\tif = {{ limit = {{ var:sol_approx_cached_worst_row = {row} var:sol_approx_worst_gate_margin < 0 }} change_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_$strategy$ add = 1 }} }}"
-        )
     lines.extend([
         "\t\tif = {",
         "\t\t\tlimit = { var:sol_approx_gate = 1 }",
-        "\t\t\tchange_variable = { name = sol_country_demand_candidate_gate_count add = 1 }",
-        "\t\t\tchange_variable = { name = sol_country_demand_strategy_gate_count_$strategy$ add = 1 }",
         "\t\t\tif = { limit = { var:sol_approx_objective < var:sol_country_demand_strategy_objective_$strategy$ }",
     ])
     for field, source in (
@@ -451,20 +354,14 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         ("objective", "sol_approx_objective"), ("gate", "sol_approx_gate"),
         ("average_ratio", "sol_approx_average_ratio"),
         ("average_absolute", "sol_approx_average_absolute"),
-        ("total_residual", "sol_approx_candidate_total_residual"),
     ):
         lines.append(f"\t\t\tset_variable = {{ name = sol_country_demand_strategy_{field}_$strategy$ value = var:{source} }}")
     lines.extend([
         "\t\t\t}",
         "\t\t}",
         "\t}",
-        "\telse = {",
     ])
-    for reason, suffix in ((1, "singular"), (2, "negative"), (3, "kkt"), (4, "total"), (5, "minimax")):
-        lines.append(
-            f"\t\tif = {{ limit = {{ var:sol_approx_reject_reason = {reason} }} change_variable = {{ name = sol_country_demand_strategy_reject_{suffix}_$strategy$ add = 1 }} }}"
-        )
-    lines.extend(["\t}", "}", ""])
+    lines.extend(["}", ""])
 
     masks = [mask for mask in range(1, 16)]
 
@@ -491,45 +388,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     def close_mask_limit() -> None:
         lines.append("\t}")
 
-    def append_kkt_l2_candidate(strategy: int, mask: int) -> None:
-        active = [index for index in range(1, 5) if mask & (1 << (index - 1))]
-        lines.append(f"sol_country_demand_approx_candidate_{strategy}_{mask} = {{")
-        lines.append("\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
-        lines.append(f"\tchange_variable = {{ name = sol_country_demand_strategy_attempt_count_{strategy} add = 1 }}")
-        lines.append("\tsol_country_demand_approx_reset_kkt = yes")
-        for row in active:
-            for col in active:
-                lines.append(f"\tset_variable = {{ name = sol_m_{row}_{col} value = var:sol_approx_g_{row}_{col} }}")
-            lines.append(f"\tset_variable = {{ name = sol_m_{row}_5 value = var:sol_approx_c_{row} }}")
-            lines.append(f"\tset_variable = {{ name = sol_b_{row} value = var:sol_approx_p_{row} }}")
-        for row in range(1, 5):
-            if row not in active:
-                lines.append(f"\tset_variable = {{ name = sol_m_{row}_{row} value = 1 }}")
-        for col in active:
-            lines.append(f"\tset_variable = {{ name = sol_m_5_{col} value = var:sol_approx_c_{col} }}")
-        lines.append("\tset_variable = { name = sol_b_5 value = 1 }")
-        lines.append("\tsol_country_demand_solve_kkt_5 = yes")
-        lines.append("\tif = {")
-        lines.append("\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
-        for row in active:
-            first = active[0]
-            lines.append("\t\tif = {")
-            lines.append("\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
-            lines.append(f"\t\t\tset_variable = {{ name = sol_approx_numerical_lhs value = {{ value = var:sol_approx_g_{row}_{first} multiply = var:sol_delta_{first} }} }}")
-            for col in active[1:]:
-                lines.append(f"\t\t\tchange_variable = {{ name = sol_approx_numerical_lhs add = {{ value = var:sol_approx_g_{row}_{col} multiply = var:sol_delta_{col} }} }}")
-            lines.append(f"\t\t\tchange_variable = {{ name = sol_approx_numerical_lhs add = {{ value = var:sol_approx_c_{row} multiply = var:sol_delta_5 }} }}")
-            lines.append(f"\t\t\tset_variable = {{ name = sol_approx_numerical_residual value = {{ value = var:sol_approx_numerical_lhs subtract = var:sol_approx_p_{row} }} }}")
-            lines.append("\t\t\tsol_country_demand_abs = { source = sol_approx_numerical_residual target = sol_approx_numerical_residual_abs }")
-            lines.append(f"\t\t\tsol_country_demand_abs = {{ source = sol_approx_p_{row} target = sol_approx_numerical_tolerance }}")
-            lines.append("\t\t\tchange_variable = { name = sol_approx_numerical_tolerance multiply = 0.00001 }")
-            lines.append("\t\t\tif = { limit = { var:sol_approx_numerical_tolerance < 0.00001 } set_variable = { name = sol_approx_numerical_tolerance value = 0.00001 } }")
-            lines.append("\t\t\tif = { limit = { var:sol_approx_numerical_residual_abs > var:sol_approx_numerical_tolerance } set_variable = { name = sol_country_demand_solve_status value = -6 } }")
-            lines.append("\t\t}")
-        lines.append("\t}")
-        lines.append(f"\tsol_country_demand_approx_assess = {{ strategy = {strategy} }}")
-        lines.append("}")
-
     def append_reduced_l2_candidate(strategy: int, mask: int) -> None:
         """Emit an L2 candidate with the hard-total equation eliminated.
 
@@ -544,8 +402,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         free = active[:-1]
         size = len(free)
         lines.append(f"sol_country_demand_approx_candidate_{strategy}_{mask} = {{")
-        lines.append("\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
-        lines.append(f"\tchange_variable = {{ name = sol_country_demand_strategy_attempt_count_{strategy} add = 1 }}")
         lines.append("\tsol_country_demand_approx_reset_kkt = yes")
         lines.append("\tset_variable = { name = sol_country_demand_solve_status value = 1 }")
         lines.append("\tset_variable = { name = sol_delta_1 value = 0 }")
@@ -614,9 +470,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             lines.append("\t\tsol_country_demand_solve_reduced_3 = yes")
             lines.append("\t\tif = {")
             lines.append("\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
-        else:
-            lines.append("\t\tset_variable = { name = sol_country_demand_solver_size value = 1 }")
-
         lines.append("\t\tif = {")
         lines.append("\t\t\tlimit = { var:sol_country_demand_solve_status = 1 }")
         lines.append("\t\t\tset_variable = { name = sol_reduced_total_remaining value = var:sol_approx_total_target }")
@@ -660,8 +513,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         free = active[:-1]
         size = len(active)
         lines.append(f"sol_country_demand_minimax_vertex_{mask}_{vertex} = {{")
-        lines.append("\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
-        lines.append("\tchange_variable = { name = sol_country_demand_strategy_attempt_count_5 add = 1 }")
         lines.append("\tsol_country_demand_approx_reset_kkt = yes")
         lines.append("\tset_variable = { name = sol_country_demand_solve_status value = 1 }")
         lines.append("\tset_variable = { name = sol_delta_1 value = 0 }")
@@ -750,8 +601,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         lines.append(
             "\t\tlimit = { var:sol_country_demand_exact_status = 1 var:sol_approx_total_col_4 > 0.00001 var:sol_country_class_coefficient_1 >= -0.00001 var:sol_country_class_coefficient_2 >= -0.00001 var:sol_country_class_coefficient_3 >= -0.00001 var:sol_country_class_coefficient_4 >= -0.00001 }"
         )
-        lines.append("\t\tchange_variable = { name = sol_country_demand_candidate_attempt_count add = 1 }")
-        lines.append("\t\tchange_variable = { name = sol_country_demand_strategy_attempt_count_5 add = 1 }")
         lines.append("\t\tsol_country_demand_approx_reset_kkt = yes")
         lines.append("\t\tset_variable = { name = sol_country_demand_solve_status value = 1 }")
         lines.append("\t\tset_variable = { name = sol_reduced_total_remaining value = var:sol_approx_total_target }")
@@ -823,49 +672,20 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = var:sol_country_demand_strategy_average_ratio_$strategy$ }",
         "\tset_variable = { name = sol_country_demand_selected_average_absolute value = var:sol_country_demand_strategy_average_absolute_$strategy$ }",
         "\tset_variable = { name = sol_country_demand_selected_objective value = var:sol_country_demand_strategy_objective_$strategy$ }",
-        "\tset_variable = { name = sol_country_demand_total_residual value = var:sol_country_demand_strategy_total_residual_$strategy$ }",
         "}",
         "",
         "sol_country_demand_solve_approximation = {",
-        "\tsol_country_demand_approx_reset_diagnostics = yes",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
-        "\tset_variable = { name = sol_country_demand_solve_mode value = 3 }",
         "\tset_variable = { name = sol_country_demand_selected_strategy value = 0 }",
-        "\tset_variable = { name = sol_country_demand_gate_passed value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_gate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_attempt_count value = 0 }",
         "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
-        "\tset_variable = { name = sol_country_demand_approx_reason value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_objective value = 999999 }",
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = -999999 }",
         "\tset_variable = { name = sol_country_demand_selected_average_absolute value = -999999 }",
-        "\tset_variable = { name = sol_country_demand_total_residual value = -999999 }",
     ])
     for strategy in range(1, 7):
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_attempt_count_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_candidate_count_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_count_{strategy} value = 0 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_objective_{strategy} value = 999999 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_{strategy} value = 0 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_average_ratio_{strategy} value = -999999 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_average_absolute_{strategy} value = -999999 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_valid_count_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_objective_{strategy} value = 999999 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_gate_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_average_ratio_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_average_absolute_{strategy} value = 0 }}")
-        lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_total_residual_{strategy} value = 0 }}")
-        for suffix in ("singular", "negative", "kkt", "total", "minimax"):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_reject_{suffix}_{strategy} value = 0 }}")
-        for row in range(1, 5):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_fail_{row}_{strategy} value = 0 }}")
-        for field in (
-            "factor_1", "factor_2", "factor_3", "factor_4",
-            "prediction_1", "prediction_2", "prediction_3", "prediction_4",
-            "improvement_1", "improvement_2", "improvement_3", "improvement_4",
-        ):
-            lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_best_{field}_{strategy} value = 0 }}")
     lines.extend([
         "\tif = { limit = { var:sol_country_demand_exact_status != 1 } sol_country_demand_approx_prepare_country = yes }",
         "\t# Exact success is adopted directly; only exact failures reach approximation.",
@@ -882,14 +702,6 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\t\t\tsol_country_demand_run_strategy_5 = yes",
         "\t\t}",
         "\t}",
-    ])
-    lines.extend([
-        "\t# Keep a compact reason code so a raw fallback is actionable in CMF.",
-        "\tif = { limit = { var:sol_country_demand_gate_possible = 0 } set_variable = { name = sol_country_demand_approx_reason value = 1 } }",
-        "\telse_if = { limit = { var:sol_country_demand_anchor_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 2 } }",
-        "\telse_if = { limit = { var:sol_country_demand_candidate_attempt_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 3 } }",
-        "\telse_if = { limit = { var:sol_country_demand_candidate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 4 } }",
-        "\telse_if = { limit = { var:sol_country_demand_candidate_gate_count <= 0 } set_variable = { name = sol_country_demand_approx_reason value = 5 } }",
     ])
     # Deterministic lexicographic winner: ratio, absolute gain, objective;
     # strategy order remains the final tie breaker because strategies run 1..6.
@@ -912,17 +724,12 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\t\tlimit = { var:sol_country_demand_exact_status = 1 }",
         "\t\t# Exact factors are already validated; adopt them without approximation or gate filtering.",
         "\t\tset_variable = { name = sol_country_demand_selected_strategy value = 7 }",
-        "\t\tset_variable = { name = sol_country_demand_gate_passed value = 1 }",
-        "\t\tset_variable = { name = sol_country_demand_approx_reason value = 0 }",
         "\t\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
         "\t\tset_variable = { name = sol_country_demand_selected_average_ratio value = 1 }",
         "\t\tset_variable = { name = sol_country_demand_selected_average_absolute value = 0 }",
-        "\t\tset_variable = { name = sol_country_demand_total_residual value = 0 }",
-        "\t\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
-        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 1 }",
         "\t}",
-        "\telse_if = { limit = { var:sol_country_demand_selected_strategy > 0 } set_variable = { name = sol_country_demand_gate_passed value = 1 } }",
-        "\telse = {",
+        "\tif = {",
+        "\t\tlimit = { var:sol_country_demand_selected_strategy <= 0 }",
         "\t\tset_variable = { name = sol_country_class_coefficient_1 value = 1 }",
         "\t\tset_variable = { name = sol_country_class_coefficient_2 value = 1 }",
         "\t\tset_variable = { name = sol_country_class_coefficient_3 value = 1 }",
@@ -1292,19 +1099,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_location_final_demand_scale value = var:sol_location_raw_demand_scale }",
         "\tset_variable = { name = sol_location_pop_demand_modifier_size value = { value = var:sol_location_final_demand_scale subtract = 1 } }",
         "\tset_variable = { name = sol_location_baseline_total_spending value = { value = var:sol_location_base_total_spending multiply = var:sol_location_raw_demand_scale } }",
-        "\tset_variable = { name = sol_location_anchor_score_nobles value = 0 }",
-        "\tset_variable = { name = sol_location_anchor_score_clergy value = 0 }",
-        "\tset_variable = { name = sol_location_anchor_score_burghers value = 0 }",
-        "\tset_variable = { name = sol_location_anchor_score_commoners value = 0 }",
-        "\tset_variable = { name = sol_location_anchor_score_tribesmen value = 0 }",
-        "\tif = {",
-        "\t\tlimit = { var:sol_location_base_total_spending > 0 }",
-        "\t\tset_variable = { name = sol_location_anchor_score_nobles value = { value = var:sol_location_nobles_base_spending multiply = var:sol_location_nobles_base_spending divide = var:sol_location_base_total_spending } }",
-        "\t\tset_variable = { name = sol_location_anchor_score_clergy value = { value = var:sol_location_clergy_base_spending multiply = var:sol_location_clergy_base_spending divide = var:sol_location_base_total_spending } }",
-        "\t\tset_variable = { name = sol_location_anchor_score_burghers value = { value = var:sol_location_burghers_base_spending multiply = var:sol_location_burghers_base_spending divide = var:sol_location_base_total_spending } }",
-        "\t\tset_variable = { name = sol_location_anchor_score_commoners value = { value = var:sol_location_commoners_base_spending multiply = var:sol_location_commoners_base_spending divide = var:sol_location_base_total_spending } }",
-        "\t\tset_variable = { name = sol_location_anchor_score_tribesmen value = { value = var:sol_location_tribesmen_base_spending multiply = var:sol_location_tribesmen_base_spending divide = var:sol_location_base_total_spending } }",
-        "\t}",
         "\tset_variable = { name = sol_location_share_nobles value = 0 }",
         "\tset_variable = { name = sol_location_share_clergy value = 0 }",
         "\tset_variable = { name = sol_location_share_burghers value = 0 }",
@@ -1328,7 +1122,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\t\tlimit = { var:$score$ > var:sol_location_demand_structural_best_score }",
         "\t\tset_variable = { name = sol_location_demand_structural_second_score value = var:sol_location_demand_structural_best_score }",
         "\t\tset_variable = { name = sol_location_demand_structural_best_score value = var:$score$ }",
-        "\t\tset_variable = { name = sol_location_demand_structural_class value = $class$ }",
         "\t}",
         "\telse_if = {",
         "\t\tlimit = { var:$score$ > var:sol_location_demand_structural_second_score }",
@@ -1340,7 +1133,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\t# Scores measure relative over-representation against the country structure.",
         "\t# The country normalizers have a 0.02 floor and scores are capped to [-3, 3].",
         "\tset_variable = { name = sol_location_demand_class value = 0 }",
-        "\tset_variable = { name = sol_location_demand_structural_class value = 0 }",
         "\tset_variable = { name = sol_location_demand_structural_best_score value = -3.1 }",
         "\tset_variable = { name = sol_location_demand_structural_second_score value = -3.1 }",
         "\tset_variable = { name = sol_location_demand_class_confidence value = 0 }",
@@ -1377,8 +1169,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\t\tlimit = { var:sol_location_demand_class_score_candidate > var:sol_location_demand_class_score }",
         "\t\tset_variable = { name = sol_location_demand_class value = $class$ }",
         "\t\tset_variable = { name = sol_location_demand_class_score value = var:sol_location_demand_class_score_candidate }",
-        "\t\tset_variable = { name = sol_location_demand_class_selected_affinity value = var:$score$ }",
-        "\t\tset_variable = { name = sol_location_demand_class_selected_penalty value = var:sol_location_demand_class_penalty_candidate }",
         "\t}",
         "}",
         "",
@@ -1391,8 +1181,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_location_demand_class_score value = -999 }",
         "\tset_variable = { name = sol_location_demand_class_score_candidate value = 0 }",
         "\tset_variable = { name = sol_location_demand_class_penalty_candidate value = 0 }",
-        "\tset_variable = { name = sol_location_demand_class_selected_affinity value = 0 }",
-        "\tset_variable = { name = sol_location_demand_class_selected_penalty value = 0 }",
         "\tif = {",
         "\t\tlimit = { var:sol_location_base_total_spending > 0.00001 }",
         "\t\tsol_location_demand_consider_capacity_class = { class = 1 score = sol_location_demand_score_nobles }",
@@ -1428,7 +1216,6 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 2 }",
         "\t\tsol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 3 }",
         "\t\tsol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 4 }",
-        "\t\tsol_country_demand_eliminate_cell = { pivot = $pivot$ row = $row$ col = 5 }",
         "\t\tsol_country_demand_eliminate_rhs = { pivot = $pivot$ row = $row$ }",
         "\t}",
         "}",
@@ -1441,8 +1228,6 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\t\t\t# Class rows are normalized to nationwide stratum base, so this is a relative threshold.",
         "\t\t\tlimit = { var:sol_pivot_abs_$pivot$ <= 0.0001 }",
         "\t\t\tset_variable = { name = sol_country_demand_solve_status value = -1 }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot value = $pivot$ }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_pivot_value value = var:sol_m_$pivot$_$pivot$ }",
         "\t\t}",
         "\t}",
         "}",
@@ -1481,37 +1266,26 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_m_1_2 value = 0 }",
         "\tset_variable = { name = sol_m_1_3 value = 0 }",
         "\tset_variable = { name = sol_m_1_4 value = 0 }",
-        "\tset_variable = { name = sol_m_1_5 value = 0 }",
         "\tset_variable = { name = sol_m_2_1 value = 0 }",
         "\tset_variable = { name = sol_m_2_2 value = 0 }",
         "\tset_variable = { name = sol_m_2_3 value = 0 }",
         "\tset_variable = { name = sol_m_2_4 value = 0 }",
-        "\tset_variable = { name = sol_m_2_5 value = 0 }",
         "\tset_variable = { name = sol_m_3_1 value = 0 }",
         "\tset_variable = { name = sol_m_3_2 value = 0 }",
         "\tset_variable = { name = sol_m_3_3 value = 0 }",
         "\tset_variable = { name = sol_m_3_4 value = 0 }",
-        "\tset_variable = { name = sol_m_3_5 value = 0 }",
         "\tset_variable = { name = sol_m_4_1 value = 0 }",
         "\tset_variable = { name = sol_m_4_2 value = 0 }",
         "\tset_variable = { name = sol_m_4_3 value = 0 }",
         "\tset_variable = { name = sol_m_4_4 value = 0 }",
-        "\tset_variable = { name = sol_m_4_5 value = 0 }",
-        "\tset_variable = { name = sol_m_5_1 value = 0 }",
-        "\tset_variable = { name = sol_m_5_2 value = 0 }",
-        "\tset_variable = { name = sol_m_5_3 value = 0 }",
-        "\tset_variable = { name = sol_m_5_4 value = 0 }",
-        "\tset_variable = { name = sol_m_5_5 value = 0 }",
         "\tset_variable = { name = sol_b_1 value = { value = var:sol_country_demand_target_nobles subtract = var:sol_country_baseline_spending_nobles } }",
         "\tset_variable = { name = sol_b_2 value = { value = var:sol_country_demand_target_clergy subtract = var:sol_country_baseline_spending_clergy } }",
         "\tset_variable = { name = sol_b_3 value = { value = var:sol_country_demand_target_burghers subtract = var:sol_country_baseline_spending_burghers } }",
         "\tset_variable = { name = sol_b_4 value = { value = var:sol_country_demand_target_commoners subtract = var:sol_country_baseline_spending_commoners } }",
-        "\tset_variable = { name = sol_b_5 value = { value = var:sol_country_demand_target_tribesmen subtract = var:sol_country_baseline_spending_tribesmen } }",
         "\tset_variable = { name = sol_delta_1 value = 0 }",
         "\tset_variable = { name = sol_delta_2 value = 0 }",
         "\tset_variable = { name = sol_delta_3 value = 0 }",
         "\tset_variable = { name = sol_delta_4 value = 0 }",
-        "\tset_variable = { name = sol_delta_5 value = 0 }",
         "}",
         "",
         "sol_country_demand_cache_original_matrix = {",
@@ -1519,33 +1293,22 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_original_m_1_2 value = var:sol_m_1_2 }",
         "\tset_variable = { name = sol_original_m_1_3 value = var:sol_m_1_3 }",
         "\tset_variable = { name = sol_original_m_1_4 value = var:sol_m_1_4 }",
-        "\tset_variable = { name = sol_original_m_1_5 value = var:sol_m_1_5 }",
         "\tset_variable = { name = sol_original_m_2_1 value = var:sol_m_2_1 }",
         "\tset_variable = { name = sol_original_m_2_2 value = var:sol_m_2_2 }",
         "\tset_variable = { name = sol_original_m_2_3 value = var:sol_m_2_3 }",
         "\tset_variable = { name = sol_original_m_2_4 value = var:sol_m_2_4 }",
-        "\tset_variable = { name = sol_original_m_2_5 value = var:sol_m_2_5 }",
         "\tset_variable = { name = sol_original_m_3_1 value = var:sol_m_3_1 }",
         "\tset_variable = { name = sol_original_m_3_2 value = var:sol_m_3_2 }",
         "\tset_variable = { name = sol_original_m_3_3 value = var:sol_m_3_3 }",
         "\tset_variable = { name = sol_original_m_3_4 value = var:sol_m_3_4 }",
-        "\tset_variable = { name = sol_original_m_3_5 value = var:sol_m_3_5 }",
         "\tset_variable = { name = sol_original_m_4_1 value = var:sol_m_4_1 }",
         "\tset_variable = { name = sol_original_m_4_2 value = var:sol_m_4_2 }",
         "\tset_variable = { name = sol_original_m_4_3 value = var:sol_m_4_3 }",
         "\tset_variable = { name = sol_original_m_4_4 value = var:sol_m_4_4 }",
-        "\tset_variable = { name = sol_original_m_4_5 value = var:sol_m_4_5 }",
-        "\tset_variable = { name = sol_original_m_5_1 value = var:sol_m_5_1 }",
-        "\tset_variable = { name = sol_original_m_5_2 value = var:sol_m_5_2 }",
-        "\tset_variable = { name = sol_original_m_5_3 value = var:sol_m_5_3 }",
-        "\tset_variable = { name = sol_original_m_5_4 value = var:sol_m_5_4 }",
-        "\tset_variable = { name = sol_original_m_5_5 value = var:sol_m_5_5 }",
         "}",
         "",
         "sol_country_demand_solve_classes = {",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 4 }",
         "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
-        "\tset_variable = { name = sol_country_demand_solve_mode value = 1 }",
         "\tsol_country_demand_clear_matrix = yes",
         "\tset_variable = { name = sol_country_demand_target_lower value = { value = var:sol_country_demand_target_commoners add = var:sol_country_demand_target_tribesmen } }",
         "\tset_variable = { name = sol_country_baseline_lower value = { value = var:sol_country_baseline_spending_commoners add = var:sol_country_baseline_spending_tribesmen } }",
@@ -1592,7 +1355,6 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_m_2_$col$ value = var:sol_country_class_baseline_spending_clergy_$class$ }",
         "\tset_variable = { name = sol_m_3_$col$ value = var:sol_country_class_baseline_spending_burghers_$class$ }",
         "\tset_variable = { name = sol_m_4_$col$ value = var:sol_country_class_baseline_lower_$class$ }",
-        "\tset_variable = { name = sol_m_5_$col$ value = var:sol_country_class_baseline_spending_tribesmen_$class$ }",
         "}",
         "",
         "sol_country_demand_fill_class_matrix = {",
@@ -1629,20 +1391,7 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\t\t\tscope:sol_demand_cached_location.var:sol_location_baseline_total_spending > 0.00001",
         "\t\t}",
         "\t\tchange_variable = { name = sol_country_class_count_$class$ add = 1 }",
-        "\t\tchange_variable = { name = sol_country_class_raw_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale }",
-        "\t\tchange_variable = { name = sol_country_class_base_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_base_total_spending }",
         "\t\tchange_variable = { name = sol_country_class_baseline_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_baseline_total_spending }",
-        "\t\tchange_variable = { name = sol_country_class_affinity_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }",
-        "\t\tchange_variable = { name = sol_country_class_penalty_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_penalty }",
-        "\t\tchange_variable = { name = sol_country_class_confidence_total_$class$ add = scope:sol_demand_cached_location.var:sol_location_demand_class_confidence }",
-        "\t\tif = { limit = { scope:sol_demand_cached_location.var:sol_location_demand_structural_class = $class$ } change_variable = { name = sol_country_class_structural_match_count_$class$ add = 1 } }",
-        "\t\tchange_variable = { name = sol_country_class_base_spending_nobles_$class$ add = scope:sol_demand_cached_location.var:sol_location_nobles_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_spending_clergy_$class$ add = scope:sol_demand_cached_location.var:sol_location_clergy_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_spending_burghers_$class$ add = scope:sol_demand_cached_location.var:sol_location_burghers_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_spending_commoners_$class$ add = scope:sol_demand_cached_location.var:sol_location_commoners_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_spending_tribesmen_$class$ add = scope:sol_demand_cached_location.var:sol_location_tribesmen_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_lower_$class$ add = scope:sol_demand_cached_location.var:sol_location_commoners_base_spending }",
-        "\t\tchange_variable = { name = sol_country_class_base_lower_$class$ add = scope:sol_demand_cached_location.var:sol_location_tribesmen_base_spending }",
         "\t\tset_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_nobles_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }",
         "\t\tchange_variable = { name = sol_country_class_baseline_spending_nobles_$class$ add = var:sol_demand_scaled_tmp }",
         "\t\tset_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_clergy_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }",
@@ -1650,40 +1399,18 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\t\tset_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_burghers_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }",
         "\t\tchange_variable = { name = sol_country_class_baseline_spending_burghers_$class$ add = var:sol_demand_scaled_tmp }",
         "\t\tset_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_commoners_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }",
-        "\t\tchange_variable = { name = sol_country_class_baseline_spending_commoners_$class$ add = var:sol_demand_scaled_tmp }",
         "\t\tchange_variable = { name = sol_country_class_baseline_lower_$class$ add = var:sol_demand_scaled_tmp }",
         "\t\tset_variable = { name = sol_demand_scaled_tmp value = { value = scope:sol_demand_cached_location.var:sol_location_tribesmen_base_spending multiply = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale } }",
-        "\t\tchange_variable = { name = sol_country_class_baseline_spending_tribesmen_$class$ add = var:sol_demand_scaled_tmp }",
         "\t\tchange_variable = { name = sol_country_class_baseline_lower_$class$ add = var:sol_demand_scaled_tmp }",
-        "\t\tif = {",
-        "\t\t\tlimit = { scope:sol_demand_cached_location.var:sol_location_raw_demand_scale < var:sol_country_class_min_raw_$class$ }",
-        "\t\t\tset_variable = { name = sol_country_class_min_raw_$class$ value = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale }",
-        "\t\t}",
-        "\t\tif = {",
-        "\t\t\tlimit = { scope:sol_demand_cached_location.var:sol_location_raw_demand_scale > var:sol_country_class_max_raw_$class$ }",
-        "\t\t\tset_variable = { name = sol_country_class_max_raw_$class$ value = scope:sol_demand_cached_location.var:sol_location_raw_demand_scale }",
-        "\t\t}",
-        "\t\tif = {",
-        "\t\t\tlimit = { scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity < var:sol_country_class_min_affinity_$class$ }",
-        "\t\t\tset_variable = { name = sol_country_class_min_affinity_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }",
-        "\t\t}",
-        "\t\tif = {",
-        "\t\t\tlimit = { scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity > var:sol_country_class_max_affinity_$class$ }",
-        "\t\t\tset_variable = { name = sol_country_class_max_affinity_$class$ value = scope:sol_demand_cached_location.var:sol_location_demand_class_selected_affinity }",
-        "\t\t}",
         "\t}",
         "}",
         "",
         "sol_country_demand_validate_class = {",
-        "\tsol_country_demand_abs = { source = sol_country_class_coefficient_$class$ target = sol_country_class_coefficient_abs_$class$ }",
-        "\tif = { limit = { var:sol_country_class_coefficient_abs_$class$ > var:sol_country_demand_max_adjustment } set_variable = { name = sol_country_demand_max_adjustment value = var:sol_country_class_coefficient_abs_$class$ } }",
         "\tif = {",
         "\t\tlimit = { var:sol_country_demand_solve_status = 1 }",
         "\t\tif = {",
         "\t\t\tlimit = { var:sol_country_class_coefficient_$class$ < 0 }",
         "\t\t\tset_variable = { name = sol_country_demand_solve_status value = -2 }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_class value = $class$ }",
-        "\t\t\tset_variable = { name = sol_country_demand_failure_class_coeff value = var:sol_country_class_coefficient_$class$ }",
         "\t\t}",
         "\t}",
         "}",
@@ -1695,9 +1422,6 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "\tif = {",
         "\t\tlimit = { var:sol_country_demand_solve_status = 1 var:sol_country_class_residual_abs_$row$ > var:sol_country_class_residual_tolerance_$row$ }",
         "\t\tset_variable = { name = sol_country_demand_solve_status value = -7 }",
-        "\t\tset_variable = { name = sol_country_demand_failure_row value = $row$ }",
-        "\t\tset_variable = { name = sol_country_demand_failure_residual value = var:sol_country_class_residual_$row$ }",
-        "\t\tset_variable = { name = sol_country_demand_failure_tolerance value = var:sol_country_class_residual_tolerance_$row$ }",
         "\t}",
         "}",
         "",
@@ -1802,21 +1526,12 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "sol_solve_country_pop_demand_raw_only = {",
         "\t# Baseline path: compute raw location scales and write only the caches needed by SOL UI/modifiers.",
         "\tset_variable = { name = sol_country_demand_solve_status value = -9 }",
-        "\tset_variable = { name = sol_country_demand_solver_size value = 0 }",
-        "\tset_variable = { name = sol_country_demand_solve_mode value = 0 }",
         "\tset_variable = { name = sol_country_demand_exact_status value = -9 }",
         "\tset_variable = { name = sol_country_demand_selected_strategy value = 0 }",
-        "\tset_variable = { name = sol_country_demand_gate_passed value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_gate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_attempt_count value = 0 }",
         "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
-        "\tset_variable = { name = sol_country_demand_approx_reason value = 6 }",
         "\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_average_absolute value = 0 }",
-        "\tset_variable = { name = sol_country_demand_total_residual value = 0 }",
-        "\tset_variable = { name = sol_country_demand_raw_total_residual value = 0 }",
         "\tset_variable = { name = sol_country_demand_target_nobles value = 0 }",
         "\tset_variable = { name = sol_country_demand_target_clergy value = 0 }",
         "\tset_variable = { name = sol_country_demand_target_burghers value = 0 }",
@@ -1836,7 +1551,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\tlimit = { num_locations > 0 }",
         "\t\tevery_owned_location = {",
         "\t\t\tlimit = { is_land = yes }",
-        "\t\t\tremove_variable = sol_demand_anchor_selected",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
         "\t\t\towner = {",
@@ -1868,24 +1582,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_baseline_lower value = { value = var:sol_country_baseline_spending_commoners add = var:sol_country_baseline_spending_tribesmen } }",
         "\tset_variable = { name = sol_country_baseline_spending_total value = { add = var:sol_country_baseline_spending_nobles add = var:sol_country_baseline_spending_clergy add = var:sol_country_baseline_spending_burghers add = var:sol_country_baseline_lower } }",
         "\tset_variable = { name = sol_country_demand_target_lower value = { value = var:sol_country_demand_target_commoners add = var:sol_country_demand_target_tribesmen } }",
-        "\tset_variable = { name = sol_demand_scaled_tmp value = 0 }",
-        "\tchange_variable = { name = sol_demand_scaled_tmp add = var:sol_country_demand_target_nobles }",
-        "\tchange_variable = { name = sol_demand_scaled_tmp add = var:sol_country_demand_target_clergy }",
-        "\tchange_variable = { name = sol_demand_scaled_tmp add = var:sol_country_demand_target_burghers }",
-        "\tchange_variable = { name = sol_demand_scaled_tmp add = var:sol_country_demand_target_lower }",
-        "\tset_variable = { name = sol_country_demand_raw_total_residual value = { value = var:sol_country_baseline_spending_total subtract = var:sol_demand_scaled_tmp } }",
-        "\tset_variable = { name = sol_country_solved_spending_nobles value = var:sol_country_baseline_spending_nobles }",
-        "\tset_variable = { name = sol_country_solved_spending_clergy value = var:sol_country_baseline_spending_clergy }",
-        "\tset_variable = { name = sol_country_solved_spending_burghers value = var:sol_country_baseline_spending_burghers }",
-        "\tset_variable = { name = sol_country_solved_spending_commoners value = var:sol_country_baseline_spending_commoners }",
-        "\tset_variable = { name = sol_country_solved_spending_tribesmen value = var:sol_country_baseline_spending_tribesmen }",
-        "\tset_variable = { name = sol_country_solved_spending_lower value = var:sol_country_baseline_lower }",
-        "\tset_variable = { name = sol_country_demand_error_nobles value = { value = var:sol_country_solved_spending_nobles subtract = var:sol_country_demand_target_nobles } }",
-        "\tset_variable = { name = sol_country_demand_error_clergy value = { value = var:sol_country_solved_spending_clergy subtract = var:sol_country_demand_target_clergy } }",
-        "\tset_variable = { name = sol_country_demand_error_burghers value = { value = var:sol_country_solved_spending_burghers subtract = var:sol_country_demand_target_burghers } }",
-        "\tset_variable = { name = sol_country_demand_error_commoners value = { value = var:sol_country_solved_spending_commoners subtract = var:sol_country_demand_target_commoners } }",
-        "\tset_variable = { name = sol_country_demand_error_tribesmen value = { value = var:sol_country_solved_spending_tribesmen subtract = var:sol_country_demand_target_tribesmen } }",
-        "\tset_variable = { name = sol_country_demand_error_lower value = { value = var:sol_country_solved_spending_lower subtract = var:sol_country_demand_target_lower } }",
         "}",
         "",
         "sol_solve_country_pop_demand = {",
@@ -1905,15 +1601,10 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "",
         "sol_solve_country_pop_demand_solver = {",
         "\t# root = country. Builds location caches, solves country-stratum closure, and writes final location scales.",
-        "\tsol_country_demand_approx_reset_diagnostics = yes",
         "\tset_variable = { name = sol_country_demand_strategy_objective_6 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_6 value = 0 }",
         "\tset_variable = { name = sol_country_demand_solve_status value = 0 }",
         "\tset_variable = { name = sol_country_demand_exact_status value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_strategy value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_gate_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_candidate_attempt_count value = 0 }",
         "\tset_variable = { name = sol_country_demand_gate_possible value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = 0 }",
@@ -1923,24 +1614,11 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_demand_strategy_objective_3 value = 0 }",
         "\tset_variable = { name = sol_country_demand_strategy_objective_4 value = 0 }",
         "\tset_variable = { name = sol_country_demand_strategy_objective_5 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_1 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_2 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_3 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_4 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_best_objective_5 value = 0 }",
         "\tset_variable = { name = sol_country_demand_anchor_count value = 0 }",
-        "\tset_variable = { name = sol_country_demand_max_adjustment value = 0 }",
-        "\tremove_variable = sol_demand_anchor_1",
-        "\tremove_variable = sol_demand_anchor_2",
-        "\tremove_variable = sol_demand_anchor_3",
-        "\tremove_variable = sol_demand_anchor_4",
-        "\tremove_variable = sol_demand_anchor_5",
-        "\tremove_variable = sol_country_demand_failure_anchor_scope",
         "\tset_variable = { name = sol_delta_1 value = 0 }",
         "\tset_variable = { name = sol_delta_2 value = 0 }",
         "\tset_variable = { name = sol_delta_3 value = 0 }",
         "\tset_variable = { name = sol_delta_4 value = 0 }",
-        "\tset_variable = { name = sol_delta_5 value = 0 }",
         "\tset_variable = { name = sol_country_class_coefficient_1 value = 0 }",
         "\tset_variable = { name = sol_country_class_coefficient_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_coefficient_3 value = 0 }",
@@ -1957,7 +1635,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_demand_lhs_2 value = 0 }",
         "\tset_variable = { name = sol_country_demand_lhs_3 value = 0 }",
         "\tset_variable = { name = sol_country_demand_lhs_4 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_lhs_5 value = 0 }",
         "\tset_variable = { name = sol_demand_eq_tmp value = 0 }",
         "\tset_variable = { name = sol_country_demand_target_nobles value = 0 }",
         "\tset_variable = { name = sol_country_demand_target_clergy value = 0 }",
@@ -1991,25 +1668,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_class_negative_pressure_4 value = 0 }",
         "\tset_variable = { name = sol_country_class_negative_pressure_total value = 0 }",
         "\tset_variable = { name = sol_country_class_balance_weight value = 0.05 }",
-        "\tset_variable = { name = sol_country_classified_location_count value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_total value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_avg value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_min value = 999999 }",
-        "\tset_variable = { name = sol_country_class_confidence_max value = 0 }",
-        "\tset_variable = { name = sol_country_class_max_location_base value = 0 }",
-        "\tset_variable = { name = sol_country_class_max_location_target_ratio value = 0 }",
-        "\tset_variable = { name = sol_country_class_score_min_nobles value = 999999 }",
-        "\tset_variable = { name = sol_country_class_score_max_nobles value = -999999 }",
-        "\tset_variable = { name = sol_country_class_score_min_clergy value = 999999 }",
-        "\tset_variable = { name = sol_country_class_score_max_clergy value = -999999 }",
-        "\tset_variable = { name = sol_country_class_score_min_burghers value = 999999 }",
-        "\tset_variable = { name = sol_country_class_score_max_burghers value = -999999 }",
-        "\tset_variable = { name = sol_country_class_score_min_lower value = 999999 }",
-        "\tset_variable = { name = sol_country_class_score_max_lower value = -999999 }",
-        "\tset_variable = { name = sol_country_structural_class_count_1 value = 0 }",
-        "\tset_variable = { name = sol_country_structural_class_count_2 value = 0 }",
-        "\tset_variable = { name = sol_country_structural_class_count_3 value = 0 }",
-        "\tset_variable = { name = sol_country_structural_class_count_4 value = 0 }",
         "\tset_variable = { name = sol_pivot_abs_1 value = 0 }",
         "\tset_variable = { name = sol_pivot_abs_2 value = 0 }",
         "\tset_variable = { name = sol_pivot_abs_3 value = 0 }",
@@ -2026,64 +1684,14 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_demand_rhs_nobles value = 0 }",
         "\tset_variable = { name = sol_country_demand_rhs_clergy value = 0 }",
         "\tset_variable = { name = sol_country_demand_rhs_burghers value = 0 }",
-        "\tset_variable = { name = sol_country_demand_rhs_commoners value = 0 }",
-        "\tset_variable = { name = sol_country_demand_rhs_tribesmen value = 0 }",
         "\tset_variable = { name = sol_country_class_count_1 value = 0 }",
         "\tset_variable = { name = sol_country_class_count_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_count_3 value = 0 }",
         "\tset_variable = { name = sol_country_class_count_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_total_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_total_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_total_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_total_4 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_total_1 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_total_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_total_3 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_total_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_raw_total_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_raw_total_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_raw_total_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_raw_total_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_affinity_total_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_affinity_total_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_affinity_total_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_affinity_total_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_penalty_total_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_penalty_total_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_penalty_total_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_penalty_total_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_total_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_total_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_total_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_confidence_total_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_structural_match_count_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_structural_match_count_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_structural_match_count_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_structural_match_count_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_nobles_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_nobles_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_nobles_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_nobles_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_clergy_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_clergy_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_clergy_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_clergy_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_burghers_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_burghers_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_burghers_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_burghers_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_commoners_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_commoners_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_commoners_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_commoners_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_tribesmen_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_tribesmen_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_tribesmen_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_spending_tribesmen_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_lower_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_lower_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_lower_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_base_lower_4 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_spending_nobles_1 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_spending_nobles_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_spending_nobles_3 value = 0 }",
@@ -2096,39 +1704,14 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_class_baseline_spending_burghers_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_spending_burghers_3 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_spending_burghers_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_commoners_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_commoners_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_commoners_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_commoners_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_tribesmen_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_tribesmen_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_tribesmen_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_baseline_spending_tribesmen_4 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_lower_1 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_lower_2 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_lower_3 value = 0 }",
         "\tset_variable = { name = sol_country_class_baseline_lower_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_min_raw_1 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_raw_2 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_raw_3 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_raw_4 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_max_raw_1 value = 0 }",
-        "\tset_variable = { name = sol_country_class_max_raw_2 value = 0 }",
-        "\tset_variable = { name = sol_country_class_max_raw_3 value = 0 }",
-        "\tset_variable = { name = sol_country_class_max_raw_4 value = 0 }",
-        "\tset_variable = { name = sol_country_class_min_affinity_1 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_affinity_2 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_affinity_3 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_min_affinity_4 value = 999999 }",
-        "\tset_variable = { name = sol_country_class_max_affinity_1 value = -999999 }",
-        "\tset_variable = { name = sol_country_class_max_affinity_2 value = -999999 }",
-        "\tset_variable = { name = sol_country_class_max_affinity_3 value = -999999 }",
-        "\tset_variable = { name = sol_country_class_max_affinity_4 value = -999999 }",
         "\tif = {",
         "\t\tlimit = { num_locations > 0 }",
         "\t\tevery_owned_location = {",
         "\t\t\tlimit = { is_land = yes }",
-        "\t\t\tremove_variable = sol_demand_anchor_selected",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
         "\t\t\towner = {",
@@ -2193,7 +1776,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t# One percent per class preserves an anchor; the other ninety-six percent follows negative pressure.",
         "\tset_variable = { name = sol_country_class_capacity_floor value = { value = var:sol_country_baseline_spending_total multiply = 0.01 } }",
         "\tset_variable = { name = sol_country_class_negative_pool value = { value = var:sol_country_baseline_spending_total multiply = 0.96 } }",
-        "\tset_variable = { name = sol_country_class_target_base value = var:sol_country_class_capacity_floor }",
         "\tset_variable = { name = sol_country_class_target_capacity_1 value = var:sol_country_class_capacity_floor }",
         "\tset_variable = { name = sol_country_class_target_capacity_2 value = var:sol_country_class_capacity_floor }",
         "\tset_variable = { name = sol_country_class_target_capacity_3 value = var:sol_country_class_capacity_floor }",
@@ -2231,8 +1813,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tsol_location_prepare_demand_class_scores = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
         "\t\t}",
-        "\t\tif = { limit = { var:sol_country_classified_location_count > 0 } set_variable = { name = sol_country_class_confidence_avg value = { value = var:sol_country_class_confidence_total divide = var:sol_country_classified_location_count } } }",
-        "\t\tif = { limit = { var:sol_country_class_capacity_floor > 0.00001 } set_variable = { name = sol_country_class_max_location_target_ratio value = { value = var:sol_country_class_max_location_base divide = var:sol_country_class_capacity_floor } } }",
         "\t\tordered_owned_location = {",
         "\t\t\tlimit = { is_land = yes var:sol_location_baseline_total_spending > 0.00001 }",
         "\t\t\torder_by = var:sol_location_demand_class_confidence",
@@ -2249,20 +1829,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\t}",
         "\t\t}",
         "\t}",
-        "\tif = {",
-        "\t\tlimit = { var:sol_country_classified_location_count <= 0 }",
-        "\t\t# Keep no-base diagnostics explicit instead of leaking initialization sentinels.",
-        "\t\tset_variable = { name = sol_country_class_confidence_min value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_confidence_max value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_min_nobles value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_max_nobles value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_min_clergy value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_max_clergy value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_min_burghers value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_max_burghers value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_min_lower value = 0 }",
-        "\t\tset_variable = { name = sol_country_class_score_max_lower value = 0 }",
-        "\t}",
         "\tset_variable = { name = sol_country_demand_anchor_count value = 0 }",
         "\tif = { limit = { var:sol_country_class_count_1 > 0 } change_variable = { name = sol_country_demand_anchor_count add = 1 } }",
         "\tif = { limit = { var:sol_country_class_count_2 > 0 } change_variable = { name = sol_country_demand_anchor_count add = 1 } }",
@@ -2272,19 +1838,11 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\tlimit = { var:sol_country_base_spending_total > 0.00001 }",
         "\t\tsol_country_demand_clear_matrix = yes",
         "\t\tsol_country_demand_fill_class_matrix = yes",
-        "\t\t# Cache normalized structure and relative signatures even if a class is missing.",
-        "\t\tsol_country_demand_measure_class_profile = { class = 1 signature = sol_country_class_score_nobles_1 cross_1 = sol_country_class_score_clergy_1 cross_2 = sol_country_class_score_burghers_1 cross_3 = sol_country_class_score_lower_1 }",
-        "\t\tsol_country_demand_measure_class_profile = { class = 2 signature = sol_country_class_score_clergy_2 cross_1 = sol_country_class_score_nobles_2 cross_2 = sol_country_class_score_burghers_2 cross_3 = sol_country_class_score_lower_2 }",
-        "\t\tsol_country_demand_measure_class_profile = { class = 3 signature = sol_country_class_score_burghers_3 cross_1 = sol_country_class_score_nobles_3 cross_2 = sol_country_class_score_clergy_3 cross_3 = sol_country_class_score_lower_3 }",
-        "\t\tsol_country_demand_measure_class_profile = { class = 4 signature = sol_country_class_score_lower_4 cross_1 = sol_country_class_score_nobles_4 cross_2 = sol_country_class_score_clergy_4 cross_3 = sol_country_class_score_burghers_4 }",
         "\t}",
         "\tif = {",
         "\t\tlimit = { num_locations > 0 var:sol_country_base_spending_total <= 0.00001 }",
-        "\t\tset_variable = { name = sol_country_demand_solver_size value = 5 }",
-        "\t\tset_variable = { name = sol_country_demand_solve_mode value = 3 }",
         "\t\tset_variable = { name = sol_country_demand_solve_status value = -5 }",
         "\t\tset_variable = { name = sol_country_demand_exact_status value = -5 }",
-        "\t\tset_variable = { name = sol_country_demand_approx_reason value = 6 }",
         "\t}",
         "\telse_if = {",
         "\t\tlimit = { num_locations > 0 var:sol_country_base_spending_total > 0.00001 }",
