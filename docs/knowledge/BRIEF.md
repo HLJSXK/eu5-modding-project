@@ -261,6 +261,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | scope | any | Omitting max from an ordered_* scope while expecting it to iterate every matching object | Set an explicit sufficient max for full ordered traversal, or a verified dynamic bound. Reserve max = 1 or the default single result for deliberate best-candidate selection. | In runtime testing, ordered_owned_location without max scored 189 valid locations in the first pass but assigned only the first location in the ordered pass. An explicit max = 100000 makes the classification pass traverse all practical country location counts. |
 | scope | any | Passing an inline arithmetic block such as value = { value = var:X divide = var:Y } to add_to_global_variable_map | Evaluate arithmetic with set_variable first, pass the resulting scalar as value = var:temporary_value, then remove the temporary variable after the map write. | The variable-map effect parses value as a direct scalar or event target, not a script-math block. The invalid SOL CMF writes corrupted class raw-average/share diagnostics without changing classification or solver gameplay state. |
 | scope | any | Using max = 0 when a value expression must be clamped to a nonnegative lower bound | Use min = 0 for a lower bound and max = <positive limit> for an upper bound; verify both sides when writing a bounded value expression. | EU5 value expressions apply min as the lower clamp and max as the upper clamp. Reversing them can silently zero positive solver factors; the SOL exact-derived minimax candidate exposed this at runtime on 2026-08-08. |
+| framework | global | Initializing a default-OFF CMM bool alias in the mod's on_game_start defaults effect, e.g. set_global_variable = { name = sol_x_enabled value = no } | Omit default-OFF aliases from the init effect entirely. cmm_sync_bool_alias sets the global only when the toggle is ON and calls remove_global_variable when OFF, so has_global_variable must stay false until CMM enables it. Also invert the CMM-absent fallback in the matching sol_*_is_on trigger: default-ON toggles use OR = { NOT = { has_global_variable_map = cmm } ... }, while default-OFF toggles must NOT include that escape or they read as enabled without CMM. | Documentation-only (no regex lint) because a legitimate default-ON init line is textually identical apart from the value. set_global_variable with value = no still creates the key, so has_global_variable returns true and a default-OFF feature runs from turn one. Any setting registered with default_value = 0 must appear in exactly four places: cmm_register_global_bool_setting, cmm_sync_bool_alias, the cmf_on_callback switch, and a <mod_id>__<setting_id>_on_changed scripted GUI when cmm_add_scripted_gui is called — but never in the init defaults. |
 
 ## Valid Enum Values
 
@@ -285,10 +286,10 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 | Category | Count | Index file | Notes |
 | --- | --- | --- | --- |
 | GUI Icons (`@xxx!`) | 364 | `data/index/icons.txt` | Use `@name!` in raw_text/text fields and YAML values |
-| Scripted Triggers | 512 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
+| Scripted Triggers | 513 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
 | Scripted Effects | 2059 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2394 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 227 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 228 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 

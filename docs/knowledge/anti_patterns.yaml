@@ -570,3 +570,11 @@
   scope: any
   source: "reference_game_files/game/in_game/common/auto_modifiers/country.txt:330-335"
   notes: "EU5 value expressions apply min as the lower clamp and max as the upper clamp. Reversing them can silently zero positive solver factors; the SOL exact-derived minimax candidate exposed this at runtime on 2026-08-08."
+
+- id: cmm_default_off_alias_initialized
+  bad: "Initializing a default-OFF CMM bool alias in the mod's on_game_start defaults effect, e.g. set_global_variable = { name = sol_x_enabled value = no }"
+  correction: "Omit default-OFF aliases from the init effect entirely. cmm_sync_bool_alias sets the global only when the toggle is ON and calls remove_global_variable when OFF, so has_global_variable must stay false until CMM enables it. Also invert the CMM-absent fallback in the matching sol_*_is_on trigger: default-ON toggles use OR = { NOT = { has_global_variable_map = cmm } ... }, while default-OFF toggles must NOT include that escape or they read as enabled without CMM."
+  category: framework
+  scope: global
+  source: "reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_alias_effects.txt:105-125; reference_mods/3662193478/in_game/common/scripted_effects/fum_cmm_effects.txt:8-15 (FUM never initializes its default_value = 0 aliases)"
+  notes: "Documentation-only (no regex lint) because a legitimate default-ON init line is textually identical apart from the value. set_global_variable with value = no still creates the key, so has_global_variable returns true and a default-OFF feature runs from turn one. Any setting registered with default_value = 0 must appear in exactly four places: cmm_register_global_bool_setting, cmm_sync_bool_alias, the cmf_on_callback switch, and a <mod_id>__<setting_id>_on_changed scripted GUI when cmm_add_scripted_gui is called — but never in the init defaults."
