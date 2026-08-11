@@ -1,0 +1,18 @@
+Colonial Administrations:
+- Spanish:
+  - Cuba
+  - Santo Domingo (spanish hispaniola)
+  - Venezuela
+  - Colombia
+  - Peru
+  - Chile
+  - La Plata
+  - New Spain
+- Portuguese:
+  - Brazil
+- England/UK:
+  - Canada
+  - USA
+- France
+  - Saint-Domingue (french hispaniola)
+  - Quebec (french canada)

@@ -1,0 +1,192 @@
+﻿REPLACE_OR_CREATE:purchase_trade_port = {
+	type = diplomacy
+	category = CATEGORY_ECONOMY_ACTIONS
+
+	ai_tick = daily
+	ai_tick_frequency = 360
+
+	potential = {
+		scope:actor = {
+			is_possible_colonial_empire = yes
+		}
+	}
+
+	cooldown = { 
+		type = purchase_trade_port
+		years = 20
+	}
+
+	allow = {
+		scope:actor = {
+			or = {
+				# renaissance
+				has_advance = por_pursuing_waves
+				has_advance = route_to_the_indies_advance
+				# discovery
+				has_advance = coastal_trade_routes_advance
+				# reformation
+				has_advance = global_trade_routes_advance
+			}
+		}
+	}
+	
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+
+		column = { data = name }
+		column = { data = population }
+
+		visible = {
+			is_real_country = yes
+			any_owned_location = {
+				is_port = yes
+				within_colonial_range_of = scope:actor
+			}
+			capital = {
+				or = {
+					# africa
+					sub_continent = sub_continent:west_africa
+					sub_continent = sub_continent:central_africa
+					sub_continent = sub_continent:east_africa
+					region = region:zimbabwe_region
+					region = region:southern_africa_islands_region
+					region = region:madagascar_region
+					# middle east
+					region = region:arabia_region
+					# asia
+					sub_continent = sub_continent:south_asia
+					sub_continent = sub_continent:east_asia
+					region = region:indonesia_region
+					region = region:melanesia_region
+				}
+			}
+		}
+        enabled = {
+			power_projection < scope:actor.power_projection
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		source = recipient
+		target_flag = target
+		source_flags = only_actual_locations
+		name = "purchase_trade_port_select_location"
+		none_available_msg_key = "purchase_trade_port_no_locations"
+		column = { data = name }
+		column = { data = population }
+		visible = { is_port = yes }
+		enabled = { within_colonial_range_of = scope:actor }
+	}
+
+	ai_will_do = {
+		if = {
+			limit = {
+				scope:actor = {
+					gold > {
+						value = scope:recipient.country_tax_base
+						add = {
+							value = scope:target.development
+							multiply = 5
+						}
+						max = {
+							value = scope:recipient.country_tax_base
+							multiply = 4
+						}
+					}
+				}
+				or = {
+					scope:target.sub_continent = sub_continent:south_asia
+					scope:target.sub_continent = sub_continent:east_asia
+				}
+			}
+			add = 100
+			if = {
+				limit = {
+					scope:actor = {
+						has_or_had_tag = POR
+						scope:target = location:hormuz
+						scope:target = location:goa
+						scope:target = location:xiangshan_xinhui # macau
+					}
+				}
+				add = 500
+			}
+		}
+	}
+	
+	effect = {
+        scope:recipient = {
+			add_gold = {
+				value = 100
+				add = scope:recipient.country_tax_base
+				add = {
+					value = scope:target.development
+					multiply = 5
+				}
+				max = {
+					value = scope:recipient.country_tax_base
+					multiply = 4
+				}
+			}
+			add_opinion_mutual_effect = {
+				target = scope:actor
+				modifier = opinion_traders_in_x
+			}
+		}
+		scope:actor = {
+			add_gold = {
+				value = 100
+				add = scope:recipient.country_tax_base
+				add = {
+					value = scope:target.development
+					multiply = 5
+				}
+				max = {
+					value = scope:recipient.country_tax_base
+					multiply = 4
+				}
+				multiply = -1
+			}
+			scope:target = {
+				change_location_owner = scope:actor
+				change_integration_level = integrated
+			}
+		}
+	}
+
+	accept = {
+		if = {
+			limit = { exists = scope:target }
+			add = scope:actor.power_projection
+			subtract = scope:recipient.power_projection
+		}
+	}
+
+	diplo_chance = {
+		base = -50
+		core = -50
+		location_value = -25
+		rank = -25
+		
+		actor_is_rival = -100
+		actor_overlord_is_rival = -100
+		recipient_is_rival = -100
+		recipient_overlord_is_rival = -100
+		competing_power = -100
+		capital = -99999
+
+		relative_strength = 50
+
+		opinion = 0.1
+		trust_in_actor = 0.5
+
+		in_debt = 2
+		negative_stability = 0.2
+
+		rank_difference = 10
+	}
+}
