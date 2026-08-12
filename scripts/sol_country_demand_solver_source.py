@@ -61,6 +61,7 @@ _SOLVER_EFFECTS = frozenset(
         "sol_country_demand_solve_approximation",
         "sol_country_demand_run_fast_proportional",
         "sol_country_demand_minimax_vertex_enumeration",
+        "sol_country_demand_run_vertex_selector",
     }
 )
 
@@ -71,6 +72,7 @@ def _is_solver_effect(name: str) -> bool:
             "sol_country_demand_approx_candidate_",
             "sol_country_demand_minimax_vertex_",
             "sol_country_demand_run_strategy_",
+            "sol_vertex_",
         )
     )
 

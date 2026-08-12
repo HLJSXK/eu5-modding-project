@@ -35,6 +35,15 @@ class ScriptWriter:
         return "\n".join(self.lines).strip() + "\n"
 
 
+# Strategy ids that still route through sol_country_demand_approx_assess and
+# therefore need per-strategy gate/objective/factor slots.
+#   6 = AI proportional_fast
+# Retired: 1-4 player L2 variants, 5 minimax.
+# Not listed: 7 exact-direct and 8 vertex sweep both write the adopted
+# coefficients and their own id directly, bypassing the slot machinery.
+ASSESSOR_STRATEGIES: tuple[int, ...] = (6,)
+
+
 def _emit_country_approximation_runtime_lines() -> list[str]:
     """Generate the fixed-size runtime approximation machinery.
 
@@ -259,15 +268,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         ])
     lines.append("\t}")
 
-    for col in range(1, 5):
-        lines.extend([
-            f"\tset_variable = {{ name = sol_approx_a_1_{col} value = {{ value = var:sol_original_m_1_{col} divide = var:sol_approx_scale_1 }} }}",
-            f"\tset_variable = {{ name = sol_approx_a_2_{col} value = {{ value = var:sol_original_m_2_{col} divide = var:sol_approx_scale_2 }} }}",
-            f"\tset_variable = {{ name = sol_approx_a_3_{col} value = {{ value = var:sol_original_m_3_{col} divide = var:sol_approx_scale_3 }} }}",
-            f"\tset_variable = {{ name = sol_approx_a_4_{col} value = {{ value = var:sol_original_m_4_{col} divide = var:sol_approx_scale_4 }} }}",
-        ])
-    for row in range(1, 5):
-        lines.append(f"\tset_variable = {{ name = sol_approx_y_{row} value = {{ value = var:sol_approx_target_{row} divide = var:sol_approx_scale_{row} }} }}")
+    # The scale-normalised matrix (sol_approx_a_*) and rhs (sol_approx_y_*) were
+    # only ever read by the retired reduced-L2 candidates. Both the vertex sweep
+    # and proportional_fast work from sol_original_m_* / sol_approx_target_*
+    # directly, so writing them now would only trip the unused-variable check.
     lines.extend(["}", ""])
 
     # Candidate assessor: all numeric checks, four-stratum gate and per-
@@ -320,13 +324,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             f"\tchange_variable = {{ name = sol_approx_average_ratio add = var:sol_approx_ratio_{row} }}",
             f"\tset_variable = {{ name = sol_approx_error_ratio_{row} value = {{ value = var:sol_approx_candidate_abs_error_{row} divide = var:sol_approx_scale_{row} }} }}",
         ])
-        lines.append(f"\tif = {{ limit = {{ $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_approx_objective }} set_variable = {{ name = sol_approx_objective value = var:sol_approx_error_ratio_{row} }} }}")
-        lines.append(f"\tif = {{ limit = {{ $strategy$ != 5 }} change_variable = {{ name = sol_approx_objective add = {{ value = var:sol_approx_error_ratio_{row} multiply = var:sol_approx_error_ratio_{row} }} }} }}")
-    lines.extend([
-        "\tif = { limit = { var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_delta_5 < -0.00001 } set_variable = { name = sol_approx_candidate_valid value = 0 } }",
-    ])
-    for row in range(1, 5):
-        lines.append(f"\tif = {{ limit = {{ var:sol_approx_candidate_valid = 1 $strategy$ = 5 var:sol_approx_error_ratio_{row} > var:sol_delta_5 }} set_variable = {{ name = sol_approx_candidate_valid value = 0 }} }}")
+        # Only proportional_fast still reaches the assessor, so the objective is
+        # always the sum of squared relative errors. The minimax branch and its
+        # sol_delta_5 bound checks are gone with strategy 5.
+        lines.append(f"\tchange_variable = {{ name = sol_approx_objective add = {{ value = var:sol_approx_error_ratio_{row} multiply = var:sol_approx_error_ratio_{row} }} }}")
     lines.extend([
         "\tset_variable = { name = sol_approx_average_ratio value = { value = var:sol_approx_average_ratio divide = 4 } }",
         "\tset_variable = { name = sol_approx_average_absolute value = { value = var:sol_approx_average_absolute divide = 4 } }",
@@ -625,7 +626,12 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         lines.append("\t\tsol_country_demand_approx_assess = { strategy = 5 }")
         lines.append("\t}")
 
-    for strategy in range(1, 6):
+    # Player L2/minimax candidates are retired in favour of the strict
+    # no-worsen vertex sweep emitted by sol_vertex_selector_source. Only the AI
+    # proportional_fast path (strategy 6) still uses the candidate assessor, so
+    # no per-strategy candidate effects are emitted here any more.
+    retired_player_strategies: tuple[int, ...] = ()
+    for strategy in retired_player_strategies:
         if strategy < 5:
             for mask in masks:
                 append_reduced_l2_candidate(strategy, mask)
@@ -683,7 +689,11 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = -999999 }",
         "\tset_variable = { name = sol_country_demand_selected_average_absolute value = -999999 }",
     ])
-    for strategy in range(1, 7):
+    # Only strategy 6 (AI proportional_fast) still goes through the candidate
+    # assessor, so only its slot is initialised. Slots 1-5 belonged to the
+    # retired player L2 variants and minimax; strategy 8 (vertex sweep) writes
+    # the coefficients and its own id directly and needs no slot.
+    for strategy in ASSESSOR_STRATEGIES:
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_objective_{strategy} value = 999999 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_gate_{strategy} value = 0 }}")
         lines.append(f"\tset_variable = {{ name = sol_country_demand_strategy_average_ratio_{strategy} value = -999999 }}")
@@ -691,23 +701,29 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
     lines.extend([
         "\tif = { limit = { var:sol_country_demand_exact_status != 1 } sol_country_demand_approx_prepare_country = yes }",
         "\t# Exact success is adopted directly; only exact failures reach approximation.",
-        "\t# The wide gate protects the worst raw row and requires positive mean gain.",
-        "\t# Player countries have two settings: exact and approx (both default enabled).",
-        "\t# AI countries are hardcoded to NOT solve (performance reasons) and skip all prep work.",
+        "\t# Four CMF toggles control exact and approx for human/AI independently.",
+        "\t# Human approximation: strict no-worsen vertex sweep (strategy 8).",
+        "\t# AI approximation: proportional-fast (strategy 6), reuses the candidate assessor.",
+        "\t# gate_possible is the prefilter: with every raw row already inside",
+        "\t# tolerance there is nothing for either path to improve, so both skip.",
         "\tif = {",
         "\t\tlimit = { is_human = yes var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
         "\t\tif = { limit = { OR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_solver_human_approx_enabled } }",
-        "\t\t\tsol_country_demand_run_strategy_1 = yes",
-        "\t\t\tsol_country_demand_run_strategy_2 = yes",
-        "\t\t\tsol_country_demand_run_strategy_3 = yes",
-        "\t\t\tsol_country_demand_run_strategy_4 = yes",
-        "\t\t\tsol_country_demand_run_strategy_5 = yes",
+        "\t\t\tsol_country_demand_run_vertex_selector = yes",
+        "\t\t}",
+        "\t}",
+        "\telse_if = {",
+        "\t\tlimit = { is_ai = yes var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
+        "\t\tif = { limit = { has_global_variable = sol_solver_ai_approx_enabled }",
+        "\t\t\tsol_country_demand_approx_prepare_strategy = { strategy = 6 }",
+        "\t\t\tsol_country_demand_run_fast_proportional = yes",
         "\t\t}",
         "\t}",
     ])
-    # Deterministic lexicographic winner: ratio, absolute gain, objective;
-    # strategy order remains the final tie breaker because strategies run 1..6.
-    for strategy in range(1, 7):
+    # Winner selection among assessor-driven strategies. With only strategy 6
+    # left this is a single guarded adoption rather than a comparison chain, but
+    # the form is kept so a future assessor strategy can be added back cheaply.
+    for strategy in ASSESSOR_STRATEGIES:
         lines.extend([
             "\tif = {",
             f"\t\tlimit = {{ var:sol_country_demand_strategy_gate_{strategy} = 1 }}",
@@ -718,7 +734,10 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             "\t\t}",
             "\t}",
         ])
-    for strategy in range(1, 7):
+    # Assessor strategies stash their factors in per-strategy slots, so the
+    # adopted one is copied out here. Strategy 8 already wrote the coefficients
+    # itself inside the vertex sweep and is deliberately absent from this loop.
+    for strategy in ASSESSOR_STRATEGIES:
         for col in range(1, 5):
             lines.append(f"\tif = {{ limit = {{ var:sol_country_demand_selected_strategy = {strategy} }} set_variable = {{ name = sol_country_class_coefficient_{col} value = var:sol_country_demand_strategy_factor_{col}_{strategy} }} }}")
     lines.extend([
@@ -1436,6 +1455,9 @@ def emit_section_30_country_demand_math(writer: ScriptWriter) -> None:
         "}",
     ])
     writer.extend(_emit_country_approximation_runtime_lines())
+    from sol_vertex_selector_source import emit_vertex_selector
+
+    writer.extend(emit_vertex_selector())
 
 def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
     writer.extend([
@@ -1508,15 +1530,12 @@ def emit_section_31_country_demand_diagnostics(writer: ScriptWriter) -> None:
         "",
         "sol_country_demand_log_refresh = {",
         "\t# Exactly one human-only row naming the strategy this country adopted.",
-        "\t# Strategy ids: 1-4 player L2 variants, 5 minimax, 6 AI fast, 7 exact-direct.",
+        "\t# Strategy ids: 6 AI fast, 7 exact-direct, 8 strict no-worsen vertex sweep.",
+        "\t# Ids 1-5 (player L2 variants and minimax) are retired.",
         "\tif = {",
         "\t\tlimit = { is_human = yes }",
         "\t\tif = { limit = { var:sol_country_demand_selected_strategy = 7 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_EXACT } }",
-        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 1 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_BALANCED_L2 } }",
-        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 2 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_IMPROVEMENT_L2 } }",
-        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 3 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_TARGET_L2 } }",
-        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 4 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_ABSOLUTE_L2 } }",
-        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 5 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_MINIMAX } }",
+        "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 8 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_VERTEX } }",
         "\t\telse_if = { limit = { var:sol_country_demand_selected_strategy = 6 } sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_FAST } }",
         "\t\telse = { sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_STRATEGY_RAW_FALLBACK } }",
         "\t}",
@@ -1611,11 +1630,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\tset_variable = { name = sol_country_demand_selected_objective value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_average_ratio value = 0 }",
         "\tset_variable = { name = sol_country_demand_selected_average_absolute value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_objective_1 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_objective_2 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_objective_3 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_objective_4 value = 0 }",
-        "\tset_variable = { name = sol_country_demand_strategy_objective_5 value = 0 }",
         "\tset_variable = { name = sol_country_demand_anchor_count value = 0 }",
         "\tset_variable = { name = sol_delta_1 value = 0 }",
         "\tset_variable = { name = sol_delta_2 value = 0 }",
@@ -1855,8 +1869,8 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tlimit = {",
         "\t\t\t\tOR = {",
         "\t\t\t\t\tNOT = { has_global_variable_map = cmm }",
-        "\t\t\t\t\t# AI countries do not run exact solver due to performance.",
         "\t\t\t\t\tAND = { is_human = yes has_global_variable = sol_solver_human_exact_enabled }",
+        "\t\t\t\t\tAND = { is_ai = yes has_global_variable = sol_solver_ai_exact_enabled }",
         "\t\t\t\t}",
         "\t\t\t}",
         "\t\t\tsol_country_demand_solve_classes = yes",
