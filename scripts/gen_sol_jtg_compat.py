@@ -389,7 +389,14 @@ def _render_effects(rows: List[Dict[str, object]]) -> str:
 
 
 def _goods_widget(good: str, variable_map: str, scope: str, indent: str) -> str:
-    overlay = (
+    # Suppression indicator: red down arrow when consumed but expensive
+    suppression_overlay = (
+        f'text_single = {{ size = {{ 100% 100% }} align = center raw_text = "#R @arrow_down!#!" '
+        f'visible = "[And(GreaterThan_CFixedPoint(GetVariableFromGlobalVariableMap(\'{variable_map}_{good}\', {scope}).GetValue,\'(CFixedPoint)0\'), '
+        f'GreaterThan_CFixedPoint(GetVariableFromGlobalVariableMap(\'sol_market_price_suppressed_{good}\', {scope}).GetValue,\'(CFixedPoint)0\'))]" }} '
+    )
+    # No-consumption overlay: gray X when not consumed
+    no_consumption_overlay = (
         f'text_single = {{ size = {{ 100% 100% }} align = center raw_text = "@trigger_no!" fontsize = 23 '
         f"visible = \"[Not(GreaterThan_CFixedPoint(GetVariableFromGlobalVariableMap('{variable_map}_{good}', {scope}).GetValue,'(CFixedPoint)0'))]\" }}"
     )
@@ -398,10 +405,10 @@ def _goods_widget(good: str, variable_map: str, scope: str, indent: str) -> str:
             f'icon = {{ size = {{ 24 24 }} parentanchor = center '
             f'texture = "gfx/interface/icons/trade_goods/icon_goods_{good}.dds" }}'
         )
-        return f'{indent}widget = {{ size = {{ 34 30 }} tooltip = "{good}" {icon} {overlay} }}'
+        return f'{indent}widget = {{ size = {{ 34 30 }} tooltip = "{good}" {icon} {suppression_overlay}{no_consumption_overlay} }}'
     return (
         f'{indent}widget = {{ size = {{ 34 30 }} tooltip = "{good}" '
-        f'text_single = {{ size = {{ 100% 100% }} align = center raw_text = "@{good}!" }} {overlay} }}'
+        f'text_single = {{ size = {{ 100% 100% }} align = center raw_text = "@{good}!" }} {suppression_overlay}{no_consumption_overlay} }}'
     )
 
 

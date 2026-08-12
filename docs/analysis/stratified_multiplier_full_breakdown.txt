@@ -1,0 +1,57 @@
+================================================================
+STRATIFIED MULTIPLIER IMPACT - FULL SOLVER BREAKDOWN
+================================================================
+
+Aggregated across 7 saves (1337-1386), 9788 countries:
+
+                        Unified       Stratified    Delta
+----------------------------------------------------------------
+Exact solve             111 (1.1%)     49 (0.5%)    -62 (-0.6%)
+Approximation           643 (6.6%)    675 (6.9%)    +32 (+0.3%)
+  (feasible, not exact)
+----------------------------------------------------------------
+Total feasible          754 (7.7%)    681 (7.0%)    -73 (-0.7%)
+Infeasible            9,034 (92.3%) 9,107 (93.0%)   +73 (+0.7%)
+
+INTERPRETATION:
+
+1. **Exact solve collapses**: -0.6% absolute, -56% relative (111 → 49).
+   分阶层乘子让目标向量旋转，62 个国家的旋转后方向落在非负解的边界之外。
+
+2. **Approximation compensates slightly**: +0.3% absolute.
+   一些原本精确可解但接近边界的国家，旋转后虽然失去了精确解，但残差
+   仍在锥内（< 0.01），所以仍能通过近似路径返回一个可行的 x ≥ 0。
+   
+   但这不足以抵消精确解的损失——总可行率仍下降 0.7%。
+
+3. **Net feasibility loss**: -73 countries.
+   这 73 国的旋转幅度太大，目标向量完全离开 cone(M 列)，近似也救不回来。
+
+4. **Late-game amplification (1386 observer)**:
+   Exact:  37 → 8  (-2.7%)
+   Approx: 51 → 49 (-0.2%)  # 近似几乎不变，因为晚期锥很窄，离开就彻底离开
+   
+   贵族/市民积累到 +30% ~ +50% adjustment，平民/部落民常年 -20% ~ -25%，
+   五个阶层的散度在晚期达到峰值，统一乘子的稳定作用更加关键。
+
+5. **Gate pass unchanged**: 99.9% in both.
+   Wide gate 只看 raw error 绝对值 > 1e-5，统一/分阶层的 raw baseline 定义
+   相同（都是 total_liquid / total_base），所以 gate 判定结果一致。
+
+MECHANISM SUMMARY:
+
+- 统一乘子 k: 目标 t' = k·t，矩阵 M' = k·M，求解 x 时 k 约掉，方向不变。
+- 分阶层乘子 K = diag(k₁,k₂,k₃,k₄): 目标 t' = K·t，矩阵 M' ≠ K·M（因为
+  M 的行是地区加权的跨阶层混合），所以 t'/cone(M') 的相对位置改变。
+
+当 k₁…k₄ 散度大时，t' 偏离原锥轴线，容易出锥。
+
+RECOMMENDATION:
+
+Keep unified multiplier. 分阶层方案的 +0.3% 近似补偿无法抵消 -0.6% 精确损失，
+且近似解本身的质量（per-stratum residual）在分阶层下也更差（因为旋转让
+worst-case stratum 的残差放大）。
+
+如果设计意图是"让贵族存款充裕时多消费、平民负债时少消费"，更直接的路径是
+调整 target 公式本身（如 target = liquid_funds × estate_influence_weight），
+而不是通过乘子旋转——后者把阶层差异引入了一个原本只负责总量调节的环节。

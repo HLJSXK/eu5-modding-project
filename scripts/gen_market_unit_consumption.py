@@ -144,6 +144,7 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
         "sol_refresh_market_pop_demand_maps = {",
         "\t# Global scope. Refresh per-market unit spending and market-keyed goods counters.",
         "\t# Unit spending is hardcoded consumption quantity times min(market price, base price).",
+        "\t# Also tracks which goods have suppressed demand (market_price > default_price).",
         "\tevery_market_in_world = {",
         "\t\tsave_scope_as = sol_market_cache",
     ]
@@ -159,22 +160,32 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
         local_names.extend(
             [
                 f"sol_market_effective_price_{good}",
+                f"sol_market_actual_price_{good}",
                 f"sol_market_consumes_{good}_count",
+                f"sol_market_price_suppressed_{good}",
             ]
         )
 
         lines.extend(
             [
+                f"\t\tset_local_variable = {{ name = sol_market_actual_price_{good} value = \"market_price(goods:{good})\" }}",
                 f"\t\tset_local_variable = {{",
                 f"\t\t\tname = sol_market_effective_price_{good}",
                 f"\t\t\tvalue = {{",
-                f"\t\t\t\tvalue = \"market_price(goods:{good})\"",
+                f"\t\t\t\tvalue = local_var:sol_market_actual_price_{good}",
                 f"\t\t\t\tmax = \"default_price(goods:{good})\"",
                 f"\t\t\t}}",
                 f"\t\t}}",
                 f"\t\tset_local_variable = {{ name = sol_market_consumes_{good}_count value = \"goods_supply_in_market(goods:{good})\" }}",
+                f"\t\tset_local_variable = {{ name = sol_market_price_suppressed_{good} value = 0 }}",
+                f"\t\tif = {{",
+                f"\t\t\tlimit = {{ local_var:sol_market_actual_price_{good} > \"default_price(goods:{good})\" }}",
+                f"\t\t\tset_local_variable = {{ name = sol_market_price_suppressed_{good} value = 1 }}",
+                f"\t\t}}",
                 f"\t\tremove_from_global_variable_map = {{ name = sol_market_consumes_{good} key = scope:sol_market_cache }}",
                 f"\t\tadd_to_global_variable_map = {{ name = sol_market_consumes_{good} key = scope:sol_market_cache value = local_var:sol_market_consumes_{good}_count }}",
+                f"\t\tremove_from_global_variable_map = {{ name = sol_market_price_suppressed_{good} key = scope:sol_market_cache }}",
+                f"\t\tadd_to_global_variable_map = {{ name = sol_market_price_suppressed_{good} key = scope:sol_market_cache value = local_var:sol_market_price_suppressed_{good} }}",
                 "\t\tif = {",
                 f"\t\t\tlimit = {{ local_var:sol_market_consumes_{good}_count > 0 }}",
             ]
