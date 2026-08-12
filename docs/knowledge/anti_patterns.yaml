@@ -594,3 +594,11 @@
   scope: country
   source: "HUN five-save series 2026-08-11: Class 1 column mass 1.98-5.50 vs Class 4 156-177; capacity targets C1/C2 ~1.9-2.3 vs C4 140-193 with capacity_floor = 0.01, negative_pool = 0.96"
   notes: "Documentation-only (no regex lint). Amplification and feasibility are independent problems: amplification comes from unequal column mass (the 1% anchor), feasibility comes from cone containment. Raising capacity_floor trades jitter for margin in both directions, so it is a tuning decision rather than a fix. HUN is especially exposed because nobles are 68% of national spending yet carry zero pressure, leaving the class that represents them with almost no matrix mass."
+
+- id: reduced_frequency_pulse_drops_modifier_between_solves
+  bad: "Implementing a 'reduce calculation frequency' toggle by moving both the solve AND the add_location_modifier call to yearly_country_pulse with years = 1, so the modifier's lifetime is what carries the value between solves"
+  correction: "Split the effect: keep applying the modifier every month from the cached per-location size variable (months = 1, mode = replace) and move only the expensive solve to yearly_country_pulse. A stale coefficient re-applied monthly is acceptable; a lapsed modifier is not."
+  category: scope
+  scope: country
+  source: "src/stable/in_game/common/on_action/SOL_economy_on_actions.txt; gls_full_refresh_country in scripts/sol_economy_effects_source.py calls the monthly updater unconditionally on every game start and save load"
+  notes: "Documentation-only (no regex lint). Relying on a years = 1 modifier to bridge yearly solves looks self-sustaining in steady state but breaks at every entry point that is not the yearly pulse: game start, save load, player-to-AI handover, a newly formed country, and switching the toggle on mid-game all write (or leave) a months = 1 modifier that expires long before the country's own anniversary date arrives. The country then runs on the bare demand_add baseline for up to 11 months with no error and no log line. Applying monthly from the cache also makes the toggle safe to flip at any time, and costs only the every_owned_location write the default configuration was already paying."

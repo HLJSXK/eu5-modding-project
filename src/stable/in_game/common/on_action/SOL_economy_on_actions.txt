@@ -16,17 +16,6 @@ sol_local_pop_demand_monthly_pulse = {
 		total_population > 0
 		num_locations > 0
 		sol_sol_is_on = yes
-		# Run monthly for:
-		# 1. All human-controlled countries (always monthly, regardless of CMF setting)
-		# 2. AI countries when reduced frequency is NOT enabled (default behavior)
-		# When reduced frequency IS enabled, AI countries use sol_ai_yearly_pop_demand_pulse.
-		OR = {
-			is_human = yes
-			AND = {
-				is_ai = yes
-				sol_ai_reduced_freq_is_on = no
-			}
-		}
 	}
 	effect = {
 		# Prime the yearly estate-building maintenance cache once on start/load.
@@ -38,7 +27,32 @@ sol_local_pop_demand_monthly_pulse = {
 			sol_update_estate_building_maintenance = yes
 			set_variable = { name = sol_estate_building_maintenance_initialized value = 1 }
 		}
-		sol_update_local_pop_demand_modifiers = yes
+		# Humans, and AI on the normal cadence, re-solve then apply every month.
+		# AI under reduced frequency skips the solve and re-applies the coefficients
+		# cached by its own yearly pulse. The modifier is always written monthly so
+		# no country can ever be left without one — see sol_apply_local_pop_demand_modifiers.
+		if = {
+			limit = {
+				OR = {
+					is_human = yes
+					AND = {
+						is_ai = yes
+						sol_ai_reduced_freq_is_on = no
+					}
+				}
+			}
+			sol_update_local_pop_demand_modifiers = yes
+		}
+		else = {
+			# No cached coefficients yet (first month of a new game, a freshly
+			# formed country, or the setting was just switched on): solve once so
+			# the very first applied modifier is correct rather than a bare 1.0.
+			if = {
+				limit = { NOT = { has_variable = sol_country_demand_solve_status } }
+				sol_solve_country_pop_demand = yes
+			}
+			sol_apply_local_pop_demand_modifiers = yes
+		}
 	}
 }
 
@@ -56,10 +70,12 @@ yearly_country_pulse = {
 }
 
 sol_ai_yearly_pop_demand_pulse = {
-	# This pulse only runs for AI countries when the "Reduce AI calculation frequency" CMF setting is enabled.
-	# It replicates the logic of sol_update_local_pop_demand_modifiers, but with 1-year modifier duration
-	# instead of 1-month, reducing the calculation frequency from monthly to yearly (on anniversary date).
-	# Human countries are never affected by this setting and always calculate monthly.
+	# Only runs for AI countries with the "Reduce AI calculation frequency" CMF setting on.
+	# It owns the expensive part — the country-level solve — and fires once per year on the
+	# country's own anniversary date, which staggers the cost across the whole calendar.
+	# Applying the result stays monthly (sol_local_pop_demand_monthly_pulse), so the
+	# modifier never lapses and a stale coefficient is the worst case, never a missing one.
+	# Human countries are never affected by this setting and always solve monthly.
 	trigger = {
 		total_population > 0
 		num_locations > 0
@@ -68,22 +84,9 @@ sol_ai_yearly_pop_demand_pulse = {
 		sol_ai_reduced_freq_is_on = yes
 	}
 	effect = {
-		# Calculate country-level demand coefficients (same as monthly pulse)
-		sol_solve_country_pop_demand = yes
-
-		# Apply modifiers with 1-year duration (vs 1-month in monthly pulse)
-		if = {
-			limit = { num_locations > 0 }
-			every_owned_location = {
-				limit = { is_land = yes }
-				add_location_modifier = {
-					modifier = sol_local_pop_demand_modifier
-					years = 1
-					mode = replace
-					size = var:sol_location_pop_demand_modifier_size
-				}
-			}
-		}
+		# Solve and apply together so the fresh coefficients take effect immediately
+		# rather than waiting for next month's apply-only pass.
+		sol_update_local_pop_demand_modifiers = yes
 	}
 }
 

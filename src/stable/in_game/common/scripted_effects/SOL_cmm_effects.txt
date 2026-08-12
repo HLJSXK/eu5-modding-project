@@ -10,15 +10,15 @@ sol_initialize_cmm_bool_alias_defaults = {
 	set_global_variable = { name = sol_iwe_enabled value = yes }
 	set_global_variable = { name = sol_hwe_enabled value = yes }
 	set_global_variable = { name = sol_rwe_enabled value = yes }
-	# Country-level solver defaults: human exact+approx on, AI both off (performance).
+	# Performance (perf) tab defaults: every setting in both groups defaults ON.
+	set_global_variable = { name = sol_ai_reduced_freq_enabled value = yes }
 	set_global_variable = { name = sol_solver_human_exact_enabled value = yes }
 	set_global_variable = { name = sol_solver_human_approx_enabled value = yes }
-	# Default-OFF settings are deliberately NOT initialized here. cmm_sync_bool_alias
-	# uses remove_global_variable for the off state, so has_global_variable must stay
-	# false until CMM turns the setting on:
-	#   sol_solver_ai_exact_enabled
-	#   sol_solver_ai_approx_enabled
-	#   sol_ai_reduced_freq_enabled
+	set_global_variable = { name = sol_solver_ai_exact_enabled value = yes }
+	set_global_variable = { name = sol_solver_ai_approx_enabled value = yes }
+	# No default-OFF settings remain in this mod. If one is added later it must NOT
+	# be initialized here: cmm_sync_bool_alias uses remove_global_variable for the
+	# off state, so has_global_variable must stay false until CMM turns it on.
 }
 
 # Root scope: country.
@@ -51,22 +51,6 @@ sol_register_cmf_mod = {
 	cmm_add_scripted_gui = {
 		mod_id = sol
 		setting_id = sol_map
-	}
-
-	cmm_register_global_bool_setting = {
-		mod_id = sol
-		setting_id = ai_reduced_freq
-		tab_id = feat
-		group_id = sol
-		default_value = 0
-	}
-	cmm_sync_bool_alias = {
-		setting = sol__ai_reduced_freq
-		alias = sol_ai_reduced_freq_enabled
-	}
-	cmm_add_scripted_gui = {
-		mod_id = sol
-		setting_id = ai_reduced_freq
 	}
 
 	## Economic Balance (as) Group
@@ -267,12 +251,31 @@ sol_register_cmf_mod = {
 		setting_id = rwe
 	}
 
-	# Country-level Solver Tab
-	## Country Solver Controls (country_solver) Group
+	# Performance (perf) Tab
+	# CMF renders tabs, groups, and settings in registration order, so the
+	# calculation-frequency group is registered before the solver group.
+	## Calculation Frequency (calc_freq) Group
+	cmm_register_global_bool_setting = {
+		mod_id = sol
+		setting_id = ai_reduced_freq
+		tab_id = perf
+		group_id = calc_freq
+		default_value = 1
+	}
+	cmm_sync_bool_alias = {
+		setting = sol__ai_reduced_freq
+		alias = sol_ai_reduced_freq_enabled
+	}
+	cmm_add_scripted_gui = {
+		mod_id = sol
+		setting_id = ai_reduced_freq
+	}
+
+	## Country-level Solver (country_solver) Group
 	cmm_register_global_bool_setting = {
 		mod_id = sol
 		setting_id = solver_human_exact
-		tab_id = solver
+		tab_id = perf
 		group_id = country_solver
 		default_value = 1
 	}
@@ -283,7 +286,7 @@ sol_register_cmf_mod = {
 	cmm_register_global_bool_setting = {
 		mod_id = sol
 		setting_id = solver_human_approx
-		tab_id = solver
+		tab_id = perf
 		group_id = country_solver
 		default_value = 1
 	}
@@ -294,9 +297,9 @@ sol_register_cmf_mod = {
 	cmm_register_global_bool_setting = {
 		mod_id = sol
 		setting_id = solver_ai_exact
-		tab_id = solver
+		tab_id = perf
 		group_id = country_solver
-		default_value = 0
+		default_value = 1
 	}
 	cmm_sync_bool_alias = {
 		setting = sol__solver_ai_exact
@@ -305,9 +308,9 @@ sol_register_cmf_mod = {
 	cmm_register_global_bool_setting = {
 		mod_id = sol
 		setting_id = solver_ai_approx
-		tab_id = solver
+		tab_id = perf
 		group_id = country_solver
-		default_value = 0
+		default_value = 1
 	}
 	cmm_sync_bool_alias = {
 		setting = sol__solver_ai_approx
@@ -338,12 +341,6 @@ sol_handle_cmf_callback = {
 			cmm_sync_bool_alias = {
 				setting = sol__sol_map
 				alias = sol_sol_map_enabled
-			}
-		}
-		flag:sol__ai_reduced_freq = {
-			cmm_sync_bool_alias = {
-				setting = sol__ai_reduced_freq
-				alias = sol_ai_reduced_freq_enabled
 			}
 		}
 		## Economic Balance (as) Group
@@ -420,7 +417,15 @@ sol_handle_cmf_callback = {
 				alias = sol_rwe_enabled
 			}
 		}
-		# Country-level Solver Tab
+		# Performance (perf) Tab
+		## Calculation Frequency (calc_freq) Group
+		flag:sol__ai_reduced_freq = {
+			cmm_sync_bool_alias = {
+				setting = sol__ai_reduced_freq
+				alias = sol_ai_reduced_freq_enabled
+			}
+		}
+		## Country-level Solver (country_solver) Group
 		flag:sol__solver_human_exact = {
 			cmm_sync_bool_alias = {
 				setting = sol__solver_human_exact

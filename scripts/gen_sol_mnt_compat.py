@@ -948,14 +948,11 @@ def _render_cmm() -> str:
         "\tset_global_variable = { name = sol_iwe_enabled value = yes }",
         "\tset_global_variable = { name = sol_hwe_enabled value = yes }",
         "\tset_global_variable = { name = sol_rwe_enabled value = yes }",
-        "\tremove_global_variable = sol_solver_ai_prepare_enabled",
-        "\tremove_global_variable = sol_solver_ai_exact_enabled",
-        "\tremove_global_variable = sol_solver_ai_l2_enabled",
-        "\tremove_global_variable = sol_solver_ai_minimax_enabled",
-        "\tset_global_variable = { name = sol_solver_human_prepare_enabled value = yes }",
+        "\tset_global_variable = { name = sol_ai_reduced_freq_enabled value = yes }",
         "\tset_global_variable = { name = sol_solver_human_exact_enabled value = yes }",
-        "\tset_global_variable = { name = sol_solver_human_l2_enabled value = yes }",
-        "\tset_global_variable = { name = sol_solver_human_minimax_enabled value = yes }",
+        "\tset_global_variable = { name = sol_solver_human_approx_enabled value = yes }",
+        "\tset_global_variable = { name = sol_solver_ai_exact_enabled value = yes }",
+        "\tset_global_variable = { name = sol_solver_ai_approx_enabled value = yes }",
         "}",
         "",
         "REPLACE:sol_register_cmf_mod = {",
@@ -981,14 +978,13 @@ def _render_cmm() -> str:
     _append_bool_setting(lines, "iwe", "hw", "sol_iwe_enabled")
     _append_bool_setting(lines, "hwe", "hw", "sol_hwe_enabled")
     _append_bool_setting(lines, "rwe", "hw", "sol_rwe_enabled")
-    _append_bool_setting(lines, "solver_ai_prepare", "country_solver", "sol_solver_ai_prepare_enabled", False, default_value=0, tab_id="solver")
-    _append_bool_setting(lines, "solver_ai_exact", "country_solver", "sol_solver_ai_exact_enabled", False, default_value=0, tab_id="solver")
-    _append_bool_setting(lines, "solver_ai_l2", "country_solver", "sol_solver_ai_l2_enabled", False, default_value=0, tab_id="solver")
-    _append_bool_setting(lines, "solver_ai_minimax", "country_solver", "sol_solver_ai_minimax_enabled", False, default_value=0, tab_id="solver")
-    _append_bool_setting(lines, "solver_human_prepare", "country_solver", "sol_solver_human_prepare_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_human_exact", "country_solver", "sol_solver_human_exact_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_human_l2", "country_solver", "sol_solver_human_l2_enabled", False, tab_id="solver")
-    _append_bool_setting(lines, "solver_human_minimax", "country_solver", "sol_solver_human_minimax_enabled", False, default_value=1, tab_id="solver")
+    # Performance (perf) tab. Registration order sets render order, so the
+    # calculation-frequency group comes before the solver group.
+    _append_bool_setting(lines, "ai_reduced_freq", "calc_freq", "sol_ai_reduced_freq_enabled", tab_id="perf")
+    _append_bool_setting(lines, "solver_human_exact", "country_solver", "sol_solver_human_exact_enabled", False, tab_id="perf")
+    _append_bool_setting(lines, "solver_human_approx", "country_solver", "sol_solver_human_approx_enabled", False, tab_id="perf")
+    _append_bool_setting(lines, "solver_ai_exact", "country_solver", "sol_solver_ai_exact_enabled", False, tab_id="perf")
+    _append_bool_setting(lines, "solver_ai_approx", "country_solver", "sol_solver_ai_approx_enabled", False, tab_id="perf")
     if lines[-1] == "":
         lines.pop()
     lines.extend(
@@ -1015,14 +1011,11 @@ def _render_cmm() -> str:
         ("iwe", "sol_iwe_enabled", False),
         ("hwe", "sol_hwe_enabled", False),
         ("rwe", "sol_rwe_enabled", False),
-        ("solver_ai_prepare", "sol_solver_ai_prepare_enabled", False),
-        ("solver_ai_exact", "sol_solver_ai_exact_enabled", False),
-        ("solver_ai_l2", "sol_solver_ai_l2_enabled", False),
-        ("solver_ai_minimax", "sol_solver_ai_minimax_enabled", False),
-        ("solver_human_prepare", "sol_solver_human_prepare_enabled", False),
+        ("ai_reduced_freq", "sol_ai_reduced_freq_enabled", False),
         ("solver_human_exact", "sol_solver_human_exact_enabled", False),
-        ("solver_human_l2", "sol_solver_human_l2_enabled", False),
-        ("solver_human_minimax", "sol_solver_human_minimax_enabled", False),
+        ("solver_human_approx", "sol_solver_human_approx_enabled", False),
+        ("solver_ai_exact", "sol_solver_ai_exact_enabled", False),
+        ("solver_ai_approx", "sol_solver_ai_approx_enabled", False),
     ):
         _append_callback(lines, setting_id, alias, numeric)
     lines.extend(["\t}", "}", ""])
