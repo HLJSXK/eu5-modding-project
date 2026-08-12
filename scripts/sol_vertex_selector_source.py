@@ -28,12 +28,22 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Row order is nobles, clergy, burghers, lower.
+# Row order is nobles, clergy, burghers, lower, matching the class matrix rows
+# built by sol_country_demand_fill_class_column.
+#
+# These must be the ABSOLUTE country targets, because the vertex sweep solves
+# M f = t directly rather than the exact path's delta form (M d = t - baseline).
+# The lower row uses target_lower, which folds commoners and tribesmen together
+# exactly as sol_country_class_baseline_lower_* does on the matrix side.
+#
+# Do NOT use sol_country_demand_rhs_*: those are only zeroed during setup and
+# never receive a real value, so reading them makes every vertex solve M f = 0
+# and the whole sweep collapses to raw_fallback.
 TARGET_VARS = (
-    "sol_country_demand_rhs_nobles",
-    "sol_country_demand_rhs_clergy",
-    "sol_country_demand_rhs_burghers",
-    "sol_country_demand_rhs_lower",
+    "sol_country_demand_target_nobles",
+    "sol_country_demand_target_clergy",
+    "sol_country_demand_target_burghers",
+    "sol_country_demand_target_lower",
 )
 TIE_FRACTION = "0.01"
 

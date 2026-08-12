@@ -41,7 +41,16 @@ class ScriptWriter:
 # Retired: 1-4 player L2 variants, 5 minimax.
 # Not listed: 7 exact-direct and 8 vertex sweep both write the adopted
 # coefficients and their own id directly, bypassing the slot machinery.
-ASSESSOR_STRATEGIES: tuple[int, ...] = (6,)
+# Strategy ids that still route through sol_country_demand_approx_assess.
+# Empty now that proportional_fast is retired in favour of the vertex sweep for
+# both sides. The assessor and its emitters are kept so a future candidate-style
+# strategy can be reinstated without rewriting the plumbing.
+ASSESSOR_STRATEGIES: tuple[int, ...] = ()
+
+# Countries below this owned-location count skip country-level solving entirely
+# and use the raw-only baseline. See sol_solve_country_pop_demand for the
+# measured justification.
+SOLVER_MIN_LOCATIONS = 5
 
 
 def _emit_country_approximation_runtime_lines() -> list[str]:
@@ -183,21 +192,31 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\tif = { limit = { var:sol_approx_cached_total_tolerance < 0.00001 } set_variable = { name = sol_approx_cached_total_tolerance value = 0.00001 } }",
         "}",
         "",
+    ])
+
+    # RETIRED: proportional_fast. Both sides use the strict no-worsen vertex
+    # sweep now, which adopted a candidate for 90.7% of eligible countries on the
+    # 1338.02.08 save against this pass's 4.2%. The emitter is kept intact and
+    # still runs, but its output goes to a discarded buffer instead of `lines`,
+    # so reinstating the strategy only needs `retired = lines` here plus adding
+    # its id back to ASSESSOR_STRATEGIES.
+    retired: list[str] = []
+    retired.extend([
         "sol_country_demand_run_fast_proportional = {",
         "\t# AI path: one diagonal/Jacobi correction plus hard-total normalization; no active-set enumeration or linear solve.",
         "\tset_variable = { name = sol_fast_active_column_total value = 0 }",
         "\tset_variable = { name = sol_fast_pre_total value = 0 }",
     ])
     for col in range(1, 5):
-        lines.extend([
+        retired.extend([
             f"\tif = {{ limit = {{ var:sol_country_class_count_{col} > 0 }} change_variable = {{ name = sol_fast_active_column_total add = var:sol_approx_total_col_{col} }} }}",
         ])
-    lines.extend([
+    retired.extend([
         "\tset_variable = { name = sol_country_demand_solve_status value = 1 }",
         "\tif = { limit = { var:sol_fast_active_column_total <= 0.00001 } set_variable = { name = sol_country_demand_solve_status value = -1 } }",
     ])
     for col in range(1, 5):
-        lines.extend([
+        retired.extend([
             f"\tset_variable = {{ name = sol_fast_weight_{col} value = 0 }}",
             f"\tif = {{ limit = {{ var:sol_country_class_count_{col} > 0 }}",
             f"\t\tset_variable = {{ name = sol_fast_weight_{col} value = 1 }}",
@@ -207,30 +226,33 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
             f"\tset_variable = {{ name = sol_fast_pre_term_{col} value = {{ value = var:sol_approx_total_col_{col} multiply = var:sol_fast_weight_{col} }} }}",
             f"\tchange_variable = {{ name = sol_fast_pre_total add = var:sol_fast_pre_term_{col} }}",
         ])
-    lines.extend([
+    retired.extend([
         "\tif = { limit = { var:sol_fast_pre_total <= 0.00001 } set_variable = { name = sol_country_demand_solve_status value = -1 } }",
         "\tset_variable = { name = sol_fast_hard_total_scale value = 0 }",
         "\tif = { limit = { var:sol_country_demand_solve_status = 1 } set_variable = { name = sol_fast_hard_total_scale value = { value = var:sol_approx_total_target divide = var:sol_fast_pre_total } } }",
     ])
     for col in range(1, 5):
-        lines.extend([
+        retired.extend([
             f"\tset_variable = {{ name = sol_delta_{col} value = {{ value = var:sol_fast_weight_{col} multiply = var:sol_fast_hard_total_scale }} }}",
             f"\tif = {{ limit = {{ var:sol_country_class_count_{col} <= 0 }} set_variable = {{ name = sol_delta_{col} value = 0 }} }}",
         ])
     for row in range(1, 5):
-        lines.extend([
+        retired.extend([
             f"\tsol_country_demand_abs = {{ source = sol_approx_raw_{row} target = sol_fast_raw_abs_{row} }}",
             f"\tsol_country_demand_abs = {{ source = sol_approx_target_{row} target = sol_fast_target_abs_{row} }}",
             f"\tset_variable = {{ name = sol_approx_scale_{row} value = var:sol_fast_raw_abs_{row} }}",
             f"\tif = {{ limit = {{ var:sol_fast_target_abs_{row} > var:sol_approx_scale_{row} }} set_variable = {{ name = sol_approx_scale_{row} value = var:sol_fast_target_abs_{row} }} }}",
             f"\tif = {{ limit = {{ var:sol_approx_scale_{row} < 0.00001 }} set_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }} }}",
         ])
-    lines.extend([
+    retired.extend([
         "\tsol_country_demand_approx_assess = { strategy = 6 }",
         "}",
         "",
-        "sol_country_demand_approx_prepare_strategy = {",
     ])
+    # End of the retired block. Everything below is live output again -- this
+    # header must NOT go into `retired`, or its body is emitted without an
+    # enclosing effect and every brace after it is off by one.
+    lines.append("sol_country_demand_approx_prepare_strategy = {")
     for row in range(1, 5):
         lines.append(f"\tset_variable = {{ name = sol_approx_scale_{row} value = 0.00001 }}")
     lines.extend([
@@ -706,17 +728,22 @@ def _emit_country_approximation_runtime_lines() -> list[str]:
         "\t# AI approximation: proportional-fast (strategy 6), reuses the candidate assessor.",
         "\t# gate_possible is the prefilter: with every raw row already inside",
         "\t# tolerance there is nothing for either path to improve, so both skip.",
+        "\t# Both sides now run the same strict no-worsen vertex sweep. The old AI",
+        "\t# proportional_fast pass adopted a candidate for only 4.2% of eligible",
+        "\t# countries against the vertex sweep's 90.7% on the same save, and its",
+        "\t# median scaled L1 barely moved off raw (0.335 vs raw 0.343, vertex",
+        "\t# 0.114), so a single shared path is both simpler and strictly better.",
         "\tif = {",
-        "\t\tlimit = { is_human = yes var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
-        "\t\tif = { limit = { OR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_solver_human_approx_enabled } }",
+        "\t\tlimit = { var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
+        "\t\tif = {",
+        "\t\t\tlimit = {",
+        "\t\t\t\tOR = {",
+        "\t\t\t\t\tNOT = { has_global_variable_map = cmm }",
+        "\t\t\t\t\tAND = { is_human = yes has_global_variable = sol_solver_human_approx_enabled }",
+        "\t\t\t\t\tAND = { is_ai = yes has_global_variable = sol_solver_ai_approx_enabled }",
+        "\t\t\t\t}",
+        "\t\t\t}",
         "\t\t\tsol_country_demand_run_vertex_selector = yes",
-        "\t\t}",
-        "\t}",
-        "\telse_if = {",
-        "\t\tlimit = { is_ai = yes var:sol_country_demand_exact_status != 1 var:sol_country_demand_gate_possible = 1 var:sol_country_demand_anchor_count > 0 }",
-        "\t\tif = { limit = { has_global_variable = sol_solver_ai_approx_enabled }",
-        "\t\t\tsol_country_demand_approx_prepare_strategy = { strategy = 6 }",
-        "\t\t\tsol_country_demand_run_fast_proportional = yes",
         "\t\t}",
         "\t}",
     ])
@@ -1607,9 +1634,21 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "",
         "sol_solve_country_pop_demand = {",
         "\tgls_compute_savings_pressure = yes",
+        "\t# Size prefilter, checked before anything else because num_locations is",
+        "\t# known up front while the non-empty class count only exists after the",
+        "\t# confidence-ordered classification pass has already been paid for.",
+        "\t# Under four locations the pigeonhole principle caps the matrix at three",
+        "\t# non-empty columns, and measured gains there are marginal: the median",
+        "\t# scaled L1 of a single-location country moves 0.329 -> 0.310, versus",
+        "\t# 0.371 -> 0.222 from three locations up. Skipping them drops 70% of the",
+        "\t# exact-failed country count for 17% of the owned-location traversal.",
+        "\tif = {",
+        "\t\tlimit = { num_locations < " + str(SOLVER_MIN_LOCATIONS) + " }",
+        "\t\tsol_solve_country_pop_demand_raw_only = yes",
+        "\t}",
         "\t# A side enters the solver body when either of its two toggles is on;",
         "\t# with both off it uses the raw-only baseline and skips all preparation.",
-        "\tif = {",
+        "\telse_if = {",
         "\t\tlimit = {",
         "\t\t\tOR = {",
         "\t\t\t\tNOT = { has_global_variable_map = cmm }",
