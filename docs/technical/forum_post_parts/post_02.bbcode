@@ -1,10 +1,12 @@
-[SIZE=2][I]Part 2 of 4. Sections: 4. The mathematical model, 5. The approximation: a strictly non-worsening vertex sweep[/I][/SIZE]
+[SIZE=2][I]Part 2 of 3. Sections: 3. The algorithm, 4. Solver outcomes[/I][/SIZE]
 
-[SIZE=5][B]4. The mathematical model[/B][/SIZE]
+[SIZE=5][B]3. The algorithm[/B][/SIZE]
 
-[SPOILER="Section 4: full derivation (notation, linear system, cone containment, exact solve)"]
+[I]This section goes into more technical detail. If that does not interest you, skip ahead to section 4.[/I]
 
-[B]4.1 Notation[/B]
+[SPOILER="Section 3: notation, the linear system, exact solving, approximation, prefilters"]
+
+[B]3.1 Notation[/B]
 
 A country owns [ICODE]n[/ICODE] locations, partitioned into [ICODE]K[/ICODE] classes [ICODE]C_1 ... C_K[/ICODE].
 
@@ -30,11 +32,11 @@ System matrix [ICODE]M[/ICODE], a 4 x K matrix:
 
 [CODE]M[s][k] = sum over locations l in class C_k of ( m_raw(l) * B_s(l) )[/CODE]
 
-Element [ICODE](s,k)[/ICODE] is the [B]raw-weighted base spending[/B] of stratum [ICODE]s[/ICODE] summed over class [ICODE]k[/ICODE].
+Element [ICODE](s,k)[/ICODE] is the raw-weighted base spending of stratum [ICODE]s[/ICODE] summed over class [ICODE]k[/ICODE].
 
 Class correction factors: the vector [ICODE]x = (x_1, ..., x_K)[/ICODE].
 
-[B]4.2 The linear system[/B]
+[B]3.2 The linear system[/B]
 
 The equation to solve:
 
@@ -49,11 +51,11 @@ The two parts mean:
 [*][ICODE]x >= 0[/ICODE] — modifiers cannot be negative (hard engine constraint)
 [/LIST]
 
-[B]The crux[/B]: this is a [B]constrained[/B] linear system. Drop the nonnegativity and a solution always exists as long as the matrix has full rank. Add [ICODE]x >= 0[/ICODE] and a large fraction of systems become [B]infeasible[/B].
+This is a constrained linear system. Drop the nonnegativity and a solution always exists as long as the matrix has full rank. Add [ICODE]x >= 0[/ICODE] and many systems become infeasible.
 
-[B]4.3 Feasibility equals cone containment[/B]
+[B]3.3 Exact solving[/B]
 
-When does a solution exist? [B]Exactly when the target vector t lies inside the nonnegative cone spanned by M's columns.[/B]
+The system has a solution exactly when the target vector [ICODE]t[/ICODE] lies inside the nonnegative cone spanned by [ICODE]M[/ICODE]'s columns.
 
 The nonnegative cone is defined as:
 
@@ -61,7 +63,7 @@ The nonnegative cone is defined as:
 
 where [ICODE]M[:,k][/ICODE] is the k-th column.
 
-Concretely, for the population structure from section 3 the three class columns are (ordered nobles / clergy / burghers / lower, with m_raw = 1):
+For the population structure from section 2, the three class columns are (ordered nobles / clergy / burghers / lower, with m_raw = 1):
 
 [CODE]           Manor      Hub       Farm
 nobles       400        150       100
@@ -71,46 +73,24 @@ lower        350        300       750[/CODE]
 
 The nonnegative cone is every point reachable as [ICODE]x1*Manor + x2*Hub + x3*Farm[/ICODE] with all [ICODE]x >= 0[/ICODE]. If [ICODE]t[/ICODE] is in there, feasible; if not, infeasible.
 
-That "cannot" from the end of section 3 can now be stated precisely. Let the target be nobles +49% and lower -20%, with clergy and burghers unchanged:
+Let the target be nobles +49% and lower -20%, with clergy and burghers unchanged, i.e. [ICODE]t = (968, 300, 650, 1120)[/ICODE].
 
-[CODE]t = (968, 300, 650, 1120)[/CODE]
+Two rows suffice. The clergy-to-nobles ratio per column is [ICODE]150/400 = 0.375[/ICODE], [ICODE]100/150 = 0.667[/ICODE], [ICODE]50/100 = 0.500[/ICODE], while the target demands [ICODE]300/968 = 0.310[/ICODE]. Any nonnegative combination has a ratio bounded between 0.375 and 0.667, so 0.310 is unreachable — because 50% of clergy and 61.5% of nobles sit in the same manor belt, and raising nobles necessarily raises clergy with them.
 
-Run nonnegative least squares to find the closest reachable point and you get [ICODE]x = (1.93, 0.95, 0.21)[/ICODE], predicting:
+That is the rigorous meaning of "outside the cone". Note how sensitive it is to the target: change it to clergy +40% (ratio 0.434, inside the band) and the maximum relative error under the same population structure immediately drops to 2.7% — nearly feasible. Whether a target is reachable depends on whether it respects the co-location relationships in the population structure, not on algorithmic precision.
 
-[TABLE]
-[TR][TH]Stratum[/TH][TH]Target[/TH][TH]Closest reachable[/TH][TH]Relative error[/TH][/TR]
-[TR][TD]Nobles[/TD][TD]968[/TD][TD]935.5[/TD][TD]3.4%[/TD][/TR]
-[TR][TD]Clergy[/TD][TD]300[/TD][TD]394.9[/TD][TD][B]31.6%[/B][/TD][/TR]
-[TR][TD]Burghers[/TD][TD]650[/TD][TD]640.2[/TD][TD]1.5%[/TD][/TR]
-[TR][TD]Lower[/TD][TD]1120[/TD][TD]1119.3[/TD][TD]0.1%[/TD][/TR]
-[/TABLE]
+Because the nonnegative cone is a narrow region — three or four nonnegative vectors span only a small slice of 4-dimensional space — the exact solution is infeasible in most cases. And [ICODE]t[/ICODE] is determined by actual income, which evolves independently of population structure, so it can easily land outside.
 
-Interestingly, [B]the conflict is not in lower[/B] — it's satisfied to 0.1%. What breaks is clergy, overshooting by 31.6%.
-
-The reason is that clergy and nobles are [B]co-located[/B]: 50% of clergy (150/300) sit in the manor belt, and so do 61.5% of nobles (400/650). Pushing nobles to 968 requires weighting the manor belt heavily (x1 = 1.93), which necessarily drags clergy up with it.
-
-Those two strata alone suffice to prove infeasibility. The clergy-to-nobles ratio per column is:
-
-[CODE]Manor: 150/400 = 0.375
-Hub:   100/150 = 0.667
-Farm:   50/100 = 0.500[/CODE]
-
-The target demands [ICODE]300/968 = 0.310[/ICODE]. [B]That is below all three columns.[/B] Any nonnegative combination has a ratio bounded between the minimum 0.375 and the maximum 0.667, so 0.310 is unreachable, period.
-
-That is the rigorous meaning of "outside the cone". And note: change the target to clergy +40% (i.e. t_clergy = 420, ratio 0.434, inside [0.375, 0.667]) and the maximum relative error under the same population structure immediately drops to 2.7% — [B]nearly feasible[/B]. Whether a target is reachable depends on whether it respects the co-location relationships baked into the population structure, not on algorithmic precision.
-
-[CENTER][IMG]FIGURE_3_URL[/IMG]
-[SIZE=2][I]Figure 3: the four-dimensional system projected onto the (nobles, clergy) plane. Left: the three arrows are the class column vectors; the cyan wedge is everything their nonnegative combinations can reach. The raw baseline sits inside the wedge, while the target (red X) has slope 0.310, below the wedge's lower bound of 0.375 — unreachable no matter how x is tuned, with the nearest point being the blue dot (clergy overshooting 31.6%). Right: the whole decision compressed into one quantity, the clergy/nobles ratio, which must fall inside [0.375, 0.667]. Note the rightmost bar — retarget clergy to +40% and its ratio of 0.434 falls back inside the band.[/I][/SIZE][/CENTER]
-
-There is an important corollary here: [B]no amount of classifier tuning can rescue an infeasible case.[/B] Because every class column is a nonnegative sum of location columns:
+Furthermore, since each class column is a nonnegative sum of location columns:
 
 [CODE]cone( any partition ) is a subset of cone( one column per location )[/CODE]
 
-In other words, if even the finest possible model — an independent coefficient per location — is infeasible, no coarser classification can be feasible either.
+If even one independent coefficient per location is infeasible, no classification scheme can be feasible. That yields a fast test: treat each location as its own class, run one nonnegative least squares, and if that is infeasible then every classification is too.
 
-[B]4.4 The exact solve[/B]
+[CENTER][IMG]FIGURE_3_URL[/IMG]
+[SIZE=2][I]Figure 3: the four-dimensional system projected onto the (nobles, clergy) plane. Left: the three arrows are the class column vectors (Manor belt / Trade hub / Farm province); the cyan wedge is everything their nonnegative combinations can reach. The raw baseline sits inside the wedge, while the target (red X) has slope 0.310, below the wedge's lower bound of 0.375 — unreachable no matter how x is tuned, with the nearest point being the blue dot (clergy overshooting 31.6%). Right: the whole decision compressed into one quantity, the clergy/nobles ratio, which must fall inside [0.375, 0.667]. Note the rightmost bar — retarget clergy to +40% and its ratio of 0.434 falls back inside the band.[/I][/SIZE][/CENTER]
 
-In the shipped implementation the class count is fixed at K = 4 (matching the stratum count), so M is square and the algorithm is direct:
+In the real implementation the class count is fixed at K = 4 (matching the stratum count), so M is square and the algorithm is direct:
 
 [LIST=1]
 [*]Compute [ICODE]x = M^-1 t[/ICODE] (fixed-dimension Gaussian elimination)
@@ -121,38 +101,22 @@ In the shipped implementation the class count is fixed at K = 4 (matching the st
 
 Complexity O(K^3), constant at K = 4.
 
-There is a crucial distinction here: [B]"the equation has a solution" and "the solution is usable" are two different things.[/B] The population structure above has only 3 columns, but the point is identical — solve the first three rows exactly and you get
+Corresponding to the nonnegativity condition in the feasibility test, there is a crucial distinction here: "the equation has a solution" and "the solution is usable" are two different things. Solving exactly for the population structure from section 2 gives
 
 [CODE]x = (6.30, 5.24, -23.38)[/CODE]
 
-The equation is solved, det != 0, numerically flawless. But the third factor is -23.38, the engine rejects negative modifiers, and so the solution [B]exists but is unusable[/B].
+The equation is solved, det != 0, numerically flawless. But the third factor is -23.38, the engine rejects negative modifiers, and so the solution exists but is unusable. This turns out to be very common in measurement. So the solver's design goal is not a 100% feasibility rate but finding the best approximation given confirmed infeasibility.
 
 [CENTER][IMG]FIGURE_4_URL[/IMG]
 [SIZE=2][I]Figure 4: same population structure. Left, the exact solve on the first three rows; the third factor is deeply negative, landing in the region the engine rejects (red shading). Right, the usable nonnegative approximation (1.93, 0.95, 0.21), at the cost of clergy missing its target by 31.6%.[/I][/SIZE][/CENTER]
 
-Hungary's measurements are the real-world version of this: across five consecutive saves the most negative factor in the minimum-norm solution ranged from -6.03 to -4.36, with the count of locations needing a negative factor growing from 8 to 43 (full data in section 6). Those same saves had matrix condition numbers of [B]55.6 to 96.0[/B] — perfectly healthy.
+[B]3.4 Approximate solving[/B]
 
-[B]A good condition number does not imply feasibility[/B] — the former is numerical stability, the latter is geometric position. These are easy to conflate, but det(M) != 0 only guarantees uniqueness and says nothing about nonnegativity. Misattributing infeasibility to "poor matrix conditioning" was a real dead end during diagnosis.
+The first step is deciding how to measure a candidate. The most direct option is the absolute residual [ICODE]||M f - t||[/ICODE], but then the strata are dimensionally incomparable — noble liquid funds can be dozens of times lower-stratum funds, so absolute error is completely dominated by the large stratum.
 
-[/SPOILER]
-
-[HR][/HR]
-
-[SIZE=5][B]5. The approximation: a strictly non-worsening vertex sweep[/B][/SIZE]
-
-[SPOILER="Section 5: objective function, hard constraint, vertex enumeration, retired strategies"]
-
-The previous section established that infeasibility is the norm, so approximation is not a fallback but the main path. One thing to establish up front: [B]the objective function is not an arbitrary choice[/B]. Get it wrong and the whole strategy loses, in measurement, to doing nothing at all. SOL went through several rounds of this before converging on a fairly restrained design.
-
-[B]5.1 Defining "better" first: two scaled metrics[/B]
-
-Step one is deciding how to measure a candidate. The naive move is absolute residual [ICODE]||M f - t||[/ICODE], but then the strata are dimensionally incomparable — noble liquid funds can be dozens of times lower-stratum funds, so absolute error is completely dominated by the large stratum.
-
-So we scale [B]per row, by that row's target[/B]. For each stratum s define the relative residual:
+So we scale per row, by that row's target. For each stratum s define the relative residual:
 
 [CODE]r_s(f) = | (M f)_s - t_s |  /  | t_s |[/CODE]
-
-A negligible target (|t_s| <= 1e-5) contributes 0 for that row, avoiding division-by-zero noise amplification.
 
 On top of that, two scalars:
 
@@ -161,51 +125,49 @@ Linf(f) = max( r_nobles, r_clergy, r_burghers, r_lower )        <- worst stratum
 
 L1 measures overall fit; Linf measures whether any stratum got sacrificed.
 
-Note this is L1, not L2. That is deliberate, and section 8 explains why squared error is actively wrong for this problem.
-
-[B]5.2 The hard constraint: never worse than doing nothing[/B]
-
-This is the most important link in the design, and the easiest to overlook.
-
-Let [ICODE]f = 1[/ICODE] (all factors at 1, i.e. no correction) be the [B]raw[/B] baseline, with metrics [ICODE]L1_raw[/ICODE] and [ICODE]Linf_raw[/ICODE]. A candidate f is accepted only if [B]neither metric worsens[/B]:
+Let [ICODE]f = 1[/ICODE] (all factors at 1, i.e. no correction) be the raw baseline — this is the previous version's SOL algorithm, balancing location by location — with metrics [ICODE]L1_raw[/ICODE] and [ICODE]Linf_raw[/ICODE]. A candidate f is accepted only if neither metric worsens:
 
 [CODE]L1(f)   <= L1_raw      AND      Linf(f) <= Linf_raw[/CODE]
 
-Fail either and the candidate is discarded outright, without even entering comparison.
+Fail either and the candidate is discarded without entering comparison. Failing the first means there was no optimisation at all; failing the second means a stratum that was already the worst off got worse still, and the player's experience degrades.
 
-Why does this matter so much? Because under infeasibility an "optimised" solution can easily be worse than no correction for some particular stratum — you pushed the mean down at the cost of tripling one small stratum's error. From the player's side, that stratum's demand suddenly collapses. The hard constraint keeps every such looks-better-actually-worse solution out.
-
-The companion design decision: [B]the incumbent is initialised to raw itself[/B]. So when the sweep finishes there is always a solution in hand that is no worse than raw — worst case it [I]is[/I] raw, and we fall back to [ICODE]raw_fallback[/ICODE]. The solver has no "failure" state.
-
-[B]5.3 Selection rule: L1 primary, Linf as tie-break[/B]
-
-Among candidates that pass the hard constraint, comparison against the incumbent [ICODE]f*[/ICODE] runs:
+Here we chose an L1-dominant constraint formulation. Among candidates that pass the hard constraint, comparison against the incumbent [ICODE]f*[/ICODE] runs:
 
 [LIST]
-[*]If [ICODE]L1(f) < L1(f*) - 0.01 * L1(f*)[/ICODE] — [B]clearly better, accept[/B]
-[*]Else if [ICODE]L1(f) < L1(f*) + 0.01 * L1(f*)[/ICODE] and [ICODE]Linf(f) < Linf(f*)[/ICODE] — [B]a tie on L1 but a better worst stratum, accept[/B]
+[*]If [ICODE]L1(f) < L1(f*) - 0.01 * L1(f*)[/ICODE] — clearly better, accept
+[*]Else if [ICODE]L1(f) < L1(f*) + 0.01 * L1(f*)[/ICODE] and [ICODE]Linf(f) < Linf(f*)[/ICODE] — tied on L1 but a better worst row, accept
 [*]Otherwise reject
 [/LIST]
 
-So plus/minus 1% on L1 forms a [B]tolerance band[/B]: inside it, treat as a tie and switch to asking whose worst stratum is lighter. Overall fit stays primary, but we don't randomly pick between two near-identical L1 candidates and drop a stratum in the process.
+So plus/minus 1% on L1 forms a tolerance band: inside it, treat as a tie and switch to asking whose worst stratum is lighter. Overall fit stays primary, without randomly picking between two near-identical L1 candidates and dropping a stratum in the process. The 1% is obviously a tunable number, but I did not spend much time on it because the effect is small.
 
-[B]5.4 Where candidates come from: 209 vertices[/B]
+[ICODE]M f = t[/ICODE] with [ICODE]f >= 0[/ICODE] defines a polytope. When the target is unreachable the optimum sits on the boundary — some components exactly zero, or some equations exactly satisfied. Those boundary points are the "vertices", determined by which rows participate in elimination and which columns are free.
 
-The remaining question is which f to enumerate.
+To find those vertices the code enumerates 209 (exact row order, free column) combinations, each running one fixed-dimension Gaussian elimination to produce a candidate f, which then goes through the tests above. The best vertex becomes the approximate solution.
 
-[ICODE]M f = t[/ICODE] with [ICODE]f >= 0[/ICODE] defines a polytope. When the target is unreachable the optimum sits on the [B]boundary[/B] — some components exactly zero, or some equations exactly satisfied. Those boundary points are the "vertices", determined by which rows participate in elimination and which columns are free.
+Note: offline replay against saves confirms these 209 combinations match full enumeration with partial pivoting exactly — no solutions missed — while shrinking the generated script by 87%.
 
-The implementation enumerates [B]209 (exact row order, free column) combinations[/B]. Each runs one fixed-dimension Gaussian elimination to produce a candidate f, then feeds it through the 5.2/5.3 tests. Offline replay confirms these 209 combinations match full enumeration with partial pivoting [B]exactly[/B] — no solutions missed — while shrinking the generated script file by 87%.
+[B]3.5 Prefilters and the overall flow[/B]
 
-The reason for expanding to 209 separate effects rather than writing a loop is a Jomini scripting limitation: no dynamic arrays and no real loops, so matrix dimensions must be fixed at generation time. The cost is a long file (the solver runs about 11,600 lines), but runtime cost is a predictable constant.
+Two prefilters run before solving proper, both cheap.
 
-[B]5.5 Prefilter and overall flow[/B]
+The first is the size filter: any country with fewer than 5 locations goes straight to the raw-only path, skipping even classification. The reason is the pigeonhole principle — below four locations the matrix has at most 3 non-empty columns, so it cannot cover four strata anyway.
 
-Before the sweep runs there is a cheap check ([ICODE]sol_country_demand_gate_possible[/ICODE]): if [B]all four of raw's relative residuals are already within tolerance[/B], no correction is needed and the sweep cannot improve anything, so it is skipped entirely.
+Measurement supports the trade: a single-location country's median scaled L1 only improves from 0.329 to 0.310, whereas from three locations up it is 0.371 to 0.222. Skipping them drops 70% of the exact-failed country count for 17% of the traversal.
 
-The complete flow has only two tiers:
+The second is the residual filter: if all four of raw's relative residuals are already within tolerance, no correction is needed and the sweep cannot improve anything, so it is skipped. This layer matters less.
 
-[CODE]raw error prefilter ---- all rows within tolerance ----> skip (keep raw)
+The complete flow:
+
+[CODE]size filter ---- num_locations < 5 ----> raw-only (skip classification and solving)
+        |
+     5 locations or more
+        v
+CMF toggle check ---- both toggles for this side off ----> raw-only
+        |
+     at least one on
+        v
+raw error filter ---- all four rows within tolerance ----> skip (keep raw)
         |
      some row over
         v
@@ -213,29 +175,110 @@ exact solve (4x4 Gaussian) ---- success ----> adopt, strategy id 7
         |
       fail (singular / negative component)
         v
-209-vertex sweep (hard non-worsening + L1 primary) ---- found ----> adopt, strategy id 8
+209-vertex sweep (hard no-worsen + L1 primary) ---- found ----> adopt, strategy id 8
         |
       nothing admissible
         v
-raw_fallback (all four factors = 1, strategy id 0)[/CODE]
+raw_fallback (all four factors = 1, degrading to location-level balance, strategy id 0)[/CODE]
 
-Human and AI countries take [B]the same path[/B]; the only difference is four CMF toggles (AI/human x exact/approximate) controlling whether each tier is enabled.
-
-[B]5.6 The strategies that were retired[/B]
-
-Earlier versions tried six other approximations. All are retired. Worth recording, because "why not those" carries information:
-
-[TABLE]
-[TR][TH]Strategy[/TH][TH]Why it was retired[/TH][/TR]
-[TR][TD]Four L2 variants (balanced / improvement / target / absolute)[/TD][TD]Optimised something other than the declared objective. Among exact-failed countries, [B]the vertex sweep beat them on scaled L1 in 91.1% of cases[/B] (median improvement +17.11pp), with zero regressions[/TD][/TR]
-[TR][TD][ICODE]minimax_ratio[/ICODE][/TD][TD]Same, plus substantially higher cost[/TD][/TR]
-[TR][TD][ICODE]proportional_fast[/ICODE] (AI-only heuristic)[/TD][TD]On the same save it adopted a candidate for only [B]4.2%[/B] of eligible countries, against the sweep's [B]90.7%[/B]. Its median scaled L1 of 0.335 barely moved off raw's 0.343, while the sweep reached 0.114[/TD][/TR]
-[/TABLE]
-
-The [ICODE]proportional_fast[/ICODE] lesson is worth dwelling on. It was a cheap heuristic designed for AI performance, and in theory "always better than nothing". Measurement showed it almost never produced a candidate that could pass the hard constraint — the direction it optimised did not match the acceptance criterion, so running it was equivalent to not running it. Given that, putting AI and humans on one better path is both simpler and faster.
-
-These retired objectives still live in the offline tool [ICODE]tools/eu5_save_parser/demand_analysis.py[/ICODE] as comparison baselines reproducing the measurements above. [B]They are not in the game runtime[/B] — finding them in the offline tool does not mean they run in-game.
+Human and AI countries take the same path; the only difference is the four CMF toggles (AI/human x exact/approximate) controlling whether each tier is enabled.
 
 [/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]4. Solver outcomes[/B][/SIZE]
+
+This section replays the algorithm in full against real saves at three timepoints: 1337.10, 1386.03 and 1743.04.
+
+[B]4.1 Outcome rates[/B]
+
+Counting where each country ends up, in the runtime's own priority order:
+
+[TABLE]
+[TR][TH]Category[/TH][TH]1337.10[/TH][TH]1386.03[/TH][TH]1743.04[/TH][/TR]
+[TR][TD]prefiltered -> raw[/TD][TD]965 (67.0%)[/TD][TD]629 (59.4%)[/TD][TD]261 (44.3%)[/TD][/TR]
+[TR][TD]unsolvable -> raw[/TD][TD]55 (3.8%)[/TD][TD]47 (4.4%)[/TD][TD]82 (13.9%)[/TD][/TR]
+[TR][TD]approximate solve[/TD][TD]407 (28.2%)[/TD][TD]348 (32.9%)[/TD][TD]236 (40.1%)[/TD][/TR]
+[TR][TD]exact solve[/TD][TD]14 (1.0%)[/TD][TD]35 (3.3%)[/TD][TD]10 (1.7%)[/TD][/TR]
+[TR][TD][B]total[/B][/TD][TD][B]1,441[/B][/TD][TD][B]1,059[/B][/TD][TD][B]589[/B][/TD][/TR]
+[/TABLE]
+
+Several things worth noting:
+
+[LIST=1]
+[*]The exact solve is extremely rare, only 1.0% to 3.3%. Section 3 explained that a K=4 square system requires all four components nonnegative, and real data almost never satisfies that. Of course, since many players like to expand and hold more locations, players should expect a higher exact-solve rate than this.
+[*]The approximation is the workhorse, covering 28.2% to 40.1%. Adding the exact solve, 29.2% to 41.8% of countries actually receive a correction.
+[*]The unsolvable cases sit mostly among the small countries the prefilter blocks. For larger countries the unsolvable share is low — only 3.8% to 4.4% in 1337 and 1386 — and the vast majority obtain an adoptable improvement.
+[/LIST]
+
+Finally, verifying section 2's inference that more locations work better. Bucketing the countries that entered the solver by size (1337.10 save):
+
+[TABLE]
+[TR][TH]Locations[/TH][TH]Countries[/TH][TH]Exact[/TH][TH]Approx[/TH][TH]Unsolvable[/TH][TH]Corrected[/TH][/TR]
+[TR][TD]5-9[/TD][TD]229[/TD][TD]3[/TD][TD]190[/TD][TD]36[/TD][TD]84.3%[/TD][/TR]
+[TR][TD]10-49[/TD][TD]214[/TD][TD]6[/TD][TD]189[/TD][TD]19[/TD][TD]91.1%[/TD][/TR]
+[TR][TD]50-199[/TD][TD]28[/TD][TD]2[/TD][TD]26[/TD][TD]0[/TD][TD]100.0%[/TD][/TR]
+[TR][TD]200+[/TD][TD]5[/TD][TD]3[/TD][TD]2[/TD][TD]0[/TD][TD]100.0%[/TD][/TR]
+[/TABLE]
+
+The inference holds: 84.3% up to 100%, and not one country above 50 locations fails. More classes span a richer set of combinations, so the target has a better chance of landing inside reachable range.
+
+[B]4.2 Improvement rates[/B]
+
+The two tables below measure scaled L1 (mean relative deviation) and scaled Linf (worst-stratum deviation).
+
+Improvement is computed [B]per country and then medianed[/B], not as median-raw divided by median-solved — the latter mixes different countries' numerators and denominators and produces a figure that corresponds to no actual country.
+
+Scaled L1:
+
+[TABLE]
+[TR][TH]Path[/TH][TH]Save[/TH][TH]Countries[/TH][TH]raw median[/TH][TH]solved median[/TH][TH]median improvement[/TH][/TR]
+[TR][TD]exact[/TD][TD]1337.10[/TD][TD]14[/TD][TD]0.1988[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]exact[/TD][TD]1386.03[/TD][TD]35[/TD][TD]0.1910[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]exact[/TD][TD]1743.04[/TD][TD]10[/TD][TD]0.1995[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1337.10[/TD][TD]407[/TD][TD]0.3299[/TD][TD]0.1083[/TD][TD]64.4%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1386.03[/TD][TD]348[/TD][TD]0.3222[/TD][TD]0.0960[/TD][TD]66.9%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1743.04[/TD][TD]236[/TD][TD]0.4307[/TD][TD]0.2616[/TD][TD]42.9%[/TD][/TR]
+[/TABLE]
+
+Scaled Linf:
+
+[TABLE]
+[TR][TH]Path[/TH][TH]Save[/TH][TH]Countries[/TH][TH]raw median[/TH][TH]solved median[/TH][TH]median improvement[/TH][/TR]
+[TR][TD]exact[/TD][TD]1337.10[/TD][TD]14[/TD][TD]0.5596[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]exact[/TD][TD]1386.03[/TD][TD]35[/TD][TD]0.4817[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]exact[/TD][TD]1743.04[/TD][TD]10[/TD][TD]0.3901[/TD][TD]0.0000[/TD][TD]100%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1337.10[/TD][TD]407[/TD][TD]0.6872[/TD][TD]0.3486[/TD][TD]50.0%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1386.03[/TD][TD]348[/TD][TD]0.6607[/TD][TD]0.3237[/TD][TD]52.2%[/TD][/TR]
+[TR][TD]approx[/TD][TD]1743.04[/TD][TD]236[/TD][TD]0.7848[/TD][TD]0.7073[/TD][TD]13.4%[/TD][/TR]
+[/TABLE]
+
+Again, several points worth noting:
+
+[LIST=1]
+[*]The exact solve's 100% is definitional — it hits the target, so both metrics go to zero.
+[*]Look instead at the exact solve's raw column: those countries were already 19% to 20% off on mean deviation, with the worst stratum 39% to 56% off. Countries where the exact solve is feasible are not "already roughly correct"; they are just as far off, they simply happen to land inside the cone.
+[*]The approximation is the real body of cases, 236 to 407 countries. L1 improves 43% to 67%, bringing mean deviation from around 30% down to roughly 10%; Linf improves about 50%, bringing the worst stratum from 69% off down to 35%.
+[/LIST]
+
+[B]4.3 Prefilter effect[/B]
+
+The size filter blocks a lot of countries. What does it cost and what does it buy?
+
+[TABLE]
+[TR][TH]Item[/TH][TH]1337.10[/TH][TH]1386.03[/TH][TH]1743.04[/TH][/TR]
+[TR][TD]countries filtered[/TD][TD]965 (67.0%)[/TD][TD]629 (59.4%)[/TD][TD]261 (44.3%)[/TD][/TR]
+[TR][TD]location traversal given up[/TD][TD]1,751 (13.1%)[/TD][TD]1,176 (8.7%)[/TD][TD]521 (2.7%)[/TD][/TR]
+[TR][TD]of which exactly solvable[/TD][TD]0 (0.0%)[/TD][TD]2 (0.3%)[/TD][TD]0 (0.0%)[/TD][/TR]
+[TR][TD]of which approximable[/TD][TD]565 (58.5%)[/TD][TD]390 (62.0%)[/TD][TD]113 (43.3%)[/TD][/TR]
+[TR][TD]of which unsolvable anyway[/TD][TD]400 (41.5%)[/TD][TD]237 (37.7%)[/TD][TD]148 (56.7%)[/TD][/TR]
+[/TABLE]
+
+The benefit is clear: it blocks 40% to 70% of countries while giving up only 2.7% to 13.1% of location traversal, with little impact on population demand balance.
+
+The cost needs separating out. [B]Almost no exact solves are sacrificed[/B], which matches expectation: below four locations the matrix has at most 3 non-empty columns and cannot cover four strata. What is actually given up is approximation opportunity — 43% to 62% of the filtered countries could have received an approximate solution.
+
+This is a performance decision. Adding the prefilter costs little while cutting sweep triggers substantially. In measurement, only with the prefilter in place does monthly computation reach an imperceptible level.
 
 [HR][/HR]
