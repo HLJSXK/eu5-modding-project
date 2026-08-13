@@ -1,0 +1,241 @@
+[SIZE=2][I]Part 2 of 4. Sections: 4. The mathematical model, 5. The approximation: a strictly non-worsening vertex sweep[/I][/SIZE]
+
+[SIZE=5][B]4. The mathematical model[/B][/SIZE]
+
+[SPOILER="Section 4: full derivation (notation, linear system, cone containment, exact solve)"]
+
+[B]4.1 Notation[/B]
+
+A country owns [ICODE]n[/ICODE] locations, partitioned into [ICODE]K[/ICODE] classes [ICODE]C_1 ... C_K[/ICODE].
+
+Stratum set: [ICODE]S = {nobles, clergy, burghers, lower}[/ICODE], four of them.
+
+Known quantities, computed each month in the location pulse:
+
+[LIST]
+[*][ICODE]I_s(l)[/ICODE] — net income (liquid funds) of stratum [ICODE]s[/ICODE] at location [ICODE]l[/ICODE]
+[*][ICODE]B_s(l)[/ICODE] — base spending of stratum [ICODE]s[/ICODE] at location [ICODE]l[/ICODE]
+[*][ICODE]m_raw(l)[/ICODE] — the raw demand coefficient, i.e. the income-weighted average when classes are ignored
+[/LIST]
+
+[CODE]m_raw(l) = ( sum over s of I_s(l) ) / ( sum over s of B_s(l) )[/CODE]
+
+Country-level targets:
+
+[CODE]t_s = sum over all locations l of I_s(l)          for each stratum s[/CODE]
+
+That is, each stratum's total liquid funds nationwide.
+
+System matrix [ICODE]M[/ICODE], a 4 x K matrix:
+
+[CODE]M[s][k] = sum over locations l in class C_k of ( m_raw(l) * B_s(l) )[/CODE]
+
+Element [ICODE](s,k)[/ICODE] is the [B]raw-weighted base spending[/B] of stratum [ICODE]s[/ICODE] summed over class [ICODE]k[/ICODE].
+
+Class correction factors: the vector [ICODE]x = (x_1, ..., x_K)[/ICODE].
+
+[B]4.2 The linear system[/B]
+
+The equation to solve:
+
+[CODE]M x = t        subject to    x >= 0[/CODE]
+
+where [ICODE]t = (t_nobles, t_clergy, t_burghers, t_lower)[/ICODE].
+
+The two parts mean:
+
+[LIST]
+[*][ICODE]M x = t[/ICODE] — each stratum's nationwide total demand equals its liquid funds
+[*][ICODE]x >= 0[/ICODE] — modifiers cannot be negative (hard engine constraint)
+[/LIST]
+
+[B]The crux[/B]: this is a [B]constrained[/B] linear system. Drop the nonnegativity and a solution always exists as long as the matrix has full rank. Add [ICODE]x >= 0[/ICODE] and a large fraction of systems become [B]infeasible[/B].
+
+[B]4.3 Feasibility equals cone containment[/B]
+
+When does a solution exist? [B]Exactly when the target vector t lies inside the nonnegative cone spanned by M's columns.[/B]
+
+The nonnegative cone is defined as:
+
+[CODE]cone(M) = { sum over k of ( lambda_k * M[:,k] )  :  every lambda_k >= 0 }[/CODE]
+
+where [ICODE]M[:,k][/ICODE] is the k-th column.
+
+Concretely, for the population structure from section 3 the three class columns are (ordered nobles / clergy / burghers / lower, with m_raw = 1):
+
+[CODE]           Manor      Hub       Farm
+nobles       400        150       100
+clergy       150        100        50
+burghers     100        450       100
+lower        350        300       750[/CODE]
+
+The nonnegative cone is every point reachable as [ICODE]x1*Manor + x2*Hub + x3*Farm[/ICODE] with all [ICODE]x >= 0[/ICODE]. If [ICODE]t[/ICODE] is in there, feasible; if not, infeasible.
+
+That "cannot" from the end of section 3 can now be stated precisely. Let the target be nobles +49% and lower -20%, with clergy and burghers unchanged:
+
+[CODE]t = (968, 300, 650, 1120)[/CODE]
+
+Run nonnegative least squares to find the closest reachable point and you get [ICODE]x = (1.93, 0.95, 0.21)[/ICODE], predicting:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Target[/TH][TH]Closest reachable[/TH][TH]Relative error[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]968[/TD][TD]935.5[/TD][TD]3.4%[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]300[/TD][TD]394.9[/TD][TD][B]31.6%[/B][/TD][/TR]
+[TR][TD]Burghers[/TD][TD]650[/TD][TD]640.2[/TD][TD]1.5%[/TD][/TR]
+[TR][TD]Lower[/TD][TD]1120[/TD][TD]1119.3[/TD][TD]0.1%[/TD][/TR]
+[/TABLE]
+
+Interestingly, [B]the conflict is not in lower[/B] — it's satisfied to 0.1%. What breaks is clergy, overshooting by 31.6%.
+
+The reason is that clergy and nobles are [B]co-located[/B]: 50% of clergy (150/300) sit in the manor belt, and so do 61.5% of nobles (400/650). Pushing nobles to 968 requires weighting the manor belt heavily (x1 = 1.93), which necessarily drags clergy up with it.
+
+Those two strata alone suffice to prove infeasibility. The clergy-to-nobles ratio per column is:
+
+[CODE]Manor: 150/400 = 0.375
+Hub:   100/150 = 0.667
+Farm:   50/100 = 0.500[/CODE]
+
+The target demands [ICODE]300/968 = 0.310[/ICODE]. [B]That is below all three columns.[/B] Any nonnegative combination has a ratio bounded between the minimum 0.375 and the maximum 0.667, so 0.310 is unreachable, period.
+
+That is the rigorous meaning of "outside the cone". And note: change the target to clergy +40% (i.e. t_clergy = 420, ratio 0.434, inside [0.375, 0.667]) and the maximum relative error under the same population structure immediately drops to 2.7% — [B]nearly feasible[/B]. Whether a target is reachable depends on whether it respects the co-location relationships baked into the population structure, not on algorithmic precision.
+
+[CENTER][IMG]FIGURE_3_URL[/IMG]
+[SIZE=2][I]Figure 3: the four-dimensional system projected onto the (nobles, clergy) plane. Left: the three arrows are the class column vectors; the cyan wedge is everything their nonnegative combinations can reach. The raw baseline sits inside the wedge, while the target (red X) has slope 0.310, below the wedge's lower bound of 0.375 — unreachable no matter how x is tuned, with the nearest point being the blue dot (clergy overshooting 31.6%). Right: the whole decision compressed into one quantity, the clergy/nobles ratio, which must fall inside [0.375, 0.667]. Note the rightmost bar — retarget clergy to +40% and its ratio of 0.434 falls back inside the band.[/I][/SIZE][/CENTER]
+
+There is an important corollary here: [B]no amount of classifier tuning can rescue an infeasible case.[/B] Because every class column is a nonnegative sum of location columns:
+
+[CODE]cone( any partition ) is a subset of cone( one column per location )[/CODE]
+
+In other words, if even the finest possible model — an independent coefficient per location — is infeasible, no coarser classification can be feasible either.
+
+[B]4.4 The exact solve[/B]
+
+In the shipped implementation the class count is fixed at K = 4 (matching the stratum count), so M is square and the algorithm is direct:
+
+[LIST=1]
+[*]Compute [ICODE]x = M^-1 t[/ICODE] (fixed-dimension Gaussian elimination)
+[*]Check that every [ICODE]x_k >= 0[/ICODE]
+[*]Any negative component — unusable, fall through to approximation
+[*]Otherwise adopt it
+[/LIST]
+
+Complexity O(K^3), constant at K = 4.
+
+There is a crucial distinction here: [B]"the equation has a solution" and "the solution is usable" are two different things.[/B] The population structure above has only 3 columns, but the point is identical — solve the first three rows exactly and you get
+
+[CODE]x = (6.30, 5.24, -23.38)[/CODE]
+
+The equation is solved, det != 0, numerically flawless. But the third factor is -23.38, the engine rejects negative modifiers, and so the solution [B]exists but is unusable[/B].
+
+[CENTER][IMG]FIGURE_4_URL[/IMG]
+[SIZE=2][I]Figure 4: same population structure. Left, the exact solve on the first three rows; the third factor is deeply negative, landing in the region the engine rejects (red shading). Right, the usable nonnegative approximation (1.93, 0.95, 0.21), at the cost of clergy missing its target by 31.6%.[/I][/SIZE][/CENTER]
+
+Hungary's measurements are the real-world version of this: across five consecutive saves the most negative factor in the minimum-norm solution ranged from -6.03 to -4.36, with the count of locations needing a negative factor growing from 8 to 43 (full data in section 6). Those same saves had matrix condition numbers of [B]55.6 to 96.0[/B] — perfectly healthy.
+
+[B]A good condition number does not imply feasibility[/B] — the former is numerical stability, the latter is geometric position. These are easy to conflate, but det(M) != 0 only guarantees uniqueness and says nothing about nonnegativity. Misattributing infeasibility to "poor matrix conditioning" was a real dead end during diagnosis.
+
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]5. The approximation: a strictly non-worsening vertex sweep[/B][/SIZE]
+
+[SPOILER="Section 5: objective function, hard constraint, vertex enumeration, retired strategies"]
+
+The previous section established that infeasibility is the norm, so approximation is not a fallback but the main path. One thing to establish up front: [B]the objective function is not an arbitrary choice[/B]. Get it wrong and the whole strategy loses, in measurement, to doing nothing at all. SOL went through several rounds of this before converging on a fairly restrained design.
+
+[B]5.1 Defining "better" first: two scaled metrics[/B]
+
+Step one is deciding how to measure a candidate. The naive move is absolute residual [ICODE]||M f - t||[/ICODE], but then the strata are dimensionally incomparable — noble liquid funds can be dozens of times lower-stratum funds, so absolute error is completely dominated by the large stratum.
+
+So we scale [B]per row, by that row's target[/B]. For each stratum s define the relative residual:
+
+[CODE]r_s(f) = | (M f)_s - t_s |  /  | t_s |[/CODE]
+
+A negligible target (|t_s| <= 1e-5) contributes 0 for that row, avoiding division-by-zero noise amplification.
+
+On top of that, two scalars:
+
+[CODE]L1(f)   = ( r_nobles + r_clergy + r_burghers + r_lower ) / 4     <- mean relative deviation
+Linf(f) = max( r_nobles, r_clergy, r_burghers, r_lower )        <- worst stratum[/CODE]
+
+L1 measures overall fit; Linf measures whether any stratum got sacrificed.
+
+Note this is L1, not L2. That is deliberate, and section 8 explains why squared error is actively wrong for this problem.
+
+[B]5.2 The hard constraint: never worse than doing nothing[/B]
+
+This is the most important link in the design, and the easiest to overlook.
+
+Let [ICODE]f = 1[/ICODE] (all factors at 1, i.e. no correction) be the [B]raw[/B] baseline, with metrics [ICODE]L1_raw[/ICODE] and [ICODE]Linf_raw[/ICODE]. A candidate f is accepted only if [B]neither metric worsens[/B]:
+
+[CODE]L1(f)   <= L1_raw      AND      Linf(f) <= Linf_raw[/CODE]
+
+Fail either and the candidate is discarded outright, without even entering comparison.
+
+Why does this matter so much? Because under infeasibility an "optimised" solution can easily be worse than no correction for some particular stratum — you pushed the mean down at the cost of tripling one small stratum's error. From the player's side, that stratum's demand suddenly collapses. The hard constraint keeps every such looks-better-actually-worse solution out.
+
+The companion design decision: [B]the incumbent is initialised to raw itself[/B]. So when the sweep finishes there is always a solution in hand that is no worse than raw — worst case it [I]is[/I] raw, and we fall back to [ICODE]raw_fallback[/ICODE]. The solver has no "failure" state.
+
+[B]5.3 Selection rule: L1 primary, Linf as tie-break[/B]
+
+Among candidates that pass the hard constraint, comparison against the incumbent [ICODE]f*[/ICODE] runs:
+
+[LIST]
+[*]If [ICODE]L1(f) < L1(f*) - 0.01 * L1(f*)[/ICODE] — [B]clearly better, accept[/B]
+[*]Else if [ICODE]L1(f) < L1(f*) + 0.01 * L1(f*)[/ICODE] and [ICODE]Linf(f) < Linf(f*)[/ICODE] — [B]a tie on L1 but a better worst stratum, accept[/B]
+[*]Otherwise reject
+[/LIST]
+
+So plus/minus 1% on L1 forms a [B]tolerance band[/B]: inside it, treat as a tie and switch to asking whose worst stratum is lighter. Overall fit stays primary, but we don't randomly pick between two near-identical L1 candidates and drop a stratum in the process.
+
+[B]5.4 Where candidates come from: 209 vertices[/B]
+
+The remaining question is which f to enumerate.
+
+[ICODE]M f = t[/ICODE] with [ICODE]f >= 0[/ICODE] defines a polytope. When the target is unreachable the optimum sits on the [B]boundary[/B] — some components exactly zero, or some equations exactly satisfied. Those boundary points are the "vertices", determined by which rows participate in elimination and which columns are free.
+
+The implementation enumerates [B]209 (exact row order, free column) combinations[/B]. Each runs one fixed-dimension Gaussian elimination to produce a candidate f, then feeds it through the 5.2/5.3 tests. Offline replay confirms these 209 combinations match full enumeration with partial pivoting [B]exactly[/B] — no solutions missed — while shrinking the generated script file by 87%.
+
+The reason for expanding to 209 separate effects rather than writing a loop is a Jomini scripting limitation: no dynamic arrays and no real loops, so matrix dimensions must be fixed at generation time. The cost is a long file (the solver runs about 11,600 lines), but runtime cost is a predictable constant.
+
+[B]5.5 Prefilter and overall flow[/B]
+
+Before the sweep runs there is a cheap check ([ICODE]sol_country_demand_gate_possible[/ICODE]): if [B]all four of raw's relative residuals are already within tolerance[/B], no correction is needed and the sweep cannot improve anything, so it is skipped entirely.
+
+The complete flow has only two tiers:
+
+[CODE]raw error prefilter ---- all rows within tolerance ----> skip (keep raw)
+        |
+     some row over
+        v
+exact solve (4x4 Gaussian) ---- success ----> adopt, strategy id 7
+        |
+      fail (singular / negative component)
+        v
+209-vertex sweep (hard non-worsening + L1 primary) ---- found ----> adopt, strategy id 8
+        |
+      nothing admissible
+        v
+raw_fallback (all four factors = 1, strategy id 0)[/CODE]
+
+Human and AI countries take [B]the same path[/B]; the only difference is four CMF toggles (AI/human x exact/approximate) controlling whether each tier is enabled.
+
+[B]5.6 The strategies that were retired[/B]
+
+Earlier versions tried six other approximations. All are retired. Worth recording, because "why not those" carries information:
+
+[TABLE]
+[TR][TH]Strategy[/TH][TH]Why it was retired[/TH][/TR]
+[TR][TD]Four L2 variants (balanced / improvement / target / absolute)[/TD][TD]Optimised something other than the declared objective. Among exact-failed countries, [B]the vertex sweep beat them on scaled L1 in 91.1% of cases[/B] (median improvement +17.11pp), with zero regressions[/TD][/TR]
+[TR][TD][ICODE]minimax_ratio[/ICODE][/TD][TD]Same, plus substantially higher cost[/TD][/TR]
+[TR][TD][ICODE]proportional_fast[/ICODE] (AI-only heuristic)[/TD][TD]On the same save it adopted a candidate for only [B]4.2%[/B] of eligible countries, against the sweep's [B]90.7%[/B]. Its median scaled L1 of 0.335 barely moved off raw's 0.343, while the sweep reached 0.114[/TD][/TR]
+[/TABLE]
+
+The [ICODE]proportional_fast[/ICODE] lesson is worth dwelling on. It was a cheap heuristic designed for AI performance, and in theory "always better than nothing". Measurement showed it almost never produced a candidate that could pass the hard constraint — the direction it optimised did not match the acceptance criterion, so running it was equivalent to not running it. Given that, putting AI and humans on one better path is both simpler and faster.
+
+These retired objectives still live in the offline tool [ICODE]tools/eu5_save_parser/demand_analysis.py[/ICODE] as comparison baselines reproducing the measurements above. [B]They are not in the game runtime[/B] — finding them in the offline tool does not mean they run in-game.
+
+[/SPOILER]
+
+[HR][/HR]

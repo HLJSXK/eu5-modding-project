@@ -1,0 +1,224 @@
+[SIZE=2][I]Part 1 of 4. Sections: header, 1. The information bottleneck: one number for four strata, 2. Where the idea came from, 3. Verifying the mechanism first[/I][/SIZE]
+
+[SIZE=6][B]Why a single location can't tell strata apart, and how a country can compensate[/B][/SIZE]
+
+[I]A technical write-up on the country-level demand solver in Standard of Living (SOL), a mod for EU5.[/I]
+
+[I]Sections 1-3 are plain prose: what the problem is, how the idea came about, and which half of that idea turned out to be wrong. Section 4 onward gets formal. If you like equations, jump to section 4. If you want the full story of a design decision, including the part where I was wrong, start at the top.[/I]
+
+[HR][/HR]
+
+[SIZE=5][B]1. The information bottleneck: one number for four strata[/B][/SIZE]
+
+[B]What the engine gives us[/B]
+
+EU5 exposes a modifier called [ICODE]local_pop_demand[/ICODE] that applies to a location. It is a [B]scalar[/B] — an ordinary number like 1.2 or 0.8.
+
+Set [ICODE]local_pop_demand = 1.2[/ICODE] on a location and [B]every stratum there[/B] gets its demand multiplied by 1.2:
+
+[LIST]
+[*]Noble silk demand x 1.2
+[*]Clergy book demand x 1.2
+[*]Burgher tool demand x 1.2
+[*]Peasant grain demand x 1.2
+[/LIST]
+
+Sounds fine. Real economies don't work that way.
+
+[B]Strata diverge[/B]
+
+In a thriving trade city the four strata can be in wildly different positions:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Income per capita[/TH][TH]Multiple it can afford[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]500[/TD][TD]2.0[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]200[/TD][TD]1.4[/TD][/TR]
+[TR][TD]Burghers[/TD][TD]150[/TD][TD]1.1[/TD][/TR]
+[TR][TD]Lower[/TD][TD]30[/TD][TD]0.4[/TD][/TR]
+[/TABLE]
+
+So: [B]what single value do you put on this location?[/B]
+
+Say 1.1, roughly the weighted average:
+
+[LIST]
+[*]Nobles should be at 2.0, get 1.1 — [B]45% short[/B]
+[*]Lower should be at 0.4, get 1.1 — [B]175% over[/B] (with what money?)
+[/LIST]
+
+Whatever number you pick, you are [B]simultaneously shortchanging some strata and overfunding others[/B]. This is not an implementation bug, it is [B]arithmetically impossible[/B]: one number cannot express four different coefficients.
+
+[CENTER][IMG]FIGURE_1_URL[/IMG]
+[SIZE=2][I]Figure 1: four strata compressed into one scalar. Labels on the right are the resulting relative error per stratum.[/I][/SIZE][/CENTER]
+
+[B]Why it matters[/B]
+
+You might say: it's a game, an approximation is fine.
+
+But historical economic shocks are usually [B]stratum-specific[/B]:
+
+[LIST]
+[*][B]Food crises[/B] hit peasants and the urban poor
+[*][B]Luxury collapses[/B] hit noble consumption
+[*][B]Wartime inflation[/B] hits burghers hardest — no rent cushion like nobles, no subsistence fallback like peasants
+[/LIST]
+
+Flatten all strata into one scalar and every one of those disappears. Grain prices double and noble demand moves exactly like peasant demand. War breaks out and all four strata tighten in lockstep.
+
+That isn't "slightly imprecise". It means [B]the economic model has lost the class dimension entirely[/B].
+
+[B]So what do we do[/B]
+
+The answer is a little counterintuitive: [B]what one location cannot do, a country with many locations can.[/B]
+
+The next section is how that idea came about, including where it was wrong.
+
+[HR][/HR]
+
+[SIZE=5][B]2. Where the idea came from[/B][/SIZE]
+
+Before the solution, I want to reconstruct how this approach surfaced — because [B]the derivation itself contains an assumption that data later disproved[/B], and understanding exactly how it failed is the key to the whole system.
+
+[B]The sticking point[/B]
+
+The project was stuck on a phenomenon that made no sense: one stratum swimming in gold while another starved, and this happened [B]constantly[/B]. The root cause is the bottleneck from section 1 — with no way to control a single stratum's demand, the arithmetic can't help but be wrong.
+
+Then one day it clicked: [B]stratum ratios differ enormously between locations[/B]. If so, we could in principle apply extra corrections per location to covertly emulate control over stratum demand.
+
+[B]A tale of two locations[/B]
+
+Take nobles and peasants.
+
+[B]Location A is a remote village[/B]: low control, very few nobles. Peasant autonomy is low here, so nobles are rich and peasants are poor — the computation might give nobles +500% and peasants -50%. The weighted average could land at -40%.
+
+What does that mean? That number [B]overestimates peasant demand and underestimates noble demand[/B]. If every location in the country looked like A, peasants would stay permanently poor while nobles hoarded gold at an almost comical rate.
+
+[B]Location B is the capital[/B]: high control, a larger noble share. Peasant autonomy is higher too, so nobles aren't especially rich and peasants aren't especially poor — perhaps nobles +20%, peasants +50%, averaging +25%.
+
+That number [B]underestimates peasant demand and overestimates noble demand[/B]. A country of nothing but B would see peasants accumulating savings and nobles growing poor. Less dramatic than A, admittedly.
+
+[SIZE=2][I](Aside: these two figures are internally consistent. Working backwards from the average, nobles account for just 1.8% of base spending in A and 83.3% in B — exactly matching "very few nobles" and "a larger noble share". That 1.8% spending share in the village, at roughly 10x peasant per-capita spending, is about 0.2% of the population.)[/I][/SIZE]
+
+Now put them together. What if a country has one B and many A? Broadly, peasants still end up poor and nobles still end up rich. Invert it — a more urbanised country with more freemen — and you get impoverished nobles instead.
+
+A conclusion emerges here: [B]the severity of SOL's inability to steer stratum economies actually depends on the "power distribution" across locations, and on the relative counts of each location type.[/B] It isn't a constant bias; it varies with a country's internal structure.
+
+[B]The key step[/B]
+
+Then came the idea: [B]what if we intervene once more, on top of the averaged result?[/B]
+
+Suppose the country has one B and many A. We apply an additional layer of coefficients: a demand bonus on noble-heavy B, a demand malus on noble-sparse A. That neatly raises the effective total noble demand. Reverse it — malus on B, bonus on A — and peasant demand rises instead.
+
+As long as a country holds both A-like and B-like locations, rebalancing two strata's spending becomes possible.
+
+[B]This is really moving the equation from location level to country level[/B]
+
+Thinking further, I realised what this amounts to: [B]changing "location-level income = expenditure" into "country-level income = expenditure".[/B]
+
+The original approach should in theory compute, per location, each stratum's liquid funds over its base spending (the former depending on political power, the latter equalling demand x goods price x headcount). But with no stratum resolution it degenerates into total liquid funds over total base spending.
+
+The new approach instead aggregates income across locations first, then [B]solves for n location coefficients[/B] (n = location count) such that those coefficients, multiplied by local base spending and summed, land exactly on the country-level per-stratum income totals.
+
+[B]The prediction I made, and where it was wrong[/B]
+
+That gives only 4 equations (5 with tribesmen), against very high degrees of freedom — any two locations with linearly independent stratum base-spending vectors add another one. So the judgement at the time was:
+
+[QUOTE]Extracting as few as 4 or 5 linearly independent locations should be enough to solve for a set of coefficients, finally achieving genuinely stratum-resolved demand adjustment.[/QUOTE]
+
+[B]That judgement was half right, and the wrong half consumed the overwhelming majority of the engineering that followed.[/B]
+
+The right half is the mechanism. Location heterogeneity really can reconstruct the stratum signal; that is the foundation of the entire system.
+
+The wrong half is the feasibility criterion. Linear independence guarantees the solution is [B]unique[/B]. But the engine does not accept negative modifiers — what we need is a [B]nonnegative[/B] solution. Those are entirely different things. As we'll see, det(M) != 0, a healthy condition number, and four linearly independent locations can all hold simultaneously while the solution still carries a component like -23.38, making it useless.
+
+The real criterion is a geometric condition called [B]cone containment[/B] — section 4 defines it properly; for now it's enough to know it is considerably stricter than linear independence.
+
+Screening real saves against that criterion gives an ugly result: [B]across 11 saves spanning 406 game years and 15,283 country states, only 12.7% have an exact solution.[/B] The other 87.3% do not. And that figure comes from the [B]most permissive model available[/B] — one independent coefficient per location, more degrees of freedom than any classification scheme has; if even that fails, coarser classification cannot succeed. (Full data and methodology in section 6.)
+
+So everything after this point is really answering a question I hadn't anticipated: [I]what do you do when no exact solution exists?[/I]
+
+[HR][/HR]
+
+[SIZE=5][B]3. Verifying the mechanism first[/B][/SIZE]
+
+Before tackling "no exact solution", we should confirm the mechanism actually works. This section runs it through numbers you can check by hand.
+
+[B]The key observation[/B]
+
+Each location gets one scalar modifier, but [B]population structures differ completely between locations[/B]:
+
+[TABLE]
+[TR][TH]Location type[/TH][TH]Nobles[/TH][TH]Clergy[/TH][TH]Burghers[/TH][TH]Lower[/TH][/TR]
+[TR][TD]Manor belt[/TD][TD]40%[/TD][TD]15%[/TD][TD]10%[/TD][TD]35%[/TD][/TR]
+[TR][TD]Trade hub[/TD][TD]15%[/TD][TD]10%[/TD][TD]45%[/TD][TD]30%[/TD][/TR]
+[TR][TD]Farm province[/TD][TD]10%[/TD][TD]5%[/TD][TD]10%[/TD][TD]75%[/TD][/TR]
+[/TABLE]
+
+Now assign [B]different[/B] modifiers: manor belt 1.8, trade hub 1.2, farm province 0.7.
+
+What happens [B]at the national aggregate[/B]?
+
+[LIST]
+[*][B]Total noble demand[/B] = manor nobles x 1.8 + hub nobles x 1.2 + farm nobles x 0.7
+The manor belt has a high noble share (40%) and a high modifier (1.8), so total noble demand is [B]weighted upward[/B]
+[*][B]Total lower demand[/B] = manor lower x 1.8 + hub lower x 1.2 + farm lower x 0.7
+The farm province has a high lower share (75%) and a low modifier (0.7), so total lower demand is [B]weighted downward[/B]
+[/LIST]
+
+By choosing modifiers carefully we [B]reconstruct stratum differentiation[/B] at the national aggregate — even though each location internally still applies one flat number.
+
+[CENTER][IMG]FIGURE_2_URL[/IMG]
+[SIZE=2][I]Figure 2: left, the population composition of the three location types with each one's assigned modifier below the axis. Right, the four resulting nationwide effective multipliers; in-bar text is base spending -> corrected spending. Three modifiers produce four distinct multipliers — that is where stratum differentiation is rebuilt.[/I][/SIZE][/CENTER]
+
+[B]Running the numbers[/B]
+
+All of that is directly checkable. Give each location type 1000 pop distributed per the table above, with base spending proportional to headcount (1 unit per person).
+
+Uncorrected (all three modifiers at 1):
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Manor[/TH][TH]Hub[/TH][TH]Farm[/TH][TH]National total[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]400[/TD][TD]150[/TD][TD]100[/TD][TD]650[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]150[/TD][TD]100[/TD][TD]50[/TD][TD]300[/TD][/TR]
+[TR][TD]Burghers[/TD][TD]100[/TD][TD]450[/TD][TD]100[/TD][TD]650[/TD][/TR]
+[TR][TD]Lower[/TD][TD]350[/TD][TD]300[/TD][TD]750[/TD][TD]1400[/TD][/TR]
+[/TABLE]
+
+With 1.8 / 1.2 / 0.7 applied:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Manor x1.8[/TH][TH]Hub x1.2[/TH][TH]Farm x0.7[/TH][TH]National total[/TH][TH]Change[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]720[/TD][TD]180[/TD][TD]70[/TD][TD]970[/TD][TD][B]+49%[/B][/TD][/TR]
+[TR][TD]Clergy[/TD][TD]270[/TD][TD]120[/TD][TD]35[/TD][TD]425[/TD][TD][B]+42%[/B][/TD][/TR]
+[TR][TD]Burghers[/TD][TD]180[/TD][TD]540[/TD][TD]70[/TD][TD]790[/TD][TD][B]+22%[/B][/TD][/TR]
+[TR][TD]Lower[/TD][TD]630[/TD][TD]360[/TD][TD]525[/TD][TD]1515[/TD][TD][B]+8%[/B][/TD][/TR]
+[/TABLE]
+
+The four strata received [B]four different effective multipliers[/B] — +49% / +42% / +22% / +8% — even though every stratum inside each location used the same number.
+
+Where does the difference come from? Compare the noble and lower distributions: 61.5% of nobles (400/650) sit in the manor belt at 1.8, while only 25% of lower (350/1400) are there and 53.6% (750/1400) sit in the farm province at 0.7. [B]The same modifiers, weighted by different population distributions, produce different outcomes.[/B]
+
+This also exposes the method's limit: the four effective multipliers are [B]not free[/B]. They are jointly determined by three modifiers and a fixed population distribution, so the reachable combinations are bounded.
+
+The limit comes from [B]co-location[/B]. Note that 50% of clergy (150/300) and 61.5% of nobles (400/650) are both in the manor belt — raising nobles by weighting the manor belt cannot avoid dragging clergy up too. That is exactly why the table shows nobles +49% alongside clergy +42%; the two are bound together. If a target demands nobles rise sharply while clergy stays put, this population structure cannot deliver. Section 4 turns that "cannot" into a decidable condition.
+
+[B]Large countries have it easier[/B]
+
+A side effect: [B]more locations, better results[/B].
+
+[LIST]
+[*][B]Large country (100+ locations)[/B]: can split into 10-20 classes, plenty of freedom to tune
+[*][B]Small country (5 locations)[/B]: barely manages 4 classes (matching the 4 strata), and any deviation leaves the system unsolvable
+[/LIST]
+
+Historically defensible — large empires did have more complex internal markets. Possibly a balance concern though (large countries get both more land and a more accurate economic model).
+
+[B]But this is not magic[/B]
+
+A working mechanism is not a mechanism that always succeeds. That 12.7% from the previous section is the price: in the vast majority of cases, hitting all four stratum targets [B]simultaneously[/B] is not achievable.
+
+The population structure above already hints at why — nobles at +49% necessarily drags clergy to +42%. The real question is when that coupling makes a target outright unreachable.
+
+Turning that hint into a decidable condition requires the maths.
+
+[HR][/HR]

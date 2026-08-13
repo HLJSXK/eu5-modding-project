@@ -1,0 +1,745 @@
+[SIZE=6][B]Why a single location can't tell strata apart, and how a country can compensate[/B][/SIZE]
+
+[I]A technical write-up on the country-level demand solver in Standard of Living (SOL), a mod for EU5.[/I]
+
+[I]Sections 1-3 are plain prose: what the problem is, how the idea came about, and which half of that idea turned out to be wrong. Section 4 onward gets formal. If you like equations, jump to section 4. If you want the full story of a design decision, including the part where I was wrong, start at the top.[/I]
+
+[HR][/HR]
+
+[SIZE=5][B]1. The information bottleneck: one number for four strata[/B][/SIZE]
+
+[B]What the engine gives us[/B]
+
+EU5 exposes a modifier called [ICODE]local_pop_demand[/ICODE] that applies to a location. It is a [B]scalar[/B] — an ordinary number like 1.2 or 0.8.
+
+Set [ICODE]local_pop_demand = 1.2[/ICODE] on a location and [B]every stratum there[/B] gets its demand multiplied by 1.2:
+
+[LIST]
+[*]Noble silk demand x 1.2
+[*]Clergy book demand x 1.2
+[*]Burgher tool demand x 1.2
+[*]Peasant grain demand x 1.2
+[/LIST]
+
+Sounds fine. Real economies don't work that way.
+
+[B]Strata diverge[/B]
+
+In a thriving trade city the four strata can be in wildly different positions:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Income per capita[/TH][TH]Multiple it can afford[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]500[/TD][TD]2.0[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]200[/TD][TD]1.4[/TD][/TR]
+[TR][TD]Burghers[/TD][TD]150[/TD][TD]1.1[/TD][/TR]
+[TR][TD]Lower[/TD][TD]30[/TD][TD]0.4[/TD][/TR]
+[/TABLE]
+
+So: [B]what single value do you put on this location?[/B]
+
+Say 1.1, roughly the weighted average:
+
+[LIST]
+[*]Nobles should be at 2.0, get 1.1 — [B]45% short[/B]
+[*]Lower should be at 0.4, get 1.1 — [B]175% over[/B] (with what money?)
+[/LIST]
+
+Whatever number you pick, you are [B]simultaneously shortchanging some strata and overfunding others[/B]. This is not an implementation bug, it is [B]arithmetically impossible[/B]: one number cannot express four different coefficients.
+
+[CENTER][IMG]FIGURE_1_URL[/IMG]
+[SIZE=2][I]Figure 1: four strata compressed into one scalar. Labels on the right are the resulting relative error per stratum.[/I][/SIZE][/CENTER]
+
+[B]Why it matters[/B]
+
+You might say: it's a game, an approximation is fine.
+
+But historical economic shocks are usually [B]stratum-specific[/B]:
+
+[LIST]
+[*][B]Food crises[/B] hit peasants and the urban poor
+[*][B]Luxury collapses[/B] hit noble consumption
+[*][B]Wartime inflation[/B] hits burghers hardest — no rent cushion like nobles, no subsistence fallback like peasants
+[/LIST]
+
+Flatten all strata into one scalar and every one of those disappears. Grain prices double and noble demand moves exactly like peasant demand. War breaks out and all four strata tighten in lockstep.
+
+That isn't "slightly imprecise". It means [B]the economic model has lost the class dimension entirely[/B].
+
+[B]So what do we do[/B]
+
+The answer is a little counterintuitive: [B]what one location cannot do, a country with many locations can.[/B]
+
+The next section is how that idea came about, including where it was wrong.
+
+[HR][/HR]
+
+[SIZE=5][B]2. Where the idea came from[/B][/SIZE]
+
+Before the solution, I want to reconstruct how this approach surfaced — because [B]the derivation itself contains an assumption that data later disproved[/B], and understanding exactly how it failed is the key to the whole system.
+
+[B]The sticking point[/B]
+
+The project was stuck on a phenomenon that made no sense: one stratum swimming in gold while another starved, and this happened [B]constantly[/B]. The root cause is the bottleneck from section 1 — with no way to control a single stratum's demand, the arithmetic can't help but be wrong.
+
+Then one day it clicked: [B]stratum ratios differ enormously between locations[/B]. If so, we could in principle apply extra corrections per location to covertly emulate control over stratum demand.
+
+[B]A tale of two locations[/B]
+
+Take nobles and peasants.
+
+[B]Location A is a remote village[/B]: low control, very few nobles. Peasant autonomy is low here, so nobles are rich and peasants are poor — the computation might give nobles +500% and peasants -50%. The weighted average could land at -40%.
+
+What does that mean? That number [B]overestimates peasant demand and underestimates noble demand[/B]. If every location in the country looked like A, peasants would stay permanently poor while nobles hoarded gold at an almost comical rate.
+
+[B]Location B is the capital[/B]: high control, a larger noble share. Peasant autonomy is higher too, so nobles aren't especially rich and peasants aren't especially poor — perhaps nobles +20%, peasants +50%, averaging +25%.
+
+That number [B]underestimates peasant demand and overestimates noble demand[/B]. A country of nothing but B would see peasants accumulating savings and nobles growing poor. Less dramatic than A, admittedly.
+
+[SIZE=2][I](Aside: these two figures are internally consistent. Working backwards from the average, nobles account for just 1.8% of base spending in A and 83.3% in B — exactly matching "very few nobles" and "a larger noble share". That 1.8% spending share in the village, at roughly 10x peasant per-capita spending, is about 0.2% of the population.)[/I][/SIZE]
+
+Now put them together. What if a country has one B and many A? Broadly, peasants still end up poor and nobles still end up rich. Invert it — a more urbanised country with more freemen — and you get impoverished nobles instead.
+
+A conclusion emerges here: [B]the severity of SOL's inability to steer stratum economies actually depends on the "power distribution" across locations, and on the relative counts of each location type.[/B] It isn't a constant bias; it varies with a country's internal structure.
+
+[B]The key step[/B]
+
+Then came the idea: [B]what if we intervene once more, on top of the averaged result?[/B]
+
+Suppose the country has one B and many A. We apply an additional layer of coefficients: a demand bonus on noble-heavy B, a demand malus on noble-sparse A. That neatly raises the effective total noble demand. Reverse it — malus on B, bonus on A — and peasant demand rises instead.
+
+As long as a country holds both A-like and B-like locations, rebalancing two strata's spending becomes possible.
+
+[B]This is really moving the equation from location level to country level[/B]
+
+Thinking further, I realised what this amounts to: [B]changing "location-level income = expenditure" into "country-level income = expenditure".[/B]
+
+The original approach should in theory compute, per location, each stratum's liquid funds over its base spending (the former depending on political power, the latter equalling demand x goods price x headcount). But with no stratum resolution it degenerates into total liquid funds over total base spending.
+
+The new approach instead aggregates income across locations first, then [B]solves for n location coefficients[/B] (n = location count) such that those coefficients, multiplied by local base spending and summed, land exactly on the country-level per-stratum income totals.
+
+[B]The prediction I made, and where it was wrong[/B]
+
+That gives only 4 equations (5 with tribesmen), against very high degrees of freedom — any two locations with linearly independent stratum base-spending vectors add another one. So the judgement at the time was:
+
+[QUOTE]Extracting as few as 4 or 5 linearly independent locations should be enough to solve for a set of coefficients, finally achieving genuinely stratum-resolved demand adjustment.[/QUOTE]
+
+[B]That judgement was half right, and the wrong half consumed the overwhelming majority of the engineering that followed.[/B]
+
+The right half is the mechanism. Location heterogeneity really can reconstruct the stratum signal; that is the foundation of the entire system.
+
+The wrong half is the feasibility criterion. Linear independence guarantees the solution is [B]unique[/B]. But the engine does not accept negative modifiers — what we need is a [B]nonnegative[/B] solution. Those are entirely different things. As we'll see, det(M) != 0, a healthy condition number, and four linearly independent locations can all hold simultaneously while the solution still carries a component like -23.38, making it useless.
+
+The real criterion is a geometric condition called [B]cone containment[/B] — section 4 defines it properly; for now it's enough to know it is considerably stricter than linear independence.
+
+Screening real saves against that criterion gives an ugly result: [B]across 11 saves spanning 406 game years and 15,283 country states, only 12.7% have an exact solution.[/B] The other 87.3% do not. And that figure comes from the [B]most permissive model available[/B] — one independent coefficient per location, more degrees of freedom than any classification scheme has; if even that fails, coarser classification cannot succeed. (Full data and methodology in section 6.)
+
+So everything after this point is really answering a question I hadn't anticipated: [I]what do you do when no exact solution exists?[/I]
+
+[HR][/HR]
+
+[SIZE=5][B]3. Verifying the mechanism first[/B][/SIZE]
+
+Before tackling "no exact solution", we should confirm the mechanism actually works. This section runs it through numbers you can check by hand.
+
+[B]The key observation[/B]
+
+Each location gets one scalar modifier, but [B]population structures differ completely between locations[/B]:
+
+[TABLE]
+[TR][TH]Location type[/TH][TH]Nobles[/TH][TH]Clergy[/TH][TH]Burghers[/TH][TH]Lower[/TH][/TR]
+[TR][TD]Manor belt[/TD][TD]40%[/TD][TD]15%[/TD][TD]10%[/TD][TD]35%[/TD][/TR]
+[TR][TD]Trade hub[/TD][TD]15%[/TD][TD]10%[/TD][TD]45%[/TD][TD]30%[/TD][/TR]
+[TR][TD]Farm province[/TD][TD]10%[/TD][TD]5%[/TD][TD]10%[/TD][TD]75%[/TD][/TR]
+[/TABLE]
+
+Now assign [B]different[/B] modifiers: manor belt 1.8, trade hub 1.2, farm province 0.7.
+
+What happens [B]at the national aggregate[/B]?
+
+[LIST]
+[*][B]Total noble demand[/B] = manor nobles x 1.8 + hub nobles x 1.2 + farm nobles x 0.7
+The manor belt has a high noble share (40%) and a high modifier (1.8), so total noble demand is [B]weighted upward[/B]
+[*][B]Total lower demand[/B] = manor lower x 1.8 + hub lower x 1.2 + farm lower x 0.7
+The farm province has a high lower share (75%) and a low modifier (0.7), so total lower demand is [B]weighted downward[/B]
+[/LIST]
+
+By choosing modifiers carefully we [B]reconstruct stratum differentiation[/B] at the national aggregate — even though each location internally still applies one flat number.
+
+[CENTER][IMG]FIGURE_2_URL[/IMG]
+[SIZE=2][I]Figure 2: left, the population composition of the three location types with each one's assigned modifier below the axis. Right, the four resulting nationwide effective multipliers; in-bar text is base spending -> corrected spending. Three modifiers produce four distinct multipliers — that is where stratum differentiation is rebuilt.[/I][/SIZE][/CENTER]
+
+[B]Running the numbers[/B]
+
+All of that is directly checkable. Give each location type 1000 pop distributed per the table above, with base spending proportional to headcount (1 unit per person).
+
+Uncorrected (all three modifiers at 1):
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Manor[/TH][TH]Hub[/TH][TH]Farm[/TH][TH]National total[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]400[/TD][TD]150[/TD][TD]100[/TD][TD]650[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]150[/TD][TD]100[/TD][TD]50[/TD][TD]300[/TD][/TR]
+[TR][TD]Burghers[/TD][TD]100[/TD][TD]450[/TD][TD]100[/TD][TD]650[/TD][/TR]
+[TR][TD]Lower[/TD][TD]350[/TD][TD]300[/TD][TD]750[/TD][TD]1400[/TD][/TR]
+[/TABLE]
+
+With 1.8 / 1.2 / 0.7 applied:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Manor x1.8[/TH][TH]Hub x1.2[/TH][TH]Farm x0.7[/TH][TH]National total[/TH][TH]Change[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]720[/TD][TD]180[/TD][TD]70[/TD][TD]970[/TD][TD][B]+49%[/B][/TD][/TR]
+[TR][TD]Clergy[/TD][TD]270[/TD][TD]120[/TD][TD]35[/TD][TD]425[/TD][TD][B]+42%[/B][/TD][/TR]
+[TR][TD]Burghers[/TD][TD]180[/TD][TD]540[/TD][TD]70[/TD][TD]790[/TD][TD][B]+22%[/B][/TD][/TR]
+[TR][TD]Lower[/TD][TD]630[/TD][TD]360[/TD][TD]525[/TD][TD]1515[/TD][TD][B]+8%[/B][/TD][/TR]
+[/TABLE]
+
+The four strata received [B]four different effective multipliers[/B] — +49% / +42% / +22% / +8% — even though every stratum inside each location used the same number.
+
+Where does the difference come from? Compare the noble and lower distributions: 61.5% of nobles (400/650) sit in the manor belt at 1.8, while only 25% of lower (350/1400) are there and 53.6% (750/1400) sit in the farm province at 0.7. [B]The same modifiers, weighted by different population distributions, produce different outcomes.[/B]
+
+This also exposes the method's limit: the four effective multipliers are [B]not free[/B]. They are jointly determined by three modifiers and a fixed population distribution, so the reachable combinations are bounded.
+
+The limit comes from [B]co-location[/B]. Note that 50% of clergy (150/300) and 61.5% of nobles (400/650) are both in the manor belt — raising nobles by weighting the manor belt cannot avoid dragging clergy up too. That is exactly why the table shows nobles +49% alongside clergy +42%; the two are bound together. If a target demands nobles rise sharply while clergy stays put, this population structure cannot deliver. Section 4 turns that "cannot" into a decidable condition.
+
+[B]Large countries have it easier[/B]
+
+A side effect: [B]more locations, better results[/B].
+
+[LIST]
+[*][B]Large country (100+ locations)[/B]: can split into 10-20 classes, plenty of freedom to tune
+[*][B]Small country (5 locations)[/B]: barely manages 4 classes (matching the 4 strata), and any deviation leaves the system unsolvable
+[/LIST]
+
+Historically defensible — large empires did have more complex internal markets. Possibly a balance concern though (large countries get both more land and a more accurate economic model).
+
+[B]But this is not magic[/B]
+
+A working mechanism is not a mechanism that always succeeds. That 12.7% from the previous section is the price: in the vast majority of cases, hitting all four stratum targets [B]simultaneously[/B] is not achievable.
+
+The population structure above already hints at why — nobles at +49% necessarily drags clergy to +42%. The real question is when that coupling makes a target outright unreachable.
+
+Turning that hint into a decidable condition requires the maths.
+
+[HR][/HR]
+
+[SIZE=5][B]4. The mathematical model[/B][/SIZE]
+
+[SPOILER="Section 4: full derivation (notation, linear system, cone containment, exact solve)"]
+
+[B]4.1 Notation[/B]
+
+A country owns [ICODE]n[/ICODE] locations, partitioned into [ICODE]K[/ICODE] classes [ICODE]C_1 ... C_K[/ICODE].
+
+Stratum set: [ICODE]S = {nobles, clergy, burghers, lower}[/ICODE], four of them.
+
+Known quantities, computed each month in the location pulse:
+
+[LIST]
+[*][ICODE]I_s(l)[/ICODE] — net income (liquid funds) of stratum [ICODE]s[/ICODE] at location [ICODE]l[/ICODE]
+[*][ICODE]B_s(l)[/ICODE] — base spending of stratum [ICODE]s[/ICODE] at location [ICODE]l[/ICODE]
+[*][ICODE]m_raw(l)[/ICODE] — the raw demand coefficient, i.e. the income-weighted average when classes are ignored
+[/LIST]
+
+[CODE]m_raw(l) = ( sum over s of I_s(l) ) / ( sum over s of B_s(l) )[/CODE]
+
+Country-level targets:
+
+[CODE]t_s = sum over all locations l of I_s(l)          for each stratum s[/CODE]
+
+That is, each stratum's total liquid funds nationwide.
+
+System matrix [ICODE]M[/ICODE], a 4 x K matrix:
+
+[CODE]M[s][k] = sum over locations l in class C_k of ( m_raw(l) * B_s(l) )[/CODE]
+
+Element [ICODE](s,k)[/ICODE] is the [B]raw-weighted base spending[/B] of stratum [ICODE]s[/ICODE] summed over class [ICODE]k[/ICODE].
+
+Class correction factors: the vector [ICODE]x = (x_1, ..., x_K)[/ICODE].
+
+[B]4.2 The linear system[/B]
+
+The equation to solve:
+
+[CODE]M x = t        subject to    x >= 0[/CODE]
+
+where [ICODE]t = (t_nobles, t_clergy, t_burghers, t_lower)[/ICODE].
+
+The two parts mean:
+
+[LIST]
+[*][ICODE]M x = t[/ICODE] — each stratum's nationwide total demand equals its liquid funds
+[*][ICODE]x >= 0[/ICODE] — modifiers cannot be negative (hard engine constraint)
+[/LIST]
+
+[B]The crux[/B]: this is a [B]constrained[/B] linear system. Drop the nonnegativity and a solution always exists as long as the matrix has full rank. Add [ICODE]x >= 0[/ICODE] and a large fraction of systems become [B]infeasible[/B].
+
+[B]4.3 Feasibility equals cone containment[/B]
+
+When does a solution exist? [B]Exactly when the target vector t lies inside the nonnegative cone spanned by M's columns.[/B]
+
+The nonnegative cone is defined as:
+
+[CODE]cone(M) = { sum over k of ( lambda_k * M[:,k] )  :  every lambda_k >= 0 }[/CODE]
+
+where [ICODE]M[:,k][/ICODE] is the k-th column.
+
+Concretely, for the population structure from section 3 the three class columns are (ordered nobles / clergy / burghers / lower, with m_raw = 1):
+
+[CODE]           Manor      Hub       Farm
+nobles       400        150       100
+clergy       150        100        50
+burghers     100        450       100
+lower        350        300       750[/CODE]
+
+The nonnegative cone is every point reachable as [ICODE]x1*Manor + x2*Hub + x3*Farm[/ICODE] with all [ICODE]x >= 0[/ICODE]. If [ICODE]t[/ICODE] is in there, feasible; if not, infeasible.
+
+That "cannot" from the end of section 3 can now be stated precisely. Let the target be nobles +49% and lower -20%, with clergy and burghers unchanged:
+
+[CODE]t = (968, 300, 650, 1120)[/CODE]
+
+Run nonnegative least squares to find the closest reachable point and you get [ICODE]x = (1.93, 0.95, 0.21)[/ICODE], predicting:
+
+[TABLE]
+[TR][TH]Stratum[/TH][TH]Target[/TH][TH]Closest reachable[/TH][TH]Relative error[/TH][/TR]
+[TR][TD]Nobles[/TD][TD]968[/TD][TD]935.5[/TD][TD]3.4%[/TD][/TR]
+[TR][TD]Clergy[/TD][TD]300[/TD][TD]394.9[/TD][TD][B]31.6%[/B][/TD][/TR]
+[TR][TD]Burghers[/TD][TD]650[/TD][TD]640.2[/TD][TD]1.5%[/TD][/TR]
+[TR][TD]Lower[/TD][TD]1120[/TD][TD]1119.3[/TD][TD]0.1%[/TD][/TR]
+[/TABLE]
+
+Interestingly, [B]the conflict is not in lower[/B] — it's satisfied to 0.1%. What breaks is clergy, overshooting by 31.6%.
+
+The reason is that clergy and nobles are [B]co-located[/B]: 50% of clergy (150/300) sit in the manor belt, and so do 61.5% of nobles (400/650). Pushing nobles to 968 requires weighting the manor belt heavily (x1 = 1.93), which necessarily drags clergy up with it.
+
+Those two strata alone suffice to prove infeasibility. The clergy-to-nobles ratio per column is:
+
+[CODE]Manor: 150/400 = 0.375
+Hub:   100/150 = 0.667
+Farm:   50/100 = 0.500[/CODE]
+
+The target demands [ICODE]300/968 = 0.310[/ICODE]. [B]That is below all three columns.[/B] Any nonnegative combination has a ratio bounded between the minimum 0.375 and the maximum 0.667, so 0.310 is unreachable, period.
+
+That is the rigorous meaning of "outside the cone". And note: change the target to clergy +40% (i.e. t_clergy = 420, ratio 0.434, inside [0.375, 0.667]) and the maximum relative error under the same population structure immediately drops to 2.7% — [B]nearly feasible[/B]. Whether a target is reachable depends on whether it respects the co-location relationships baked into the population structure, not on algorithmic precision.
+
+[CENTER][IMG]FIGURE_3_URL[/IMG]
+[SIZE=2][I]Figure 3: the four-dimensional system projected onto the (nobles, clergy) plane. Left: the three arrows are the class column vectors; the cyan wedge is everything their nonnegative combinations can reach. The raw baseline sits inside the wedge, while the target (red X) has slope 0.310, below the wedge's lower bound of 0.375 — unreachable no matter how x is tuned, with the nearest point being the blue dot (clergy overshooting 31.6%). Right: the whole decision compressed into one quantity, the clergy/nobles ratio, which must fall inside [0.375, 0.667]. Note the rightmost bar — retarget clergy to +40% and its ratio of 0.434 falls back inside the band.[/I][/SIZE][/CENTER]
+
+There is an important corollary here: [B]no amount of classifier tuning can rescue an infeasible case.[/B] Because every class column is a nonnegative sum of location columns:
+
+[CODE]cone( any partition ) is a subset of cone( one column per location )[/CODE]
+
+In other words, if even the finest possible model — an independent coefficient per location — is infeasible, no coarser classification can be feasible either.
+
+[B]4.4 The exact solve[/B]
+
+In the shipped implementation the class count is fixed at K = 4 (matching the stratum count), so M is square and the algorithm is direct:
+
+[LIST=1]
+[*]Compute [ICODE]x = M^-1 t[/ICODE] (fixed-dimension Gaussian elimination)
+[*]Check that every [ICODE]x_k >= 0[/ICODE]
+[*]Any negative component — unusable, fall through to approximation
+[*]Otherwise adopt it
+[/LIST]
+
+Complexity O(K^3), constant at K = 4.
+
+There is a crucial distinction here: [B]"the equation has a solution" and "the solution is usable" are two different things.[/B] The population structure above has only 3 columns, but the point is identical — solve the first three rows exactly and you get
+
+[CODE]x = (6.30, 5.24, -23.38)[/CODE]
+
+The equation is solved, det != 0, numerically flawless. But the third factor is -23.38, the engine rejects negative modifiers, and so the solution [B]exists but is unusable[/B].
+
+[CENTER][IMG]FIGURE_4_URL[/IMG]
+[SIZE=2][I]Figure 4: same population structure. Left, the exact solve on the first three rows; the third factor is deeply negative, landing in the region the engine rejects (red shading). Right, the usable nonnegative approximation (1.93, 0.95, 0.21), at the cost of clergy missing its target by 31.6%.[/I][/SIZE][/CENTER]
+
+Hungary's measurements are the real-world version of this: across five consecutive saves the most negative factor in the minimum-norm solution ranged from -6.03 to -4.36, with the count of locations needing a negative factor growing from 8 to 43 (full data in section 6). Those same saves had matrix condition numbers of [B]55.6 to 96.0[/B] — perfectly healthy.
+
+[B]A good condition number does not imply feasibility[/B] — the former is numerical stability, the latter is geometric position. These are easy to conflate, but det(M) != 0 only guarantees uniqueness and says nothing about nonnegativity. Misattributing infeasibility to "poor matrix conditioning" was a real dead end during diagnosis.
+
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]5. The approximation: a strictly non-worsening vertex sweep[/B][/SIZE]
+
+[SPOILER="Section 5: objective function, hard constraint, vertex enumeration, retired strategies"]
+
+The previous section established that infeasibility is the norm, so approximation is not a fallback but the main path. One thing to establish up front: [B]the objective function is not an arbitrary choice[/B]. Get it wrong and the whole strategy loses, in measurement, to doing nothing at all. SOL went through several rounds of this before converging on a fairly restrained design.
+
+[B]5.1 Defining "better" first: two scaled metrics[/B]
+
+Step one is deciding how to measure a candidate. The naive move is absolute residual [ICODE]||M f - t||[/ICODE], but then the strata are dimensionally incomparable — noble liquid funds can be dozens of times lower-stratum funds, so absolute error is completely dominated by the large stratum.
+
+So we scale [B]per row, by that row's target[/B]. For each stratum s define the relative residual:
+
+[CODE]r_s(f) = | (M f)_s - t_s |  /  | t_s |[/CODE]
+
+A negligible target (|t_s| <= 1e-5) contributes 0 for that row, avoiding division-by-zero noise amplification.
+
+On top of that, two scalars:
+
+[CODE]L1(f)   = ( r_nobles + r_clergy + r_burghers + r_lower ) / 4     <- mean relative deviation
+Linf(f) = max( r_nobles, r_clergy, r_burghers, r_lower )        <- worst stratum[/CODE]
+
+L1 measures overall fit; Linf measures whether any stratum got sacrificed.
+
+Note this is L1, not L2. That is deliberate, and section 8 explains why squared error is actively wrong for this problem.
+
+[B]5.2 The hard constraint: never worse than doing nothing[/B]
+
+This is the most important link in the design, and the easiest to overlook.
+
+Let [ICODE]f = 1[/ICODE] (all factors at 1, i.e. no correction) be the [B]raw[/B] baseline, with metrics [ICODE]L1_raw[/ICODE] and [ICODE]Linf_raw[/ICODE]. A candidate f is accepted only if [B]neither metric worsens[/B]:
+
+[CODE]L1(f)   <= L1_raw      AND      Linf(f) <= Linf_raw[/CODE]
+
+Fail either and the candidate is discarded outright, without even entering comparison.
+
+Why does this matter so much? Because under infeasibility an "optimised" solution can easily be worse than no correction for some particular stratum — you pushed the mean down at the cost of tripling one small stratum's error. From the player's side, that stratum's demand suddenly collapses. The hard constraint keeps every such looks-better-actually-worse solution out.
+
+The companion design decision: [B]the incumbent is initialised to raw itself[/B]. So when the sweep finishes there is always a solution in hand that is no worse than raw — worst case it [I]is[/I] raw, and we fall back to [ICODE]raw_fallback[/ICODE]. The solver has no "failure" state.
+
+[B]5.3 Selection rule: L1 primary, Linf as tie-break[/B]
+
+Among candidates that pass the hard constraint, comparison against the incumbent [ICODE]f*[/ICODE] runs:
+
+[LIST]
+[*]If [ICODE]L1(f) < L1(f*) - 0.01 * L1(f*)[/ICODE] — [B]clearly better, accept[/B]
+[*]Else if [ICODE]L1(f) < L1(f*) + 0.01 * L1(f*)[/ICODE] and [ICODE]Linf(f) < Linf(f*)[/ICODE] — [B]a tie on L1 but a better worst stratum, accept[/B]
+[*]Otherwise reject
+[/LIST]
+
+So plus/minus 1% on L1 forms a [B]tolerance band[/B]: inside it, treat as a tie and switch to asking whose worst stratum is lighter. Overall fit stays primary, but we don't randomly pick between two near-identical L1 candidates and drop a stratum in the process.
+
+[B]5.4 Where candidates come from: 209 vertices[/B]
+
+The remaining question is which f to enumerate.
+
+[ICODE]M f = t[/ICODE] with [ICODE]f >= 0[/ICODE] defines a polytope. When the target is unreachable the optimum sits on the [B]boundary[/B] — some components exactly zero, or some equations exactly satisfied. Those boundary points are the "vertices", determined by which rows participate in elimination and which columns are free.
+
+The implementation enumerates [B]209 (exact row order, free column) combinations[/B]. Each runs one fixed-dimension Gaussian elimination to produce a candidate f, then feeds it through the 5.2/5.3 tests. Offline replay confirms these 209 combinations match full enumeration with partial pivoting [B]exactly[/B] — no solutions missed — while shrinking the generated script file by 87%.
+
+The reason for expanding to 209 separate effects rather than writing a loop is a Jomini scripting limitation: no dynamic arrays and no real loops, so matrix dimensions must be fixed at generation time. The cost is a long file (the solver runs about 11,600 lines), but runtime cost is a predictable constant.
+
+[B]5.5 Prefilter and overall flow[/B]
+
+Before the sweep runs there is a cheap check ([ICODE]sol_country_demand_gate_possible[/ICODE]): if [B]all four of raw's relative residuals are already within tolerance[/B], no correction is needed and the sweep cannot improve anything, so it is skipped entirely.
+
+The complete flow has only two tiers:
+
+[CODE]raw error prefilter ---- all rows within tolerance ----> skip (keep raw)
+        |
+     some row over
+        v
+exact solve (4x4 Gaussian) ---- success ----> adopt, strategy id 7
+        |
+      fail (singular / negative component)
+        v
+209-vertex sweep (hard non-worsening + L1 primary) ---- found ----> adopt, strategy id 8
+        |
+      nothing admissible
+        v
+raw_fallback (all four factors = 1, strategy id 0)[/CODE]
+
+Human and AI countries take [B]the same path[/B]; the only difference is four CMF toggles (AI/human x exact/approximate) controlling whether each tier is enabled.
+
+[B]5.6 The strategies that were retired[/B]
+
+Earlier versions tried six other approximations. All are retired. Worth recording, because "why not those" carries information:
+
+[TABLE]
+[TR][TH]Strategy[/TH][TH]Why it was retired[/TH][/TR]
+[TR][TD]Four L2 variants (balanced / improvement / target / absolute)[/TD][TD]Optimised something other than the declared objective. Among exact-failed countries, [B]the vertex sweep beat them on scaled L1 in 91.1% of cases[/B] (median improvement +17.11pp), with zero regressions[/TD][/TR]
+[TR][TD][ICODE]minimax_ratio[/ICODE][/TD][TD]Same, plus substantially higher cost[/TD][/TR]
+[TR][TD][ICODE]proportional_fast[/ICODE] (AI-only heuristic)[/TD][TD]On the same save it adopted a candidate for only [B]4.2%[/B] of eligible countries, against the sweep's [B]90.7%[/B]. Its median scaled L1 of 0.335 barely moved off raw's 0.343, while the sweep reached 0.114[/TD][/TR]
+[/TABLE]
+
+The [ICODE]proportional_fast[/ICODE] lesson is worth dwelling on. It was a cheap heuristic designed for AI performance, and in theory "always better than nothing". Measurement showed it almost never produced a candidate that could pass the hard constraint — the direction it optimised did not match the acceptance criterion, so running it was equivalent to not running it. Given that, putting AI and humans on one better path is both simpler and faster.
+
+These retired objectives still live in the offline tool [ICODE]tools/eu5_save_parser/demand_analysis.py[/ICODE] as comparison baselines reproducing the measurements above. [B]They are not in the game runtime[/B] — finding them in the offline tool does not mean they run in-game.
+
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]6. Real data[/B][/SIZE]
+
+The 12.7% cited repeatedly above gets its provenance here: the full measurement methodology, the sample composition, and exactly where the conflict sits.
+
+[B]6.1 The cone feasibility survey[/B]
+
+Dataset: 11 debug saves from 1337.06 to 1743.04, spanning roughly 406 game years, [B]15,283 country-save pairs[/B] (saves from 1337-1338 carry 1,504-1,525 countries each, fewer in later consolidated states). Countries with no valid locations or all-zero targets were skipped.
+
+Method: for each state, solve NNLS using the [B]finest model[/B] — one independent nonnegative coefficient per owned location. This matters: it is the theoretical ceiling for any classification scheme. The shipped solver has only 4 classes and far fewer degrees of freedom, so the rate measured here is an [B]optimistic bound[/B]; if even this fails, coarser classification necessarily fails harder.
+
+[TABLE]
+[TR][TH]Metric[/TH][TH]Value[/TH][/TR]
+[TR][TD]Scored country-save pairs[/TD][TD]15,283[/TD][/TR]
+[TR][TD]Exact solve [B]feasible[/B][/TD][TD]1,940 ([B]12.7%[/B])[/TD][/TR]
+[TR][TD]Exact solve [B]infeasible[/B][/TD][TD]13,343 ([B]87.3%[/B])[/TD][/TR]
+[TR][TD]Median residual among infeasible[/TD][TD]0.129 - 0.243[/TD][/TR]
+[TR][TD]Maximum residual among infeasible[/TD][TD]1.00 - 1.22[/TD][/TR]
+[/TABLE]
+
+Median residuals sit above 0.13 — this is not "just barely missing", it is clearly out of reach.
+
+Why: real economies carry a [B]structural conflict[/B] between income distribution and population structure. Noble-dense regions tend to also be where clergy concentrate (cities, seats of lordship), which makes the "nobles" and "clergy" columns highly correlated and flattens the cone. Once actual income breaks that correlation — wealthy nobles alongside strapped clergy — the target falls outside.
+
+[B]Time trend[/B]: there isn't one. Feasibility stays in a narrow 12.5-13.2% band across 406 years (1337: 12.5%, 1338: 13.2%, later 1386/1536/1743 combined: 12.6%). Infeasibility is not a property of some historical phase, it is intrinsic to this modelling approach.
+
+[B]6.2 Hungary across five saves: infeasibility is the steady state[/B]
+
+Tracking Hungary over five consecutive saves (measured 2026-08-11, 189 owned locations). Again not using the class matrix but [B]one independent nonnegative factor per location[/B] — the theoretical limit of the reachable set, looser than any classification.
+
+[TABLE]
+[TR][TH]Save[/TH][TH]All-location cone residual[/TH][TH]Most negative factor[/TH][TH]Locations needing x < 0[/TH][/TR]
+[TR][TD]1337.10.02[/TD][TD]0.0504[/TD][TD]-6.03[/TD][TD]8[/TD][/TR]
+[TR][TD]1337.11.02[/TD][TD]0.0558[/TD][TD]-5.95[/TD][TD]12[/TD][/TR]
+[TR][TD]1337.12.01[/TD][TD]0.0465[/TD][TD]-5.75[/TD][TD]8[/TD][/TR]
+[TR][TD]1338.01.13[/TD][TD][B]0.1057[/B][/TD][TD]-4.65[/TD][TD][B]43[/B][/TD][/TR]
+[TR][TD]1338.02.02[/TD][TD]0.0903[/TD][TD]-4.36[/TD][TD]37[/TD][/TR]
+[/TABLE]
+
+[B]All five saves infeasible[/B], residuals oscillating between 0.0465 and 0.1057, and the count of locations needing negative factors climbing from 8 to 43. Not bad luck — a [B]persistent state[/B].
+
+Decomposing by stratum subset pins the conflict precisely (residual 0.000 means that subset is reachable):
+
+[TABLE]
+[TR][TH]Stratum subset[/TH][TH]Residual range[/TH][TH]Verdict[/TH][/TR]
+[TR][TD]Single stratum (N / C / B / L individually)[/TD][TD]0.000[/TD][TD]All reachable[/TD][/TR]
+[TR][TD]B + L (both need scaling down)[/TD][TD]0.000[/TD][TD]Same-direction pair reachable[/TD][/TR]
+[TR][TD]N + C (both need scaling up)[/TD][TD]0.009 - 0.030[/TD][TD]Nearly reachable[/TD][/TR]
+[TR][TD]N + L[/TD][TD]0.025 - 0.074[/TD][TD]Conflict[/TD][/TR]
+[TR][TD]C + L[/TD][TD]0.026 - 0.106[/TD][TD]Conflict[/TD][/TR]
+[TR][TD]C + B + L[/TD][TD]0.094 - 0.180[/TD][TD]Worst conflict[/TD][/TR]
+[TR][TD]N + C + B + L (complete)[/TD][TD]0.049 - 0.109[/TD][TD]Infeasible[/TD][/TR]
+[/TABLE]
+
+[B]The conflict structure is now clear[/B]: nobles and clergy need scaling up while lower needs scaling down substantially (its compression ratio falls to 0.586 by 1338). Satisfying either side alone is easy, same-direction combinations are easy, but [B]opposing combinations are impossible[/B] — those strata's per-location spending is coupled (nobles-vs-lower share correlation 0.29 to 0.47), so no nonnegative factor field separates them.
+
+There's an extra lesson here. While diagnosing this, four plausible-sounding attributions were [B]all ruled out by data[/B]:
+
+[LIST=1]
+[*][B]"Zeros are being silently clamped"[/B] — a 0 returned by a nonnegative solve is a legitimate boundary optimum, not a clamping artefact
+[*][B]"The matrix is ill-conditioned"[/B] — measured condition numbers were 55.6 to 96.0, perfectly healthy
+[*][B]"The yearly unit-spending refresh triggers it"[/B] — saves 1337.10/11/12 had frozen unit spending and feasibility still moved
+[*][B]"Classifier churn causes it"[/B] — running 1338 data under 1337's classes still gave Class 4 = -1.089
+[/LIST]
+
+The real cause is the structural conflict above, unrelated to algorithm, numerics, or classifier.
+
+So the solver's design goal is not "raise the feasibility rate" (impossible) but [B]find the best compromise that is no worse than doing nothing, given confirmed infeasibility[/B] — which is precisely where section 5's hard constraint comes from.
+
+[B]6.3 Large versus small countries: the original hunch, confirmed[/B]
+
+Section 2's derivation already noted that severity depends on "the power distribution across locations and the relative counts of each location type" — more and more varied locations mean more room to manoeuvre. That was qualitative at the time. Measurement makes it concrete:
+
+[TABLE]
+[TR][TH]Owned locations[/TH][TH]Countries[/TH][TH]Feasible[/TH][TH]Rate[/TH][/TR]
+[TR][TD]1 - 9[/TD][TD]12,829[/TD][TD]1,292[/TD][TD][B]10.1%[/B][/TD][/TR]
+[TR][TD]10 - 49[/TD][TD]2,090[/TD][TD]466[/TD][TD]22.3%[/TD][/TR]
+[TR][TD]50 - 199[/TD][TD]308[/TD][TD]147[/TD][TD]47.7%[/TD][/TR]
+[TR][TD]200+[/TD][TD]56[/TD][TD]35[/TD][TD][B]62.5%[/B][/TD][/TR]
+[/TABLE]
+
+From 10.1% to 62.5% — [B]over a six-fold spread[/B]. Countries with more locations have more freedom to internally balance conflicting stratum needs; small countries simply don't have enough.
+
+Worth noting the sample distribution itself: 12,829 of the 15,283 states (84%) are small countries with 1-9 locations. So that headline 87.3% infeasibility rate is substantially dragged down by a mass of minor states. For a 200+ location empire, the lived experience is that over six months in ten solve exactly.
+
+Historically this makes sense — large empires did have more complex, more self-regulating internal markets. Something to watch on balance, though: large countries get both more land and a more accurate economic model.
+
+[CENTER][IMG]FIGURE_5_URL[/IMG]
+[SIZE=2][I]Figure 5: (a) overall feasible/infeasible split; (b) feasibility rate bucketed by location count; (c) Hungary's five-save all-location cone residual (red bars) and locations needing negative factors (blue line); (d) residual decomposition by stratum subset, where N/C/B/L are nobles/clergy/burghers/lower — single strata and same-direction pairs are reachable, opposing combinations conflict.[/I][/SIZE][/CENTER]
+
+[HR][/HR]
+
+[SIZE=5][B]7. Diagnostic tooling[/B][/SIZE]
+
+[B]The offline cone analyser[/B]
+
+Location: [ICODE]tools/eu5_save_parser/cone_feasibility.py[/ICODE]
+
+It loads a save, extracts each country's M and t, computes the cone residual under the finest model, and reports feasibility plus matrix condition numbers.
+
+[CODE]python tools/eu5_save_parser/cone_feasibility.py --save path/to/save.eu5[/CODE]
+
+[B]This is step one for diagnosing any [ICODE]negative_factor[/ICODE] report or any whole-class -100% [ICODE]local_pop_demand[/ICODE].[/B] If the all-location residual exceeds roughly 0.01, the target is unreachable and no classifier change, class count change, capacity rule, or conditioning fix will help — only relaxing the target definition or accepting an approximation. Running this first saves a great deal of wasted debugging.
+
+[B]Figure generation[/B]
+
+[ICODE]scripts/generate_solver_diagrams.py[/ICODE] produces every figure in this post, writing to [ICODE]docs/analysis/solver_diagrams/[/ICODE].
+
+[HR][/HR]
+
+[SIZE=5][B]8. Design trade-offs[/B][/SIZE]
+
+[SPOILER="Section 8: why not per-stratum modifiers, why scaled L1 over L2, and one counterintuitive artefact"]
+
+[B]Why not just have the engine expose per-stratum modifiers[/B]
+
+Ideally the engine would offer [ICODE]local_pop_demand_nobles[/ICODE], [ICODE]local_pop_demand_clergy[/ICODE] and so on as four independent modifiers. That requires C++ engine changes, a save format change, UI rework, and per-modifier overhead. Waiting for official support could mean several versions. SOL needs to work now.
+
+[B]Why accept an 87.3% infeasibility rate[/B]
+
+Infeasibility is not "algorithm failure", it is [B]a property of the problem[/B]. Section 4's example gives the mechanism: clergy and nobles are co-located (50% and 61.5% in the manor belt respectively), so their ratio is locked by population structure into [0.375, 0.667], and a target demanding 0.310 is simply out of reach. Hungary's measurements are the real-world version: nobles-vs-lower per-location share correlation of 0.29 to 0.47, so targets requiring opposite adjustments for those two land outside the reachable set.
+
+Given that, "exact" is not a goal one can work toward. What the solver [I]can[/I] work toward is three things: [B]never worse than no correction[/B] (guaranteed by the hard constraint), mean relative deviation as low as possible, and predictable constant cost.
+
+Stepping back, [I]where[/I] the remaining residual lands also matters. Using section 3's structure: nobles have 650 nationwide base spending, lower has 1400. A 5% deviation concentrated on lower means 70 units of misallocated demand; the same 5% on nobles is only 32.5 units. Scaled L1 weighting all four strata equally is exactly what stops the optimiser from shoving all error onto one side — which leads directly into the next point.
+
+[B]Why scaled L1 rather than L2[/B]
+
+This is where I was wrong initially, so it deserves its own treatment.
+
+"Least squares" is close to a reflex for fitting problems, and NNLS has mature, stable algorithms. It is wrong here, on three levels.
+
+[B]Level one: squaring amplifies the large stratum's voice.[/B] Using section 3's structure (nobles 650, clergy 300, burghers 650, lower 1400), suppose two candidates:
+
+[TABLE]
+[TR][TH]Candidate[/TH][TH]Nobles[/TH][TH]Clergy[/TH][TH]Burghers[/TH][TH]Lower[/TH][TH]L1 (mean)[/TH][TH]L2 (sum sq)[/TH][/TR]
+[TR][TD]A[/TD][TD]4%[/TD][TD]4%[/TD][TD]4%[/TD][TD]4%[/TD][TD]0.040[/TD][TD]0.0064[/TD][/TR]
+[TR][TD]B[/TD][TD]1%[/TD][TD]1%[/TD][TD]1%[/TD][TD]12%[/TD][TD]0.0375[/TD][TD]0.0147[/TD][/TR]
+[/TABLE]
+
+L1 calls B marginally better (0.0375 < 0.040); L2 calls A clearly better (0.0064 < 0.0147). At a glance L2 looks more sensible — but which is genuinely better depends on which stratum absorbed that 12%. If it lands on lower, that's 168 units of misallocated demand on a base of 1400, and lower is precisely the group least able to absorb demand swings. L2's squared penalty suppresses that whole family of candidates indiscriminately, including ones where concentrated error happens to land on a small stratum and the overall outcome is clearly better.
+
+The deeper issue is dimensionality. Without per-row scaling, using raw absolute residuals, lower's base of 1400 naturally contributes the largest squared terms and the optimiser pours nearly all resources into it, sacrificing the noble and clergy fits entirely. Scaling fixes dimensionality, but squaring still changes how strata trade off against each other.
+
+[B]Level two: L2 has no concept of "non-worsening".[/B] The minimum-squared-error solution can easily be worse than no correction for some stratum. Say raw's four deviations are 3% / 3% / 3% / 20% and some L2 optimum gives 8% / 2% / 2% / 10% — the sum of squares drops from 0.0427 to 0.0172, a large apparent improvement, yet nobles degraded from 3% to 8%. What the player sees is noble demand suddenly going off-target. L2 only looks at the total; it does not check whether a row got sacrificed. Preventing that requires bolting on a constraint, at which point the objective is no longer pure L2 anyway.
+
+[B]Level three, the decisive one: it lost in measurement.[/B] Four L2 variants were implemented early on (balanced / improvement / target / absolute). Among exact-failed countries, the vertex sweep using scaled L1 as its primary objective [B]won in 91.1% of countries[/B], median improvement 17.11 percentage points, with [B]zero regressions[/B]. The L2 variants' optimisation direction did not match the final evaluation criterion — however correctly they ran, they ran toward the wrong thing.
+
+So the final design is:
+
+[TABLE]
+[TR][TH]Role[/TH][TH]Metric[/TH][TH]Rationale[/TH][/TR]
+[TR][TD]Primary objective[/TD][TD]Scaled L1 (mean of four relative residuals)[/TD][TD]Equal weight per stratum, not dominated by the large one[/TD][/TR]
+[TR][TD]Tie-break[/TD][TD]Scaled Linf (worst row)[/TD][TD]Inside the 1% band, switch to checking whether a stratum was sacrificed[/TD][/TR]
+[TR][TD]Hard constraint[/TD][TD]Neither may exceed raw[/TD][TD]Guarantees never worse than no correction[/TD][/TR]
+[TR][TD]Retired[/TD][TD]Four L2 variants, [ICODE]minimax_ratio[/ICODE][/TD][TD]Objective misaligned with evaluation; lost in measurement[/TD][/TR]
+[/TABLE]
+
+Worth noting that Linf was not discarded entirely — it survives as the tie-break. That is more sensible than pure minimax: pure minimax sacrifices overall fit to flatten the worst row, whereas as a tie-break it only intervenes when overall fit is already tied.
+
+[B]One counterintuitive artefact[/B]
+
+Class coefficients occasionally come out in the tens or even hundreds (for example x1 = 105.98). This is [B]not numerical blow-up[/B].
+
+Capacity targets are constructed as [ICODE]baseline * floor + baseline * negative_pool * pressure_share[/ICODE], with pressure clipped at zero. A stratum whose baseline is [I]below[/I] target (needing to scale up) contributes zero pressure, so the class representing it receives only the 1% capacity floor. That column then carries roughly 1-3% of the dominant column's mass, [ICODE]||W^-1 row||[/ICODE] reaches 96 to 404, and a normal monthly move of 0.01 in a compression ratio swings that coefficient by 1 to 4 units.
+
+Amplification and feasibility are [B]independent problems[/B]: amplification comes from unequal column mass (the 1% anchor), feasibility comes from cone containment. Raising the capacity floor trades jitter against margin in both directions, making it a tuning decision rather than a fix.
+
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]9. Notes for modders[/B][/SIZE]
+
+[SPOILER="Section 9: classifier internals, solver structure, performance gotchas"]
+
+[B]How the classifier works, and how to change it[/B]
+
+Classification lives not in the solver but in [ICODE]scripts/sol_economy_effects_source.py[/ICODE] (emitted into [ICODE]A_SOL_economy_effects.txt[/ICODE]). It is [B]not[/B] clustering like k-means, but a deterministic two-step process:
+
+[LIST=1]
+[*][B]Score[/B]: each location's four stratum shares are compared against the nationwide shares to produce a "relative over-representation" score, clipped to [-3, 3]. The gap between the top and second score becomes the [B]confidence[/B].
+[*][B]Greedy assignment[/B]: locations are traversed in [B]descending[/B] confidence order ([ICODE]ordered_owned_location[/ICODE] with [ICODE]order_by = confidence[/ICODE]) and placed into their matching class, subject to that class's capacity cap. High-confidence locations claim slots first; ambiguous ones are handled last.
+[/LIST]
+
+Capacity works out as: each class first takes 1% of nationwide raw spending as a floor anchor, and the remaining 96% is distributed proportionally to each stratum's [B]downward pressure[/B] (the portion where [ICODE]raw baseline - target > 0[/ICODE]).
+
+To change it: adjust the scoring features, the clipping range, the capacity floor, or swap greedy for another assignment rule. The class count is fixed at 4 (matching the strata); changing that means also changing the solver's matrix dimensions and all 209 vertex cases — not a small edit.
+
+Re-run [ICODE]gen_sol_chain.py[/ICODE] afterwards to update every deploy target.
+
+[B]A counterintuitive gotcha[/B]: an [ICODE]ordered_*[/ICODE] scope without an explicit [ICODE]max[/ICODE] iterates exactly [B]one[/B] object. In testing, the scoring pass found 189 valid locations while the assignment pass processed only the first. You must write something like [ICODE]max = 100000[/ICODE] to get full traversal.
+
+[B]Modifying the solver[/B]
+
+[ICODE]scripts/sol_country_demand_solver_source.py[/ICODE] governs generation of the exact solve and the vertex sweep. Be aware it contains a body of [B]dead code[/B]: [ICODE]sol_country_demand_approx_assess[/ICODE], [ICODE]select_approx_strategy[/ICODE], [ICODE]approx_prepare_strategy[/ICODE] and [ICODE]solve_reduced_3/4[/ICODE] are defined but never called, leftovers from retired strategies. Meanwhile [ICODE]run_fast_proportional[/ICODE] and [ICODE]minimax_vertex_enumeration[/ICODE] appear only in the generator's name-list constant (used for file routing) and are never rendered into the game files at all.
+
+Before editing, grep to confirm whether an effect is actually live:
+
+[CODE]grep -c sol_country_demand_run_fast_proportional \
+  src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt
+# 0 = not rendered;  1 = definition only (dead code);  >1 = actually called[/CODE]
+
+[B]Performance trade-offs[/B]
+
+AI and human countries currently share one solve path, differing only in frequency: the CMF "reduce AI calculation frequency" toggle (default on) moves AI [B]solving[/B] to each country's own anniversary pulse, while humans solve monthly. Switching AI to monthly improves responsiveness at the cost of CPU.
+
+One trap worth flagging: [B]reduced frequency can only reduce the solve, never the modifier write.[/B] If you also move [ICODE]add_location_modifier[/ICODE] to the yearly pulse and rely on a [ICODE]years = 1[/ICODE] lifetime to bridge between solves, then at every entry point that isn't the yearly pulse — game start, save load, player/AI handover, a newly formed country, toggling the setting mid-game — what actually gets written is a [ICODE]months = 1[/ICODE] modifier that expires long before the country's anniversary arrives. The country then runs on the bare [ICODE]demand_add[/ICODE] baseline for up to 11 months, with no error and no log line. The correct approach is to rewrite the modifier every month from cached coefficients, and move only the expensive solve to the yearly pulse.
+
+[/SPOILER]
+
+[HR][/HR]
+
+[SIZE=5][B]10. Conclusion[/B][/SIZE]
+
+[B]Revisiting section 2's prediction[/B]
+
+We can now grade that original derivation.
+
+[B]The mechanism holds completely.[/B] "Stratum ratios differ enormously between locations, so we can apply extra per-location corrections to covertly emulate stratum control" — correct, and the foundation of the whole system. Section 3's arithmetic verified it: three modifiers really did produce four distinct effective multipliers. The distillation of "change location-level income = expenditure into country-level income = expenditure" was also accurate; that is exactly [ICODE]M x = t[/ICODE].
+
+[B]The feasibility criterion was wrong.[/B] The conclusion at the time was "extracting as few as 4 or 5 linearly independent locations should be enough to solve for a set of coefficients". Linear independence does guarantee a unique solution exists — in R^K. The engine wants a solution in the [I]nonnegative[/I] orthant, and those are far apart: in section 4's example the three columns are fully linearly independent and the solution is unique, yet it is (6.30, 5.24, -23.38), whose third component is deeply negative and therefore useless.
+
+The real criterion is cone containment, and by it 87.3% of real states have no solution. [B]That gap is the source of all the engineering that followed[/B]: had the original prediction been right, this post would have ended at section 4.
+
+Worth adding that the original derivation also contained a [B]correct instinct[/B] that went unexplored: the remark that "severity depends on the power distribution across locations and the relative counts of each location type". That was already brushing against the fact that feasibility depends on a country's internal structure — and section 6's bucketed data (10.1% to 62.5%) is its quantitative form.
+
+[B]Three lessons[/B]
+
+[B]Constraints breed structure.[/B] Had the engine simply provided four per-stratum modifiers, the discovery that location heterogeneity can reconstruct the stratum signal would never have happened.
+
+[B]"Has a solution" and "the solution is usable" are two different things.[/B] This is where the original prediction failed, and where diagnosis kept failing afterwards — attributing infeasibility to poor conditioning, to clamped zeros, to classifier churn; four attributions, all refuted by data. Feasibility is a geometric question (is the target inside the cone), not a numerical one.
+
+[B]The objective function must align with the evaluation criterion.[/B] The four L2 variants and [ICODE]proportional_fast[/ICODE] were not wrongly implemented; their [B]optimisation direction did not match the final evaluation criterion[/B]. L2 lets the large stratum dominate, and [ICODE]proportional_fast[/ICODE] almost never produced a candidate able to pass the hard constraint (4.2% versus the vertex sweep's 90.7%). However correctly they ran, they ran toward the wrong thing. The eventual approach was to define "better" precisely first (scaled L1, plus Linf tie-break, plus hard non-worsening), then go looking for an algorithm.
+
+[B]Closing[/B]
+
+When SOL started, the goal was to make class actually matter economically. The engine offered one scalar modifier. It looked impossible.
+
+Recast mathematically, the impossible became [B]a nonnegative optimisation problem with 4 constraints and K degrees of freedom[/B]. Then the data said: 87.3% of the time, that problem [B]has no exact solution[/B].
+
+But "no exact solution" is not "no answer". Change the goal from "hit the target" to "get as close as possible while guaranteeing no degradation" and the problem becomes solvable — and solves rather well: among exact-failed countries the vertex sweep found an adoptable improvement for 90.7%, dropping median scaled L1 from raw's 0.343 to 0.114.
+
+Players won't notice the relative residual that remains. They will notice nobles and peasants heading toward different fates.
+
+That's enough.
+
+[HR][/HR]
+
+[SPOILER="Appendix A: notation reference"]
+
+[TABLE]
+[TR][TH]Symbol[/TH][TH]Meaning[/TH][/TR]
+[TR][TD]n[/TD][TD]Number of owned locations[/TD][/TR]
+[TR][TD]K[/TD][TD]Number of classifier classes (fixed at 4)[/TD][/TR]
+[TR][TD]S[/TD][TD]Stratum set: nobles, clergy, burghers, lower[/TD][/TR]
+[TR][TD]I_s(l)[/TD][TD]Net income of stratum s at location l[/TD][/TR]
+[TR][TD]B_s(l)[/TD][TD]Base spending of stratum s at location l[/TD][/TR]
+[TR][TD]m_raw(l)[/TD][TD]Raw demand coefficient of location l[/TD][/TR]
+[TR][TD]M[/TD][TD]System matrix, 4 x K (rows are strata, columns are classes)[/TD][/TR]
+[TR][TD]t[/TD][TD]Target vector, length 4 (per-stratum liquid funds)[/TD][/TR]
+[TR][TD]x[/TD][TD]Class correction factors, length K[/TD][/TR]
+[TR][TD]cone(M)[/TD][TD]Nonnegative cone spanned by M's columns[/TD][/TR]
+[TR][TD]L1, Linf[/TD][TD]Scaled mean and scaled worst-row relative deviation[/TD][/TR]
+[TR][TD]kappa(M)[/TD][TD]Matrix condition number[/TD][/TR]
+[TR][TD]NNLS[/TD][TD]Nonnegative least squares[/TD][/TR]
+[/TABLE]
+
+[/SPOILER]
+
+[SPOILER="Appendix B: code locations"]
+
+[TABLE]
+[TR][TH]Purpose[/TH][TH]Path[/TH][/TR]
+[TR][TD]Solver generator[/TD][TD][ICODE]scripts/sol_country_demand_solver_source.py[/ICODE][/TD][/TR]
+[TR][TD]Generated solver[/TD][TD][ICODE]src/<target>/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt[/ICODE][/TD][/TR]
+[TR][TD]Location aggregation and runtime[/TD][TD][ICODE]src/<target>/in_game/common/scripted_effects/A_SOL_economy_effects.txt[/ICODE][/TD][/TR]
+[TR][TD]Cone feasibility tool[/TD][TD][ICODE]tools/eu5_save_parser/cone_feasibility.py[/ICODE][/TD][/TR]
+[TR][TD]Save demand analysis[/TD][TD][ICODE]tools/eu5_save_parser/demand_analysis.py[/ICODE][/TD][/TR]
+[TR][TD]Figure generation[/TD][TD][ICODE]scripts/generate_solver_diagrams.py[/ICODE][/TD][/TR]
+[/TABLE]
+
+[/SPOILER]
