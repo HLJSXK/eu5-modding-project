@@ -245,7 +245,36 @@ An income-closed demand system must override it with `NPop = { POP_NEEDS_INCOME_
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
 
-### 6.6. Localization
+### 6.6. Conditional Estate Membership
+
+Population-backed estates are not necessarily enabled by a country-level
+`add_estate` effect or government reform. Each pop type can declare ordered
+estate mappings whose trigger is evaluated in pop scope. Vanilla nobles,
+clergy, burghers, laborers, soldiers, peasants, and slaves all contain:
+
+```
+dhimmi_estate = { is_dhimmi = yes }
+```
+
+The vanilla `is_dhimmi` scripted trigger requires the pop to belong to the
+Buddhist, Christian, Dharmic, Israelite, Mandaean, Manichaean, or Zoroastrian
+religion group; its owner must be Muslim; and the pop must not be linked to a
+foreign building. A qualifying pop is therefore assigned to `dhimmi_estate`
+instead of its ordinary estate. Tribesmen have no Dhimmi mapping.
+
+Keep four layers distinct when tracing an estate:
+
+- `common/estates` defines the estate type and its mechanics.
+- `common/pop_types` plus a pop-scoped trigger determine which pops belong to it.
+- `country_has_estate = estate_type:<key>` tests whether a country currently has it.
+- Setup-template `government.privilege` entries grant initial privileges; they do not define or create the estate membership rule.
+
+For example, `muslim_monarchy.txt` grants several Dhimmi privileges, while
+`muslim_monarchy_no_abrahamic_dhimmi.txt` still grants Dhimmi privileges. The
+`no_abrahamic_dhimmi` suffix only means that the template omits the starting
+`dhimmi_abrahamic_communities` privilege; it does not disable the Dhimmi estate.
+
+### 6.7. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
