@@ -60,15 +60,15 @@ exclusive with other SOL compatibility submods.
 
 ### `sol_jtg_compatibility_submod/`
 
-Compatibility layer loaded after all five Just Trade Goods mods and `stable`.
-It applies SOL's approximate per-stratum demand scaling to the 22 new goods with
-direct pop demand, adds their final quantities to SOL's market and country
-spending caches, and rebuilds both goods panels with all 77 demand goods.
+Compatibility layer loaded after Just Goods and `stable`. It applies SOL's
+approximate per-stratum demand scaling to the 26 new goods with direct pop
+demand, removes Just Goods wealth/development/regional demand gates for those
+goods, adds their final quantities to SOL's market and country spending caches,
+and rebuilds both goods panels with all 81 demand goods.
 
 The target relies on JTG localization and DDS assets instead of copying them.
-Just Spices must be enabled manually because its metadata ID is empty. This
-target is mutually exclusive with `sol_pp_compatibility_submod` because both
-replace the same two SOL scripted effects.
+This target is mutually exclusive with `sol_pp_compatibility_submod` because
+both replace the same two SOL scripted effects.
 
 The standalone `location_window.gui` override is generated from the vanilla
 reference by `scripts/generate_sol_location_window.py`, which is called by the

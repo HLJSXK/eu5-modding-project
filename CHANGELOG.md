@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Added the SOL-JTG compact compatibility target for Just Brass, Just Meat, Just Soap, Just Spices, and Just Cheese. It applies SOL-style per-stratum demand scaling with clean magnitude-aware rounding to 22 new goods, fully negates their source wealth/development demand gates, and includes them in SOL market accounting and both goods panels.
+- Added the SOL-JTG compact compatibility target for Just Goods (`3785316314` / `moveably.goods`). It applies SOL-style per-stratum demand scaling with clean magnitude-aware rounding to 26 direct-demand goods, fully negates their source wealth/development/regional demand gates, and includes them in SOL market accounting and both 81-good panels.
 - Built the Glorp UI version of `location_window.gui` directly into the main SOL target without adding runtime dependencies. SOL vendors the required extracted vanilla types and its own zoom-button type, removes external Construction Manager automation calls, and adds the SOL income display and Living Standard tooltip button on top.
 
 ### Changed
+- Migrated the SOL-JTG compatibility target to the merged Just Goods Workshop mod (`3785316314` / `moveably.goods`), expanding coverage to 26 direct-demand goods including the new clocks goods and neutralizing Just Goods regional demand modifiers.
 - Changed all SOL release targets to date-based `YYMMDD` mod versions, stamped automatically by the build workflow while keeping the EU5 compatibility version separate.
 - Removed every development-based pop-demand constraint: the engine-wide development multiplier is now zero, all nine vanilla per-good development thresholds are fully negated, PP `victuals` is handled by the compatibility generator, and SOL no longer carries development-adjusted spending through its runtime or UI.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.

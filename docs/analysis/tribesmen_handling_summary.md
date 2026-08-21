@@ -174,7 +174,7 @@ The unified adjustment applies to all strata, including tribesmen. The per-strat
 
 **Status**: Explicit zero demand.
 
-The JTG compact submod applies fixed multipliers to 22 JTG goods:
+The JTG compact submod applies fixed multipliers to the 26 direct-demand Just Goods goods:
 
 ```
 1.05 / 0.45 / 1.75 / 0.02 / 0.10 / 0.025 / 0
@@ -182,7 +182,7 @@ nobles clergy burghers laborers peasants soldiers tribesmen
                                                     ↑
 ```
 
-Tribesmen get **multiplier = 0** for all JTG goods (brass, meat, soap, spices, cheese). This zeroing is deliberate: tribal economies in EU5 are modeled as subsistence-oriented with minimal demand for artisan/luxury processed goods.
+Tribesmen get **multiplier = 0** for all direct-demand Just Goods goods, including the clocks goods added by the merged release. This zeroing is deliberate: tribal economies in EU5 are modeled as subsistence-oriented with minimal demand for artisan/luxury processed goods.
 
 ---
 
@@ -235,7 +235,7 @@ When the solver finds that row 4 (lower) is infeasible, you cannot tell whether 
 
 ### 3. Tribal Zero in JTG Is Hard-Coded
 
-If a future version of JTG adds tribal-specific goods (e.g., "furs" or "bison"), the current zero multiplier would suppress that demand. The generator would need to be updated to read tribal demand from JTG source mods.
+If a future version of Just Goods adds tribal-specific direct-demand goods, the current zero multiplier would suppress that demand. The generator would need to be updated to treat those goods as an explicit tribal-demand exception.
 
 ---
 
