@@ -1,0 +1,399 @@
+﻿refresh_global_academy_list = {
+    # Create the list
+    clear_global_variable_list = global_academies_list
+    every_country = {
+        every_in_list = {
+            variable = national_academies_list
+            add_to_global_variable_list = { name = global_academies_list target = this }
+        }
+    }
+
+    # Sort the List
+    sort_global_variable_list = {
+        name = global_academies_list
+        order = {
+            value = var:academic_tradition_value
+        }
+    }
+
+    # Track the highest tradition value for map mode scaling
+    set_global_variable = { name = highest_academic_tradition value = 0 }
+    ordered_in_global_list = {
+        variable = global_academies_list
+        position = 0
+        set_global_variable = { name = highest_academic_tradition value = var:academic_tradition_value }
+    }
+}
+
+refresh_national_academy_list = { 
+    clear_variable_list = national_academies_list
+    every_owned_location = { 
+        limit = { 
+            has_location_modifier = clocks_academy_site
+        }
+        owner = { add_to_variable_list = { name = national_academies_list target = prev } }
+    }
+}
+
+set_academic_tradition = { 
+    # Get Global Modifier
+    owner ?= { 
+        set_local_variable = { 
+			name = gatm
+			value = modifier:global_academic_tradition_modifier
+		}
+    }
+    
+    # Get Language Strength
+    set_variable = { 
+        name = language_bonus_multiplier 
+        value = { 
+            value = owner.liturgical_language.language_power
+            multiply = 0.5
+        }
+    }
+    
+
+    # Get Total Modifier
+    set_local_variable = {
+        name = total_academic_tradition_modifier
+        value = {
+            # Base 
+            value = 1
+            # Flat Local Modifier Bonusses
+            add = { 
+                value = modifier:local_academic_tradition_modifier
+            }
+            # Language
+            add = { 
+                value = var:language_bonus_multiplier
+            }
+            # Flat Global Modifier Bonusses
+            add = { 
+                value ?= local_var:gatm
+            }
+        }
+    }
+    
+    ## Make sure location has academic momentum
+    if = { limit = { NOT = { has_variable = academic_momentum } } set_variable = { name = academic_momentum value = 0 } }
+
+    set_variable = { 
+        name = academic_tradition_value
+        value = {
+            value = average_location_literacy
+            add = {
+                value = var:academic_momentum
+            }
+            multiply = { 
+                value = local_var:total_academic_tradition_modifier
+            }
+        }
+    }
+
+    ## Set Research Speed Bonus
+    set_variable = { 
+        name = local_research_speed_bonus
+        value = { 
+            value = var:academic_tradition_value
+            multiply = 0.0005
+            min = 0.01
+            max = 0.20
+        }
+    }
+}
+
+add_academic_momentum = {
+    set_local_variable = { name = mom_t value = $amount$ }
+
+    if = {
+        limit = { local_var:mom_t >= 0 }
+        custom_tooltip = {
+            text = academic_momentum_gain_tt
+            subject = THIS
+            change_variable = { name = academic_momentum add = local_var:mom_t }
+        }
+    }
+    else = {
+        custom_tooltip = {
+            text = academic_momentum_loss_tt
+            subject = THIS
+            change_variable = { name = academic_momentum add = local_var:mom_t }
+        }
+    }
+    set_academic_tradition = yes
+}
+
+add_academic_influence = {
+
+    if = { 
+        limit = { NOT = { has_variable = academic_influence } }
+        set_variable = { name = academic_influence value = 0 }
+    }
+
+    set_local_variable = { name = infl_t value = $amount$ }
+    if = {
+        limit = { local_var:infl_t >= 0 }
+        custom_tooltip = {
+            text = academic_influence_gain_tt
+            if = { 
+                limit = { NOT = { has_variable = academic_influence } }
+                set_variable = { name = academic_influence value = 0 }
+            }
+            change_variable = { name = academic_influence add = local_var:infl_t }
+            if = {
+                limit = { var:academic_influence > modifier:maximum_academic_influence }
+                set_variable = { name = academic_influence value = modifier:maximum_academic_influence }
+            }
+        }
+    }
+    else = {
+        custom_tooltip = {
+            text = academic_influence_loss_tt
+            if = { 
+                limit = { NOT = { has_variable = academic_influence } }
+                set_variable = { name = academic_influence value = 0 }
+            }
+            change_variable = { name = academic_influence add = local_var:infl_t }
+            if = {
+                limit = { var:academic_influence > modifier:maximum_academic_influence }
+                set_variable = { name = academic_influence value = modifier:maximum_academic_influence }
+            }
+        }
+    }
+    check_academic_influence_alert = yes
+}
+
+grant_academy_effect = {
+    if = {
+        limit = { NOT = { has_building = building_type:university } }
+        construct_building = {
+            building_type = building_type:university
+            cost_multiplier = 0
+            cost_multiplier_reason = "academies_start"
+            instant = yes
+        }
+    }
+
+    add_location_modifier = { modifier = clocks_academy_site years = -1 }
+
+    if = {
+        limit = { NOT = { has_building = building_type:rectorate_chair_clergy } }
+        construct_building = {
+            building_type = building_type:rectorate_chair_clergy
+            cost_multiplier = 0
+            cost_multiplier_reason = "academies_start"
+            instant = yes
+        }
+    }
+
+    owner = { refresh_national_academy_list = yes }
+}
+
+clocks_swap_academic_chair = {
+    if = { 
+        limit = { 
+            owner = { modifier:burghers_academic_authority = yes }
+        }
+        construct_building = {
+            building_type = building_type:rectorate_chair_burghers
+            cost_multiplier = 0
+            cost_multiplier_reason = "academies_swap"
+            instant = yes
+        }
+    }
+    else_if = { 
+        limit = { 
+            OR = { 
+                owner = { modifier:nobles_academic_authority = yes }
+                owner = { modifier:crown_academic_authority = yes }
+            }
+        }
+        construct_building = {
+            building_type = building_type:rectorate_chair_nobility
+            cost_multiplier = 0
+            cost_multiplier_reason = "academies_swap"
+            instant = yes
+        }
+    }
+    else = { 
+        construct_building = {
+            building_type = building_type:rectorate_chair_clergy
+            cost_multiplier = 0
+            cost_multiplier_reason = "academies_swap"
+            instant = yes
+        }
+    }
+}
+
+trigger_academy_event = { 
+    if = {
+        limit = { NOT = { has_embraced_institution = institution:printing_press } }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.1 } }
+            10 = { trigger_event_non_silently = { id = academic_events.2 } }
+            10 = { trigger_event_non_silently = { id = academic_events.3 } }
+            10 = { trigger_event_non_silently = { id = academic_events.4 } }
+            10 = { trigger_event_non_silently = { id = academic_events.5 } }
+            10 = { trigger_event_non_silently = { id = academic_events.6 } }
+            10 = { trigger_event_non_silently = { id = academic_events.7 } }
+            10 = { trigger_event_non_silently = { id = academic_events.8 } }
+            10 = { trigger_event_non_silently = { id = academic_events.9 } }
+        }
+    }
+    else_if = {
+        limit = {
+            has_embraced_institution = institution:renaissance
+            NOT = { has_embraced_institution = institution:confessionalism }
+        }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.1 } }
+            10 = { trigger_event_non_silently = { id = academic_events.2 } }
+            10 = { trigger_event_non_silently = { id = academic_events.3 } }
+            10 = { trigger_event_non_silently = { id = academic_events.4 } }
+            10 = { trigger_event_non_silently = { id = academic_events.5 } }
+            10 = { trigger_event_non_silently = { id = academic_events.6 } }
+            10 = { trigger_event_non_silently = { id = academic_events.7 } }
+            10 = { trigger_event_non_silently = { id = academic_events.8 } }
+            10 = { trigger_event_non_silently = { id = academic_events.9 } }
+            10 = { trigger_event_non_silently = { id = academic_events.10 } }
+            10 = { trigger_event_non_silently = { id = academic_events.11 } }
+            10 = { trigger_event_non_silently = { id = academic_events.12 } }
+            10 = { trigger_event_non_silently = { id = academic_events.13 } }
+            10 = { trigger_event_non_silently = { id = academic_events.14 } }
+            10 = { trigger_event_non_silently = { id = academic_events.15 } }
+            10 = { trigger_event_non_silently = { id = academic_events.16 } }
+            10 = { trigger_event_non_silently = { id = academic_events.17 } }
+            10 = { trigger_event_non_silently = { id = academic_events.18 } }
+        }
+    }
+    else_if = {
+        limit = {
+            has_embraced_institution = institution:printing_press
+            NOT = { has_embraced_institution = institution:scientific_revolution }
+        }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.10 } }
+            10 = { trigger_event_non_silently = { id = academic_events.11 } }
+            10 = { trigger_event_non_silently = { id = academic_events.12 } }
+            10 = { trigger_event_non_silently = { id = academic_events.13 } }
+            10 = { trigger_event_non_silently = { id = academic_events.14 } }
+            10 = { trigger_event_non_silently = { id = academic_events.15 } }
+            10 = { trigger_event_non_silently = { id = academic_events.16 } }
+            10 = { trigger_event_non_silently = { id = academic_events.17 } }
+            10 = { trigger_event_non_silently = { id = academic_events.18 } }
+            10 = { trigger_event_non_silently = { id = academic_events.19 } }
+            10 = { trigger_event_non_silently = { id = academic_events.20 } }
+            10 = { trigger_event_non_silently = { id = academic_events.21 } }
+            10 = { trigger_event_non_silently = { id = academic_events.22 } }
+            10 = { trigger_event_non_silently = { id = academic_events.23 } }
+            10 = { trigger_event_non_silently = { id = academic_events.24 } }
+            10 = { trigger_event_non_silently = { id = academic_events.25 } }
+            10 = { trigger_event_non_silently = { id = academic_events.26 } }
+            10 = { trigger_event_non_silently = { id = academic_events.27 } }
+        }
+    }
+    else_if = {
+        limit = {
+            has_embraced_institution = institution:confessionalism
+            NOT = { has_embraced_institution = institution:enlightenment }
+        }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.19 } }
+            10 = { trigger_event_non_silently = { id = academic_events.20 } }
+            10 = { trigger_event_non_silently = { id = academic_events.21 } }
+            10 = { trigger_event_non_silently = { id = academic_events.22 } }
+            10 = { trigger_event_non_silently = { id = academic_events.23 } }
+            10 = { trigger_event_non_silently = { id = academic_events.24 } }
+            10 = { trigger_event_non_silently = { id = academic_events.25 } }
+            10 = { trigger_event_non_silently = { id = academic_events.26 } }
+            10 = { trigger_event_non_silently = { id = academic_events.27 } }
+            10 = { trigger_event_non_silently = { id = academic_events.28 } }
+            10 = { trigger_event_non_silently = { id = academic_events.29 } }
+            10 = { trigger_event_non_silently = { id = academic_events.30 } }
+            10 = { trigger_event_non_silently = { id = academic_events.33 } }
+            10 = { trigger_event_non_silently = { id = academic_events.31 } }
+            10 = { trigger_event_non_silently = { id = academic_events.32 } }
+            10 = { trigger_event_non_silently = { id = academic_events.34 } }
+            10 = { trigger_event_non_silently = { id = academic_events.35 } }
+            10 = { trigger_event_non_silently = { id = academic_events.36 } }
+        }
+    }
+    else_if = {
+        limit = { 
+            has_embraced_institution = institution:scientific_revolution
+            NOT = { has_embraced_institution = institution:enlightenment }
+         }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.29 } }
+            10 = { trigger_event_non_silently = { id = academic_events.30 } }
+            10 = { trigger_event_non_silently = { id = academic_events.33 } }
+            10 = { trigger_event_non_silently = { id = academic_events.31 } }
+            10 = { trigger_event_non_silently = { id = academic_events.32 } }
+            10 = { trigger_event_non_silently = { id = academic_events.34 } }
+            10 = { trigger_event_non_silently = { id = academic_events.35 } }
+            10 = { trigger_event_non_silently = { id = academic_events.36 } }
+            10 = { trigger_event_non_silently = { id = academic_events.37 } }
+            10 = { trigger_event_non_silently = { id = academic_events.38 } }
+            10 = { trigger_event_non_silently = { id = academic_events.39 } }
+            10 = { trigger_event_non_silently = { id = academic_events.40 } }
+            10 = { trigger_event_non_silently = { id = academic_events.41 } }
+            10 = { trigger_event_non_silently = { id = academic_events.42 } }
+            10 = { trigger_event_non_silently = { id = academic_events.43 } }
+            10 = { trigger_event_non_silently = { id = academic_events.44 } }
+            10 = { trigger_event_non_silently = { id = academic_events.45 } }
+        }
+    }
+    else_if = {
+        limit = { has_embraced_institution = institution:enlightenment }
+        random_list = {
+            10 = { trigger_event_non_silently = { id = academic_events.37 } }
+            10 = { trigger_event_non_silently = { id = academic_events.38 } }
+            10 = { trigger_event_non_silently = { id = academic_events.39 } }
+            10 = { trigger_event_non_silently = { id = academic_events.40 } }
+            10 = { trigger_event_non_silently = { id = academic_events.41 } }
+            10 = { trigger_event_non_silently = { id = academic_events.42 } }
+            10 = { trigger_event_non_silently = { id = academic_events.43 } }
+            10 = { trigger_event_non_silently = { id = academic_events.44 } }
+            10 = { trigger_event_non_silently = { id = academic_events.45 } }
+            10 = { trigger_event_non_silently = { id = academic_events.46 } }
+            10 = { trigger_event_non_silently = { id = academic_events.47 } }
+            10 = { trigger_event_non_silently = { id = academic_events.48 } }
+            10 = { trigger_event_non_silently = { id = academic_events.49 } }
+            10 = { trigger_event_non_silently = { id = academic_events.50 } }
+            10 = { trigger_event_non_silently = { id = academic_events.51 } }
+            10 = { trigger_event_non_silently = { id = academic_events.52 } }
+            10 = { trigger_event_non_silently = { id = academic_events.53 } }
+            10 = { trigger_event_non_silently = { id = academic_events.54 } }
+        }
+    }
+}
+
+# CMF Alert
+check_academic_influence_alert = {
+    if = { 
+        limit = { has_variable = academic_influence }
+        if = {
+            limit = {
+                var:academic_influence >= {
+                    value = modifier:maximum_academic_influence
+                    multiply = 0.9
+                }
+                NOT = { has_variable = academic_influence_alert_shown }
+            }
+            cmf_show_alert = { alert = academic_influence_alert }
+            set_variable = { name = academic_influence_alert_shown value = 1 }
+        }
+        if = {
+            limit = {
+                var:academic_influence < {
+                    value = modifier:maximum_academic_influence
+                    multiply = 0.9
+                }
+                has_variable = academic_influence_alert_shown
+            }
+            cmf_remove_alert = { alert = academic_influence_alert }
+            remove_variable = academic_influence_alert_shown
+        }
+    }
+}
