@@ -1,0 +1,365 @@
+# Dīwān al-Mamālik — the realm-grand chancery, seated in the capital.
+# Buyid in origin, Saljuq in systematization, Ilkhanid in scale: the
+# Juvaynīs and Rashīd al-Dīn ran their empires from this office, and
+# Mustawfī of Qazvīn audited them out of it. Mechanically: one per
+# realm, capital-only, city-rank-or-better, gated to a persianate
+# sultanate that has either drifted toward the Tāzīk pole on its own
+# (axis ≥ 50) or paid for the chancery class via the
+# restore_persian_bureaucracy action.
+#
+# This is THE central state institution. Nobles staff it — burghers
+# promote up to fill — and the country picks up max-control, crown
+# power, diwan-estate power, and tax efficiency in exchange.
+
+central_diwan = {
+	is_foreign = no
+	pop_type = nobles
+	max_levels = 1
+
+	employment_size = insane_noble_employment
+
+	category = government_category
+
+	town = no
+	city = yes
+	megalopolis = yes
+
+	expensive = yes
+	build_time = large_capital_build_time
+
+	# The realm-grand chancery is the upgraded form of the duchy-tier
+	# Regional Dīwān. When the Dīwān al-Mamālik is seated, the regional
+	# chancery is folded into it — same building, scaled up.
+	obsolete = regional_diwan
+
+	location_potential = {
+		is_capital = yes
+	}
+	raw_modifier = {
+		local_diwan_estate_power = 1.0 ## the diwan estate is the chancery's resident interest group, and the building is its power base. The local presence of the Dīwān al-Mamālik boosts the estate's power in the capital, where it can directly access the machinery of government.
+		local_nobles_desired_pop_scaled = 0.01 ## attracts nobility to the capital, where they can staff the chancery or associate themselves with it.
+		local_clergy_desired_pop_scaled = 0.025 ## attracts clerics to the capital, where they can staff the chancery or associate themselves with it.
+		local_burghers_desired_pop_scaled = 0.05 ## attracts burghers to the capital, where they can staff the chancery or associate themselves with it.
+	}
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+		# Rank floor: only a kingdom-rank realm seats the realm-grand
+		# chancery. Duchy-rank realms run the lighter Regional Dīwān
+		# instead; this is the upgrade tier.
+		country_rank_level >= 3
+		OR = {
+			societal_value:turk_vs_tazik >= 50
+			has_variable = restored_persian_bureaucracy
+			country_rank_level >= 4 ### a persianate empire can seat the Dīwān al-Mamālik even if it has not yet drifted to the Tāzīk pole, because the empire is large enough to require a full chancery.
+		}
+	}
+
+	# Persists once built. If the realm leaves persianate_sultanate the
+	# chancery dissolves; the axis/action gate is for *earning the right
+	# to build*, not for keeping it.
+	remove_if = {
+		OR = {
+			is_no_longer_capital = yes
+			location.owner ?= {
+				government_type != government_type:persianate_sultanate
+			}
+		}
+	}
+
+	capital_country_modifier = {
+		global_max_control = 0.04
+		global_crown_estate_power = 0.20
+		global_diwan_estate_power = 0.5
+		tax_income_efficiency = 0.04
+		
+	}
+
+	unique_production_methods = {
+		central_diwan_maintenance = {
+			paper      = 0.8
+			books      = 0.3
+			fine_cloth = 0.3
+
+			category = building_maintenance
+		}
+	}
+
+	# Founding the chancery is itself a Tāzīk act — the persianate
+	# bureaucratic estate institutionalizes here, and the axis registers
+	# the choice. Seeds a small noble cohort: the founding scribal staff.
+	on_built = {
+		location = {
+			add_pop = {
+				culture = culture:farsi_culture
+				religion = root.owner.religion
+				type = pop_type:nobles
+				size = { value = 0.05 }
+			}
+		}
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = 5 }
+		}
+	}
+
+	construction_demand = early_capital_building_construction
+}
+
+
+# Regional Dīwān — the chancery seat of a duchy-rank persianate sultanate,
+# or the regional chancery of a major Persian/Arab urban capital under a
+# Türk-led realm that has not yet reached kingdom rank. Mid-tier between
+# the per-province Local Dīwān and the realm-grand Dīwān al-Mamālik.
+#
+# The Injuids of Fars ran exactly this kind of chancery from Shiraz: a
+# real Persian secretariat, but not the imperial Dīwān al-Mamālik —
+# they were duchy-rank amirs, not Pādshāhs. Jalayirid Baghdad is the
+# Türk-led counterpart: the diwan persisted because the city could not
+# be governed without it, even though the high command was militarized.
+#
+# Mechanically: one per realm, capital-only, city-rank-or-better,
+# duchy-rank minimum, persianate_sultanate-only, no axis gate. When the
+# realm reaches kingdom rank and qualifies for the Dīwān al-Mamālik, the
+# central_diwan obsoletes this one — the chancery is upgraded, not
+# duplicated.
+
+regional_diwan = {
+	is_foreign = no
+	pop_type = nobles
+	max_levels = 1
+
+	employment_size = huge_noble_employment
+
+	category = government_category
+
+	town = no
+	city = yes
+	megalopolis = yes
+
+	expensive = yes
+	build_time = government_build_time
+
+	location_potential = {
+		   
+		OR = {
+			is_capital = yes
+			AND = {
+				country_rank_level >= 4
+				any_location_in_area = {
+					NOT = {
+						has_building = building_type:regional_diwan
+						has_building = building_type:central_diwan
+					}
+				}
+			}
+		}
+		
+	}
+	raw_modifier = {
+		local_nobles_desired_pop_scaled = 0.0075
+		local_clergy_desired_pop_scaled = 0.02
+		local_burghers_desired_pop_scaled = 0.04
+	}
+	modifier = {
+		# The local diwan is a parallel proximity source — the chancery's
+		# writ runs outward from it, exactly as a governor's seat
+		# projects the crown's. ~40% of a local_governor's reach (80),
+		# matching the dīwān's role as auxiliary, not principal, node.
+		local_proximity_source = 66
+		pure_tooltip_entry = regional_diwan_tooltip
+		# The chancery culture lifts both layers it touches: the noble
+		# secretariat that fills the office, and the burgher scribal
+		# class that promotes into it.
+		local_nobles_max_literacy = 10
+		local_burghers_max_literacy = 10
+
+		# Local presence of the diwan estate's machinery.
+		local_diwan_estate_power = 0.33
+	}
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+		# Duchy minimum. Below that, the chancery is a single Local Dīwān
+		# in one province; there is nothing for a regional office to sit
+		# above. No axis gate: the historical baseline of any persianate
+		# sultanate in the iran-zamīn region.
+		country_rank_level >= 2
+	}
+
+	# Persists once built. If the realm leaves persianate_sultanate the
+	# chancery dissolves; the rank gate is for *earning the right to
+	# build*, not for keeping it.
+	remove_if = {
+		OR = {
+			AND = {
+				is_no_longer_capital = yes
+				country_rank_level < 4
+			}
+			location.owner ?= {
+				government_type != government_type:persianate_sultanate
+			}
+		}
+	}
+
+	capital_country_modifier = {
+		global_max_control = 0.015
+		global_crown_estate_power = 0.05
+		global_diwan_estate_power = 0.15
+		tax_income_efficiency = 0.015
+	}
+
+	unique_production_methods = {
+		regional_diwan_maintenance = {
+			paper      = 0.5
+			books      = 0.2
+			fine_cloth = 0.2
+
+			category = building_maintenance
+		}
+	}
+
+	# Founding the regional chancery is a smaller Tāzīk gesture than
+	# the full Dīwān al-Mamālik — the secretarial class establishes
+	# itself, but no commitment to elevate it to realm-grand status.
+	on_built = {
+		location = {
+			add_pop = {
+				culture = culture:farsi_culture
+				religion = root.owner.religion
+				type = pop_type:nobles
+				size = { value = 0.025 }
+			}
+		}
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = 2 }
+		}
+	}
+
+	construction_demand = local_governor_construction
+}
+
+
+# Local Dīwān — the provincial chancery branch, seated in the chief
+# town. The walī's secretariat: tax rolls, land registers, qāḍī's
+# records of waqf and contract, audits of bazaar weights. Mechanically:
+# one per province, town-rank-or-better, persianate_sultanate-only, and
+# only buildable once the chancery actually reaches the place
+# (local_control > 0.5). It mirrors the iqṭāʿ — that grant was a Tazik
+# *instrument* with Türk consequences; this is a Tāzīk *institution*
+# proper, projecting the state's writ outward.
+#
+# The mirror is exact in the local axes: iqṭāʿ suppresses local noble
+# literacy and erodes local control; the dīwān lifts noble AND burgher
+# literacy and acts as a proximity source, just like a governor's seat,
+# projecting authority into the surrounding countryside.
+
+local_diwan = {
+	is_foreign = no
+	pop_type = nobles
+	max_levels = 1
+
+	employment_size = large_noble_employment
+
+	category = government_category
+
+	rural_settlement = no
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = government_build_time
+
+	destroyable_building = yes
+
+	# Provincial chancery branches don't sit in the capital — the capital
+	# has the Dīwān al-Mamālik itself. Mirror of central_diwan's
+	# is_capital = yes gate.
+	location_potential = {
+		is_capital = no
+	}
+
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+	}
+
+	allow = {
+		local_control > 0.5
+		custom_tooltip = {
+			text = local_diwan_one_per_province_tt
+			location.province = {
+				NOT = {
+					any_location_in_province = {
+						has_building = building_type:local_diwan
+					}
+				}
+			}
+		}
+	}
+
+	# Demolishable only once the chancery's grip on the location has
+	# slipped — symmetric to the iqṭāʿ's destroy gate, inverted. The
+	# diwan does not voluntarily fold its own offices.
+	can_destroy = {
+		local_control < 0.3
+	}
+
+	unique_production_methods = {
+		local_diwan_maintenance = {
+			paper      = 0.3
+			books      = 0.1
+			fine_cloth = 0.1
+
+			category = building_maintenance
+		}
+	}
+	raw_modifier = {
+		local_nobles_desired_pop_scaled = 0.005 ## attracts nobility to the capital of the province, where they can staff the chancery or associate themselves with it.
+		local_clergy_desired_pop_scaled = 0.0125 ## attracts clerics to the capital of the province, where they can staff the chancery or associate themselves with it.
+		local_burghers_desired_pop_scaled = 0.025 ## attracts burghers to the capital of the province, where they can staff the chancery or associate themselves with it.
+	}
+	modifier = {
+		# The local diwan is a parallel proximity source — the chancery's
+		# writ runs outward from it, exactly as a governor's seat
+		# projects the crown's. ~40% of a local_governor's reach (80),
+		# matching the dīwān's role as auxiliary, not principal, node.
+		local_proximity_source = 33
+
+		# The chancery culture lifts both layers it touches: the noble
+		# secretariat that fills the office, and the burgher scribal
+		# class that promotes into it.
+		local_nobles_max_literacy = 10
+		local_burghers_max_literacy = 10
+
+		# Local presence of the diwan estate's machinery.
+		local_diwan_estate_power = 0.75
+	}
+
+	# A slightly larger Tāzīk push than the iqṭāʿ's −1 — the Local
+	# Diwan is a far scarcer instrument (one per province, urban-only)
+	# than the iqṭāʿ (every rural location), so each instance carries
+	# proportionally more axis weight.
+	on_built = {
+		location = {
+			add_pop = {
+				culture = culture:farsi_culture
+				religion = root.owner.religion
+				type = pop_type:nobles
+				size = { value = 0.01 }
+			}
+		}
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = 2 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.03 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.02 }
+		}
+	}
+
+	# Shuttering a local diwan is a public defeat for the chancery.
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.05 }
+		}
+	}
+
+	construction_demand = local_governor_construction
+
+	graphical_tags = { small_military }
+}

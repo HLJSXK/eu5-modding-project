@@ -1,0 +1,233 @@
+# =====================================================================
+# MUṢĀDARA — the king's right of confiscation, exercised in the maẓālim
+#
+# Option 1 of the muṣādara system. The diwan is not taxed openly the way
+# the amirs are (low max_tax; they shelter wealth in waqf) — they are
+# seized at the king's WILL, in his court of grievances. That arbitrariness
+# is precisely why the chancery class is uneasy: not systematic law, but
+# the sword of Damocles. This is the player-initiated parliament version
+# of the maẓālim "traitor vizier" flow already in mazalim_events.txt.
+#
+# A parliament action (type = parliament), as the maẓālim is modelled.
+# Gated on having a diwan member in the cabinet — you need the chancery
+# in your government to execute a confiscation (and they are the ones
+# most exposed to it). Costs political capital (parliament issue support),
+# carries a 5-year cooldown so it is a decision and not a faucet, and —
+# when turned on the diwan — a real chance the vizier pays with his head.
+#
+# Linkage: abolishing the maẓālim court (option 3) ends the active
+# parliament and so disables this action — confiscation lives in the
+# court of justice, and falls with it.
+# =====================================================================
+
+enact_musadara = {
+	show_message = no
+	type = parliament
+
+	potential = {
+		scope:actor = {
+			government_type = government_type:persianate_sultanate
+			# You need the chancery in your government to enact a seizure —
+			# and they are the ones living under the threat.
+			any_cabinet_character = { has_estate = estate_type:diwan_estate }
+			# 5-year cooldown (set in the effect).
+			
+			NOT = { has_variable = enact_musadara_recent }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			# Only in session — confiscation is pronounced in the maẓālim.
+			modifier:access_to_musadara = yes  
+			is_active_parliament = yes
+			parliament_issue_support >= {
+				value = parliament_request_support
+				divide = 2
+			}
+		}
+	}
+
+	ai_tick = daily
+	ai_tick_frequency = 30
+	automation_tick = daily
+	automation_tick_frequency = 30
+
+	# Pick the estate to confiscate from. The diwan is the usual mark; the
+	# other wealthy estates can be seized too. Peasants have nothing worth
+	# the writ.
+	# select_trigger = {
+	# 	looking_for_a = estate
+	# 	source = actor
+	# 	target_flag = target_estate
+	# 	name = "enact_musadara_select_estate"
+
+	# 	column = { data = name }
+
+	# 	enabled = {
+	# 		estate_gold > 1
+	# 		OR = {
+	# 			estate_type = estate_type:diwan_estate
+	# 			estate_type = estate_type:amirs_estate
+	# 			estate_type = estate_type:burghers_estate
+	# 			estate_type = estate_type:clergy_estate
+	# 		}
+	# 	}
+	# }
+
+	effect = {
+		
+		scope:actor = {
+			
+			# The political-capital cost — spent in the court.
+			
+			change_parliament_issue_support = {
+				value = {
+					add = modifier:parliament_request_issue_support_needed
+					divide = 2
+				}
+				multiply = -1
+			}
+			# Seize half the estate's coffers into the treasury — less
+			# whatever the diwan has sheltered in waqf, which the writ cannot
+			# reach. Inlined (not a scripted_effect call) so the maẓālim
+			# tooltip can preview the amount — a scripted_effect call resolves
+			# only after the tooltip has already rendered.
+			"estate(estate_type:diwan_estate)" = { save_scope_as = seize_target }
+			set_local_variable = {
+				name = seized_assets
+				value = {
+					value = scope:seize_target.estate_gold
+					multiply = 0.5
+				}
+			}
+
+
+			change_local_variable = {
+				name = seized_assets
+				multiply = {
+					value = 1
+					subtract = var:diwan_waqf_shelter
+				}
+			}
+			
+			add_gold_to_estate = {
+				estate_type = estate_type:diwan_estate
+				value = {
+					value = local_var:seized_assets
+					multiply = -1
+				}
+			}
+			add_gold = { value = local_var:seized_assets }
+
+
+			# The plundered estate is bitter.
+			add_estate_satisfaction = {
+				type = estate_type:diwan_estate
+				value = -0.4
+			}
+
+
+
+			
+			# Muṣādara of the diwan carries the Ilkhanid risk: the vizier
+			# may pay with his head. (No head-diwan member → nothing to seize
+			# but the gold.)
+
+
+			random_cabinet_character = {
+				limit = {
+					has_estate = estate_type:diwan_estate
+				}
+				kill_character = {
+					target = this
+					reason = execution
+				}
+			}
+				
+			
+
+			# The aftertaste: the realm-wide chill of confiscation, felt by
+			# every elite estate. The same scar the desperation event leaves.
+			add_country_modifier = { modifier = recent_musadara years = 5 }
+			### diwan elite begin building waqfs to shelter their wealth.
+			custom_tooltip = waqf_buildings_tooltip_tt
+			hidden_effect = {
+				reassess_waqf_damage = yes
+				every_owned_location = {
+					limit = {
+						is_city = yes
+					}
+					random = {
+						chance = 10
+						construct_estate_building = {
+							estate_type = estate_type:diwan_estate
+							building_type = building_type:ayyan_waqf
+						}
+					}
+				}
+				capital = {
+					construct_estate_building = {
+						estate_type = estate_type:diwan_estate
+						building_type = building_type:ayyan_waqf
+					}
+				}
+				### other elite take notice, too.
+				every_owned_location = {
+					random = {
+						chance = 1
+						construct_estate_building = {
+							estate_type = estate_type:clergy_estate
+							building_type = building_type:clerical_waqf
+						}
+					}
+				}
+				every_owned_location = {
+					limit = {
+						is_city = yes
+					}
+					random = {
+						chance = 2.5
+						construct_estate_building = {
+							estate_type = estate_type:burghers_estate
+							building_type = building_type:urban_waqf
+						}
+					}
+				}
+			}
+			
+			### 
+			# Cooldown: one confiscation per five years.
+			set_variable = {
+				name = enact_musadara_recent
+				value = 1
+				years = 5
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = {
+			# The desperate treasury reaches for the cudgel.
+			if = {
+				limit = { scope:actor = { num_loans > 0 } }
+				value = 5
+			}
+			if = {
+				limit = { scope:actor = { num_loans > 5 } }
+				value = 10
+			}
+			if = {
+				limit = { scope:actor = { num_loans > 10 } }
+				value = 20
+			}
+
+			# (Removed: the old "prefer a gorged estate" bonus keyed off
+			# scope:target_estate, which is no longer set before the effect
+			# runs — the target is hardcoded to the diwan now, and the
+			# num_loans desperation tiers above already drive the AI. Re-add
+			# with "estate(estate_type:diwan_estate)" = { estate_gold > ... }
+			# if you want the diwan-gorged signal back.)
+		}
+	}
+}

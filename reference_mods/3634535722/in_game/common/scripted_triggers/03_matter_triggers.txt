@@ -1,0 +1,356 @@
+# Triggers for the Matter of Tork / Matter of Tazik consolidation disasters.
+# Design spec: docs/design/eranzamin_plan.md §19 (mechanic), §20 (END gate).
+#
+# The territorial-gate-held-24-months requirement is implemented via a
+# country variable `eranzamin_consolidation_months` that ticks up each
+# month the country is above the territorial threshold and resets to 0
+# when it falls below. The on_monthly in the eranzamin_succession
+# situation maintains the counter.
+
+# ---Identity-pole detection helpers ---------------------------------------
+
+is_axis_tazik_committed = {
+	# Tazik commitment: axis at the Matter-trigger threshold for Tork.
+	# Per §19.2.
+	societal_value:turk_vs_tazik >= 45
+}
+
+is_axis_tork_committed = {
+	societal_value:turk_vs_tazik <= -45
+}
+
+is_axis_tazik_triumph = {
+	# END-gate Tazik clause A. Per §20.1.
+	societal_value:turk_vs_tazik >= 75
+}
+
+is_axis_tork_triumph = {
+	societal_value:turk_vs_tazik <= -75
+}
+
+# ---Territorial gate ------------------------------------------------------
+
+is_eranzamin_territorial_gate_met = {
+	# Proxy for "60% of region dev under direct or vassal control."
+	# Calibrated to the situation's full-victory threshold (400 locations
+	# in 01_eranzamin_succession) scaled to 60% — the Matter must fire
+	# and RESOLVE well before the victory clauses can complete. The old
+	# 300 value (75% of victory) meant regional powers like a Caucasus-
+	# spanning Shirvan or an Iraq+Fars Muzaffarid empire consolidated to
+	# enormous size without the Türk question ever being asked.
+	# TODO: when EU5 exposes a cleaner share_of_region_dev trigger, swap
+	# this for the exact 60% threshold.
+	num_locations_owned_or_owned_by_subjects_or_below > 240
+	is_subject = no
+	capital ?= { is_eranzamin_region_province = yes }
+}
+
+is_eranzamin_consolidation_sustained = {
+	# Held the territorial gate for 24 months continuous.
+	is_eranzamin_territorial_gate_met = yes
+	# trigger_if: plain AND members do not short-circuit, so the var
+	# read logged errors on countries that never set the counter.
+	trigger_if = {
+		limit = { has_variable = eranzamin_consolidation_months }
+		var:eranzamin_consolidation_months >= 24
+	}
+	trigger_else = {
+		always = no
+	}
+}
+
+# ---Matter trigger gates --------------------------------------------------
+
+matter_of_tork_can_start = {
+	# The Place of the Sword fires for ANY non-Borjigin consolidator —
+	# farr, ghazi, or mystical. No axis gate: the Türk question exists
+	# regardless of how Tazik the court is. Design:
+	# docs/design/matter_of_tork_design.md §2.
+	has_variable = eranzamin_contender
+	is_eranzamin_consolidation_sustained = yes
+
+	# A Borjigin has no Matter — his right to the ulus runs through
+	# the line, so the Türks have no grievance.
+	custom_tooltip = {
+		text = matter_tork_not_borjigin_tt
+		NOT = { ruler ?= { dynasty = dynasty:borjigin_dynasty } }
+	}
+	# A regent rules in the khan's name; same logic.
+	NOT = { has_reform = government_reform:chinggisid_regency }
+	# Türk-coded regimes: the Türk military class IS the constituency,
+	# so the question has no force. They face the Matter of Tazik.
+	NOT = { has_reform = government_reform:amir_sultanate }
+	NOT = { has_reform = government_reform:turkmen_confederation }
+
+	# The question needs a questioner: no Matter without an actual
+	# Türk demographic base (playtest fix — fired for MZF whose
+	# military constituency was rural Iranic gentry; the breakaway
+	# had no support base and zero provinces defected). ABSOLUTE
+	# count, not percentage: a million armed tribesmen are a problem
+	# for a fifty-million realm too.
+	custom_tooltip = {
+		text = matter_tork_tribal_base_tt
+		num_pop_type_in_country:tribesmen >= 750
+	}
+
+	custom_tooltip = {
+		text = matter_tork_not_yet_fired_tt
+		NOT = { has_variable = matter_of_tork_fired }
+	}
+	custom_tooltip = {
+		text = matter_tork_not_yet_completed_tt
+		NOT = { has_variable = matter_of_tork_completed }
+	}
+	OR = {
+		estate_type:amirs_estate = {
+			target_satisfaction < 0.65
+		}
+		estate_type:tribes_estate = {
+			target_satisfaction < 0.65
+		}
+	}
+
+
+}
+
+# ---Disposition availability (claim-button allow gates) -------------------
+# One answer per realm: any claim locks the rest.
+
+matter_tork_no_disposition_yet = {
+	has_variable = matter_of_tork_fired
+	NOT = { has_variable = matter_tork_disposition_chosen }
+}
+
+matter_tork_can_claim_iranization = {
+	matter_tork_no_disposition_yet = yes
+	in_civil_war = no
+	# To digest the amirs you must first seat them at the diwan —
+	# Niẓām al-Mulk's nightmare as the price of his solution. The
+	# grant also costs a one-shot −20 axis push toward Türk.
+	has_estate_privilege = estate_privilege:amirs_umara_at_the_diwan
+}
+
+matter_tork_can_claim_marcher_compact = {
+	matter_tork_no_disposition_yet = yes
+	in_civil_war = no
+	any_owned_province = { is_tribal_pastoral_location = yes }
+}
+
+matter_tork_can_claim_murid_bond = {
+	matter_tork_no_disposition_yet = yes
+	in_civil_war = no
+	# The charismatic-authority pole. Foreclosed by legalism, Sunni OR
+	# Shia; enabled by mysticism, Sunni OR Shia. Same bar as the
+	# zill_allah_regime law.
+	societal_value:mysticism_vs_jurisprudence <= -50
+	# The bond needs a physical network for the murids to BE in
+	# (decision 38): four lodges standing. sufi_lodge is max_levels 1,
+	# so levels = lodge count.
+	custom_tooltip = {
+		text = matter_tork_lodge_network_tt
+		total_effective_building_levels:sufi_lodge >= 4
+	}
+}
+
+matter_tork_can_claim_expulsion = {
+	matter_tork_no_disposition_yet = yes
+	# You do this from strength, not mid-war.
+	at_war = no
+	# The hosts cannot be marched off land that still feeds them:
+	# at least two zones already declared royal inju (decision 38).
+	custom_tooltip = {
+		text = matter_tork_expulsion_inju_tt
+		has_variable = matter_tork_inju_count
+		var:matter_tork_inju_count >= 2
+	}
+}
+
+matter_tork_can_claim_eradication = {
+	matter_tork_no_disposition_yet = yes
+	at_war = no
+	# The attempt is a civil war by design; a realm already shaking
+	# does not get to start it on purpose.
+	stability >= 0
+	# You cannot end a class whose economic base still stands: five
+	# zones declared royal inju first (decision 38).
+	custom_tooltip = {
+		text = matter_tork_eradication_inju_tt
+		has_variable = matter_tork_inju_count
+		var:matter_tork_inju_count >= 5
+	}
+}
+
+# Ghazi-line identity — used to branch the Frontier (strong/native)
+# and Sufi (very hard) disposition variants.
+matter_tork_is_ghazi_line = {
+	OR = {
+		has_reform = government_reform:ghazi_sultanate
+		has_reform = government_reform:dar_al_jihad
+	}
+}
+
+matter_of_tazik_can_start = {
+	has_variable = eranzamin_contender
+	is_axis_tork_committed = yes
+	is_eranzamin_consolidation_sustained = yes
+	NOT = { has_variable = matter_of_tazik_fired }
+	NOT = { has_variable = matter_of_tazik_resolved }
+}
+
+# ---Matter resolution flags (set by resolution events) -------------------
+
+matter_of_tork_resolved_trigger = {
+	OR = {
+		has_variable = matter_of_tork_resolved
+		has_variable = matter_of_tork_resolved_by_synthesis
+	}
+}
+
+matter_of_tazik_resolved_trigger = {
+	OR = {
+		has_variable = matter_of_tazik_resolved
+		has_variable = matter_of_tazik_resolved_by_synthesis
+	}
+}
+
+# ---Safavid synthesis threshold -----------------------------------------
+
+# Per §20.1.C: spiritualism >= 75, mysticism >= 75, religious_unity >= 0.80.
+# TODO: confirm the exact societal-value polarity keys in the mod / base
+# game. Placeholders below assume `spiritualism` and `mysticism` are valid
+# societal-value names; if not, swap to the correct ones at integration time.
+safavid_synthesis_thresholds_met = {
+	religious_unity >= 0.80
+	# Spiritualism pole strong
+	# Mysticism pole strong
+	# Until polarity names are verified, gate on legitimacy + estate religion
+	# satisfaction as a pre-check. To be replaced.
+	custom_tooltip = {
+		text = safavid_synthesis_polarity_tt
+		legitimacy >= 75
+	}
+}
+
+# ---END gate (situation can_end) ----------------------------------------
+
+# Per §20: any one of these three clauses, plus territorial gate (which
+# is checked against `controls_eranzamin_key_cities` + 150-loc threshold
+# in the existing situation).
+eranzamin_end_condition_met = {
+	OR = {
+		# Clause A — Tazik Triumph
+		AND = {
+			is_axis_tazik_triumph = yes
+			matter_of_tork_resolved_trigger = yes
+		}
+		# Clause B — Türk Triumph
+		AND = {
+			is_axis_tork_triumph = yes
+			#matter_of_tazik_resolved_trigger = yes
+		}
+		# Clause C — Safavid Synthesis
+		safavid_synthesis_thresholds_met = yes
+	}
+}
+
+# ---Stressor helper triggers --------------------------------------------
+
+# Used by the disaster's on_monthly to count one-shot bumps applied
+# during the disaster window.
+
+is_tribal_pastoral_location = {
+	# A location whose dominant pop type is tribesmen, used to detect
+	# "consolidate_diwan applied on a pastoral province" stressor.
+	OR = {
+		location_rank = location_rank:rural_settlement
+		location_rank = location_rank:town
+	}
+	OR = {
+		any_pop = {
+			pop_type = pop_type:tribesmen
+			pop_size >= 2.5
+		}
+		
+		any_pop = {
+			pop_type = pop_type:nobles
+			pop_size > 0.2
+			AND = {
+				NOT = { culture = culture:farsi_culture }
+				NOT = { culture = culture:iraqi_culture }
+				NOT = { culture = culture:adhari_culture }
+				NOT = { culture = culture:khorasani_culture }
+				NOT = { culture = culture:tajik_culture }
+			}
+		} 
+			
+	}
+		
+}
+
+
+is_urban_diwan_capable_location = {
+	# Urban location whose pops include Urban Iranic OR Urban Iraqi Arab.
+	# Iraqi Arabs are part of the same bureaucratic tradition as Persians
+	# (dīwān is Pahlavi → Arabic); excluding them leaves Iraq with no
+	# diwan participation, which is historically wrong. See memory
+	# `feedback_iraqi_arabs_are_tazik.md`.
+	#
+	# TODO: confirm exact culture-group keys. Iraqi Arab is likely
+	# culture_group = mashriqi_group or culture = iraqi_arab.
+	any_pop = {
+		OR = {
+			AND = {
+				pop_type = pop_type:burghers
+				culture ?= { has_culture_group = culture_group:iranian_group }
+			}
+			AND = {
+				pop_type = pop_type:burghers
+				culture ?= { has_culture_group = culture_group:mashriqi_group }
+			}
+		}
+	}
+}
+
+# ---The Great Raid: designatable theaters (region scope) ------------------
+# BLACKLIST, not whitelist (design 2026-08-25): the enterprising player
+# who expanded fast may point the hosts at Ethiopia, China, the Balkans
+# or the Ruslands. Excluded: Iran proper (persia/khorasan — note
+# khorasan_region also contains Transoxiana, so Mavarannahr is covered),
+# Anatolia (Shattered Rum's theater), and the Islamic heartlands
+# (arabia, crescent = Iraq/Syria, egypt, maghreb, somalia, sahel).
+# The Caucasus stays IN: Georgia was the most-raided target of the
+# whole era (Timur went eight times). The steppe stays IN despite
+# Özbeg's nominal Islam — Timur vs Tokhtamysh is period truth.
+# Old World only: the hosts ride, they do not sail.
+is_great_raid_designatable_region = {
+	NOT = { this = region:persia_region }
+	NOT = { this = region:khorasan_region }
+	NOT = { this = region:anatolia_region }
+	NOT = { this = region:arabia_region }
+	NOT = { this = region:crescent_region }
+	NOT = { this = region:egypt_region }
+	NOT = { this = region:maghreb_region }
+	NOT = { this = region:somalia_region }
+	NOT = { this = region:sahel_region }
+	# Land the hosts can actually reach and hold: an ownable Old World
+	# location exists in the region (also filters the ocean regions).
+	any_ownable_location_in_region = {
+		OR = {
+			continent = continent:asia
+			continent = continent:europe
+			continent = continent:africa
+		}
+	}
+}
+
+# ---Culture scope: the hosts of the Matter --------------------------------
+# Mirrors is_turco_mongol_polity's group list (07_martyrs_triggers.txt),
+# callable on a culture directly — used by the Great Raid migration
+# engine's per-pop filters.
+is_turco_mongol_culture = {
+	OR = {
+		has_culture_group = culture_group:turkic_group
+		has_culture_group = culture_group:mongolian_group
+		has_culture_group = culture_group:tatar_group
+	}
+}

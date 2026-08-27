@@ -1,0 +1,309 @@
+# =====================================================================
+# THE SARBADAR PHENOMENON — insurgent Shiism as regional weather
+#
+# Active while any Commonwealth of Martyrs exists. The Jūrī-network
+# preachers spread through the urban craft world: covert cells
+# (sarbadar_preachers buildings, host-owned, event-planted) appear in
+# neighbor cities, preferentially where the futuwwa substrate exists —
+# a zurkhāna in the location, or the asnaf_futuwwa_compact privilege
+# in the host realm. Cells convert Sunni artisan pops and depress
+# control; the (later) rebel-fork logic reads cell presence to spawn
+# urban Sarbadar imitations. Modeled on the Reformation preachers
+# chassis (situation_buildings.txt + reformation.txt on_monthly).
+# =====================================================================
+
+sarbadar_phenomenon = {
+
+	monthly_spawn_chance = monthly_spawn_chance_unique
+
+	can_start = {
+		any_country = {
+			government_type = government_type:commonwealth_of_martyrs
+		}
+	}
+
+	can_end = {
+		NOT = {
+			any_country = {
+				government_type = government_type:commonwealth_of_martyrs
+			}
+		}
+	}
+
+	# Region-gated like eranzamin_succession: the phenomenon is the
+	# Persian world's weather, not Burgundy's. Countries elsewhere see
+	# it only once the cells have actually reached them.
+	visible = {
+		OR = {
+			any_owned_location = { is_eranzamin_region_province = yes }
+			capital.sub_continent = sub_continent:middle_east
+			capital.sub_continent = sub_continent:central_asia
+			any_owned_location = {
+				has_building_with_at_least_one_level = sarbadar_preachers
+			}
+		}
+	}
+
+	on_start = {
+		# Introduce the phenomenon to everyone who can see it.
+
+	}
+
+	on_monthly = {
+		# --- The preachers travel the caravan roads ------------------
+		# Contagion is market-borne, not adjacency-borne (the Samarqand
+		# Sarbadars were nowhere near Sabzavar). A CARRIER is any cell,
+		# or any commonwealth-owned city. Carriers infect cities in
+		# their own market; a carrier sitting on the MARKET CENTER also
+		# infects cities of countries within the market's trade range
+		# (the long jump). Substrate raises receptivity: a zurkhāna in
+		# the target city, or the asnaf_futuwwa_compact privilege in
+		# the host realm. All chances monthly, tunable.
+
+		# Pass 1 — inside the carrier's own market.
+		every_country = {
+			limit = {
+				OR = {
+					government_type = government_type:commonwealth_of_martyrs
+					any_owned_location = {
+						has_building_with_at_least_one_level = sarbadar_preachers
+					}
+				}
+			}
+			every_owned_location = {
+				limit = {
+					OR = {
+						has_building_with_at_least_one_level = sarbadar_preachers
+						AND = {
+							owner ?= { government_type = government_type:commonwealth_of_martyrs }
+							is_city = yes
+						}
+					}
+				}
+				market ?= {
+					# ALL planting passes go through sarbadar_cell_can_take_root
+					# (06_shia_rework_triggers): Muslim quarter + inside the
+					# region's world. Without it the trickle chained market to
+					# market all the way into Christian Europe.
+
+					# The receptive vessel first: the zurkhāna crowd.
+					random_location_in_market = {
+						limit = {
+							sarbadar_cell_can_take_root = yes
+							has_building_with_at_least_one_level = zurkhanah
+						}
+						random = {
+							chance = 6
+							construct_building = {
+								building_type = building_type:sarbadar_preachers
+								cost_multiplier = 0
+								cost_multiplier_reason = "game_concept_event"
+								instant = yes
+							}
+						}
+					}
+					# The futuwwa-compact shade: hosts that legalized the
+					# guild brotherhoods gave the network room to grow.
+					random_location_in_market = {
+						limit = {
+							sarbadar_cell_can_take_root = yes
+							owner ?= {
+								has_estate_privilege = estate_privilege:asnaf_futuwwa_compact
+							}
+						}
+						random = {
+							chance = 4
+							construct_building = {
+								building_type = building_type:sarbadar_preachers
+								cost_multiplier = 0
+								cost_multiplier_reason = "game_concept_event"
+								instant = yes
+							}
+						}
+					}
+					# The base trickle.
+					random_location_in_market = {
+						limit = {
+							sarbadar_cell_can_take_root = yes
+						}
+						random = {
+							chance = 2
+							construct_building = {
+								building_type = building_type:sarbadar_preachers
+								cost_multiplier = 0
+								cost_multiplier_reason = "game_concept_event"
+								instant = yes
+							}
+						}
+					}
+				}
+			}
+		}
+
+		# Pass 2 — the long jump: a carrier on a MARKET CENTER reaches
+		# cities of countries within the market's trade range.
+		every_country = {
+			limit = {
+				NOT = { government_type = government_type:commonwealth_of_martyrs }
+				OR = {
+					capital.sub_continent = sub_continent:middle_east
+					capital.sub_continent = sub_continent:central_asia
+				}
+				any_owned_location = { is_city = yes }
+			}
+			save_scope_as = spread_victim
+			if = {
+				limit = {
+					any_market_in_world = {
+						in_trade_range_of = scope:spread_victim
+						any_location_in_market = {
+							is_market_center = yes
+							OR = {
+								has_building_with_at_least_one_level = sarbadar_preachers
+								owner ?= { government_type = government_type:commonwealth_of_martyrs }
+							}
+						}
+					}
+				}
+				random_owned_location = {
+					# Location-level gate too: a Middle-East-capital country
+					# with European holdings (the Horde) must not receive
+					# cells in its European cities.
+					limit = {
+						sarbadar_cell_can_take_root = yes
+					}
+					random = {
+						chance = 2
+						construct_building = {
+							building_type = building_type:sarbadar_preachers
+							cost_multiplier = 0
+							cost_multiplier_reason = "game_concept_event"
+							instant = yes
+						}
+					}
+				}
+			}
+		}
+
+		# --- The revolution eats its vanguard ------------------------
+		# A commonwealth whose Shaykhi wing has been drained (dispatch
+		# after dispatch, each -5% for 25 years) normalizes: the
+		# Sufyani notables take the council — the Muʾayyad arc, as an
+		# outcome of a resource loop rather than a date.
+		every_country = {
+			limit = {
+				government_type = government_type:commonwealth_of_martyrs
+				"estate_power(estate_type:shaykhi_dervishes_estate)" < 0.10
+				NOT = { has_variable = sufyani_takeover_fired }
+			}
+			random = {
+				chance = 15
+				set_variable = sufyani_takeover_fired
+				trigger_event_non_silently = martyrs.4
+			}
+		}
+
+		# --- The missions work (owned-territory dawa) ----------------
+		# Where the commonwealth has planted a Mission of the Liberated,
+		# the lower orders tip first — laborers, peasants, tribesmen.
+		# The notables convert last and resentfully (engine conversion
+		# on the building handles the rest of the population at the
+		# slow rate; this pass is the bottom-up surge).
+		every_country = {
+			limit = {
+				government_type = government_type:commonwealth_of_martyrs
+				any_owned_location = {
+					has_building_with_at_least_one_level = mission_of_the_liberated
+				}
+			}
+			every_owned_location = {
+				limit = {
+					has_building_with_at_least_one_level = mission_of_the_liberated
+				}
+				every_pop = {
+					limit = {
+						religion = religion:sunni
+						OR = {
+							pop_type = pop_type:laborers
+							pop_type = pop_type:peasants
+							pop_type = pop_type:tribesmen
+						}
+					}
+					random = {
+						chance = 2
+						change_pop_religion = religion:shia
+						split_pop = {
+							fraction = 0.5
+							religion = religion:sunni
+						}
+					}
+				}
+			}
+		}
+
+		# --- The cells work -----------------------------------------
+		# Where a cell stands, the message moves through the bazaars:
+		# Sunni artisan pops tip toward the Imam's cause (half converts,
+		# half holds — the change→split-back pattern from the base
+		# Reformation trade-spread action).
+		every_country = {
+			limit = {
+				any_owned_location = {
+					has_building_with_at_least_one_level = sarbadar_preachers
+				}
+			}
+			every_owned_location = {
+				limit = {
+					has_building_with_at_least_one_level = sarbadar_preachers
+				}
+				every_pop = {
+					limit = {
+						religion = religion:sunni
+						OR = {
+							pop_type = pop_type:burghers
+							pop_type = pop_type:laborers
+						}
+					}
+					random = {
+						chance = 2
+						change_pop_religion = religion:shia
+						split_pop = {
+							fraction = 0.5
+							religion = religion:sunni
+						}
+					}
+				}
+			}
+		}
+	}
+
+	on_ending = {
+	}
+
+	on_ended = {
+	}
+
+	map_color = {
+		if = {
+			limit = {
+				has_building_with_at_least_one_level = sarbadar_preachers
+			}
+			value = rgb { 60 60 160 }
+		}
+		else_if = {
+			limit = {
+				owner ?= { government_type = government_type:commonwealth_of_martyrs }
+			}
+			value = rgb { 30 30 120 }
+		}
+	}
+
+	tooltip = {
+		if = {
+			limit = {
+				has_building_with_at_least_one_level = sarbadar_preachers
+			}
+			custom_tooltip = sarbadar_preachers_present_tt
+		}
+	}
+}

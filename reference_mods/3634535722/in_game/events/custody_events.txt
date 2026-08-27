@@ -1,0 +1,415 @@
+namespace = custody
+
+# ============================================================
+# The Custody of the Ulus — events
+#   .1   announce
+#   .40  the Kuriltai of Confirmation (Sole Custody fork)
+#   .50  Endured (the weaker, dated fork)
+#   .90  the Fiction Expires
+# Design: docs/design/custody_of_the_ulus_design.md
+# ============================================================
+
+custody.1 = {
+	type = country_event
+	category = disaster_event
+	title = custody.1.title
+	desc = custody.1.desc
+	outcome = neutral
+
+	# trigger = {
+	# 	has_variable = custody_fired
+	# }
+
+	option = {
+		name = custody.1.a
+	}
+}
+
+# ---DEMAND FEALTY (custodian → governor; event-based) -------------------
+# Fired AT the governorate by the custodian's custody_demand_fealty
+# action. var:custody_demanding_lord points back at the custodian
+# (set in the action effect, survives the event boundary). The
+# governor accepts or refuses; on each, a notification fires back.
+
+custody.31 = {
+	type = country_event
+	title = custody.31.title
+	desc = custody.31.desc
+	outcome = neutral
+	immediate = {
+		set_variable = {
+			name = custody_demanded_recently
+			value = 1
+			months = 6
+		}
+	}
+	# Accept — enter the custodian's house. Weak and threatened
+	# governors swear readily; strong ones do not.
+	option = {
+		name = custody.31.a
+		trigger = { exists = var:custody_demanding_lord }
+		ai_chance = {
+			factor = 20
+			modifier = { factor = 4  military_strength < 5 }
+			modifier = { factor = 2  at_war = yes }
+			modifier = { factor = 0.2  military_strength > 20 }
+		}
+		make_subject_of = {
+			target = var:custody_demanding_lord
+			type = subject_type:ulus_governorate
+		}
+		# The khalʿat arrives.
+		add_gold = {
+			value = var:custody_demanding_lord.country_tax_base
+			max = { value = var:custody_demanding_lord.country_tax_base multiply = 4 }
+		}
+		# The custodian pays, in coin and in pride; gains a steward.
+		var:custody_demanding_lord = {
+			add_gold = {
+				value = country_tax_base
+				max = { value = country_tax_base multiply = 4 }
+				multiply = -1
+			}
+			add_legitimacy = -10
+			add_prestige = 10
+			# Name the new governorate for the result event (root here
+			# is still the swearing governor).
+			set_variable = { name = custody_sworn_gov value = root }
+			trigger_event_non_silently = custody.32
+		}
+		remove_variable = custody_demanding_lord
+	}
+
+	# Refuse — keep our corner and our own name.
+	option = {
+		name = custody.31.b
+		ai_chance = {
+			factor = 20
+			modifier = { factor = 4  military_strength > 15 }
+		}
+		var:custody_demanding_lord ?= {
+			set_variable = { name = custody_sworn_gov value = root }
+			trigger_event_non_silently = custody.33
+		}
+		remove_variable = custody_demanding_lord
+	}
+}
+
+# ---DEMAND RESULT — accepted (to the custodian) -------------------------
+custody.32 = {
+	type = country_event
+	title = custody.32.title
+	desc = custody.32.desc
+	outcome = positive
+
+	option = {
+		name = custody.32.a
+		remove_variable = custody_sworn_gov
+	}
+}
+
+# ---DEMAND RESULT — refused (to the custodian) -------------------------
+custody.33 = {
+	type = country_event
+	title = custody.33.title
+	desc = custody.33.desc
+	outcome = negative
+
+	option = {
+		name = custody.33.a
+		remove_variable = custody_sworn_gov
+	}
+}
+
+# ---THE GOVERNORATE'S CHOICE (fealty pulse) -----------------------------
+# Fired on the monthly pulse (09_custody_governorate_pulse.txt) for a
+# non-subject ilkhanate_governorate while regencies stand. Offers the
+# top three stewards by levy potential to swear to — or to hold out.
+# The three options scope to the ranked stewards built in immediate
+# (ordered_in_list, descending by levy → position 0 = strongest).
+
+custody.30 = {
+	type = country_event
+	title = custody.30.title
+	desc = custody.30.desc
+	outcome = neutral
+
+	immediate = {
+		# Cooldown: a governorate is pressed to choose at most once
+		# every five years. The timed variable auto-expires, after
+		# which the pulse may ask again. Set on FIRE (even on hold-out)
+		# so a defiant governor is not re-nagged each pulse.
+		set_variable = { name = custody_gov_pulse_recent value = 1 years = 5 }
+		# Gather the standing regencies, then rank the top three by
+		# levy potential (military power). check_range_bounds = no so a
+		# field of fewer than three logs no error.
+		international_organization:eranzamin ?= {
+			every_international_organization_member = {
+				limit = {
+					NOT = { this = root }
+					has_reform = government_reform:chinggisid_regency
+				}
+				add_to_list = custody_steward_list
+			}
+		}
+		ordered_in_list = {
+			list = custody_steward_list
+			order_by = military_strength
+			position = 0
+			check_range_bounds = no
+			save_scope_as = steward_1
+		}
+		ordered_in_list = {
+			list = custody_steward_list
+			order_by = military_strength
+			position = 1
+			check_range_bounds = no
+			save_scope_as = steward_2
+		}
+		ordered_in_list = {
+			list = custody_steward_list
+			order_by = military_strength
+			position = 2
+			check_range_bounds = no
+			save_scope_as = steward_3
+		}
+	}
+
+	# Swear to the strongest.
+	option = {
+		name = custody.30.a
+		trigger = { exists = scope:steward_1 }
+		make_subject_of = {
+			target = scope:steward_1
+			type = subject_type:ulus_governorate
+		}
+		add_legitimacy = 5
+	}
+
+	# Swear to the second.
+	option = {
+		name = custody.30.b
+		trigger = { exists = scope:steward_2 }
+		make_subject_of = {
+			target = scope:steward_2
+			type = subject_type:ulus_governorate
+		}
+		add_legitimacy = 5
+	}
+
+	# Swear to the third.
+	option = {
+		name = custody.30.c
+		trigger = { exists = scope:steward_3 }
+		make_subject_of = {
+			target = scope:steward_3
+			type = subject_type:ulus_governorate
+		}
+		add_legitimacy = 5
+	}
+
+
+	# Hold out. Abu Saʿīd made us governors; we answer to his memory,
+	# not to these pretenders. (The pulse will ask again in time.)
+	option = {
+		name = custody.30.d
+	}
+}
+
+# ---THE KURILTAI OF CONFIRMATION (Sole Custody fork) --------------------
+# Fired by the Summon the Kuriltai action: zero rivals, held 24
+# months. Winning the custody war gets you nothing durable — it gets
+# you the RIGHT TO CHOOSE what the regency becomes.
+
+custody.40 = {
+	type = country_event
+	category = disaster_event
+	title = custody.40.title
+	desc = custody.40.desc
+	outcome = positive
+
+	# The Quiet Crown — the Shaykh Uvays move, 1356: stop minting
+	# the khan's name, take the sultan title. The realm is already
+	# yours in fact, so the claim lands softly. Behind it, the
+	# legitimacy market opens: farr, ghazi, the amirs' assent — and
+	# the Matter of Tork can now fire; Persia can now be formed.
+	option = {
+		name = custody.40.a
+		remove_reform = government_reform:chinggisid_regency
+		add_legitimacy = -25
+		set_variable = custody_quiet_crown
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.10 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.10 }
+	}
+
+	# The Restored Yarliq — the khanate made real: the throne bound
+	# to the Borjigin line by marriage and enthronement, the fiction
+	# consummated into fact. The Mongol endpoint; deliberately NOT
+	# Persia. The puppet-death cycle ends — the khan is your house now.
+	option = {
+		name = custody.40.b
+		set_variable = custody_restored_yarliq
+		remove_reform = government_reform:chinggisid_regency
+		add_reform = government_reform:gurkani_regime
+		add_country_modifier = { modifier = custody_restored_yarliq_mod months = -1 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.10 }
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.10 }
+	}
+}
+
+# ---ENDURED (300 months, two successions survived) ----------------------
+# The weaker, dated fork: survival earns options — worse ones than
+# victory would have.
+
+custody.50 = {
+	type = country_event
+	category = disaster_event
+	title = custody.50.title
+	desc = custody.50.desc
+	outcome = neutral
+
+	# The Gurkani Regime — the Timurid model: the fiction
+	# institutionalized permanently. Rule as son-in-law with a tame
+	# khan. Worse than the fresh fiction; stable forever. Exits the
+	# puppet-death cycle (the reform is gone).
+	option = {
+		name = custody.50.a
+		remove_reform = government_reform:chinggisid_regency
+		add_reform = government_reform:gurkani_regime
+		add_legitimacy = -10
+		set_variable = custody_endured
+	}
+
+	# The late Quiet Crown — the open market, at a survivor's price.
+	option = {
+		name = custody.50.b
+		remove_reform = government_reform:chinggisid_regency
+		add_legitimacy = -50
+		set_variable = custody_endured
+		set_variable = custody_quiet_crown
+	}
+
+	# Ride on. The charade continues toward rock bottom; the
+	# disaster closes its books, but the puppet-death cycle does not.
+	option = {
+		name = custody.50.c
+		set_variable = custody_endured
+	}
+}
+
+# ---THE FICTION EXPIRES --------------------------------------------------
+# The reform is gone with no resolution flag to explain it: the
+# -100 exit was forced (charade_counter at rock bottom) or taken in
+# panic. What remains is the army's standing assent — the honest
+# version of what the regency always was.
+
+custody.90 = {
+	type = country_event
+	category = disaster_event
+	title = custody.90.title
+	desc = custody.90.desc
+	outcome = negative
+
+	immediate = {
+		add_reform = government_reform:amir_sultanate
+		add_country_modifier = { modifier = custody_expired_scar months = -1 }
+	}
+
+	option = {
+		name = custody.90.a
+	}
+}
+
+# =====================================================================
+# custody.34 — A GOVERNORATE HAS SWORN (to the custodian)
+#
+# Fired at the steward by custody_declare_fealty. Purely informative:
+# the kneeling itself is not refusable (historically right — a regent
+# does not turn away a governor who reads the khan's name in his
+# khutbah), but the custodian must at least KNOW. The war question is
+# handled separately (custody.35): swearing no longer drags him in.
+# =====================================================================
+custody.34 = {
+	type = country_event
+	outcome = neutral
+	title = custody.34.title
+	desc = custody.34.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	trigger = {
+		has_variable = custody_new_sworn
+	}
+
+	immediate = {
+		var:custody_new_sworn = { save_scope_as = sworn_governorate }
+	}
+
+	option = {
+		name = custody.34.a
+		remove_variable = custody_new_sworn
+	}
+}
+
+# =====================================================================
+# custody.35 — THE GOVERNORATE CALLS FOR ITS CUSTODIAN
+#
+# Fired at the custodian from on_war_declared when a sworn governorate
+# is attacked by anyone but the custodian himself. Scopes come from
+# the hook (on_action -> event chains keep them): sworn_governorate,
+# ulus_attacker, ulus_war. Riding is a choice — refusing costs the
+# governorate's opinion and a little face.
+# =====================================================================
+custody.35 = {
+	type = country_event
+	outcome = neutral
+	title = custody.35.title
+	desc = custody.35.desc
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	trigger = {
+		exists = scope:ulus_war
+		exists = scope:sworn_governorate
+		exists = scope:ulus_attacker
+	}
+
+	# ----- A: Ride to them. -----
+	option = {
+		name = custody.35.a
+		ai_chance = {
+			factor = 70
+			# Already fighting elsewhere: the regent counts his lances.
+			modifier = {
+				factor = 0.25
+				at_war = yes
+			}
+			# A weak attacker is an easy vindication of the custody.
+			modifier = {
+				factor = 2
+				scope:ulus_attacker = { military_strength < root.military_strength }
+			}
+		}
+		join_war_as_defender = { war = scope:ulus_war }
+	}
+
+	# ----- B: Let them fend for themselves. -----
+	option = {
+		name = custody.35.b
+		ai_chance = { factor = 30 }
+		scope:sworn_governorate = {
+			add_opinion = {
+				target = root
+				modifier = opinion_refused_call_for_help_modifier
+			}
+		}
+		# A custodian who will not defend the ulus is a custodian in name.
+		add_legitimacy = -5
+	}
+}

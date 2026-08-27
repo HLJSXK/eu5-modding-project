@@ -1,0 +1,317 @@
+# Iqṭāʿ Grant — a chancery-registered fiscal grant assigning the revenue of
+# a rural parcel to an amir in exchange for the upkeep of his retinue.
+# Mechanically: the amir physically settles, his clan and lieutenants with
+# him, and the local noble pop grows toward a larger cap. Because the new
+# arrivals live off horses and herds rather than tax registers, local noble
+# literacy is suppressed — they do not promote into the diwan class while
+# the grant remains in force.
+#
+# Eligibility: rural locations only, persianate_sultanate government, local
+# control < 50 at construction time (iqṭāʿ historically went to parcels the
+# chancery could not reach directly — the amir's tribal authority replaces
+# the absence of central authority). One iqṭāʿ per location.
+
+iqta_grant = {
+	is_foreign = no
+	max_levels = 3
+	pop_type = nobles
+
+	employment_size = large_noble_employment
+
+	category = military_category
+	AI_ignore_available_worker_flag = yes
+	important_for_AI = yes
+	rural_settlement = yes
+	town = no
+	city = no
+	megalopolis = no
+	forbidden_for_estates = yes
+	build_time = estate_build_time
+	price = iqta_price ### extremely cheap
+	destroyable_building = yes
+
+	possible_production_methods = {
+		iqta_grant_maintenance
+	}
+
+	construction_demand = estate_construct_building
+
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+		OR ={
+			has_estate_privilege = estate_privilege:amirs_iqta_grant
+			has_estate_privilege = estate_privilege:amirs_hereditary_tuyul
+		}
+	}
+
+	allow = {
+		local_control < 0.6
+	}
+
+	# Revoking an iqṭāʿ was historically the chancery's hardest political
+	# act, which is to say possible only once the diwan had reasserted direct order in the
+	# parcel. Below 70 control the amir's authority is still the only
+	# authority, and the grant cannot be pulled.
+	can_destroy = {
+		local_control > 0.8
+	}
+
+	# Noble pop cap: a flat baseline (the amir's own household plus a small
+	# personal retinue, present everywhere a grant exists) plus a scaled
+	# component that lets a populous parcel sustain a real Türkmen host
+	# while a thin rural rock supports only the amir's own kin.
+	raw_modifier = {
+		local_nobles_pop_growth = 0.10
+		
+		 # minor reduction to reflect the amir's encroachment on the diwan's turf
+		amirs_estate_target_satisfaction = 0.01 # minor boost to reflect the amir's increased local presence and prestige
+		 # the amir's authority is a substitute for the chancery's; the grant is a recognition of that fact on the chancery's part, and a formalization of it on the amir's part. The grant is a formal acknowledgment that the amir's authority in the parcel is real, and that the chancery will not contest it while the grant stands. The control hit reflects the fact that the amir's authority is not as strong as the chancery's would be, but it is still significant.
+		 # the amir's local power is a direct function of the grant — the grant is what gives the amir his local authority, and the amir's local power is a reflection of that authority. The grant is a recognition of the amir's local power, and a formalization of it on the chancery's part. The power boost reflects the fact that the amir's local power is significant, but not overwhelming — the grant is a recognition of the amir's local power, but it does not make him a local despot.
+		
+	}
+
+	modifier = {
+		local_nobles_desired_pop = 0.1
+		local_manpower = 0.01 #### this is FAKE, and will be offset .... a lil trick, to the AI. 
+		local_nobles_desired_pop_scaled = 0.02
+		local_levy_size_modifier = 0.2
+		pure_tooltip_entry = fake_manpower_tooltip           
+
+		}
+	
+	# The grant is a Tazik instrument with Türk consequences: the diwan
+	# resents the lost revenue, the amirs welcome the formal recognition,
+	# and the axis drifts a hair toward Türk with every parcel registered.
+	on_built = {
+		location = {
+			add_pop = {
+					culture = root.owner.culture
+					religion = root.owner.religion
+					type = pop_type:nobles
+					size = { value = 0.05 }
+			}
+			add_location_modifier = {
+				modifier = iqta_building_fake_mod
+				years = -1
+				mode = replace
+				size = {
+					if = {
+						limit = {
+							root.building_level = 1
+						}
+						value = {
+							desc = script_value_base
+							value = 1
+						}
+					}
+					else_if = {
+						limit = {
+							root.building_level = 2
+						}
+						value = {
+							desc = script_value_base
+							value = 2
+						}
+					}
+					else_if = {
+						limit = {
+							root.building_level = 3
+						}
+						value = {
+							desc = script_value_base
+							value = 3
+						}
+					}
+
+				}
+			}
+
+
+		}
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = -0.025 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.0005 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.0005 }
+		}
+
+		
+	}
+
+	# Revocation costs amir trust. The withholding-event hook lives in a
+	# later workstream; this is the satisfaction floor.
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.05 }
+		}
+		remove_location_modifier = iqta_building_fake_mod
+	}
+
+	graphical_tags = { small_military }
+}
+
+
+# ============================================================
+# THE FEUDALIZATION CHAIN — the amir walks a chancery grant down the road
+#
+# The base iqṭāʿ above is the CHANCERY's instrument: registered, audited by
+# the istīfāʾ, theoretically revocable. The two buildings below are the
+# AMIRS' answer — estate buildings the amirs raise themselves, each only on a
+# parcel that already carries the prior tier (location_potential), so they are
+# a DEGRADATION of an existing grant, never a thing built from nothing. The
+# base type stays globally available; the crown keeps granting iqṭāʿ even as
+# old ones rot. The tiers STACK on top of the base, in the manner of the
+# base game's per-instance upgrade chains (cf. munich_residenz_*).
+#
+# Historiography (Lambton, Landlord and Peasant): the service-conditioned
+# iqṭāʿ decays into the unaudited de-facto-permanent grant, and finally into
+# the hereditary, lineage-locked, fiscally immune tuyul / soyurghal. Each step
+# pulls revenue and control off the register and into the amir's house, and
+# tilts the realm a little further Türk.
+#
+# NUMBERS ARE A FIRST DRAFT — tune local_tax_modifier / power / levy to taste.
+# ============================================================
+
+# --- Unaudited Iqṭāʿ — the audit lapses (estate-built by the amirs) ---
+# Nothing is signed: the amir simply stops submitting to the istīfāʾ, and the
+# assessment that kept the grant revocable never comes again. De facto the
+# parcel is now his for good, and the crown's fiscal reach into it recedes.
+unaudited_iqta = {
+	is_foreign = no
+	max_levels = 1
+	pop_type = nobles
+	employment_size = 0.02
+
+	category = estate_category
+	estate = amirs_estate
+
+	rural_settlement = yes
+	town = no
+	city = no
+	megalopolis = no
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+		country_has_estate = estate_type:amirs_estate
+	}
+
+	# Only where the chancery's own grant already stands — this degrades an
+	# existing iqṭāʿ, it is not built from nothing.
+	location_potential = {
+		has_building = building_type:iqta_grant
+	}
+	allow = {
+		local_control < 0.3
+	}
+	# Revoking is the chancery forcing the audit back open — possible only once
+	# direct order has returned to the parcel.
+	can_destroy = {
+		local_control > 0.7
+	}
+
+	raw_modifier = {
+		amirs_estate_target_satisfaction = 0.01
+		pure_tooltip_entry = unaudited_iqta_tooltip
+	}
+
+	modifier = {
+		local_amirs_estate_power = 0.5
+		local_max_control = -0.15
+		local_levy_size_modifier = -0.1
+	}
+
+	# Slipping the audit drifts the realm Türk and stings the diwan, who have
+	# just lost a stream of revenue they can no longer count on.
+	on_built = {
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = -0.25 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.01 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.01 }
+		}
+	}
+
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.05 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+
+	graphical_tags = { small_military }
+}
+
+# --- Tuyul (Toyul) — the hereditary terminus (estate-built by the amirs) ---
+# The grant passes out of the service contract entirely and locks into the
+# holder's lineage: the chancery cannot revoke it, the assessment never comes,
+# and the yield is the house's in perpetuity. Opened by the hereditary-tuyul
+# OR the soyurghal privilege — the two legal forms of the permanent carve-out.
+toyul = {
+	is_foreign = no
+	max_levels = 1
+	pop_type = nobles
+	employment_size = 0.02
+	obsolete = unaudited_iqta
+	category = estate_category
+	estate = amirs_estate
+	obsolete = unaudited_iqta
+	rural_settlement = yes
+	town = no
+	city = no
+	megalopolis = no
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	country_potential = {
+		government_type = government_type:persianate_sultanate
+		country_has_estate = estate_type:amirs_estate
+		# Either legal form of the hereditary grant unlocks the step.
+		OR = {
+			has_estate_privilege = estate_privilege:amirs_hereditary_tuyul
+			has_estate_privilege = estate_privilege:soyurghal_grants
+		}
+	}
+
+	# Only on a parcel already slipped past the audit.
+	location_potential = {
+		has_building = building_type:unaudited_iqta
+	}
+
+	# Hereditary and lineage-locked — practically irrevocable; only the fullest
+	# reassertion of direct order can pry it loose.
+	can_destroy = {
+		local_control > 0.9
+	}
+
+	raw_modifier = {
+		amirs_estate_target_satisfaction = 0.02
+		pure_tooltip_entry = toyul_tooltip
+	}
+
+	modifier = {
+		local_amirs_estate_power = 1.50
+		local_max_control = -0.30
+		 
+	}
+
+	on_built = {
+		owner = {
+			change_societal_value = { type = turk_vs_tazik value = -0.50 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.02 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.02 }
+		}
+	}
+
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.10 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+
+	graphical_tags = { small_military }
+}

@@ -1,0 +1,207 @@
+# =====================================================================
+# WAQF DAMAGE — the yearly reassessment
+#
+# The per-location building modifier cannot express a coherent realm-wide
+# cost, so the damage is recomputed from the buildings once a year and
+# applied as ONE sized country modifier per estate (mode = replace, so it
+# tracks new construction and demolition / muṣādara).
+#
+# The size is a WEIGHTED SHARE, not a raw count. For each location holding
+# the estate's waqf:
+#     location_tax_base  ×  local relative estate power  ×  building level
+# (the GRAND waqf counts each level DOUBLE), summed across the realm, then
+# × 100 / country_tax_base — the share of the realm's economy captured under
+# that estate's endowments, weighted by how entrenched the estate is and how
+# much waqf sits there. var:<estate>_count is also the handle muṣādara reads
+# to weaken the waqf over time.
+#
+# NOTE on syntax: the per-location reads MUST go through set_local_variable +
+# the location value-functions (location_tax_base, local_relative_estate_power,
+# location_building_level). Saving those via save_scope_as silently broke the
+# level math — building_level resolves fine, the scope capture did not.
+#
+# Called per country from waqf_reassessment_pulse (yearly_country_pulse).
+# =====================================================================
+
+reassess_waqf_damage = {
+
+	# --- Aʿyān Waqf (Diwan) ---
+	set_variable = { name = ayyan_count value = 0 }
+	every_owned_location = {
+		limit = {
+			OR = {
+				has_building = building_type:ayyan_waqf
+				has_building = building_type:grand_ayyan_waqf
+			}
+		}
+	set_local_variable = { name = loc_taxbase value = location_tax_base }
+	set_local_variable = { name = loc_power value = "local_relative_estate_power(estate_type:diwan_estate)" }
+	set_local_variable = { name = waqf_level value = "location_building_level(building_type:ayyan_waqf)"}
+	set_local_variable = { name = grand_waqf_level value = "location_building_level(building_type:grand_ayyan_waqf)"}
+	save_scope_as = current_location
+	
+
+		if = {
+			limit = { has_building = building_type:ayyan_waqf }
+			owner = {
+				change_variable = {
+					name = ayyan_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = local_var:waqf_level }
+					}
+				}
+			}
+		}
+		else = {
+			# Grand waqf counts double.
+			owner = {
+				change_variable = {
+					name = ayyan_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = { value = local_var:grand_waqf_level  multiply = 2 } }
+					}
+				}
+			}
+		}
+	}
+	change_variable = { name = ayyan_count  multiply = 100 }
+	change_variable = { name = ayyan_count  divide = root.country_tax_base }
+	add_country_modifier = {
+		modifier = diwan_waqf_damage
+		size = { value = var:ayyan_count }
+		years = -1
+		mode = replace
+	}
+	# The same share, read as a fraction [0, 0.9], is what shelters the diwan's
+	# wealth from the king's hand: muṣādara and the diwan corruption-case fines
+	# take that much LESS of the estate's coffers. The dead hand is, after all,
+	# precisely the wealth the writ cannot reach. Capped at 0.9 so the crown can
+	# never be fully locked out.
+	set_variable = {
+		name = diwan_waqf_shelter
+		value = {
+			value = var:ayyan_count
+			divide = 100
+			min = { value = 0 }
+			max = { value = 0.9 }
+		}
+	}
+
+	# --- Urban Waqf (Burghers) ---
+	set_variable = { name = urban_waqf_count value = 0 }
+	every_owned_location = {
+		limit = {
+			OR = {
+				has_building = building_type:urban_waqf
+				has_building = building_type:grand_urban_waqf
+			}
+		}
+		set_local_variable = { name = loc_taxbase value = location_tax_base }
+		set_local_variable = { name = loc_power value = "local_relative_estate_power(estate_type:burghers_estate)" }
+		set_local_variable = { name = waqf_level value = "location_building_level(building_type:urban_waqf)" }
+		set_local_variable = { name = grand_waqf_level value = "location_building_level(building_type:grand_urban_waqf)" }
+		save_scope_as = current_location
+
+		if = {
+			limit = { has_building = building_type:urban_waqf }
+			owner = {
+				change_variable = {
+					name = urban_waqf_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = local_var:waqf_level }
+					}
+				}
+			}
+		}
+		else = {
+			# Grand waqf counts double.
+			owner = {
+				change_variable = {
+					name = urban_waqf_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = { value = local_var:grand_waqf_level  multiply = 2 } }
+					}
+				}
+			}
+		}
+	}
+	change_variable = { name = urban_waqf_count  multiply = 100 }
+	change_variable = { name = urban_waqf_count  divide = root.country_tax_base }
+	add_country_modifier = {
+		modifier = burghers_waqf_damage
+		size = { value = var:urban_waqf_count }
+		years = -1
+		mode = replace
+	}
+
+	set_variable = {
+		name = burghers_waqf_shelter
+		value = {
+			value = var:urban_waqf_count
+			divide = 100
+			min = { value = 0 }
+			max = { value = 0.9 }
+		}
+	}
+	# --- Clerical Waqf (Clergy) ---
+	set_variable = { name = clerical_waqf_count value = 0 }
+	every_owned_location = {
+		limit = {
+			OR = {
+				has_building = building_type:clerical_waqf
+				has_building = building_type:grand_clerical_waqf
+			}
+		}
+		set_local_variable = { name = loc_taxbase value = location_tax_base }
+		set_local_variable = { name = loc_power value = "local_relative_estate_power(estate_type:clergy_estate)" }
+		set_local_variable = { name = waqf_level value = "location_building_level(building_type:clerical_waqf)" }
+		set_local_variable = { name = grand_waqf_level value = "location_building_level(building_type:grand_clerical_waqf)" }
+		save_scope_as = current_location
+
+		if = {
+			limit = { has_building = building_type:clerical_waqf }
+			owner = {
+				change_variable = {
+					name = clerical_waqf_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = local_var:waqf_level }
+					}
+				}
+			}
+		}
+		else = {
+			# Grand waqf counts double.
+			owner = {
+				change_variable = {
+					name = clerical_waqf_count
+					add = {
+						value = local_var:loc_taxbase
+						multiply = { value = local_var:loc_power  multiply = { value = local_var:grand_waqf_level  multiply = 2 } }
+					}
+				}
+			}
+		}
+	}
+	change_variable = { name = clerical_waqf_count  multiply = 100 }
+	change_variable = { name = clerical_waqf_count  divide = root.country_tax_base }
+	add_country_modifier = {
+		modifier = clergy_waqf_damage
+		size = { value = var:clerical_waqf_count }
+		years = -1
+		mode = replace
+	}
+	set_variable = {
+		name = clerical_waqf_shelter
+		value = {
+			value = var:clerical_waqf_count
+			divide = 100
+			min = { value = 0 }
+			max = { value = 0.9 }
+		}
+	}
+}

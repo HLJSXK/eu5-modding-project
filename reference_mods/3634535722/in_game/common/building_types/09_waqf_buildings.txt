@@ -1,0 +1,364 @@
+# ============================================================
+# ERANZAMIN — The Waqf pathology: the dead hand
+#
+# The structural rot the pen otherwise lacks. A waqf permanently
+# dedicates a revenue asset (bazaar rows, orchards, village land)
+# to a pious purpose and makes it INALIENABLE: outside the tax
+# collector's reach and outside muṣādara (the sultan's standing
+# power to confiscate an official's estate). The classic political-
+# economy critique (Kuran): the waqf froze productive wealth out of
+# the fisc and the credit market, in perpetuity.
+#
+# The pathology is the FAMILY waqf (waqf ahlī): notables, scribes,
+# merchants, and ulama endow "charities" while naming themselves
+# the salaried administrators — sheltering dynastic wealth as piety.
+# It is deceptively good: it genuinely funds the madrasas and soup
+# kitchens, the estate gets richer and happier, and opposing it
+# looks impious. Meanwhile it quietly hollows out the two state
+# capacities that are otherwise unkillable: tax reach and credit.
+#
+# Three ESTATE buildings (category = estate_category, estate = X),
+# one per pen-aligned estate. The estates build these THEMSELVES, so
+# the rot is automatic and scales with how strong and happy the
+# estate is. Each is a PAIR: a base waqf, and a GRAND waqf unlocked
+# by a (deceptively good) charter privilege, which obsoletes the base.
+# Per-building numbers are tiny on purpose: the drain is the carpet,
+# not the tile.
+#
+# Effects per building (raw_modifier, per instance, realm-wide, STACKS):
+#   - {estate}_estate_max_tax    (down: wealth sheltered from tax)
+#   - estate_enrichment          (up:  the bait — scoped to this building's
+#                                 estate via the estate = X association)
+#   - monthly_loan_capacity_investment (down, FLAT: inalienable wealth
+#     cannot back state credit; flat so the AI can read the cost)
+#
+# Once the charter is granted the endowments are INVIOLABLE: can_destroy
+# is blocked while the privilege stands. Tearing one down anyway (only
+# possible before/after the charter) angers the estate and the ulama.
+# ============================================================
+
+
+# --- Aʿyān Waqf (Diwan) — the bureaucrat's family endowment, the
+#     muṣādara shelter. Deepest rot: when the chancery class itself
+#     freezes wealth, the fisc rots at its own nervous system. ---
+ayyan_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = nobles
+	employment_size = 0.05
+	price = small_estate_building
+	category = estate_category
+	estate = diwan_estate
+
+	rural_settlement = no
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	country_potential = {
+		exists = root
+		government_type ?= government_type:persianate_sultanate
+		country_has_estate = estate_type:diwan_estate
+		# Waqf is the shelter AGAINST muṣādara — it only exists while the
+		# crown's right of confiscation does. (Privilege defined separately.)
+		modifier:access_to_musadara = yes
+	}
+
+	# Inviolable once the charter stands — the whole point of the privilege.
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:ayyan_waqf_charter } }
+	}
+	
+	raw_modifier = {
+		local_diwan_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+
+	}
+	remove_if = {
+		OR = {
+
+			location.owner ?= {
+				OR = {
+					NOT = {country_has_estate = estate_type:diwan_estate}
+					NOT = {government_type ?=government_type:persianate_sultanate}
+				}
+			}
+		}
+	}
+	# The realm-wide damage is no longer applied here (the per-location
+	# on_built couldn't express a coherent country cost). It is recomputed
+	# on the yearly pulse — see reassess_waqf_damage.
+	# Dissolving an endowment is sacrilege and theft of the estate's shelter.
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.025 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.01 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}
+
+# The grand form — unlocked by the Inviolable Endowments privilege,
+# which obsoletes the base waqf. Twice the drain, twice the outrage.
+grand_ayyan_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = nobles
+	employment_size = 0.05
+	price = expensive_estate_building
+	category = estate_category
+	estate = diwan_estate
+
+	rural_settlement = no
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	obsolete = ayyan_waqf
+
+	country_potential = {
+		exists = root
+		government_type ?= government_type:persianate_sultanate
+		country_has_estate = estate_type:diwan_estate
+		modifier:access_to_musadara = yes
+		has_estate_privilege = estate_privilege:ayyan_waqf_charter
+	}
+
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:ayyan_waqf_charter } }
+	}
+
+	raw_modifier = {
+		# Country fields here are cosmetic (the realm-wide cost is applied by
+		# the yearly pulse); they stay for player-facing UX. Only Local power is real.
+		diwan_estate_max_tax = -0.01
+		estate_enrichment = 0.01
+		total_loan_capacity_modifier = -0.01
+		local_diwan_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+	}
+	remove_if = {
+		OR = {
+
+			location.owner ?= {
+				OR = {
+					NOT = {country_has_estate = estate_type:diwan_estate}
+					NOT = {government_type ?=government_type:persianate_sultanate}
+				}
+			}
+		}
+	}
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.05 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.02 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}
+
+
+# --- Urban Waqf (Burghers) — the bazaar, the caravanserai, the
+#     merchant-dynasty real estate frozen into endowment. Hits
+#     commerce and urban credit. ---
+urban_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = burghers
+	employment_size = 0.05
+
+	category = estate_category
+	estate = burghers_estate
+
+	rural_settlement = no
+	town = yes
+	city = yes
+	megalopolis = yes
+	price = small_estate_building
+	
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	country_potential = {
+		government_type ?= government_type:persianate_sultanate
+		country_has_estate = estate_type:burghers_estate
+		modifier:access_to_musadara = yes
+	}
+
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:urban_waqf_charter } }
+	}
+
+	raw_modifier = {
+		burghers_estate_max_tax = -0.005
+		estate_enrichment = 0.005
+		total_loan_capacity_modifier = -0.01
+		local_burghers_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+	}
+
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.025 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.01 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}
+
+grand_urban_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = burghers
+	employment_size = 0.05
+
+	category = estate_category
+	estate = burghers_estate
+	price = expensive_estate_building
+	rural_settlement = no
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	obsolete = urban_waqf
+
+	country_potential = {
+		government_type ?= government_type:persianate_sultanate
+		country_has_estate = estate_type:burghers_estate
+		modifier:access_to_musadara = yes
+		has_estate_privilege = estate_privilege:urban_waqf_charter
+	}
+
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:urban_waqf_charter } }
+	}
+
+	raw_modifier = {
+		burghers_estate_max_tax = -0.01
+		estate_enrichment = 0.01
+		monthly_loan_capacity_investment = -2.5
+		local_burghers_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+	}
+
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.05 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.02 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}
+
+
+# --- Clerical Waqf (Clergy) — the madrasa/shrine/mosque endowment
+#     under ulama control: the most "legitimate" and untouchable,
+#     growing the religious establishment's autonomous wealth beyond
+#     the state's reach. Rural too — shrine and village endowments. ---
+clerical_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = clergy
+	employment_size = 0.05
+	price = small_estate_building
+	category = estate_category
+	estate = clergy_estate
+
+	rural_settlement = yes
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	country_potential = {
+		government_type ?= government_type:persianate_sultanate
+		religion.group = religion_group:muslim
+		country_has_estate = estate_type:clergy_estate
+		modifier:access_to_musadara = yes
+	}
+
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:clerical_waqf_charter } }
+	}
+
+	raw_modifier = {
+		clergy_estate_max_tax = -0.005
+		estate_enrichment = 0.005
+		monthly_loan_capacity_investment = -1.0
+		local_clergy_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+	}
+
+	# The main estate IS the clergy; dissolving a sacred endowment is the
+	# gravest of the three.
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.025 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}
+
+grand_clerical_waqf = {
+	is_foreign = no
+	max_levels = 10
+	pop_type = clergy
+	employment_size = 0.05
+	price = expensive_estate_building
+	category = estate_category
+	estate = clergy_estate
+
+	rural_settlement = yes
+	town = yes
+	city = yes
+	megalopolis = yes
+
+	build_time = estate_build_time
+	destroyable_building = yes
+
+	obsolete = clerical_waqf
+
+	country_potential = {
+		government_type ?= government_type:persianate_sultanate
+		religion.group = religion_group:muslim
+		country_has_estate = estate_type:clergy_estate
+		modifier:access_to_musadara = yes
+		has_estate_privilege = estate_privilege:clerical_waqf_charter
+	}
+
+	can_destroy = {
+		owner ?= { NOT = { has_estate_privilege = estate_privilege:clerical_waqf_charter } }
+	}
+
+	raw_modifier = {
+		clergy_estate_max_tax = -0.01
+		estate_enrichment = 0.01
+		monthly_loan_capacity_investment = -2.5
+		local_clergy_estate_power = 0.25
+		pure_tooltip_entry = waqf_tax_erosion
+	}
+
+	on_destroyed = {
+		owner = {
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+		}
+	}
+
+	construction_demand = estate_construct_building
+}

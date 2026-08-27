@@ -1,0 +1,260 @@
+# ============================================================
+# Scripted effects for the Farr Proof of Fortune disaster.
+#
+# Pattern follows matter_of_tork: variable-based progress (here
+# legitimacy itself is the ledger, so we track only zone-time
+# counters), threshold dispatch with once-fired flags, resolution
+# poll in priority order.
+#
+# Counters maintained:
+#   - farr_disaster_months — total months since disaster start
+#   - farr_high_months    — months at legitimacy ≥ 75
+#   - farr_low_months     — months at legitimacy ≤ 25
+#
+# Threshold-fired flags (apparatus, upward):
+#   - farr_50_fired / 65 / 80 / 90
+# Threshold-fired flags (erosion, downward):
+#   - farr_35_fired / 20 / 10
+# ============================================================
+
+# ---Init: called from disaster on_start --------------------------------
+farr_proof_init = {
+	# Zero the counters.
+	set_variable = { name = farr_disaster_months value = 0 }
+	set_variable = { name = farr_high_months value = 0 }
+	set_variable = { name = farr_low_months value = 0 }
+
+	# Clear any stale threshold flags from a prior run (defensive —
+	# the disaster locks after one run, but if re-fire is ever enabled
+	# we want a clean slate).
+	remove_variable = farr_50_fired
+	remove_variable = farr_65_fired
+	remove_variable = farr_80_fired
+	remove_variable = farr_90_fired
+	remove_variable = farr_35_fired
+	remove_variable = farr_20_fired
+	remove_variable = farr_10_fired
+
+	# Clear resolution flags (set by resolution events).
+	remove_variable = farr_proof_vindicated
+	remove_variable = farr_proof_broken_formal
+	remove_variable = farr_proof_broken_lapse
+	remove_variable = farr_proof_endured
+}
+
+# ---Monthly tick: counters only -----------------------------------------
+# Legitimacy itself is the ledger; we just track time-in-zone so the
+# resolution poll can read "sustained" not "spot".
+farr_proof_monthly_tick = {
+	change_variable = { name = farr_disaster_months add = 1 }
+
+	if = {
+		limit = { legitimacy >= 95 }
+		change_variable = { name = farr_high_months add = 1 }
+	}
+	if = {
+		limit = { legitimacy <= 40 }
+		change_variable = { name = farr_low_months add = 1 }
+	}
+}
+
+# ---Apparatus dispatch — RETIRED ----------------------------------------
+# Apparatus events (.50/.65/.80/.90) are no longer auto-fired on
+# threshold-touch. They are claimed by the player via the disaster
+# panel's action buttons (see common/generic_actions/farr_proof_actions.txt).
+# The flags (farr_50_fired etc.) are set in the action's effect block.
+#
+# This makes consolidating doctrinal apparatus a deliberate act — the
+# player can sit on legitimacy ≥ 90 and time pādishāh-assumption to
+# coincide with a key victory rather than having it fire silently.
+
+# ---Erosion dispatch (downward thresholds, fire once each) --------------
+# These are the public signs of withdrawn favor — bī-farr, the glory
+# has left him. Each fires once on first crossing downward.
+farr_proof_erosion_dispatch = {
+	# 35: amīrs absent from court.
+	if = {
+		limit = {
+			legitimacy <= 35
+			NOT = { has_variable = farr_35_fired }
+		}
+		set_variable = farr_35_fired
+		trigger_event_non_silently = farr_proof.35
+	}
+	# 20: a province's khutba dropped.
+	if = {
+		limit = {
+			legitimacy <= 20
+			NOT = { has_variable = farr_20_fired }
+		}
+		set_variable = farr_20_fired
+		trigger_event_non_silently = farr_proof.20
+	}
+	# 10: the first whispered bī-farr.
+	if = {
+		limit = {
+			legitimacy <= 10
+			NOT = { has_variable = farr_10_fired }
+		}
+		set_variable = farr_10_fired
+		trigger_event_non_silently = farr_proof.10
+	}
+}
+
+# ---Omen pulse (random per month, low chance per omen) ------------------
+# Roughly: 10% chance any omen fires in a given month; weighted toward
+# plague during the 1346–50 historical window. Across a 25-year disaster
+# that yields ~25–30 omen events — enough to feel like fortune is
+# constantly testing the king, not so many they spam the player.
+# Per-event 2-year cooldowns live EVENT-SIDE: each omen's trigger
+# checks NOT has_variable = <cd> and its immediate sets it. A rolled
+# event whose trigger fails simply doesn't fire — the month stays
+# quiet. (In-list `trigger` blocks are base-legal too — see
+# character_events.txt erratic list — used below only for the plague
+# year-window boost.)
+farr_proof_omen_pulse = {
+	random_list = {
+		90 = {}
+		# comet
+		3 = { trigger_event_non_silently = farr_proof.100 }
+		# earthquake
+		3 = { trigger_event_non_silently = farr_proof.101 }
+		# plague — base weight...
+		4 = { trigger_event_non_silently = farr_proof.102 }
+		# ...plus a Black-Death-window bonus entry (in-list trigger:
+		# the base-cited form), tripling the plague's weight 1346-50.
+		8 = {
+			trigger = {
+				current_year >= 1346
+				current_year <= 1350
+			}
+			trigger_event_non_silently = farr_proof.102
+		}
+		# the rains withheld — drought read as withdrawal of barakat
+		3 = { trigger_event_non_silently = farr_proof.103 }
+		# the conjunction — the munajjims read a favorable qiran
+		2 = { trigger_event_non_silently = farr_proof.104 }
+		# the hunt marvel — the king takes the lion
+		2 = { trigger_event_non_silently = farr_proof.105 }
+		# the generous rains — fortune attests (2/3 the drought's odds;
+		# shares a one-year variable with it: no year holds both)
+		2 = { trigger_event_non_silently = farr_proof.106 }
+		# the Homay lands on the king's shoulder — once, ever
+		1 = { trigger_event_non_silently = farr_proof.107 }
+	}
+}
+
+# ---Resolution poll (priority order, fire once each) --------------------
+# Order matters: catastrophic break (legitimacy collapse) preempts all
+# else; then vindication, then quiet lapse, then survival.
+farr_proof_resolution_poll = {
+	# Broken-formal: the legitimacy floor has been breached. A Türk
+	# amīr usurps. Most severe — fires immediately on the day.
+	if = {
+		limit = {
+			legitimacy <= 0
+			NOT = { has_variable = farr_proof_vindicated }
+			NOT = { has_variable = farr_proof_broken_formal }
+			NOT = { has_variable = farr_proof_broken_lapse }
+			NOT = { has_variable = farr_proof_endured }
+		}
+		set_variable = farr_proof_broken_formal
+		trigger_event_non_silently = farr_proof.201
+	}
+
+	# Vindicated: 60 cumulative months at legitimacy ≥ 75. The houses
+	# that watched you win swear. This is the wire into the Matter.
+	if = {
+		limit = {
+			farr_proof_can_vindicate = yes
+			NOT = { has_variable = farr_proof_vindicated }
+			NOT = { has_variable = farr_proof_broken_formal }
+			NOT = { has_variable = farr_proof_broken_lapse }
+			NOT = { has_variable = farr_proof_endured }
+		}
+		set_variable = farr_proof_vindicated
+		trigger_event_non_silently = farr_proof.200
+	}
+
+	# Broken-lapse: 60 cumulative months at legitimacy ≤ 25. The
+	# doctrine quietly lapses; no decisive defeat, just inanition.
+	if = {
+		limit = {
+			farr_proof_can_break_lapse = yes
+			NOT = { has_variable = farr_proof_vindicated }
+			NOT = { has_variable = farr_proof_broken_formal }
+			NOT = { has_variable = farr_proof_broken_lapse }
+			NOT = { has_variable = farr_proof_endured }
+		}
+		set_variable = farr_proof_broken_lapse
+		trigger_event_non_silently = farr_proof.203
+	}
+
+	# Endured: year 25 (300 months) has elapsed and none of the above
+	# fired. Survival itself adjudged fortune — quieter vindication.
+	if = {
+		limit = {
+			farr_proof_can_endure = yes
+			NOT = { has_variable = farr_proof_vindicated }
+			NOT = { has_variable = farr_proof_broken_formal }
+			NOT = { has_variable = farr_proof_broken_lapse }
+			NOT = { has_variable = farr_proof_endured }
+		}
+		set_variable = farr_proof_endured
+		trigger_event_non_silently = farr_proof.202
+	}
+}
+
+# ---Clear: called from disaster on_end ----------------------------------
+# Counters are cleaned; resolution flags PERSIST so the resolution event
+# can apply the appropriate permanent modifier on the next month tick.
+# The farr_proof_completed flag (set in on_end) is what locks the
+# disaster from re-firing.
+farr_proof_clear = {
+	remove_variable = farr_proof_fired
+	remove_variable = farr_disaster_months
+	remove_variable = farr_high_months
+	remove_variable = farr_low_months
+	# Threshold flags retained — they record what apparatus was
+	# achieved during the run, useful for the Matter's reading of
+	# the house's history.
+
+	# Clean up the transient battle/war modifiers. Capital-lost and
+	# defeat-shame persist until cleared otherwise; the disaster
+	# ending is the right place to retire them.
+	if = {
+		limit = { has_country_modifier = farr_capital_lost }
+		remove_country_modifier = farr_capital_lost
+	}
+	if = {
+		limit = { has_country_modifier = farr_defeat_shame }
+		remove_country_modifier = farr_defeat_shame
+	}
+	if = {
+		limit = { has_country_modifier = farr_conquest_glory }
+		remove_country_modifier = farr_conquest_glory
+	}
+
+	# Strip the apparatus REFUND modifiers. They existed only as the
+	# in-disaster cancellation of specific penalties — once the disaster
+	# is done, the penalty is gone and the refund goes with it. The
+	# legacy halves (farr_sikka_granted etc.) are NOT cleared here:
+	# they persist past Vindicated / Endured / Broken-lapse and are
+	# stripped only by farr_proof.201 (Broken-formal).
+	if = {
+		limit = { has_country_modifier = farr_sikka_refund }
+		remove_country_modifier = farr_sikka_refund
+	}
+	if = {
+		limit = { has_country_modifier = farr_khutba_refund }
+		remove_country_modifier = farr_khutba_refund
+	}
+	if = {
+		limit = { has_country_modifier = farr_hunt_and_nawruz_refund }
+		remove_country_modifier = farr_hunt_and_nawruz_refund
+	}
+	if = {
+		limit = { has_country_modifier = farr_padishah_refund }
+		remove_country_modifier = farr_padishah_refund
+	}
+}

@@ -1,0 +1,222 @@
+# ============================================================
+# THE TWO PIRS — radicalization as a process, not a coin-flip
+#
+# Historical chassis: Junayd's militancy got him EXPELLED from
+# Ardabil by his own uncle Jaʿfar (backed by Jahanshah); the
+# order split; Junayd radicalized the Anatolian Türkmen in
+# exile; his line took the order back by force and remade it.
+# Every road here starts from a SUNNI order — even the Zaydi
+# road: the ideology may be milder for Zaydis than for the
+# ghulat, but the order was a sunni house a day ago.
+#
+# The increasing gateset (see shia_rebuild_plan D.2):
+#   START    any sunni order with >=5 chapters of its base type
+#            (2.5%/month). tariqa.1 = the succession choice.
+#   DECLARE  (tariqa.1.a) religion flips to shia, BRANCH UNSET;
+#            the shrine-seat's home area unveils its lodges;
+#            -1.0 monthly legitimacy begins. The clock is the
+#            order's own legitimacy bleeding out.
+#   LADDER   disaster-panel actions: plant chapters (gold),
+#            seed conversions (gold), unveil lodges (legitimacy),
+#            spread the sayyid genealogy (network + legitimacy +
+#            gold; licenses the imamate claims), and claim the
+#            midpoint: 10 chapters + 50% shia in the shrine-seat
+#            PROVINCE -> Known Murshid (+0.5 legitimacy back,
+#            +conversion, and the banners hook goes live).
+#   ASPECTS  the confession must be CLAIMED (aspects panel, 30
+#            stability each): Twelver + Messianism, or Zaydi +
+#            Qiyam bi'l-Sayf — both genealogy-gated for orders.
+#   END      Known Murshid + 20 chapters + 15% shia in the
+#            shrine-seat AREA + legitimacy >= 50 + aspect pair.
+#            tariqa.2: the militant tier unlocks, every chapter
+#            upgrades to its twin, the last lodges unveil.
+#   Quietist (B) ends it for a generation; settling (C) for good.
+# ============================================================
+
+two_pirs = {
+
+	image = "gfx/interface/illustrations/disaster/two_pirs.dds"
+
+	# 2.5% a month once the preconditions exist (base scale: 1 = certain).
+	monthly_spawn_chance = 0.025
+
+	can_start = {
+		country_type = building
+		has_reform = government_reform:tariqa_order
+		# A sunni order: the disaster IS the passage out of the sunna.
+		NOT = { religion = religion:shia }
+		# The order has spread — the succession fight is worth having.
+		custom_tooltip = {
+			text = two_pirs_census_tt
+			OR = {
+				AND = {
+					has_reform = government_reform:tariqa_tribal_base
+					any_owned_foreign_building = {
+						count >= 5
+						building_type = building_type:tariqa_tribal_devotions
+					}
+				}
+				AND = {
+					has_reform = government_reform:tariqa_popular_base
+					any_owned_foreign_building = {
+						count >= 5
+						building_type = building_type:tariqa_rural_zawiya
+					}
+				}
+				AND = {
+					has_reform = government_reform:tariqa_urban_base
+					any_owned_foreign_building = {
+						count >= 5
+						building_type = building_type:tariqa_urban_waqf
+					}
+				}
+			}
+		}
+		NOT = { has_variable = tariqa_radicalizing }
+		NOT = { has_variable = tariqa_radicalized }
+		NOT = { has_variable = tariqa_settled }
+		NOT = { has_variable = two_pirs_quietist_upheld }
+	}
+
+	can_end = {
+		custom_tooltip = {
+			text = two_pirs_can_end_tt
+			OR = {
+				has_variable = tariqa_settled
+				has_variable = two_pirs_quietist_upheld
+				NOT = { has_reform = government_reform:tariqa_order }
+				AND = {
+					has_variable = tariqa_radicalizing
+					has_variable = tariqa_known_murshid
+					legitimacy >= 50
+					custom_tooltip = {
+						text = two_pirs_chapters_tt
+						OR = {
+							AND = {
+								has_reform = government_reform:tariqa_tribal_base
+								any_owned_foreign_building = {
+									count >= 20
+									building_type = building_type:tariqa_tribal_devotions
+								}
+							}
+							AND = {
+								has_reform = government_reform:tariqa_popular_base
+								any_owned_foreign_building = {
+									count >= 20
+									building_type = building_type:tariqa_rural_zawiya
+								}
+							}
+							AND = {
+								has_reform = government_reform:tariqa_urban_base
+								any_owned_foreign_building = {
+									count >= 20
+									building_type = building_type:tariqa_urban_waqf
+								}
+							}
+						}
+					}
+					custom_tooltip = {
+						text = two_pirs_area_share_tt
+						capital ?= {
+							area ?= {
+								religion_percentage = {
+									religion = religion:shia
+									value >= 0.15
+								}
+							}
+						}
+					}
+					custom_tooltip = {
+						text = two_pirs_aspects_tt
+						OR = {
+							AND = {
+								has_religious_aspect = religious_aspect:imamate_ithna_ashari
+								has_religious_aspect = religious_aspect:messianism
+							}
+							AND = {
+								has_religious_aspect = religious_aspect:imamate_zaydi
+								has_religious_aspect = religious_aspect:qiyam_bil_sayf
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	# Two men claim the prayer rug — and once the recitation changes,
+	# every month un-manifested is a month the claim bleeds. Massive
+	# by design: the midpoint claim gives half of it back.
+	modifier = {
+		monthly_legitimacy = -1.0
+		diplomatic_reputation = -1
+	}
+
+	on_start = {
+		trigger_event_non_silently = tariqa.1
+	}
+
+	# Panel bookkeeping (gui/panels/disaster/two_pirs.gui): the GUI can
+	# only read VARIABLES, so the ladder's three quantities are mirrored
+	# into country variables each month while the passage runs.
+	on_monthly = {
+		if = {
+			limit = { has_variable = tariqa_radicalizing }
+			# The chapter census (bar: /20).
+			set_variable = { name = two_pirs_chapters value = 0 }
+			every_owned_foreign_building = {
+				limit = {
+					OR = {
+						building_type = building_type:tariqa_tribal_devotions
+						building_type = building_type:tariqa_rural_zawiya
+						building_type = building_type:tariqa_urban_waqf
+					}
+				}
+				root = {
+					change_variable = { name = two_pirs_chapters add = 1 }
+				}
+			}
+			# The recitation shares: province (midpoint, 50%) and the
+			# wider area (completion, 15%). LOCAL variables: they scope
+			# to this effect execution, not the map entity — the data
+			# function still evaluates in place (province/area scope),
+			# but nothing is written to, or collides on, the map scope.
+			capital ?= {
+				province ?= {
+					set_local_variable = {
+						name = tp_province_share
+						value = "religion_percentage(religion:shia)"
+					}
+					root = {
+						set_variable = {
+							name = two_pirs_province_share
+							value = local_var:tp_province_share
+						}
+					}
+				}
+				area ?= {
+					set_local_variable = {
+						name = tp_area_share
+						value = "religion_percentage(religion:shia)"
+					}
+					root = {
+						set_variable = {
+							name = two_pirs_area_share
+							value = local_var:tp_area_share
+						}
+					}
+				}
+			}
+		}
+	}
+
+	on_end = {
+		if = {
+			limit = { has_variable = tariqa_radicalizing }
+			remove_variable = tariqa_radicalizing
+			set_variable = tariqa_radicalized
+			remove_country_modifier = tariqa_proofs_mod
+			trigger_event_non_silently = tariqa.2
+		}
+	}
+}

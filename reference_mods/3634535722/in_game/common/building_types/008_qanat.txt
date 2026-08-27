@@ -1,0 +1,221 @@
+# ============================================================
+# ERANZAMIN — The qanat pair
+#
+# Replaces the qanat vegetation types. All former qanat_farmland /
+# crumbling_qanat locations convert to vegetation = sparse; the
+# qanat STATE lives in these two buildings. The modifier values
+# are exactly the old vegetation blocks minus sparse's baseline
+# (pop capacity 25), so the 1337 map is numerically unchanged —
+# but now the land can degrade and recover.
+#
+#   damaged_qanat : seeded at start on the crumbling belt.
+#       NOT player-buildable. Residual channels still watering a
+#       reduced population. This is what war leaves behind.
+#   qanat_network     : the maintained system. Seeded on the
+#       intact oasis belts at start; elsewhere it is BUILT —
+#       expensive, slow, and gated (axis or diwan privilege, plus
+#       a control floor): restoring the channels is a Tazik act
+#       of justice, the dāʾira-yi ʿadālat in masonry.
+#
+# SEEDING WORKFLOW: before converting the vegetation, dump the
+# lists with the places tool —
+#   python3 places.py filter --vegetation qanat_farmland    -> seed qanat_network
+#   python3 places.py filter --vegetation crumbling_qanat   -> seed damaged_qanat
+# then write those names into building_manager and flip the
+# vegetation to sparse.
+#
+# WAR WIRING (elsewhere): hostile sack / tribal settlement events
+# should downgrade — destroy qanat_network, spawn damaged_qanat
+# in its place (one effect block in rally_turkic_tribes' arrival
+# effects and in any sack event). Full destruction (removing even
+# the dilapidated tier) should be rare and deliberate: that is the
+# Merv treatment, and it should read as an atrocity.
+#
+# [verify] flags: climate keys, modifier names, whether allow can
+# read estate privileges at location scope (if not, hoist the
+# privilege check into country_potential).
+# ============================================================
+### step one. we REMOVE irrigation systems building from the region. The qanat_farmland and crumbling_qanat vegetation types are left in place for mod compatibility, but their terrain bonuses are removed and they are replaced on the map with sparse. The qanat's functionality for THIS region is now entirely in the two buildings below.
+
+INJECT:irrigation_systems = {
+
+	remove_if = {
+		location = {
+			OR = {
+				has_building = building_type:crumbling_qanat
+				has_building = building_type:qanat_network
+			}
+		}
+	}
+	
+}
+
+damaged_qanat = {
+	is_foreign = no
+	pop_type = peasants
+	max_levels = 1
+
+	employment_size = 2.5        # large numbers of people are needed to work part time regardless.
+
+	category = infrastructure_category       # [verify key]
+
+	rural_settlement = yes
+	town = yes
+	city = yes
+
+	# Never built — only seeded at start or left behind by war.
+	country_potential = {
+		always = no
+	}
+	remove_if = {
+		### two scenarios for AUTOMATIC. the location becomes thoroughly ruined. or the location auto grows enough over time. the player can also invest but that's separate (not autoamtic).
+		location = {
+			OR = {
+				development > 50
+			}
+			
+		}
+
+	}
+	# Cannot be demolished by its owner; ruins are not policy.
+	is_indestructible = yes
+
+	raw_modifier = {
+		# crumbling qanat MAKES qanat worse.
+		local_population_capacity = -15
+		local_monthly_food_modifier = -0.1
+		local_monthly_development_modifier = -0.04
+		supply_limit = -1.5
+		local_max_rgo_size_modifier = -0.05
+
+	}
+}
+
+qanat_network = {
+	is_foreign = no
+	pop_type = peasants
+	max_levels = 3
+	obsolete = damaged_qanat
+	employment_size = 2       
+	price = small_estate_building ### not actually EXPENSIVE to start, just takes a LONG time to build. the maintenance cost is what makes it expensive to keep building + opportunity cost.
+	category = infrastructure_category
+
+	rural_settlement = yes
+	town = yes
+	city = yes
+
+	expensive = yes
+	build_time = 3650          # a major qanat took years
+
+	# Where qanats make sense at all: the arid plateau, not the
+	# Caspian rainforest and not the high wasteland.
+	location_potential = {
+		OR = {
+			vegetation = qanat_farmland
+			vegetation = crumbling_qanat
+		}
+	}
+
+
+	allow = {
+		local_control > 0.3
+		custom_tooltip = {
+			text = qanat_repair_gate_tt
+			owner = {
+				OR = {
+					societal_value:turk_vs_tazik >= 25
+					has_estate_privilege = estate_privilege:diwan_land_registers   # [verify scope/trigger name]
+				}
+			}
+		}
+	}
+
+	# 
+	is_indestructible = yes
+	#
+
+	unique_production_methods = {
+		qanat_maintenance = {
+			masonry = 0.3
+			tools   = 0.1
+			category = building_maintenance
+		}
+	}
+
+	modifier = {
+		# qanat_farmland (65 / 0.22 / 0.04 / rgo 0.05 / supply 2) minus sparse (25):
+		local_population_capacity = 5
+		local_monthly_food_modifier = 0.02
+		local_monthly_development_modifier = 0.0066
+		supply_limit = 0.33
+		
+	}
+
+	# Repairing the channels is the Circle of Justice made physical:
+	# the peasants return, the registers record it, the realm tilts
+	# toward the pen. Consumes the ruin it replaces.
+	on_built = {
+		location = {
+			if = {
+				limit = { has_building = building_type:damaged_qanat }
+				destroy_building = "building(building_type:damaged_qanat|this)"
+			}
+		}
+		owner = {
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = 0.03 }
+			change_societal_value = { type = turk_vs_tazik value = 1 }
+		}
+	}
+
+
+	graphical_tags = { small_economy }                          # [verify tag]
+}
+
+
+# qanat_farmland = {
+# 	color = terrain_qanat          
+# 	movement_cost = 1.15               
+# 	has_sand = yes                     
+
+# 	location_modifier = {
+# 		local_population_capacity = 65
+# 		local_monthly_food_modifier = 0.22     # strong food, slightly below farmland (0.33)
+# 		local_monthly_development_modifier = 0.04  # modest (farmland is 0.10)
+# 		local_max_rgo_size_modifier = 0.05     # modest
+# 		supply_limit = 2                       # lower than farmland (5); deserts still hurt armies
+# 	}
+
+# 	audio_tags = { masDataVegetationDensity = 0.22 }  # “not lush”
+# 	debug_color = rgb { 80 220 60 }  # distinct green
+# }
+
+# seasonal_irrigated = {
+# 	color = terrain_seasonal          # or make a new tint if you want
+# 	movement_cost = 1.05               # slightly worse than farmland
+# 	has_sand = no                     # keeps “arid” flavor (optional)
+# 	location_modifier = {
+# 		local_population_capacity = 80       # higher than qanat, below true farmland
+# 		local_monthly_food_modifier = 0.28   # close to farmland, but not Nile-tier
+# 		local_monthly_development_modifier = 0.06
+# 		local_max_rgo_size_modifier = 0.05
+# 		supply_limit = 3
+# 	}
+
+# 	audio_tags = { masDataVegetationDensity = 0.25 }
+# }
+
+# crumbling_qanat = {
+#   color = terrain_crumbling        # add tint later 
+#   movement_cost = 1.15
+#   has_sand = yes
+
+#   location_modifier = {
+#     local_population_capacity = 45        # > sparse (25), < grasslands (50) or around it
+#     local_monthly_food_modifier = 0.10    # > 0, but much < qanat
+#     local_monthly_development_modifier = 0.02
+#     supply_limit = 0
+#   }
+
+#   audio_tags = { masDataVegetationDensity = 0.15 }
+#   debug_color = rgb { 120 200 80 }
+# }

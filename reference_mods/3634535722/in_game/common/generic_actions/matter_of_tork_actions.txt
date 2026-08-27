@@ -1,0 +1,1421 @@
+# ============================================================
+# The Matter of Tork — disposition claim buttons
+#
+# Five buttons on the disaster panel. Each is one answer to
+# "what is the Türk's place now?" — and the ONLY door to that
+# answer in the whole mod. One claim per realm: any disposition
+# locks the others (matter_tork_disposition_chosen, set by the
+# claim events).
+#
+#   claim_iranization        — A. dissolved into us   (~20y; needs amirs at the diwan)
+#   matter_tork_release_march — B. kept at the edge   (zone earned by conquest)
+#   claim_murid_bond         — C. our instrument      (mysticism ≤ -50)
+#   claim_expulsion          — D. removed from society (~10y process)
+#   claim_eradication        — E. destroyed as a class (civil war + 50y)
+#
+# Plus the approach layer: matter_tork_change_approach (the council),
+# and the per-approach actions (purchase ghulams / sponsor qanat /
+# invite shaykhs / release march).
+#
+# The claim buttons COST nothing at the button layer — the costs
+# live in the claim events (the farr/ghazi lesson about claims
+# cascading does not apply here: the dispositions are mutually
+# exclusive, so there is no cascade to prevent).
+#
+# Design: docs/design/matter_of_tork_design.md §4
+# ============================================================
+
+matter_tork_change_approach = {
+	type = disaster
+	show_message = no
+
+	# The AI picks its approach once, at the council; it does not
+	# second-guess itself monthly.
+	ai_tick = never
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	# A council, not a toggle: re-convening takes two years.
+	cooldown = {
+		type = matter_tork_change_approach
+		years = 2
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_of_tork_fired
+			NOT = { has_variable = matter_tork_disposition_chosen }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			# Re-convene the council. The horizon clock does not reset;
+			# earned gains persist; only the ambient swaps.
+			trigger_event_non_silently = matter_of_tork.2
+		}
+	}
+
+	ai_will_do = {
+		add = 0
+	}
+}
+
+# ---Approach 1: Purchase Ghulam Levies ---------------------------------
+# One corps tier per purchase (I → II → III). Needs an administrator
+# (a ghulam administration privilege or the reform), an implementer
+# (the fostering households privilege), and — past tier I — the
+# physical apparatus: tier II needs >= 1 ghulam barracks, tier III
+# needs >= 3. [verify: any_owned_location count = N syntax]
+
+matter_tork_purchase_ghulams = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 3
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_purchase_ghulams
+
+	# NOTE: potential does NOT hide actions (playtest-confirmed) —
+	# conditions live in allow for clear tooltips. v1.5: per-approach
+	# disaster variants for true visibility control (decision 37).
+	cooldown = {
+		type = matter_tork_purchase_ghulams
+		years = 2
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 1
+			# The administrator.
+			OR = {
+				has_estate_privilege = estate_privilege:diwan_ghulam_administration
+				has_estate_privilege = estate_privilege:amirs_ghulam_administration
+				has_reform = government_reform:ghulam_system
+			}
+			# The implementer.
+			has_estate_privilege = estate_privilege:ghulam_fostering_households
+			# Tier ladder gated on BARRACKS LEVELS (decision 38): the
+			# corps needs its physical plant before it can grow.
+			# [verify: total_effective_building_levels at country scope]
+			custom_tooltip = {
+				text = matter_tork_barracks_ladder_tt
+				OR = {
+					AND = {
+						NOT = { has_variable = matter_ghulam_corps_tier }
+						total_effective_building_levels:ghulam_barracks >= 1
+					}
+					AND = {
+						var:matter_ghulam_corps_tier = 1
+						total_effective_building_levels:ghulam_barracks >= 3
+						has_variable = matter_slave_route
+					}
+					AND = {
+						var:matter_ghulam_corps_tier = 2
+						total_effective_building_levels:ghulam_barracks >= 6
+						has_variable = matter_slave_route
+					}
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			capital.market = {
+				add_temporary_demand = { type = demand:ghulam_purchase_demand years = 5 scale_with_pop = 0.01 }
+
+			}
+			# The purchase ripples through the slave markets.
+			# The boys arrive where the barracks stand — PURCHASED
+			# Caucasians, not enslaved locals (playtest fix 5: the
+			# old split_pop converted Tazik peasants into slaves).
+			# Grow existing slave pops only; if none exist yet, the
+			# barracks employment + market demand do the attracting.
+			every_owned_location = {
+				limit = { has_building = building_type:ghulam_barracks }
+				every_pop = {
+					limit = { pop_type = pop_type:slaves }
+					add_pop_size = 1
+				}
+			}
+			# Tier up.
+			if = {
+				limit = { NOT = { has_variable = matter_ghulam_corps_tier } }
+				set_variable = { name = matter_ghulam_corps_tier value = 1 }
+				add_country_modifier = { modifier = matter_ghulam_corps_1 months = -1 }
+				trigger_event_non_silently = matter_of_tork.62
+			}
+			else_if = {
+				limit = { var:matter_ghulam_corps_tier = 1 }
+				set_variable = { name = matter_ghulam_corps_tier value = 2 }
+				remove_country_modifier = matter_ghulam_corps_1
+				add_country_modifier = { modifier = matter_ghulam_corps_2 months = -1 }
+				trigger_event_non_silently = matter_of_tork.63
+			}
+			else_if = {
+				limit = { var:matter_ghulam_corps_tier = 2 }
+				set_variable = { name = matter_ghulam_corps_tier value = 3 }
+				remove_country_modifier = matter_ghulam_corps_2
+				add_country_modifier = { modifier = matter_ghulam_corps_3 months = -1 }
+				trigger_event_non_silently = matter_of_tork.64
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+# ---Approach 1: Declare Royal Inju ------------------------------------------
+# Not demolition (the player can already raze buildings) — a POLITICAL
+# act: the Tazik king declares a tribal zone crown demesne, the
+# Ilkhanid inju, and pushes the hosts off it. Destroys the pasture,
+# marks the land, rolls a crisis. The Eradication disposition needs
+# five of these; Expulsion needs two — you cannot end or expel a
+# class whose economic base still stands.
+
+matter_tork_declare_inju = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_declare_inju
+
+	cooldown = {
+		type = matter_tork_declare_inju
+		years = 2
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 1
+			# Make the requirement legible on the button (playtest fix):
+			# the declaration needs an undeclared pasture to seize.
+			custom_tooltip = {
+				text = matter_tork_inju_target_tt
+				any_owned_location = {
+					has_building = building_type:tribal_pasture
+					NOT = { has_location_modifier = matter_royal_inju }
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	# Pick any pasture location; the declaration covers its whole
+	# PROVINCE (playtest fix: inju is a zone-level legal act, not a
+	# parcel-level one).
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_location = {
+					limit = { has_building = building_type:tribal_pasture }
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		visible = {
+			NOT = { has_location_modifier = matter_royal_inju }
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			# The whole province becomes crown demesne: every owned
+			# location marked; every pasture in it broken.
+			scope:target.province = {
+				every_location_in_province = {
+					limit = { owner = scope:actor }
+					if = {
+						limit = { has_building = building_type:tribal_pasture }
+						destroy_building = "building(building_type:tribal_pasture|owner)"
+					}
+					add_location_modifier = { modifier = matter_royal_inju years = -1 }
+				}
+			}
+			scope:actor = {
+				if = {
+					limit = { NOT = { has_variable = matter_tork_inju_count } }
+					set_variable = { name = matter_tork_inju_count value = 0 }
+				}
+				change_variable = { name = matter_tork_inju_count add = 1 }
+				add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.05 }
+				# The crisis roll: quiet / ferment / an amir's open protest.
+				random_list = {
+					50 = {
+						# The stewards comply. This time.
+					}
+					35 = {
+						scope:target = {
+							add_location_modifier = { modifier = matter_tork_unrest_minor years = 5 }
+						}
+					}
+					15 = {
+						trigger_event_non_silently = matter_of_tork.66
+					}
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 30
+	}
+}
+
+# ---Approach 1: Institutionalize the Slave Caravans -------------------------
+# The Caucasus supply chain as a maintained institution, not free
+# background. Requires the caravanserai network AND a fortified
+# border with an unfortified non-Muslim neighbor — our castle facing
+# their fort-less land (conquer the forts or demand their destruction
+# in peace). Unlocks corps tiers II-III.
+# TODO: explicit relative-strength check on the neighbor; market
+# slave-SUPPLY injection (demand-side only in v1).
+
+matter_tork_institutionalize_caravans = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_institutionalize_caravans
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 1
+			NOT = { has_variable = matter_slave_route }
+			# The road infrastructure — LEVELS, not separate locations
+			# (playtest fix: a single level-3 caravanserai qualifies).
+			custom_tooltip = {
+				text = matter_tork_caravanserai_tt
+				total_effective_building_levels:caravanserai >= 3
+			}
+			# The fortified door onto the infidel slave frontier.
+			custom_tooltip = {
+				text = matter_tork_slave_frontier_tt
+				any_owned_location = {
+					OR = {
+						has_building = building_type:castle
+						has_building = building_type:fortress
+					}
+					any_neighbor_location = {
+						exists = owner
+						NOT = { owner = scope:actor }
+						owner = {
+							NOT = { religion.group = religion_group:muslim }
+						}
+						NOT = { has_building = building_type:castle }
+						NOT = { has_building = building_type:fortress }
+					}
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_slave_route
+			add_country_modifier = { modifier = matter_slave_caravans months = -1 }
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# ---Approach 2: Sponsor Qanat Settlement -----------------------------------
+# Repeatable (5y cooldown). Target a pastoral location: the qanat
+# creeps up the margin, a village takes root where the herds
+# wintered, and the assimilation runs faster where the water flows.
+
+matter_tork_sponsor_qanat = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_sponsor_qanat
+
+	cooldown = {
+		type = matter_tork_sponsor_qanat
+		years = 5
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 2
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_location = {
+					limit = { is_tribal_pastoral_location = yes }
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		visible = {
+			NOT = { has_location_modifier = matter_qanat_settlement }
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				add_location_modifier = { modifier = matter_qanat_settlement years = 20 }
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# ---Approach 3: Endow a Khanqah ---------------------------------------------
+# Subsidized construction of a sufi lodge (the RTO royal-sponsorship
+# pattern). The murid bond needs four lodges standing — the bond
+# needs a physical network for the murids to BE in.
+
+matter_tork_endow_khanqah = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_endow_khanqah
+
+	cooldown = {
+		type = matter_tork_endow_khanqah
+		years = 3
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 3
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_location = {
+					limit = {
+						NOT = { has_building = building_type:sufi_lodge }
+					}
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		visible = {
+			NOT = { has_building = building_type:sufi_lodge }
+		}
+	}
+
+	effect = {
+		change_societal_value = { type = mysticism_vs_jurisprudence value = -5 }
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				construct_building = {
+					building_type = building_type:sufi_lodge
+					cost_multiplier = 0
+					cost_multiplier_reason = "royal_sponsorship"
+				}
+			}
+			scope:actor = {
+				add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.025 }
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+# ---Approach 3: Sponsor the Dhikr Festivals ---------------------------------
+# The devotion made public — and the camps love it.
+
+matter_tork_dhikr_festivals = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_dhikr_festivals
+
+	cooldown = {
+		type = matter_tork_dhikr_festivals
+		years = 4
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 3
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			change_societal_value = { type = mysticism_vs_jurisprudence value = -3 }
+			add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.025 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.025 }
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# ---Approach 2: Endow the Madrasa of the Registers --------------------------
+# Trains the amir sons and the new assessors — by SPENDING the
+# chancery (decision 41: the Iranization program worsens civilian
+# administration while it runs; the madrasa is teaching, not
+# administering).
+
+matter_tork_endow_madrasa = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_endow_madrasa
+
+	cooldown = {
+		type = matter_tork_endow_madrasa
+		years = 10
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 2
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			add_country_modifier = { modifier = matter_madrasa_registers years = 10 }
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# ---Approach 2: Commission the Shahnama Recension ---------------------------
+# The Great Mongol Shahnama move: the court binds itself into the
+# Iranian kingly past, at scale, in pigment and gold. One-shot.
+
+matter_tork_shahnama_recension = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_shahnama_recension
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 2
+			NOT = { has_variable = matter_shahnama_done }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_shahnama_done
+			add_prestige = 10
+			add_legitimacy = 5
+			change_societal_value = { type = turk_vs_tazik value = 5 }
+		}
+	}
+
+	ai_will_do = {
+		add = 30
+	}
+}
+
+# ---Approach 4: Proclaim the Great Raid --------------------------------------
+# The hosts pointed outward AT A NAMED THEATER. Designating a region:
+#   - grants the decade of license (the old modifier) and the raid CB
+#     (cb_great_raid, visible against any owner of theater land),
+#   - stamps an inert indicator modifier on the theater's locations,
+#   - opens the monthly migration engine (02_matter_effects.txt): once
+#     you hold a beachhead there, the homeland's hosts start riding to
+#     it — the migration follows the victories, it does not precede
+#     them,
+#   - sets the release gate: matter_tork_raid_need = 20% of the
+#     theater's locations (Release the March also wants 80% of the
+#     seat's area).
+# Re-running (15y cooldown) re-points the raid: old markers swept,
+# counters rebuilt. The theater blacklist is
+# is_great_raid_designatable_region (03_matter_triggers.txt): the
+# Islamic heartlands and Anatolia are out; Georgia, Hindustan, the
+# steppe, and the enterprising player's China are in.
+
+matter_tork_great_raid = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	cooldown = {
+		type = matter_tork_great_raid
+		years = 15
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 4
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	# The theater (columbian_exchange.txt:90 pattern).
+	select_trigger = {
+		looking_for_a = region
+		source = actor
+		target_flag = target_region
+		name = "choose_a_region"
+		none_available_msg_key = "no_regions_available"
+		column = { data = name }
+		visible = {
+			is_great_raid_designatable_region = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			# Re-designation: sweep the old theater first.
+			custom_tooltip = designation_of_region_tt
+			hidden_effect = {
+				if = {
+					limit = { has_variable = matter_tork_raid_region }
+					var:matter_tork_raid_region ?= {
+						
+						every_location_in_region = {
+							limit = { has_location_modifier = matter_raid_designated }
+							remove_location_modifier = matter_raid_designated
+						}
+					}
+					matter_raid_clear_pairings = yes
+					remove_variable = matter_tork_raid_region
+					remove_variable = matter_tork_raid_need
+					remove_variable = matter_tork_raid_owned
+					remove_variable = matter_tork_raid_tribes
+				}
+			}
+
+			set_variable = { name = matter_tork_raid_region value = scope:target_region }
+			set_variable = { name = matter_tork_raid_owned value = 0 }
+
+			# Count the theater once; the release gate reads 20% of it.
+			set_local_variable = { name = raid_total value = 0 }
+			scope:target_region = {
+				every_location_in_region = {
+					scope:actor = {
+						change_local_variable = { name = raid_total add = 1 }
+					}
+				}
+			}
+			set_variable = { name = matter_tork_raid_need value = local_var:raid_total }
+			change_variable = { name = matter_tork_raid_need multiply = 0.2 }
+
+			# The banner planted on the map: inert marker, tooltip only.
+			hidden_effect = {
+				scope:target_region = {
+					every_location_in_region = {
+						add_location_modifier = { modifier = matter_raid_designated years = -1 }
+					}
+				}
+			}
+
+
+			# The decade of license, as before.
+			add_country_modifier = { modifier = matter_great_raid years = 10 }
+			add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# ---Approach 4: Grant the Yurt --------------------------------------
+# The il transplant. Requires a designated theater (Great Raid) AND a
+# beachhead in it. One stroke moves the whole social organism from the
+# homeland's single richest pastoral reservoir to your largest holding
+# in the theater: ~75% of its tribesmen over a year on the road, AND
+# the begs who own them — a yurt granted by yarligh names the beg, and
+# what moves is tents, herds, fighting men, and their aristocracy
+# together. The source quiets, the theater turns Turkic, and the power
+# center you moved now stands where you put it. That is the point, and
+# the danger.
+
+matter_tork_yurt_charters = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:matter_yurt_charters
+
+	cooldown = {
+		type = matter_tork_yurt_charters
+		years = 1
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 4
+			has_variable = matter_tork_raid_region
+			# A beachhead: the il does not ride to land you do not hold.
+			custom_tooltip = {
+				text = matter_tork_yurt_beachhead_tt
+				var:matter_tork_raid_region ?= {
+					any_location_in_region = { owner = scope:actor }
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			# The grant: your largest holding in the theater.
+			var:matter_tork_raid_region ?= {
+				ordered_location_in_region = {
+					limit = { 
+						owner = scope:actor
+						NOT = { has_location_modifier = matter_yurt_charter}
+						 }
+					order_by = population
+					max = 1
+					save_scope_as = yurt_dest
+				}
+			}
+			if = {
+				limit = { exists = scope:yurt_dest }
+				# The il: the single largest Turkic/Tatar/Mongol tribal
+				# pop of the homeland, wherever it sits (no pastoral
+				# gate - city tribesmen ride too). 75% of it, a year on
+				# the road, under its own culture.
+				ordered_pop = {
+					limit = {
+						pop_type = pop_type:tribesmen
+						location = {
+							is_eranzamin_region_province = yes
+							# Caucasus theaters overlap Eranzamin: the
+							# il never rides from the theater to itself.
+							NOT = { has_location_modifier = matter_raid_designated }
+						}
+						OR = {
+							culture = { has_culture_group = culture_group:turkic_group }
+							culture = { has_culture_group = culture_group:tatar_group }
+							culture = { has_culture_group = culture_group:mongolian_group }
+						}
+					}
+					order_by = pop_size
+					max = 3
+					if = {
+						limit = { pop_size > 1 }
+						location = { save_scope_as = yurt_source }
+						add_migration = {
+							owner = scope:actor
+							from = this.location.province_definition
+							to = scope:yurt_dest.province_definition
+							culture = this.culture
+							type = pop_type:tribesmen
+							amount = {
+								value = this.pop_size
+								multiply = 0.07
+							}
+							months = 10
+						}
+						# An il on the road is spoken for: the monthly
+						# engine will not pair this reservoir again.
+						location = { set_variable = raid_feeder_source }
+					}
+				}
+				if = {
+					limit = { exists = scope:yurt_source }
+					# The begs ride with their people: 75% of the
+					# source's Turco-Mongol nobles, each under its own
+					# culture.
+					every_pop = {
+						limit = {
+							pop_type = pop_type:nobles
+							location = { this = scope:yurt_source }
+							OR = {
+								culture = { has_culture_group = culture_group:turkic_group }
+								culture = { has_culture_group = culture_group:tatar_group }
+								culture = { has_culture_group = culture_group:mongolian_group }
+							}
+						}
+						add_migration = {
+							owner = scope:actor
+							from = scope:yurt_source.province_definition
+							to = scope:yurt_dest.province_definition
+							culture = this.culture
+							type = pop_type:nobles
+							amount = {
+								value = this.pop_size
+								multiply = 0.07
+							}
+							months = 10
+						}
+					}
+					# Pasture rights written into the registers, at the grant.
+					scope:yurt_dest = {
+						add_location_modifier = { modifier = matter_yurt_charter years = -1 }
+					}
+					add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.025 }
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 30
+	}
+}
+
+# ---Approach 3: Invite the Shaykhs of the Order ---------------------------
+# One-shot. A shaykh of the great lodges joins the court — and arms
+# the Hidden Imam chain (the Shia turn fires once mysticism reaches
+# -25 with the shaykh present).
+
+matter_tork_invite_shaykhs = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 3
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 3
+			NOT = { has_variable = matter_tork_shaykh_invited }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_tork_shaykh_invited
+			create_character = {
+				estate = estate_type:clergy_estate
+				religion = root.religion
+				culture = root.culture
+				age = { 40 60 }
+				adm = { 30 60 }
+				dip = { 60 90 }
+				mil = { 10 40 }
+			}
+			change_societal_value = { type = mysticism_vs_jurisprudence value = -7.5 }
+			add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+claim_iranization = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 1
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			matter_tork_can_claim_iranization = yes
+			NOT = { has_variable = matter_tork_iranization_claimed }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_tork_iranization_claimed
+			trigger_event_non_silently = matter_of_tork.10
+		}
+	}
+
+	# The historical default — the AI's safe answer.
+	ai_will_do = {
+		add = 60
+	}
+}
+
+# ---B. Release the March (disposition B, consummated by the act) -------
+# The march is EARNED by conquest IN THE DESIGNATED THEATER (Great
+# Raid designates; the migration engine and the Yurt grants fill).
+# Gates: >= 20% of the theater's locations held (matter_tork_raid_need,
+# counted at designation; matter_tork_raid_owned recounted monthly),
+# a seat whose AREA is at least ~80% yours (at most one foreign
+# location in it), and peace. Release hands the march EVERY holding
+# you have in the theater — the hosts you drove there, their begs,
+# and the land they took, cut loose as one march pointed away from
+# you. The interior release is gone: this is the Seljuk play proper,
+# the uc planted on the dar al-harb frontier, not carved from your
+# own Fars pastures.
+# TODO v1.5: custom marcher_confederation subject type (uc_bey-like
+# contract) instead of plain march — the ticking bomb in the terms.
+
+matter_tork_release_march = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 4
+			matter_tork_no_disposition_yet = yes
+			at_war = no
+			has_variable = matter_tork_raid_region
+			# The theater is won: a fifth of it flies your banner.
+			custom_tooltip = {
+				text = matter_tork_release_need_tt
+				var:matter_tork_raid_owned >= var:matter_tork_raid_need
+			}
+			# And it is a REAL march, not a strip: at least 25 holdings.
+			custom_tooltip = {
+				text = matter_tork_release_size_tt
+				var:matter_tork_raid_owned >= 25
+			}
+			# And the hosts have actually arrived: half a million
+			# tribesmen on the ground. A march is people, not lines.
+			custom_tooltip = {
+				text = matter_tork_release_tribes_tt
+				var:matter_tork_raid_tribes >= 500
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				var:matter_tork_raid_region ?= {
+					every_location_in_region = {
+						limit = { owner = scope:actor }
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		visible = {
+			# The seat's area is consolidated: at most ONE location of
+			# it in foreign hands (~80% for a typical 8-location area).
+			is_city = yes
+			area = {
+				NOT = {
+					any_location_in_area = {
+						count >= 2
+						NOT = { owner = scope:actor }
+					}
+				}
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				save_scope_as = matter_march_seat
+				add_pop = {
+					culture = culture:farsi_culture
+					religion = root.owner.religion
+					type = pop_type:nobles
+					size = { value = 2 }
+					literacy = 40
+				}
+				create_country_from_location = {
+					# change_country_name = MATTER_TORK_MARCH
+					# Tributary, NOT march: the released hosts must be
+					# able to wage their own offensive wars — that is
+					# the entire point of pointing them outward.
+					make_subject_of = { target = scope:actor type = subject_type:tributary }
+					save_scope_as = matter_march_country
+				}
+			}
+			# Everything you hold in the theater rides out with the seat.
+			scope:actor = {
+				var:matter_tork_raid_region ?= {
+					every_location_in_region = {
+						limit = { owner = scope:actor }
+						change_location_owner = scope:matter_march_country
+						change_integration_level = core
+					}
+					# The banner comes down: the raid is consummated.
+					every_location_in_region = {
+						limit = { has_location_modifier = matter_raid_designated }
+						remove_location_modifier = matter_raid_designated
+					}
+				}
+				matter_raid_clear_pairings = yes
+				remove_variable = matter_tork_raid_region
+				remove_variable = matter_tork_raid_need
+				remove_variable = matter_tork_raid_owned
+				remove_variable = matter_tork_raid_tribes
+				set_variable = matter_tork_disposition_chosen
+				set_variable = matter_tork_marcher_claimed
+				# The compact ceremony — modifiers + resolution.
+				trigger_event_non_silently = matter_of_tork.20
+			}
+			# ---The constitution of the march -------------------------
+			# A Persianate amir-sultanate under a Muslim beg of the
+			# hosts' own greatest people: the released il gets the
+			# government its historical models (Danishmendids,
+			# Artuqids, the house of Osman) actually built.
+			scope:matter_march_country ?= {
+				### should be aggressive. 
+				set_personality = ai_personality:ai_aggressive
+
+
+
+				set_variable = tributary_march_released_by_legitimate_ruler
+				# The greatest single host of the march names its people.
+				ordered_pop = {
+					limit = {
+						OR = {
+							culture = { has_culture_group = culture_group:turkic_group }
+							culture = { has_culture_group = culture_group:tatar_group }
+							culture = { has_culture_group = culture_group:mongolian_group }
+						}
+					}
+					order_by = pop_size
+					max = 1
+					save_scope_as = march_top_pop
+				}
+				
+				change_government_type = government_type:persianate_sultanate
+				change_heir_selection = heir_selection:favorite_son_elective_succession
+				if = {
+					limit = { exists = scope:march_top_pop }
+					change_culture = scope:march_top_pop.culture
+				}
+				# The compact is Islamic: the releaser's rite if he is
+				# Muslim, the sunna otherwise.
+				if = {
+					limit = {
+						scope:actor = { religion.group = religion_group:muslim }
+					}
+					change_religion = scope:actor.religion
+				}
+				else = {
+					change_religion = religion:sunni
+				}
+				# AFTER the government switch (the reform requires the
+				# type; add_reform silently fails on a false potential).
+				add_reform = government_reform:persianate_bureaucracy_reform
+				add_reform = government_reform:amir_sultanate
+				set_court_language = culture:farsi_culture.dialect
+				grant_estate_privilege = estate_privilege:diwan_land_registers
+				grant_estate_privilege = estate_privilege:diwan_musadara_confiscation
+				grant_estate_privilege = estate_privilege:amirs_iqta_grant
+				grant_estate_privilege = estate_privilege:amirs_personal_retinues
+				grant_estate_privilege = estate_privilege:amirs_frontier_autonomy
+				set_country_rank = country_rank:rank_duchy
+				add_policy = policy:muslim_marriage
+				add_policy = policy:mongol_law_policy
+				add_policy = policy:strict_hisba_enforcement
+				### should set a country disposition for him afterwards
+				# The beg: a Muslim amir of the march's own greatest
+				# people, a soldier before anything else.
+				create_character = {
+					estate = estate_type:amirs_estate
+					age = { min = 28 max = 45 }
+					culture = scope:march_top_pop.culture
+					religion = scope:matter_march_country.religion
+					adm = { 50 100 }
+					dip = { 50 100 }
+					mil = { 70 100 }
+					save_scope_as = march_amir
+				}
+				set_new_ruler = scope:march_amir
+			}
+		}
+	}
+
+	# The ghazi's native disposition; the farr-king's weak one.
+	ai_will_do = {
+		add = 20
+		if = {
+			limit = { scope:actor = { matter_tork_is_ghazi_line = yes } }
+			add = 60
+		}
+	}
+}
+
+claim_murid_bond = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 1
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			matter_tork_can_claim_murid_bond = yes
+			NOT = { has_variable = matter_tork_murid_claimed }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_tork_murid_claimed
+			trigger_event_non_silently = matter_of_tork.30
+		}
+	}
+
+	# Native for the mystical line; the AI ghazi avoids unbuilding
+	# his own law.
+	ai_will_do = {
+		add = 80
+		if = {
+			limit = { scope:actor = { matter_tork_is_ghazi_line = yes } }
+			subtract = 70
+		}
+	}
+}
+
+claim_expulsion = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 1
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			matter_tork_can_claim_expulsion = yes
+			NOT = { has_variable = matter_tork_expulsion_claimed }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_tork_expulsion_claimed
+			trigger_event_non_silently = matter_of_tork.40
+		}
+	}
+
+	# High-risk; AI takes it only rarely.
+	ai_will_do = {
+		add = 5
+	}
+}
+
+claim_eradication = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 1
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	# Recoiling at the confirm returns the button — but not instantly
+	# (the .50 decline option removes the claimed-flag; the cooldown
+	# stops confirm-event spam).
+	cooldown = {
+		type = claim_eradication
+		years = 1
+	}
+
+	allow = {
+		scope:actor = {
+			matter_tork_can_claim_eradication = yes
+			NOT = { has_variable = matter_tork_eradication_claimed }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:matter_of_tork
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = matter_tork_eradication_claimed
+			trigger_event_non_silently = matter_of_tork.50
+		}
+	}
+
+	# Extreme risk, deferred payoff — effectively never for the AI.
+	ai_will_do = {
+		add = 0
+	}
+}

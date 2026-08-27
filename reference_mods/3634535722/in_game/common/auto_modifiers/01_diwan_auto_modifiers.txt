@@ -1,0 +1,152 @@
+﻿# Base values for the Diwan Estate — MERGED definition (the former
+# duplicate in 01_diwan_power_balance.txt is retired). Gate moved
+# from government types to the chancery flag: the flag is the master
+# switch of the whole architecture, and every diwan-bearing polity
+# (Iranian, Mamluk, Indian, Timurid, Rum-vindicated, commonwealth —
+# whose formation grants the bureaucracy reform) carries it.
+diwan_base_values = {
+    potential_trigger = {
+        modifier:has_nizam_ul_mulk_chancery = yes
+    }
+
+    # Base Satisfaction (similar to other estates having ~30-50%)
+    diwan_estate_target_satisfaction = 0.40
+
+    # Base power floors for BOTH service estates — the power_balance
+    # file's scaling engines (sedentary% / tribal%) stack on top.
+    global_diwan_estate_power = 0.30
+    global_amirs_estate_power = 0.30
+}
+
+
+amirs_base_values = {
+    potential_trigger = {
+        OR = {
+        government_type = government_type:persianate_sultanate
+        government_type = government_type:commonwealth_of_martyrs
+        }
+
+    }
+
+    # Base Satisfaction (similar to other estates having ~30-50%)
+    amirs_estate_target_satisfaction = 0.40
+
+    # Base Power (if needed to ensure they exist)
+    global_amirs_estate_power = 0.05
+}
+
+# Compensates the engine's hidden pop-level court-language penalty on diwan
+# satisfaction. Persian was the diwan class's own professional language across
+# the Iranic-cultural zone (Iraq, Caucasus, Khorasan); a Persian court does
+# not chafe an Arab/Kurd/Lur diwan member the way the base mechanic assumes.
+diwan_persian_court_language = {
+    potential_trigger = {
+        country_has_estate = estate_type:diwan_estate
+        court_language = language:persian_language
+    }
+
+    diwan_estate_target_satisfaction = 0.05
+}
+
+amirs_war_auto_modifier = {
+    potential_trigger = {
+        country_has_estate = estate_type:amirs_estate
+        at_war = yes
+    }
+    ## wars bring loot and revenue.
+    amirs_estate_target_satisfaction = 0.025
+}
+
+# =====================================================================
+# THE VIZIERATE — the diwan expects to run the cabinet
+#
+# The Persianate state IS the vizier-and-dīwān state: the chancery class
+# staffs the administration and one of their own holds the head of the
+# cabinet (the vizierate). The base game's incentive to pack the cabinet
+# with royal kin is exactly backwards here. The diwan's ideal: every
+# cabinet seat but one is theirs, and the head is theirs.
+#
+# The cabinet's standing with the chancery, in four parts. The first
+# three PARTITION the head/presence state (exactly one applies); the
+# fourth — crowding — is INDEPENDENT and stacks on top.
+#   1. No diwan in the cabinet at all     → −0.2 + heavy inefficiency
+#   2. Diwan present, an outsider at head  → −0.05 + moderate inefficiency
+#   3. A diwan vizier heads the cabinet    → +0.05 to all (the reward)
+#   4. Two or more outsiders crowd the     → −0.05 (independent of head)
+#      present diwan
+# =====================================================================
+
+# 1. The chancery is locked out of its own government. The worst case.
+diwan_excluded_from_cabinet = {
+    potential_trigger = {
+        government_type = government_type:persianate_sultanate
+        country_has_estate = estate_type:diwan_estate
+        NOT = {
+            any_cabinet_character = { has_estate = estate_type:diwan_estate }
+        }
+    }
+
+    diwan_estate_target_satisfaction = -0.2
+    country_cabinet_efficiency = -0.25
+    tax_income_efficiency = -0.15
+}
+
+# 2. The diwan sit in the cabinet, but a non-diwan holds the vizierate.
+diwan_not_at_cabinet_head = {
+    potential_trigger = {
+        government_type = government_type:persianate_sultanate
+        country_has_estate = estate_type:diwan_estate
+        # At least one diwan member is in the cabinet ...
+        any_cabinet_character = { has_estate = estate_type:diwan_estate }
+        # ... but the head of cabinet is not one of them.
+        NOT = {
+            any_cabinet_character = {
+                modifier:is_head_of_cabinet = yes
+                has_estate = estate_type:diwan_estate
+            }
+        }
+    }
+
+    diwan_estate_target_satisfaction = -0.05
+    country_cabinet_efficiency = -0.10
+    tax_income_efficiency = -0.05
+}
+
+# 3. A diwan vizier heads the cabinet — the proper order, and the only
+#    positive tier: +0.05 to satisfaction and to both efficiencies.
+diwan_at_cabinet_head = {
+    potential_trigger = {
+        government_type = government_type:persianate_sultanate
+        country_has_estate = estate_type:diwan_estate
+        any_cabinet_character = {
+            modifier:is_head_of_cabinet = yes
+            has_estate = estate_type:diwan_estate
+        }
+    }
+
+    diwan_estate_target_satisfaction = 0.05
+    country_cabinet_efficiency = 0.05
+    tax_income_efficiency = 0.05
+    global_crown_estate_power = 0.15 ## almost as good as having a royal family vizier, but not quite.
+    
+}
+
+# 4. Outsiders crowd the chancery: a diwan member is present, but two or
+#    more non-diwan colleagues sit alongside. INDEPENDENT of who holds the
+#    head — it stacks on tier 2 or tier 3.
+diwan_crowded_in_cabinet = {
+    potential_trigger = {
+        government_type = government_type:persianate_sultanate
+        country_has_estate = estate_type:diwan_estate
+        # At least one diwan member present ...
+        any_cabinet_character = { has_estate = estate_type:diwan_estate }
+        # ... but two or more outsiders alongside, whoever heads it.
+        any_cabinet_character = {
+            NOT = { has_estate = estate_type:diwan_estate }
+            count >= 2
+        }
+    }
+
+    diwan_estate_target_satisfaction = -0.05
+    country_cabinet_efficiency = -0.05
+}

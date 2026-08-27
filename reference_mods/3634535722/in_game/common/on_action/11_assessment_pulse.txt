@@ -1,0 +1,78 @@
+# =====================================================================
+# WAQF REASSESSMENT — yearly cadence on the monthly pulse
+#
+# Re-declaring yearly_country_pulse EXTENDS it (Paradox merges on_actions).
+# The expensive recompute (reassess_waqf_damage iterates every owned
+# location) runs at most ONCE A YEAR — the timed variable gates it — while
+# the monthly trigger check stays cheap. (If a true yearly_country_pulse
+# on_action is preferred, drop the variable gate and move this there.)
+# =====================================================================
+
+yearly_country_pulse = {
+	on_actions = {
+		waqf_reassessment_pulse
+		iqta_reassessment_pulse
+	}
+}
+
+waqf_reassessment_pulse = {
+	trigger = {
+		government_type = government_type:persianate_sultanate
+		# Waqf only exists where the right of muṣādara stands.
+		modifier:access_to_musadara = yes
+		# At most once a year — the timed variable auto-expires.
+
+	}
+	effect = {
+		reassess_waqf_damage = yes
+	}
+}
+
+
+iqta_reassessment_pulse = {
+
+	trigger = {
+		government_type = government_type:persianate_sultanate
+		any_owned_location = {
+			has_building = building_type:iqta_grant
+		}
+	}
+
+	effect = {
+		every_owned_location = {
+			limit = {
+				has_building = building_type:iqta_grant
+			}
+			"building(building_type:iqta_grant|owner)" = {save_scope_as = iqta_building}
+			add_location_modifier = {
+				modifier = iqta_building_fake_mod
+				years = -1
+				mode = replace
+				size = {
+					value = "location_building_level(building_type:iqta_grant)" ## iqta grant now correctly reassess yearly
+				}
+			}
+			if = {
+				limit = {
+					OR  = {
+						AND = {
+							owner ?= {
+								months_since_war > 60
+							}
+							local_control < 0.3
+						}
+						local_control < 0.15
+					}
+					
+				}
+				random = {
+					chance = 10
+					construct_estate_building = {
+						estate_type = estate_type:amirs_estate
+						building_type = building_type:unaudited_iqta
+					}
+				}
+			}
+		}
+	}
+}

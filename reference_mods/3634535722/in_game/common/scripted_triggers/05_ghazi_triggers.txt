@@ -1,0 +1,179 @@
+# ============================================================
+# Ghazi: Burden of the Sword — scripted triggers
+#
+# Tier classification (§6 of design doc):
+#   tier-1: INTERNAL targets — handled by event paths, not war
+#           hooks. No trigger here.
+#   tier-2: MUSLIMS-IN-NAME — yasa-policy holders, heterodox
+#           Muslim states. Credit at x1.0 with fatwa, x0.5 without.
+#   tier-3: TRUE DAR AL-HARB — non-Muslim states (Christian,
+#           Hindu, Tengri, polytheist). Credit at x2.0, no caveats.
+#   ordinary Sunni Muslim states: no credit, jurist complaint.
+#
+# Resolution gates: polled monthly inside the disaster.
+# Apparatus claim thresholds: gates on the generic-action buttons.
+# ============================================================
+
+# ---------- Tier classification (called on target country scope) ---
+
+# Tier-3: true dar al-harb. Non-Muslim states are the doctrine's
+# native food. Any non-Muslim religion qualifies.
+ghazi_target_is_tier_3 = {
+	NOT = {religion.group = religion_group:muslim}
+}
+
+# Tier-2: Muslims-in-name. Yasa-holders (the Chinggisid ring still
+# governing by the tent's law) and heterodox Muslim states. The
+# rule: a Muslim ruler whose practice the doctrine refuses to
+# recognize.
+ghazi_target_is_tier_2 = {
+	religion.group = religion_group:muslim
+	OR = {
+		# Yasa-policy holders — the chinggisid_regency reform or
+		# yasa_law law-option presence. (Implementation note: edit
+		# this list as the yasa-law set is finalized.)
+		has_reform = government_reform:chinggisid_regency
+		# Heterodox Muslim — religion != sunni AND != ismaili-standard
+		# (treat Sarbadar / ghulat poles as tier-2).
+		AND = {
+			NOT = { religion = religion:sunni }
+			NOT = { religion = religion:shia }
+		}
+	}
+}
+
+# Tier-2 with NO yasa-holder qualifier — for the fatwa-required
+# branch (heterodox Muslim states need the fatwa before they are
+# canonically war-targetable; yasa-holders the doctrine handles
+# on its own because the tent-law violation is publicly visible).
+ghazi_target_needs_fatwa = {
+	ghazi_target_is_tier_2 = yes
+	NOT = { has_reform = government_reform:chinggisid_regency }
+}
+
+# Ordinary Sunni Muslim — no credit, jurist complaint.
+ghazi_target_is_ordinary_sunni = {
+	religion = religion:sunni
+	NOT = { ghazi_target_is_tier_2 = yes }
+}
+
+# ---------- Geographic frontier gates -----------------------------
+
+# Realm borders a tier-3 country directly. Required for Guardian
+# of the Thughur; interior states cannot claim.
+ghazi_borders_dar_al_harb = {
+	any_neighbor_country = {
+		ghazi_target_is_tier_3 = yes
+	}
+}
+
+# ---------- Apparatus claim thresholds ---------------------------
+
+# Jihad Within (4.1) — first rung. The gate is the lack of yasa.
+# A Türk-descended ghazi must purge the tent's law first; this is
+# the design's point. Legitimacy threshold modest.
+ghazi_can_claim_jihad_within = {
+	legitimacy >= 50
+	NOT = { has_country_modifier = ghazi_jihad_within_refund }
+	NOT = { has_country_modifier = ghazi_hisba_apparatus }
+	# Self-purity condition: cannot purge the tent's law while
+	# holding it. (Players may have already swapped this off via
+	# the law system; this gate enforces the order.)
+	NOT = { has_reform = government_reform:chinggisid_regency }
+}
+
+# Ribat Network (4.2) — mid threshold + treasury cost is event-
+# side. Requires the realm to be in some position to endow lodges.
+ghazi_can_claim_ribat_network = {
+	legitimacy >= 60
+	NOT = { has_country_modifier = ghazi_ribat_network_refund }
+	NOT = { has_country_modifier = ghazi_the_lodges_endowed }
+	# Must be able to afford the endowment (six months' income —
+	# matches the cost in ghazi_burden.65.a).
+	gold >= {
+		value = monthly_income_total
+		multiply = 6
+	}
+}
+
+# Caliphal Investiture (4.3) — mid threshold. Diplomatic reach
+# to Cairo is assumed (the diploma comes; the cost is the string).
+ghazi_can_claim_investiture = {
+	legitimacy >= 60
+	NOT = { has_country_modifier = ghazi_investiture_refund }
+	NOT = { has_country_modifier = ghazi_caliphal_diploma }
+}
+
+# Sultan of the Ghazis (4.4) — the title-jump. Split threshold:
+# leg ≥ 75 if investiture was taken (the historical ladder), else
+# leg ≥ 90 (the proud path: never bound the dynasty to Cairo).
+ghazi_can_claim_sultan_of_ghazis = {
+	NOT = { has_country_modifier = ghazi_sultan_of_ghazis_refund }
+	NOT = { has_country_modifier = ghazi_sultan_of_ghazis_in_protocol }
+	OR = {
+		AND = {
+			has_country_modifier = ghazi_caliphal_diploma
+			legitimacy >= 75
+		}
+		legitimacy >= 90
+	}
+}
+
+# ---------- Resolution gates --------------------------------------
+
+# SWORD OF ISLAM — sustained high legitimacy AND a real record of
+# tier-3 victories. The doctrine requires the wars actually
+# happened.
+ghazi_can_resolve_sword_of_islam = {
+	legitimacy >= 75
+	var:ghazi_high_months >= 60
+	var:ghazi_tier3_wins >= 2
+}
+
+# GUARDIAN OF THE THUGHUR — 25 years elapsed, realm intact, AND
+# the realm BORDERS dar al-harb (interior states excluded).
+ghazi_can_resolve_guardian = {
+	var:ghazi_burden_months >= 300
+	ghazi_borders_dar_al_harb = yes
+	# No catastrophic damage — capital not lost, dynasty intact.
+	NOT = { has_country_modifier = ghazi_capital_lost }
+}
+
+# DERVISH RISING — sustained low legitimacy AND the corps exists
+# (ribat network was claimed) AND designation expectations have
+# repeatedly failed.
+ghazi_can_resolve_dervish_rising = {
+	legitimacy <= 25
+	var:ghazi_low_months >= 60
+	# The constituency must exist before it can defect.
+	has_country_modifier = ghazi_the_lodges_endowed
+	# Two or more designation failures recorded.
+	var:ghazi_designation_failures >= 2
+}
+
+# DOCTRINE LAPSES — sustained low legitimacy WITHOUT the rising's
+# preconditions. The quiet failure.
+ghazi_can_resolve_doctrine_lapse = {
+	var:ghazi_low_months >= 60
+	# If the rising's gate would fire, defer to it.
+	NOT = { ghazi_can_resolve_dervish_rising = yes }
+}
+
+# ---------- Internal campaign gate -------------------------------
+# Tier-1 internal campaigns. The hisba apparatus is the precondition
+# (apparatus 4.1 — the censor's office). The law axis must be on the
+# strict / muhtasib_regime side: the campaign IS the apparatus put
+# to public use, and the lax / customary postures will not back it.
+# A hisba_office building must exist somewhere — the censor needs
+# a desk. Counter cap 3: the design's "realm runs out of sin".
+ghazi_can_launch_internal_campaign = {
+	has_country_modifier = ghazi_hisba_apparatus
+	OR = {
+		has_policy = strict_hisba_enforcement
+		has_policy = muhtasib_regime
+	}
+	any_owned_location = {
+		has_building = building_type:hisba_office
+	}
+	var:ghazi_internal_campaigns < 3
+}

@@ -1,0 +1,88 @@
+# # ============================================================
+# # Demand Ulus Fealty — the custodian's side of submission.
+# #
+# # The regent asks a non-subject Ilkhanate governorate to swear and
+# # become his ulus_governorate. Triggered via perform_diplomatic_action
+# # from the custody_demand_fealty disaster-panel action; the governor
+# # (recipient) decides by diplo_chance.
+# #
+# # On acceptance:
+# #   - the governor becomes the custodian's ulus_governorate vassal
+# #   - the custodian PAYS gold (khalʿat and gifts) and LEGITIMACY
+# #     (a sole ruler does not have to ASK for fealty), and GAINS
+# #     prestige (a steward whose name draws oaths)
+# #   - the governor RECEIVES the gifts
+# #
+# # ai_tick = never: the AI custodian initiates through the custody
+# # action's own ai_will_do, not standalone here. diplo_chance governs
+# # the governor's acceptance.
+# #
+# # Design: docs/design/custody_of_the_ulus_design.md
+# # ============================================================
+
+# demand_ulus_fealty = {
+# 	type = diplomacy
+# 	# CATEGORY_DIPLO_ACTIONS does not exist (caused the malformed
+# 	# result). Subjugation-style interactions use SUBJECT_ACTIONS.
+# 	category = CATEGORY_HOSTILE_ACTIONS
+
+# 	ai_tick = never
+
+# 	potential = {
+# 		scope:actor = {
+# 			has_variable = custody_fired
+# 			NOT = { has_variable = custody_completed }
+# 		}
+# 		scope:recipient = {
+# 			has_reform = government_reform:ilkhanate_governorate
+# 			is_subject = no
+# 		}
+# 	}
+
+# 	allow = {
+# 		scope:recipient = {
+# 			is_subject = no
+# 			NOT = { is_at_war_with = scope:actor }
+# 		}
+# 	}
+
+# 	effect = {
+# 		# The oath: the governor enters the custodian's house.
+# 		scope:recipient = {
+# 			make_subject_of = {
+# 				target = scope:actor
+# 				type = subject_type:ulus_governorate
+# 			}
+# 			# The gifts arrive — khalʿat, robes, a stipend.
+# 			add_gold = {
+# 				value = scope:actor.country_tax_base
+# 				max = { value = scope:actor.country_tax_base multiply = 4 }
+# 			}
+# 		}
+# 		# The custodian pays for the oath, in coin and in pride.
+# 		scope:actor = {
+# 			add_gold = {
+# 				value = scope:actor.country_tax_base
+# 				max = { value = scope:actor.country_tax_base multiply = 4 }
+# 				multiply = -1
+# 			}
+# 			# Having to ASK is itself an admission you are not yet sole.
+# 			add_legitimacy = -10
+# 			# But a steward whose name draws oaths is a steward indeed.
+# 			add_prestige = 10
+# 		}
+# 	}
+
+# 	# The governor's acceptance: a function of how it regards the
+# 	# custodian. The khalʿat in the effect is the sweetener; the
+# 	# weak-seek-protection logic lives on the governor's own
+# 	# custody_declare_fealty action.
+# 	# base was -10 — a guaranteed decline (the "meaningless result").
+# 	# A governorate offered khalʿat and shelter accepts unless it
+# 	# actively dislikes the custodian; tune base down if too eager.
+# 	diplo_chance = {
+# 		base = 30
+# 		opinion = 0.25
+# 		in_debt = 25
+# 	}
+# }

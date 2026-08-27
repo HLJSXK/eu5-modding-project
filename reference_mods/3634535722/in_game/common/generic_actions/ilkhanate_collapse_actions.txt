@@ -1,0 +1,827 @@
+# ERĀNZAMĪN — Contender Actions
+#
+# Three integration modes replace the old single integrate_province action.
+# Each is a two-step (situation → province) flow patterned on the base game's
+# rot_select_core_region. Per design §7, integration is itself a *stance*:
+# how you absorb a province pushes your turk_vs_tazik axis further and
+# rewards/penalises the relevant estate.
+#
+# v1 caveats:
+#   -Province-type filtering (urban / tribal / Kurdish-exclude) is not yet
+#     wired — needs population-fraction triggers and a Kurdish-province list.
+#     All three actions currently appear on every territory-level province.
+#   -Cost is shared across all three (price:ilkhanate_integration_price).
+#     Future tuning could split this (Diwan expensive, Yurt cheap).
+
+consolidate_diwan = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			custom_tooltip = {
+				text = consolidate_diwan_axis_tt
+				societal_value:turk_vs_tazik > 25
+			}
+			# Capacity gate: the chancery must actually exist before it
+			# can extend its writ. Appetite (axis) is necessary but not
+			# sufficient — you have to have built the Dīwān al-Mamālik
+			# in your capital first.
+			custom_tooltip = {
+				text = consolidate_diwan_central_diwan_tt
+				any_owned_location = {
+					is_capital = yes
+					has_building = building_type:central_diwan
+				}
+			}
+		}
+	}
+
+	price = price:ilkhanate_integration_price
+
+	# Slow, deliberate — bureaucracy takes time to extend.
+	cooldown = {
+		years = 1
+		type = consolidate_diwan
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		target_flag = target
+		name = "consolidate_diwan_select_province"
+		none_available_msg_key = "consolidate_diwan_no_provinces"
+		column = { data = name }
+		column = { data = population }
+		column = { data = province_tax_base }
+		visible = {
+			is_eranzamin_region_province = yes
+			any_location_in_province = {
+				owner = scope:actor
+				integration_level = conquered
+			}
+			# Per-province capacity: the chancery extends only where it
+			# already has a provincial office on the ground.
+			any_location_in_province = {
+				has_building = building_type:local_diwan
+			}
+		}
+	}
+
+	effect = {
+		custom_tooltip = {
+			text = consolidate_the_diwan_tt
+			
+		}
+		scope:target = {
+			every_location_in_province = {
+				limit = { owner = scope:actor }
+				change_integration_level = core
+				add_location_modifier = {
+					modifier = consolidate_diwan_mod
+					years = 10
+				}
+			}
+		}
+		scope:actor = {
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.10 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.05 }
+			change_societal_value = { type = turk_vs_tazik value = 5 }
+		}
+	}
+
+	ai_will_do = {
+		value = 100
+		modifier = {
+			factor = 0
+			scope:actor = { societal_value:turk_vs_tazik < 30 }
+		}
+	}
+}
+
+grant_the_yurt = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			custom_tooltip = {
+				text = grant_the_yurt_axis_tt
+				societal_value:turk_vs_tazik < -15
+			}
+		}
+	}
+
+	price = price:ilkhanate_integration_price
+
+	# Quick — handing land to an amir is a single audience.
+	cooldown = { 
+		months = 3
+		type = grant_the_yurt
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		target_flag = target
+		name = "grant_the_yurt_select_province"
+		none_available_msg_key = "grant_the_yurt_no_provinces"
+		column = { data = name }
+		column = { data = population }
+		column = { data = province_tax_base }
+		visible = {
+			is_eranzamin_region_province = yes
+			any_location_in_province = {
+				owner = scope:actor
+				integration_level = conquered
+			}
+		}
+	}
+
+	effect = {
+
+		scope:target = {
+			every_location_in_province = {
+				limit = { owner = scope:actor }
+				# Grant the Yurt = iqtaʿ to the amirs; not full coring.
+				change_integration_level = integrated
+				add_location_modifier = {
+					modifier = grant_the_yurt_mod
+					years = 10
+				}
+			}
+		}
+		custom_tooltip = {
+			text = grant_the_yurt_tt
+			
+		}
+		scope:actor = {
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.10 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.05 }
+			change_societal_value = { type = turk_vs_tazik value = -5 }
+		}
+	}
+
+	ai_will_do = {
+		value = 100
+		modifier = {
+			factor = 0
+			scope:actor = { societal_value:turk_vs_tazik > -30 }
+		}
+	}
+}
+
+mixed_settlement = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+		}
+	}
+
+	price = price:ilkhanate_integration_price
+
+	cooldown = { 
+		months = 6
+		type = mixed_settlement
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		target_flag = target
+		name = "mixed_settlement_select_province"
+		none_available_msg_key = "mixed_settlement_no_provinces"
+		column = { data = name }
+		column = { data = population }
+		column = { data = province_tax_base }
+		visible = {
+			is_eranzamin_region_province = yes
+			any_location_in_province = {
+				owner = scope:actor
+				integration_level = conquered
+			}
+		}
+	}
+
+	effect = {
+		custom_tooltip = {
+			text = mixed_settlement_tt
+			
+		}
+		scope:target = {
+			every_location_in_province = {
+				limit = { owner = scope:actor }
+				change_integration_level = core
+				add_location_modifier = {
+					modifier = mixed_settlement_mod
+					years = 10
+				}
+			}
+		}
+		# No estate or axis shifts — the compromise is neutral.
+	}
+
+	ai_will_do = {
+		# Default fallback when the axis-gated paths aren't available.
+		value = 60
+	}
+}
+
+rally_turkic_tribes = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+			parliament_type = parliament_type:diwan_council
+		}
+	}
+
+	# Two gates. Prestige floor: only a warlord with standing can
+	# attract the tribes. Axis floor: a Persianized court — Injuids,
+	# Muzaffarids, anyone leaning Tāzīk — cannot credibly summon the
+	# steppe confederations. The tribes follow the man on horseback,
+	# not the man in the chancery. Cost is paid on top of the gates.
+	allow = {
+		scope:actor = {
+			prestige > 40
+			custom_tooltip = {
+				text = rally_turkic_tribes_axis_tt
+				societal_value:turk_vs_tazik < 0
+			}
+		}
+	}
+
+	price = price:ilkhanate_rally_price
+
+	cooldown = { 
+		years = 10
+		type = rally_turkic_tribes
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	effect = {
+		# Pick a rural location that hasn't received a tribal wave in
+		# the last decade. Per-location cooldown is a soft brake on
+		# dogpiling one province with the demographic load.
+		scope:actor = {
+			random_owned_rural_location = {
+				limit = {
+					NOT = { has_variable = recent_tribal_settlement }
+
+				}
+
+				save_scope_as = target_rally_location
+			}
+		}
+
+		# Rank-scaled spawn — a county chief draws ~5,000 warriors;
+		# an emperor can summon a full ~30,000-strong confederation.
+		# Nobles spawn at 1/10 the tribesman count (the amir layer).
+		if = {
+			limit = { scope:actor = { country_rank_level = 4 } }
+			scope:target_rally_location = {
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:tribesmen
+					size = { value = 30.0 }
+				}
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:nobles
+					size = { value = 3.0 }
+				}
+			}
+		}
+		else_if = {
+			limit = { scope:actor = { country_rank_level = 3 } }
+			scope:target_rally_location = {
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:tribesmen
+					size = { value = 20.0 }
+				}
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:nobles
+					size = { value = 2.0 }
+				}
+			}
+		}
+		else_if = {
+			limit = { scope:actor = { country_rank_level = 2 } }
+			scope:target_rally_location = {
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:tribesmen
+					size = { value = 10.0 }
+				}
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:nobles
+					size = { value = 1.0 }
+				}
+			}
+		}
+		else = {
+			scope:target_rally_location = {
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:tribesmen
+					size = { value = 5.0 }
+				}
+				add_pop = {
+					culture = culture:turkoman_culture
+					religion = scope:actor.religion
+					type = pop_type:nobles
+					size = { value = 0.5 }
+				}
+			}
+		}
+
+		# Arrival side-effects on the destination location. The 20-year
+		# settlement modifier caps noble literacy — keeps the new amir
+		# layer from immediately Persianizing into the diwan.
+		scope:target_rally_location = {
+			add_location_modifier = {
+				modifier = turkic_tribal_settlement_mod
+				years = 20
+			}
+			change_prosperity = prosperity_mild_penalty
+			set_variable = {
+				name = recent_tribal_settlement
+				years = 10
+			}
+		}
+
+		# Country-side costs. The warlord pays in friction with the
+		# settled estates — diwan, burghers, peasants all alienated by
+		# the influx — and in lost stability. Amirs are pleased.
+		scope:actor = {
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.10 }
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.25 }
+			add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.25 }
+			add_estate_satisfaction = { type = estate_type:peasants_estate value = -0.25 }
+			add_stability = -10
+			change_societal_value = {
+				type = turk_vs_tazik
+				value = -5
+			}
+		}
+	}
+
+	ai_will_do = {
+		value = 50
+		modifier = {
+			factor = 2
+			at_war = yes
+		}
+	}
+}
+
+restore_persian_bureaucracy = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+			parliament_type = parliament_type:diwan_council
+		}
+	}
+
+	# Prestige gate, parallel to rally — the warlord must have standing
+	# to bring the Iranian chancery class into his service. No axis gate:
+	# the whole point of this action is to give a Türk-leaning warlord a
+	# deliberate path INTO the Persianate institution, even from below 0.
+	# Rank floor: a county-rank petty lord cannot credibly seat the
+	# realm-grand chancery — duchy or higher only.
+	allow = {
+		scope:actor = {
+			prestige > 30
+			custom_tooltip = {
+				text = restore_persian_bureaucracy_rank_tt
+				country_rank_level > 1
+			}
+			
+		}
+	}
+
+	price = price:ilkhanate_bureaucracy_price
+
+	cooldown = {
+		 type = restore_persian_bureaucracy
+		 years = 15
+		  }
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	effect = {
+		# Realm-wide diwan extension. Stack-friendly — each fire adds
+		# another 25-year instance, so a contender who keeps Persianizing
+		# accumulates real admin weight over the succession arc.
+		custom_tooltip = {
+			text = restore_diwan_tt
+		}
+		scope:actor = {
+			add_country_modifier = {
+				modifier = diwan_extension_mod
+				years = 25
+			}
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.15 }
+			add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.15 }
+			change_societal_value = {
+				type = turk_vs_tazik
+				value = 10
+			}
+			# Permanent flag: once you have paid for the chancery class
+			# you keep the right to seat the Dīwān al-Mamālik, even if
+			# the axis later drifts away from Tāzīk. This is the action's
+			# real unlock — the building gate reads this variable.
+			set_variable = restored_persian_bureaucracy
+		}
+	}
+
+	ai_will_do = {
+		value = 50
+	}
+}
+
+# Erānzamīn contenders should not need a spy network to manufacture
+# casus belli on each other — the succession crisis IS the legitimating
+# casus, and pressing a claim is a public political act, not espionage.
+# Modeled on rot_plan_invasion: two-step select (situation → neighbor
+# contender), grants cb_eranzamin_succession on the target. Gives Amir
+# Chupan (and every other contender) a fast lane to war without first
+# burning treasury on intelligence operations they cannot afford.
+press_eranzamin_claim = {
+	show_message = no
+	type = situation
+
+	potential = {
+		scope:actor = {
+			has_variable = eranzamin_contender
+		}
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 3
+
+	cooldown = {
+		type = press_eranzamin_claim
+		months = 6
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:actor = {
+				every_neighbor_country = {
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target
+		name = "press_eranzamin_claim_select_country"
+		none_available_msg_key = "press_eranzamin_claim_no_countries"
+		column = { data = name }
+		column = { data = expected_army_size }
+		visible = {
+			is_real_country = yes
+			is_member_of_international_organization = international_organization:eranzamin
+			scope:actor = {
+				can_declare_war_on = root
+				NOT = { has_truce_with = root }
+				NOT = { is_allied_with = { target = root } }
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = { exists = scope:target }
+				add_casus_belli = {
+					target = scope:target
+					type = casus_belli:cb_eranzamin_succession
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		value = 100
+		modifier = {
+			factor = 0
+			at_war = yes
+		}
+	}
+}
+
+
+custody_declare_fealty = {
+	type = situation
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			OR ={
+				has_reform = government_reform:ilkhanate_governorate
+				# has_reform = government_reform:ghazi_sultanate
+				# has_reform = government_reform:farr_i_izadi
+				# has_reform = government_reform:chinggisid_regency
+			}
+			is_subject = no
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	# The roll of stewards: IO members holding a khan (regency or
+	# Borjigin) or contending in earnest. Self excluded.
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:actor = {
+				international_organization:eranzamin ?= {
+					every_international_organization_member = {
+						limit = {
+							NOT = { this = scope:actor }
+							OR = {
+								has_reform = government_reform:chinggisid_regency
+								has_variable = eranzamin_contender
+								ruler ?= { dynasty = dynasty:borjigin_dynasty }
+							}
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target_steward
+		name = "choose_steward"
+		none_available_msg_key = "no_stewards_available"
+		column = { data = name }
+		column = { data = expected_army_size }
+	}
+
+	effect = {
+		scope:actor = {
+			# if = {
+			# 	limit = {
+			# 		scope:actor = {
+			# 			### this is a retreat. you lose legitimacy and prestige, but the disaster ends. commenting for now.
+			# 			OR ={
+			# 				has_reform = government_reform:ilkhanate_governorate
+			# 				has_reform = government_reform:ghazi_sultanate
+			# 				has_reform = government_reform:farr_i_izadi
+			# 				has_reform = government_reform:chinggisid_regency
+			# 			}
+			# 		}
+			# 	}
+			# }
+			if = {
+				limit = { exists = scope:target_steward }
+				make_subject_of = {
+					target = scope:target_steward
+					type = subject_type:ulus_governorate
+				}
+				# The custodian learns of it (custody.34). Variable, not
+				# scope: saved scopes do not survive action -> event.
+				scope:target_steward = {
+					set_variable = { name = custody_new_sworn value = scope:actor }
+					trigger_event_non_silently = custody.34
+				}
+			}
+
+		}
+	}
+
+	# A governorate swears for protection: the weaker and the more
+	# threatened it is, the readier it is to kneel.
+	ai_will_do = {
+		add = 10
+		modifier = {
+			add = 50
+			scope:actor = { military_strength < 5 }
+		}
+		modifier = {
+			add = 30
+			scope:actor = { at_war = yes }
+		}
+		modifier = {
+			add = -40
+			scope:actor = { military_strength > 20 }
+		}
+	}
+}
+
+# ============================================================
+# Drop the Khan from the Khutbah — the governorate walks out.
+#
+# An ulus_governorate stops reading its overlord's khan in the
+# Friday khutbah: the subjecthood ends. The overlord cancels the
+# relation (cancel_subject, overlord-scoped) — a clean, near-
+# peaceful renunciation, fitting the governorate's high autonomy.
+# An AI does this when it is strong enough to stand alone, or its
+# overlord can no longer shield it.
+# ============================================================
+
+custody_drop_khan = {
+	type = situation
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			has_reform = government_reform:ilkhanate_governorate
+			is_subject_type = ulus_governorate
+			NOT = { is_at_war_with = scope:actor.overlord }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:eranzamin_succession = this
+			situation_is_active = yes
+		}
+	}
+
+	effect = {
+
+		scope:actor = {
+			set_variable = {
+				name = custody_dropped_khan
+				years = 5
+			}
+			remove_reform = government_reform:ilkhanate_governorate
+			trigger_event_non_silently = ilkhanate_flavor.1
+			overlord ?= {
+				add_opinion = {
+					modifier = opinion_betrayed_genghis
+					target = scope:actor
+				}
+
+				cancel_subject = scope:actor
+				remove_truce_with = scope:actor
+				add_casus_belli = {
+					target = scope:actor
+					type = casus_belli:cb_eranzamin_succession
+				}
+			}
+			add_legitimacy = 5
+		}
+	}
+
+	# Walk out when strong enough to stand alone, or when the
+	# overlord is in no position to object.
+
+	ai_will_do = {
+		value = 0
+		add = {
+			if = {
+				limit = {
+					#if we have a holy site for this religion, big incentive as we can get bonuses
+					scope:actor = { military_strength > 15 }
+				}
+				value = 30
+			}
+		}
+		add = {
+			if = {
+				limit = {
+					#if we have a holy site for this religion, big incentive as we can get bonuses
+					scope:actor = { military_strength > 15 }
+				}
+				value = 30
+			}
+		}
+		add = {
+			if = {
+				limit = {
+					#if we have a holy site for this religion, big incentive as we can get bonuses
+					scope:actor = { military_strength > 15 }
+				}
+				value = 30
+			}
+		}
+		add = {
+			if = {
+				limit = {
+					#if we have a holy site for this religion, big incentive as we can get bonuses
+					scope:actor = { military_strength > 30 }
+				}
+				value = 50
+			}
+		}
+		add = {
+			if = {
+				limit = {
+					#if we have a holy site for this religion, big incentive as we can get bonuses
+					scope:actor.military_strength > scope:actor.overlord.military_strength
+				}
+				value = 30
+			}
+		}
+	}
+}

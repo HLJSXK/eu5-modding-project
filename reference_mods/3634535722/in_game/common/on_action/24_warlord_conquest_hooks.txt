@@ -1,0 +1,85 @@
+# =====================================================================
+# ILKHANATE WARLORD — scripted conquest-on-occupation
+#
+# Replaces the hardcoded auto_conquer_at_war flag that used to sit on the
+# ilkhanate_warlord character modifier. The modifier (still granted to
+# contender rulers/heirs by the Erānzamīn situation and the khurūj chain)
+# now only carries force_allow_as_leader; the conquest itself is scripted
+# here so it can be conditioned — next step: defenders holding
+# iranian_kingship, dar_al_jihad, or legitimacy settled by winning the
+# custody disaster become IMMUNE (add the gate in the trigger below).
+#
+# Two engine hooks are needed for full coverage (re-declaring an engine
+# on_action EXTENDS it — Paradox merges on_actions across files):
+#   on_siege_won          — location WITH a fort falls after a siege
+#   on_location_occupied  — location WITHOUT a fort finishes the
+#                           occupation process
+# Both provide the same scopes:
+#   root           = the occupying country
+#   scope:target   = the location taken
+#   scope:character = the leading general (may not exist)
+# =====================================================================
+
+on_siege_won = {
+	on_actions = {
+		eranzamin_warlord_auto_conquest
+	}
+}
+
+on_location_occupied = {
+	on_actions = {
+		eranzamin_warlord_auto_conquest
+	}
+}
+
+eranzamin_warlord_auto_conquest = {
+	trigger = {
+
+		# Only enemy land in an actual war; also keeps recaptures of our
+		# own occupied locations from re-firing (we are never at war with
+		# ourselves).
+		has_variable = eranzamin_contender
+		situation:eranzamin_succession ?= {
+			situation_is_active = yes
+        }
+		scope:target ?= {
+			is_eranzamin_region_province = yes
+		}
+		scope:target.owner ?= 
+			{ 
+				NOT = {
+					OR = {
+						has_reform = government_reform:iranian_kingship
+						has_reform = government_reform:dar_al_jihad
+						has_reform = government_reform:gurkani_regime
+						has_reform = government_reform:crowned_murshid_reform
+						has_reform = government_reform:timurid_empire
+						has_reform = government_reform:sultanate_of_rum
+					}
+				}
+				is_at_war_with = root 
+				
+				
+			}
+	}
+	effect = {
+		scope:target = {
+			if = {
+				limit = {
+					is_province_capital = yes
+				}
+				province = {
+					every_location_in_province = {
+						change_location_owner = root
+					}
+				}
+
+
+			}
+			else = {
+				change_location_owner = root
+			}
+			
+		}
+	}
+}

@@ -1,0 +1,938 @@
+# Scripted effects for the Matter of Tork / Matter of Tazik disasters.
+# Design spec: docs/design/eranzamin_plan.md §19.7 (firing structure).
+#
+# Pattern: pre-defined dormant breakaway tags (BTC, BUR — see country
+# definitions) are released into a civil war via create_rebel +
+# start_civil_war. Tribal-or urban-coded cores migrate to the rebel.
+
+# ---Consolidation-months counter (gate for matter_of_X_can_start) -------
+# Ticks up monthly while the contender is above the territorial gate.
+# Resets to 0 the first month they fall below. Read by
+# is_eranzamin_consolidation_sustained via var:eranzamin_consolidation_months.
+
+eranzamin_maintain_consolidation_counter = {
+	if = {
+		limit = { is_eranzamin_territorial_gate_met = yes }
+		if = {
+			limit = { NOT = { has_variable = eranzamin_consolidation_months } }
+			set_variable = { name = eranzamin_consolidation_months value = 0 }
+		}
+		change_variable = { name = eranzamin_consolidation_months add = 1 }
+	}
+	else = {
+		if = {
+			limit = { has_variable = eranzamin_consolidation_months }
+			set_variable = { name = eranzamin_consolidation_months value = 0 }
+		}
+	}
+}
+
+# ---Progress meter helpers ----------------------------------------------
+
+matter_initialize_progress = {
+	# Called from disaster on_start. Establishes the progress counter
+	# and the threshold-fired flags.
+	if = {
+		limit = { NOT = { has_variable = matter_progress } }
+		set_variable = { name = matter_progress value = 0 }
+	}
+	else = {
+		set_variable = { name = matter_progress value = 0 }
+	}
+	# Clear any old threshold-fired flags from a previous run (in case
+	# re-firing is ever enabled — defensive).
+	remove_variable = matter_25_fired
+	remove_variable = matter_50_fired
+	remove_variable = matter_75_fired
+	remove_variable = co_opt_track
+	remove_variable = petition_refused
+}
+
+matter_clear_progress = {
+	# Called from disaster on_end.
+	if = {
+		limit = { has_variable = matter_progress }
+		remove_variable = matter_progress
+	}
+}
+
+# ============================================================
+# MATTER OF TORK — "The Place of the Sword" disposition machinery
+# Design: docs/design/matter_of_tork_design.md
+#
+# No progress meter. A 240-month horizon counter, two process
+# counters (Iranization / Expulsion), and war-end polls for the
+# Eradication attempt and the catastrophic defection.
+# ============================================================
+
+matter_tork_init = {
+	# Called from disaster on_start. Zero the horizon, clear any
+	# stale flags from a hypothetical earlier run (defensive — the
+	# Matter is one-shot per playthrough).
+	set_variable = { name = matter_tork_months value = 0 }
+	remove_variable = matter_tork_disposition_chosen
+	remove_variable = matter_tork_iranization_underway
+	remove_variable = matter_tork_iranization_months
+	remove_variable = matter_tork_expulsion_underway
+	remove_variable = matter_tork_expulsion_months
+	remove_variable = matter_tork_expulsion_stage_1
+	remove_variable = matter_tork_expulsion_stage_2
+	remove_variable = matter_eradication_attempt
+	remove_variable = matter_tork_defection_war
+	remove_variable = matter_tork_war_observed
+	remove_variable = matter_tork_war_settled
+	remove_variable = matter_tork_iranization_claimed
+	remove_variable = matter_tork_marcher_claimed
+	remove_variable = matter_tork_murid_claimed
+	remove_variable = matter_tork_expulsion_claimed
+	remove_variable = matter_tork_eradication_claimed
+	remove_variable = matter_tork_approach
+	remove_variable = matter_tork_anger_months
+	remove_variable = matter_tork_anger_warned
+	remove_variable = matter_tork_vilayat_months
+	remove_variable = matter_tork_vilayat_71_fired
+	remove_variable = matter_tork_vilayat_72_fired
+	remove_variable = matter_tork_vilayat_73_fired
+	remove_variable = matter_tork_imam_offered
+	remove_variable = matter_tork_beacon_months
+	remove_variable = matter_tork_beacon_80_fired
+	remove_variable = matter_tork_beacon_81_fired
+	remove_variable = matter_tork_beacon_82_fired
+	remove_variable = matter_tork_unleash_months
+	remove_variable = matter_tork_unleash_85_fired
+}
+
+# ---Approach layer (the Council on the Hosts) ---------------------------
+# Switching swaps ONLY the ambient modifier. Earned gains — privileges,
+# corps tiers, axis movement, conquered land, timed event modifiers —
+# persist. The horizon clock never resets.
+
+matter_tork_clear_approach_ambients = {
+	if = {
+		limit = { has_country_modifier = matter_approach_ghulam }
+		remove_country_modifier = matter_approach_ghulam
+	}
+	if = {
+		limit = { has_country_modifier = matter_approach_beacon }
+		remove_country_modifier = matter_approach_beacon
+	}
+	if = {
+		limit = { has_country_modifier = matter_approach_vilayat }
+		remove_country_modifier = matter_approach_vilayat
+	}
+	if = {
+		limit = { has_country_modifier = matter_approach_unleash }
+		remove_country_modifier = matter_approach_unleash
+	}
+}
+
+matter_tork_set_approach_ghulam = {
+	matter_tork_clear_approach_ambients = yes
+	set_variable = { name = matter_tork_approach value = 1 }
+	add_country_modifier = { modifier = matter_approach_ghulam months = -1 }
+	# Sticky: once the program is founded it exists as an institution.
+	# The ghulam privileges' potential reads this; a granted privilege
+	# survives an approach switch (earned-gains rule).
+	set_variable = matter_tork_ghulam_program
+}
+
+matter_tork_set_approach_beacon = {
+	matter_tork_clear_approach_ambients = yes
+	set_variable = { name = matter_tork_approach value = 2 }
+	add_country_modifier = { modifier = matter_approach_beacon months = -1 }
+	# Sticky: the program's privileges stay grantable once founded.
+	set_variable = matter_tork_beacon_program
+}
+
+matter_tork_set_approach_vilayat = {
+	matter_tork_clear_approach_ambients = yes
+	set_variable = { name = matter_tork_approach value = 3 }
+	add_country_modifier = { modifier = matter_approach_vilayat months = -1 }
+	# Sticky: the courtship, once begun, is a fact the lodges remember.
+	set_variable = matter_tork_vilayat_program
+}
+
+matter_tork_set_approach_unleash = {
+	matter_tork_clear_approach_ambients = yes
+	set_variable = { name = matter_tork_approach value = 4 }
+	add_country_modifier = { modifier = matter_approach_unleash months = -1 }
+}
+
+matter_tork_monthly_tick = {
+	change_variable = { name = matter_tork_months add = 1 }
+	# Process counters tick only while their disposition runs.
+	if = {
+		limit = { has_variable = matter_tork_iranization_underway }
+		change_variable = { name = matter_tork_iranization_months add = 1 }
+	}
+	if = {
+		limit = { has_variable = matter_tork_expulsion_underway }
+		change_variable = { name = matter_tork_expulsion_months add = 1 }
+	}
+	# Vilayat courtship counter — drives the approach-3 event chain.
+	if = {
+		limit = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 3
+		}
+		if = {
+			limit = { NOT = { has_variable = matter_tork_vilayat_months } }
+			set_variable = { name = matter_tork_vilayat_months value = 0 }
+		}
+		change_variable = { name = matter_tork_vilayat_months add = 1 }
+	}
+	# Beacon counter — drives the approach-2 event chain.
+	if = {
+		limit = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 2
+		}
+		if = {
+			limit = { NOT = { has_variable = matter_tork_beacon_months } }
+			set_variable = { name = matter_tork_beacon_months value = 0 }
+		}
+		change_variable = { name = matter_tork_beacon_months add = 1 }
+	}
+	# Unleash counter — drives the approach-4 event chain.
+	if = {
+		limit = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 4
+		}
+		if = {
+			limit = { NOT = { has_variable = matter_tork_unleash_months } }
+			set_variable = { name = matter_tork_unleash_months value = 0 }
+		}
+		change_variable = { name = matter_tork_unleash_months add = 1 }
+	}
+	# ---The Great Raid: the hosts ride to the designated theater ----------
+	# Runs while a theater stands, regardless of the council's current
+	# approach. Two jobs:
+	#   1. recount the beachhead (matter_tork_raid_owned - the release
+	#      gate and the tooltips read it),
+	#   2. PAIR each theater holding with up to two homeland feeder
+	#      reservoirs: at most one new caravan a month. The largest
+	#      unpaired Turkic/Tatar/Mongol pop of Eranzamin (no pastoral
+	#      gate - city tribesmen drain like the steppe's) sends 40% of
+	#      itself over ten years to the fullest holding that still has
+	#      feeder capacity. Pairings are marked with location variables
+	#      (raid_feeder_source on the source, raid_feeders count on the
+	#      destination) and swept by matter_raid_clear_pairings on
+	#      re-designation and on release.
+	if = {
+		limit = { has_variable = matter_tork_raid_region }
+		set_local_variable = { name = raid_owned value = 0 }
+		set_local_variable = { name = raid_tribes value = 0 }
+		var:matter_tork_raid_region ?= {
+			every_location_in_region = {
+				limit = { owner = root }
+				root = {
+					change_local_variable = { name = raid_owned add = 1 }
+				}
+				# The hosts in place: total tribesmen across the
+				# holdings, of any culture — the march needs PEOPLE,
+				# and by release day they are overwhelmingly the ils
+				# you sent (the banner blocks assimilation).
+				every_pop = {
+					limit = { pop_type = pop_type:tribesmen }
+					root = {
+						change_local_variable = { name = raid_tribes add = prev.pop_size }
+					}
+				}
+			}
+		}
+		set_variable = { name = matter_tork_raid_owned value = local_var:raid_owned }
+		set_variable = { name = matter_tork_raid_tribes value = local_var:raid_tribes }
+		if = {
+			limit = { var:matter_tork_raid_owned >= 1 }
+			# The fullest holding that still has feeder capacity (< 2).
+			var:matter_tork_raid_region ?= {
+				ordered_location_in_region = {
+					limit = {
+						owner = root
+						trigger_if = {
+							limit = { has_variable = raid_feeders }
+							var:raid_feeders < 2
+						}
+					}
+					order_by = population
+					max = 1
+					save_scope_as = raid_dest
+				}
+			}
+			if = {
+				limit = { exists = scope:raid_dest }
+				# The largest unpaired reservoir, wherever it sits.
+				ordered_pop = {
+					limit = {
+						location = {
+							is_eranzamin_region_province = yes
+							NOT = { has_variable = raid_feeder_source }
+							# The Caucasus theater overlaps Eranzamin:
+							# the theater must never feed itself.
+							NOT = { has_location_modifier = matter_raid_designated }
+						}
+						OR = {
+							culture = { has_culture_group = culture_group:turkic_group }
+							culture = { has_culture_group = culture_group:tatar_group }
+							culture = { has_culture_group = culture_group:mongolian_group }
+						}
+					}
+					order_by = pop_size
+					max = 1
+					if = {
+						limit = { pop_size > 1 }
+						# 40% of the pop, ten years on the road.
+						add_migration = {
+							owner = root
+							from = this.location.province_definition
+							to = scope:raid_dest.province_definition
+							culture = this.culture
+							type = pop_type:tribesmen
+							amount = {
+								value = this.pop_size
+								multiply = 0.0033
+							}
+							months = 120
+						}
+						location = { set_variable = { name = raid_feeder_source value = 10 } }
+						scope:raid_dest = {
+							if = {
+								limit = { NOT = { has_variable = raid_feeders } }
+								set_variable = { name = raid_feeders value = 0  years = 10 }
+							}
+							change_variable = { name = raid_feeders add = 1 }
+						}
+					}
+				}
+			}
+		}
+	}
+	# Amirs-at-the-diwan hook (decision 32): seating the amīrs is a
+	# political fact — a hard one-shot −20 axis push toward Türk the
+	# month the privilege is first seen granted. (Detected here, so
+	# only while the Matter runs — acceptable: this is when the
+	# privilege matters; revisit if it needs to be global.)
+	if = {
+		limit = {
+			has_estate_privilege = estate_privilege:amirs_umara_at_the_diwan
+			NOT = { has_variable = matter_amir_diwan_pushed }
+		}
+		set_variable = matter_amir_diwan_pushed
+		change_societal_value = { type = turk_vs_tazik value = -20 }
+	}
+	# War-observation latch: the war-end polls only arm after the
+	# civil war has actually been seen running, so the month between
+	# spawn and the war flag going up cannot false-fire a resolution.
+	if = {
+		limit = {
+			in_civil_war = yes
+			OR = {
+				has_variable = matter_eradication_attempt
+				has_variable = matter_tork_defection_war
+			}
+		}
+		set_variable = matter_tork_war_observed
+	}
+	# Ghulam-approach anger counter: building the replacement army
+	# while the military estates sit at low satisfaction is a plot
+	# they can smell. Counter resets the month satisfaction recovers.
+	if = {
+		limit = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 1
+			OR = {
+				estate_satisfaction:amirs_estate < 0.3
+				estate_satisfaction:tribes_estate < 0.3
+			}
+		}
+		if = {
+			limit = { NOT = { has_variable = matter_tork_anger_months } }
+			set_variable = { name = matter_tork_anger_months value = 0 }
+		}
+		change_variable = { name = matter_tork_anger_months add = 1 }
+	}
+	else = {
+		if = {
+			limit = { has_variable = matter_tork_anger_months }
+			remove_variable = matter_tork_anger_months
+			remove_variable = matter_tork_anger_warned
+		}
+	}
+}
+
+matter_tork_process_dispatch = {
+	# --- A. Iranization completion: 240 months of cabinet work AND
+	# the realm has ACTUALLY Iranized — axis at/past +90. Reaching 50
+	# is easy; +90 demands the full Tazik reform stack cooperating,
+	# not just the approach tools. (Design decision #31.)
+	if = {
+		limit = {
+			has_variable = matter_tork_iranization_underway
+			var:matter_tork_iranization_months >= 240
+			societal_value:turk_vs_tazik >= 90
+			NOT = { has_variable = matter_of_tork_resolved }
+		}
+		trigger_event_non_silently = matter_of_tork.11
+	}
+	# --- D. Expulsion tranches at 36 / 84 / 120 months.
+	if = {
+		limit = {
+			has_variable = matter_tork_expulsion_underway
+			var:matter_tork_expulsion_months >= 36
+			NOT = { has_variable = matter_tork_expulsion_stage_1 }
+		}
+		set_variable = matter_tork_expulsion_stage_1
+		trigger_event_non_silently = matter_of_tork.41
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_expulsion_underway
+			var:matter_tork_expulsion_months >= 84
+			NOT = { has_variable = matter_tork_expulsion_stage_2 }
+		}
+		set_variable = matter_tork_expulsion_stage_2
+		trigger_event_non_silently = matter_of_tork.42
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_expulsion_underway
+			var:matter_tork_expulsion_months >= 120
+			NOT = { has_variable = matter_of_tork_resolved }
+		}
+		trigger_event_non_silently = matter_of_tork.43
+	}
+	# --- E. Eradication revolt window: the attempt's civil war ended.
+	if = {
+		limit = {
+			has_variable = matter_eradication_attempt
+			has_variable = matter_tork_war_observed
+			in_civil_war = no
+			NOT = { has_variable = matter_tork_war_settled }
+		}
+		set_variable = matter_tork_war_settled
+		if = {
+			limit = { NOT = { exists = var:matter_breakaway_ref } }
+			# Won — the class is broken; the purge completes.
+			trigger_event_non_silently = matter_of_tork.51
+		}
+		else = {
+			# Lost / white peace — the catastrophic failure.
+			trigger_event_non_silently = matter_of_tork.99
+		}
+	}
+	# --- Unleash chain (approach 4 active, pre-release): the begs
+	# quarrel at 12 months.
+	if = {
+		limit = {
+			has_variable = matter_tork_unleash_months
+			var:matter_tork_unleash_months >= 12
+			NOT = { has_variable = matter_tork_unleash_85_fired }
+			NOT = { has_variable = matter_tork_disposition_chosen }
+		}
+		set_variable = matter_tork_unleash_85_fired
+		trigger_event_non_silently = matter_of_tork.85
+	}
+	# --- Beacon chain (approach 2 active): the examination at 18
+	# months, the qanat at 40, the resistance at 70.
+	if = {
+		limit = {
+			has_variable = matter_tork_beacon_months
+			var:matter_tork_beacon_months >= 18
+			NOT = { has_variable = matter_tork_beacon_80_fired }
+		}
+		set_variable = matter_tork_beacon_80_fired
+		trigger_event_non_silently = matter_of_tork.80
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_beacon_months
+			var:matter_tork_beacon_months >= 40
+			NOT = { has_variable = matter_tork_beacon_81_fired }
+		}
+		set_variable = matter_tork_beacon_81_fired
+		trigger_event_non_silently = matter_of_tork.81
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_beacon_months
+			var:matter_tork_beacon_months >= 70
+			NOT = { has_variable = matter_tork_beacon_82_fired }
+		}
+		set_variable = matter_tork_beacon_82_fired
+		trigger_event_non_silently = matter_of_tork.82
+	}
+	# --- Vilayat courtship chain (approach 3 active): the camps at
+	# 12 months, the jurists at 36, the headgear at 60. The Hidden
+	# Imam offer is condition-gated, not clocked.
+	if = {
+		limit = {
+			has_variable = matter_tork_vilayat_months
+			var:matter_tork_vilayat_months >= 12
+			NOT = { has_variable = matter_tork_vilayat_71_fired }
+		}
+		set_variable = matter_tork_vilayat_71_fired
+		trigger_event_non_silently = matter_of_tork.71
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_vilayat_months
+			var:matter_tork_vilayat_months >= 36
+			NOT = { has_variable = matter_tork_vilayat_72_fired }
+		}
+		set_variable = matter_tork_vilayat_72_fired
+		trigger_event_non_silently = matter_of_tork.72
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_vilayat_months
+			var:matter_tork_vilayat_months >= 60
+			NOT = { has_variable = matter_tork_vilayat_73_fired }
+		}
+		set_variable = matter_tork_vilayat_73_fired
+		trigger_event_non_silently = matter_of_tork.73
+	}
+	# --- The Claim of the Hidden Imam: the Shia turn, offered once
+	# the realm is leaning mystical and the shaykhs are at court.
+	if = {
+		limit = {
+			has_variable = matter_tork_approach
+			var:matter_tork_approach = 3
+			has_variable = matter_tork_shaykh_invited
+			societal_value:mysticism_vs_jurisprudence <= -25
+			NOT = { religion = religion:shia }
+			NOT = { has_variable = matter_tork_imam_offered }
+		}
+		set_variable = matter_tork_imam_offered
+		trigger_event_non_silently = matter_of_tork.70
+	}
+	# --- Ghulam-approach anger: warning at 24 months, the plot
+	# realized at 48 (early defection — the same machinery as the
+	# horizon catastrophe; the war-end poll routes it to .91/.92).
+	if = {
+		limit = {
+			has_variable = matter_tork_anger_months
+			var:matter_tork_anger_months >= 24
+			NOT = { has_variable = matter_tork_anger_warned }
+		}
+		set_variable = matter_tork_anger_warned
+		trigger_event_non_silently = matter_of_tork.60
+	}
+	if = {
+		limit = {
+			has_variable = matter_tork_anger_months
+			var:matter_tork_anger_months >= 48
+			NOT = { has_variable = matter_tork_defection_war }
+			NOT = { has_variable = matter_tork_disposition_chosen }
+		}
+		set_variable = matter_tork_defection_war
+		set_variable = matter_tork_disposition_chosen
+		trigger_event_non_silently = matter_of_tork.61
+	}
+	# --- Catastrophic defection war ended.
+	if = {
+		limit = {
+			has_variable = matter_tork_defection_war
+			has_variable = matter_tork_war_observed
+			in_civil_war = no
+			NOT = { has_variable = matter_tork_war_settled }
+		}
+		set_variable = matter_tork_war_settled
+		if = {
+			limit = { exists = var:matter_breakaway_ref }
+			trigger_event_non_silently = matter_of_tork.91
+		}
+		else = {
+			trigger_event_non_silently = matter_of_tork.92
+		}
+	}
+}
+
+matter_tork_horizon_poll = {
+	# 240 months without an answer → the tribes answer for you.
+	if = {
+		limit = {
+			var:matter_tork_months >= 240
+			NOT = { has_variable = matter_tork_disposition_chosen }
+			NOT = { has_variable = matter_tork_defection_war }
+		}
+		set_variable = matter_tork_defection_war
+		set_variable = matter_tork_disposition_chosen
+		trigger_event_non_silently = matter_of_tork.90
+	}
+}
+
+matter_tork_clear = {
+	# Called from disaster on_end. Remove counters and transient
+	# modifiers; permanent disposition outcomes stay. Earned approach
+	# gains (privileges, corps tiers) also stay — they are political
+	# facts, not disaster bookkeeping.
+	matter_tork_clear_approach_ambients = yes
+	remove_variable = matter_tork_months
+	remove_variable = matter_tork_iranization_months
+	remove_variable = matter_tork_expulsion_months
+	remove_variable = matter_tork_war_observed
+	remove_variable = matter_tork_approach
+	remove_variable = matter_tork_anger_months
+	remove_variable = matter_tork_anger_warned
+	remove_variable = matter_tork_vilayat_months
+	remove_variable = matter_tork_beacon_months
+	remove_variable = matter_tork_unleash_months
+	if = {
+		limit = { has_country_modifier = matter_answer_given }
+		remove_country_modifier = matter_answer_given
+	}
+	if = {
+		limit = { has_country_modifier = matter_iranization_underway }
+		remove_country_modifier = matter_iranization_underway
+	}
+	if = {
+		limit = { has_country_modifier = matter_expulsion_underway }
+		remove_country_modifier = matter_expulsion_underway
+	}
+	if = {
+		limit = { has_country_modifier = matter_eradication_underway }
+		remove_country_modifier = matter_eradication_underway
+	}
+}
+
+# -------- The refounding of the amirs estate (Expulsion / Eradication) --------
+# Decision (round 6): the estate SLOT — men of the sword holding
+# land — survives; its Turko-Mongol content does not. Strip the old
+# charter's privileges; the dehqan-revival set (11_dehqan_privileges)
+# becomes grantable via matter_turk_dissolved. If the corps was
+# amir-administered, the purge transfers it to the chancery — the
+# can_build_ghulam_barracks chain survives the change of nature.
+
+matter_tork_refound_amirs_estate = {
+	if = {
+		limit = { has_estate_privilege = estate_privilege:amirs_tribal_hosts }
+		revoke_estate_privilege = estate_privilege:amirs_tribal_hosts
+	}
+	if = {
+		limit = { has_estate_privilege = estate_privilege:amirs_tribal_autonomy_rights }
+		revoke_estate_privilege = estate_privilege:amirs_tribal_autonomy_rights
+	}
+	if = {
+		limit = { has_estate_privilege = estate_privilege:amirs_umara_at_the_diwan }
+		revoke_estate_privilege = estate_privilege:amirs_umara_at_the_diwan
+	}
+	if = {
+		limit = { has_estate_privilege = estate_privilege:iqta_commutation }
+		revoke_estate_privilege = estate_privilege:iqta_commutation
+	}
+	# The purge transfers amir-held ghulam commands to the chancery.
+	if = {
+		limit = { has_estate_privilege = estate_privilege:amirs_ghulam_administration }
+		revoke_estate_privilege = estate_privilege:amirs_ghulam_administration
+		grant_estate_privilege = estate_privilege:diwan_ghulam_administration
+	}
+}
+
+# ---Tribal tranche removal (Expulsion stages / Eradication purge) -------
+# Strips a slice of tribesmen pops from owned tribal provinces.
+# add_pop_size confirmed valid (takes negative values).
+
+matter_tork_remove_tribal_tranche = {
+
+	every_owned_location = {
+		
+		limit = {is_tribal_pastoral_location = yes}
+		every_pop = {
+			limit = { pop_type = pop_type:tribesmen }
+			add_pop_size = -7.5
+		}
+	}
+	
+}
+
+matter_tork_remove_tribal_tranche_token = {
+
+	every_owned_location = {
+		
+		limit = {is_tribal_pastoral_location = yes}
+		every_pop = {
+			limit = { pop_type = pop_type:tribesmen }
+			add_pop_size = -1
+		}
+	}
+	
+}
+
+matter_of_tazik_monthly_tick = {
+	if = { limit = { societal_value:turk_vs_tazik <= -30 } change_variable = { name = matter_progress add = 10 } }
+	if = { limit = { modifier:amirs_estate_target_satisfaction >= 0.80 } change_variable = { name = matter_progress add = 8 } }
+	if = { limit = { modifier:diwan_estate_target_satisfaction <= 0.30 } change_variable = { name = matter_progress add = 15 } }
+	# Decay
+	if = { limit = { modifier:diwan_estate_target_satisfaction >= 0.70 } change_variable = { name = matter_progress add = -8 } }
+	# Clamp
+	if = { limit = { var:matter_progress < 0 } set_variable = { name = matter_progress value = 0 } }
+	if = { limit = { var:matter_progress > 100 } set_variable = { name = matter_progress value = 100 } }
+}
+
+# ---Threshold dispatch (Tazik only — Tork now uses dispositions) --------
+
+matter_of_tazik_threshold_dispatch = {
+	if = {
+		limit = {
+			var:matter_progress >= 25
+			NOT = { has_variable = matter_25_fired }
+		}
+		set_variable = matter_25_fired
+		trigger_event_non_silently= matter_of_tazik.25
+	}
+	if = {
+		limit = {
+			var:matter_progress >= 50
+			NOT = { has_variable = matter_50_fired }
+		}
+		set_variable = matter_50_fired
+		trigger_event_non_silently= matter_of_tazik.50
+	}
+	if = {
+		limit = {
+			var:matter_progress >= 75
+			NOT = { has_variable = matter_75_fired }
+		}
+		set_variable = matter_75_fired
+		trigger_event_non_silently= matter_of_tazik.75
+	}
+	if = {
+		limit = {
+			var:matter_progress >= 100
+			NOT = { has_variable = matter_100_fired }
+		}
+		set_variable = matter_100_fired
+		trigger_event_non_silently= matter_of_tazik.100
+	}
+	# Safavid synthesis override — auto-resolves the disaster if the
+	# 75/75/0.80 thresholds are met while it's running. Per §20.4.
+	if = {
+		limit = {
+			safavid_synthesis_thresholds_met = yes
+			NOT = { has_variable = matter_synthesis_override }
+		}
+		set_variable = matter_synthesis_override
+		trigger_event_non_silently= matter_of_tazik.200
+	}
+}
+
+# ---Breakaway spawn (Matter of Tork firing) ----------------------------
+
+spawn_turkmen_breakaway = {
+	# Per §19.7: spawn the Türkmen Confederation breakaway tag as a
+	# civil-war rebel. Inherit 30-50% of player's tribal-pop cores.
+	# First implementation uses create_rebel + start_civil_war following
+	# horde_civil_war.txt patterns; pop allegiance shift per
+	# succession_crisis.txt:220 pattern.
+	create_rebel = {
+		category = pretender
+		name = matter_of_tork_breakaway
+		save_scope_as = matter_breakaway_scope
+	}
+	set_variable = {
+		name = matter_breakaway_ref
+		value = scope:matter_breakaway_scope
+	}
+	# Transfer allegiance of pops in tribal-pastoral locations. Engine
+	# auto-selects ~30-50% of provinces based on rebel weight after
+	# allegiance shifts. OWNED provinces only — allegiance cannot be
+	# shifted on land we do not hold (audit fix).
+
+
+
+	every_owned_location = {
+		limit = { is_tribal_pastoral_location = yes }
+
+		every_pop = {
+			limit = {
+				OR = {
+					pop_type = pop_type:tribesmen
+					AND = {
+						pop_type = pop_type:nobles
+						OR = {
+							culture = culture:turkoman_culture
+							# turkic_group covers the Azeri and the rest
+							# of the Turkic spectrum (playtest fix);
+							# mongolian_group for the Chinggisid retinues.
+							culture ?= {
+								has_culture_group = culture_group:turkic_group
+							}
+							culture ?= {
+								has_culture_group = culture_group:mongolian_group
+							}
+						}
+					}
+				}
+			}
+			change_pop_allegiance = scope:matter_breakaway_scope
+		}
+		add_to_list = rev_rebelling_locations_list	
+		
+	}
+	
+	# Initiate the civil war.
+	scope:matter_breakaway_scope = {
+		start_civil_war = {
+				save_scope_as = matter_breakaway_country
+				every_in_list = {
+					list = rev_rebelling_locations_list
+
+					change_location_owner = scope:matter_breakaway_country
+				}
+		}
+	}
+	# Total mobilization of the hosts: every man who can sit a horse
+	# rides. Without this the breakaway is a pushover; with it the
+	# civil war is the real war §19.7 intended.
+	scope:matter_breakaway_country ?= {
+		add_country_modifier = { modifier = matter_total_mobilization years = 10 }
+		every_owned_location = {
+			change_control = 1.0
+		}
+	}
+	# Track war duration in months so the Co-opt resolution can check
+	# the ≥ 36-month gate. Counter is incremented in the disaster's
+	# on_monthly while the civil war is active.
+	set_variable = { name = matter_war_months value = 0 }
+}
+
+# ---Breakaway spawn (Matter of Tazik firing) ---------------------------
+
+spawn_urban_breakaway = {
+	# §19.7 Matter of Tazik. Urban/theocratic breakaway. Inherit 30-50%
+	# of most urban-developed Persianate cores. Religious unrest cascade
+	# rolled in the threshold-100 event.
+	create_rebel = {
+		category = pretender
+		name = matter_of_tazik_breakaway
+		save_scope_as = matter_breakaway_scope
+	}
+	set_variable = {
+		name = matter_breakaway_ref
+		value = scope:matter_breakaway_scope
+	}
+	# Per urban location (country scope: every_owned_location — the
+	# old every_province/every_controlled_location nesting was scope-
+	# confused and the engine dropped the inner effect entirely).
+	every_owned_location = {
+		limit = { is_urban_diwan_capable_location = yes }
+		random = {
+			chance = 40
+			every_pop = {
+				limit = {
+					OR = {
+						pop_type = pop_type:burghers
+						pop_type = pop_type:clergy
+						AND = {
+							pop_type = pop_type:nobles
+							culture ?= {
+								has_culture_group = culture_group:iranian_group
+							}
+						}
+					}
+				}
+				change_pop_allegiance = scope:matter_breakaway_scope
+			}
+		}
+	}
+	scope:matter_breakaway_scope = {
+		start_civil_war = {}
+	}
+	set_variable = { name = matter_war_months value = 0 }
+}
+
+# ---War-duration tick (called from disaster on_monthly while in CW) ---
+
+matter_war_duration_tick = {
+	if = {
+		limit = {
+			has_variable = matter_war_months
+			in_civil_war = yes
+		}
+		change_variable = { name = matter_war_months add = 1 }
+	}
+}
+
+# ---Resolution polling (called from disaster on_monthly) ---------------
+# Detects war-end and routes to Suppress (won, no breakaway), Concede
+# (white peace, breakaway still exists), or Co-opt (only fires if the
+# co_opt_track flag is set and war ≥36mo — gated by the event triggers).
+
+matter_of_tazik_resolution_poll = {
+	if = {
+		limit = {
+			in_civil_war = yes
+			has_variable = co_opt_track
+			has_variable = matter_war_months
+			var:matter_war_months >= 36
+			NOT = { has_variable = matter_coopt_offered }
+		}
+		set_variable = matter_coopt_offered
+		trigger_event_non_silently= matter_of_tazik.502
+	}
+	if = {
+		limit = {
+			in_civil_war = no
+			has_variable = matter_of_tazik_fired
+			NOT = { has_variable = matter_of_tazik_resolved }
+			NOT = { has_variable = matter_of_tazik_resolved_by_synthesis }
+		}
+		if = {
+			limit = { NOT = { exists = var:matter_breakaway_ref } }
+			trigger_event_non_silently= matter_of_tazik.500
+		}
+		else = {
+			trigger_event_non_silently= matter_of_tazik.501
+		}
+	}
+}
+
+# ---Resolution-event applies (Tazik only — Tork applies live in its
+# disposition events) ----------------------------------------------------
+
+# §19.8 Suppress (after Matter of Tazik) — Türk-coded polity won
+matter_of_tazik_apply_suppress = {
+	add_country_modifier = {
+		modifier = praetorian_eranzamin
+		years = -1
+		mode = add_and_extend
+	}
+	change_societal_value = { type = turk_vs_tazik value = -25 }
+	set_variable = matter_of_tazik_resolved
+	remove_variable = matter_of_tazik_fired
+}
+
+matter_of_tazik_apply_concede = {
+	add_country_modifier = {
+		modifier = dual_realm_of_eranzamin
+		years = -1
+		mode = add_and_extend
+	}
+	set_variable = matter_of_tazik_resolved
+	set_variable = matter_dual_realm_active
+	remove_variable = matter_of_tazik_fired
+}
+
+matter_of_tazik_apply_co_opt = {
+	add_country_modifier = {
+		modifier = convergent_eranzamin
+		years = -1
+		mode = add_and_extend
+	}
+	set_variable = matter_of_tazik_resolved
+	set_variable = matter_convergent_active
+	remove_variable = matter_of_tazik_fired
+}
+
+# §20.4 Qizilbash Synthesis override
+matter_apply_qizilbash_synthesis = {
+	add_country_modifier = {
+		modifier = qizilbash_synthesis
+		years = -1
+		mode = add_and_extend
+	}
+	set_variable = matter_of_tork_resolved_by_synthesis
+	set_variable = matter_of_tazik_resolved_by_synthesis
+	# Disaster will end via can_end trigger once the flag is set.
+}

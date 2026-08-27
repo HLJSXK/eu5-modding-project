@@ -1,0 +1,134 @@
+# ============================================================
+# Ghazi: The Burden of the Sword — the claim under audit
+#
+# Declaring ghazi_sultanate converts "sword of the faith" from a
+# title into a hunger. The doctrine says heaven's reward attends
+# the holy warrior; this disaster is the umma checking.
+#
+# Mechanism: legitimacy IS the credibility ledger (no parallel
+# variable). The disaster applies a peacetime bleed (-0.5/mo)
+# offset by the ghazi_lord_at_war auto-modifier ONLY when at war
+# with a qualifying (tier-2 or tier-3) target. Peace lets the
+# bleed win. The dynamic is decay-at-rest.
+#
+# Four resolutions:
+#   - Sword of Islam (Vindicated): sustained high legitimacy +
+#       tier3_wins >= 2 → Ghazi Corps institutionalized,
+#       legitimacy floor, identity locked.
+#   - Dervish Rising (Broken-formal): sustained low + corps exists
+#       + designation expectations repeatedly failed → ribat
+#       network defects to a charismatic shaykh; reform stripped;
+#       legacies stripped; generative clause feeds the murshid_i_kamil
+#       lineage (the Safavi origin event).
+#   - Guardian of the Thughur (Endured, geographically gated):
+#       25 years, realm intact, BORDERS dar al-harb and has not
+#       lost ground on that frontier. Interior states cannot claim.
+#   - The Doctrine Lapses (Broken-lapse): sustained low without
+#       the rising's preconditions → title goes ceremonial,
+#       muhtasib_regime option lost, bleed ends.
+#
+# Apparatus events fire on player claim via disaster-panel buttons
+# (jihad_within, ribat_network, caliphal_investiture, sultan_of_ghazis).
+# Each grants refund (cancels its corresponding standing penalty)
+# + legacy (institutional trace that persists past resolution,
+# stripped only by Dervish Rising).
+#
+# Erosion events fire on downward threshold-touch (35/20/10).
+# Omen events fire as random pulses; juridical-communal register
+# (preacher turns, volunteers drift, fatwa-questioning, treatment-
+# of-city audit, infidel-victory surge, muhtasib-turns).
+#
+# Triggers: in_game/common/scripted_triggers/05_ghazi_triggers.txt
+# Effects: in_game/common/scripted_effects/04_ghazi_effects.txt
+# ============================================================
+
+ghazi_burden_of_sword = {
+
+	image = "gfx/interface/illustrations/disaster/ghazi_burden_of_sword.dds"
+
+	# Fire as soon as the reform is adopted. The can_start gate is
+	# the real filter; high spawn chance just ensures no long wait.
+	monthly_spawn_chance = 1
+
+	can_start = {
+		has_reform = government_reform:ghazi_sultanate
+		custom_tooltip = {
+			text = ghazi_burden_not_yet_completed_tt
+			NOT = { has_variable = ghazi_burden_completed }
+		}
+		custom_tooltip = {
+			text = ghazi_burden_not_yet_fired_tt
+			NOT = { has_variable = ghazi_burden_fired }
+		}
+	}
+
+	# End conditions: any resolution variable set, or the realm has
+	# ceased to hold the reform (player abandoned the claim).
+	can_end = {
+		custom_tooltip = {
+			text = ghazi_burden_can_end_tt
+			OR = {
+				has_variable = ghazi_sword_of_islam
+				has_variable = ghazi_dervish_rising
+				has_variable = ghazi_guardian_of_thughur
+				has_variable = ghazi_doctrine_lapsed
+				NOT = { has_reform = government_reform:ghazi_sultanate }
+			}
+		}
+	}
+
+	# The hunger. Peacetime bleed — each line is a specific
+	# in-world silence (the claim itself unpaid, jurists withholding
+	# endorsement, volunteers absent, pulpits cool, foreign
+	# chanceries omitting the title). At a qualifying war, the
+	# ghazi_lord_at_war auto-modifier offsets all of this and nets
+	# the realm positive. The four apparatus refunds collectively
+	# cancel the bleed once all are claimed.
+	#
+	# The reform's own ambient pressures (clergy lever, amir
+	# tensions over yasa) stand on the reform; the disaster does
+	# not double them.
+	modifier = {
+		monthly_legitimacy = -0.5 ## calibrated such that a TRUE ghazva removes the penalty.
+		clergy_estate_target_satisfaction = -0.05
+		global_levy_size_modifier = -0.10
+		monthly_religious_influence = -0.10
+		monthly_prestige = -0.05
+	}
+
+	on_start = {
+		ghazi_burden_init = yes
+		set_variable = ghazi_burden_fired
+		trigger_event_non_silently = ghazi_burden.1
+		add_legitimacy = -60 ### the khutba names you ghazi; the world is now waiting to see it.
+	}
+
+	on_monthly = {
+		# Sustained-zone counters: tick ghazi_high_months when
+		# legitimacy ≥ 75, ghazi_low_months when ≤ 25,
+		# ghazi_burden_months always. Also: designation_expectation
+		# tick if a frontier is designated with no recent progress.
+		ghazi_burden_monthly_tick = yes
+		# Erosion events downward (35/20/10) fire automatically —
+		# the public signs of withheld credibility happen TO the
+		# ghazi, not by his choice. Apparatus events upward are
+		# player-claimed via the disaster panel's action buttons.
+		ghazi_burden_erosion_dispatch = yes
+		# Omen pulse — preacher-turns, volunteers-drift, fatwa-
+		# questioning, treatment-of-city, infidel-victory surge,
+		# muhtasib-turns. The juridical-communal register.
+		ghazi_burden_omen_pulse = yes
+		# Resolution poll — sword/rising/guardian/lapse.
+		ghazi_burden_resolution_poll = yes
+	}
+
+	on_end = {
+		ghazi_burden_clear = yes
+		# Lock the claim so the disaster doesn't immediately re-fire
+		# on the same reform tenure. Cleared by the resolution events
+		# only where re-declaration is allowed (Sword keeps the
+		# floor; Guardian allows none; Broken outcomes lock).
+		set_variable = ghazi_burden_completed
+		remove_variable = ghazi_burden_fired
+	}
+}

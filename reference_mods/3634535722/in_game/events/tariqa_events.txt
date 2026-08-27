@@ -1,0 +1,713 @@
+namespace = tariqa
+
+# =====================================================================
+# tariqa.1 — THE TWO PIRS (disaster resolution choice)
+#
+# The Junayd-vs-Jaʿfar succession fight as a three-way choice. See
+# 05_two_pirs.txt for the trigger conditions.
+# =====================================================================
+tariqa.1 = {
+	type = country_event
+	category = disaster_event
+	outcome = neutral
+	title = tariqa.1.title
+	desc = tariqa.1.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = angry
+	}
+
+	# ----- A: Back the militant claimant — THE DECLARATION -----
+	# Not the end of the disaster but the beginning of the process:
+	# the order is now shia with the BRANCH UNSET (ghuluww is
+	# confessionally ambiguous). Twelver-Messianist or Zaydi-Qiyam is
+	# a claim still to be made — and the genealogy that licenses it
+	# still to be forged. See 05_two_pirs.txt for the full gateset.
+	option = {
+		name = tariqa.1.a
+		set_variable = tariqa_radicalizing
+		# Panel trackers start at zero (two_pirs.gui reads these; the
+		# disaster's on_monthly maintains them).
+		set_variable = { name = two_pirs_chapters value = 0 }
+		set_variable = { name = two_pirs_province_share value = 0 }
+		set_variable = { name = two_pirs_area_share value = 0 }
+		change_religion = religion:shia
+		ruler = {change_character_religion = religion:shia}
+		heir = {change_character_religion = religion:shia}
+		every_character = {
+			limit = {
+				dynasty = root.ruler.dynasty
+				NOT = { religion = religion:shia }
+			}
+			change_character_religion = religion:shia
+		}
+		add_country_modifier = {
+			modifier = tariqa_militant_zeal
+			years = -1
+		}
+		# The home cluster unveils first: every lodge in the
+		# shrine-seat's own area changes its recitation openly. The
+		# rest of the network stays outwardly sunni — taqiyya — until
+		# unveiled by hand or by the completion sweep.
+		every_owned_foreign_building = {
+			limit = {
+				building_type = building_type:tariqa_khanaqah
+				location ?= {
+					area = root.capital.area
+				}
+			}
+			location ?= {
+				construct_building = {
+					building_type = building_type:radical_khanaqah
+					owner = root
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					instant = yes
+				}
+				destroy_building = prev
+			}
+		}
+		custom_tooltip = tariqa_radicalizing_process_tt
+	}
+
+	# ----- B: Back the quietist establishment -----
+	option = {
+		name = tariqa.1.b
+		# The exile rides for Anatolia with his devotees. His line
+		# will be back — the question returns in a generation.
+		set_variable = {
+			name = two_pirs_quietist_upheld
+			value = 1
+			years = 20
+		}
+		add_legitimacy = 10
+		# The militant wing takes some of the census with it.
+		add_country_modifier = {
+			modifier = tariqa_militant_exile
+			years = 20
+		}
+	}
+
+	# ----- C: Petition the patron for territory — settle down -----
+	option = {
+		name = tariqa.1.c
+		set_variable = tariqa_settled
+		# The order becomes a small landed polity at its shrine-seat.
+		# tariqa_order's potential (country_type = building) fails and
+		# the reform drops away on its own.
+		capital ?= {
+			change_location_owner = root
+		}
+		change_country_type = location
+		add_legitimacy = 20
+	}
+}
+
+# =====================================================================
+# tariqa.2 — THE MANIFESTATION (Two Pirs completion)
+#
+# Fired from the disaster's on_end once the full gateset holds: Known
+# Murshid, 20 chapters, 15% shia in the shrine-seat area, legitimacy
+# solvent, and the aspect pair claimed. The reward the whole ladder
+# built toward: the chapters militarize.
+# =====================================================================
+tariqa.2 = {
+	type = country_event
+	category = disaster_event
+	outcome = positive
+	title = tariqa.2.title
+	desc = tariqa.2.desc
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	# The sweep and the levy boost happen REGARDLESS — the options
+	# decide what the manifested order does with them, not whether
+	# the manifestation is real.
+	immediate = {
+		# Every chapter becomes a muster: 10x the men, sworn.
+		if = {
+			limit = { has_reform = government_reform:tariqa_tribal_base }
+			every_owned_foreign_building = {
+				limit = { building_type = building_type:tariqa_tribal_devotions }
+				location ?= {
+					construct_building = {
+						building_type = building_type:qizilbash_lodge
+						owner = root
+						cost_multiplier = 0
+						cost_multiplier_reason = "game_concept_event"
+						instant = yes
+					}
+					destroy_building = prev
+				}
+			}
+		}
+		else_if = {
+			limit = { has_reform = government_reform:tariqa_popular_base }
+			every_owned_foreign_building = {
+				limit = { building_type = building_type:tariqa_rural_zawiya }
+				location ?= {
+					construct_building = {
+						building_type = building_type:dervish_takiya
+						owner = root
+						cost_multiplier = 0
+						cost_multiplier_reason = "game_concept_event"
+						instant = yes
+					}
+					destroy_building = prev
+				}
+			}
+		}
+		else_if = {
+			limit = { has_reform = government_reform:tariqa_urban_base }
+			every_owned_foreign_building = {
+				limit = { building_type = building_type:tariqa_urban_waqf }
+				location ?= {
+					construct_building = {
+						building_type = building_type:futuwwa_brotherhood
+						owner = root
+						cost_multiplier = 0
+						cost_multiplier_reason = "game_concept_event"
+						instant = yes
+					}
+					destroy_building = prev
+				}
+			}
+		}
+		# And the last quiet lodges unveil — taqiyya is over.
+		every_owned_foreign_building = {
+			limit = { building_type = building_type:tariqa_khanaqah }
+			location ?= {
+				construct_building = {
+					building_type = building_type:radical_khanaqah
+					owner = root
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					instant = yes
+				}
+				destroy_building = prev
+			}
+		}
+		# The manifested order raises men no mere network could.
+		add_country_modifier = {
+			modifier = tariqa_manifest_mod
+			years = -1
+		}
+	}
+
+	# ----- A: Consolidate — the rising will come on OUR terms -----
+	option = {
+		name = tariqa.2.a
+		custom_tooltip = tariqa_militant_unlock_tt
+		add_legitimacy = 10
+	}
+
+	# ----- B: The khuruj follows NOW — mobilize the provinces -----
+	# The impatient road: every militant lodge rises today. Half the
+	# war chest of a prepared khuruj (x12 vs x24) — manifestation is
+	# not the same thing as readiness.
+	option = {
+		name = tariqa.2.b
+		custom_tooltip = tariqa_rise_now_tt
+		custom_tooltip = tariqa_khuruj_muster_tt
+
+		# The books close; the sword opens. The age reads mystically.
+		change_societal_value = { type = mysticism_vs_jurisprudence value = -100 }
+
+		# Capture the base type BEFORE the government flip destroys the
+		# tariqa reforms — the muster branches on it below.
+		if = {
+			limit = { has_reform = government_reform:tariqa_tribal_base }
+			set_variable = tariqa_khuruj_tribal
+		}
+
+		# The lodge census: every militant chapter musters.
+		set_variable = { name = khuruj_muster value = 0 }
+		every_owned_foreign_building = {
+			limit = {
+				OR = {
+					building_type = building_type:qizilbash_lodge
+					building_type = building_type:dervish_takiya
+					building_type = building_type:futuwwa_brotherhood
+				}
+			}
+			root = {
+				change_variable = { name = khuruj_muster add = 1 }
+			}
+		}
+
+		# The order takes the field: an ARMY first, a state only if it
+		# wins. (Debugged sequencing: the army flip is landless-legal;
+		# the settled flip waits for the coronation, tariqa.6, so no
+		# tick ever passes on a landless location-country.)
+		change_country_type = army
+		set_variable = tariqa_khuruj_underway
+		change_government_type = government_type:persianate_sultanate
+		add_reform = government_reform:khuruj_rising_reform
+		ruler ?= {
+			add_character_modifier = {
+				modifier = ilkhanate_warlord
+				years = -1
+				mode = add_and_extend
+			}
+		}
+		heir ?= {
+			add_character_modifier = {
+				modifier = ilkhanate_warlord
+				years = -1
+				mode = add_and_extend
+			}
+		}
+
+		# The devotee army musters at the shrine-seat: two regiments per
+		# five lodges (a blanket network must not field six figures of
+		# fanatics — tooltip explains the scale to the player).
+		capital ?= {
+			while = {
+				limit = {
+					root = { var:khuruj_muster > 0 }
+				}
+				if = {
+					limit = {
+						root = { has_variable = tariqa_khuruj_tribal }
+					}
+					create_sub_unit_with_owner = {
+						type = a_turkoman_light_cavalry
+						owner = root
+					}
+					create_sub_unit_with_owner = {
+						type = a_turkoman_light_cavalry
+						owner = root
+					}
+				}
+				else = {
+					create_sub_unit_with_owner = {
+						type = a_dervish_corps
+						owner = root
+					}
+					create_sub_unit_with_owner = {
+						type = a_dervish_corps
+						owner = root
+					}
+				}
+				add_manpower = 0.5
+				root = {
+					change_variable = { name = khuruj_muster add = -5 }
+				}
+			}
+		}
+
+		# The war chest: a generation of futūḥ, spent at once.
+		add_gold = {
+			value = monthly_income_total
+			multiply = 24
+		}
+
+		# The khurūj is against the neighborhood, not a neighbor.
+		every_country = {
+			limit = {
+				capital ?= {
+					area = root.capital.area
+				}
+				NOT = { this = root }
+			}
+			save_scope_as = neighbour
+			root = {
+				declare_war_with_cb = {
+					target = scope:neighbour
+					type = casus_belli:cb_eranzamin_succession
+				}
+			}
+		}
+
+		remove_variable = khuruj_muster
+		if = {
+			limit = { has_variable = tariqa_khuruj_tribal }
+			remove_variable = tariqa_khuruj_tribal
+		}
+	}
+}
+
+# =====================================================================
+# tariqa.3 — THE BANNERS SEEK A PIR
+#
+# Fired from on_new_country_formed (16_shia_rebel_banners.txt) when a
+# shia rebel country rises in a region where a Known Murshid or a
+# fully militant order keeps a lodge. A DECISION POINT, not a free
+# khuruj: accept and you take their fight — including the parent
+# state's armies — ready or not. Decline and the shia die alone,
+# which the movement will remember. scope:shia_rebels = the risen.
+# =====================================================================
+tariqa.3 = {
+	type = country_event
+	outcome = neutral
+	title = tariqa.3.title
+	desc = tariqa.3.desc
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	trigger = {
+		exists = scope:shia_rebels
+	}
+
+	# ----- A: Take command — they become our banners -----
+	# The FULL KHURŪJ, same transformation as tariqa.2.b: the order
+	# takes the field as an army, annexes the rising (debugged
+	# sequencing: annex only works AFTER the type flip), and inherits
+	# its war. The coronation (tariqa.6) settles it later.
+	option = {
+		name = tariqa.3.a
+		custom_tooltip = tariqa_banners_war_tt
+		custom_tooltip = tariqa_khuruj_muster_tt
+
+		# The books close; the sword opens.
+		change_societal_value = { type = mysticism_vs_jurisprudence value = -100 }
+
+		# Capture the base type BEFORE the government flip destroys the
+		# tariqa reforms — the muster branches on it below.
+		if = {
+			limit = { has_reform = government_reform:tariqa_tribal_base }
+			set_variable = tariqa_khuruj_tribal
+		}
+
+		# The lodge census: every militant chapter musters.
+		set_variable = { name = khuruj_muster value = 0 }
+		every_owned_foreign_building = {
+			limit = {
+				OR = {
+					building_type = building_type:qizilbash_lodge
+					building_type = building_type:dervish_takiya
+					building_type = building_type:futuwwa_brotherhood
+				}
+			}
+			root = {
+				change_variable = { name = khuruj_muster add = 1 }
+			}
+		}
+
+		change_country_type = army
+		set_variable = tariqa_khuruj_underway
+		change_government_type = government_type:persianate_sultanate
+		add_reform = government_reform:khuruj_rising_reform
+		ruler ?= {
+			add_character_modifier = {
+				modifier = ilkhanate_warlord
+				years = -1
+				mode = add_and_extend
+			}
+		}
+		heir ?= {
+			add_character_modifier = {
+				modifier = ilkhanate_warlord
+				years = -1
+				mode = add_and_extend
+			}
+		}
+
+		# The banners come over: their land, their dead, their war.
+		annex_country = { country = scope:shia_rebels }
+
+		# The devotee army musters at the shrine-seat: two regiments
+		# per five lodges.
+		capital ?= {
+			while = {
+				limit = {
+					root = { var:khuruj_muster > 0 }
+				}
+				if = {
+					limit = {
+						root = { has_variable = tariqa_khuruj_tribal }
+					}
+					create_sub_unit_with_owner = {
+						type = a_turkoman_light_cavalry
+						owner = root
+					}
+					create_sub_unit_with_owner = {
+						type = a_turkoman_light_cavalry
+						owner = root
+					}
+				}
+				else = {
+					create_sub_unit_with_owner = {
+						type = a_dervish_corps
+						owner = root
+					}
+					create_sub_unit_with_owner = {
+						type = a_dervish_corps
+						owner = root
+					}
+				}
+				add_manpower = 0.5 ## 500 manpower, as reserves.
+				root = {
+					change_variable = { name = khuruj_muster add = -5 }
+				}
+			}
+		}
+
+		# The war chest: a generation of futūḥ, spent at once.
+		add_gold = {
+			value = monthly_income_total
+			multiply = 24
+		}
+
+		# The rising's war is ours now — the host first, then the
+		# neighborhood. Annexing the rebels ended their civil war;
+		# the pir re-declares it as his own.
+		if = {
+			limit = { exists = scope:banner_host }
+			declare_war_with_cb = {
+				target = scope:banner_host
+				type = casus_belli:cb_eranzamin_succession
+			}
+		}
+		every_country = {
+			limit = {
+				capital ?= {
+					area = root.capital.area
+				}
+				NOT = { this = root }
+				NOT = { this ?= scope:banner_host }
+			}
+			save_scope_as = neighbour
+			root = {
+				declare_war_with_cb = {
+					target = scope:neighbour
+					type = casus_belli:cb_eranzamin_succession
+				}
+			}
+		}
+
+		remove_variable = khuruj_muster
+		if = {
+			limit = { has_variable = tariqa_khuruj_tribal }
+			remove_variable = tariqa_khuruj_tribal
+		}
+	}
+
+	# ----- B: Not yet. The proofs are not complete. -----
+	option = {
+		name = tariqa.3.b
+		# No mechanical punishment: prudence is a legitimate reading
+		# of the age. The rebels die alone; the text says the rest.
+	}
+}
+
+# =====================================================================
+# tariqa.4 — THE PATRON'S ENDOWMENT (patronize_tariqa_order offer)
+#
+# Fired at the ORDER when a ruler takes the patronage action. The
+# patron arrives via var:tariqa_patron_offer (variables survive the
+# event boundary; saved scopes do not — custody.31 pattern). Accepting
+# is the order's whole business model; refusal is reserved for a pir
+# who genuinely hates the throne — and it costs that throne dearly,
+# because the refusal is public.
+# =====================================================================
+tariqa.4 = {
+	type = country_event
+	outcome = neutral
+	title = tariqa.4.title
+	desc = tariqa.4.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = happy
+	}
+
+	trigger = {
+		exists = var:tariqa_patron_offer
+	}
+
+	# ----- A: Accept — the baraka flows back -----
+	option = {
+		name = tariqa.4.a
+		ai_chance = {
+			factor = 95
+		}
+		# The endowment reaches the shrine-seat (the patron already
+		# paid the price: scaled_gold 6).
+		add_gold = {
+			value = var:tariqa_patron_offer.monthly_income_total
+			multiply = 6
+		}
+		var:tariqa_patron_offer = {
+			# The shaykh's blessing, read from the minbar.
+			add_legitimacy = 10
+			add_stability = 5
+			capital = {
+				construct_building = {
+					building_type = building_type:grand_tariqa_khanaqah
+					owner = root
+					payer = var:tariqa_patron_offer
+				}
+			}
+		}
+		remove_variable = tariqa_patron_offer
+	}
+
+	# ----- B: Refuse — the pir spits on the coin -----
+	option = {
+		name = tariqa.4.b
+		ai_chance = {
+			factor = 1
+			# Only a pir who truly hates the throne refuses money.
+			modifier = {
+				factor = 30
+				opinion = { target = var:tariqa_patron_offer value < -50 }
+			}
+			# A radical order spurns an unbelieving patron's khila.
+			modifier = {
+				factor = 15
+				is_radical_tariqa = yes
+				var:tariqa_patron_offer = {
+					NOT = { religion = religion:shia }
+				}
+			}
+		}
+		# The refusal travels faster than the offer did.
+		var:tariqa_patron_offer = {
+			add_legitimacy = -15
+			# The deed is torn up; the endowment comes back.
+			add_gold = {
+				value = monthly_income_total
+				multiply = 6
+			}
+		}
+		# The devotees tell the story for a generation.
+		add_legitimacy = 5
+		remove_variable = tariqa_patron_offer
+	}
+}
+
+# =====================================================================
+# tariqa.5 — IN WHOSE NAME IS THE COIN MINTED (the rebel fork, D.3)
+#
+# Fired at a new shia rebel country (on_new_country_formed) when no
+# known murshid is in reach to claim its banners. The two historical
+# precedents for a shia rising that must govern itself:
+#   A. Sarbadar — the commonwealth: no king, the coin struck in the
+#      Hidden Imam's name, the state as His trusteeship (niyaba amma).
+#      Favored where the Juri network's cells prepared the ground.
+#   B. Musha'sha' — the mahdi: a claimant IS the manifestation, and
+#      the state is his sword. Favored in the countryside, where the
+#      end of time outsells jurisprudence.
+# =====================================================================
+tariqa.5 = {
+	type = country_event
+	outcome = neutral
+	title = tariqa.5.title
+	desc = tariqa.5.desc
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	# ----- A: The commonwealth of the gallows (the Sarbadar answer) -----
+	option = {
+		name = tariqa.5.a
+		ai_chance = {
+			factor = 30
+			# The Juri network's cells make the constitutional answer
+			# thinkable: sworn craftsmen already run the quarters.
+			modifier = {
+				factor = 4
+				any_owned_location = {
+					has_building_with_at_least_one_level = sarbadar_preachers
+				}
+			}
+			# Urban risings reach for institutions.
+			modifier = {
+				factor = 2
+				capital ?= { is_city = yes }
+			}
+		}
+		change_government_type = government_type:commonwealth_of_martyrs
+		# Born hot: fresh zeal, a full quarter-century of it — and it
+		# joins the movement.
+		add_country_modifier = {
+			modifier = revolutionary_zeal
+			years = 25
+		}
+		international_organization:sarbadar_movement ?= {
+			add_country_to_international_organization = root
+		}
+		add_religious_aspect = religious_aspect:imamate_ithna_ashari
+		add_religious_aspect = religious_aspect:niyaba_amma
+		set_religious_school = religious_school:shaykhiyya_school
+	}
+
+	# ----- B: The mahdi's sultanate (the Musha'sha' answer) -----
+	option = {
+		name = tariqa.5.b
+		ai_chance = {
+			factor = 50
+			# The countryside buys the end of time.
+			modifier = {
+				factor = 2
+				capital ?= { NOT = { is_city = yes } }
+			}
+		}
+		change_government_type = government_type:persianate_sultanate
+		add_religious_aspect = religious_aspect:imamate_ithna_ashari
+		add_religious_aspect = religious_aspect:messianism
+		set_religious_school = religious_school:nurbakhshi_school
+	}
+}
+
+# =====================================================================
+# tariqa.6 — THE CORONATION (the khurūj takes a great city)
+#
+# Fired from 18_khuruj_coronation when the rising order takes Tabriz,
+# Isfahan, Baghdad, Nishapur, Shiraz, or Herat. The template is the
+# 1501 Tabriz coronation without the name: the young pir crowned in
+# the conquered metropolis, the khuṭba of the Twelve read from its
+# pulpit, the sword shown to whoever objects. The army becomes a
+# kingdom: settled country type (safe — the army owns its conquests
+# and the coronation city becomes the capital in the same tick), the
+# Rising reform retired for the chancery and the crowned murshid.
+# =====================================================================
+tariqa.6 = {
+	type = country_event
+	outcome = positive
+	title = tariqa.6.title
+	desc = tariqa.6.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = happy
+	}
+
+	trigger = {
+		has_reform = government_reform:khuruj_rising_reform
+		has_variable = khuruj_coronation_city
+	}
+
+	immediate = {
+		# Licenses murshid_i_kamil_reform (its potential gate). Never
+		# removed: the coronation happened.
+		set_variable = tariqa_crowned_murshid
+	}
+
+	option = {
+		name = tariqa.6.a
+		# The coronation city is the seat now — owned by the army that
+		# took it, so the settled flip below is safe.
+		set_capital = var:khuruj_coronation_city
+		change_country_type = location
+		remove_reform = government_reform:khuruj_rising_reform
+		add_reform = government_reform:persianate_bureaucracy_reform
+		add_reform = government_reform:crowned_murshid_reform
+		set_country_rank = country_rank:rank_kingdom
+		# The crown is the answer to the question the khurūj kept open.
+		add_legitimacy = 100
+		# The conquest phase ends; the warlords sheathe.
+
+		remove_variable = tariqa_khuruj_underway
+	}
+}

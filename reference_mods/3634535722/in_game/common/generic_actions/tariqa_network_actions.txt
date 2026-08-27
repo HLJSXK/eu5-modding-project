@@ -1,0 +1,930 @@
+# =====================================================================
+# NETWORK ACTIONS — the preacher dispatch and the patronage flow
+#
+# dispatch_dervish_preacher (Commonwealth of Martyrs):
+#   Direct the Juri network at a chosen foreign city. Gated on Shaykhi
+#   power >= 25% — only a dervish-ascendant commonwealth commands the
+#   network (the Sufyani wing hates it). Each dispatch drains the
+#   sending wing: a stacking -5% Shaykhi power malus for 25 years
+#   (preachers_dispatched_mod). Spread the revolution and you hollow
+#   it at home — the Muʾayyad normalization arc as a resource loop.
+#
+# patronize_tariqa_order (any Muslim ruler hosting an order's lodge):
+#   Gold flows to the shrine-seat, baraka flows back. In the
+#   legitimacy-starved decades after 1335 this is the cheapest
+#   legitimacy on the market — which is historically exactly why the
+#   orders got rich.
+# =====================================================================
+
+dispatch_dervish_preacher = {
+	show_message = no
+	# Situation action: renders in the sarbadar_phenomenon panel
+	# (SituationView.GetActionGroups) — the situation is the home of
+	# the whole ferment, and a bare panel is a dead panel.
+	type = situation
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			government_type = government_type:commonwealth_of_martyrs
+		}
+		is_situation_active = situation:sarbadar_phenomenon
+	}
+
+	allow = {
+		scope:actor = {
+			"estate_power(estate_type:shaykhi_dervishes_estate)" >= 0.25
+		}
+	}
+
+	cooldown = {
+		type = dispatch_dervish_preacher
+		months = 24
+	}
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:sarbadar_phenomenon = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		target_flag = target
+		name = "dispatch_preacher_select_city"
+		none_available_msg_key = "dispatch_preacher_no_cities"
+		column = { data = name }
+		visible = {
+			# Same rooting gate as the situation's spread passes.
+			sarbadar_cell_can_take_root = yes
+			NOT = { owner ?= scope:actor }
+		}
+	}
+
+	effect = {
+		scope:target = {
+			construct_building = {
+				building_type = building_type:sarbadar_preachers
+				cost_multiplier = 0
+				cost_multiplier_reason = "game_concept_event"
+				instant = yes
+			}
+		}
+		scope:actor = {
+			# The wing that sends its best men abroad rules less at home.
+			add_country_modifier = {
+				modifier = preachers_dispatched_mod
+				years = 25
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+patronize_tariqa_order = {
+	show_message = no
+	# Situation action — lives in the sarbadar_phenomenon panel with
+	# the rest of the ferment's interactions.
+	type = situation
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			religion.group = religion_group:muslim
+			NOT = { country_type = building }
+		}
+	}
+
+	allow = {
+	}
+
+	cooldown = {
+		type = patronize_tariqa_order
+		months = 60
+	}
+
+	price = price:patronize_tariqa_order
+
+	select_trigger = {
+		looking_for_a = situation
+		target_flag = recipient
+		name = "choose_situation"
+		column = { data = name }
+		visible = {
+			situation:sarbadar_phenomenon = this
+			situation_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "patronize_order_select"
+		none_available_msg_key = "patronize_order_no_orders"
+		column = { data = name }
+		visible = {
+			has_reform = government_reform:tariqa_order
+			# The order must actually have a lodge in the patron's realm.
+			any_owned_foreign_building = {
+				building_type = building_type:tariqa_khanaqah
+				location ?= {
+					owner ?= scope:actor
+				}
+			}
+		}
+	}
+
+	# An OFFER, not a transaction: the order answers by event (tariqa.4),
+	# the custody_demand_fealty pattern — a variable carries the patron
+	# across the event boundary (saved scopes do not survive it).
+	# Acceptance is near-certain; a pir who truly hates the throne can
+	# spit on the coin, and the refusal is read from every minbar in the
+	# patron's realm (-15 legitimacy, endowment returned).
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				set_variable = { name = tariqa_patron_offer value = scope:actor }
+				trigger_event_non_silently = tariqa.4
+			}
+		}
+		custom_tooltip = patronize_offer_tt
+	}
+
+	ai_will_do = {
+		add = {
+			# The legitimacy-starved reach for the shrine.
+			if = {
+				limit = { scope:actor = { legitimacy < 40 } }
+				value = 50
+			}
+			if = {
+				limit = { scope:actor = { legitimacy < 20 } }
+				value = 50
+			}
+		}
+	}
+}
+
+# =====================================================================
+# THE THREE ENDGAMES — how an order stops being a network
+# (docs/design D.2.1). These are type = religious (religion panel):
+# unlike the ferment actions above, the order's own endgames must not
+# depend on the sarbadar_phenomenon situation being active.
+#
+#   proclaim_khuruj      (tribal)  — the rising: lodge locations flip,
+#                                    devotee army spawns, order lands
+#   rise_against_patron  (popular) — the Marʿashi ending: when a host
+#                                    strikes the zawiyas and fails
+#   capture_the_court    (urban)   — the Hurufi road: convert the
+#                                    throne itself
+# =====================================================================
+
+proclaim_khuruj = {
+	show_message = no
+	type = religious
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_reform = government_reform:tariqa_tribal_base
+			NOT = { has_variable = tariqa_settled }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			# Only a completed radicalization arms the tribes — the
+			# doctrine of rising (Messianism or Qiyam bi'l-Sayf) was
+			# claimed inside the Two Pirs; the lodges are its proof.
+			is_militant_tariqa = yes
+			any_owned_foreign_building = {
+				count >= 3
+				building_type = building_type:qizilbash_lodge
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			# Census: one sword-column per qizilbash lodge.
+			set_variable = { name = khuruj_muster value = 0 }
+			every_owned_foreign_building = {
+				limit = {
+					building_type = building_type:qizilbash_lodge
+				}
+				scope:actor = {
+					change_variable = { name = khuruj_muster add = 1 }
+				}
+				# The lodges rise: their locations come over to the pir.
+				location ?= {
+					change_location_owner = scope:actor
+				}
+			}
+			# The order becomes a landed conqueror.
+			change_country_type = location
+			change_government_type = government_type:persianate_sultanate
+			# The devotee army musters at the shrine-seat.
+			capital ?= {
+				while = {
+					limit = {
+						scope:actor = { var:khuruj_muster > 0 }
+					}
+					create_sub_unit_with_owner = {
+						type = a_age_1_traditions_light_cavalry
+						owner = scope:actor
+					}
+					create_sub_unit_with_owner = {
+						type = a_age_1_traditions_light_cavalry
+						owner = scope:actor
+					}
+					scope:actor = {
+						change_variable = { name = khuruj_muster subtract = 1 }
+					}
+				}
+			}
+			# The war chest: a generation of futuh, spent at once.
+			add_gold = {
+				value = monthly_income_total
+				multiply = 24
+			}
+			remove_variable = khuruj_muster
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+rise_against_patron = {
+	show_message = no
+	type = religious
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_reform = government_reform:tariqa_popular_base
+			NOT = { has_variable = tariqa_settled }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			# The Marʿashi trigger: the patron has struck the zawiyas
+			# (patron_struck is set when a host destroys one), or open
+			# war has come to the order.
+			OR = {
+				has_variable = patron_struck
+				at_war = yes
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "rise_against_patron_select"
+		none_available_msg_key = "rise_against_patron_no_target"
+		column = { data = name }
+		visible = {
+			scope:actor = {
+				any_owned_foreign_building = {
+					count >= 2
+					OR = {
+						building_type = building_type:tariqa_rural_zawiya
+						building_type = building_type:dervish_takiya
+					}
+					location ?= {
+						owner ?= root
+					}
+				}
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = { name = rising_muster value = 0 }
+			every_owned_foreign_building = {
+				limit = {
+					OR = {
+						building_type = building_type:tariqa_rural_zawiya
+						building_type = building_type:dervish_takiya
+					}
+					location ?= {
+						owner ?= scope:target
+					}
+				}
+				scope:actor = {
+					change_variable = { name = rising_muster add = 1 }
+				}
+				location ?= {
+					change_location_owner = scope:actor
+				}
+			}
+			# The countryside rises with the zawiyas — the order becomes
+			# a commonwealth-type state (the Marʿashi ending).
+			change_country_type = location
+			change_government_type = government_type:commonwealth_of_martyrs
+			capital ?= {
+				while = {
+					limit = {
+						scope:actor = { var:rising_muster > 0 }
+					}
+					create_sub_unit_with_owner = {
+						type = a_age_1_traditions_heavy_infantry
+						owner = scope:actor
+					}
+					scope:actor = {
+						change_variable = { name = rising_muster subtract = 1 }
+					}
+				}
+			}
+			add_gold = {
+				value = monthly_income_total
+				multiply = 12
+			}
+			remove_variable = rising_muster
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+capture_the_court = {
+	show_message = no
+	type = religious
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_reform = government_reform:tariqa_urban_base
+			NOT = { has_variable = tariqa_settled }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			# The court converts to SOMETHING — the capture only means
+			# anything once the order's own passage is complete.
+			is_militant_tariqa = yes
+		}
+	}
+
+	cooldown = {
+		type = capture_the_court
+		months = 240
+	}
+
+	price = price:capture_the_court
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = target
+		name = "capture_the_court_select"
+		none_available_msg_key = "capture_the_court_no_target"
+		column = { data = name }
+		visible = {
+			religion.group = religion_group:muslim
+			NOT = { country_type = building }
+			scope:actor = {
+				any_owned_foreign_building = {
+					count >= 2
+					OR = {
+						building_type = building_type:tariqa_urban_waqf
+						building_type = building_type:futuwwa_brotherhood
+					}
+					location ?= {
+						owner ?= root
+					}
+				}
+			}
+		}
+	}
+
+	effect = {
+		# The throne converts: the Hurufi dream, achieved. The court
+		# takes the ORDER's confession — whichever road it walked.
+		scope:target = {
+			change_religion = religion:shia
+			ruler = {change_character_religion = religion:shia}
+			heir = {change_character_religion = religion:shia}
+			every_character = {
+				limit = {
+					dynasty = scope:target.ruler.dynasty
+					NOT = { religion = religion:shia }
+				}
+				change_character_religion = religion:shia
+			}
+			if = {
+				limit = {
+					scope:actor = {
+						has_religious_aspect = religious_aspect:imamate_zaydi
+					}
+				}
+				add_religious_aspect = religious_aspect:imamate_zaydi
+			}
+			else = {
+				add_religious_aspect = religious_aspect:imamate_ithna_ashari
+			}
+			set_religious_school = religious_school:safavid_school
+		}
+		scope:actor = {
+			add_legitimacy = 20
+			# The order becomes the converted court's establishment:
+			# a grand lodge rises in the captured capital.
+			scope:target = {
+				capital ?= {
+					construct_building = {
+						building_type = building_type:grand_tariqa_khanaqah
+						owner = scope:actor
+						cost_multiplier = 0
+						cost_multiplier_reason = "game_concept_event"
+					}
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+# =====================================================================
+# THE RADICALIZATION LADDER — Two Pirs disaster actions
+# (type = disaster: rendered in the disaster panel, alive only while
+# the passage runs). The rule: what you CLAIM is an action; what
+# ARRIVES is an event. All costs income- or legitimacy-scaled.
+# =====================================================================
+
+# The khalifa on the road: buy a new chapter of the base outright.
+# Feeds the 10-chapter midpoint and the 20-chapter completion gate.
+send_forth_the_khalifas = {
+	show_message = no
+	type = disaster
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_variable = tariqa_radicalizing
+		}
+	}
+
+	allow = {
+	}
+
+	cooldown = {
+		type = send_forth_the_khalifas
+		months = 12
+	}
+
+	price = price:send_forth_the_khalifas
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:two_pirs
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		target_flag = target
+		name = "khalifas_select_location"
+		none_available_msg_key = "khalifas_no_locations"
+		column = { data = name }
+		visible = {
+			NOT = { owner ?= scope:actor }
+			any_pop = {
+				religion.group = religion_group:muslim
+			}
+			NOT = { has_building_with_at_least_one_level = tariqa_tribal_devotions }
+			NOT = { has_building_with_at_least_one_level = tariqa_rural_zawiya }
+			NOT = { has_building_with_at_least_one_level = tariqa_urban_waqf }
+		}
+	}
+
+	effect = {
+		scope:target = {
+			if = {
+				limit = {
+					scope:actor = { has_reform = government_reform:tariqa_tribal_base }
+				}
+				construct_building = {
+					building_type = building_type:tariqa_tribal_devotions
+					owner = scope:actor
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					instant = yes
+				}
+			}
+			else_if = {
+				limit = {
+					scope:actor = { has_reform = government_reform:tariqa_popular_base }
+				}
+				construct_building = {
+					building_type = building_type:tariqa_rural_zawiya
+					owner = scope:actor
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					instant = yes
+				}
+			}
+			else_if = {
+				limit = {
+					scope:actor = { has_reform = government_reform:tariqa_urban_base }
+				}
+				construct_building = {
+					building_type = building_type:tariqa_urban_waqf
+					owner = scope:actor
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					instant = yes
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+# The daʿi's seed: directly convert ~2% of a chosen quarter's Muslims.
+# Feeds the 50%-province midpoint and 15%-area completion gates.
+plant_the_seed = {
+	show_message = no
+	type = disaster
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_variable = tariqa_radicalizing
+		}
+	}
+
+	allow = {
+	}
+
+	cooldown = {
+		type = plant_the_seed
+		months = 6
+	}
+
+	price = price:plant_the_seed
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:two_pirs
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		target_flag = target
+		name = "seed_select_location"
+		none_available_msg_key = "seed_no_locations"
+		column = { data = name }
+		visible = {
+			any_pop = {
+				religion.group = religion_group:muslim
+				NOT = { religion = religion:shia }
+			}
+		}
+	}
+
+	effect = {
+		scope:target = {
+			# The daʿwa works within Islam: dhimmi quarters untouched.
+			every_pop = {
+				limit = {
+					religion.group = religion_group:muslim
+					NOT = { religion = religion:shia }
+				}
+				split_pop = {
+					fraction = 0.02
+					religion = religion:shia
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+# Unveil a lodge ahead of the sweep: spend standing, change one
+# quarter's recitation openly.
+proclaim_the_mystery = {
+	show_message = no
+	type = disaster
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_variable = tariqa_radicalizing
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			legitimacy >= 20
+		}
+	}
+
+	cooldown = {
+		type = proclaim_the_mystery
+		months = 24
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:two_pirs
+			disaster_is_active = yes
+		}
+	}
+
+	# Candidate list built FROM the actor's own lodges (custody_demand_
+	# fealty pattern): has_building_with_at_least_one_level does not see
+	# the actor's foreign-owned buildings from a bare location visible,
+	# so a trigger-based select offered everyone's lodges but ours.
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_foreign_building = {
+					limit = { building_type = building_type:tariqa_khanaqah }
+					location ?= { add_to_list = source }
+				}
+			}
+		}
+		target_flag = target
+		name = "mystery_select_location"
+		none_available_msg_key = "mystery_no_locations"
+		column = { data = name }
+	}
+
+	effect = {
+		scope:actor = {
+			add_legitimacy = -15
+			every_owned_foreign_building = {
+				limit = {
+					building_type = building_type:tariqa_khanaqah
+					location ?= { this = scope:target }
+				}
+				location ?= {
+					construct_building = {
+						building_type = building_type:radical_khanaqah
+						owner = scope:actor
+						cost_multiplier = 0
+						cost_multiplier_reason = "game_concept_event"
+						instant = yes
+					}
+					destroy_building = prev
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+# The forged nasab — the Safwat al-safa redaction as an action. The
+# network circulates it (>=5 lodges), the order's standing sells it
+# (legitimacy >= 60), and the copyists bill for it (six months'
+# income). Licenses the imamate claims: no genealogy, no Messianism,
+# no Qiyam bi'l-Sayf.
+spread_sayyid_genealogy = {
+	show_message = no
+	type = disaster
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_variable = tariqa_radicalizing
+			NOT = { has_variable = sayyid_genealogy_established }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			legitimacy >= 60
+			any_owned_foreign_building = {
+				count >= 5
+				OR = {
+					building_type = building_type:tariqa_khanaqah
+					building_type = building_type:radical_khanaqah
+				}
+			}
+		}
+	}
+
+	price = price:spread_sayyid_genealogy
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:two_pirs
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = sayyid_genealogy_established
+			add_country_modifier = {
+				modifier = sayyid_nasab_mod
+				years = -1
+			}
+			custom_tooltip = sayyid_genealogy_tt
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}
+
+# The midpoint CLAIM: 10 chapters and half the shrine-seat province
+# reciting. Claims Known Murshid — the legitimacy bleed halves, the
+# conversion accelerates, and the region's shia risings now look to
+# the order (the banners hook, tariqa.3).
+claim_of_the_age = {
+	show_message = no
+	type = disaster
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	potential = {
+		scope:actor = {
+			country_type = building
+			has_variable = tariqa_radicalizing
+			NOT = { has_variable = tariqa_known_murshid }
+		}
+	}
+
+	allow = {
+		scope:actor = {
+			custom_tooltip = {
+				text = claim_of_the_age_chapters_tt
+				OR = {
+					AND = {
+						has_reform = government_reform:tariqa_tribal_base
+						any_owned_foreign_building = {
+							count >= 10
+							building_type = building_type:tariqa_tribal_devotions
+						}
+					}
+					AND = {
+						has_reform = government_reform:tariqa_popular_base
+						any_owned_foreign_building = {
+							count >= 10
+							building_type = building_type:tariqa_rural_zawiya
+						}
+					}
+					AND = {
+						has_reform = government_reform:tariqa_urban_base
+						any_owned_foreign_building = {
+							count >= 10
+							building_type = building_type:tariqa_urban_waqf
+						}
+					}
+				}
+			}
+			custom_tooltip = {
+				text = claim_of_the_age_province_tt
+				capital ?= {
+					province ?= {
+						religion_percentage = {
+							religion = religion:shia
+							value >= 0.5
+						}
+					}
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:two_pirs
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = tariqa_known_murshid
+			add_country_modifier = {
+				modifier = tariqa_proofs_mod
+				years = -1
+			}
+			custom_tooltip = known_murshid_tt
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}

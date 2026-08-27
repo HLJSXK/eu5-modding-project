@@ -1,0 +1,335 @@
+# encourage_pastoralism = {
+# 	ability = mil
+# 	icon = settle_tribesmen
+	
+# 	potential = {
+# 		has_estate = amirs_estate
+# 	}
+	
+# 	select_trigger = {
+# 		looking_for_a = area
+# 		source = actor
+# 		target_flag = selected_area
+		
+# 		visible = {
+# 			NOT = { cabinet_already_performing_same_task_on_target = { cabinet_action = encourage_pastoralism interaction_target = selected_area } }
+# 		}
+		
+# 		name = "encourage_pastoralism_select_area"
+		
+# 		map_color = {
+# 			lerp = {
+# 				min_color = define:NMapColors|MAP_COLOR_LOW
+# 				max_color = define:NMapColors|MAP_COLOR_HIGH
+# 				factor = local_tribesmen_desired_pop
+# 			}
+# 		}
+# 	}
+	
+# 	location_modifier = {
+# 		local_tribesmen_desired_pop = 0.15
+# 		local_peasants_desired_pop = -0.15
+# 		local_food_capacity_modifier = -0.10
+# 		local_amirs_estate_power = 0.10
+# 	}
+	
+# 	map_marker = {
+# 		show_for_owner = yes
+# 	}
+# }
+
+# assess_provincial_deftar = {
+# 	ability = adm
+# 	icon = taluqdar_tax_collection
+	
+# 	potential = {
+# 		has_estate = diwan_estate
+# 	}
+	
+# 	select_trigger = {
+# 		looking_for_a = area
+# 		source = actor
+# 		target_flag = selected_area
+		
+# 		visible = {
+# 			"area_average_control(scope:actor)" < 0.90
+# 			NOT = { cabinet_already_performing_same_task_on_target = { cabinet_action = assess_provincial_deftar interaction_target = selected_area } }
+# 		}
+		
+# 		name = "assess_deftar_select_area"
+		
+# 		map_color = {
+# 			lerp = {
+# 				min_color = define:NMapColors|MAP_COLOR_LOW
+# 				max_color = define:NMapColors|MAP_COLOR_HIGH
+# 				factor = local_control
+# 			}
+# 		}
+# 	}
+	
+# 	location_modifier = {
+# 		local_integration_speed_modifier = 0.50
+# 		local_monthly_control = 0.005
+# 		local_tax_income_efficiency = 0.15
+# 		local_unrest = 2
+# 		local_amirs_estate_power = -0.10
+# 	}
+
+# 	map_marker = {
+# 		show_for_owner = yes
+# 	}
+# }
+
+# =====================================================================
+# VICTORY CABINET ACTIONS — unlocked by the Erānzamīn victory event
+# (ilkhanate_flavor.10). Each victor unlocks exactly ONE, gated on a
+# country variable set at the moment of triumph:
+#   - united_iran_diwan_unlocked  → Integrate into the Dīwān  (Tāzīk win)
+#   - united_iran_turk_unlocked   → Invite Turkic Settlers     (Türk win)
+# Both run as persistent cabinet tasks: they hold a cabinet slot,
+# accelerate the province's ongoing integration, and auto-cease once all
+# its land has reached the integrated tier (is_finished). These drive the
+# administrative track (conquered -> integrated) ONLY. Core is a separate
+# status from the culture system — reached by assimilating the province to
+# your culture OR accepting the local culture, with its own bonuses — and
+# is not something these actions touch.
+# =====================================================================
+
+# The Shahanshah's chancery completes the conquest on paper. A settled,
+# legitimate dīwān registers a province far faster than the unaided pace
+# (province_integration_speed). Requires a provincial dīwān office already
+# on the ground — the cadastre only extends where the secretariat has a
+# foothold — and the province must sit in Iranshahr proper.
+integrate_into_diwan = {
+	ability = adm
+	icon = taluqdar_tax_collection
+
+	potential = {
+		has_variable = united_iran_diwan_unlocked
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		source = actor
+		target_flag = target
+
+		name = "integrate_into_diwan_select_province"
+		none_available_msg_key = "integrate_into_diwan_no_provinces"
+
+		column = { data = name }
+		column = { data = population }
+		column = { data = province_tax_base }
+
+		visible = {
+			is_iranshahr_province = yes
+			# A provincial chancery office must already stand here.
+			any_location_in_province = {
+				has_building = building_type:local_diwan
+			}
+			# There must be owned, not-yet-cored land left to register.
+			any_location_in_province = {
+				owner = scope:actor
+				integration_level = conquered
+			}
+			NOT = {
+				cabinet_already_performing_same_task_on_target = {
+					cabinet_action = integrate_into_diwan
+					interaction_target = target
+				}
+			}
+		}
+	}
+
+    province_modifier = {
+        province_integration_speed = 6
+    }
+    progress = {
+        scope:target = {
+            value = province_average_integration
+        }
+    }
+	# Cease automatically once nothing owned here is left below core.
+	is_finished = {
+		scope:target = {
+			any_location_in_province = {
+				OR = {
+					integration_level = integrated
+					integration_level = core
+				}
+				count = all
+			}
+		}
+	}
+
+	map_marker = {
+		show_for_owner = yes
+	}
+
+	ai_will_do = {
+		value = 100
+		# Strongly preferred where the province is large and rich.
+		modifier = {
+			factor = 1.5
+			scope:target = { province_tax_base > 20 }
+		}
+	}
+}
+
+# The restored Khanate completes the conquest by changing who lives on
+# the land. On activation a wave of Türkmen settlers MIGRATES in from the
+# most populous Turkic-majority province anywhere in the world — owned or
+# not (add_migration) — and the target thereafter integrates faster
+# (province_integration_speed).
+# The weaker, demographic counterpart to the dīwān route — modelled on the
+# base invite_turkic_migration, but without the situation scaffolding.
+# Targets any province we hold with land still only at the conquered tier.
+invite_turkic_settlers = {
+	ability = mil
+	icon = settle_tribesmen
+
+	potential = {
+		has_variable = united_iran_turk_unlocked
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		source = actor
+		target_flag = target
+
+		name = "invite_turkic_settlers_select_province"
+		none_available_msg_key = "invite_turkic_settlers_no_provinces"
+
+		column = { data = name }
+		column = { data = population }
+		column = { data = province_culture_percentage }
+
+		visible = {
+			is_iranshahr_province = yes
+
+			any_location_in_province = {
+				owner = scope:actor
+				integration_level = conquered
+			}
+			NOT = {
+				cabinet_already_performing_same_task_on_target = {
+					cabinet_action = invite_turkic_settlers
+					interaction_target = target
+				}
+			}
+		}
+	}
+
+	# The invitation goes out and real settlers MIGRATE in. A wave is drawn
+	# from the most populous Turkic-majority province ANYWHERE — the steppe,
+	# Transoxiana, a neighbour's land — and resettled in the target over ten
+	# years (add_migration). This MOVES people between provinces; it does NOT
+	# transmute the resident population in place. (The old split_pop was the
+	# wrong category: conversion-by-fiat, not settlement.)
+	on_activate = {
+		# Gather the candidate reservoirs: Turkic-majority provinces across
+		# the steppe and Central Asian regions — OWNED OR NOT. We must walk
+		# the geography (areas) to reach them: every_province/ordered_province
+		# only iterate provinces WE own, never the wider Turkic world. So
+		# every_area (all areas) -> every_province_in_area (all provinces in
+		# the area, any owner) -> add to a list to rank.
+		every_area = {
+			limit = {
+				OR = {
+					region = region:khorasan_region
+					region = region:xinjiang_region
+					region = region:mongolia_region
+					region = region:steppes_region
+				}
+			}
+			every_province_in_area = {
+
+				limit = {
+					## unowned provinces.
+					NOT = {owner = scope:actor}
+					culture_group_percentage = {
+						culture_group = culture_group:turkic_group
+						value > 0.5
+					}
+				}
+				add_to_list = settler_candidates
+			}
+		}
+
+		# Draw from the most populous reservoir (position 0), shying from one
+		# we drained in the last 20 years. check_range_bounds = no keeps it
+		# quiet if no candidate exists at all.
+		ordered_in_list = {
+			list = settler_candidates
+			order_by = {
+				value = population
+				if = {
+					limit = { has_variable = recently_drained_for_settlement }
+					multiply = 0.5
+				}
+			}
+			position = 0
+			check_range_bounds = no
+			save_scope_as = settler_origin
+			set_variable = {
+				name = recently_drained_for_settlement
+				years = 20
+			}
+		}
+
+		# Resettle that reservoir's people, of its dominant (Turkic) culture,
+		# into the target over 120 months.
+		if = {
+			limit = { exists = scope:settler_origin }
+			add_migration = {
+				owner = scope:actor
+				from = scope:settler_origin.province_definition
+				to = scope:target.province_definition
+				culture = scope:settler_origin.dominant_culture
+				type = pop_type:tribesmen
+				amount = {
+					value = scope:settler_origin.population
+					multiply = 0.001
+				}
+				months = 120
+			}
+		}
+	}
+
+    province_modifier = {
+        province_integration_speed = 3
+    }
+    progress = {
+        scope:target = {
+            value = province_average_integration
+        }
+    }
+	is_finished = {
+		scope:target = {
+			any_location_in_province = {
+				OR = {
+					integration_level = integrated
+					integration_level = core
+				}
+				count = all
+			}
+		}
+	}
+
+	map_marker = {
+		show_for_owner = yes
+	}
+
+	ai_will_do = {
+		value = 100
+		# Prefer provinces where our people already hold a real foothold.
+		modifier = {
+			factor = 1.5
+			scope:target = {
+				culture_percentage = {
+					culture = scope:actor.culture
+					value > 0.25
+				}
+			}
+		}
+	}
+}

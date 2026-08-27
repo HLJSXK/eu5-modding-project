@@ -1,0 +1,183 @@
+# =====================================================================
+# THE SELJUK INHERITANCE — the claim of custody under audit
+#
+# Farr-pattern legitimacy wager (02_farr_proof_of_fortune.txt is the
+# chassis; same economy, state-building flavor):
+#
+#   DECLARE  — on_start: -40 legitimacy (your patents ran from the
+#              Ilkhan's chancery; the claim voids your own paperwork).
+#   BLEED    — -1.0/mo ambient. Offsets: +0.3 at war (auto-modifier,
+#              05_rum_auto.txt), conquest glory +0.4/mo per won war
+#              (12mo, stacking), battle/province ticks — all via
+#              20_rum_hooks.txt, mirrored from the farr hooks.
+#   BUILD    — the four-step program, ALL panel actions, with
+#              ESCALATING legitimacy prices (farr structure: each
+#              rung dearer than the last), each buying a PERMANENT
+#              standing offset plus a 5-year RELIEF pulse (+0.5/mo,
+#              extends):
+#                1. Proclaim Custody of the Old Capital (-10 leg;
+#                   requires owning Konya — Karaman's entire head
+#                   start). Losing Konya REVOKES the step (monthly
+#                   watcher below: -15 legitimacy, modifier
+#                   stripped) until retaken and re-proclaimed.
+#                   Proclaiming also unlocks the
+#                   rum_summon_to_obedience SITUATION action:
+#                   -5 legitimacy per use, grants cb_rum_custody
+#                   (Anatolia-fenced conquest CB) on a neighbor.
+#                2. Strike the Sikka   (-20 leg; step 1 + Konya)
+#                3. Restore the Diwan  (-30 leg, -5 stability, one
+#                   year's income; step 2 + a Regional Diwan and
+#                   two Local Diwans built; grants bureaucracy
+#                   reform = the chancery)
+#                4. Reopen Trunk Road  (-40 leg; step 3 + Konya +
+#                   Sivas)
+#   RESOLVE  — polled monthly:
+#              Vindicated: all four steps standing + 36 cumulative
+#                months at legitimacy >= 60 + dominance (60+ locations
+#                with an Anatolian capital OR 3+ subjects) → rum.20 →
+#                sultanate_of_rum, kingdom rank.
+#              Broken: legitimacy <= 5 → rum.21 → claim stripped,
+#                permanent re-declaration lock. (Losing Konya no
+#                longer breaks the claim — it un-builds it.)
+#              Abandoned: reform lost → quiet end.
+# =====================================================================
+
+seljuk_inheritance = {
+
+	image = "gfx/interface/illustrations/disaster/seljuk_inheritance.dds"
+
+	monthly_spawn_chance = 1
+
+	can_start = {
+		has_reform = government_reform:seljuk_claimant
+		custom_tooltip = {
+			text = rum_inheritance_not_completed_tt
+			NOT = { has_variable = rum_inheritance_completed }
+		}
+		custom_tooltip = {
+			text = rum_inheritance_not_fired_tt
+			NOT = { has_variable = rum_inheritance_fired }
+		}
+	}
+
+	can_end = {
+		OR = {
+			custom_tooltip = {
+				text = rum_inheritance_end_vindicated_tt
+				has_variable = rum_seljuk_vindicated
+			}
+			custom_tooltip = {
+				text = rum_inheritance_end_broken_tt
+				has_variable = rum_seljuk_broken
+			}
+			custom_tooltip = {
+				text = rum_inheritance_end_abandoned_tt
+				NOT = { has_reform = government_reform:seljuk_claimant }
+			}
+		}
+	}
+
+	# The audit. Full farr-weight bleed: a claim under examination
+	# costs -1.0/mo at rest. The at-war offset (+0.3), conquest glory
+	# (+0.4/won war), and the program's standing offsets (+0.65 all
+	# four) plus relief pulses (+0.5, 5y each) are what turn the
+	# ledger — the claimant who builds and wins breaks even and
+	# climbs; the claimant who sits in Larende bleeds out.
+	modifier = {
+		monthly_legitimacy = -1.0
+		# Until the sikka: whose name is on the coin? Not yours.
+		minting_income_factor = -0.3
+		# A claimant's court must look like a court.
+		# (court_spending_cost_modifier is deprecated in 1.2.0 —
+		# court_spending_efficiency is the live field.)
+		court_spending_efficiency = -0.1
+		# The begs did not agree to be subjects of a sultan.
+		nobles_estate_target_satisfaction = -0.05
+		diplomatic_reputation = -1
+	}
+
+	on_start = {
+		set_variable = rum_inheritance_fired
+		# Program counter for the panel track (seljuk_inheritance.gui):
+		# 0 → 4 as capital / sikka / road / diwan land.
+		set_variable = {
+			name = rum_program_steps
+			value = 0
+		}
+		# Cumulative months at legitimacy >= 60 — the vindication clock.
+		set_variable = {
+			name = rum_high_months
+			value = 0
+		}
+		trigger_event_non_silently = rum.1
+		# Your patents ran from the Ilkhan's chancery; the claim
+		# invalidates your own paperwork on day one.
+		add_legitimacy = -40
+	}
+
+	on_monthly = {
+		# --- The Old Capital watcher: the step is CLAIMED via the
+		#     rum_proclaim_old_capital disaster action (needs Konya);
+		#     this watcher only handles the LOSS — step revoked,
+		#     modifier revoked, the land watches you fumble the
+		#     crown's own seat. ---
+		if = {
+			limit = {
+				NOT = { owns = location:konya }
+				has_variable = rum_old_capital
+			}
+			remove_variable = rum_old_capital
+			change_variable = { name = rum_program_steps add = -1 }
+			remove_country_modifier = rum_old_capital_mod
+			add_legitimacy = -15
+			trigger_event_non_silently = rum.14
+		}
+
+		# --- The vindication clock: cumulative months at >= 60. ---
+		if = {
+			limit = { legitimacy >= 60 }
+			change_variable = { name = rum_high_months add = 1 }
+		}
+
+		# --- Broken: the claim collapses. ---
+		if = {
+			limit = {
+				NOT = { has_variable = rum_seljuk_vindicated }
+				NOT = { has_variable = rum_seljuk_broken }
+				legitimacy <= 5
+			}
+			set_variable = rum_seljuk_broken
+			trigger_event_non_silently = rum.21
+		}
+		# --- Vindicated: the apparatus stands, the realm dominates,
+		#     and the land has watched it stand for three years. ---
+		else_if = {
+			limit = {
+				NOT = { has_variable = rum_seljuk_vindicated }
+				NOT = { has_variable = rum_seljuk_broken }
+				has_variable = rum_old_capital
+				has_variable = rum_sikka_struck
+				has_variable = rum_trunk_road_open
+				has_variable = rum_diwan_restored
+				var:rum_high_months >= 36
+				legitimacy >= 60
+				OR = {
+					AND = {
+						num_locations >= 60
+						capital ?= { region = region:anatolia_region }
+					}
+					num_subjects >= 3
+				}
+			}
+			set_variable = rum_seljuk_vindicated
+			trigger_event_non_silently = rum.20
+		}
+	}
+
+	on_end = {
+		# Stop the hooks (20_rum_hooks.txt keys on this) and lock
+		# against re-fire on the same tenure.
+		remove_variable = rum_inheritance_fired
+		set_variable = rum_inheritance_completed
+	}
+}

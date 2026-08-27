@@ -1,0 +1,1 @@
+effect set_variable = { name = debug_peasant_income value = "estate(estate_type:peasants_estate).estate_taxable_income" } actually worked, btw!

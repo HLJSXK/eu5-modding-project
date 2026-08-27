@@ -1,0 +1,509 @@
+# ============================================================
+# Cultural-weight rebalance: the Mongol thin stratum + the
+# civilizational cores.
+#
+# The engine credits each location's cultural influence and
+# tradition to the OWNER's primary culture, not the location's
+# dominant culture. Two artifacts follow:
+#  - Mongol-primary empires (Yuan/JAL/CHB/GRG/Chagatai) accrue
+#    continental weight from sheer landmass → Mongol assimilates
+#    Iranic/Chinese/Iraqi pops and never converts. Categorically
+#    inverted (the Ilkhanid elite Persianized/Turkicized within
+#    decades of 1295; the Yuan sinicized or withdrew; the Horde
+#    Kipchakized).
+#  - Tag-COUNT inflates weight: Kurdish culture, with many small
+#    tags, outweighs the literate urban civilizations. The thing
+#    to model is civilizational CORES (corpus, chancery, cities),
+#    not the number of thrones.
+#
+# Three layers:
+#  1. Country: Mongol-primary contribution slashed.
+#  2. Country: narrow flat floors for the named core cultures
+#     only (NOT whole groups — that is what fed the Kurdish
+#     artifact).
+#  3. Location [verify — no base-game examples of location-scoped
+#     auto-modifiers; syntax per modifier registry is
+#     type = location / category = location]: city-rank locations
+#     of the core cultures give POSITIVE local weight when the
+#     owner shares the culture group, NEGATIVE when foreign-held —
+#     the conqueror is absorbed by the civilization he sits on,
+#     scaling with how much of it he holds.
+# ============================================================
+
+# ---Layer 1: the thin stratum (numbers tuned in playtest) -------------
+
+mongol_thin_stratum = {
+	potential_trigger = {
+		culture = { has_culture_group = culture_group:mongolian_group }
+	}
+	cultural_influence_modifier = -0.85
+	cultural_tradition_modifier = -0.95
+}
+
+# ---Layer 2: narrow flat floors (named core cultures only) ------------
+# Adhari / Farsi / Tajik / Khorasani — the Persianate literary core.
+# Iraqi only on the Arabic side (the Baghdad-Basra scholarly belt),
+# NOT the whole arabic_group. Han via chinese_group unchanged for now
+# (no tag-count artifact observed there).
+
+iranian_civilizational_weight = {
+	potential_trigger = {
+		culture = {
+			OR = {
+				this = culture:adhari_culture
+				this = culture:farsi_culture
+				this = culture:tajik_culture
+				this = culture:khorasani_culture
+			}
+		}
+	}
+	cultural_influence = 0.5
+	cultural_tradition = 0.5
+}
+
+han_civilizational_weight = {
+	potential_trigger = {
+		culture = { has_culture_group = culture_group:chinese_group }
+	}
+	cultural_influence = 0.5
+	cultural_tradition = 0.5
+}
+
+mashriqi_civilizational_weight = {
+	potential_trigger = {
+		culture = { this = culture:iraqi_culture }
+	}
+	cultural_influence = 0.5
+	cultural_tradition = 0.5
+}
+
+# ---Layer 3: civilizational core locations (location-scoped) ----------
+# [verify in-game: location-scoped auto-modifiers have no base-game
+# precedent. If these silently fail to evaluate, fall back to layer-2
+# floors only.]
+#
+# Rank ladder (per design call): rural = small, town = middle,
+# city = baseline (playtest anchor), megalopolis = 1.5x city.
+#
+#   rank        native infl/trad    foreign infl/trad
+#   rural       +0.10 / +0.10       -0.10 / -0.05
+#   town        +0.25 / +0.25       -0.25 / -0.10
+#   city        +0.50 / +0.50       -0.50 / -0.25
+#   megalopolis +0.75 / +0.75       -0.75 / -0.40
+#
+# Native-held: the civilization empowers its own (owner shares the
+# culture group of the location's dominant culture — group-level on
+# purpose: a Tabrizi dynasty ruling Fars IS the Persianate ruling
+# itself, and the modal case of a Kurdish town under a Farsi throne
+# is the town being affirmed as a Persosphere location).
+# Foreign-held: the conqueror is absorbed by what he holds — the
+# drain scales with how much of the civilization the empire sits on.
+
+# ===== IRANIAN CORE ====================================================
+
+iranian_core_rural_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			culture = { has_culture_group = culture_group:iranian_group }
+		}
+	}
+	local_cultural_influence = 0.1
+	local_cultural_tradition = 0.1
+}
+
+iranian_core_rural_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:iranian_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.1
+	local_cultural_tradition = -0.05
+}
+
+iranian_core_town_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			culture = { has_culture_group = culture_group:iranian_group }
+		}
+	}
+	local_cultural_influence = 0.25
+	local_cultural_tradition = 0.25
+}
+
+iranian_core_town_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:iranian_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.25
+	local_cultural_tradition = -0.1
+}
+
+iranian_core_city_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			culture = { has_culture_group = culture_group:iranian_group }
+		}
+	}
+	local_cultural_influence = 0.5
+	local_cultural_tradition = 0.5
+}
+
+iranian_core_city_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:iranian_group }
+			}
+		}
+	}
+	local_burghers_assimilation_blocked = yes
+	local_cultural_influence = -0.5
+	local_cultural_tradition = -0.25
+}
+
+iranian_core_megalopolis_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			culture = { has_culture_group = culture_group:iranian_group }
+		}
+	}
+	local_cultural_influence = 0.75
+	local_cultural_tradition = 0.75
+}
+
+iranian_core_megalopolis_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		OR = {
+			dominant_culture = culture:adhari_culture
+			dominant_culture = culture:farsi_culture
+			dominant_culture = culture:tajik_culture
+			dominant_culture = culture:khorasani_culture
+		}
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:iranian_group }
+			}
+		}
+	}
+	local_burghers_assimilation_blocked = yes
+	local_cultural_influence = -0.75
+	local_cultural_tradition = -0.4
+}
+
+# ===== HAN CORE ========================================================
+
+han_core_rural_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			culture = { has_culture_group = culture_group:chinese_group }
+		}
+	}
+	local_cultural_influence = 0.1
+	local_cultural_tradition = 0.1
+}
+
+han_core_rural_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:chinese_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.1
+	local_cultural_tradition = -0.05
+}
+
+han_core_town_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			culture = { has_culture_group = culture_group:chinese_group }
+		}
+	}
+	local_cultural_influence = 0.25
+	local_cultural_tradition = 0.25
+}
+
+han_core_town_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:chinese_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.25
+	local_cultural_tradition = -0.1
+}
+
+han_core_city_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			culture = { has_culture_group = culture_group:chinese_group }
+		}
+	}
+	local_burghers_assimilation_blocked = yes
+	local_cultural_influence = 0.5
+	local_cultural_tradition = 0.5
+}
+
+han_core_city_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:chinese_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.5
+	local_cultural_tradition = -0.25
+}
+
+han_core_megalopolis_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			culture = { has_culture_group = culture_group:chinese_group }
+		}
+	}
+	local_cultural_influence = 0.75
+	local_cultural_tradition = 0.75
+}
+
+han_core_megalopolis_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		dominant_culture = { has_culture_group = culture_group:chinese_group }
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:chinese_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.75
+	local_cultural_tradition = -0.4
+}
+
+# ===== MASHRIQI CORE ===================================================
+
+mashriqi_core_rural_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			culture = { has_culture_group = culture_group:arabic_group }
+		}
+	}
+	local_cultural_influence = 0.1
+	local_cultural_tradition = 0.1
+}
+
+mashriqi_core_rural_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:rural_settlement
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:arabic_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.1
+	local_cultural_tradition = -0.05
+}
+
+mashriqi_core_town_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			culture = { has_culture_group = culture_group:arabic_group }
+		}
+	}
+	local_cultural_influence = 0.25
+	local_cultural_tradition = 0.25
+}
+
+mashriqi_core_town_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:town
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:arabic_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.25
+	local_cultural_tradition = -0.1
+}
+
+mashriqi_core_city_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			culture = { has_culture_group = culture_group:arabic_group }
+		}
+	}
+	local_cultural_influence = 0.5
+	local_cultural_tradition = 0.5
+}
+
+mashriqi_core_city_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:city
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:arabic_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.5
+	local_cultural_tradition = -0.25
+}
+
+mashriqi_core_megalopolis_native = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			culture = { has_culture_group = culture_group:arabic_group }
+		}
+	}
+	local_cultural_influence = 0.75
+	local_cultural_tradition = 0.75
+}
+
+mashriqi_core_megalopolis_foreign = {
+	type = location
+	category = location
+	potential_trigger = {
+		location_rank = location_rank:megalopolis
+		dominant_culture = culture:iraqi_culture
+		owner ?= {
+			NOT = {
+				culture = { has_culture_group = culture_group:arabic_group }
+			}
+		}
+	}
+	local_cultural_influence = -0.75
+	local_cultural_tradition = -0.4
+}

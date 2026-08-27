@@ -1,0 +1,98 @@
+# ============================================================
+# The Matter of Tork — "The Place of the Sword"
+#
+# NOT a legitimacy disaster. By the time it fires, legitimacy is
+# settled — the player came through farr_proof_of_fortune, the
+# ghazi_burden_of_sword, or the mystical turn. The question this
+# disaster asks is the one legitimacy does NOT answer:
+#
+#   You are a non-Borjigin holding the ulus. The Türk military
+#   constituency's world-picture — rank denominated in proximity
+#   to the golden line — has just been made irrelevant by your
+#   legitimacy. They did not evaporate. They are standing in the
+#   realm, armed, a third of the land and most of the cavalry.
+#   WHAT IS THEIR PLACE NOW?
+#
+# Resolved by claiming ONE of five dispositions (panel buttons):
+#   A  Co-optation / Iranization — dissolved into us  (~20y process)
+#   B  Frontier Confederation — kept at the edge      (instant; March subject)
+#   C  Sufi Synthesis — transformed into our instrument (instant; mysticism-gated)
+#   D  Expulsion — removed from the society           (~10y process)
+#   E  Eradication — destroyed as a constituency      (civil war + 50y maturation)
+#
+# Unresolved past 240 months → mass Türk defection (civil war).
+#
+# Design: docs/design/matter_of_tork_design.md
+# Triggers: in_game/common/scripted_triggers/03_matter_triggers.txt
+# Effects:  in_game/common/scripted_effects/02_matter_effects.txt
+# Actions:  in_game/common/generic_actions/matter_of_tork_actions.txt
+# ============================================================
+
+matter_of_tork = {
+
+	image = "gfx/interface/illustrations/disaster/matter_of_tork.dds"
+
+	# The can_start gate is the real filter; the spawn chance just
+	# keeps the wait short once the gate opens (fires ~year 50-70
+	# in practice, when consolidation completes).
+	monthly_spawn_chance = 0.05
+
+	can_start = {
+		matter_of_tork_can_start = yes
+	}
+
+	can_end = {
+		OR = {
+			custom_tooltip = {
+				text = matter_tork_end_resolved_tt
+				has_variable = matter_of_tork_resolved
+			}
+			custom_tooltip = {
+				text = matter_tork_end_synthesis_tt
+				has_variable = matter_of_tork_resolved_by_synthesis
+			}
+			custom_tooltip = {
+				text = matter_tork_end_lost_realm_tt
+				NOT = { has_variable = eranzamin_contender }
+			}
+		}
+	}
+
+	# The friction. An armed constituency whose world has been
+	# voided, standing unhappily in the realm. About a fifth the
+	# weight of the farr/ghazi wager-bleeds — this is not a claim
+	# under audit, it is a question waiting for an answer. The
+	# matter_answer_given offset (applied when a disposition is
+	# claimed) cancels most of it.
+	modifier = {
+		amirs_estate_target_satisfaction = -0.10
+		tribes_estate_target_satisfaction = -0.10
+		monthly_amirs_estate_rebel_growth = 0.01
+		monthly_tribes_estate_rebel_growth = 0.015
+		monthly_legitimacy = -0.10
+		stability_decay = -0.001
+	}
+
+	on_start = {
+		matter_tork_init = yes
+		set_variable = matter_of_tork_fired
+		trigger_event_non_silently = matter_of_tork.1
+	}
+
+	on_monthly = {
+		# Horizon counter + process counters (iranization / expulsion).
+		matter_tork_monthly_tick = yes
+		# Process completion + staged-event dispatch (Iranization
+		# completion, Expulsion tranches, Eradication war-end poll,
+		# defection war-end poll).
+		matter_tork_process_dispatch = yes
+		# Horizon timeout → mass defection.
+		matter_tork_horizon_poll = yes
+	}
+
+	on_end = {
+		matter_tork_clear = yes
+		# One-shot per playthrough.
+		set_variable = matter_of_tork_completed
+	}
+}

@@ -1,0 +1,120 @@
+namespace = iqta
+
+# =====================================================================
+# THE AMIRS DEMAND IQṬĀʿ — the grant system made legible
+#
+# The iqṭāʿ (03_iqta_grant) is the Persianate state's bargain with its
+# horsemen: a rural parcel's revenue assigned to an amir, who settles
+# there with his retinue and answers the summons with heavy cavalry.
+# The chancery loses the parcel's taxes; the realm gains the lances.
+# Players (and the AI) rarely discover this on their own, so the
+# amirs ask for it out loud: at the end of the first year, and every
+# ten years after while the realm holds fewer than fifteen grants.
+#
+#   A — grant: the iqṭāʿ privilege if not yet held, then THREE new
+#       grants in qualifying parcels (rural, no grant yet, control
+#       under 60 — the chancery's unreachable places). AI always.
+#   B — refuse: the amirs are affronted; the dīwān quietly pleased.
+#
+# Wired from yearly_country_pulse (22_iqta_hooks); 10-year cooldown
+# by event-side variable.
+# =====================================================================
+iqta.1 = {
+	type = country_event
+	outcome = neutral
+	title = iqta.1.title
+	desc = iqta.1.desc
+
+	illustration_tags = {
+		10 = exterior
+		10 = regular
+	}
+
+	trigger = {
+		government_type = government_type:persianate_sultanate
+		country_has_estate = estate_type:amirs_estate
+		NOT = { has_variable = iqta_demand_cd }
+		# Fewer than fifteen parcels under grant ...
+		NOT = {
+			any_owned_location = {
+				has_building_with_at_least_one_level = iqta_grant
+				count >= 15
+			}
+		}
+		# ... and somewhere left to grant one.
+		any_owned_location = {
+			location_rank = location_rank:rural_settlement
+			NOT = { has_building_with_at_least_one_level = iqta_grant }
+			local_control < 0.6
+		}
+	}
+
+	immediate = {
+		set_variable = { name = iqta_demand_cd value = 1 years = 10 }
+	}
+
+	# ----- A: Register the grants. -----
+	option = {
+		name = iqta.1.a
+		ai_chance = { factor = 100 }
+		custom_tooltip = iqta_grant_three_tt
+		# The right itself, if the chancery never conceded it.
+		if = {
+			limit = {
+				NOT = { has_estate_privilege = estate_privilege:amirs_iqta_grant }
+				NOT = { has_estate_privilege = estate_privilege:amirs_hereditary_tuyul }
+			}
+			grant_estate_privilege = estate_privilege:amirs_iqta_grant
+		}
+		# Three parcels the registers could not reach anyway.
+		random_owned_location = {
+			limit = {
+				location_rank = location_rank:rural_settlement
+				NOT = { has_building_with_at_least_one_level = iqta_grant }
+				local_control < 0.6
+			}
+			construct_building = {
+				building_type = building_type:iqta_grant
+				cost_multiplier = 0
+				cost_multiplier_reason = "game_concept_event"
+				instant = yes
+			}
+		}
+		random_owned_location = {
+			limit = {
+				location_rank = location_rank:rural_settlement
+				NOT = { has_building_with_at_least_one_level = iqta_grant }
+				local_control < 0.6
+			}
+			construct_building = {
+				building_type = building_type:iqta_grant
+				cost_multiplier = 0
+				cost_multiplier_reason = "game_concept_event"
+				instant = yes
+			}
+		}
+		random_owned_location = {
+			limit = {
+				location_rank = location_rank:rural_settlement
+				NOT = { has_building_with_at_least_one_level = iqta_grant }
+				local_control < 0.6
+			}
+			construct_building = {
+				building_type = building_type:iqta_grant
+				cost_multiplier = 0
+				cost_multiplier_reason = "game_concept_event"
+				instant = yes
+			}
+		}
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.10 }
+	}
+
+	# ----- B: The registers stay whole. -----
+	option = {
+		name = iqta.1.b
+		ai_chance = { factor = 0 }
+		custom_tooltip = iqta_refuse_tt
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.15 }
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.05 }
+	}
+}

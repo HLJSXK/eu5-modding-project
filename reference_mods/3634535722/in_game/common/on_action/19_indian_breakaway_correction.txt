@@ -1,0 +1,100 @@
+# =====================================================================
+# INDIAN BREAKAWAY CORRECTION (persianate_periphery_plan.md)
+#
+# Base's Fall of Delhi creates breakaways two ways:
+#   - delhi_situation.16: the four named releases (BAH/MLW/GJR/JNP) —
+#     Muslim rulers and state religion set, but NO government, reform,
+#     or court language: Sunni states on a default chassis.
+#   - delhi_situation.8.a: "provincial sultanates" — a bare
+#     create_country_from_location with NO ruler and NO religion set:
+#     they come out as pop-derived HINDU states, which is the bug
+#     (post-collapse India with not a single Muslim polity).
+#
+# Every one of these spawns carries a marker variable set at creation
+# (bahmanis_var / malwa_var / gujarat_var / jaunpur_var /
+# delhi_provincial_sultanate_variable). This hook fires for any new
+# South Asian country and hands off to periphery.1 (2-day delay, so
+# the marker variables and base's own follow-up effects are all
+# settled first); the event's trigger reads the markers and applies
+# the sultanate chassis. Organic rebel states WITHOUT the markers —
+# e.g. a genuine taluqdar rising — are deliberately left alone:
+# a Hindu rebellion staying Hindu is correct.
+# =====================================================================
+
+on_new_country_formed = {
+	on_actions = {
+		correct_delhi_breakaway
+	}
+}
+
+# The Indian minors batch: base gives MAB, RJR, SMA, SND, HNV the
+# indian_sultanate_reform (so our REPLACE already hands them the
+# chancery flag) but leaves them on their base government types —
+# an inconsistent half-state. Align them at game start: the same
+# persianate_sultanate chassis as Delhi, same succession, Persian
+# court. change_government_type can drop reforms, so the reform is
+# re-granted after the switch (idempotent if it survived).
+on_game_start = {
+	on_actions = {
+		indian_minors_persianate_start
+	}
+}
+
+indian_minors_persianate_start = {
+	effect = {
+		every_country = {
+			limit = {
+				OR = {
+					tag = MAB
+					tag = RJR
+					tag = SMA
+					tag = SND
+					tag = HNV
+				}
+			}
+			if = {
+				limit = {
+					NOT = { government_type = government_type:persianate_sultanate }
+				}
+				change_government_type = government_type:persianate_sultanate
+				change_heir_selection = heir_selection:favorite_son_elective_succession
+			}
+			add_reform = government_reform:indian_sultanate_reform
+			set_court_language = culture:farsi_culture.dialect
+		}
+	}
+}
+
+# The Khusraw Khan protocol: an Indian sultanate leaving Islam is a
+# constitutional crisis, not a paint change — the amirs' legitimacy IS
+# the dispensation. Muslim-internal changes (sunni→shia, the later
+# Deccan turn) pass untouched. root = country, scope:old_religion.
+on_religion_changed = {
+	on_actions = {
+		indian_sultanate_apostasy
+	}
+}
+
+indian_sultanate_apostasy = {
+	trigger = {
+		has_reform = government_reform:indian_sultanate_reform
+		NOT = { religion.group = religion_group:muslim }
+	}
+	effect = {
+		trigger_event_non_silently = periphery.2
+	}
+}
+
+correct_delhi_breakaway = {
+	trigger = {
+		capital ?= {
+			sub_continent = sub_continent:south_asia
+		}
+	}
+	effect = {
+		trigger_event_silently = {
+			id = periphery.1
+			days = 2
+		}
+	}
+}

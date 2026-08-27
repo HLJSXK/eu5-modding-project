@@ -1,0 +1,986 @@
+namespace = farr_proof
+
+# ============================================================
+# Farr Proof of Fortune — events
+#
+# Structure:
+#   .1            announce (disaster fired)
+#   .50/.65/.80/.90  apparatus (sikka, khutba, hunt+nawrūz, pādishāh)
+#                     — claimed by the player via the disaster panel's
+#                     action buttons (common/generic_actions/farr_proof_actions.txt)
+#                     when legitimacy crosses each threshold
+#   .35/.20/.10   erosion (amīrs absent, khutba dropped, bī-farr)
+#                     — fire once on first downward threshold-touch
+#   .100/.101/.102   omens (comet, earthquake, plague)
+#                     — random pulses while disaster active; .102
+#                     weight-multiplied during 1346–50 plague window
+#   .200          Vindicated — Farr Manifest
+#   .201          Broken-formal — Türk amīr usurpation
+#   .202          Endured — quiet vindication at year 25
+#   .203          Broken-lapse — doctrine lapses, prestige scar
+#   .300–.306     INDICATOR events for the on-action hooks. Each
+#                     fires every time its hook applies, until the
+#                     player silences it. Option (b) sets
+#                     farr_silence_<type> (per-type mute); option
+#                     (c) sets farr_silence_all (master mute).
+# ============================================================
+
+# ---------------------------------------------------------------
+# .1 ANNOUNCE — the boast before God and the amīrs
+# ---------------------------------------------------------------
+farr_proof.1 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.1.title
+	desc = farr_proof.1.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = farr_proof_fired
+	}
+
+	option = {
+		custom_tooltip = farr_proof.1.a.tt
+		name = farr_proof.1.a
+		# Acknowledge — no mechanical effect. The wager has begun.
+	}
+}
+
+# ===============================================================
+# APPARATUS EVENTS — irreversible permanent rewards on upward threshold
+# ===============================================================
+
+# ---50 SIKKA — minting in your name --------------------------------
+farr_proof.50 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.50.title
+	desc = farr_proof.50.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.50.a
+		# Refund: cancels the minting + burgher penalties while disaster runs.
+		# Cleared by farr_proof_clear on disaster end.
+		add_country_modifier = {
+			modifier = farr_sikka_refund
+			months = -1
+		}
+		# Legacy: the dār al-ḍarb infrastructure persists past resolution
+		# (unless Broken-formal strips it).
+		add_country_modifier = {
+			modifier = farr_sikka_granted
+			months = 300 ## twenty-five years. 
+		}
+	}
+}
+
+# ---65 KHUTBA — the Friday sermon in your name ---------------------
+farr_proof.65 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.65.title
+	desc = farr_proof.65.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.65.a
+		# Refund: cancels the clergy penalty while disaster runs.
+		add_country_modifier = {
+			modifier = farr_khutba_refund
+			months = -1
+		}
+		# Legacy: ʿulamāʾ-state alignment persists past resolution.
+		add_country_modifier = {
+			modifier = farr_khutba_in_your_name
+			months = 300
+		}
+
+	}
+}
+
+# ---80 HUNT + NAWRŪZ — Sasanian-steppe synthesis -------------------
+farr_proof.80 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.80.title
+	desc = farr_proof.80.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.80.a
+		# Refund: cancels the amīrs' withheld assent while disaster runs.
+		add_country_modifier = {
+			modifier = farr_hunt_and_nawruz_refund
+			months = -1
+		}
+		# Legacy: tribes+amīrs see kingship enacted; the rebel-growth
+		# dampener persists past resolution.
+		add_country_modifier = {
+			modifier = farr_hunt_and_nawruz
+			months = 300
+			mode = add_and_extend
+		}
+		
+	}
+}
+
+# ---90 PĀDISHĀH — title escalation, malik → pādishāh ---------------
+farr_proof.90 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.90.title
+	desc = farr_proof.90.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.90.a
+		# Refund: cancels the largest slice of the standing legitimacy
+		# bleed. With all four refunds standing, the disaster's bleed
+		# is fully cancelled — pādishāh is the consummation.
+		add_country_modifier = {
+			modifier = farr_padishah_refund
+			months = -1
+		}
+		# Legacy: titular weight imprinted in diplomatic correspondence.
+		add_country_modifier = {
+			modifier = farr_padishah
+			months = -1
+		}
+		set_country_rank = country_rank:rank_kingdom ## we become, a kingdom.
+
+		add_prestige = 25
+	}
+}
+
+# ===============================================================
+# EROSION EVENTS — public signs of withdrawn favor
+# ===============================================================
+
+# ---35 AMĪRS ABSENT FROM COURT --------------------------------------
+farr_proof.35 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.35.title
+	desc = farr_proof.35.desc
+	outcome = negative
+
+	# Send envoys to placate — small mend, costs prestige
+	option = {
+		name = farr_proof.35.a
+		add_legitimacy = 3
+		add_prestige = -10
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.03 }
+	}
+
+	# Stand firm — the doctrine is not negotiable
+	option = {
+		name = farr_proof.35.b
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.05 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.05 }
+	}
+}
+
+# ---20 A PROVINCE'S KHUTBA DROPPED ---------------------------------
+farr_proof.20 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.20.title
+	desc = farr_proof.20.desc
+	outcome = negative
+
+	# Discipline the qāḍī — assert authority
+	option = {
+		name = farr_proof.20.a
+		add_legitimacy = 2
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+		random_owned_location = {
+			add_location_modifier = { modifier = ez_unrest_3 years = 3 }
+		}
+	}
+
+	# Bribe the next sermon back — burn gold, salve appearances
+	option = {
+		name = farr_proof.20.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = -3
+		}
+		add_legitimacy = 5
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+}
+
+# ---10 THE FIRST WHISPERED BĪ-FARR ----------------------------------
+farr_proof.10 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.10.title
+	desc = farr_proof.10.desc
+	outcome = negative
+
+	# Stage a great ceremony — buy patience, not Proof
+	option = {
+		name = farr_proof.10.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.05 }
+		# Note: deliberately NO legitimacy gain — ceremony buys patience,
+		# not Proof, per design. The Türks respect what heaven does, not
+		# what you stage.
+	}
+
+	# Endure the whisper in silence — let the wager run
+	option = {
+		name = farr_proof.10.b
+		add_prestige = 5
+	}
+}
+
+# ===============================================================
+# OMEN EVENTS — court interpretations, visible choice / hidden roll
+# Choice axes are legible (publish broadly vs keep within the court).
+# Roll modifiers are hidden — same epistemic situation as a 14th-c. shah.
+# ===============================================================
+
+# ---100 COMET — heaven writes in the sky ---------------------------
+farr_proof.100 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.100.title
+	desc = farr_proof.100.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_comet }
+	}
+
+	# 2-year per-omen cooldown: set here, checked in the trigger, so a
+	# pulse roll during the cooldown fires nothing and stays quiet.
+	immediate = {
+		set_variable = { name = farr_omen_cd_comet value = 1 years = 2 }
+	}
+
+	# Publish the interpretation broadly — high-variance roll
+	option = {
+		name = farr_proof.100.a
+		random_list = {
+			60 = { add_legitimacy = 6 }
+			40 = { add_legitimacy = -8 }
+		}
+	}
+
+	# Keep the reading within the court — low-variance roll
+	option = {
+		name = farr_proof.100.b
+		random_list = {
+			55 = { add_legitimacy = 2 }
+			45 = { add_legitimacy = -2 }
+		}
+	}
+}
+
+# ---101 EARTHQUAKE — the earth itself protests or attests -----------
+farr_proof.101 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.101.title
+	desc = farr_proof.101.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_quake }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_quake value = 1 years = 2 }
+	}
+
+	# Tour the ruins — generous relief, claim shows
+	option = {
+		name = farr_proof.101.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -4.5
+		}
+		random_list = {
+			65 = { add_legitimacy = 5 }
+			35 = { add_legitimacy = -3 }
+		}
+	}
+
+	# Order the qāḍīs to read it as test, not verdict
+	option = {
+		name = farr_proof.101.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.03 }
+		random_list = {
+			50 = { add_legitimacy = 1 }
+			50 = { add_legitimacy = -3 }
+		}
+	}
+}
+
+# ---102 PLAGUE — Mustawfī's window (weight-boosted 1346–50) --------
+farr_proof.102 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.102.title
+	desc = farr_proof.102.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_plague }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_plague value = 1 years = 2 }
+	}
+
+	weight_multiplier = {
+		base = 1
+		modifier = {
+			factor = 5
+			current_year >= 1346
+			current_year <= 1350
+		}
+	}
+
+	# Lead public prayers — visible piety, hostage to outcome
+	option = {
+		name = farr_proof.102.a
+		random_list = {
+			50 = { add_legitimacy = 4 }
+			50 = { add_legitimacy = -10 }
+		}
+	}
+
+	# Open the granaries — material relief, fiscal cost
+	option = {
+		name = farr_proof.102.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = -9
+		}
+		random_list = {
+			70 = { add_legitimacy = 3 }
+			30 = { add_legitimacy = -4 }
+		}
+	}
+
+	# Withdraw to the citadel — preserve the dynasty, lose the city
+	option = {
+		name = farr_proof.102.c
+		add_legitimacy = -6
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.08 }
+	}
+}
+
+# ---103 THE RAINS WITHHELD — drought as withdrawal of barakat -------
+farr_proof.103 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.103.title
+	desc = farr_proof.103.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_drought }
+		# The rains speak once a year, one way or the other: shared
+		# with the good-rains omen (farr_proof.106).
+		NOT = { has_variable = farr_rains_read_year }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_drought value = 1 years = 2 }
+		set_variable = { name = farr_rains_read_year value = 1 years = 1 }
+	}
+
+	# Remit the kharaj — the king carries the sky's debt himself
+	option = {
+		name = farr_proof.103.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		add_estate_satisfaction = { type = estate_type:peasants_estate value = 0.05 }
+		random_list = {
+			70 = { add_legitimacy = 4 }
+			30 = { add_legitimacy = -2 }
+		}
+	}
+
+	# Blame the assessors — the dry year becomes a corruption case
+	option = {
+		name = farr_proof.103.b
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.08 }
+		random_list = {
+			45 = { add_legitimacy = 2 }
+			55 = { add_legitimacy = -4 }
+		}
+	}
+}
+
+# ---104 THE CONJUNCTION — the munajjims read a favorable qiran ------
+# The Saturn-Jupiter conjunction as royal fortune: the same science
+# that will one day mint sahib-qiran for Timur. A POSITIVE omen —
+# and publishing a claim on heaven makes heaven your creditor.
+farr_proof.104 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.104.title
+	desc = farr_proof.104.desc
+	outcome = positive
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_qiran }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_qiran value = 1 years = 2 }
+	}
+
+	# Proclaim it from the mint and the minbar — heaven in writing
+	option = {
+		name = farr_proof.104.a
+		add_legitimacy = 15
+	}
+
+	# Reward the astrologers, file the reading — quiet credit
+	option = {
+		name = farr_proof.104.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = -1.5
+		}
+		add_legitimacy = 5
+	}
+}
+
+# ---106 THE GENEROUS RAINS — fortune attests ------------------------
+# The mirror-books cut both ways: when the king is just, the rains
+# fall. Shares a one-year variable with the drought (.103): the same
+# year cannot hold both readings.
+farr_proof.106 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.106.title
+	desc = farr_proof.106.desc
+	outcome = positive
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_good_rains }
+		NOT = { has_variable = farr_rains_read_year }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_good_rains value = 1 years = 2 }
+		set_variable = { name = farr_rains_read_year value = 1 years = 1 }
+	}
+
+	# Let the khutba say what the qanats already say
+	option = {
+		name = farr_proof.106.a
+		add_legitimacy = 4
+	}
+
+	# Tax the surplus quietly — heaven's gift, the treasury's year
+	option = {
+		name = farr_proof.106.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = 3
+		}
+		add_legitimacy = 1
+	}
+}
+
+# ---107 THE HOMAY LANDS — once, ever --------------------------------
+# The bird of kingship, whose shadow makes kings and which never
+# lands. It has landed. There is no second reading of this, and no
+# second occurrence: fire_only_once.
+farr_proof.107 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.107.title
+	desc = farr_proof.107.desc
+	outcome = positive
+	fire_only_once = yes
+
+	trigger = {
+		has_variable = farr_proof_fired
+	}
+
+	option = {
+		name = farr_proof.107.a
+		add_legitimacy = 50
+	}
+}
+
+# ---105 THE HUNT MARVEL — the king takes the lion -------------------
+# The royal hunt as fortune's audit: Bahram Gur's register. A king
+# who kills the lion before witnesses has been visibly chosen; a
+# king who stages it and is found out has been visibly desperate.
+farr_proof.105 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.105.title
+	desc = farr_proof.105.desc
+	outcome = positive
+
+	trigger = {
+		has_variable = farr_proof_fired
+		NOT = { has_variable = farr_omen_cd_hunt }
+	}
+
+	immediate = {
+		set_variable = { name = farr_omen_cd_hunt value = 1 years = 2 }
+	}
+
+	# Parade the kill through the bazaars — fortune on a cart
+	option = {
+		name = farr_proof.105.a
+		random_list = {
+			65 = { add_legitimacy = 4 }
+			35 = { add_legitimacy = -3 }
+		}
+	}
+
+	# Feast the amirs on it — the old rite, kept in the right room
+	option = {
+		name = farr_proof.105.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = -1.5
+		}
+		add_legitimacy = 2
+		add_prestige = 5
+	}
+}
+
+# ===============================================================
+# RESOLUTION EVENTS
+# ===============================================================
+
+# ---200 VINDICATED — Farr Manifest ---------------------------------
+# The amīrs who watched you win swear. The bleed becomes a stream.
+# The local quarrel resolves; the wire into the Matter is now live —
+# observer houses are now disposed to recognize the dynasty.
+farr_proof.200 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.200.title
+	desc = farr_proof.200.desc
+	outcome = positive
+
+	immediate = {
+		# Apply the permanent Farr Manifest modifier
+		add_country_modifier = {
+			modifier = farr_manifest
+			months = 120
+		}
+		# Mark the dynasty's vindication for the Matter to read
+		set_variable = farr_proof_vindicated_permanent
+		remove_reform = government_reform:farr_i_izadi
+		add_reform = government_reform:iranian_kingship
+	}
+
+	option = {
+		name = farr_proof.200.a
+		add_legitimacy = 20
+		add_prestige = 50
+		add_stability = 10
+	}
+}
+
+# ---201 BROKEN-FORMAL — Türk amīr usurpation -----------------------
+# The legitimacy floor breached. A Türk amīr seizes the throne;
+# the realm survives, the doctrine does not. The reform is stripped
+# and the government tilts to chinggisid_regency.
+farr_proof.201 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.201.title
+	desc = farr_proof.201.desc
+	outcome = negative
+
+	immediate = {
+		# The old ruler is killed in the coup; the engine generates an heir,
+		# but the political fact of the realm has shifted hard toward the
+		# amīrs. A dedicated Türk-character template can replace this in a
+		# later pass; for now the modifier + estate shifts carry the meaning.
+		
+		create_character = {
+			dynasty = dynasty:borjigin_dynasty
+			estate = estate_type:amirs_estate
+			religion = root.religion
+			culture = culture:mongolian_culture
+			age = {24 40}
+			adm = {0 20} # not an administrator.
+			dip = {33 66} ## not complex, but has certain charisma
+			mil = {75 100}
+			save_scope_as = the_military_usurper_scope
+		}
+
+		
+		kill_character = ROOT.ruler
+		set_new_ruler = scope:the_military_usurper_scope
+		# Strip the farr reform; the doctrine dies with the dynasty.
+		remove_reform = government_reform:farr_i_izadi
+		# The Ghaznavid template fills the vacuum — a Türkic amīr
+		# sultanate atop a fully Persianized administrative state.
+		# The realm survives; the legitimating doctrine has changed.
+		add_reform = government_reform:amir_sultanate
+		# Broken-formal alone strips the apparatus LEGACIES. The
+		# institutional traces (the dār al-ḍarb, the khutba-precedent,
+		# the Nawrūz court, the pādishāh title) die with the dynasty;
+		# the new amīr regime has its own legitimating script and will
+		# not maintain the doctrinal apparatus of the dead house.
+		if = {
+			limit = { has_country_modifier = farr_sikka_granted }
+			remove_country_modifier = farr_sikka_granted
+		}
+		if = {
+			limit = { has_country_modifier = farr_khutba_in_your_name }
+			remove_country_modifier = farr_khutba_in_your_name
+		}
+		if = {
+			limit = { has_country_modifier = farr_hunt_and_nawruz }
+			remove_country_modifier = farr_hunt_and_nawruz
+		}
+		if = {
+			limit = { has_country_modifier = farr_padishah }
+			remove_country_modifier = farr_padishah
+		}
+		# Permanent scar — the cousins remember, future declarations locked.
+		add_country_modifier = {
+			modifier = attempted_farr_and_failed
+			years = 25
+			mode = add_and_extend
+		}
+		# Mark for future events / IO contender logic.
+		set_variable = farr_was_broken_formal
+		# Settle the political fact: Türk amīrs win this round.
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.25 }
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.20 }
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.20 }
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.10 }
+		# Modest legitimacy restoration — the new regime has its own claim.
+		add_legitimacy = 25
+	}
+
+	option = {
+		name = farr_proof.201.a
+		# The new ruler accepts the realm as it stands.
+	}
+}
+
+# ---202 ENDURED — quiet vindication --------------------------------
+# 25 years passed, realm intact, neither Vindicated nor Broken.
+# Survival itself is read as fortune, in a smaller key.
+farr_proof.202 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.202.title
+	desc = farr_proof.202.desc
+	outcome = positive
+
+	immediate = {
+		add_country_modifier = {
+			modifier = farr_endured
+			months = -1
+		}
+		set_variable = farr_was_endured
+		remove_reform = government_reform:farr_i_izadi
+		add_reform = government_reform:iranian_kingship
+	}
+
+	option = {
+		name = farr_proof.202.a
+		add_legitimacy = 10
+		add_prestige = 15
+	}
+}
+
+# ---203 BROKEN-LAPSE — the doctrine quietly lapses -----------------
+# 60 cumulative months at legitimacy ≤ 25. No dramatic usurpation,
+# no decisive defeat. The cousins remember; the chronicles record.
+# The bleed stops; the prestige scar remains. Re-declaration is
+# locked by the reform's potential (see government_reforms).
+farr_proof.203 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.203.title
+	desc = farr_proof.203.desc
+	outcome = negative
+
+	immediate = {
+		add_country_modifier = {
+			modifier = attempted_farr_and_failed
+			months = -1
+		}
+		set_variable = farr_was_broken_lapse
+		# Strip the reform — the unproven boast cannot be held indefinitely.
+		remove_reform = government_reform:farr_i_izadi
+	}
+
+	option = {
+		name = farr_proof.203.a
+		add_legitimacy = -15
+		add_prestige = -25
+	}
+}
+
+# ===============================================================
+# INDICATOR EVENTS — fire whenever their hook applies, until the
+# player silences them.
+#
+# Each event has three options:
+#   (a) Acknowledge — applies the effect, keeps notifying.
+#   (b) Silence this notification type — applies the effect and
+#       sets farr_silence_<type>, muting future notifications of
+#       only this kind.
+#   (c) Silence all of these notifications — applies the effect
+#       and sets farr_silence_all, muting every remaining
+#       notification for the run.
+#
+# The hook checks BOTH farr_silence_<type> and farr_silence_all;
+# if either is set, the hook applies the effect directly and does
+# not trigger the event (trigger_event_silently does not work on
+# multi-option events).
+# ===============================================================
+
+# ---300 BATTLE WON --------------------------------------------------
+farr_proof.300 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.300.title
+	desc = farr_proof.300.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.300.a
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = farr_proof.300.b
+		set_variable = farr_silence_battle_won
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = farr_proof.300.c
+		set_variable = farr_silence_all
+		add_legitimacy = 1
+	}
+}
+
+# ---301 BATTLE LOST -------------------------------------------------
+farr_proof.301 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.301.title
+	desc = farr_proof.301.desc
+	outcome = negative
+
+	option = {
+		name = farr_proof.301.a
+		add_legitimacy = -2
+	}
+
+	option = {
+		name = farr_proof.301.b
+		set_variable = farr_silence_battle_lost
+		add_legitimacy = -2
+	}
+
+	option = {
+		name = farr_proof.301.c
+		set_variable = farr_silence_all
+		add_legitimacy = -2
+	}
+}
+
+# ---302 WAR WON -----------------------------------------------------
+farr_proof.302 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.302.title
+	desc = farr_proof.302.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.302.a
+		add_legitimacy = 5
+		add_country_modifier = {
+			modifier = farr_conquest_glory
+			months = 12
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = farr_proof.302.b
+		set_variable = farr_silence_war_won
+		add_legitimacy = 5
+		add_country_modifier = {
+			modifier = farr_conquest_glory
+			months = 12
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = farr_proof.302.c
+		set_variable = farr_silence_all
+		add_legitimacy = 5
+		add_country_modifier = {
+			modifier = farr_conquest_glory
+			months = 12
+			mode = add_and_extend
+		}
+	}
+}
+
+# ---303 WAR LOST ----------------------------------------------------
+farr_proof.303 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.303.title
+	desc = farr_proof.303.desc
+	outcome = negative
+
+	option = {
+		name = farr_proof.303.a
+		add_legitimacy = -10
+		add_country_modifier = {
+			modifier = farr_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = farr_proof.303.b
+		set_variable = farr_silence_war_lost
+		add_legitimacy = -10
+		add_country_modifier = {
+			modifier = farr_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = farr_proof.303.c
+		set_variable = farr_silence_all
+		add_legitimacy = -10
+		add_country_modifier = {
+			modifier = farr_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+}
+
+# ---304 CAPITAL LOST ------------------------------------------------
+farr_proof.304 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.304.title
+	desc = farr_proof.304.desc
+	outcome = negative
+
+	option = {
+		name = farr_proof.304.a
+		add_legitimacy = -20
+		add_country_modifier = {
+			modifier = farr_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+
+	option = {
+		name = farr_proof.304.b
+		set_variable = farr_silence_capital_lost
+		add_legitimacy = -20
+		add_country_modifier = {
+			modifier = farr_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+
+	option = {
+		name = farr_proof.304.c
+		set_variable = farr_silence_all
+		add_legitimacy = -20
+		add_country_modifier = {
+			modifier = farr_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+}
+
+# ---305 NON-CAPITAL PROVINCE LOST -----------------------------------
+farr_proof.305 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.305.title
+	desc = farr_proof.305.desc
+	outcome = negative
+
+	option = {
+		name = farr_proof.305.a
+		add_legitimacy = -3
+	}
+
+	option = {
+		name = farr_proof.305.b
+		set_variable = farr_silence_province_lost
+		add_legitimacy = -3
+	}
+
+	option = {
+		name = farr_proof.305.c
+		set_variable = farr_silence_all
+		add_legitimacy = -3
+	}
+}
+
+# ---306 PROVINCE GAINED ---------------------------------------------
+farr_proof.306 = {
+	type = country_event
+	category = disaster_event
+	title = farr_proof.306.title
+	desc = farr_proof.306.desc
+	outcome = positive
+
+	option = {
+		name = farr_proof.306.a
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = farr_proof.306.b
+		set_variable = farr_silence_province_gained
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = farr_proof.306.c
+		set_variable = farr_silence_all
+		add_legitimacy = 1
+	}
+}

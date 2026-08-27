@@ -1,0 +1,123 @@
+# Scripted effects for the Custody of the Ulus disaster.
+# Design: docs/design/custody_of_the_ulus_design.md
+#
+# Reuses the EXISTING charade machinery (decision 3): charade_counter
+# (successions survived) and the sized charade_continues_mod are owned
+# by ilkhanate_flavor.2 / on_borjigin_puppet_death — this system reads
+# them, never writes them.
+
+custody_init = {
+	set_variable = { name = custody_months value = 0 }
+	set_variable = { name = custody_sole_months value = 0 }
+	set_variable = { name = custody_rivals value = 0 }
+	# Rivals YOU put down (incremented by on_military_annex hook,
+	# 08_custody_hooks.txt). The apparatus gates read this OR the
+	# rivals-remaining threshold — you earn the fiction by winning
+	# the contest, or by outlasting the field as it kills itself.
+	set_variable = { name = custody_kills value = 0 }
+	remove_variable = custody_quiet_crown
+	remove_variable = custody_restored_yarliq
+	remove_variable = custody_endured
+	remove_variable = custody_expired
+	remove_variable = custody_household_secured
+	remove_variable = custody_kuriltai_fired
+	custody_count_rivals = yes
+}
+
+# ---Rival census (monthly). The count drives the contested auto-
+# modifier, the sole-custody clock, and the panel track. -----------------
+
+custody_count_rivals = {
+	set_variable = { name = custody_rivals value = 0 }
+	international_organization:eranzamin ?= {
+		every_international_organization_member = {
+			limit = { custody_is_rival = yes }
+			root = {
+				change_variable = { name = custody_rivals add = 1 }
+			}
+		}
+	}
+}
+
+custody_monthly_tick = {
+	change_variable = { name = custody_months add = 1 }
+	custody_count_rivals = yes
+	# The Duel of Khans scales PER RIVAL: -0.1 legitimacy per rival
+	# custody standing. Sized-modifier maintenance on the
+	# charade_continues_mod pattern (mode = replace re-sizes monthly).
+	if = {
+		limit = { var:custody_rivals >= 1 }
+		add_country_modifier = {
+			modifier = custody_contested
+			years = -1
+			mode = replace
+			size = {
+				value = root.var:custody_rivals
+				min = 1
+				max = 8
+			}
+		}
+	}
+	else = {
+		if = {
+			limit = { has_country_modifier = custody_contested }
+			remove_country_modifier = custody_contested
+		}
+	}
+	# The sole-custody clock: runs at zero rivals, resets otherwise.
+	if = {
+		limit = { custody_has_sole_custody = yes }
+		change_variable = { name = custody_sole_months add = 1 }
+	}
+	else = {
+		set_variable = { name = custody_sole_months value = 0 }
+	}
+}
+
+custody_resolution_poll = {
+	# --- Expiry: the reform is gone and no resolution flag explains
+	# it — the fiction died (the -100 exit of ilkhanate_flavor.2.a,
+	# forced at charade_counter >= 4, or any other collapse).
+	if = {
+		limit = {
+			NOT = { has_reform = government_reform:chinggisid_regency }
+			NOT = { custody_resolved_trigger = yes }
+		}
+		set_variable = custody_expired
+		trigger_event_non_silently = custody.90
+	}
+	# --- Endured: 300 custody-months and two successions survived
+	# with the fiction intact. The weaker, dated fork.
+	if = {
+		limit = {
+			custody_can_endure = yes
+			NOT = { custody_resolved_trigger = yes }
+		}
+		trigger_event_non_silently = custody.50
+	}
+	# Sole-custody fork is NOT polled — the player times it via the
+	# Summon the Kuriltai action (>= 24 sole months).
+}
+
+custody_clear = {
+	remove_variable = custody_months
+	remove_variable = custody_sole_months
+	remove_variable = custody_rivals
+	remove_variable = custody_kills
+	if = {
+		limit = { has_country_modifier = custody_contested }
+		remove_country_modifier = custody_contested
+	}
+	if = {
+		limit = { has_country_modifier = custody_household_mod }
+		remove_country_modifier = custody_household_mod
+	}
+	if = {
+		limit = { has_country_modifier = custody_sikka_mod }
+		remove_country_modifier = custody_sikka_mod
+	}
+	if = {
+		limit = { has_country_modifier = custody_proclaimed_mod }
+		remove_country_modifier = custody_proclaimed_mod
+	}
+}

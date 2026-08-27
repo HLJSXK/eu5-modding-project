@@ -1,0 +1,202 @@
+# The succession crisis of Erānzamīn — what the late Ilkhanid chancery
+# called its own realm (post-Ghazan coinage, Rashid al-Din's chancery).
+# Replaces the previous broken ilkhanate_collapse_situation.
+#
+# Fires on game start once on_diwan_start sets the global gate. Tracks
+# contender countries via a variable; the contender passive (war score,
+# AE, integration cost) is applied via membership in the eranzamin IO,
+# so this file does NOT add_country_modifier — that would double-stack.
+#
+# Provisional victory is still the size+key-cities check (Tabriz,
+# Baghdad, Soltaniyeh, Isfahan, 150+ locations, sovereign). Step 11
+# of the design plan will replace this with path-completion victory.
+
+eranzamin_succession = {
+
+	# Script value defined at main_menu/common/script_values/default_values.txt:1080
+	# Equals 1, so the situation fires the first month can_start passes.
+	monthly_spawn_chance = monthly_spawn_chance_unique
+
+	can_start = {
+		has_global_variable = start_eranzamin_succession
+		NOT = { has_global_variable = eranzamin_succession_resolved }
+	}
+
+	can_end = {
+		OR = {
+			
+
+			any_country = {
+				is_eranzamin_contender = yes
+				custom_tooltip = {
+					text = eranzamin_contender_tt
+					has_variable = eranzamin_succession_victor
+					has_variable = eranzamin_contender
+				}
+				
+				num_locations_owned_or_owned_by_subjects_or_below > 400
+				controls_eranzamin_key_cities = yes
+				is_subject = no
+				eranzamin_end_condition_met = yes
+			}
+
+			# Timeout: ~50-100 years of war (Path 6, the historical Timurid sweep)
+			current_year > 1450
+		}
+	}
+
+	# Country-scope eligibility. Anyone with a foothold in the region,
+	# a neighbor of one, or sitting in an adjacent sub_continent can
+	# see the alert.
+	visible = {
+		OR = {
+			any_owned_location = { is_eranzamin_region_province = yes }
+			any_neighbor_country = {
+				any_owned_location = { is_eranzamin_region_province = yes }
+			}
+			capital.sub_continent = sub_continent:middle_east
+			capital.sub_continent = sub_continent:central_asia
+		}
+	}
+
+	on_start = {
+		# Region modifier — Post-Ilkhanid Chaos
+
+		international_organization:eranzamin = {
+			every_international_organization_member = {
+				every_owned_location = {
+					add_location_modifier = {
+						modifier = eranzamin_succession_region_modifier
+						mode = add_and_extend
+						years = 40
+					}
+				}
+
+			}
+		}
+		
+
+		# Flag contenders. The eranzamin IO grants the contender *modifier*
+		# automatically to its members — this variable is the orthogonal
+		# flag used by generic_actions and tooltip gates.
+		#
+		# The ruler also gets the ilkhanate_warlord character modifier
+		# (force_allow_as_leader; conquest-on-occupation is scripted off
+		# this modifier in on_action/24_warlord_conquest_hooks.txt) —
+		# this is the "Mongol-style warlord prerogative" that lets
+		# contenders fight the succession at speed. The blanket mutual-core grant from
+		# the old civil-war event is GONE — integration is now player-
+		# driven via the Consolidate Diwan / Grant the Yurt / Mixed
+		# Settlement actions (design §7).
+		every_country = {
+			limit = { is_eranzamin_contender = yes }
+			set_variable = { name = eranzamin_contender value = yes }
+			
+			add_country_modifier = {
+				modifier = eranzamin_contender_modifier
+				years = -1
+				mode = add_and_extend
+			}
+			trigger_event_non_silently= ilkhanate_flavor.1
+		}
+
+		# The orders watch. Tariqa building-countries in the region are
+		# NOT contenders (excluded from is_eranzamin_contender) but get
+		# the legitimacy-question event with their own answer (option H)
+		# — otherwise the AI walks them into a reform they immediately
+		# lose.
+		every_country = {
+			limit = {
+				country_type = building
+				capital ?= {
+					province = { is_eranzamin_region_province = yes }
+				}
+			}
+			trigger_event_non_silently = ilkhanate_flavor.1
+		}
+	}
+
+	on_monthly = {
+		# Maintain the consolidation-months counter for every contender.
+		# Ticks up while above the territorial gate, resets to 0 when
+		# below. Read by matter_of_X_can_start via the
+		# is_eranzamin_consolidation_sustained trigger.
+		every_country = {
+			limit = { has_variable = eranzamin_contender }
+			eranzamin_maintain_consolidation_counter = yes
+
+		}
+		every_country = {
+			limit = { 
+				NOT = { has_variable = eranzamin_contender }
+				is_eranzamin_contender = yes
+				
+
+			}
+			set_variable = eranzamin_contender
+		}
+		# Provisional victory check — fire winner event the moment the
+		# size + key-cities + END-clause gate is crossed by any contender.
+		every_country = {
+			limit = {
+				has_variable = eranzamin_contender
+				num_locations_owned_or_owned_by_subjects_or_below > 400
+				controls_eranzamin_key_cities = yes
+				is_subject = no
+				eranzamin_end_condition_met = yes
+
+			}
+			set_variable = eranzamin_succession_victor
+		}
+
+		# Timeout check. The situation's on_monthly runs in SITUATION
+		# scope — the event needs a country, so fan out over the IO's
+		# members (log fix: "expected scope 'country', got 'situation'").
+		if = {
+			limit = { current_year > 1550 }
+			international_organization:eranzamin ?= {
+				every_international_organization_member = {
+					trigger_event_non_silently = ilkhanate_flavor.99
+				}
+			}
+		}
+	}
+
+	# Mark resolved BEFORE on_ended runs. The eranzamin IO reads this
+	# global as its auto_disband trigger.
+	on_ending = {
+		set_global_variable = eranzamin_succession_resolved
+	}
+
+	on_ended = {
+		remove_succession_mod_effect = yes
+		every_country = {
+			limit = { has_variable = eranzamin_contender }
+			remove_variable = eranzamin_contender
+			remove_country_modifier = eranzamin_contender_modifier
+		}
+		remove_global_variable = start_eranzamin_succession
+		every_country = {
+			limit = { has_variable = eranzamin_succession_victor }
+			trigger_event_non_silently= ilkhanate_flavor.10
+		}
+	}
+
+	map_color = {
+		if = {
+			limit = { owner ?= { has_variable = eranzamin_contender } }
+			value = rgb { 200 50 50 }
+		}
+		else_if = {
+			limit = { is_eranzamin_region_province = yes }
+			value = rgb { 150 150 150 }
+		}
+	}
+
+	tooltip = {
+		if = {
+			limit = { owner ?= { has_variable = eranzamin_contender } }
+			custom_tooltip = eranzamin_contender_tt
+		}
+	}
+}

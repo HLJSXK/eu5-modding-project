@@ -1,0 +1,201 @@
+namespace = periphery
+
+# =====================================================================
+# periphery.1 — THE GOVERNOR'S KHUTBA (Delhi breakaway correction)
+#
+# Silently triggered 2 days after any new South Asian country forms
+# (19_indian_breakaway_correction). Fires only for base's intended
+# sultanate spawns (marker variables); applies the chassis a Delhi
+# breakaway historically carried: Persianate sultanate government,
+# the Delhi Dispensation reform (and with it the chancery), a Persian
+# court, a Muslim state, and — where base left the throne to a
+# pop-derived local — a rebel amir on it. Every 14th-century Delhi
+# amputation was an AMIR taking his assignment sovereign.
+# =====================================================================
+periphery.1 = {
+	type = country_event
+	outcome = neutral
+	title = periphery.1.title
+	desc = periphery.1.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = regular
+	}
+
+	trigger = {
+		OR = {
+			has_variable = delhi_provincial_sultanate_variable
+			has_variable = bahmanis_var
+			has_variable = malwa_var
+			has_variable = gujarat_var
+			has_variable = jaunpur_var
+		}
+		# Idempotence guard.
+		NOT = { has_reform = government_reform:indian_sultanate_reform }
+	}
+
+	option = {
+		name = periphery.1.a
+
+		change_government_type = government_type:persianate_sultanate
+		add_reform = government_reform:indian_sultanate_reform
+		# Succession stays inside the (Muslim) dynasty — without this,
+		# breakaways drew heirs from the general character pool, where
+		# the Hindu taluqdar nobility now dominates (the Bahmani
+		# Hindu-ruler bug).
+		change_heir_selection = heir_selection:favorite_son_elective_succession
+		set_court_language = culture:farsi_culture.dialect
+
+		# Culture surgery: create_country_from_location hands the state
+		# its province's majority culture (Bahmani spawning as a Kannada
+		# polity). The ruling stratum of every Delhi breakaway is the
+		# transplanted Delhi service class — dehlavi primary (the Dakhni
+		# identity is what these deportees' language BECOMES) — with the
+		# local majority kept as an accepted culture, not erased.
+		if = {
+			limit = {
+				NOT = { culture = culture:dehlavi }
+			}
+			culture = {
+				save_scope_as = breakaway_local_culture
+			}
+			change_primary_culture = culture:dehlavi
+			add_accepted_culture = scope:breakaway_local_culture
+		}
+
+		# The provincial spawns come out pop-derived: a "provincial
+		# sultanate" that is neither a sultanate nor Muslim. Fix the
+		# state religion; the named four (already Sunni) skip this.
+		if = {
+			limit = {
+				NOT = { religion.group = religion_group:muslim }
+			}
+			change_religion = religion:sunni
+		}
+
+		# The superstrate: the deported service households — Daulatabad's
+		# exiles and their children — planted in the breakaway's urban
+		# spine. 1,000 in the capital, 500 per city, 250 per town.
+		capital ?= {
+			add_pop = {
+				culture = culture:dehlavi
+				religion = religion:sunni
+				type = pop_type:nobles
+				size = { value = 1 }
+			}
+		}
+		every_owned_location = {
+			limit = {
+				location_rank = location_rank:city
+				NOT = { this = root.capital }
+			}
+			add_pop = {
+				culture = culture:dehlavi
+				religion = religion:sunni
+				type = pop_type:nobles
+				size = { value = 0.5 }
+			}
+		}
+		every_owned_location = {
+			limit = {
+				location_rank = location_rank:town
+			}
+			add_pop = {
+				culture = culture:dehlavi
+				religion = religion:sunni
+				type = pop_type:nobles
+				size = { value = 0.25 }
+			}
+		}
+	}
+}
+
+# =====================================================================
+# periphery.2 — THE KHUSRAW KHAN PROTOCOL (apostasy fork)
+#
+# Fired from on_religion_changed when an indian_sultanate_reform state
+# leaves the Muslim fold. The 1320 precedent is the current dynasty's
+# origin: a convert-usurper on the throne, and the amirs killed him
+# inside a year and found a believer. Option A takes the road never
+# taken — shed the dispensation (the chancery dissolves with it) and
+# become what the land is, whole. Option B is the precedent.
+# =====================================================================
+periphery.2 = {
+	type = country_event
+	outcome = neutral
+	title = periphery.2.title
+	desc = periphery.2.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = angry
+	}
+
+	# ----- A: The dispensation is ended. Be what the people are. -----
+	option = {
+		name = periphery.2.a
+		ai_chance = {
+			factor = 5
+		}
+		remove_reform = government_reform:indian_sultanate_reform
+		# The COST of the road never taken (sign bug fixed: this was
+		# +100/+100, which made apostasy the AI's favorite outcome).
+		# Shedding the dispensation means shedding everything built on
+		# it — the state that walks away walks away naked, and usually
+		# into the arms of whoever rises against it.
+		add_stability = -100
+		add_legitimacy = -100
+	}
+
+	# ----- B: The amirs remember Khusraw Khan. -----
+	option = {
+		name = periphery.2.b
+		ai_chance = {
+			factor = 95
+		}
+		# The family first, then the apostate — no heir of his line
+		# inherits anything.
+		ruler ?= {
+			every_child = {
+				death = { reason = death_reason:execution }
+			}
+			death = { reason = death_reason:execution }
+		}
+		create_character = {
+			estate = estate_type:amirs_estate
+			age = { min = 25 max = 45 }
+			culture = culture:dehlavi
+			religion = religion:sunni
+			adm = { 50 80 }
+			dip = { 40 70 }
+			mil = { 60 90 }
+			save_scope_as = amirs_candidate
+		}
+		set_new_ruler = scope:amirs_candidate
+		change_religion = scope:old_religion
+
+		# And the throne: base gives the named four their historical
+		# rulers (Ismail etc.) — untouched. The provincial spawns get
+		# whatever local the engine generated; a breakaway is led by
+		# the rebel governor, a Muslim amir of the service class.
+		if = {
+			limit = {
+				ruler ?= {
+					NOT = { religion.group = religion_group:muslim }
+				}
+			}
+			create_character = {
+				estate = estate_type:amirs_estate
+				age = { min = 30 max = 55 }
+				culture = culture:dehlavi
+				religion = religion:sunni
+				adm = { 40 70 }
+				dip = { 30 60 }
+				mil = { 50 90 }
+				save_scope_as = breakaway_amir
+			}
+			set_new_ruler = scope:breakaway_amir
+		}
+	}
+}

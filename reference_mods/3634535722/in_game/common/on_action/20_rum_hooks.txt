@@ -1,0 +1,265 @@
+# ============================================================
+# On-action hooks for the Seljuk Inheritance disaster — mirrored
+# from 05_farr_proof_hooks.txt, INCLUDING the notification system:
+#
+# Each hook fires a 3-option event (acknowledge / silence this
+# type / silence all). Notification gating uses TWO silence
+# variables per situation:
+#   rum_silence_<type>   — per-type silence (event option b)
+#   rum_silence_all      — master mute (event option c)
+# If EITHER is set, the hook applies the effect directly and
+# skips the event (trigger_event_silently does not work on
+# multi-option events; the event fires REPEATEDLY until the
+# player silences it, per-type or all).
+#
+# All hooks key on has_variable = rum_inheritance_fired, set by
+# the disaster on_start and removed on_end.
+#
+#   battle won   +1        battle lost  -2
+#   war won      +5 + conquest glory (0.4/mo, 12mo, extends)
+#   war lost    -10 + defeat shame   (-1.0/mo, 6mo, extends)
+#   capital lost -20       province lost -3     province gained +1
+# ============================================================
+
+on_great_battle_won = {
+	on_actions = {
+		rum_on_battle_win
+	}
+}
+
+on_battle_lost = {
+	on_actions = {
+		rum_on_battle_lost
+	}
+}
+
+on_winning_war = {
+	on_actions = {
+		rum_on_winning_war
+	}
+}
+
+on_losing_war = {
+	on_actions = {
+		rum_on_losing_war
+	}
+}
+
+on_location_changed_owner = {
+	on_actions = {
+		rum_on_location_loss
+		rum_on_location_win
+	}
+}
+
+# scope:actor = winning unit; country = scope:actor.owner.
+rum_on_battle_win = {
+	trigger = {
+		scope:actor = {
+			owner = { has_variable = rum_inheritance_fired }
+		}
+	}
+	effect = {
+		scope:actor.owner = {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = rum_silence_battle_won
+						has_variable = rum_silence_all
+					}
+				}
+				trigger_event_non_silently = rum.30
+			}
+			else = {
+				add_legitimacy = 1
+			}
+		}
+	}
+}
+
+rum_on_battle_lost = {
+	trigger = {
+		scope:actor = {
+			owner = { has_variable = rum_inheritance_fired }
+		}
+	}
+	effect = {
+		scope:actor.owner = {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = rum_silence_battle_lost
+						has_variable = rum_silence_all
+					}
+				}
+				trigger_event_non_silently = rum.31
+			}
+			else = {
+				add_legitimacy = -2
+			}
+		}
+	}
+}
+
+rum_on_winning_war = {
+	trigger = {
+		scope:winner ?= {
+			has_variable = rum_inheritance_fired
+		}
+	}
+	effect = {
+		scope:winner ?= {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = rum_silence_war_won
+						has_variable = rum_silence_all
+					}
+				}
+				trigger_event_non_silently = rum.32
+			}
+			else = {
+				add_legitimacy = 5
+				add_country_modifier = {
+					modifier = rum_conquest_glory
+					months = 12
+					mode = add_and_extend
+				}
+			}
+		}
+	}
+}
+
+rum_on_losing_war = {
+	trigger = {
+		scope:loser ?= {
+			has_variable = rum_inheritance_fired
+		}
+		# A delegation is not a defeat: land handed to one's own subject
+		# (release, grant, vassal creation) is not lost.
+		NOT = { scope:winner ?= { is_subject_of = scope:loser } }
+	}
+	effect = {
+		scope:loser ?= {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = rum_silence_war_lost
+						has_variable = rum_silence_all
+					}
+				}
+				trigger_event_non_silently = rum.33
+			}
+			else = {
+				add_legitimacy = -10
+				add_country_modifier = {
+					modifier = rum_defeat_shame
+					months = 6
+					mode = add_and_extend
+				}
+			}
+		}
+	}
+}
+
+# this = location; scope:winner / scope:loser = countries.
+rum_on_location_loss = {
+	trigger = {
+		scope:loser ?= {
+			has_variable = rum_inheritance_fired
+		}
+	}
+	effect = {
+		# Capital lost — the seat itself has changed hands.
+		if = {
+			limit = {
+				scope:loser ?= {
+					capital = root
+				}
+			}
+			scope:loser ?= {
+				if = {
+					limit = {
+						NOR = {
+							has_variable = rum_silence_capital_lost
+							has_variable = rum_silence_all
+						}
+					}
+					trigger_event_non_silently = rum.34
+				}
+				else = {
+					add_legitimacy = -20
+				}
+			}
+		}
+		# Non-capital province lost. (Konya itself additionally goes
+		# through the Old Capital watcher in the disaster's on_monthly:
+		# step revoked, modifier stripped, -15.)
+		else = {
+			scope:loser ?= {
+				if = {
+					limit = {
+						NOR = {
+							has_variable = rum_silence_province_lost
+							has_variable = rum_silence_all
+						}
+					}
+					trigger_event_non_silently = rum.35
+				}
+				else = {
+					add_legitimacy = -3
+				}
+			}
+		}
+	}
+}
+
+rum_on_location_win = {
+	trigger = {
+		scope:winner ?= {
+			has_variable = rum_inheritance_fired
+		}
+	}
+	effect = {
+		scope:winner ?= {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = rum_silence_province_gained
+						has_variable = rum_silence_all
+					}
+				}
+				trigger_event_non_silently = rum.36
+			}
+			else = {
+				add_legitimacy = 1
+			}
+		}
+	}
+}
+
+# ============================================================
+# Beylik rank correction — base ships every beylik at COUNTY
+# rank except the Ottomans (duchy), an anachronistic promotion:
+# in 1337 Karaman is at least the Ottomans' peer. All marches
+# start as duchies; late founders get the same via the
+# REPLACE:anatolian_beylik on_activate.
+# ============================================================
+
+on_game_start = {
+	on_actions = {
+		rum_beylik_rank_start
+	}
+}
+
+rum_beylik_rank_start = {
+	effect = {
+		every_country = {
+			limit = {
+				has_reform = government_reform:anatolian_beylik
+				country_rank_level < 2
+			}
+			set_country_rank = country_rank:rank_duchy
+		}
+	}
+}

@@ -1,0 +1,313 @@
+# ============================================================
+# Ghazi: Burden of the Sword — scripted effects
+#
+# Counters (set on init, ticked monthly, cleared on disaster end):
+#   ghazi_burden_months         — total months in the disaster
+#   ghazi_high_months           — months at legitimacy ≥ 75
+#   ghazi_low_months            — months at legitimacy ≤ 25
+#   ghazi_tier3_wins            — wars won against dar al-harb
+#   ghazi_designation_failures  — frontier expectations unmet
+#   ghazi_internal_campaigns    — credited internal campaigns (cap 3)
+#   ghazi_designation_progress_months — months without progress in
+#                                       designated frontier
+#
+# Per-event thresholds (one-shot):
+#   ghazi_eroded_35 / _20 / _10 — downward threshold-touch flags
+# ============================================================
+
+# ---------- Init -------------------------------------------------
+
+ghazi_burden_init = {
+	set_variable = { name = ghazi_burden_months value = 0 }
+	set_variable = { name = ghazi_high_months value = 0 }
+	set_variable = { name = ghazi_low_months value = 0 }
+	set_variable = { name = ghazi_tier3_wins value = 0 }
+	set_variable = { name = ghazi_designation_failures value = 0 }
+	set_variable = { name = ghazi_internal_campaigns value = 0 }
+	set_variable = { name = ghazi_designation_progress_months value = 0 }
+}
+
+# ---------- Monthly tick ----------------------------------------
+
+ghazi_burden_monthly_tick = {
+	change_variable = { name = ghazi_burden_months add = 1 }
+	if = {
+		limit = { legitimacy >= 75 }
+		change_variable = { name = ghazi_high_months add = 1 }
+	}
+	if = {
+		limit = { legitimacy <= 25 }
+		change_variable = { name = ghazi_low_months add = 1 }
+	}
+	# Designation expectation tick — if any frontier is designated
+	# and no progress recorded recently, count toward expectation
+	# failure. Progress events (war-won-in-theater, province-gained-
+	# in-theater) reset the counter; at 60 months it fires erosion
+	# and increments ghazi_designation_failures.
+	if = {
+		limit = {
+			OR = {
+				has_country_modifier = ghazi_frontier_caucasus
+				has_country_modifier = ghazi_frontier_rum
+				has_country_modifier = ghazi_frontier_hindustan
+			}
+		}
+		change_variable = { name = ghazi_designation_progress_months add = 1 }
+		if = {
+			limit = { var:ghazi_designation_progress_months >= 60 }
+			trigger_event_non_silently = ghazi_burden.40
+			change_variable = { name = ghazi_designation_failures add = 1 }
+			set_variable = { name = ghazi_designation_progress_months value = 0 }
+			add_country_modifier = {
+				modifier = ghazi_designation_failed_scar
+				months = 36
+				mode = add_and_extend
+			}
+		}
+	}
+}
+
+# ---------- Erosion dispatch ------------------------------------
+# Downward threshold-touch — one-shot per threshold per run. The
+# public signs of withheld credibility happen TO the ghazi.
+
+ghazi_burden_erosion_dispatch = {
+	if = {
+		limit = {
+			legitimacy <= 35
+			NOT = { has_variable = ghazi_eroded_35 }
+		}
+		set_variable = ghazi_eroded_35
+		trigger_event_non_silently = ghazi_burden.35
+	}
+	if = {
+		limit = {
+			legitimacy <= 20
+			NOT = { has_variable = ghazi_eroded_20 }
+		}
+		set_variable = ghazi_eroded_20
+		trigger_event_non_silently = ghazi_burden.20
+	}
+	if = {
+		limit = {
+			legitimacy <= 10
+			NOT = { has_variable = ghazi_eroded_10 }
+		}
+		set_variable = ghazi_eroded_10
+		trigger_event_non_silently = ghazi_burden.10
+	}
+}
+
+# ---------- Omen pulse ------------------------------------------
+# Random juridical-communal pulses. Each option is roughly 1%/mo
+# average; the silent zero block keeps the pulse mostly quiet.
+
+# Per-event 2-year cooldowns live EVENT-SIDE (trigger checks the
+# variable, immediate sets it): a rolled event whose trigger fails
+# simply doesn't fire, and the month stays quiet. The same preacher
+# cannot turn every season.
+ghazi_burden_omen_pulse = {
+	random_list = {
+		1000 = {}
+		# A famous preacher's sermon turns
+		10 = { trigger_event_non_silently = ghazi_burden.100 }
+		# The volunteers drift (to a rival)
+		10 = { trigger_event_non_silently = ghazi_burden.101 }
+		# A fatwa arrives questioning your wars (fires when Sunni-vs-
+		# Sunni wars have happened; gated event-side too)
+		8  = { trigger_event_non_silently = ghazi_burden.102 }
+		# News of infidel victory — surge window opens
+		6  = { trigger_event_non_silently = ghazi_burden.103 }
+		# Muhtasib turns on the court (only with hisba apparatus +
+		# sustained low legitimacy)
+		6  = { trigger_event_non_silently = ghazi_burden.104 }
+		# A scholar at court proposes the yasa-fatwa. Multi-option
+		# event — fired non-silently. The event-side trigger gates on
+		# NOT ghazi_fatwa_acquired; its cooldown renews the offer
+		# every two years instead of pestering.
+		8  = { trigger_event_non_silently = ghazi_burden.150 }
+		# The returned ghazi — a hero comes home expecting honors
+		8  = { trigger_event_non_silently = ghazi_burden.105 }
+		# The neglected ribat — a border lodge falls while the court fed
+		6  = { trigger_event_non_silently = ghazi_burden.106 }
+		# The banners flock — a frontier shaykh names THIS court the
+		# true seat of ghaza (positive)
+		6  = { trigger_event_non_silently = ghazi_burden.108 }
+		# The captives return — a ransom exchange comes home (positive)
+		6  = { trigger_event_non_silently = ghazi_burden.109 }
+	}
+}
+
+# ---------- Resolution poll -------------------------------------
+# Fire the resolution that qualifies. Order matters: vindication
+# first, then catastrophic Broken-formal, then Endured, then quiet
+# Broken-lapse.
+
+ghazi_burden_resolution_poll = {
+	if = {
+		limit = {
+			ghazi_can_resolve_sword_of_islam = yes
+			NOT = { has_variable = ghazi_sword_of_islam }
+			NOT = { has_variable = ghazi_dervish_rising }
+			NOT = { has_variable = ghazi_guardian_of_thughur }
+			NOT = { has_variable = ghazi_doctrine_lapsed }
+		}
+		set_variable = ghazi_sword_of_islam
+		trigger_event_non_silently = ghazi_burden.200
+	}
+	else_if = {
+		limit = {
+			ghazi_can_resolve_dervish_rising = yes
+			NOT = { has_variable = ghazi_sword_of_islam }
+			NOT = { has_variable = ghazi_dervish_rising }
+			NOT = { has_variable = ghazi_guardian_of_thughur }
+			NOT = { has_variable = ghazi_doctrine_lapsed }
+		}
+		set_variable = ghazi_dervish_rising
+		trigger_event_non_silently = ghazi_burden.201
+	}
+	else_if = {
+		limit = {
+			ghazi_can_resolve_guardian = yes
+			NOT = { has_variable = ghazi_sword_of_islam }
+			NOT = { has_variable = ghazi_dervish_rising }
+			NOT = { has_variable = ghazi_guardian_of_thughur }
+			NOT = { has_variable = ghazi_doctrine_lapsed }
+		}
+		set_variable = ghazi_guardian_of_thughur
+		trigger_event_non_silently = ghazi_burden.202
+	}
+	else_if = {
+		limit = {
+			ghazi_can_resolve_doctrine_lapse = yes
+			NOT = { has_variable = ghazi_sword_of_islam }
+			NOT = { has_variable = ghazi_dervish_rising }
+			NOT = { has_variable = ghazi_guardian_of_thughur }
+			NOT = { has_variable = ghazi_doctrine_lapsed }
+		}
+		set_variable = ghazi_doctrine_lapsed
+		trigger_event_non_silently = ghazi_burden.203
+	}
+}
+
+# ---------- War credit application ------------------------------
+# Called from the on_winning_war hook. Scope: root = ghazi country,
+# scope:loser = vanquished. Classifies tier and applies credit.
+# tier-1 (internal) is handled by event paths, NOT here.
+
+ghazi_apply_war_credit = {
+	if = {
+		# Tier-3: dar al-harb. x2.0 credit (no caveats). Increment
+		# tier3 counter — feeds the Sword of Islam gate.
+		limit = { scope:loser = { ghazi_target_is_tier_3 = yes } }
+		add_legitimacy = 10
+		change_variable = { name = ghazi_tier3_wins add = 1 }
+		add_country_modifier = {
+			modifier = ghazi_conquest_glory
+			months = 12
+			mode = add_and_extend
+		}
+		# Frontier progress: reset the designation expectation
+		# counter if a designated frontier modifier is held.
+		if = {
+			limit = {
+				OR = {
+					has_country_modifier = ghazi_frontier_caucasus
+					has_country_modifier = ghazi_frontier_rum
+					has_country_modifier = ghazi_frontier_hindustan
+				}
+			}
+			set_variable = { name = ghazi_designation_progress_months value = 0 }
+		}
+	}
+	else_if = {
+		# Tier-2 with fatwa: x1.0 credit.
+		limit = {
+			scope:loser = { ghazi_target_is_tier_2 = yes }
+			has_variable = ghazi_fatwa_acquired
+		}
+		add_legitimacy = 5
+		add_country_modifier = {
+			modifier = ghazi_conquest_glory
+			months = 6
+			mode = add_and_extend
+		}
+	}
+	else_if = {
+		# Tier-2 WITHOUT fatwa: x0.5 credit + jurist complaint event.
+		limit = { scope:loser = { ghazi_target_is_tier_2 = yes } }
+		add_legitimacy = 2
+		trigger_event_non_silently = ghazi_burden.102
+	}
+	else_if = {
+		# Ordinary Sunni: no credit, jurist complaint.
+		limit = { scope:loser = { ghazi_target_is_ordinary_sunni = yes } }
+		trigger_event_non_silently = ghazi_burden.102
+	}
+}
+
+# ---------- Internal campaign credit (diminishing) --------------
+# Called from each branch of ghazi_burden.500. Applies legitimacy +
+# clergy credit on a tapering curve and increments the counter. The
+# design's "realm runs out of sin": the first campaign reads as
+# righteousness, the third reads as theater.
+#
+#   campaign #1 (counter == 0): +5 leg, +0.08 clergy
+#   campaign #2 (counter == 1): +3 leg, +0.05 clergy
+#   campaign #3 (counter == 2): +1 leg, +0.03 clergy
+
+ghazi_apply_internal_campaign_credit = {
+	if = {
+		limit = { var:ghazi_internal_campaigns = 0 }
+		add_legitimacy = 5
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.08 }
+	}
+	else_if = {
+		limit = { var:ghazi_internal_campaigns = 1 }
+		add_legitimacy = 3
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+	else = {
+		add_legitimacy = 1
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.03 }
+	}
+	change_variable = { name = ghazi_internal_campaigns add = 1 }
+}
+
+# ---------- Clear (on disaster end) ------------------------------
+# Removes refund modifiers (penalty + refund both gone). Legacies
+# are NOT touched here — they persist past Sword/Guardian/Lapse,
+# and are stripped only by the Dervish Rising's immediate block.
+
+ghazi_burden_clear = {
+	if = {
+		limit = { has_country_modifier = ghazi_jihad_within_refund }
+		remove_country_modifier = ghazi_jihad_within_refund
+	}
+	if = {
+		limit = { has_country_modifier = ghazi_ribat_network_refund }
+		remove_country_modifier = ghazi_ribat_network_refund
+	}
+	if = {
+		limit = { has_country_modifier = ghazi_investiture_refund }
+		remove_country_modifier = ghazi_investiture_refund
+	}
+	if = {
+		limit = { has_country_modifier = ghazi_sultan_of_ghazis_refund }
+		remove_country_modifier = ghazi_sultan_of_ghazis_refund
+	}
+	# Frontier designation modifiers also clear — they're tied to
+	# the disaster's mobilization, not the post-resolution settlement.
+	if = {
+		limit = { has_country_modifier = ghazi_frontier_caucasus }
+		remove_country_modifier = ghazi_frontier_caucasus
+	}
+	if = {
+		limit = { has_country_modifier = ghazi_frontier_rum }
+		remove_country_modifier = ghazi_frontier_rum
+	}
+	if = {
+		limit = { has_country_modifier = ghazi_frontier_hindustan }
+		remove_country_modifier = ghazi_frontier_hindustan
+	}
+}

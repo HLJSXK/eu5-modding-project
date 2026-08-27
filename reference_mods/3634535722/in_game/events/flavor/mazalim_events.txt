@@ -1,0 +1,250 @@
+namespace = mazalim_events
+
+# -----------------------------------------------------------------------------------------
+# ACT 1: THE ROT (The Empty Realm)
+# -----------------------------------------------------------------------------------------
+mazalim_events.1 = {
+	outcome = neutral
+	type = country_event
+	title = mazalim_events.1.title
+	desc = mazalim_events.1.desc
+	
+	illustration_tags = {
+		10 = interior
+		10 = throne_room
+	}
+	
+	trigger = {
+		parliament_type = parliament_type:diwan_council
+		any_cabinet_character = {
+			modifier:is_head_of_cabinet = yes
+			is_ruler = no
+		}
+		
+		# High Corruption Context
+		"estate_power(estate_type:diwan_estate)" > 0.4
+		
+		# The Trigger: The State fails to find resources.
+		OR = {
+			manpower_percentage < 0.25
+			monthly_income_total < 0
+			# Less than three months' income in the vault.
+			gold < {
+				value = monthly_income_total
+				multiply = 3
+			}
+		}
+		
+		NOT = { has_variable = rast_ravshan_conspiracy }
+	}
+	
+
+	
+	immediate = {
+		set_variable = { name = rast_ravshan_conspiracy years = 20 }
+		
+		# Identify the traitor
+		random_cabinet_character = {
+			limit = { modifier:is_head_of_cabinet = yes }
+			save_scope_as = traitor_vizier
+		}
+	}
+	
+	option = {
+		name = mazalim_events.1.a # "Where have all the people gone?"
+		
+		# The Shah goes to the desert to think/hunt
+		trigger_event_non_silently= { 
+			id = mazalim_events.2
+			days = 15
+		}
+	}
+}
+
+# -----------------------------------------------------------------------------------------
+# ACT 2: THE REALIZATION (The Shepherd and the Dog)
+# -----------------------------------------------------------------------------------------
+mazalim_events.2 = {
+	outcome = neutral
+	type = country_event
+	title = mazalim_events.2.title
+	desc = mazalim_events.2.desc
+	
+	illustration_tags = {
+		10 = exterior
+		10 = desert
+	}
+	
+	immediate = {
+		random_cabinet_character = {
+			limit = { modifier:is_head_of_cabinet = yes }
+			save_scope_as = traitor_vizier
+		}
+	}
+	
+	option = {
+		name = mazalim_events.2.a # "The Vizier is the dog..."
+		scope:actor = {
+			ruler = {
+				add_character_modifier = { modifier = hunting_trip years = 0.5 }
+			}
+		}
+		
+		
+		trigger_event_non_silently= { 
+			id = mazalim_events.3
+			days = 30
+		}
+	}
+}
+
+# -----------------------------------------------------------------------------------------
+# ACT 3: THE INVESTIGATION (The Prisons)
+# -----------------------------------------------------------------------------------------
+mazalim_events.3 = {
+	outcome = neutral
+	type = country_event
+	title = mazalim_events.3.title
+	desc = mazalim_events.3.desc
+	
+	illustration_tags = {
+		10 = interior
+		10 = prison
+	}
+	
+	immediate = {
+		random_cabinet_character = {
+			limit = { modifier:is_head_of_cabinet = yes }
+			save_scope_as = traitor_vizier
+		}
+	}
+
+	option = {
+		name = mazalim_events.3.a # "Open the gates! I will hear every grievance!"
+		
+		custom_tooltip = "mazalim_call_tooltip"
+		
+		trigger_event_non_silently= {
+			id = mazalim_events.4
+			days = 7
+		}
+	}
+	
+	option = {
+		name = mazalim_events.3.b # "It is too deep. I cannot fight this."
+		
+		add_prestige = -20
+		add_legitimacy = -10
+		add_stability = -10
+		
+		scope:traitor_vizier = {
+			add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.2 }
+		}
+		
+		add_country_modifier = {
+			modifier = ignored_corruption
+			years = 10
+		}
+	}
+}
+
+# -----------------------------------------------------------------------------------------
+# ACT 4: THE JUDGMENT (The Seven Day Execution)
+# -----------------------------------------------------------------------------------------
+mazalim_events.4 = {
+	outcome = neutral
+	type = country_event
+	title = mazalim_events.4.title
+	desc = mazalim_events.4.desc
+	
+	illustration_tags = {
+		10 = exterior
+		10 = execution
+	}
+	
+	immediate = {
+		random_cabinet_character = {
+			limit = { modifier:is_head_of_cabinet = yes }
+			save_scope_as = traitor_vizier
+		}
+	}
+	
+	# OPTION A: COMPLETE JUSTICE
+	option = {
+		name = mazalim_events.4.a 
+		
+		scope:traitor_vizier = { death = { reason = death_reason:execution } }
+		
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.20 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.20 }
+		
+		# Refund Victims (Cost 1 Year Income)
+		add_gold = { value = monthly_income_total multiply = -12 }
+		
+		# Massive Political Capital Gain
+		change_parliament_issue_support = 1.75
+		
+		add_stability = 15
+		add_legitimacy = 20
+		
+		# Cost 25% of Max Manpower (Purging the ranks)
+		add_manpower = {
+			value = max_manpower
+			multiply = -0.25
+		}
+		add_army_tradition = -20
+		
+		random_owned_location = {
+			limit = { is_capital = no } 
+			add_location_modifier = { modifier = shepherds_reward_mod years = -1 }
+		}
+		add_country_modifier = { modifier = reign_of_justice years = 20 }
+		
+		change_societal_value = { type = turk_vs_tazik value = 0 }
+	}
+	
+	# OPTION B: BLAME THE BUREAUCRATS
+	option = {
+		name = mazalim_events.4.b
+		
+		scope:traitor_vizier = { death = { reason = death_reason:execution } }
+		
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.50 }
+		
+		# Keep Confiscated Wealth (Gain 6 Months Income)
+		add_gold = { value = monthly_income_total multiply = 6 }
+		
+		change_parliament_issue_support = 0.60
+		
+		add_stability = 5
+		add_legitimacy = 10
+		
+		change_societal_value = { type = turk_vs_tazik value = -10 }
+	}
+	
+	# OPTION C: BLAME THE ENFORCERS
+	option = {
+		name = mazalim_events.4.c
+		
+		# Cost 25% of Max Manpower (Purging the ranks)
+		add_manpower = {
+			value = max_manpower
+			multiply = -0.25
+		}
+		add_army_tradition = -20
+		
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -0.50 }
+		
+		scope:traitor_vizier = { death = { reason = death_reason:execution } }
+		
+		# Keep Confiscated Wealth (Gain 6 Months Income)
+		add_gold = { value = monthly_income_total multiply = 6 }
+		
+		change_parliament_issue_support = 0.60
+		
+		add_stability = 5
+		add_legitimacy = 10
+		
+		change_societal_value = { type = turk_vs_tazik value = 10 }
+	}
+}

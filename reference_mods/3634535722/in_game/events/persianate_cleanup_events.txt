@@ -1,0 +1,206 @@
+namespace = persianate_cleanup
+
+# One-shot game-start cleanup. Two jobs:
+#  1. Kill the base-game versions of characters we have re-authored as _pw
+#     overrides in main_menu/setup/start/05_chobanid_character_overrides.txt.
+#     The originals are still spawned by base-game character_db and would
+#     otherwise coexist as duplicates.
+#  2. Revoke the base communal_lands peasant privilege from any country
+#     that meets the Boneh System potential — the mod's boneh_system
+#     privilege already fills that slot for Persianate polities.
+persianate_cleanup.1 = {
+	type = country_event
+	hidden = yes
+
+	immediate = {
+		# --- (1) Kill non-_pw duplicates ---
+		# Chobanid line
+		character:chb_hasan_kuchak ?= { kill_character_silently = this }
+		character:chb_chupan ?= { kill_character_silently = this }
+		character:chb_timurtash ?= { kill_character_silently = this }
+		character:chb_malek_ashraf ?= { kill_character_silently = this }
+		character:chb_demasq_kaja ?= { kill_character_silently = this }
+		character:chb_suleiman_khan ?= { kill_character_silently = this }
+		character:chb_sati_beg ?= { kill_character_silently = this }
+		character:chb_surgan ?= { kill_character_silently = this }
+		
+
+		# Injuids
+		character:inj_ghiyas_al_din_kai_khusrau ?= { kill_character_silently = this }
+		character:inj_jalal_al_din_mas_ud_shah ?= { kill_character_silently = this }
+		character:inj_jamal_al_din_abu_ishaq ?= { kill_character_silently = this }
+
+		# Kartids
+		character:krt_mu_izz_uddin_husayn_ibn_ghiyath_uddin ?= { kill_character_silently = this }
+
+		# Sarbedars / Hamadan / Qom
+		character:srb_abd_al_razzaq_ibn_fazlullah ?= { kill_character_silently = this }
+		character:hdn_mahmud_qutlugh ?= { kill_character_silently = this }
+		character:qom_tal_al_din_ali ?= { kill_character_silently = this }
+
+		# Jalayirids
+		character:jal_hasan_buzurg ?= { kill_character_silently = this }
+		character:jal_muhammad_khan ?= { kill_character_silently = this }
+		
+		
+		## mzf muzaffarids, killing the original to avoid duplicates. The mf is a major character with a long reign and many interactions, so it's worth the effort to rewrite him as a _pw character with proper flavor and traits.
+		character:mzf_mubariz_al_din_muhammad ?= { kill_character_silently = this }
+		character:mzf_shah_shoja ?= { kill_character_silently = this}
+		character:grg_togha_temur ?= { kill_character_silently = this }
+
+		character:dlh_muhammad_bin_tughluq ?= { kill_character_silently = this }
+		character:dlh_firuz_shah_tughluq ?= { kill_character_silently = this }
+		## demote rey
+		location:rey ?= {
+			## ray was a ruined village, not the city the game thinks it to be.
+			change_location_rank = location_rank:rural_settlement
+		}
+		# --- (2) Revoke communal_lands where Boneh System should rule ---
+		# Mirrors boneh_system's potential exactly so we only touch the same
+		# set of countries that would naturally pick up the mod privilege.
+
+		### give sarbedars their units. 
+
+
+
+		# location:sabzevar = {
+		# 	while =  {
+		# 		count = 5
+		# 		create_sub_unit_with_owner = {
+		# 			type = a_dervish_corps
+		# 			owner = c:SRB
+		# 		}
+		# 	}
+		# }
+		# c:SRB = {
+		# 	add_gold = 500
+		# }
+
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:communal_lands
+				OR = {
+					government_type = government_type:persianate_sultanate
+				}
+			}
+			revoke_estate_privilege = estate_privilege:communal_lands
+		}
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:clergy_literacy_rights
+				OR = {
+					government_type = government_type:persianate_sultanate
+				}
+			}
+			revoke_estate_privilege = estate_privilege:clergy_literacy_rights
+		}
+
+		# Burgher mint/treasury/coinage — diwan prerogative under Persianate
+		# states (see 05_persianate_burghers.txt for the override blocks).
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:treasury_rights
+				government_type = government_type:persianate_sultanate
+			}
+			revoke_estate_privilege = estate_privilege:treasury_rights
+		}
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:control_over_monetary_policy
+				government_type = government_type:persianate_sultanate
+			}
+			revoke_estate_privilege = estate_privilege:control_over_monetary_policy
+		}
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:control_over_the_coinage
+				government_type = government_type:persianate_sultanate
+			}
+			revoke_estate_privilege = estate_privilege:control_over_the_coinage
+		}
+
+		# Clergy lecture oaths — requires "university" building; Persianate
+		# analogue is the madrasa, covered by madrasa_endowment.
+		every_country = {
+			limit = {
+				has_estate_privilege = estate_privilege:clergy_lecture_oaths
+				government_type = government_type:persianate_sultanate
+			}
+			revoke_estate_privilege = estate_privilege:clergy_lecture_oaths
+		}
+
+		# persianate estates end up fucked because there are no women to marry. but that's bizarre, this is a region with large harems and families. 
+		every_country = {
+
+			limit = {
+				OR = {
+					capital = {
+						region = region:persia_region
+						region = region:khorasan_region
+						region = region:caucasus_region
+						area = area:cappadocia_area
+						area = area:iraq_arabi_area # Baghdad/Iraq
+						area = area:jazira_area # Mosul and surroundings
+					}
+
+				}
+			}
+			save_scope_as = persianate_country
+			### basically every persianate state will have some women of the ruling family lying around, so this is a non-issue. 
+
+			create_character = {
+				religion = scope:persianate_country.religion
+				culture = scope:persianate_country.culture
+				estate = estate_type:amirs_estate
+				age = { 16 25 }
+				female = yes
+			}
+			create_character = {
+				religion = scope:persianate_country.religion
+				culture = scope:persianate_country.culture
+				estate = estate_type:diwan_estate
+				age = { 16 25 }
+				female = yes
+			}
+
+			### now, we also want to add the pastures.
+			every_owned_rural_location = {
+
+				limit = {
+					OR = {
+						region = region:persia_region
+						region = region:khorasan_region
+						region = region:caucasus_region
+						area = area:cappadocia_area
+						area = area:iraq_arabi_area # Baghdad/Iraq
+						area = area:jazira_area # Mosul and surroundings
+					}
+					OR = {
+						climate = arid
+						climate = cold_arid
+						climate = continental
+					}
+					OR = {
+						vegetation = grasslands
+						vegetation = seasonal_irrigated ## will stress it less
+					}
+					num_pop_type:tribesmen > 10.0
+					local_control < 0.4
+				}
+				construct_building = {
+					building_type = building_type:tribal_pasture
+					cost_multiplier = 0
+					cost_multiplier_reason = "game_concept_event"
+					
+					instant = yes
+				}
+
+			}
+
+		}
+
+	}
+
+
+
+}

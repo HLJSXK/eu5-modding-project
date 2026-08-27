@@ -1,0 +1,157 @@
+﻿namespace = diwan_vizierate
+
+# =====================================================================
+# THE DĪWĀN'S ULTIMATUM — the chancery refuses a cabinet of princes, burghers, or other undesirable illiterati.
+#
+# Vanilla AI (and most players) pack the cabinet with royal kin. In
+# Erānzamīn that is backwards: the vizier-and-dīwān state is run by
+# the chancery, and a council of princes who cannot read siyāq
+# cannot govern. The vizierate auto-modifiers
+# (01_diwan_auto_modifiers) already punish it silently; this makes
+# the chancery SAY so, yearly, with a choice:
+#
+#   A — keep the princes: the dīwān is spurned (legitimacy, estate
+#       satisfaction, a decade of tax inefficiency). AI never.
+#   B — the pen takes the table: outsiders are dismissed until the
+#       dīwān holds a strict majority, and kuttāb fill the seats.
+#
+# Fires from yearly_country_pulse (20_diwan_vizierate_hooks) on the
+# same states the auto-modifiers call "excluded" and "crowded".
+# Cooldown 8 years either way (event-side var gate, per house rule).
+# =====================================================================
+diwan_vizierate.1 = {
+	type = country_event
+	outcome = negative
+	title = diwan_vizierate.1.title
+	desc = diwan_vizierate.1.desc
+
+	illustration_tags = {
+		10 = interior
+		10 = angry
+	}
+
+	trigger = {
+		government_type = government_type:persianate_sultanate
+		country_has_estate = estate_type:diwan_estate
+		NOT = { has_variable = diwan_ultimatum_cd }
+		any_cabinet_character = { always = yes }
+		OR = {
+			# The chancery is locked out entirely.
+			NOT = { any_cabinet_character = { has_estate = estate_type:diwan_estate } }
+			# Or the princes outnumber it.
+			any_cabinet_character = {
+				NOT = { has_estate = estate_type:diwan_estate }
+				count >= 2
+			}
+		}
+	}
+
+	immediate = {
+		set_variable = { name = diwan_ultimatum_cd value = 1 years = 5 }
+	}
+
+	# ----- A: Keep the princes. The dīwān is spurned. -----
+	option = {
+		name = diwan_vizierate.1.a
+		ai_chance = { factor = 0 }
+		add_legitimacy = -20
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.25 }
+		add_country_modifier = {
+			modifier = diwan_spurned_by_the_throne
+			years = 10
+		}
+		
+	}
+
+	# ----- B: The pen takes the table. -----
+	option = {
+		name = diwan_vizierate.1.b
+		custom_tooltip = diwan_vizierate_pen_takes_table_tt
+		# Count the table.
+		set_local_variable = { name = dv_outsiders value = 0 }
+		set_local_variable = { name = dv_diwan value = 0 }
+		every_cabinet_character = {
+			limit = { NOT = { has_estate = estate_type:diwan_estate } }
+			root = { change_local_variable = { name = dv_outsiders add = 1 } }
+		}
+		every_cabinet_character = {
+			limit = { has_estate = estate_type:diwan_estate }
+			root = { change_local_variable = { name = dv_diwan add = 1 } }
+		}
+		# Outsiders to dismiss for a STRICT diwan majority:
+		# surplus = outsiders - diwan + 1, floored below at 0 by the loop.
+		set_local_variable = { name = dv_surplus value = local_var:dv_outsiders }
+		change_local_variable = { name = dv_surplus subtract = local_var:dv_diwan }
+		change_local_variable = { name = dv_surplus add = 1 }
+		while = {
+			limit = { local_var:dv_surplus > 0 }
+			# Fresh scopes every pass — a stale dv_seated from the previous
+			# iteration would otherwise be re-seated.
+			clear_saved_scope = dv_dismissed
+			clear_saved_scope = dv_seated
+			random_cabinet_character = {
+				limit = { NOT = { has_estate = estate_type:diwan_estate } }
+				save_scope_as = dv_dismissed
+			}
+			if = {
+				limit = { exists = scope:dv_dismissed }
+				remove_from_cabinet = scope:dv_dismissed
+				# A kātib takes the vacated seat: an existing one if any
+				# is free, otherwise the chancery produces one — that is
+				# what a chancery is for.
+				random_character = {
+					limit = {
+						has_estate = estate_type:diwan_estate
+						is_in_cabinet = no
+						is_alive = yes
+						age >= 16
+					}
+					save_scope_as = dv_seated
+				}
+				if = {
+					limit = { NOT = { exists = scope:dv_seated } }
+					create_character = {
+						estate = estate_type:diwan_estate
+						age = { 28 45 }
+						adm = { 40 75 }
+						dip = { 20 55 }
+						mil = { 5 30 }
+						birth_location = root.capital
+						save_scope_as = dv_seated
+					}
+				}
+				# add_to_cabinet is a cabinet-SLOT effect: pick an open slot
+				# (base pattern: random_cabinet + NOT exists cabinet_member).
+				random_cabinet = {
+					limit = { NOT = { exists = cabinet_member } }
+					add_to_cabinet = scope:dv_seated
+				}
+			}
+			change_local_variable = { name = dv_surplus add = -1 }
+		}
+		# The vizierate itself: a majority that cannot name its own vizier
+		# is a half-measure (auto-modifier state 2). If no dīwān man
+		# presides, one does now — base's promote effect demotes the
+		# sitting head itself.
+		if = {
+			limit = {
+				any_cabinet_character = { has_estate = estate_type:diwan_estate }
+				NOT = {
+					any_cabinet_character = {
+						modifier:is_head_of_cabinet = yes
+						has_estate = estate_type:diwan_estate
+					}
+				}
+			}
+			clear_saved_scope = dv_vizier
+			random_cabinet_character = {
+				limit = { has_estate = estate_type:diwan_estate }
+				save_scope_as = dv_vizier
+			}
+			promote_to_head_of_cabinet_effect = { target = scope:dv_vizier }
+		}
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.10 }
+		# The princes do not forget being shown the door.
+		add_estate_satisfaction = { type = estate_type:crown_estate value = -0.10 }
+	}
+}

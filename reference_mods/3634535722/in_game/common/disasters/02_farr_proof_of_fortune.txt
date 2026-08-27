@@ -1,0 +1,143 @@
+# ============================================================
+# Farr Proof of Fortune — the boast under test
+#
+# Declaring farr-i īzadī converts legitimacy from a status into
+# a claim under examination. The doctrine says heaven's favor
+# rests on this house; this disaster is the world checking.
+#
+# Mechanism: legitimacy ITSELF is the ledger (no separate Proof
+# variable). The disaster applies a heavy monthly drain (-0.5),
+# offset by being at war (+0.3 auto-modifier), by conquest
+# (+0.4/mo for 12 months, stacks), and crushed by defeat
+# (-1.0/mo for 6 months) and lost provinces / capital.
+#
+# Four outcomes:
+#   - Vindicated: 60 cumulative months at legitimacy ≥ 75
+#       → "Farr Manifest" modifier inverts the cost; permanent
+#       legitimacy floor; the wire into the Matter (amir houses
+#       that watched you win swear)
+#   - Broken-formal: legitimacy collapses to 0
+#       → Türk amīr usurpation (replace_ruler, reform stripped,
+#       government tilts to chinggisid_regency)
+#   - Endured: year 25 elapses, realm intact, neither resolution
+#       fired → quieter vindication, smaller bonuses, claim stands
+#   - Broken-lapse: 60 cumulative months at legitimacy ≤ 25
+#       → doctrine quietly lapses, prestige scar (permanent flag
+#       locks re-declaration), bleed stops
+#
+# Apparatus events fire on upward threshold-touch (50/65/80/90)
+# and grant irreversible static modifiers: sikka, khutba, hunt
+# + nawrūz court, pādishāh title. These are artifacts of having
+# once held the favor — even if later lost, they remain (the
+# Muzaffarids kept their sikka long after their fortunes turned).
+#
+# Erosion events fire on downward threshold-touch (35/20/10).
+# Omen events fire as random pulses inside the disaster — the
+# plague-interpretation event is weight-multiplied for 1346–50.
+#
+# Triggers: in_game/common/scripted_triggers/04_farr_proof_triggers.txt
+# Effects: in_game/common/scripted_effects/03_farr_proof_effects.txt
+# ============================================================
+
+farr_proof_of_fortune = {
+
+	image = "gfx/interface/illustrations/disaster/farr_proof_of_fortune.dds"
+
+	# Fire as soon as the reform is adopted. The can_start gate is
+	# the real filter; high spawn chance just ensures no long wait.
+	monthly_spawn_chance = 1
+
+	can_start = {
+		has_reform = government_reform:farr_i_izadi
+		custom_tooltip = {
+			text = farr_proof_not_yet_completed_tt
+			NOT = { has_variable = farr_proof_completed }
+		}
+		custom_tooltip = {
+			text = farr_proof_not_yet_fired_tt
+			NOT = { has_variable = farr_proof_fired }
+		}
+	}
+
+	# End conditions: any resolution variable set, or the realm has
+	# ceased to hold the reform (player abandoned the claim).
+	# Each branch gets its own custom_tooltip so the panel reads as a
+	# legible list of the four endings, not one opaque blob.
+	can_end = {
+		OR = {
+			custom_tooltip = {
+				text = farr_proof_end_vindicated_tt
+				has_variable = farr_proof_vindicated
+			}
+			custom_tooltip = {
+				text = farr_proof_end_broken_formal_tt
+				has_variable = farr_proof_broken_formal
+			}
+			custom_tooltip = {
+				text = farr_proof_end_broken_lapse_tt
+				has_variable = farr_proof_broken_lapse
+			}
+			custom_tooltip = {
+				text = farr_proof_end_endured_tt
+				has_variable = farr_proof_endured
+			}
+			custom_tooltip = {
+				text = farr_proof_end_abandoned_tt
+				NOT = { has_reform = government_reform:farr_i_izadi }
+			}
+		}
+	}
+
+	# The wager. Heavy ambient bleed — at war (+0.3 auto) you net
+	# -0.2/mo; in stalemated peace you bleed full -0.5/mo. Only
+	# conquest (+0.4/mo stacking modifier) pushes you positive.
+	#
+	# The reform's amir-anger (-0.15 sat + 0.005 rebel growth) is
+	# already standing on the reform; the disaster doesn't double it.
+	modifier = {
+		monthly_legitimacy = -1.0
+		court_spending_efficiency = -0.1 ## 0.15 was crushing. (cost_modifier variant deprecated in 1.2.0 — removed.)
+		# The realm bleeds while the kingship doctrine is being
+		# established — the project is its own stress. (Moved here
+		# from on_start, where it was an invalid effect / no-op.)
+		stability_decay = 0.0025
+		amirs_estate_target_satisfaction = -0.1
+		minting_income_factor = -0.4 ## we are not really considered legitimate enough to mint coins. minting is meant to be in the name of the ruler, which in the eyes of the world, is the Ilkhan, not our ruler.
+		clergy_estate_target_satisfaction = -0.05 ## lacking khutbah 
+		burghers_estate_target_satisfaction = -0.05 ## lacking coinage
+		diplomatic_reputation = -1
+	}
+
+	on_start = {
+		farr_proof_init = yes
+		set_variable = farr_proof_fired
+		trigger_event_non_silently = farr_proof.1
+		add_legitimacy = -50 ### our own edict of appointment is invalidated, after all.
+	}
+
+	on_monthly = {
+		# Sustained-zone counters: tick farr_high_months when leg ≥ 75,
+		# farr_low_months when ≤ 25, farr_disaster_months always.
+		farr_proof_monthly_tick = yes
+		# Erosion events downward (35/20/10) fire automatically — the
+		# public signs of withdrawn favor happen TO the king, not by
+		# his choice. Apparatus events upward (50/65/80/90) are now
+		# player-claimed via the disaster panel's action buttons.
+		farr_proof_erosion_dispatch = yes
+		# Omen pulse — random comet/earthquake/plague pulses with
+		# court-interpretation choices. Plague is weighted up during
+		# the 1346–50 historical window.
+		farr_proof_omen_pulse = yes
+		# Resolution poll — vindicated/broken-formal/broken-lapse/endured.
+		farr_proof_resolution_poll = yes
+	}
+
+	on_end = {
+		farr_proof_clear = yes
+		# Lock the claim so the disaster doesn't immediately re-fire
+		# on the same reform tenure. Cleared by the resolution events
+		# only where re-declaration is allowed (Vindicated keeps the
+		# floor; Endured allows none; Broken outcomes lock).
+		set_variable = farr_proof_completed
+	}
+}

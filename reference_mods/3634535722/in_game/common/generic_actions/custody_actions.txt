@@ -1,0 +1,389 @@
+# ============================================================
+# The Custody of the Ulus — apparatus actions
+#
+#   custody_press_claim       — see the rival khans, press the CB
+#   custody_proclaim_true     — denounce the rival custodies
+#   custody_secure_household  — succession insurance (Endure apparatus)
+#   custody_sikka_everywhere  — the khan's name on every coin
+#   custody_summon_kuriltai   — the Sole Custody fork (24 sole months)
+#
+# Design: docs/design/custody_of_the_ulus_design.md
+# ============================================================
+
+# Press the Custody — the contest's war handle. The picker lists
+# every rival steward (this IS the "who are the other khans" view);
+# selecting one grants the Erānzamīn succession CB against them, so
+# the war can be declared through the normal flow. The CB already
+# exists between IO members; this just hands the player the target.
+
+custody_press_claim = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	cooldown = {
+		type = custody_press_claim
+		years = 1
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			has_variable = custody_rivals
+			var:custody_rivals >= 1
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	# The rival census, as a picker. Rival definition inlined (with an
+	# explicit self-exclusion) rather than via custody_is_rival, to
+	# avoid root-binding ambiguity in the interaction scope.
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:actor = {
+				international_organization:eranzamin ?= {
+					every_international_organization_member = {
+						limit = {
+							NOT = { this = scope:actor }
+							OR = {
+								has_reform = government_reform:chinggisid_regency
+								ruler ?= { dynasty = dynasty:borjigin_dynasty }
+							}
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target_rival
+		name = "choose_rival"
+		none_available_msg_key = "no_rivals_available"
+		column = { data = name }
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = { exists = scope:target_rival }
+				add_casus_belli = {
+					type = casus_belli:cb_eranzamin_succession
+					target = scope:target_rival
+					years = 10
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+# Demand Fealty — the custodian calls a non-subject governorate to
+# swear. The picker lists the eligible governorates; selecting one
+# proposes demand_ulus_fealty (the governor decides). Costs the
+# custodian gold + legitimacy and yields prestige only on acceptance
+# (all in the interaction's effect). Short cooldown so it is a
+# deliberate overture, not a spam.
+
+custody_demand_fealty = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 3
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	cooldown = {
+		type = custody_demand_fealty
+		months = 24
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			at_war = no
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:actor = {
+				international_organization:eranzamin ?= {
+					every_international_organization_member = {
+						limit = {
+							NOT = { this = scope:actor }
+							has_reform = government_reform:ilkhanate_governorate
+							is_subject = no
+							NOT = { has_variable = custody_demanded_recently}
+							
+							
+						}
+						add_to_list = source
+					}
+				}
+			}
+		}
+		target_flag = target
+		name = "choose_governorate"
+		none_available_msg_key = "no_governorates_available"
+		column = { data = name }
+	}
+
+	# Event-based, not a diplomatic action: the engine auto-rejects
+	# subjugation-via-country-interaction regardless of diplo_chance.
+	# We point the governor at the demanding custodian (a variable
+	# survives the event boundary) and fire the demand AT it; the
+	# governor accepts or refuses by its own event options.
+	effect = {
+		if = {
+			limit = { exists = scope:target }
+			scope:target = {
+				set_variable = { name = custody_demanding_lord value = scope:actor }
+				trigger_event_non_silently = custody.31
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = 40
+	}
+}
+
+custody_proclaim_true = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	cooldown = {
+		type = custody_proclaim_true
+		years = 5
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			has_variable = custody_rivals
+			var:custody_rivals >= 1
+			# Friction (gate, scaling): you earn the right to denounce
+			# by drawing blood, or by outlasting the field to <= 3.
+			custom_tooltip = {
+				text = custody_proclaim_gate_tt
+				OR = {
+					var:custody_kills >= 1
+					var:custody_rivals <= 3
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			# The denunciation lands harder the more khans you have
+			# already put down — sized on the charade_continues pattern.
+			if = {
+				limit = { var:custody_kills >= 1 }
+				add_country_modifier = {
+					modifier = custody_proclaimed_mod
+					years = 5
+					mode = replace
+					size = {
+						value = root.var:custody_kills
+						min = 1
+						max = 4
+					}
+				}
+			}
+			else = {
+				add_country_modifier = { modifier = custody_proclaimed_mod years = 5 }
+			}
+			add_prestige = 5
+		}
+	}
+
+	ai_will_do = {
+		add = 50
+	}
+}
+
+custody_secure_household = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:custody_secure_household
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			NOT = { has_variable = custody_household_secured }
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = custody_household_secured
+			add_country_modifier = { modifier = custody_household_mod months = -1 }
+		}
+	}
+
+	ai_will_do = {
+		add = 80
+	}
+}
+
+custody_sikka_everywhere = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 6
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	price = price:custody_sikka_everywhere
+
+	cooldown = {
+		type = custody_sikka_everywhere
+		years = 5
+	}
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			# Friction: you cannot blanket the coinage in the khan's
+			# name while equals openly contest it. Put down two rivals,
+			# or wait the field down to <= 2.
+			custom_tooltip = {
+				text = custody_sikka_gate_tt
+				OR = {
+					var:custody_kills >= 2
+					var:custody_rivals <= 2
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			add_country_modifier = { modifier = custody_sikka_mod years = 5 }
+		}
+	}
+
+	ai_will_do = {
+		add = 60
+	}
+}
+
+custody_summon_kuriltai = {
+	type = disaster
+	show_message = no
+
+	ai_tick = monthly
+	ai_tick_frequency = 3
+	automation_tick = never
+	automation_tick_frequency = 12
+
+	allow = {
+		scope:actor = {
+			has_variable = custody_fired
+			NOT = { has_variable = custody_kuriltai_fired }
+			custom_tooltip = {
+				text = custody_kuriltai_gate_tt
+				custody_can_summon_kuriltai = yes
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = disaster
+		name = "choose_disaster"
+		target_flag = recipient
+		column = { data = name }
+		visible = {
+			disaster_type = disaster_type:custody_of_the_ulus
+			disaster_is_active = yes
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			set_variable = custody_kuriltai_fired
+			trigger_event_non_silently = custody.40
+		}
+	}
+
+	ai_will_do = {
+		add = 100
+	}
+}

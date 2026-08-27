@@ -1,0 +1,267 @@
+namespace = matter_of_tazik
+
+# Matter of Tazik events — Türk-coded polity faces urban / sayyid /
+# dervish backlash. Design spec: docs/design/eranzamin_plan.md §19.6,
+# §19.7, §20.4 (Safavid synthesis override).
+
+# ---ANNOUNCEMENT --------------------------------------------------------
+
+matter_of_tazik.1 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.1.title
+	desc = matter_of_tazik.1.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = matter_of_tazik_fired
+	}
+
+	option = {
+		name = matter_of_tazik.1.a
+	}
+}
+
+# ---25 THRESHOLD: A petition from the bāzār ---------------------------
+
+matter_of_tazik.25 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.25.title
+	desc = matter_of_tazik.25.desc
+	outcome = neutral
+
+	# Hear in open court — concedes
+	option = {
+		name = matter_of_tazik.25.a
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 10 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = -5 }
+		change_variable = { name = matter_progress add = -10 }
+		set_variable = co_opt_track
+	}
+
+	# Refer to the qāḍī — delays
+	option = {
+		name = matter_of_tazik.25.b
+		change_variable = { name = matter_progress add = -5 }
+		random_owned_location = {
+			limit = { is_urban_diwan_capable_location = yes }
+			add_location_modifier = { modifier = ez_unrest_3 years = 3 }
+		}
+	}
+
+	# Confiscate the shops — provokes
+	option = {
+		name = matter_of_tazik.25.c
+		change_variable = { name = matter_progress add = 5 }
+		set_variable = petition_refused
+	}
+}
+
+# ---50 THRESHOLD: A sayyid preaches against the throne ---------------
+
+matter_of_tazik.50 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.50.title
+	desc = matter_of_tazik.50.desc
+	outcome = neutral
+
+	# Have him quietly killed — suppression line
+	option = {
+		name = matter_of_tazik.50.a
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = -0.10 }
+		change_variable = { name = matter_progress add = 5 }
+		set_variable = matter_chose_suppression
+	}
+
+	# Invite him to court — compromise
+	option = {
+		name = matter_of_tazik.50.b
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.05 }
+		change_variable = { name = matter_progress add = -5 }
+	}
+
+	# Endow a madrasa — co-opt
+	option = {
+		name = matter_of_tazik.50.c
+		add_estate_satisfaction = { type = estate_type:diwan_estate value = 0.15 }
+		change_variable = { name = matter_progress add = -15 }
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		set_variable = co_opt_track
+	}
+}
+
+# ---75 THRESHOLD: The cities have shut their gates -------------------
+
+matter_of_tazik.75 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.75.title
+	desc = matter_of_tazik.75.desc
+	outcome = neutral
+
+	# March in and break — accelerate to 100
+	option = {
+		name = matter_of_tazik.75.a
+		set_variable = { name = matter_progress value = 100 }
+		set_variable = matter_chose_suppression
+	}
+
+	# Open the gates to the dervishes — proto-Sarbedar concession
+	option = {
+		name = matter_of_tazik.75.b
+		set_variable = { name = matter_progress value = 30 }
+		add_stability = -20
+		add_legitimacy = -25
+	}
+
+	# Vizier-Regent settlement — full co-opt
+	option = {
+		name = matter_of_tazik.75.c
+		trigger = { has_variable = co_opt_track }
+		set_variable = { name = matter_progress value = 0 }
+		add_country_modifier = {
+			modifier = co_sovereignty_of_the_diwan
+			years = -1
+			mode = add_and_extend
+		}
+		set_variable = matter_of_tazik_resolved
+	}
+}
+
+# ---100: DISASTER FIRES (urban civil war) ----------------------------
+
+matter_of_tazik.100 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.100.title
+	desc = matter_of_tazik.100.desc
+	outcome = neutral
+
+	immediate = {
+		spawn_urban_breakaway = yes
+		# Religious-unrest cascade on non-rolling urban provinces
+		every_owned_province = {
+			limit = { is_urban_diwan_capable_location = yes }
+			every_location_in_province = {
+				add_location_modifier = { modifier = ez_unrest_5 years = 5 }
+				change_control = control_severe_penalty
+			}
+		}
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 20 }
+	}
+
+	option = {
+		name = matter_of_tazik.100.a
+	}
+}
+
+# ---200: SAFAVID SYNTHESIS OVERRIDE (§20.4) --------------------------
+# Fires when 75/75/0.80 thresholds met while disaster is active. Auto-
+# resolves into the Qizilbash Synthesis exit — peacefully annexes the
+# breakaway, sets both matter_resolved flags. Triggered by the
+# threshold_dispatch effect setting matter_synthesis_override flag.
+
+matter_of_tazik.200 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.200.title
+	desc = matter_of_tazik.200.desc
+	outcome = positive
+	trigger = {
+		has_variable = matter_synthesis_override
+		safavid_synthesis_thresholds_met = yes
+	}
+
+	immediate = {
+		matter_apply_qizilbash_synthesis = yes
+		# Peacefully annex the breakaway if it spawned
+		if = {
+			limit = { exists = var:matter_breakaway_ref }
+			var:matter_breakaway_ref ?= {
+				destroy_rebel = this
+			}
+		}
+	}
+
+	option = {
+		name = matter_of_tazik.200.a
+	}
+}
+
+# ---RESOLUTION EVENTS (war ended) -------------------------------------
+
+# Suppress
+matter_of_tazik.500 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.500.title
+	desc = matter_of_tazik.500.desc
+	outcome = positive
+	trigger = {
+		has_variable = matter_of_tazik_fired
+		in_civil_war = no
+		NOT = { exists = var:matter_breakaway_ref }
+	}
+
+	immediate = {
+		matter_of_tazik_apply_suppress = yes
+	}
+
+	option = { name = matter_of_tazik.500.a }
+}
+
+# Concede
+matter_of_tazik.501 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.501.title
+	desc = matter_of_tazik.501.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = matter_of_tazik_fired
+		in_civil_war = no
+		exists = var:matter_breakaway_ref
+		NOT = { has_variable = matter_chose_suppression }
+	}
+
+	immediate = {
+		matter_of_tazik_apply_concede = yes
+	}
+
+	option = { name = matter_of_tazik.501.a }
+}
+
+# Co-opt — mid-war Investiture at [city]
+matter_of_tazik.502 = {
+	type = country_event
+	category = disaster_event
+	title = matter_of_tazik.502.title
+	desc = matter_of_tazik.502.desc
+	outcome = positive
+	trigger = {
+		has_variable = matter_of_tazik_fired
+		has_variable = co_opt_track
+		in_civil_war = yes
+		exists = var:matter_breakaway_ref
+		var:matter_war_months >= 36
+	}
+
+	option = {
+		name = matter_of_tazik.502.a
+		matter_of_tazik_apply_co_opt = yes
+		var:matter_breakaway_ref ?= {
+			destroy_rebel = this
+		}
+	}
+
+	option = {
+		name = matter_of_tazik.502.b
+		change_variable = { name = matter_progress add = -10 }
+	}
+}

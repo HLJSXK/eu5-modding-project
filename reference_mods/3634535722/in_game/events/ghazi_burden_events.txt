@@ -1,0 +1,1284 @@
+namespace = ghazi_burden
+
+# ============================================================
+# Ghazi: Burden of the Sword — events
+#
+# Structure:
+#   .1            announce (disaster fired)
+#   .50/.65/.80/.90  apparatus (jihad_within, ribat_network,
+#                     investiture, sultan_of_ghazis)
+#                     — claimed by the player via the disaster
+#                     panel's action buttons; legitimacy-neutral
+#                     on claim (refund + legacy modifier pair only)
+#   .35/.20/.10   erosion (preacher cool, khutba cooler, bī-ghaza)
+#                     — fire once on first downward threshold-touch
+#   .40           designation expectation failed (timer elapsed
+#                     without progress; volunteers grumble)
+#   .100–.104     omens (preacher turns, volunteers drift, fatwa
+#                     question, infidel-victory surge, muhtasib
+#                     turns)
+#   .150          fatwa chain — a scholar at court issues the
+#                     Mardin-style ruling against yasa-holders
+#   .160–.162     frontier designation assemblies (caucasus / rum
+#                     / hindustan)
+#   .200          Sword of Islam (Vindicated)
+#   .201          Dervish Rising (Broken-formal — strips legacies,
+#                     strips reform, generative clause feeds the
+#                     murshid_i_kamil lineage)
+#   .202          Guardian of the Thughur (Endured)
+#   .203          Doctrine Lapses (Broken-lapse)
+#   .300–.307     INDICATOR events for the on-action hooks. Each
+#                     fires every time its hook applies, until the
+#                     player silences it. Option (b) sets
+#                     ghazi_silence_<type> (per-type mute); option
+#                     (c) sets ghazi_silence_all (master mute).
+# ============================================================
+
+# ---------------------------------------------------------------
+# .1 ANNOUNCE — the khutba names you ghazi
+# ---------------------------------------------------------------
+ghazi_burden.1 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.1.title
+	desc = ghazi_burden.1.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+	}
+
+	option = {
+		name = ghazi_burden.1.a
+		custom_tooltip = ghazi_burden.1.a.tt
+		# Acknowledge — no mechanical effect. The hunger has begun.
+	}
+}
+
+# ===============================================================
+# APPARATUS EVENTS — legitimacy-neutral on claim. Refund +
+# legacy pair only. Crossing a threshold does NOT push the player
+# toward the next; the apparatus settles the corresponding
+# silence and is its own end.
+# ===============================================================
+
+# ---50 JIHAD WITHIN — the censor walks the bazaar ----------------
+ghazi_burden.50 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.50.title
+	desc = ghazi_burden.50.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.50.a
+		# Refund: cancels the clergy slice while disaster runs.
+		add_country_modifier = {
+			modifier = ghazi_jihad_within_refund
+			months = -1
+		}
+		# Legacy: hisba apparatus institutionalized; persists past
+		# resolution unless Dervish Rising strips it.
+		add_country_modifier = {
+			modifier = ghazi_hisba_apparatus
+			months = -1
+		}
+		# A modest clergy bump — the jurists concede the house is
+		# at least being cleaned.
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+}
+
+# ---65 RIBAT NETWORK — the lodges endowed ------------------------
+ghazi_burden.65 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.65.title
+	desc = ghazi_burden.65.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.65.a
+		# Treasury cost: endowing the lodges (six months' income).
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		# Refund: cancels the levy slice while disaster runs.
+		add_country_modifier = {
+			modifier = ghazi_ribat_network_refund
+			months = -1
+		}
+		# Legacy: the lodges stand; permanent levy trace.
+		add_country_modifier = {
+			modifier = ghazi_the_lodges_endowed
+			months = -1
+		}
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+		# The volunteers, with somewhere to sleep at last, gather.
+		# Hand the player the frontier-designation assembly directly —
+		# this is the doctrinal next step the ribat network is FOR.
+		trigger_event_non_silently = ghazi_burden.160
+	}
+}
+
+# ---80 CALIPHAL INVESTITURE — the diploma from Cairo -------------
+ghazi_burden.80 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.80.title
+	desc = ghazi_burden.80.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.80.a
+		# Refund: cancels the religious-influence slice while
+		# disaster runs.
+		add_country_modifier = {
+			modifier = ghazi_investiture_refund
+			months = -1
+		}
+		# Legacy: the diploma exists.
+		add_country_modifier = {
+			modifier = ghazi_caliphal_diploma
+			months = -1
+		}
+		# AND THE STRING — a standing deference. Variable used by
+		# diplomacy / AI Mamluk-relations elsewhere.
+		set_variable = ghazi_owes_cairo
+		add_prestige = 30
+	}
+}
+
+# ---90 SULTAN OF THE GHAZIS — the title in your own right --------
+ghazi_burden.90 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.90.title
+	desc = ghazi_burden.90.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.90.a
+		# Refund: cancels the prestige slice + the largest
+		# legitimacy slice. With all four refunds standing the
+		# bleed is fully nulled — this is the consummation.
+		add_country_modifier = {
+			modifier = ghazi_sultan_of_ghazis_refund
+			months = -1
+		}
+		# Legacy: the title in the protocol; sikka and khutba name
+		# YOU as sword of the faith in your own right.
+		add_country_modifier = {
+			modifier = ghazi_sultan_of_ghazis_in_protocol
+			months = -1
+		}
+		# CUTS the Cairo string — the investiture's deference is
+		# repudiated. The Tabriz-1358 move.
+		if = {
+			limit = { has_variable = ghazi_owes_cairo }
+			remove_variable = ghazi_owes_cairo
+			set_variable = ghazi_cut_cairo_string
+		}
+		set_country_rank = country_rank:rank_kingdom
+		add_prestige = 50
+	}
+}
+
+# ===============================================================
+# EROSION EVENTS — public signs of withheld credibility
+# ===============================================================
+
+# ---35 THE PREACHER COOLS ----------------------------------------
+ghazi_burden.35 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.35.title
+	desc = ghazi_burden.35.desc
+	outcome = negative
+
+	# Endow the mosque — bribe the warmth back
+	option = {
+		name = ghazi_burden.35.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -4.5
+		}
+		add_legitimacy = 3
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.03 }
+	}
+
+	# Let the sermon stand — the doctrine is not for sale
+	option = {
+		name = ghazi_burden.35.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.03 }
+	}
+}
+
+# ---20 THE FRIDAY KHUTBA TURNS COLDER ----------------------------
+ghazi_burden.20 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.20.title
+	desc = ghazi_burden.20.desc
+	outcome = negative
+
+	# Summon the qāḍī and remind him whose realm this is
+	option = {
+		name = ghazi_burden.20.a
+		add_legitimacy = 2
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+		random_owned_location = { add_location_modifier = { modifier = ez_unrest_3 years = 3 } }
+	}
+
+	# Endow a new madrasa — buy back the pulpit's warmth
+	option = {
+		name = ghazi_burden.20.b
+		add_gold = {
+			value = monthly_income_total
+			multiply = -9
+		}
+		add_legitimacy = 5
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+}
+
+# ---10 BĪ-GHAZA — the first whispered word -----------------------
+ghazi_burden.10 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.10.title
+	desc = ghazi_burden.10.desc
+	outcome = negative
+
+	# Stage a great muster — buy patience, not credit
+	option = {
+		name = ghazi_burden.10.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+		add_estate_satisfaction = { type = estate_type:amirs_estate value = 0.05 }
+		# Deliberately no legitimacy — the muster is theater;
+		# the volunteers know.
+	}
+
+	# Endure the whisper — let the wager run
+	option = {
+		name = ghazi_burden.10.b
+		add_prestige = 5
+	}
+}
+
+# ---40 DESIGNATION EXPECTATION FAILED ----------------------------
+# "The volunteers came for war and found garrison duty." Fires
+# from the monthly tick when a designated frontier has had no
+# visible progress for 60 months.
+ghazi_burden.40 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.40.title
+	desc = ghazi_burden.40.desc
+	outcome = negative
+
+	# Disband the muster honorably — eat the loss
+	option = {
+		name = ghazi_burden.40.a
+		add_legitimacy = -5
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.05 }
+	}
+
+	# Redirect the corps — promise a new theater
+	option = {
+		name = ghazi_burden.40.b
+		add_legitimacy = -2
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.10 }
+		# The corps grumbles; if redirected often, drift events
+		# accelerate (handled by the omen pulse weighting).
+	}
+}
+
+# ===============================================================
+# OMEN EVENTS — juridical-communal register
+# ===============================================================
+
+# ---100 A FAMOUS PREACHER'S SERMON TURNS -------------------------
+ghazi_burden.100 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.100.title
+	desc = ghazi_burden.100.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_preacher }
+	}
+
+	# 2-year per-omen cooldown: set here, checked in the trigger, so a
+	# pulse roll during the cooldown fires nothing and stays quiet.
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_preacher value = 1 years = 2 }
+	}
+
+	# Patronize him — buy the next sermon's warmth
+	option = {
+		name = ghazi_burden.100.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -3
+		}
+		random_list = {
+			60 = { add_legitimacy = 4 }
+			40 = { add_legitimacy = -3 }
+		}
+	}
+
+	# Ignore the slight — let pulpits speak as they will
+	option = {
+		name = ghazi_burden.100.b
+		random_list = {
+			40 = { add_legitimacy = 1 }
+			60 = { add_legitimacy = -4 }
+		}
+	}
+}
+
+# ---101 THE VOLUNTEERS DRIFT -------------------------------------
+# A rival ghazi tag (any other ghazi_sultanate holder, or a
+# historical magnet) gains a temporary draw. Modeled as
+# legitimacy + levy hit on the player; the design's zero-sum
+# claim of credibility among rivals.
+ghazi_burden.101 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.101.title
+	desc = ghazi_burden.101.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_drift }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_drift value = 1 years = 2 }
+	}
+
+	# Send the qāḍīs to recall the volunteers
+	option = {
+		name = ghazi_burden.101.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -4.5
+		}
+		add_legitimacy = -2
+	}
+
+	# Let them drift — call them back by being seen at war
+	option = {
+		name = ghazi_burden.101.b
+		add_legitimacy = -5
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.05 }
+	}
+}
+
+# ---102 THE FATWA-QUESTIONING ------------------------------------
+# Fires when Sunni-vs-Sunni or unfatwa'd tier-2 wars have happened.
+# Pay the scholars or eat the legitimacy hit.
+ghazi_burden.102 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.102.title
+	desc = ghazi_burden.102.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_fatwa }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_fatwa value = 1 years = 2 }
+	}
+
+	# Pay the scholars — buy the dissent into silence
+	option = {
+		name = ghazi_burden.102.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+
+	# Stand by the wars — the legitimacy hit
+	option = {
+		name = ghazi_burden.102.b
+		add_legitimacy = -8
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.10 }
+	}
+}
+
+# ---103 NEWS OF INFIDEL VICTORY — surge window opens -------------
+# Somewhere on the umma's edge, the enemy wins. A 4-year window
+# of x2 credit; ignoring it eats legitimacy.
+ghazi_burden.103 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.103.title
+	desc = ghazi_burden.103.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_surge }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_surge value = 1 years = 2 }
+	}
+
+	# Answer the call — open the surge window
+	option = {
+		name = ghazi_burden.103.a
+		set_variable = {
+			name = ghazi_surge_window
+			value = 48
+		}
+		add_legitimacy = 3
+	}
+
+	# The realm has its own wars — ignore
+	option = {
+		name = ghazi_burden.103.b
+		add_legitimacy = -5
+	}
+}
+
+# ---104 THE MUHTASIB TURNS ON THE COURT --------------------------
+# Only fires at sustained low legitimacy with hisba apparatus
+# active. The censor's apparatus audits THE COURT — the regime
+# devouring its master.
+ghazi_burden.104 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.104.title
+	desc = ghazi_burden.104.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		has_country_modifier = ghazi_hisba_apparatus
+		legitimacy <= 35
+		NOT = { has_variable = ghazi_omen_cd_muhtasib }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_muhtasib value = 1 years = 2 }
+	}
+
+	# Submit to the audit — clergy up, ruler down
+	option = {
+		name = ghazi_burden.104.a
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.10 }
+		add_prestige = -15
+		add_legitimacy = -2
+	}
+
+	# Curb the muhtasib — clergy down, ruler steady
+	option = {
+		name = ghazi_burden.104.b
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.10 }
+		add_legitimacy = -5
+	}
+}
+
+# ---105 THE RETURNED GHAZI ---------------------------------------
+# A famous volunteer comes home from the frontier covered in glory
+# and scars, trailing young men who repeat his stories. He expects
+# honors. The court that honors him borrows his credibility; the
+# court that snubs him teaches every zurkhana what ghaza is worth.
+ghazi_burden.105 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.105.title
+	desc = ghazi_burden.105.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_hero }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_hero value = 1 years = 2 }
+	}
+
+	# Robe him, land him, seat him at the right hand
+	option = {
+		name = ghazi_burden.105.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -3
+		}
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+		add_legitimacy = 3
+	}
+
+	# A polite audience and nothing else — heroes are expensive
+	option = {
+		name = ghazi_burden.105.b
+		add_legitimacy = -4
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.05 }
+	}
+}
+
+# ---106 THE NEGLECTED RIBAT --------------------------------------
+# Word from the frontier: a border lodge was overrun — its dervishes
+# dead or carried off — while the court feasted. Nobody says it was
+# the sultan's fault. Everybody knows whose burden the thughur is.
+ghazi_burden.106 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.106.title
+	desc = ghazi_burden.106.desc
+	outcome = negative
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_ribat }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_ribat value = 1 years = 2 }
+	}
+
+	# Rebuild it twice as strong, endow it in your own name
+	option = {
+		name = ghazi_burden.106.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -6
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+		add_legitimacy = 2
+	}
+
+	# Mourn publicly, rebuild nothing — the frontier is far away
+	option = {
+		name = ghazi_burden.106.b
+		add_legitimacy = -6
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+	}
+}
+
+# ---108 THE BANNERS FLOCK — fortune attests (positive) -----------
+# A frontier shaykh of weight has named THIS court the true seat of
+# ghaza, and the volunteers are arriving to prove him right. The
+# drift event's mirror: the zero-sum credibility flows IN for once.
+ghazi_burden.108 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.108.title
+	desc = ghazi_burden.108.desc
+	outcome = positive
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_flock }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_flock value = 1 years = 2 }
+	}
+
+	# Feast them, enroll them, pay their upkeep
+	option = {
+		name = ghazi_burden.108.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -1.5
+		}
+		add_legitimacy = 4
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = 0.05 }
+	}
+
+	# Bless them and point them at the frontier — cheap grace
+	option = {
+		name = ghazi_burden.108.b
+		add_legitimacy = 1
+	}
+}
+
+# ---109 THE CAPTIVES RETURN — the ransom comes home (positive) ---
+# The qadis' collection, the merchants' sureties, and a hard border
+# negotiation have brought Muslim captives home. Whoever pays the
+# balance owns the story.
+ghazi_burden.109 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.109.title
+	desc = ghazi_burden.109.desc
+	outcome = positive
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_omen_cd_captives }
+	}
+
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_captives value = 1 years = 2 }
+	}
+
+	# Pay the balance from the treasury — the sultan's ransom
+	option = {
+		name = ghazi_burden.109.a
+		add_gold = {
+			value = monthly_income_total
+			multiply = -3
+		}
+		add_legitimacy = 5
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+
+	# Let the families and the qadis carry it — piety at cost price
+	option = {
+		name = ghazi_burden.109.b
+		add_legitimacy = 1
+	}
+}
+
+# ===============================================================
+# FATWA CHAIN (the Mardin-fatwa moment)
+# ===============================================================
+
+# ---150 A SCHOLAR PROPOSES THE RULING ----------------------------
+# A named scholar (Ibn Taymiyya analogue) at court issues the
+# fatwa: a ruler professing Islam but governing by the yasa "has
+# not entered the law"; war against him is obligatory. Acquired
+# variable gates tier-2 credit upgrade.
+ghazi_burden.150 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.150.title
+	desc = ghazi_burden.150.desc
+	outcome = neutral
+
+	trigger = {
+		has_variable = ghazi_burden_fired
+		NOT = { has_variable = ghazi_fatwa_acquired }
+		NOT = { has_variable = ghazi_omen_cd_yasa }
+	}
+
+	# The offer renews every two years while unclaimed, instead of
+	# pestering on every roll.
+	immediate = {
+		set_variable = { name = ghazi_omen_cd_yasa value = 1 years = 2 }
+	}
+
+	# Endorse the ruling — clergy cost, future tier-2 wars credit
+	option = {
+		name = ghazi_burden.150.a
+		set_variable = ghazi_fatwa_acquired
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.05 }
+		add_legitimacy = 5
+	}
+
+	# Patronize the scholar handsomely — pay gold instead of clergy
+	option = {
+		name = ghazi_burden.150.b
+		set_variable = ghazi_fatwa_acquired
+		add_gold = {
+			value = monthly_income_total
+			multiply = -12
+		}
+		add_legitimacy = 5
+	}
+
+	# Refuse to entertain the doctrine — keep the order, no upgrade
+	option = {
+		name = ghazi_burden.150.c
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+}
+
+# ===============================================================
+# FRONTIER DESIGNATION ASSEMBLIES
+# Unlocked once the ribat network is claimed. Fired periodically
+# (event-side trigger gates on apparatus 4.2). The player picks
+# one of three theaters; the modifier engages; the expectation
+# timer begins.
+# ===============================================================
+
+# ---160 THE VOLUNTEERS ARE GATHERED — Caucasus -------------------
+ghazi_burden.160 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.160.title
+	desc = ghazi_burden.160.desc
+	outcome = neutral
+
+	option = {
+		name = ghazi_burden.160.a
+		# Switch designation if one already held; one-time cost.
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_rum }
+			remove_country_modifier = ghazi_frontier_rum
+			add_legitimacy = -3
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_hindustan }
+			remove_country_modifier = ghazi_frontier_hindustan
+			add_legitimacy = -3
+		}
+		add_country_modifier = {
+			modifier = ghazi_frontier_caucasus
+			months = -1
+		}
+		set_variable = { name = ghazi_designation_progress_months value = 0 }
+	}
+	option = {
+		name = ghazi_burden.160.b
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_caucasus }
+			remove_country_modifier = ghazi_frontier_caucasus
+			add_legitimacy = -3
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_hindustan }
+			remove_country_modifier = ghazi_frontier_hindustan
+			add_legitimacy = -3
+		}
+		add_country_modifier = {
+			modifier = ghazi_frontier_rum
+			months = -1
+		}
+		set_variable = { name = ghazi_designation_progress_months value = 0 }
+	}
+	option = {
+		name = ghazi_burden.160.c
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_caucasus }
+			remove_country_modifier = ghazi_frontier_caucasus
+			add_legitimacy = -3
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_frontier_rum }
+			remove_country_modifier = ghazi_frontier_rum
+			add_legitimacy = -3
+		}
+		add_country_modifier = {
+			modifier = ghazi_frontier_hindustan
+			months = -1
+		}
+		set_variable = { name = ghazi_designation_progress_months value = 0 }
+	}
+	option = {
+		name = ghazi_burden.160.d
+		# Send the volunteers home — no designation, modest scar.
+		add_legitimacy = -5
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.05 }
+	}
+}
+
+# ===============================================================
+# INTERNAL CAMPAIGNS (tier-1)
+# Three flavors of hisba-driven purification of the realm. Each
+# branch calls ghazi_apply_internal_campaign_credit, which handles
+# the diminishing-returns curve and increments the counter.
+# Historical model: Mubariz al-Din at Shiraz, 1353 — closing the
+# taverns, persecuting the philosophers, dispersing the heterodox
+# circles. Each flavor pays a different political cost.
+# ===============================================================
+
+ghazi_burden.500 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.500.title
+	desc = ghazi_burden.500.desc
+	outcome = neutral
+
+	# Vice: the wine-shops, the gambling dens, the unveiled women
+	# of the bazaar. The Shiraz-1353 image. Burghers pay; clergy
+	# applaud; the chronicles record a city in mourning.
+	option = {
+		name = ghazi_burden.500.a
+		ghazi_apply_internal_campaign_credit = yes
+		add_country_modifier = {
+			modifier = ghazi_vice_campaign_scar
+			months = 60
+			mode = add_and_extend
+		}
+		add_estate_satisfaction = { type = estate_type:burghers_estate value = -0.10 }
+	}
+
+	# Heterodoxy: ghulat shaykhs, Hurufi cells, the doctrinally
+	# suspect ribats. Clergy applaud loudest here; but the
+	# constituency that COULD have been the realm's own dervish
+	# rising grows thinner by the same act. (Narrative effect; the
+	# Dervish Rising resolution does not condition on this counter.)
+	option = {
+		name = ghazi_burden.500.b
+		ghazi_apply_internal_campaign_credit = yes
+		add_country_modifier = {
+			modifier = ghazi_heterodoxy_campaign_scar
+			months = 60
+			mode = add_and_extend
+		}
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = 0.05 }
+	}
+
+	# Sectarian: the other branch. In a Sunni realm this is shia
+	# circles dispersed; in a Shia realm, the reverse. Modeled
+	# symmetrically as conversion-speed boost + a tolerance penalty.
+	option = {
+		name = ghazi_burden.500.c
+		ghazi_apply_internal_campaign_credit = yes
+		add_country_modifier = {
+			modifier = ghazi_sectarian_campaign_scar
+			months = 60
+			mode = add_and_extend
+		}
+		random_owned_location = { add_location_modifier = { modifier = ez_unrest_3 years = 3 } }
+	}
+}
+
+# ===============================================================
+# RESOLUTION EVENTS
+# ===============================================================
+
+# ---200 SWORD OF ISLAM — Vindicated ------------------------------
+# Sustained high legitimacy + tier3 record. The Ghazi Corps
+# institutionalized; the realm's identity locked as dar al-harb's
+# neighbor.
+ghazi_burden.200 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.200.title
+	desc = ghazi_burden.200.desc
+	outcome = positive
+
+	immediate = {
+		add_country_modifier = {
+			modifier = ghazi_sword_of_islam
+			months = -1
+		}
+		set_variable = ghazi_was_sword_of_islam
+		remove_reform = government_reform:ghazi_sultanate
+		add_reform = government_reform:dar_al_jihad
+	}
+
+	option = {
+		name = ghazi_burden.200.a
+		add_legitimacy = 25
+		add_prestige = 50
+		add_stability = 10
+	}
+}
+
+# ---201 DERVISH RISING — Broken-formal ---------------------------
+# The constituency defects to a more credible vessel. A
+# charismatic shaykh gathers the ribat network; messianic rising.
+# Strips reform AND all four legacies. The generative clause:
+# the rising's energy is the raw material the Safavid corridor
+# captures.
+ghazi_burden.201 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.201.title
+	desc = ghazi_burden.201.desc
+	outcome = negative
+
+	immediate = {
+		# Strip the reform — the doctrine dies with the dynasty.
+		remove_reform = government_reform:ghazi_sultanate
+		# The Mushaʿshaʿ-style heterodox apocalyptic tilt: the
+		# constituency went to a charismatic shaykh; the throne
+		# now runs as a millenarian fusion. This reform sits in
+		# the Age 2 heterodox axis and is the natural landing.
+		# Acts as the corridor's first step; murshid_i_kamil in
+		# Age 3 reads ghazi_birthed_messianic_rising as confirming
+		# precedent.
+		add_reform = government_reform:mushasha_messianism
+		# DERVISH RISING strips ALL apparatus legacies. The
+		# dynasty's ghazi project is erased; the ribat network
+		# now belongs to the shaykh.
+		if = {
+			limit = { has_country_modifier = ghazi_hisba_apparatus }
+			remove_country_modifier = ghazi_hisba_apparatus
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_the_lodges_endowed }
+			remove_country_modifier = ghazi_the_lodges_endowed
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_caliphal_diploma }
+			remove_country_modifier = ghazi_caliphal_diploma
+		}
+		if = {
+			limit = { has_country_modifier = ghazi_sultan_of_ghazis_in_protocol }
+			remove_country_modifier = ghazi_sultan_of_ghazis_in_protocol
+		}
+		# Permanent scar.
+		add_country_modifier = {
+			modifier = ghazi_dervish_rising_scar
+			years = 25
+			mode = add_and_extend
+		}
+		set_variable = ghazi_was_dervish_rising
+		# GENERATIVE CLAUSE: mark the dynasty as having birthed a
+		# messianic rising. The murshid_i_kamil corridor reads this
+		# variable as a precondition for the Safavid-track start.
+		set_variable = ghazi_birthed_messianic_rising
+		# Settle the political fact: clergy demoralized, tribes
+		# disinherited (they followed the shaykh, not the throne).
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = -0.15 }
+		add_estate_satisfaction = { type = estate_type:tribes_estate value = -0.20 }
+		add_legitimacy = -25
+		create_character = {
+
+			estate = estate_type:clergy_estate
+			religion = religion:shia
+			culture = root.culture
+			age = {24 40}
+			adm = {0 20} # not an administrator.
+			dip = {33 66} ## not complex, but has certain charisma
+			mil = {75 100}
+			save_scope_as = the_military_usurper_scope
+		}
+
+		
+		kill_character = ROOT.ruler
+		set_new_ruler = scope:the_military_usurper_scope
+		change_religion = religion:shia
+	}
+
+	option = {
+		name = ghazi_burden.201.a
+		# The realm survives. The doctrine does not.
+	}
+}
+
+# ---202 GUARDIAN OF THE THUGHUR — Endured (geographically gated) -
+# 25 years, realm intact, BORDERS dar al-harb, no frontier loss.
+# The murabit's answer: smaller permanent bonuses, frontier
+# defense flavor.
+ghazi_burden.202 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.202.title
+	desc = ghazi_burden.202.desc
+	outcome = positive
+
+	immediate = {
+		add_country_modifier = {
+			modifier = ghazi_guardian_of_thughur
+			months = -1
+		}
+		set_variable = ghazi_was_guardian
+		remove_reform = government_reform:ghazi_sultanate
+		add_reform = government_reform:dar_al_jihad
+	}
+
+	option = {
+		name = ghazi_burden.202.a
+		add_legitimacy = 12
+		add_prestige = 20
+	}
+}
+
+# ---203 THE DOCTRINE LAPSES — Broken-lapse ----------------------
+# Sustained low without the rising's preconditions. The title
+# goes ceremonial; muhtasib_regime option lost (revoked); bleed
+# ends. The cousins remember.
+ghazi_burden.203 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.203.title
+	desc = ghazi_burden.203.desc
+	outcome = negative
+
+	immediate = {
+		add_country_modifier = {
+			modifier = ghazi_doctrine_lapsed_scar
+			months = -1
+		}
+		set_variable = ghazi_was_doctrine_lapsed
+		# Strip the reform — the unproven ghaza cannot be held
+		# indefinitely. (Legacies retained.)
+		remove_reform = government_reform:ghazi_sultanate
+	}
+
+	option = {
+		name = ghazi_burden.203.a
+		add_legitimacy = -15
+		add_prestige = -25
+	}
+}
+
+# ===============================================================
+# INDICATOR EVENTS — fire whenever their hook applies, until the
+# player silences them.
+#
+# Each event has three options:
+#   (a) Acknowledge — applies the effect, keeps notifying.
+#   (b) Silence this notification type — applies the effect and
+#       sets ghazi_silence_<type>, muting future notifications of
+#       only this kind.
+#   (c) Silence all of these notifications — applies the effect
+#       and sets ghazi_silence_all, muting every remaining
+#       notification for the run.
+#
+# The hook checks BOTH ghazi_silence_<type> and ghazi_silence_all;
+# if either is set, the hook applies the effect directly and does
+# not trigger the event (trigger_event_silently does not work on
+# multi-option events).
+# ===============================================================
+
+# ---300 BATTLE WON -----------------------------------------------
+ghazi_burden.300 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.300.title
+	desc = ghazi_burden.300.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.300.a
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = ghazi_burden.300.b
+		set_variable = ghazi_silence_battle_won
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = ghazi_burden.300.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = 1
+	}
+}
+
+# ---301 BATTLE LOST ----------------------------------------------
+ghazi_burden.301 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.301.title
+	desc = ghazi_burden.301.desc
+	outcome = negative
+
+	option = {
+		name = ghazi_burden.301.a
+		add_legitimacy = -2
+	}
+
+	option = {
+		name = ghazi_burden.301.b
+		set_variable = ghazi_silence_battle_lost
+		add_legitimacy = -2
+	}
+
+	option = {
+		name = ghazi_burden.301.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = -2
+	}
+}
+
+# ---302 WAR WON --------------------------------------------------
+# The tier-dispatched credit is applied by ghazi_apply_war_credit
+# in the hook itself; the option payload here is the per-event
+# legitimacy pulse, mirroring the silent path in the hook.
+ghazi_burden.302 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.302.title
+	desc = ghazi_burden.302.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.302.a
+		add_legitimacy = 1.5
+	}
+
+	option = {
+		name = ghazi_burden.302.b
+		set_variable = ghazi_silence_war_won
+		add_legitimacy = 1.5
+	}
+
+	option = {
+		name = ghazi_burden.302.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = 1.5
+	}
+}
+
+# ---303 WAR LOST -------------------------------------------------
+ghazi_burden.303 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.303.title
+	desc = ghazi_burden.303.desc
+	outcome = negative
+
+	option = {
+		name = ghazi_burden.303.a
+		add_legitimacy = -3
+		add_country_modifier = {
+			modifier = ghazi_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = ghazi_burden.303.b
+		set_variable = ghazi_silence_war_lost
+		add_legitimacy = -3
+		add_country_modifier = {
+			modifier = ghazi_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+
+	option = {
+		name = ghazi_burden.303.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = -3
+		add_country_modifier = {
+			modifier = ghazi_defeat_shame
+			months = 6
+			mode = add_and_extend
+		}
+	}
+}
+
+# ---304 CAPITAL LOST ---------------------------------------------
+ghazi_burden.304 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.304.title
+	desc = ghazi_burden.304.desc
+	outcome = negative
+
+	option = {
+		name = ghazi_burden.304.a
+		add_legitimacy = -25
+		add_country_modifier = {
+			modifier = ghazi_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+
+	option = {
+		name = ghazi_burden.304.b
+		set_variable = ghazi_silence_capital_lost
+		add_legitimacy = -25
+		add_country_modifier = {
+			modifier = ghazi_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+
+	option = {
+		name = ghazi_burden.304.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = -25
+		add_country_modifier = {
+			modifier = ghazi_capital_lost
+			months = -1
+			mode = replace
+		}
+	}
+}
+
+# ---305 NON-CAPITAL PROVINCE LOST --------------------------------
+ghazi_burden.305 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.305.title
+	desc = ghazi_burden.305.desc
+	outcome = negative
+
+	option = {
+		name = ghazi_burden.305.a
+		add_legitimacy = -3
+	}
+
+	option = {
+		name = ghazi_burden.305.b
+		set_variable = ghazi_silence_province_lost
+		add_legitimacy = -3
+	}
+
+	option = {
+		name = ghazi_burden.305.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = -3
+	}
+}
+
+# ---306 PROVINCE GAINED ------------------------------------------
+ghazi_burden.306 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.306.title
+	desc = ghazi_burden.306.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.306.a
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = ghazi_burden.306.b
+		set_variable = ghazi_silence_province_gained
+		add_legitimacy = 1
+	}
+
+	option = {
+		name = ghazi_burden.306.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = 1
+	}
+}
+
+# ---307 CONSOLIDATION ON CONQUERED TIER-3 LAND -------------------
+# Bonus pulse — the consolidation the doctrine is FOR. Hook fires
+# this when a province is taken from a tier-3 target.
+ghazi_burden.307 = {
+	type = country_event
+	category = disaster_event
+	title = ghazi_burden.307.title
+	desc = ghazi_burden.307.desc
+	outcome = positive
+
+	option = {
+		name = ghazi_burden.307.a
+		add_legitimacy = 4
+		add_prestige = 10
+	}
+
+	option = {
+		name = ghazi_burden.307.b
+		set_variable = ghazi_silence_consolidation
+		add_legitimacy = 4
+		add_prestige = 10
+	}
+
+	option = {
+		name = ghazi_burden.307.c
+		set_variable = ghazi_silence_all
+		add_legitimacy = 4
+		add_prestige = 10
+	}
+}

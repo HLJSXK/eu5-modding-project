@@ -1,0 +1,88 @@
+# =====================================================================
+# THE BANNERS SEEK A PIR — the civil-war hook for shia risings
+#
+# Playtest finding: shia rebels are coded as a CIVIL WAR (the rising
+# tries to force the SAME country to be shia), not as a new country —
+# so the hook is on_civil_war_start, not on_new_country_formed, and
+# it extends the engine hook through a named on_actions entry like
+# every other file here.
+#
+# Engine scopes (base header): root = original country targeted by
+# the civil war, scope:target = rebel country declaring it,
+# scope:war = the war, scope:rebel = the rebel faction.
+#
+# When a shia religious rising fires its war, a Known Murshid (Two
+# Pirs midpoint) or fully militant order with a lodge in the rising's
+# region is offered command (tariqa.3): accepting runs the full
+# khurūj — the order takes the field and the rising's war with it.
+# When NO murshid is in reach, the rising must name itself: the
+# Sarbadar precedent or the Mushaʿshaʿ precedent (tariqa.5, at the
+# rebel country).
+# =====================================================================
+
+on_civil_war_start = {
+	on_actions = {
+		shia_banners_civil_war
+	}
+}
+
+shia_banners_civil_war = {
+	trigger = {
+		scope:rebel ?= {
+			rebel_category = religious
+		}
+		scope:target ?= {
+			religion = religion:shia
+		}
+	}
+	effect = {
+		scope:target = { save_scope_as = shia_rebels }
+		# The country the rising rose against — tariqa.3.a inherits
+		# this war.
+		save_scope_as = banner_host
+		if = {
+			limit = {
+				any_country = {
+					country_type = building
+					has_reform = government_reform:tariqa_order
+					NOT = { has_variable = tariqa_settled }
+					OR = {
+						has_variable = tariqa_known_murshid
+						is_militant_tariqa = yes
+					}
+					any_owned_foreign_building = {
+						location ?= {
+							region = scope:shia_rebels.capital.region
+						}
+					}
+				}
+			}
+			random_country = {
+				limit = {
+					country_type = building
+					has_reform = government_reform:tariqa_order
+					NOT = { has_variable = tariqa_settled }
+					# Known Murshid (midpoint) or completed passage.
+					OR = {
+						has_variable = tariqa_known_murshid
+						is_militant_tariqa = yes
+					}
+					# The order must actually be present in the region
+					# where the banners rose.
+					any_owned_foreign_building = {
+						location ?= {
+							region = scope:shia_rebels.capital.region
+						}
+					}
+				}
+				trigger_event_non_silently = tariqa.3
+			}
+		}
+		else = {
+			# No pir to proclaim: the rising founds its own answer.
+			scope:shia_rebels = {
+				trigger_event_non_silently = tariqa.5
+			}
+		}
+	}
+}

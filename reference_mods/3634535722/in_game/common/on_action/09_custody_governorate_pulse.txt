@@ -1,0 +1,116 @@
+# Custody of the Ulus — the governorate's fealty pulse.
+#
+# Paradox merges on_actions, so re-declaring monthly_country_pulse
+# EXTENDS it. A non-subject Ilkhanate governorate, with at least one
+# regency standing to swear to, is periodically pressed to choose a
+# steward (custody.30) — medium cadence (~9%/month via the 100=0
+# empty option). The per-event work and the choice live in the event.
+#
+# Design: docs/design/custody_of_the_ulus_design.md
+
+monthly_country_pulse = {
+	on_actions = {
+		custody_governorate_pulse
+		peasant_non_levying_pulse
+		peasant_non_levying_cleanup_pulse
+		correct_existing_iqta_building
+
+	}
+}
+
+
+
+
+custody_governorate_pulse = {
+	trigger = {
+		has_reform = government_reform:ilkhanate_governorate
+		is_subject = no
+		# Not pressed in the last five years — the timed variable set in
+		# custody.30's immediate auto-expires, then the pulse may ask
+		# again. (At most once per 5 years.)
+		NOT = { has_variable = custody_gov_pulse_recent }
+		# There must be a khan to swear to.
+		international_organization:eranzamin ?= {
+			any_international_organization_member = {
+				NOT = { this = root }
+				has_reform = government_reform:chinggisid_regency
+			}
+		}
+	}
+
+	random_events = {
+		# 100 = 0 keeps the pulse mostly silent; 10 = ~9%/month.
+		100 = 0
+		10 = custody.30
+	}
+}
+
+
+peasant_non_levying_pulse = {
+
+	trigger = {
+		## run ONLY for persianate sultanates which are at war.
+		
+		OR = {
+			government_type ?= government_type:persianate_sultanate
+			government_type ?= government_type:commonwealth_of_martyrs
+		}
+		at_war = yes
+		has_raised_levies = yes
+		## has_raised_levies
+	}
+	effect = {
+
+		every_owned_location = {
+			limit = {
+				modifier:levies_are_raised_flag = yes
+				NOT = { has_location_modifier = circle_of_justice_food_and_rgo_offset }
+			}
+			add_location_modifier = {modifier = circle_of_justice_food_and_rgo_offset days = -1 mode=add_and_extend}
+		}
+
+		### later on, we can add something that actually represents Tribes and Amirs being levied. 
+
+	}
+
+
+}
+
+
+peasant_non_levying_cleanup_pulse = {
+
+	trigger = {
+		## run ONLY for persianate sultanates which are at war.
+		
+		OR = {
+			government_type ?= government_type:persianate_sultanate
+			government_type ?= government_type:commonwealth_of_martyrs
+		}
+		any_owned_location = {
+			modifier:levies_are_raised_flag = no
+			has_location_modifier = circle_of_justice_food_and_rgo_offset
+		}
+		## has_raised_levies
+	}
+	effect = {
+		every_owned_location = {
+				limit = { 
+					modifier:levies_are_raised_flag = no
+					has_location_modifier = circle_of_justice_food_and_rgo_offset
+				}
+				remove_location_modifier = circle_of_justice_food_and_rgo_offset
+			}
+		### later on, we can add something that actually represents Tribes and Amirs being levied. 
+
+	}
+
+
+}
+
+### adds the global variable
+
+
+
+
+### adds the global variable
+

@@ -1,0 +1,349 @@
+# ============================================================
+# On-action hooks for the Ghazi: Burden of the Sword disaster.
+#
+# Paradox merges on_actions across files. Re-declaring an engine
+# on_action here EXTENDS it — the engine still runs its built-in
+# logic; we add a ghazi-specific tail.
+#
+# Hooks:
+#   on_great_battle_won           — per-battle credit (tier-3
+#                                   bonus is always applied; base
+#                                   pulse routed through the
+#                                   notification path)
+#   on_battle_lost                — small per-battle legitimacy
+#                                   hit
+#   on_winning_war                — ghazi_apply_war_credit is
+#                                   ALWAYS applied (tier dispatch);
+#                                   the per-event legitimacy pulse
+#                                   is routed through the
+#                                   notification path
+#   on_losing_war                 — defeat_shame modifier + legit
+#   on_location_changed_owner     — capital lost / non-capital
+#                                   lost / province gained
+#                                   (consolidation bonus on
+#                                   tier-3 gains is always applied)
+#
+# Notification gating uses TWO silence variables per situation:
+#   ghazi_silence_<situation>   — per-type silence (event option b)
+#   ghazi_silence_all           — master mute (event option c)
+#
+# If EITHER variable is set, the hook skips the event and applies
+# the effect directly. This avoids trigger_event_silently, which
+# does not work on multi-option events. The event therefore fires
+# REPEATEDLY until the player silences it (per-type or all).
+# ============================================================
+on_battle_won = {
+	on_actions = {
+		on_ghazi_burden_battle_win
+	}
+}
+on_great_battle_won = {
+	on_actions = {
+		on_ghazi_burden_battle_win
+	}
+}
+
+on_battle_lost = {
+	on_actions = {
+		ghazi_burden_on_battle_lost
+	}
+}
+on_great_battle_lost = {
+	on_actions = {
+		ghazi_burden_on_battle_lost
+	}
+}
+on_winning_war = {
+	on_actions = {
+		ghazi_burden_on_winning_war
+	}
+}
+
+on_losing_war = {
+	on_actions = {
+		ghazi_burden_on_losing_war
+	}
+}
+
+on_location_changed_owner = {
+	on_actions = {
+		ghazi_burden_on_location_changed_owner_loss
+		ghazi_burden_on_location_changed_owner_win
+	}
+}
+
+# ============================================================
+# Battle won. scope:actor = winning unit, scope:target = losing
+# unit. Country = scope:actor.owner.
+# ============================================================
+
+on_ghazi_burden_battle_win = {
+	trigger = {
+		scope:actor = {
+			owner = { has_variable = ghazi_burden_fired }
+		}
+		# scope:target is a UNIT here — is_rebel_country needs the country.
+		scope:target.owner ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		scope:actor.owner = {
+			# Tier-3 enemy: real ghaza. Always-on bonus, regardless of
+			# notification silence — this is the doctrinal yield, not
+			# the courier's tap on the shoulder.
+			if = {
+				limit = {
+					scope:target = {
+						owner = { ghazi_target_is_tier_3 = yes }
+					}
+				}
+				add_legitimacy = 2
+			}
+			# Base battle-win pulse: notify if allowed, else apply
+			# directly.
+			if = {
+				limit = {
+					NOR = {
+						has_variable = ghazi_silence_battle_won
+						has_variable = ghazi_silence_all
+					}
+				}
+				trigger_event_non_silently = ghazi_burden.300
+			}
+			else = {
+				add_legitimacy = 1
+			}
+		}
+	}
+}
+
+# ============================================================
+# Battle lost. scope:actor = losing unit, scope:target = winning
+# unit.
+# ============================================================
+
+ghazi_burden_on_battle_lost = {
+	trigger = {
+		scope:actor = {
+			owner = { has_variable = ghazi_burden_fired }
+		}
+		# scope:target is a UNIT here — is_rebel_country needs the country.
+		scope:target.owner ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		scope:actor.owner = {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = ghazi_silence_battle_lost
+						has_variable = ghazi_silence_all
+					}
+				}
+				trigger_event_non_silently = ghazi_burden.301
+			}
+			else = {
+				add_legitimacy = -2
+			}
+		}
+	}
+}
+
+# ============================================================
+# Winning war. scope:winner = winner country, scope:loser =
+# loser country. The ghazi_apply_war_credit scripted effect
+# dispatches by tier and is ALWAYS applied — it is the doctrinal
+# yield, not a notification side-effect.
+# ============================================================
+
+ghazi_burden_on_winning_war = {
+	trigger = {
+		scope:winner ?= {
+			has_variable = ghazi_burden_fired
+		}
+		scope:loser ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		scope:winner ?= {
+			ghazi_apply_war_credit = yes
+			if = {
+				limit = {
+					NOR = {
+						has_variable = ghazi_silence_war_won
+						has_variable = ghazi_silence_all
+					}
+				}
+				trigger_event_non_silently = ghazi_burden.302
+			}
+			else = {
+				add_legitimacy = 1.5
+			}
+		}
+	}
+}
+
+# ============================================================
+# Losing war. The doctrine's nightmare: the sword failed in the
+# field. defeat_shame applied, flat legitimacy debit.
+# ============================================================
+
+ghazi_burden_on_losing_war = {
+	trigger = {
+		scope:loser ?= {
+			has_variable = ghazi_burden_fired
+		}
+		# A delegation is not a defeat: land handed to one's own subject
+		# (release, grant, vassal creation) is not lost.
+		NOT = { scope:winner ?= { is_subject_of = scope:loser } }
+		scope:winner ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		scope:loser ?= {
+			if = {
+				limit = {
+					NOR = {
+						has_variable = ghazi_silence_war_lost
+						has_variable = ghazi_silence_all
+					}
+				}
+				trigger_event_non_silently = ghazi_burden.303
+			}
+			else = {
+				add_legitimacy = -3
+				add_country_modifier = {
+					modifier = ghazi_defeat_shame
+					months = 6
+					mode = add_and_extend
+				}
+			}
+		}
+	}
+}
+
+# ============================================================
+# Location changed owner. this = location; scope:winner /
+# scope:loser = countries. Capital test: scope:loser.capital =
+# root (the location).
+# ============================================================
+
+ghazi_burden_on_location_changed_owner_loss = {
+	trigger = {
+		scope:loser ?= {
+			has_variable = ghazi_burden_fired
+		}
+		scope:winner ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		# Capital lost — the seat itself has changed hands.
+		if = {
+			limit = {
+				scope:loser ?= {
+					has_variable = ghazi_burden_fired
+					capital = root
+				}
+			}
+			scope:loser ?= {
+				if = {
+					limit = {
+						NOR = {
+							has_variable = ghazi_silence_capital_lost
+							has_variable = ghazi_silence_all
+						}
+					}
+					trigger_event_non_silently = ghazi_burden.304
+				}
+				else = {
+					add_legitimacy = -25
+					add_country_modifier = {
+						modifier = ghazi_capital_lost
+						months = -1
+						mode = replace
+					}
+				}
+			}
+		}
+		# Non-capital province lost.
+		else_if = {
+			limit = {
+				scope:loser ?= { has_variable = ghazi_burden_fired }
+			}
+			scope:loser ?= {
+				if = {
+					limit = {
+						NOR = {
+							has_variable = ghazi_silence_province_lost
+							has_variable = ghazi_silence_all
+						}
+					}
+					trigger_event_non_silently = ghazi_burden.305
+				}
+				else = {
+					add_legitimacy = -3
+				}
+			}
+		}
+	}
+}
+
+ghazi_burden_on_location_changed_owner_win = {
+	trigger = {
+		scope:winner ?= {
+			has_variable = ghazi_burden_fired
+		}
+		scope:loser ?= {
+			is_rebel_country = no
+		}
+	}
+	effect = {
+		if = {
+			limit = {
+				scope:winner ?= { has_variable = ghazi_burden_fired }
+			}
+			scope:winner ?= {
+				# Tier-3 consolidation bonus: always applied. The
+				# notification (event .307) is a separate branch
+				# handled by the consolidation silence variable.
+				if = {
+					limit = {
+						scope:loser ?= { ghazi_target_is_tier_3 = yes }
+					}
+					add_legitimacy = 1
+					if = {
+						limit = {
+							NOR = {
+								has_variable = ghazi_silence_consolidation
+								has_variable = ghazi_silence_all
+							}
+						}
+						trigger_event_non_silently = ghazi_burden.307
+					}
+					else = {
+						add_legitimacy = 4
+						add_prestige = 10
+					}
+				}
+				# General province-gained notification.
+				if = {
+					limit = {
+						NOR = {
+							has_variable = ghazi_silence_province_gained
+							has_variable = ghazi_silence_all
+						}
+					}
+					trigger_event_non_silently = ghazi_burden.306
+				}
+				else = {
+					add_legitimacy = 1
+				}
+			}
+		}
+	}
+}
