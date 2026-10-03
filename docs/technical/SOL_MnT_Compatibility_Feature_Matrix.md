@@ -60,7 +60,7 @@ CMF exposes only `sol_on`, `sol_map`, `hw_on`, `iwe`, `hwe`, and `rwe`.
 
 ## Verification Boundary
 
-`scripts/gen_sol_mnt_compat.py --check` validates the 55-goods matrix,
+`scripts/gen_sol_mnt_compat.py --check` validates the 56-goods matrix,
 price-scaling tolerance, equal grains, `tools`, threshold removal, M&T
 non-demand fields, and the marked EPBM source-preservation invariant.
 `scripts/validate.py` checks static project syntax. A combined in-game load,

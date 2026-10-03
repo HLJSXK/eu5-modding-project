@@ -148,7 +148,7 @@ To verify the feature works:
 ## Performance Impact
 
 - **January tick**: Adds one price comparison and one global_variable_map write per consumed good per market
-  - ~55 goods × ~20-50 markets = ~1000-2500 extra operations once per year
+  - ~56 goods × ~20-50 markets = ~1000-2500 extra operations once per year
   - Negligible impact
   
 - **GUI rendering**: Adds one conditional overlay widget per good (55-77 depending on target)

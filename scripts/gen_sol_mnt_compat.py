@@ -123,7 +123,14 @@ ALL_POP_TYPES = (*POP_TYPES, "slaves")
 UPPER_TYPES = frozenset(("nobles", "clergy", "burghers", "laborers", "soldiers"))
 COMMONER_TYPES = frozenset(("laborers", "peasants", "soldiers"))
 GRAINS = ("maize", "millet", "rice")
+EXPECTED_SOL_GOODS = 56
 
+# M&T's 1.3 lumber object still references a removed vanilla scripted trigger.
+# The 1.4 vanilla object replaced it with a plain vegetation expression;
+# keep the current vanilla potential while retaining M&T's production fields.
+GOODS_FIELDS_FROM_VANILLA = {
+    "lumber": (("location_potential", True),),
+}
 
 @dataclass(frozen=True)
 class Block:
@@ -256,6 +263,31 @@ def _remove_fields(body: str, fields: Sequence[Tuple[str, bool]]) -> str:
     return body
 
 
+def _replace_field_from_reference(body: str, field: str, reference_body: str) -> str:
+    target_spans = _field_spans(body, field, True)
+    reference_spans = _field_spans(reference_body, field, True)
+    if len(target_spans) != 1 or len(reference_spans) != 1:
+        raise ValueError(
+            f"Expected one {field} block in both goods definitions; "
+            f"got target={len(target_spans)}, reference={len(reference_spans)}"
+        )
+    target_start, target_end = target_spans[0]
+    reference_start, reference_end = reference_spans[0]
+    return (
+        body[:target_start]
+        + reference_body[reference_start:reference_end]
+        + body[target_end:]
+    )
+
+
+def _apply_vanilla_goods_fields(good: str, body: str, vanilla_body: str) -> str:
+    for field, is_block in GOODS_FIELDS_FROM_VANILLA.get(good, ()):
+        if not is_block:
+            raise ValueError(f"Vanilla goods field override must be a block: {good}/{field}")
+        body = _replace_field_from_reference(body, field, vanilla_body)
+    return body
+
+
 DEMAND_FIELDS = (
     ("demand_add", True),
     ("demand_multiply", True),
@@ -340,20 +372,20 @@ def _load_sol_targets() -> Dict[str, Dict[str, Decimal]]:
 def _compat_quantities(
     sol_targets: Dict[str, Dict[str, Decimal]],
     vanilla_prices: Dict[str, Decimal],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> Dict[str, Dict[str, Decimal]]:
     quantities: Dict[str, Dict[str, Decimal]] = {}
     for good, target in sol_targets.items():
-        if good not in mnt_blocks:
-            raise ValueError(f"M&T goods definition missing for SOL good: {good}")
-        mnt_price = _default_price(mnt_blocks[good].body, good)
+        if good not in goods_blocks:
+            raise ValueError(f"Goods definition missing for SOL good: {good}")
+        mnt_price = _default_price(goods_blocks[good].body, good)
         vanilla_price = vanilla_prices[good]
         quantities[good] = {
             pop_type: _round_quantity(target[pop_type] * vanilla_price / mnt_price)
             for pop_type in POP_TYPES
         }
 
-    grain_prices = {good: _default_price(mnt_blocks[good].body, good) for good in GRAINS}
+    grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
     for pop_type in POP_TYPES:
         sol_spending = sum(
             sol_targets[good][pop_type] * vanilla_prices[good] for good in GRAINS
@@ -411,15 +443,15 @@ def _normalize_without_demand(body: str) -> str:
 def _render_goods(
     sol_targets: Dict[str, Dict[str, Decimal]],
     quantities: Dict[str, Dict[str, Decimal]],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# M&T owns every non-demand field. SOL owns the seven calibrated pop quantities.",
+        "# M&T owns every non-demand field where defined; new vanilla goods use the current vanilla base.",
         "# Wealth and development demand gates remain removed for SOL's continuous scaling.",
     ]
     for good in sol_targets:
-        original = mnt_blocks[good].body
+        original = goods_blocks[good].body
         mnt_pop_demand = _final_pop_demand(original)
         base = _remove_fields(original, DEMAND_FIELDS)
         demand_block = _render_demand_block(quantities[good], mnt_pop_demand["slaves"])
@@ -437,18 +469,18 @@ def _validate_demand_invariants(
     sol_targets: Dict[str, Dict[str, Decimal]],
     quantities: Dict[str, Dict[str, Decimal]],
     vanilla_prices: Dict[str, Decimal],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> None:
     for good, target in sol_targets.items():
         if good in GRAINS:
             continue
-        mnt_price = _default_price(mnt_blocks[good].body, good)
+        mnt_price = _default_price(goods_blocks[good].body, good)
         for pop_type in POP_TYPES:
             ideal = target[pop_type] * vanilla_prices[good] / mnt_price
             if abs(quantities[good][pop_type] - ideal) > QUANTUM / 2:
                 raise ValueError(f"Rounded compatibility quantity is out of range: {good}/{pop_type}")
 
-    grain_prices = {good: _default_price(mnt_blocks[good].body, good) for good in GRAINS}
+    grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
     for pop_type in POP_TYPES:
         grain_values = {quantities[good][pop_type] for good in GRAINS}
         if len(grain_values) != 1:
@@ -466,12 +498,12 @@ def _validate_demand_invariants(
 
 def _render_values_and_refresh(
     quantities: Dict[str, Dict[str, Decimal]],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> Tuple[str, str]:
     rows = [
         (
             good,
-            float(_default_price(mnt_blocks[good].body, good)),
+            float(_default_price(goods_blocks[good].body, good)),
             {pop_type: float(quantities[good][pop_type]) for pop_type in POP_TYPES},
         )
         for good in sorted(quantities)
@@ -1185,17 +1217,30 @@ def _render_outputs() -> Dict[Path, str]:
     vanilla_goods = load_vanilla_goods()
     vanilla_prices = {good: _decimal(data["price"]) for good, data in vanilla_goods.items()}
     mnt_goods_blocks_list = _blocks_in_tree(MNT_GOODS_ROOT)
-    mnt_goods_blocks: Dict[str, Block] = {}
+    vanilla_goods_blocks_list = _blocks_in_tree(VANILLA_ROOT / "in_game" / "common" / "goods")
+    goods_blocks: Dict[str, Block] = {}
     for good in sol_targets:
-        mnt_goods_blocks[good] = _unique_block(mnt_goods_blocks_list, good, "M&T good")
-    if len(sol_targets) != 55:
-        raise ValueError(f"Expected 55 SOL demand goods, found {len(sol_targets)}")
-    quantities = _compat_quantities(sol_targets, vanilla_prices, mnt_goods_blocks)
-    _validate_demand_invariants(sol_targets, quantities, vanilla_prices, mnt_goods_blocks)
-    values, refresh = _render_values_and_refresh(quantities, mnt_goods_blocks)
+        mnt_block = _optional_unique_block(mnt_goods_blocks_list, good, "M&T good")
+        vanilla_block = _unique_block(vanilla_goods_blocks_list, good, "vanilla good")
+        if mnt_block is None:
+            goods_blocks[good] = vanilla_block
+        else:
+            goods_blocks[good] = Block(
+                key=good,
+                body=_apply_vanilla_goods_fields(good, mnt_block.body, vanilla_block.body),
+                operation=mnt_block.operation,
+                source=mnt_block.source,
+            )
+    if len(sol_targets) != EXPECTED_SOL_GOODS:
+        raise ValueError(
+            f"Expected {EXPECTED_SOL_GOODS} SOL demand goods, found {len(sol_targets)}"
+        )
+    quantities = _compat_quantities(sol_targets, vanilla_prices, goods_blocks)
+    _validate_demand_invariants(sol_targets, quantities, vanilla_prices, goods_blocks)
+    values, refresh = _render_values_and_refresh(quantities, goods_blocks)
 
     return {
-        GOODS_OUTPUT: _render_goods(sol_targets, quantities, mnt_goods_blocks),
+        GOODS_OUTPUT: _render_goods(sol_targets, quantities, goods_blocks),
         VALUES_OUTPUT: values,
         EFFECTS_OUTPUT: _render_effects(refresh),
         CMM_OUTPUT: _render_cmm(),

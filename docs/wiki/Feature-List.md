@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Version:** v1.3 beta  
+**Version:** v1.4 beta  
 **Scope:** this version only includes basic SOL-based demand scaling plus the retained balance systems listed below.  
-**Game target:** Europa Universalis V 1.3 beta environment / 1.* metadata target  
+**Game target:** Europa Universalis V 1.4 beta environment / 1.4.* metadata target  
 **Dependency:** Community Mod Framework 2.* is used for in-game configuration.
 
 This build exists because EU5 engine changes broke the older SOL 1.2 demand architecture. The current version is intentionally narrower and more stable: it keeps the calibrated pop-demand baseline and replaces the old experimental chain with a local demand coefficient applied through `local_pop_demand`.
@@ -42,7 +42,7 @@ The result is a lighter model that is easier to maintain under the EU5 1.3 engin
 
 ### 1. Calibrated Baseline Demand
 
-SOL recalibrates baseline pop demand for 55 goods through `demand_add` injections.
+SOL recalibrates baseline pop demand for 56 goods through `demand_add` injections.
 It also sets the engine-wide development demand scale to zero and fully negates every vanilla per-good `development_threshold`.
 
 Source flow:

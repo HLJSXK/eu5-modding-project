@@ -384,6 +384,16 @@ def generate_inject_file(
     """Generate the complete z_SOL_pop_goods.txt text (without BOM)."""
     rows_by_good = {row.good: row for row in target_rows}
     for good, thresholds in vanilla_thresh.items():
+        row = rows_by_good.get(good)
+        wealth_keys = {
+            key for key, value in thresholds["wit"].items() if abs(value) >= 1e-9
+        }
+        missing_wealth_keys = wealth_keys - set(row.negate_wit if row else [])
+        if missing_wealth_keys:
+            raise ValueError(
+                f"{good} has vanilla wealth_impact_threshold keys "
+                f"{sorted(missing_wealth_keys)} that target_demand.csv does not negate"
+            )
         vanilla_dev_threshold = thresholds["dev_thresh"]
         if vanilla_dev_threshold is None:
             continue

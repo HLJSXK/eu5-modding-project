@@ -54,7 +54,7 @@ GROUP_GOODS: Dict[str, List[str]] = {
     "medicine":         ["medicaments", "mercury"],
     "ritual":           ["incense", "mercury"],
     "weapons":          ["weaponry", "firearms"],
-    "mounts":           ["horses", "elephants"],
+    "mounts":           ["horses", "camels", "elephants"],
     "knowledge":        ["paper", "books"],
 }
 
