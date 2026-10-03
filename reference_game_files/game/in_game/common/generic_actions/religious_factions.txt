@@ -29,7 +29,20 @@ get_claim_from_imperial_court = {
 	ai_tick_frequency = 6
 
 	price = price:get_claim_from_imperial_court
-	
+
+	# Performance: cheap actor-only short-circuit so the AI does not run the
+	# per-candidate country chooser walk (every_country_in_religion + nested
+	# building/neighbor loops in the visible block) for every Shinto country.
+	# Only Japanese clans, the imperial family, and daimyo can actually use the
+	# resulting cb_japanese_clan_expand_authority claim.
+	ai_prerequisite = {
+		OR = {
+			has_reform = government_reform:japanese_clan
+			has_reform = government_reform:japanese_imperial_family
+			has_reform = government_reform:daimyo
+		}
+	}
+
 	select_trigger = {
 		looking_for_a = religion
 		source = actor
@@ -39,7 +52,7 @@ get_claim_from_imperial_court = {
 			data = name
 		}
 	}
-	
+
 	select_trigger = {
 		looking_for_a = country
 		target_flag = target
@@ -73,14 +86,7 @@ get_claim_from_imperial_court = {
 					AND = {
 						scope:actor = { country_type = building }
 						country_type = building
-						any_owned_foreign_building_location = {
-							OR = {
-								any_foreign_building_countries_in_location = { this = scope:actor }
-								any_neighbor_location = {
-									any_foreign_building_countries_in_location = { this = scope:actor }
-								}
-							}
-						}
+						has_competing_foreign_buildings_with = scope:actor
 					}
 				}
 			}
@@ -571,7 +577,7 @@ demand_extra_payment_from_shogun_court = {
 			}
 		}
 		international_organization:japanese_shogunate.leader_country ?= {
-			opinion = { target = scope:actor value > 0 }
+			opinion = { target = scope:actor value >= -50 }
 		}
 	}
 

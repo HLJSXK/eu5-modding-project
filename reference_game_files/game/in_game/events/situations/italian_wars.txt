@@ -91,7 +91,13 @@ italian_wars.3 = {	#Informative Event for the rest of Italy
 	option = {
 		name = italian_wars.1.b
 
-		ai_will_select = { value = "root.opinion(international_organization:hre.leader_country)" }
+		ai_will_select = {
+			value = 0
+			if = {
+				limit = { country_exists = international_organization:hre.leader_country }
+				value = "root.opinion(international_organization:hre.leader_country)"
+			}
+		}
 
 		trigger = {
 			is_member_of_no_foreign_or_italian_league = yes
@@ -442,8 +448,6 @@ italian_wars.11 = {
 				}
 			}
 		}
-	
-		# TODO (separate MR): implement the actual mechanic that allows foreign league leaders to call in members for offensive wars at 90+ tension
 		custom_tooltip = as_long_as_90_tension_foreign_leaders_can_call_in_league_members_offensively_tt
 		custom_tooltip = all_leaders_of_leagues_annul_all_truces_tt
 	}
@@ -644,6 +648,23 @@ italian_wars.300 = {
 		}
 
 		if = {
+			limit = { scope:target_io = international_organization:foreign_league_balkan }
+			set_variable = iw_won_balkan_variable
+		}
+		else_if = {
+			limit = { scope:target_io = international_organization:foreign_league_france }
+			set_variable = iw_won_france_variable
+		}
+		else_if = {
+			limit = { scope:target_io = international_organization:foreign_league_iberia }
+			set_variable = iw_won_iberia_variable
+		}
+		else_if = {
+			limit = { scope:target_io = international_organization:foreign_league_hre }
+			set_variable = iw_won_hre_variable
+		}
+
+		if = {
 			limit = { root = scope:target_country }
 			set_variable = {
 				name = io_location_scale_variable
@@ -669,13 +690,74 @@ italian_wars.300 = {
 			mode = add_and_extend
 		}
 		if = {
+			limit = { has_variable = iw_won_balkan_variable }
+			# Tiered by tag and DLC
+			if = {
+				limit = {
+					has_dlc = "d008_fate_of_the_phoenix"
+					OR = {
+						has_or_had_tag = ROM
+						has_or_had_tag = BYZ
+					}
+				}
+				if = {
+					limit = {
+						OR = {
+							has_or_had_tag = ROM
+							societal_value:latinization_vs_hellenization > 0
+						}
+					}
+					add_country_modifier = {
+						modifier = iw_rom_byz_latin_victory_dlc_modifier
+						years = -1
+						mode = replace
+					}
+				}
+				else = {
+					add_country_modifier = {
+						modifier = iw_byz_hellenic_victory_dlc_modifier
+						years = -1
+						mode = replace
+					}
+				}
+			}
+			else_if = {
+				limit = {
+					OR = {
+						has_or_had_tag = ROM
+						has_or_had_tag = BYZ
+					}
+				}
+				add_country_modifier = {
+					modifier = iw_balkan_victory_no_dlc_modifier
+					years = -1
+					mode = replace
+				}
+			}
+			else_if = {
+				limit = {
+					root = scope:target_country
+					country_rank != country_rank:rank_empire
+				}
+				set_country_rank_effect = { rank = country_rank:rank_empire }
+			}
+			else_if = {
+				limit = { root = scope:target_country }
+				add_country_modifier = {
+					modifier = iw_balkan_victory_cabinet_modifier
+					years = -1
+					mode = replace
+				}
+			}
+		}
+		if = {
 			limit = {
 				root = scope:target_country
 			}
 			add_prestige = prestige_extreme_bonus
 			# France unique reward — scaled by IO locations
 			if = {
-				limit = { scope:target_io = international_organization:foreign_league_france }
+				limit = { has_variable = iw_won_france_variable }
 				add_country_modifier = {
 					modifier = iw_france_victory_modifier
 					years = modifier_duration_years_long
@@ -694,7 +776,7 @@ italian_wars.300 = {
 			}
 			# Iberia unique reward — scaled by IO locations
 			else_if = {
-				limit = { scope:target_io = international_organization:foreign_league_iberia }
+				limit = { has_variable = iw_won_iberia_variable }
 				add_country_modifier = {
 					modifier = iw_iberia_victory_modifier
 					years = modifier_duration_years_long
@@ -711,55 +793,6 @@ italian_wars.300 = {
 					}
 				}
 			}
-			# Balkan unique reward — tiered by tag and DLC
-			else_if = {
-				limit = { scope:target_io = international_organization:foreign_league_balkan }
-				if = {
-					limit = {
-						has_dlc = "d008_fate_of_the_phoenix"
-						OR = { tag = ROM  tag = BYZ }
-					}
-					if = {
-						limit = {
-							OR = {
-								tag = ROM
-								societal_value:latinization_vs_hellenization > 0
-							}
-						}
-						add_country_modifier = {
-							modifier = iw_rom_byz_latin_victory_dlc_modifier
-							years = -1
-							mode = replace
-						}
-					}
-					else = {
-						add_country_modifier = {
-							modifier = iw_byz_hellenic_victory_dlc_modifier
-							years = -1
-							mode = replace
-						}
-					}
-				}
-				else_if = {
-					limit = { OR = { tag = ROM  tag = BYZ } }
-					add_country_modifier = {
-						modifier = iw_balkan_victory_no_dlc_modifier
-						years = -1
-						mode = replace
-					}
-				}
-				else_if = {
-					limit = { country_rank != country_rank:rank_empire }
-					set_country_rank_effect = { rank = country_rank:rank_empire }
-				}
-				else = {
-					add_country_modifier = {
-						modifier = iw_balkan_victory_cabinet_modifier
-						years = -1
-						mode = replace
-					}
-				}
-			}
 			unlock_law_effect = { type = administration_of_italian_lands_law }
 		}
 		else = {
@@ -769,7 +802,7 @@ italian_wars.300 = {
 		if = {
 			limit = {
 				exists = international_organization:hre
-				scope:target_io = international_organization:foreign_league_hre
+				has_variable = iw_won_hre_variable
 				root = scope:target_country
 			}
 			change_imperial_authority = { value = imperial_authority_unique_bonus }
@@ -778,14 +811,21 @@ italian_wars.300 = {
 		else_if = {
 			limit = {
 				root != scope:target_country
+				has_variable = iw_won_hre_variable
 				NOT = { is_member_of_international_organization = international_organization:hre }
 				exists = international_organization:hre
 			}
-			scope:target_io = { add_country_to_international_organization = root }
+			international_organization:hre = { add_country_to_international_organization = root }
 		}
 	}
 
 	after = {
+		hidden_effect = {
+			remove_variable = iw_won_balkan_variable
+			remove_variable = iw_won_france_variable
+			remove_variable = iw_won_iberia_variable
+			remove_variable = iw_won_hre_variable
+		}
 		if = {
 			limit = { root = scope:target_country }
 			hidden_effect = { remove_variable = io_location_scale_variable }
@@ -1397,13 +1437,13 @@ italian_wars.24 = { #Relations Deteriorate
 		random_international_organizations_member_of = {
 			limit = {
 				OR = {
-					this = international_organization:italian_league_1
-					this = international_organization:italian_league_2
-					this = international_organization:italian_league_3
-					this = international_organization:foreign_league_balkan
-					this = international_organization:foreign_league_france
-					this = international_organization:foreign_league_iberia
-					this = international_organization:foreign_league_hre
+					international_organization_type = international_organization_type:italian_league_1
+					international_organization_type = international_organization_type:italian_league_2
+					international_organization_type = international_organization_type:italian_league_3
+					international_organization_type = international_organization_type:foreign_league_balkan
+					international_organization_type = international_organization_type:foreign_league_france
+					international_organization_type = international_organization_type:foreign_league_iberia
+					international_organization_type = international_organization_type:foreign_league_hre
 				}
 			}
 			save_scope_as = target_io
@@ -1498,13 +1538,13 @@ italian_wars.25 = { #Relations Flourish
 		random_international_organizations_member_of = {
 			limit = {
 				OR = {
-					this = international_organization:italian_league_1
-					this = international_organization:italian_league_2
-					this = international_organization:italian_league_3
-					this = international_organization:foreign_league_balkan
-					this = international_organization:foreign_league_france
-					this = international_organization:foreign_league_iberia
-					this = international_organization:foreign_league_hre
+					international_organization_type = international_organization_type:italian_league_1
+					international_organization_type = international_organization_type:italian_league_2
+					international_organization_type = international_organization_type:italian_league_3
+					international_organization_type = international_organization_type:foreign_league_balkan
+					international_organization_type = international_organization_type:foreign_league_france
+					international_organization_type = international_organization_type:foreign_league_iberia
+					international_organization_type = international_organization_type:foreign_league_hre
 				}
 			}
 			save_scope_as = target_io
@@ -1628,13 +1668,13 @@ italian_wars.26 = { #Diplomatic Incident
 			limit = {
 				leader_country = root
 				OR = {
-					this = international_organization:italian_league_1
-					this = international_organization:italian_league_2
-					this = international_organization:italian_league_3
-					this = international_organization:foreign_league_balkan
-					this = international_organization:foreign_league_france
-					this = international_organization:foreign_league_iberia
-					this = international_organization:foreign_league_hre
+					international_organization_type = international_organization_type:italian_league_1
+					international_organization_type = international_organization_type:italian_league_2
+					international_organization_type = international_organization_type:italian_league_3
+					international_organization_type = international_organization_type:foreign_league_balkan
+					international_organization_type = international_organization_type:foreign_league_france
+					international_organization_type = international_organization_type:foreign_league_iberia
+					international_organization_type = international_organization_type:foreign_league_hre
 				}
 			}
 			save_scope_as = our_io

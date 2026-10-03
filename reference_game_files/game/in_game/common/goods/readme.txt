@@ -18,6 +18,6 @@
 #		upper = <float>
 #       <pop types> = <float>
 #	}
-#	location_potential = { location trigger }           # gives error log if this is false on setup
+#	location_potential = { location trigger }           #checks if a good can be the raw material of a location. This is cached at the start of the game so it should only use static triggers like vegetation, topography, climate or geography. Also gives error log if this is false on setup
 #   custom_tags = { <strings> }							#A list of custom strings to use to identify that good
 #}

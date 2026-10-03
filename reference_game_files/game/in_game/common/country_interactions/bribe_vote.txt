@@ -5,12 +5,18 @@
 	ai_limit_per_check = 1
 
 	ai_prerequisite = {
-		monthly_balance > 5
+		last_months_balance > 5
 		num_loans < 1
 		prestige > 10
-		# Fast-exit: skip potential evaluation entirely for AI if no IO has an active policy vote
+		exists = scope:actor
+		# Fast-exit: only the proposer of an active policy vote should whip votes for it.
+		# Loops only the actor's own (few) IO memberships and does O(1) variable reads per IO,
+		# so it never iterates IO membership. This caps the actor pool from "every member"
+		# down to the proposer(s), which is what kills the O(M^2) evaluation cost on large IOs.
 		any_international_organizations_member_of = {
 			resolution_is_active = resolution:policy_vote
+			has_variable = io_law_proposer
+			var:io_law_proposer = scope:actor
 		}
 		trigger_if = {
 			limit = {
@@ -52,20 +58,26 @@
 		none_available_msg_key = "bribe_voter_for_policy_no_countries"
 		pre_evaluation_sort_value = { #prioritise financially-weak targets; avoids full ai_will_do eval (with its every_international_organization_member loop) for every org member
 			if = { limit = { is_during_bankruptcy = yes } add = 100 }
-			if = { limit = { monthly_balance < 0 } add = 20 }
+			if = { limit = { last_months_balance < 0 } add = 20 }
 		}
 		pre_evaluation_number_to_evaluate_fully = 3
+		default_sort = will
 		column = {
-			data = name
-		}
-		column = {
-			data = population
+			data = country_diplomacy_info_with_population
 		}
 		visible = {
 		}
 		enabled = {
 			scope:actor = {
 				gold > root.monthly_income_total
+			}
+			# Affordability: the actor must be able to fund a real (6x income) bribe of THIS
+			# candidate. Evaluated in the candidate (recipient) scope, so monthly_income_total
+			# is the target's. Prunes unaffordable targets (e.g. a minor bribing a great power)
+			# from the candidate list during the iteration the engine already performs.
+			monthly_income_total <= {
+				value = scope:actor.gold
+				divide = 6
 			}
 		}
 	}
@@ -131,7 +143,22 @@
 			is_visible_for_international_organization = scope:organization
 		}
 		enabled = {
-			is_allowed_for_international_organization = scope:organization
+			trigger_if = {
+				limit = {
+					scope:organization = {
+						OR = {
+							"law_policy(scope:law)" ?= root
+							"active_resolution(resolution:policy_vote)" ?= {
+								"vote_in_active_resolution(resolution_proposer)" ?= root
+							}
+						}
+					}
+				}
+				hidden_trigger = { always = yes }
+			}
+			trigger_else = {
+				is_allowed_for_international_organization = scope:organization
+			}
 		}
 	}
 
@@ -213,7 +240,7 @@
 					limit = { NOT = { this = scope:recipient } } #exclude recipient: their current vote is about to change
 					if = {
 						limit = {
-							"resolution_vote(this|scope:recipient|resolution:policy_vote)" ?= scope:policy
+							"resolution_vote(this|scope:organization|resolution:policy_vote)" ?= scope:policy
 						}
 						add = 11 # +10 base +1 per yes-voter
 					}

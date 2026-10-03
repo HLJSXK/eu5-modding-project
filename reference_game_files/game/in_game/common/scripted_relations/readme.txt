@@ -25,6 +25,9 @@
 #	called_in_defensively = <none/mutual/giving/receiving> are calls to arms sent when one party gets war declared on them
 #	called_in_offensively = <none/mutual/giving/receiving> are calls to arms sent when one party declares war
 #   lifts_trade_protection = <yes/no> is market trade protectionism lifted between the countries
+#   dangerous_relation = <yes/no> default is no, mark as yes to get an alert when someone has this relation with you
+#   can_get_without_buying = <yes/no> default is yes, set to no if you want a relation that is only purchased
+#   always_shown_when_unaffordable = <yes/no> default is no, set to yes to keep the buy action listed (disabled, with a can't-afford reason) instead of disappearing entirely when the price can't currently be paid
 #	trade_to_first = <script value> increases the attraction of the first country's markets in locations belonging to the second country
 #	trade_to_second = <script value> increases the attraction of the second country's markets in locations belonging to the first country
 #	gold_to_first = <script value> amount of gold that the second country gives the first per month
@@ -85,6 +88,7 @@
 #	mutual_color = <color definition> for the diplomacy map mode
 #	giving_color = <color definition> for the diplomacy map mode
 #	receiving_color = <color definition> for the diplomacy map mode
+#	diplomatic_map_stripe = <yes/no> default no; when yes the relation paints as a striped secondary color in the diplomacy map mode instead of competing for the solid primary color, so it stays visible alongside the underlying relation (occupation and core stripes take priority)
 #
 #	visible = <trigger> should the relationship to be visible in the first place
 #   offer_visible = <trigger> is offering this relationship available
@@ -97,12 +101,13 @@
 #	break_enabled = <triggers> can we break a one way relationship we are receiving
 #	will_expire_trigger = <triggers> criteria for this relationship auto-expiring
 #   should_ai_offer_trigger = <triggers> if false ai will not consider sending this relation
+#   use_with_enemies = <yes/no> default no. Required for the ai to impose a hostile relation by itself; without it the relation is invisible to the antagonise-rival and antagonise-objective routes, which are the only ways the ai starts one
 #
 #	wants_to_give = <ai evaluation> - use this one for both mutual and one way relations. Calculation when a request is being evaluated.
 #	wants_to_receive = <ai evaluation> - one way relations only. Calculation when an offer is being evaluated.
 #	wants_to_give_diplo_chance = <diplo evaluation> - only use this one for mutual and one way relations. Calculation when a request is being evaluated.
 #	wants_to_receive_diplo_chance = <diplo evaluation> - one way relations only. Calculation when an offer is being evaluated.
-#   wants_to_keep = <ai evaluation> - use this for both mutual and one way relations. If evaluation results in values below or equal 0 ai will try to cancel/break relation
+#   wants_to_keep = <ai evaluation> - use this for both mutual and one way relations. If evaluation results in a value below 0 ai will try to cancel/break relation, and will also refuse to offer it in the first place
 #   wants_to_keep_diplo_chance = <diplo evaluation> - use this for both mutual and one way relations.
 #   show_break_alert = <yes/no> - whether the relation should be shown in alert when AI is about to break it
 #

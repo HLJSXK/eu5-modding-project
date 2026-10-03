@@ -1,0 +1,293 @@
+types CountryAdvancesTypes
+{
+	type country_advance_card = button {
+		size = { 100% 82 }
+		margin = { 4 1 }
+
+		using = bg_paper_card
+		using = snd_UI_backward
+
+		on_action = "[OpenTechnologyViewAndPanToAdvance(CountryAdvanceItem.GetAdvance)]"
+
+			datacontext = "[CountryAdvanceItem.GetAdvance]"
+		tooltipwidget = {
+			using = Advance_tooltip_for_tech_tree
+		}
+
+		# Gold tint overlay when researched
+		background = {
+			visible = "[CountryAdvanceItem.IsResearched]"
+			texture = "gfx/interface/colors/gold_dark.dds"
+			alpha = 0.18
+			spriteType = stretched
+		}
+
+		hbox = {
+			size = { 100% 100% }
+			margin = { 4 4 }
+			spacing = 6
+
+			### LEFT: icon zone (Advance context)
+			widget = {
+				size = { 65 0 }
+				layoutpolicy_vertical = expanding
+				datacontext = "[CountryAdvanceItem.GetAdvance]"
+
+				# Advance background color (blue/green/red per unlock type)
+				widget = {
+					parentanchor = center
+					size = { 58 58 }
+					datacontext = "[Advance.GetDefinition]"
+					using = background_advance
+				}
+
+				# Advance icon (generic, non-unit)
+				icon = {
+					parentanchor = center
+					size = { 52 52 }
+					visible = "[Not(Advance.GetDefinition.HasSubunitUnlocks)]"
+					texture = "[GetAdvanceIcon(Advance.GetDefinition)]"
+				}
+
+				# Army unit illustration
+				widget = {
+					parentanchor = center
+					size = { 52 52 }
+					visible = "[And(Advance.GetDefinition.HasSubunitUnlocks, Not(Advance.GetDefinition.HasNavyUnlocks))]"
+					background = {
+						texture = "[GetSubunitTypeIllustration(Advance.GetDefinition.GetFirstSubunitUnlock, Player.GetCulture)]"
+						fittype = start
+						texture_density = 2
+						spriteborder = { 0 0 }
+						frame_grid = { 2 1 }
+						frame = 1
+						modify_texture = {
+							texture = "gfx/interface/component_masks/advance_unit_unlock_mask.dds"
+							texture_density = 2
+							blend_mode = alphamultiply
+						}
+					}
+				}
+
+				# Navy unit illustration
+				widget = {
+					parentanchor = center
+					size = { 52 52 }
+					visible = "[Advance.GetDefinition.HasNavyUnlocks]"
+					background = {
+						texture = "[GetSubunitTypeIllustration(Advance.GetDefinition.GetFirstSubunitUnlock, Player.GetCulture)]"
+						fittype = start
+						texture_density = 2
+						spriteborder = { 0 0 }
+						frame_grid = { 3 1 }
+						frame = 2
+						modify_texture = {
+							texture = "gfx/interface/component_masks/advance_unit_unlock_navy_mask.dds"
+							texture_density = 2
+							blend_mode = alphamultiply
+						}
+					}
+				}
+
+				# Age icon overlay (bottom-right corner)
+				widget = {
+					parentanchor = right|bottom
+					size = { 22 22 }
+					datacontext = "[Advance.GetAge]"
+
+					background = {
+						texture = "gfx/interface/component_tiles/hud_corners/circle_frame.dds"
+						texture_density = 2
+						using = color_gold
+					}
+
+					icon = {
+						parentanchor = center
+						size = { 80% 80% }
+						texture = "[GetAgeIcon(Age.Self)]"
+					}
+				}
+			}
+
+			### RIGHT: name and prerequisites (CountryAdvanceItem context)
+			vbox = {
+				using = layoutpolicy_expanding
+				spacing = 4
+				margin = { 2 1 }
+
+				# Name row + researched badge
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 4
+
+					text_single = {
+						using = layoutpolicy_expanding
+						align = left|nobaseline
+						autoresize = no
+						text = "[CountryAdvanceItem.GetName]"
+						default_format = "#yellow_titles"
+					}
+
+					text_single = {
+						visible = "[CountryAdvanceItem.IsResearched]"
+						autoresize = yes
+						text = "COUNTRY_ADVANCE_RESEARCHED_BADGE"
+						default_format = "#color_gold"
+					}
+				}
+
+				# Prerequisites section (only when not yet researched)
+				vbox = {
+					layoutpolicy_horizontal = expanding
+					spacing = 2
+					visible = "[Not(CountryAdvanceItem.IsResearched)]"
+
+					text_single = {
+						autoresize = yes
+						text = "COUNTRY_ADVANCE_PREREQUISITES_LABEL"
+						default_format = "#subtle_name"
+						fontsize = 11
+					}
+
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 4
+
+						# Progress bar (only when prerequisites exist)
+						widget = {
+							using = layoutpolicy_expanding
+							size = { -1 10 }
+							visible = "[GreaterThan_int32(CountryAdvanceItem.GetPrerequisiteTotal, '(int32)0')]"
+
+							progressbar_framed = {
+								size = { 100% 100% }
+								using = progress_bar_green_red_alt
+								min = 0
+								max = "[CountryAdvanceItem.GetPrerequisiteTotal]"
+								value = "[CountryAdvanceItem.GetPrerequisiteProgress]"
+							}
+							
+							
+							tooltipwidget = {
+								ContextualTooltipType = {
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[GetAgeIcon(CountryAdvanceItem.GetAge)]"
+											datacontext = "[CountryAdvanceItem.GetAge]"
+											tooltipwidget = {
+												using = Age_tooltip
+											}
+										}
+									}
+									blockoverride "title_text" {
+											text = "[CountryAdvanceItem.GetAdvance.GetNameWithNoTooltip]"
+									}
+									blockoverride "concept_link" {
+										text = [advance|e]
+									}
+									blockoverride "tooltip_content" {
+										TooltipTextBlock = {
+											blockoverride "text" {
+												text = "[CountryAdvanceItem.GetPrerequisiteProgressTooltip]"
+											}
+										}
+									}
+								}
+							}
+
+							
+						}
+
+						# "N/M" count label
+						text_single = {
+							autoresize = yes
+							visible = "[GreaterThan_int32(CountryAdvanceItem.GetPrerequisiteTotal, '(int32)0')]"
+							raw_text = "[CountryAdvanceItem.GetPrerequisiteProgress]/[CountryAdvanceItem.GetPrerequisiteTotal]"
+							fontsize = 11
+						}
+
+						# "No prerequisites" when chain is empty
+						text_single = {
+							using = layoutpolicy_expanding
+							autoresize = yes
+							visible = "[Not(GreaterThan_int32(CountryAdvanceItem.GetPrerequisiteTotal, '(int32)0'))]"
+							text = "COUNTRY_ADVANCE_NO_PREREQUISITES"
+							default_format = "#subtle_name"
+							fontsize = 11
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+lateralview = {
+	name = "country_advances_lateralview"
+
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "COUNTRY_SPECIFIC_ADVANCES_TITLE"
+			}
+			blockoverride "window_header_alt_color_texture" {
+				using = color_advances_texture
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		header_main_tabs = {
+			blockoverride "content" {
+				using = content_main_tabs
+			}
+		}
+	
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_notabs_alt
+			using = window_main_tabs_margin_alt
+			spacing = 5
+			margin_top = 5
+
+			### Hero progress header
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				size = { -1 26 }
+				margin = { 8 2 }
+				spacing = 5
+
+				text_single = {
+					using = layoutpolicy_expanding
+					align = left|nobaseline
+					text = "[CountryAdvancesLateralView.GetHeroProgressText]"
+					default_format = "#explanation_link_overview"
+					tooltipwidget = {
+						TooltipTextBlock = {
+							blockoverride "text" {
+								text = "[CountryAdvancesLateralView.GetProgressTooltip]"
+							}
+						}
+					}
+				}
+			}
+
+			### Scroll list of advance cards
+			scroll_list = {
+				using = layoutpolicy_expanding
+
+				blockoverride "scroll_list_content" {
+					addcolumn = 100%
+					addrow = 82
+					setitemsizefromcell = yes
+
+					datamodel = "[CountryAdvancesLateralView.GetAdvances]"
+					item = {
+						country_advance_card = {}
+					}
+				}
+			}
+		}
+	}
+}

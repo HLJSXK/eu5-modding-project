@@ -15,7 +15,10 @@ canonize = {
 		scope:actor.religion = {
 			has_canonization = yes
 		}
-
+		OR = {
+			NOT = { scope:actor.religion = religion:catholic }
+			scope:actor = { tag = PAP }
+		}
 	}
 
 	allow = {
@@ -93,13 +96,114 @@ canonize = {
 					}
 				}
 			}
+			if = {
+				limit = {
+					scope:target = { is_religious_order_member = yes }
+				}
+				scope:target = {
+					religious_order = {
+						every_location_in_religious_order = {
+							set_variable = { name = recent_order_service value = yes days = 1825 }
+						}
+					}
+				}
+			}
 		}
 	}
 
 	ai_will_do = {
 		add = -100
-		
+
 		# Bonus is multiplied by how good their attributes are
+		add = {
+			if = {
+				limit = {
+					exists = scope:target
+				}
+				value = scope:target.total_abilities
+			}
+		}
+	}
+}
+
+propose_canonization = {
+	type = religious
+
+	sound = UI_action_religion_generic
+
+	ai_tick = monthly
+	ai_tick_frequency = 24
+	automation_tick = monthly
+	automation_tick_frequency = 12
+	player_automated_category = religiousdoctrines
+
+	potential = {
+		scope:actor.religion = religion:catholic
+		scope:actor = { NOT = { tag = PAP } }
+	}
+
+	allow = {
+		papacy_active = yes
+		country_exists = c:PAP
+		scope:actor = {
+			modifier:country_allow_canonization = yes
+		}
+	}
+
+	price = price:canonize
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		source = actor
+		target_flag = target
+		source_flags = include_dead
+		name = "canonize_select_character"
+		none_available_msg_key = "canonize_no_characters"
+		column = {
+			data = character_info
+		}
+		visible = {
+			is_alive = no
+			religion = scope:recipient
+			not = { is_saint_of = scope:recipient }
+			OR = {
+				has_trait = pious
+				has_trait = devout
+				has_trait = theologian
+				has_trait = zealot
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			scope:target = {
+				save_scope_as = canonization_candidate
+			}
+			scope:actor = {
+				save_scope_as = canonization_proposer
+			}
+			c:PAP = {
+				trigger_event_non_silently = catholic_flavor.1003
+			}
+		}
+	}
+
+	ai_will_do = {
+		add = -50
 		add = {
 			if = {
 				limit = {

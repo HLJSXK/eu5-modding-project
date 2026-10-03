@@ -185,3 +185,201 @@ pa_change_court_language_to_estate_language = {
 
 	chance = 0.5
 }
+
+
+pa_change_liturgical_language_to_estate_language = {
+	type = country
+	estate = clergy_estate
+	estate = burghers_estate
+	estate = peasants_estate
+	estate = dhimmi_estate
+	estate = tribes_estate
+	estate = cossacks_estate
+
+	importance = 1.5
+
+	potential = {
+		# Country's religion must allow the liturgical language to change at all.
+		religion = { has_fixed_liturgical_language = no }
+		# Parliament/action cooldown gates.
+		NOT = { has_country_modifier = parliament_recently_changed_liturgical_language }
+		NOT = { has_cooldown = change_liturgical_language }
+		OR = {
+			# Clergy religion-target branch: clergy whose religion differs from ours
+			# and forces its own liturgical language — push us to that language.
+			AND = {
+				scope:target = { this = estate_type:clergy_estate }
+				"estate(scope:target)" = {
+					dominant_religion ?= {
+						NOT = { this = root.religion }
+						has_fixed_liturgical_language = yes
+						NOT = { language = { this = root.liturgical_dialect.language } }
+					}
+				}
+			}
+			# Default branch: estate dominant culture's dialect isn't our liturgical
+			# and the estate culture isn't already our dominant culture (no redundant ask).
+			AND = {
+				# Exclude clergy whose religion forces its own liturgical language —
+				# that case is handled by the religion-target branch above.
+				NOT = {
+					AND = {
+						scope:target = { this = estate_type:clergy_estate }
+						"estate(scope:target)" = {
+							dominant_religion ?= {
+								NOT = { this = root.religion }
+								has_fixed_liturgical_language = yes
+							}
+						}
+					}
+				}
+				NOT = {
+					"estate(scope:target)" = {
+						dominant_culture ?= {
+							this = root.dominant_culture
+						}
+					}
+				}
+				NOT = {
+					"estate(scope:target)" = {
+						dominant_culture ?= {
+							dialect = {
+								this = root.liturgical_dialect
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	on_accept = {
+		if = {
+			limit = {
+				scope:target = { this = estate_type:clergy_estate }
+				"estate(scope:target)" = {
+					dominant_religion ?= {
+						NOT = { this = root.religion }
+						has_fixed_liturgical_language = yes
+					}
+				}
+			}
+			# Clergy religion-target branch — use clergy religion's fixed liturgical language.
+			"estate(scope:target)" = {
+				dominant_religion = {
+					language = {
+						save_scope_as = liturgical_target_dialect
+					}
+				}
+			}
+		}
+		else = {
+			# Default branch — estate dominant culture's dialect.
+			"estate(scope:target)" = {
+				dominant_culture = {
+					dialect = {
+						save_scope_as = liturgical_target_dialect
+					}
+				}
+			}
+		}
+		if = {
+			limit = { exists = scope:liturgical_target_dialect }
+			set_liturgical_language = scope:liturgical_target_dialect
+		}
+		add_cooldown = {
+			type = change_liturgical_language
+			years = 20
+		}
+		add_country_modifier = {
+			modifier = parliament_recently_changed_liturgical_language
+			years = 20
+			mode = add_and_extend
+		}
+		add_estate_satisfaction = { type = scope:target value = 0.1 }
+	}
+
+	allow = {
+		# Re-check at vote time in case the lockout was applied between proposal and acceptance.
+		religion = { has_fixed_liturgical_language = no }
+		NOT = { has_country_modifier = parliament_recently_changed_liturgical_language }
+		NOT = { has_cooldown = change_liturgical_language }
+	}
+
+	can_bribe = {
+		can_bribe_default_trigger = yes
+	}
+	on_bribe = {
+		on_bribe_default_effect = yes
+	}
+
+	chance = 100000
+}
+
+pa_endow_order_holding = {
+	type = country
+	estate = clergy_estate
+
+	importance = 1.5
+
+	potential = {
+		religion = { has_religious_orders = yes }
+		any_religious_order_in_country = {
+			order_type = { religious_order_type_foundable_by = root }
+		}
+		any_owned_location = {
+			location_can_host_order_holding_trigger = yes
+		}
+	}
+
+	allow = {
+		at_war = no
+	}
+
+	on_accept = {
+		save_scope_as = actor
+		random_religious_order_in_country = {
+			limit = {
+				order_type = { religious_order_type_foundable_by = root }
+			}
+			save_scope_as = chosen_order
+		}
+		if = {
+			limit = { exists = scope:chosen_order }
+			random_owned_location = {
+				limit = {
+					location_can_host_order_holding_trigger = yes
+					location_valid_for_religious_order_type = scope:chosen_order.order_type
+					location_valid_for_calling = scope:chosen_order.order_calling
+				}
+				attach_to_religious_order = scope:chosen_order
+			}
+		}
+		add_estate_satisfaction = { type = scope:target value = 0.1 }
+	}
+
+	ai_will_do = {
+		if = {
+			limit = {
+				OR = {
+					num_locations < 10
+					"estate_power(estate_type:clergy_estate)" >= 0.25
+					num_order_holdings >= ai_invite_order_holdings_cap
+				}
+			}
+			value = 0
+		}
+		else = {
+			value = 10
+		}
+	}
+
+	can_bribe = {
+		can_bribe_default_trigger = yes
+	}
+	on_bribe = {
+		on_bribe_default_effect = yes
+	}
+
+	chance = 5
+}

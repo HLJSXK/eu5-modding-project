@@ -5,6 +5,9 @@
 	}
 
 	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
 		trigger_if = {
 			limit = {
 				exists = scope:target
@@ -25,7 +28,7 @@
 	automation_tick = monthly
 	automation_tick_frequency = 1
 	player_automated_category = cultureacceptance
-	
+
 	price = price:add_accepted_culture
 
 	select_trigger = {
@@ -73,6 +76,7 @@
 					exists = scope:target
 				}
 				add_accepted_culture = scope:target
+				grant_culture_bonus_advances = scope:target
 			}
 		}
 	}
@@ -89,15 +93,18 @@ remove_accepted_culture = {
 	}
 
 	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
 	}
 
 	ai_prerequisite = {
 		at_war = no
-		stability >= 50
+		stability >= 5 #decreased stability prerequisite due to it being almost never reached
 		used_cultures_capacity > modifier:cultures_capacity
 	}
 
-	ai_tick = monthly
+	ai_tick = never
 	ai_tick_frequency = 12
 
 	automation_tick = monthly
@@ -144,6 +151,7 @@ remove_accepted_culture = {
 					exists = scope:target
 				}
 				demote_accepted_culture = scope:target
+				remove_culture_bonus_advances = scope:target
 				custom_tooltip = {
 					text = lose_75_pop_satisfaction_ct
 					every_pop = {
@@ -159,27 +167,7 @@ remove_accepted_culture = {
 	}
 	
 	ai_will_do = {
-		add = {
-			desc = "willingness"
-			value = 500
-		}
-
-		subtract = {
-			desc = "less accepted pops"
-			scope:actor = {
-				value = 100
-				multiply = "culture_percentage_in_country(scope:target)"
-			}
-		}
-
-		if = {
-			limit = {
-				scope:actor = {
-					"culture_percentage_in_country(scope:target)" > 0.075
-				}
-			}
-			multiply = 0
-		}
+		# handled in code
 	}
 }
 
@@ -190,9 +178,10 @@ change_primary_culture = {
 	}
 
 	allow = {
-		 scope:actor = {
+		scope:actor = {
 			is_colonial_subject = no
-		 }
+			in_civil_war = no
+		}
 	}
 
 	ai_tick = monthly
@@ -200,8 +189,7 @@ change_primary_culture = {
 
 	automation_tick = monthly
 	automation_tick_frequency = 1
-	player_automated_category = cultureacceptance
-	
+
 	price = price:change_primary_culture
 
 	cooldown = {
@@ -304,6 +292,7 @@ change_primary_culture = {
 				}
 				change_culture = scope:target
 				add_accepted_culture = scope:old_culture
+				grant_culture_bonus_advances = scope:target
 			}
 		}
 	}
@@ -376,6 +365,9 @@ add_tolerated_culture = {
 	}
 
 	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
 		trigger_if = {
 			limit = {
 				exists = scope:target
@@ -460,15 +452,18 @@ remove_tolerated_culture = {
 	}
 
 	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
 	}
 
 	ai_prerequisite = {
 		at_war = no
-		stability >= 50
+		stability >= 5 #decreased stability prerequisite due to it being almost never reached
 		used_cultures_capacity > modifier:cultures_capacity
 	}
 
-	ai_tick = monthly
+	ai_tick = never
 	ai_tick_frequency = 12
 
 	automation_tick = monthly
@@ -530,26 +525,181 @@ remove_tolerated_culture = {
 	}
 	
 	ai_will_do = {
-		add = {
-			desc = "willingness"
-			value = 500
-		}
+		# handled in code
+	}
+}
 
-		subtract = {
-			desc = "less tolerated pops"
-			scope:actor = {
-				value = 100
-				multiply = "culture_percentage_in_country(scope:target)"
-			}
-		}
 
-		if = {
+add_discriminated_culture = {
+	type = owncountry
+
+	potential = {
+	}
+
+	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
+		trigger_if = {
 			limit = {
-				scope:actor = {
-					"culture_percentage_in_country(scope:target)" > 0.075
+				exists = scope:target
+				exists = scope:actor
+			}
+			scope:actor = {
+				culture_population_in_country = {
+					culture = scope:target
+					value > 0
 				}
 			}
-			multiply = 0
 		}
+	}
+
+	ai_tick = never
+	ai_tick_frequency = 12
+
+	automation_tick = monthly
+	automation_tick_frequency = 1
+	player_automated_category = cultureacceptance
+
+	price = price:add_discriminated_culture
+	price_modifier = {
+		add = {
+			desc = BASE_VALUE
+			value = 1
+		}
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			add = {
+				desc = "SORT_CULTURE_POPULATION"
+				value = "scope:actor.culture_percentage_in_country(scope:target)"
+				multiply = 100
+			}
+			if = {
+				limit = {
+					scope:target = { is_accepted_in = scope:actor }
+				}
+				add = {
+					desc = "PRICE_DISCRIMINATE_ACCEPTED_CULTURE"
+					value = 5
+				}
+			}
+			else_if = {
+				limit = {
+					scope:target = { is_tolerated_in = scope:actor }
+				}
+				add = {
+					desc = "PRICE_DISCRIMINATE_TOLERATED_CULTURE"
+					value = 2
+				}
+			}
+		}
+		min = 1
+	}
+
+	select_trigger = {
+		looking_for_a = culture
+		source_ai_override = actor
+		target_flag = target
+		source_flags_ai_override = include_any_present
+		name = "add_discriminated_culture_select_culture"
+		none_available_msg_key = "add_discriminated_culture_no_cultures"
+		column = {
+			data = name
+		}
+		enabled = {
+			NOR = {
+				scope:actor.culture = this
+				is_discriminated_in = scope:actor
+			}
+			scope:actor = {
+				OR = {
+					culture_percentage_in_country = {
+						culture = root
+						value >= 0.01
+					}
+
+					culture_population_in_country = {
+						culture = root
+						value >= 1000
+					}
+				}
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = scope:target
+				}
+				add_discriminated_culture = scope:target
+				custom_tooltip = {
+					text = lose_75_pop_satisfaction_ct
+					every_pop = {
+						limit = {
+							owner = scope:actor
+							culture = scope:target
+						}
+						add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+					}
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		# handled in code
+	}
+}
+
+remove_discriminated_culture = {
+	type = owncountry
+
+	potential = {
+	}
+
+	allow = {
+		scope:actor = {
+			in_civil_war = no
+		}
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	automation_tick = monthly
+	automation_tick_frequency = 1
+	player_automated_category = cultureacceptance
+
+	price = price:remove_discriminated_culture
+
+	select_trigger = {
+		looking_for_a = culture
+		source = actor
+		target_flag = target
+		source_flags = only_discriminated
+		name = "remove_discriminated_culture_select_culture"
+		none_available_msg_key = "remove_discriminated_culture_no_cultures"
+		column = {
+			data = name
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = scope:target
+				}
+				remove_discriminated_culture = scope:target
+			}
+		}
+	}
+
+	ai_will_do = {
+		# handled in code
 	}
 }

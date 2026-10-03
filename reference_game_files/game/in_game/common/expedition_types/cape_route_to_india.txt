@@ -1,0 +1,508 @@
+﻿cape_route_to_india_expedition = {
+
+	unique = yes
+	repeatable = no
+	travel_speed = 0.8
+	dynamic_first_waypoint = yes
+	origin = closest_non_rural_port
+	travel_mode = sea
+	show_start_message = no
+
+	variables = {
+		provisions = {
+			display = piechart
+			icon = "gfx/interface/icons/unit_view/food.dds"
+			start = 100
+			min = 0
+			max = 100
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			monthly_change = {
+				subtract = {
+					desc = "EXPEDITION_PROVISIONS_TRAVEL_DRAIN"
+					value = 0
+					if = {
+						limit = {
+							expedition_is_traveling = yes
+							NOT = { expedition_is_paused = yes }
+						}
+						add = 2
+					}
+				}
+			}
+		}
+		morale = {
+			display = piechart
+			icon = "gfx/interface/icons/flat_icons/navy_morale.dds"
+			start = 100
+			min = 0
+			max = 100
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			monthly_change = {
+				subtract = {
+					desc = "EXPEDITION_MORALE_LOW_PROVISIONS"
+					value = 0
+					if = {
+						limit = {
+							expedition_is_traveling = yes
+							NOT = { expedition_is_paused = yes }
+							var:provisions < 50
+						}
+						add = 5
+					}
+				}
+			}
+		}
+		num_ships = {
+			display = fraction
+			icon = "gfx/interface/icons/control_groups/navy.dds"
+			start = 4
+			min = 0
+			max = 4
+		}
+		cargo = {
+			icon = "gfx/interface/icons/trade_goods/icon_goods_pepper.dds"
+			start = 0
+			min = 0
+		}
+	}
+
+	potential = {
+		tag = POR
+	}
+
+	can_start = {
+		has_advance = por_pursuing_waves
+		has_advance = por_feitorias
+		has_non_rural_port = yes
+	}
+
+	leader = {
+		is_explorer = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	on_start = {
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+		}
+		set_variable = { name = cape_feitorias_established value = 0 }
+		ordered_owned_location = {
+			limit = {
+				is_port = yes
+				is_core_of = root
+			}
+			order_by = {
+				value = modifier:harbor_suitability
+				multiply = -1
+			}
+			max = 1
+			save_scope_as = cape_departure_port
+		}
+		scope:expedition = {
+			set_variable = { name = cape_survival value = 1 }
+			if = {
+				limit = { exists = scope:cape_departure_port }
+				set_variable = { name = departure_port value = scope:cape_departure_port }
+			}
+			add_new_waypoint = location:northern_fuerteventura_coast
+			add_new_waypoint = location:senegal_coast
+			add_new_waypoint = location:santiago
+			add_new_waypoint = location:cape_mount
+			add_new_waypoint = location:axim
+			add_new_waypoint = location:fernando_po
+			add_new_waypoint = location:sao_tome
+			add_new_waypoint = location:loango
+			add_new_waypoint = location:luanda
+			add_new_waypoint = location:walvis_bay
+			add_new_waypoint = location:good_hope_cape
+			add_new_waypoint = location:mossel_bay
+			add_new_waypoint = location:sofala
+			add_new_waypoint = location:quelimane
+			add_new_waypoint = location:mozambique
+			add_new_waypoint = location:mombasa
+			add_new_waypoint = location:malindi
+			add_new_waypoint = location:mogadishu
+			add_new_waypoint = location:masqat
+			add_new_waypoint = location:karwar
+			add_new_waypoint = location:kozhikode
+		}
+		trigger_event_non_silently = cape_route_to_india_events.1
+	}
+
+	on_monthly = {
+		if = {
+			limit = { scope:expedition = { var:num_ships <= 0 } }
+			fail_expedition = scope:expedition
+		}
+		scope:expedition = {
+			remove_variable = cape_monthly_event_claimed
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_traveling = yes
+					NOT = { expedition_is_paused = yes }
+					var:morale < 50
+					NOT = { has_variable = cape_mutiny_cooldown }
+				}
+			}
+			random = {
+				chance = {
+					value = 50
+					subtract = scope:expedition.var:morale
+					min = 1
+				}
+				scope:expedition = { set_variable = cape_monthly_event_claimed }
+				trigger_event_non_silently = cape_route_to_india_events.24
+			}
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_traveling = yes
+					NOT = { expedition_is_paused = yes }
+					var:provisions < 55
+					NOT = { has_variable = cape_monthly_event_claimed }
+					NOT = { has_variable = cape_scurvy_done }
+				}
+			}
+			random = {
+				chance = {
+					value = 55
+					subtract = scope:expedition.var:provisions
+					min = 2
+				}
+				scope:expedition = { set_variable = cape_monthly_event_claimed }
+				trigger_event_non_silently = cape_route_to_india_events.19
+			}
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_traveling = yes
+					NOT = { expedition_is_paused = yes }
+					NOT = { has_variable = cape_monthly_event_claimed }
+				}
+			}
+			random_list = {
+				1 = {
+					trigger = { scope:expedition = { NOT = { has_variable = cape_tempest_done } } }
+					trigger_event_non_silently = cape_route_to_india_events.20
+				}
+				1 = {
+					trigger = { scope:expedition = { NOT = { has_variable = cape_becalmed_done } } }
+					trigger_event_non_silently = cape_route_to_india_events.21
+				}
+				1 = {
+					trigger = {
+						scope:expedition = { NOT = { has_variable = cape_worm_done } }
+						scope:location = { climate = tropical }
+					}
+					trigger_event_non_silently = cape_route_to_india_events.22
+				}
+				1 = {
+					trigger = { scope:expedition = { NOT = { has_variable = spoiled_stores_done } } }
+					trigger_event_non_silently = pacific_crossing_events.13
+				}
+				1 = {
+					trigger = { scope:expedition = { NOT = { has_variable = fish_shoal_done } } }
+					trigger_event_non_silently = pacific_crossing_events.12
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							var:provisions < 50
+							NOT = { has_variable = cape_resupply_cooldown }
+						}
+						scope:location = {
+							any_neighbor_location = { is_land = yes }
+						}
+					}
+					if = {
+						limit = {
+							scope:location = {
+								any_neighbor_location = {
+									is_land = yes
+									exists = owner
+									owner = { NOT = { is_enemy_of = root } }
+								}
+							}
+						}
+						trigger_event_non_silently = cape_route_to_india_events.26
+					}
+					else_if = {
+						limit = {
+							scope:location = {
+								any_neighbor_location = {
+									is_land = yes
+									has_owner = no
+								}
+							}
+						}
+						trigger_event_non_silently = cape_route_to_india_events.25
+					}
+				}
+				6 = {}
+			}
+		}
+	}
+
+	on_arrive_to_new_location = {
+		scope:location = {
+			discover_location = root
+		}
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = { scope:location = location:santiago }
+			if = {
+				limit = { scope:location = { top_owner ?= root } }
+				trigger_event_non_silently = cape_route_to_india_events.2
+			}
+			else = {
+				trigger_event_non_silently = cape_route_to_india_events.28
+			}
+		}
+		else_if = {
+			limit = { scope:location = location:axim }
+			trigger_event_non_silently = cape_route_to_india_events.14
+		}
+		else_if = {
+			limit = {
+				scope:location = location:fernando_po
+				NOT = { has_variable = cape_route_homeward }
+			}
+			trigger_event_non_silently = cape_route_to_india_events.15
+		}
+		else_if = {
+			limit = { scope:location = location:sao_tome }
+			trigger_event_non_silently = cape_route_to_india_events.3
+		}
+		else_if = {
+			limit = { scope:location = location:loango }
+			trigger_event_non_silently = cape_route_to_india_events.4
+		}
+		else_if = {
+			limit = { scope:location = location:luanda }
+			trigger_event_non_silently = cape_route_to_india_events.5
+		}
+		else_if = {
+			limit = { scope:location = location:walvis_bay }
+			trigger_event_non_silently = cape_route_to_india_events.6
+		}
+		else_if = {
+			limit = {
+				scope:location = location:good_hope_cape
+				NOT = { has_variable = cape_route_homeward }
+			}
+			trigger_event_non_silently = cape_route_to_india_events.7
+		}
+		else_if = {
+			limit = { scope:location = location:mossel_bay }
+			trigger_event_non_silently = cape_route_to_india_events.8
+		}
+		else_if = {
+			limit = { scope:location = location:sofala }
+			trigger_event_non_silently = cape_route_to_india_events.9
+		}
+		else_if = {
+			limit = { scope:location = location:mozambique }
+			trigger_event_non_silently = cape_route_to_india_events.10
+		}
+		else_if = {
+			limit = {
+				scope:location = location:mombasa
+				NOT = { has_variable = cape_route_homeward }
+			}
+			trigger_event_non_silently = cape_route_to_india_events.11
+		}
+		else_if = {
+			limit = { scope:location = location:malindi }
+			trigger_event_non_silently = cape_route_to_india_events.12
+		}
+		else_if = {
+			limit = { scope:location = location:mogadishu }
+			trigger_event_non_silently = cape_route_to_india_events.16
+		}
+		else_if = {
+			limit = { scope:location = location:masqat }
+			trigger_event_non_silently = cape_route_to_india_events.17
+		}
+		else_if = {
+			limit = { scope:location = location:quelimane }
+			trigger_event_non_silently = cape_route_to_india_events.29
+		}
+		else_if = {
+			limit = { scope:location = location:karwar }
+			trigger_event_non_silently = cape_route_to_india_events.29
+		}
+		else_if = {
+			limit = { scope:location = location:kozhikode }
+			trigger_event_non_silently = cape_route_to_india_events.13
+			set_variable = { name = cape_route_homeward value = 1 }
+			scope:expedition = {
+				add_new_waypoint = location:mombasa
+				add_new_waypoint = location:good_hope_cape
+				add_new_waypoint = location:fernando_po
+				add_new_waypoint = root.capital
+			}
+		}
+	}
+
+	on_end = {
+		if = {
+			limit = { NOT = { has_global_variable = cape_route_discovered } }
+			set_global_variable = { name = cape_route_discovered value = 1 }
+			add_prestige = prestige_extreme_bonus
+			add_country_modifier = {
+				modifier = cape_route_pioneer
+				days = 10950
+			}
+		}
+		else = {
+			add_prestige = prestige_radical_bonus
+		}
+		add_legitimacy = legitimacy_mild_bonus
+		if = {
+			limit = { scope:expedition = { var:num_ships >= 3 } }
+			add_prestige = prestige_mild_bonus
+		}
+		if = {
+			limit = { scope:expedition = { var:morale >= 60 } }
+			custom_tooltip = cape_route_to_india_expedition_high_morale_prestige_tt
+			add_prestige = prestige_weak_bonus
+		}
+		if = {
+			limit = { scope:expedition = { var:morale < 20 } }
+			custom_tooltip = cape_route_to_india_expedition_low_morale_prestige_tt
+			add_prestige = prestige_weak_penalty
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					has_variable = cargo
+					var:cargo > 0
+				}
+			}
+			add_gold = {
+				value = scope:expedition.var:cargo
+				multiply = "capital.market.market_price(goods:pepper)"
+			}
+			capital.market = {
+				add_goods_supply = {
+					amount = scope:expedition.var:cargo
+					goods = goods:pepper
+				}
+			}
+		}
+		if = {
+			limit = { var:cape_feitorias_established >= 5 }
+			add_country_modifier = {
+				modifier = east_africa_trade_dominance
+				days = 10950
+			}
+		}
+		else_if = {
+			limit = { var:cape_feitorias_established >= 3 }
+			add_country_modifier = {
+				modifier = portuguese_african_network
+				days = 10950
+			}
+		}
+		else_if = {
+			limit = { var:cape_feitorias_established >= 1 }
+			add_country_modifier = {
+				modifier = cape_route_established
+				days = 7300
+			}
+		}
+		remove_variable = cape_feitorias_established
+		if = {
+			limit = { has_variable = cape_route_indian_pilot }
+			remove_variable = cape_route_indian_pilot
+		}
+		if = {
+			limit = { has_variable = cape_route_homeward }
+			remove_variable = cape_route_homeward
+		}
+		scope:expedition = {
+			remove_variable = morale
+			remove_variable = provisions
+			remove_variable = num_ships
+			remove_variable = cape_survival
+			remove_variable = cargo
+			remove_variable = departure_port
+			remove_variable = cape_mutiny_cooldown
+			remove_variable = cape_scurvy_done
+			remove_variable = cape_tempest_done
+			remove_variable = cape_becalmed_done
+			remove_variable = cape_worm_done
+			remove_variable = spoiled_stores_done
+			remove_variable = fish_shoal_done
+			remove_variable = cape_resupply_cooldown
+		}
+	}
+
+	on_fail = {
+		if = {
+			limit = { has_variable = cape_route_voluntary_return }
+			trigger_event_non_silently = cape_route_to_india_events.30
+			remove_variable = cape_route_voluntary_return
+		}
+		else = {
+			trigger_event_non_silently = cape_route_to_india_events.27
+		}
+		remove_variable = cape_feitorias_established
+		if = {
+			limit = { has_variable = cape_route_indian_pilot }
+			remove_variable = cape_route_indian_pilot
+		}
+		if = {
+			limit = { has_variable = cape_route_homeward }
+			remove_variable = cape_route_homeward
+		}
+		scope:expedition = {
+			remove_variable = morale
+			remove_variable = provisions
+			remove_variable = num_ships
+			remove_variable = cape_survival
+			remove_variable = cargo
+			remove_variable = departure_port
+			remove_variable = cape_mutiny_cooldown
+			remove_variable = cape_scurvy_done
+			remove_variable = cape_tempest_done
+			remove_variable = cape_becalmed_done
+			remove_variable = cape_worm_done
+			remove_variable = spoiled_stores_done
+			remove_variable = fish_shoal_done
+			remove_variable = cape_resupply_cooldown
+		}
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		if = {
+			limit = { any_character = { has_trait = navigator } }
+			multiply = 3
+		}
+	}
+
+	utility = {
+		value = 18
+	}
+
+	leader_utility = {
+		value = 1
+		if = {
+			limit = {
+				has_trait = navigator
+			}
+			add = 5
+		}
+	}
+}

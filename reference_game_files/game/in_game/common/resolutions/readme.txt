@@ -54,6 +54,9 @@
 #						visible = { <some trigger...root is the object being tested, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc> }
 #						enabled = { <some trigger...root is the object being tested, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc> }
 #						selected = { <some trigger...root is the object being tested, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc> } tests to see if the target is currently selected
+#						validate_vote_trigger = { <trigger> } optional. root is the object being tested, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc>
+#                               When set, we check that a cast vote is still valid bypassing this trigger. When not set, the default is to rebuild the interaction_source_list and check if the vote target is contained in it.
+#                               Only for per-candidate membership (not top-N/ranked lists), e.g. can_lead_international_organization = scope:recipient
 #                       min = <script value> minimum value for value types
 #                       max = <script value> maximum value for value types
 #                       step = <script value> step value for changing value types in the UI
@@ -64,8 +67,8 @@
 # 						secondary_map_color = <script color> striped map color for location (root = location, scope:actor/recipient etc)
 # NOTE: The last select_trigger is what countries will vote on.
 # - show_message = no, optional, to prevent messages showing
-# - ai_will_select <scripted value>: script for the AI to use for how much it wants to propose a vote for whatever, scope:actor is the country we're calculating a score for; scope:recipient is either the situation or international organization this resolution applies to - depending on the looking_for_a definition, scope:target, scope:target_1, scope:target_2....etc
-# - ai_will_do <scripted value>: script for the AI to use for how much it wants to vote for whatever, scope:actor is the country we're calculating a score for; scope:proposer is the proposer country; scope:recipient is either the situation or international organization this resolution applies to - depending on the looking_for_a definition, scope:target, scope:target_1, scope:target_2....etc
+# - ai_will_propose <scripted value>: script for the AI to use for how much it wants to propose a vote for whatever, scope:actor is the country we're calculating a score for; scope:recipient is either the situation or international organization this resolution applies to - depending on the looking_for_a definition, scope:target, scope:target_1, scope:target_2....etc
+# - ai_will_do/ai_vote_weight <scripted value>: script for the AI to use for how much it wants to vote for whatever, scope:actor is the country we're calculating a score for; scope:proposer is the proposer country; scope:recipient is either the situation or international organization this resolution applies to - depending on the looking_for_a definition, scope:target, scope:target_1, scope:target_2....etc
 # - ai_proposer_risk <scripted value>: script for the AI to use for how much it doesn't want a resolution to be rejected, scope:actor is the country we're calculating a score for; scope:proposer is the proposer country; scope:recipient, scope:target, scope:target_1, scope:target_2....etc
 # - ai_tick_frequency <scripted value>: script to determine how often this action should be checked for each country. scope:actor is the country. This is just a per-country check.
 # - years:
@@ -83,22 +86,44 @@
 #
 # To use the action in GUI script, use this sort of thing:
 #
-#action_button_default = {
-#	title = "<optional title for action tooltip>"
-#	description = "<optional description for action tooltip. By default, uses the generic action description>"
-#	effects = "<optional description of the effects for action tooltip. By default, uses the generic action effects but you can override>"
-#	conditions = "<optional description of the conditions for action tooltip. By default, uses the generic action trigger but you can override>"
-#	root = "[GUI script to get the country that is contemplating the action]"
-#	actor = "[GUI script to get the country that is proposing/voting on the action]"
-#   proposer = "[GUI script to get the country that proposed the action]"
-#	recipient = "[<GUI script to get the recipient of the action>]"
-#	target = "[<GUI script to get the target of the action>]"
-#   target = ... (you can add as many targets as you want in case the action has several)
-#	left_action = "<id of the action to perform with a click of the left button>"
-#	left_click_and_hold_action = "<id of the action to perform with a click and hold of the left button>"
-#	right_action = "<id of the action to perform with a click of the right button>"
-#	right_click_and_hold_action = "<id of the action to perform with a click and hold of the right button>"
+#button = {
+#	visible = "[PdxGuiWidget.IsUberButtonVisible]"
+#	enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+#	tooltipwidget = { using = action_tooltip_pop_out }
+#
+#	scripted_action_tooltip = {
+#		click_type = left		left (default) or right
+#		click_mode = single		single for a plain click, confirm for click-and-hold / confirmation dialog
+#		action_name = "<id of the resolution to propose/vote on>"
+#		actor = "[GUI script to get the country that is proposing/voting on the action]"
+#		proposer = "[GUI script to get the country that proposed the action]"
+#		parameter = { parameter_name = "recipient" parameter_value = "[<GUI script to get the recipient of the action>]" }
+#		parameter = { parameter_name = "target" parameter_value = "[<GUI script to get the target of the action>]" }
+#		parameter = ... (add one parameter block per target in case the action has several)
+#	}
+#
+#	button_tooltip_override = {
+#		title = "<optional title for action tooltip>"
+#		description = "<optional description for action tooltip>"
+#		effects = "<optional description of the effects. By default, uses the resolution's effect block>"
+#		conditions = "<optional description of the conditions>"
+#	}
 #}
+#
+# Add one scripted_action_tooltip per click direction and mode you want the button to support:
+#	click_type = left / right	click_mode = single (plain click) / confirm (click-and-hold or dialog)
+#
+# Each block is independent. actor, proposer, and any parameter more than one block needs, must be written
+# inside every scripted_action_tooltip that uses them.
+#
+# The country contemplating the action comes from the widget's datacontext.
+#
+# Resolutions live in their own database, so generic_action_tooltip does not apply to them. Use
+# action_tooltip_pop_out - it fills the title, description, effects and conditions from the resolution the
+# button resolves. Override title_icon_texture / concept_link if you want a specific look.
+#
+# Resolution buttons are usually driven by a dynamic key rather than a literal one, e.g.
+# action_name = "[ResolutionGlue.GetEnactResolution.GetKey]".
 #
 # Useful triggers/effects:
 # - resolution:<key> - scopes to the resolution

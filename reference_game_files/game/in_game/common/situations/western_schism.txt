@@ -15,8 +15,59 @@
 		}
 	}
 	
-	can_end = {
-		western_schism_end_trigger = yes
+	outcome = {
+		name = "western_schism_papacy_collapses"
+		trigger = {
+			OR = {
+				NOT = { exists = international_organization:catholic_church }
+				NOT = { country_exists = c:PAP }
+				c:PAP = { num_cardinals = 0 }
+			}
+		}
+	}
+	outcome = {
+		name = "western_schism_rome_prevails"
+		trigger = {
+			custom_tooltip = {
+				text = western_schism_1_tt
+				has_variable = western_schism_pope_score
+				has_variable = western_schism_anti_pope_score
+			}
+			custom_tooltip = {
+				text = western_schism_2_tt
+				var:western_schism_pope_score >= 2
+				situation:western_schism = {
+					has_variable = western_schism_ended_by_event
+				}
+			}
+		}
+	}
+	outcome = {
+		name = "western_schism_antipope_prevails"
+		trigger = {
+			custom_tooltip = {
+				text = western_schism_1_tt
+				has_variable = western_schism_pope_score
+				has_variable = western_schism_anti_pope_score
+			}
+			custom_tooltip = {
+				text = western_schism_3_tt
+				var:western_schism_anti_pope_score >= 2
+				situation:western_schism = {
+					has_variable = western_schism_ended_by_event
+				}
+			}
+		}
+	}
+	outcome = {
+		name = "western_schism_conclave_deadlocked"
+		trigger = {
+			custom_tooltip = {
+				text = western_schism_4_tt
+				has_variable = western_schism_no_resolution_months
+				var:western_schism_no_resolution_months >= 1
+			}
+		}
 	}
 	
 	visible = {
@@ -45,6 +96,7 @@
 		set_variable = { name = western_schism_pope_score value = 0 }
 		set_variable = { name = western_schism_anti_pope_score value = 0 }
 		set_variable = { name = western_schism_cardinal_weight_bonus value = 0 }
+		set_variable = { name = western_schism_no_resolution_months value = 0 }
 	
 		start_western_schism_resolution = yes
 
@@ -71,6 +123,41 @@
 		set_papal_states_schism_cardinal = yes
 		set_schism_opponent_country = yes
 
+		if = {
+			limit = {
+				NOT = {
+					international_organization:catholic_church = {
+						exists = "active_resolution(resolution:western_schism_resolution)"
+					}
+				}
+			}
+			start_western_schism_resolution = yes
+		}
+
+		if = {
+			limit = {
+				international_organization:catholic_church = {
+					exists = "active_resolution(resolution:western_schism_resolution)"
+				}
+			}
+			set_variable = { name = western_schism_no_resolution_months value = 0 }
+		}
+		else_if = {
+			limit = {
+				var:western_schism_pope_score < 2
+				var:western_schism_anti_pope_score < 2
+				has_variable = western_schism_no_resolution_months
+			}
+			change_variable = { name = western_schism_no_resolution_months add = 1 }
+		}
+		else_if = {
+			limit = {
+				var:western_schism_pope_score < 2
+				var:western_schism_anti_pope_score < 2
+			}
+			set_variable = { name = western_schism_no_resolution_months value = 1 }
+		}
+
 		hidden_effect = {
 			religion:catholic = {
 				#event for neutral countries
@@ -87,13 +174,15 @@
 					}
 					random_list = {
 						3 = { trigger_event_non_silently = western_schism.3 }
-						100 = { }
+						1 = { trigger_event_non_silently = western_schism.31 }
+						135 = { }
 					}
 				}
 				#random events during the schism for cardinal countries who support PAP
 				every_cardinal_country = {
 					limit = {
 						NOT = { tag = PAP }
+						NOT = { has_variable = recently_had_any_western_schism_event }
 						this != root.var:schism_opponent_country
 						any_owned_location = {
 							any_pop = {
@@ -116,13 +205,17 @@
 						1 = { trigger_event_non_silently = western_schism.13 }
 						1 = { trigger_event_non_silently = western_schism.14 }
 						1 = { trigger_event_non_silently = western_schism.15 }
-						100 = { }
+						1 = { trigger_event_non_silently = western_schism.27 }
+						1 = { trigger_event_non_silently = western_schism.28 }
+						1 = { trigger_event_non_silently = western_schism.36 }
+						160 = { }
 					}
 				}
 				#random events during the schism for cardinal countries who support the not PAP side
 				every_cardinal_country = {
 					limit = {
 						NOT = { tag = PAP }
+						NOT = { has_variable = recently_had_any_western_schism_event }
 						this != root.var:schism_opponent_country
 						save_temporary_scope_as = voter
 						international_organization:catholic_church = {
@@ -139,7 +232,10 @@
 						1 = { trigger_event_non_silently = western_schism.13 }
 						1 = { trigger_event_non_silently = western_schism.14 }
 						1 = { trigger_event_non_silently = western_schism.15 }
-						100 = { }
+						1 = { trigger_event_non_silently = western_schism.29 }
+						1 = { trigger_event_non_silently = western_schism.30 }
+						1 = { trigger_event_non_silently = western_schism.36 }
+						160 = { }
 					}
 				}
 				#random events during the schism for non cardinal countries
@@ -149,6 +245,7 @@
 						NOT = {
 							tag = PAP
 						}
+						NOT = { has_variable = recently_had_any_western_schism_event }
 					}
 					random_list = {
 						1 = { trigger_event_non_silently = western_schism.5 }
@@ -159,15 +256,31 @@
 						1 = { trigger_event_non_silently = western_schism.14 }
 						1 = { trigger_event_non_silently = western_schism.15 }
 						1 = { trigger_event_non_silently = western_schism.1100 }
-						100 = { }
+						1 = { trigger_event_non_silently = western_schism.20 }
+						1 = { trigger_event_non_silently = western_schism.21 }
+						1 = { trigger_event_non_silently = western_schism.22 }
+						1 = { trigger_event_non_silently = western_schism.23 }
+						1 = { trigger_event_non_silently = western_schism.24 }
+						1 = { trigger_event_non_silently = western_schism.25 }
+						1 = { trigger_event_non_silently = western_schism.34 }
+						1 = { trigger_event_non_silently = western_schism.35 }
+						1 = { trigger_event_non_silently = western_schism.37 }
+						1 = { trigger_event_non_silently = western_schism.38 }
+						1 = { trigger_event_non_silently = western_schism.39 }
+						235 = { }
 					}
 				}
 			}
 			c:PAP = {
-				random_list = {
-					1 = { trigger_event_non_silently = western_schism.15 }
-					1 = { trigger_event_non_silently = western_schism.1200 }
-					100 = { }
+				if = {
+					limit = { NOT = { has_variable = recently_had_any_western_schism_event } }
+					random_list = {
+						1 = { trigger_event_non_silently = western_schism.15 }
+						1 = { trigger_event_non_silently = western_schism.1200 }
+						1 = { trigger_event_non_silently = western_schism.32 }
+						1 = { trigger_event_non_silently = western_schism.33 }
+						200 = { }
+					}
 				}
 			}
 			international_organization:catholic_church = {
@@ -213,6 +326,7 @@
 		remove_variable = western_schism_pope_score
 		remove_variable = western_schism_anti_pope_score
 		remove_variable = western_schism_cardinal_weight_bonus
+		remove_variable = western_schism_no_resolution_months
 		clear_global_variable_list = western_schism_possible_votes
 		if = {
 			limit = { resolution_is_active = resolution:western_schism_resolution }

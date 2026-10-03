@@ -1,0 +1,291 @@
+﻿relic_expedition = {
+
+	unique = yes
+	repeatable = yes
+	dynamic_first_waypoint = yes
+	returns_home = yes
+	should_end_at_last_waypoint = no
+	origin = capital
+	travel_mode = both
+	travel_speed = 0.75
+	category = religious
+	icon = category_religious
+	show_start_message = no
+
+	variables = {
+		clues = {
+			icon = "gfx/interface/icons/flat_icons/holy_site_importance.dds"
+			start = 1
+			min = 0
+		}
+		hunt_retinue = {
+			icon = "gfx/interface/icons/unit_category/army_auxiliary.dds"
+			start = 40
+			min = 0
+		}
+	}
+
+	potential = {
+		religion = religion:catholic
+		NOR = {
+			current_age = age_4_reformation
+			current_age = age_5_absolutism
+			current_age = age_6_revolutions
+		}
+		OR = {
+			government_type = government_type:theocracy
+			societal_value:spiritualist_vs_humanist < -75
+		}
+	}
+
+	can_start = {
+		gold >= 80
+		at_war = no
+		NOT = { has_cooldown = relic_expedition_cooldown }
+	}
+
+	leader = {
+		is_adult = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	on_start = {
+		add_cooldown = {
+			type = relic_expedition_cooldown
+			years = 5
+		}
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+			add_new_waypoint = location:jerusalem
+			set_variable = { name = clues value = 1 }
+			set_variable = { name = hunt_retinue value = 40 }
+		}
+		trigger_event_non_silently = { id = relic_expedition_events.1}
+	}
+
+	on_monthly = {
+		if = {
+			limit = { scope:expedition = { var:hunt_retinue <= 0 } }
+			trigger_event_non_silently = relic_expedition_events.5
+		}
+		if = {
+			limit = { scope:expedition = { var:clues <= 0 } }
+			trigger_event_non_silently = relic_expedition_events.4
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					NOT = { expedition_is_paused = yes }
+					NOT = { expedition_is_returning = yes }
+				}
+			}
+			random_list = {
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_port = yes }
+							NOT = { has_variable = relic_hunt_rivals_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.12
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = relic_hunt_forger_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.13
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_is_traveling = yes
+							expedition_current_location ?= {
+								is_land = yes
+								OR = {
+									vegetation = desert
+									vegetation = sparse
+								}
+							}
+							NOT = { has_variable = relic_hunt_sandstorm_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.14
+				}
+				1 = {
+					trigger = { scope:expedition = { NOT = { has_variable = relic_hunt_fever_fired } } }
+					trigger_event_non_silently = relic_expedition_events.15
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_is_traveling = yes
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = relic_hunt_bandits_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.16
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = relic_hunt_pilgrim_rumor_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.17
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							has_variable = relic_hunt_visited_jerusalem
+							NOT = { has_variable = relic_hunt_funds_short_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.18
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							has_variable = relic_hunt_visited_jerusalem
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = relic_hunt_local_authority_fired }
+						}
+					}
+					trigger_event_non_silently = relic_expedition_events.19
+				}
+				8 = {}
+			}
+		}
+	}
+
+	on_arrive_to_new_location = {
+		scope:location = {
+			discover_location = root
+		}
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = { NOT = { scope:location = root.capital } }
+			trigger_event_non_silently = relic_expedition_events.2
+		}
+		else_if = {
+			limit = { scope:expedition = { expedition_is_returning = yes } }
+			end_expedition = scope:expedition
+		}
+	}
+
+	on_end = {
+		add_prestige = prestige_mild_bonus
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = estate_satisfaction_mild_bonus
+		}
+		if = {
+			limit = { religion = { has_religious_influence = yes } }
+			add_religious_influence = religious_influence_mild_bonus
+		}
+		change_societal_value = {
+			type = spiritualist_vs_humanist
+			value = societal_value_tiny_move_to_left
+		}
+		scope:expedition = {
+			expedition_leader ?= {
+				add_adm = 10
+				add_dip = 10
+			}
+		}
+		if = {
+			limit = { exists = scope:expedition.var:relic_hunt_found_relic }
+			if = {
+				limit = { scope:expedition = { var:relic_pick ?= 1 } }
+				custom_tooltip = relic_expedition_found_relic_true_cross_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 2 } }
+				custom_tooltip = relic_expedition_found_relic_holy_lance_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 3 } }
+				custom_tooltip = relic_expedition_found_relic_holy_shroud_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 4 } }
+				custom_tooltip = relic_expedition_found_relic_holy_nail_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 5 } }
+				custom_tooltip = relic_expedition_found_relic_true_cross_fragment_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 6 } }
+				custom_tooltip = relic_expedition_found_relic_saint_bones_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 7 } }
+				custom_tooltip = relic_expedition_found_relic_baptist_head_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 8 } }
+				custom_tooltip = relic_expedition_found_relic_virgin_milk_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 9 } }
+				custom_tooltip = relic_expedition_found_relic_holy_thorn_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 10 } }
+				custom_tooltip = relic_expedition_found_relic_holy_chalice_tt
+			}
+			else_if = {
+				limit = { scope:expedition = { var:relic_pick ?= 11 } }
+				custom_tooltip = relic_expedition_found_relic_titulus_crucis_tt
+			}
+			scope:expedition = {
+				remove_variable = relic_hunt_found_relic
+				remove_variable = relic_pick
+			}
+		}
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		multiply = 0.25
+		if = {
+			limit = {
+				has_ruler = yes
+				ruler = {
+					OR = {
+						has_trait = zealot
+						has_trait = pious
+					}
+				}
+			}
+			multiply = 2
+		}
+
+		if = {
+			limit = {
+				gold <= {
+					save_temporary_value_as = {
+						name = scale
+						value = 10
+					}
+					value = scaled_gold_for_effect
+				}
+			}
+			multiply = 0
+		}
+	}
+
+	utility = {
+		value = 4
+	}
+}

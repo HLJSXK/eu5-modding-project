@@ -1,0 +1,202 @@
+﻿cartographic_survey_expedition = {
+
+	unique = yes
+	travel_speed = 1
+	dynamic_first_waypoint = yes
+	origin = closest_non_rural_port
+
+	potential = {
+		has_advance = explorer_commisions_advance
+		has_ports = yes
+	}
+
+	can_start = {
+		has_non_rural_port = yes
+		at_war = no
+		NOT = { has_country_modifier = accurate_charts }
+		NOT = { has_cooldown = cartographic_survey_cooldown }
+		any_owned_location = {
+			is_port = yes
+			NOT = { this = root.capital }
+		}
+	}
+
+	leader = {
+		is_adult = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	on_start = {
+		add_cooldown = {
+			type = cartographic_survey_cooldown
+			years = 5
+		}
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+		}
+		set_variable = { name = coasts_surveyed value = 0 }
+		save_scope_as = cartographic_survey_country
+
+		ordered_owned_location = {
+			limit = { is_port = yes }
+			order_by = development
+			max = 1
+			scope:expedition = { add_new_waypoint = prev }
+			save_scope_as = cartographic_survey_origin
+			set_variable = { name = cartographic_survey_visited value = 1 }
+		}
+
+		ordered_owned_location = {
+			limit = { is_port = yes }
+			order_by = development
+			max = 5
+			every_neighbor_location = {
+				limit = {
+					is_land = no
+					NOT = { has_variable = cartographic_survey_visited }
+				}
+				set_variable = { name = cartographic_survey_visited value = 1 }
+				scope:expedition = { add_new_waypoint = prev }
+				every_neighbor_location = {
+					limit = {
+						is_land = yes
+						is_coastal = yes
+						owner ?= scope:cartographic_survey_country
+						NOT = { has_variable = cartographic_survey_visited }
+					}
+					set_variable = { name = cartographic_survey_visited value = 1 }
+					scope:expedition = { add_new_waypoint = prev }
+				}
+			}
+		}
+
+		scope:expedition = { add_new_waypoint = scope:cartographic_survey_origin }
+
+		trigger_event_non_silently = { id = cartographic_survey_events.1 days = 5 }
+	}
+
+	on_arrive_to_new_location = {
+		scope:location = {
+			discover_location = root
+		}
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = { scope:location = { is_land = yes } }
+			scope:expedition = { pause_expedition = 30 }
+		}
+		if = {
+			limit = {
+				scope:location = { is_port = yes }
+				NOT = { scope:location = root.capital }
+				scope:location.owner ?= root
+			}
+			discover_area = scope:location.area
+			change_variable = { name = coasts_surveyed add = 1 }
+			random_list = {
+				# Material-specific good (falls through to generic encounter if no material match)
+				30 = {
+					if = {
+						limit = { scope:location = { raw_material = goods:fish } }
+						trigger_event_non_silently = cartographic_survey_events.10
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:lumber } }
+						trigger_event_non_silently = cartographic_survey_events.11
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:salt } }
+						trigger_event_non_silently = cartographic_survey_events.12
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:pearls } }
+						trigger_event_non_silently = cartographic_survey_events.13
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:wine } }
+						trigger_event_non_silently = cartographic_survey_events.14
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:dyes } }
+						trigger_event_non_silently = cartographic_survey_events.15
+					}
+					else_if = {
+						limit = { scope:location = { raw_material = goods:amber } }
+						trigger_event_non_silently = cartographic_survey_events.16
+					}
+					else = {
+						random_list = {
+							33 = { trigger_event_non_silently = cartographic_survey_events.20 }
+							33 = { trigger_event_non_silently = cartographic_survey_events.21 }
+							34 = { trigger_event_non_silently = cartographic_survey_events.22 }
+						}
+					}
+				}
+				# Generic harbour encounters (3 × 10 = 30%)
+				10 = { trigger_event_non_silently = cartographic_survey_events.20 }
+				10 = { trigger_event_non_silently = cartographic_survey_events.21 }
+				10 = { trigger_event_non_silently = cartographic_survey_events.22 }
+				# Bad outcomes (4 × 10 = 40%)
+				10 = { trigger_event_non_silently = cartographic_survey_events.30 }
+				10 = { trigger_event_non_silently = cartographic_survey_events.31 }
+				10 = { trigger_event_non_silently = cartographic_survey_events.32 }
+				10 = { trigger_event_non_silently = cartographic_survey_events.33 }
+			}
+		}
+	}
+
+	on_end = {
+		if = {
+			limit = { var:coasts_surveyed >= 3 }
+			add_country_modifier = {
+				modifier = accurate_charts
+				days = 5475
+			}
+			add_prestige = prestige_mild_bonus
+		}
+		else_if = {
+			limit = { var:coasts_surveyed >= 1 }
+			add_prestige = prestige_weak_bonus
+		}
+		remove_variable = coasts_surveyed
+		every_owned_location = {
+			limit = { has_variable = cartographic_survey_visited }
+			remove_variable = cartographic_survey_visited
+		}
+	}
+
+	on_fail = {
+		remove_variable = coasts_surveyed
+		every_owned_location = {
+			limit = { has_variable = cartographic_survey_visited }
+			remove_variable = cartographic_survey_visited
+		}
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		if = {
+			limit = { any_character = { has_trait = navigator } }
+			multiply = 2
+		}
+	}
+
+	utility = {
+		value = 3
+	}
+
+	leader_utility = {
+		value = 1
+		if = {
+			limit = {
+				has_trait = navigator
+			}
+			add = 5
+		}
+	}
+}

@@ -33,15 +33,37 @@
 				exists = leader_country
 				leader_country = { is_subject = no }
 			}
-			leader_country = {
+			if = {
+				limit = {
+					exists = international_organization:crusade
+					international_organization:crusade = { var:phase = 1 }
+				}
 				add_to_local_variable_list = {
 					name = payees
-					target = this
+					target = international_organization:crusade
+				}
+			}
+			else = {
+				leader_country = {
+					add_to_local_variable_list = {
+						name = payees
+						target = this
+					}
 				}
 			}
 		}
 		else_if = {
 			limit = { has_enabled_currency = gold }
+			add_to_local_variable_list = {
+				name = payees
+				target = this
+			}
+		}
+		every_international_organization_member = {
+			limit = {
+				country_can_pay_tithe = yes
+				has_variable = has_bula_de_cruzada
+			}
 			add_to_local_variable_list = {
 				name = payees
 				target = this
@@ -94,6 +116,20 @@
 	}
 	proportion_for_payee = {
 		if = {
+			limit = { has_variable = has_bula_de_cruzada }
+			add = {
+				desc = "tithe"
+				every_estate = {
+					add = estate_taxable_income
+				}
+				multiply = {
+					value = 1
+					add = modifier:tithe_cost_modifier
+					min = 0.1
+				}
+			}
+		}
+		else_if = {
 			limit = {
 				has_global_variable_list = western_schism_possible_votes
 			}
@@ -146,7 +182,15 @@
 			}
 		}
 		else = {
-			#simple, just pay the pope
+			# The Pope (or the Crusade war-chest during preparation) is the sole payee here (no
+			# member is withholding its own tithe via a Bula de Cruzada), so it receives 100% of
+			# the collected pool. A single payee with any positive proportion gets the whole pool.
+			#
+			# NB: keep this a plain constant. Do NOT try to re-sum the pool here with
+			# every_international_organization_member { limit = { country_can_pay_tithe = yes } }:
+			# country_can_pay_tithe keys off `root` being the IO, but in proportion_for_payee `root`
+			# is the PAYEE (a country with no leader_country), so the trigger's trigger_else = no
+			# fires for every member and the whole proportion collapses to 0 — that was the tithe bug.
 			add = {
 				desc = "tithe"
 				value = 1

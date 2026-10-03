@@ -29,6 +29,12 @@
 			}
 			at_war = no
 		}
+		c:FRA = {
+			custom_tooltip = {
+				text = hyw_france_recently_received_demand_tt
+				NOT = { has_variable = hyw_recent_subject_demand }
+			}
+		}
 	}
 
 	cooldown = {
@@ -40,6 +46,9 @@
 
 	automation_tick = never
 	automation_tick_frequency = 12
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
 
 	select_trigger = {
 		looking_for_a = situation
@@ -54,11 +63,13 @@
 		}
 	}
 
-	effect = { 
+	effect = {
 		scope:actor = {
 			trigger_event_non_silently = hundred_years_war.206
 		}
-		
+		hidden_effect = {
+			c:FRA = { set_variable = { name = hyw_recent_subject_demand days = 180 } }
+		}
 	}
 
 	ai_will_do = {	#Appanage should always want this as long as they are disloyal
@@ -186,8 +197,6 @@ influence_french_subject = {	#Influence French Subject
 		type = influence_french_subject
 		months = 2
 	}
-
-	price = price:hyw_main_actions_price
 
 	potential = {
 		scope:actor = { tag = ENG }
@@ -510,6 +519,9 @@ demand_appanage_promotion = {	#Demand Promotion to Appanage
 	automation_tick = never
 	automation_tick_frequency = 12
 
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
 	allow = {
 		c:FRA = {
 			has_ruler = yes
@@ -538,6 +550,12 @@ demand_appanage_promotion = {	#Demand Promotion to Appanage
 						} 
 					}
 				}
+			}
+		}
+		c:FRA = {
+			custom_tooltip = {
+				text = hyw_france_recently_received_demand_tt
+				NOT = { has_variable = hyw_recent_subject_demand }
 			}
 		}
 	}
@@ -593,9 +611,12 @@ demand_appanage_promotion = {	#Demand Promotion to Appanage
 		column = { data = character_info }
 	}
 
-	effect = { 
+	effect = {
 		c:FRA ?= {
 			trigger_event_non_silently = hundred_years_war.210
+			hidden_effect = {
+				set_variable = { name = hyw_recent_subject_demand days = 180 }
+			}
 		}
 	}
 
@@ -633,7 +654,13 @@ demand_territory_return = {	#Demand Return of Territory
 
 	allow = {
 		scope:actor = { at_war = no }
-		c:FRA = { at_war = no }
+		c:FRA = {
+			at_war = no
+			custom_tooltip = {
+				text = hyw_france_recently_received_demand_tt
+				NOT = { has_variable = hyw_recent_subject_demand }
+			}
+		}
 	}
 
 	price = price:hyw_main_actions_price
@@ -685,6 +712,9 @@ demand_territory_return = {	#Demand Return of Territory
 		if = {
 			limit = { exists = scope:target_location }
 			scope:target_location.owner ?= { trigger_event_non_silently = hundred_years_war.213 }
+			hidden_effect = {
+				c:FRA = { set_variable = { name = hyw_recent_subject_demand days = 180 } }
+			}
 		}
 		else = { custom_tooltip = demand_territory_return_tt }		
 	}
@@ -1032,14 +1062,29 @@ procure_core_claim = {	#Procure Core Claim
 	}
 
 	ai_will_do = {	#We generally want to do this always
-		add = 25
+		add = -1
 		if = {
-			limit = { exists = scope:target_location }
-			add = {			#We want claims against relatively equal countries
-				value = 100
-				multiply = "scope:actor.relative_strength(scope:target_location.owner)"
+			limit = { 
+				scope:actor = { 
+					wants_to_attack = scope:target_location.owner
+				}
+			}
+
+			add = {
+				value = 500
+				desc = "wants to attack"
+			}
+		}
+
+		if = {
+			limit = {
+				scope:actor.num_cbs > 0
+			}
+			add = {
+				value = -1000
+				desc = "already has CBs"
 			}	
-		}	
+		}
 	}
 }
 
@@ -1098,6 +1143,10 @@ request_war_entry = {	#Request War Entry
 						is_rival_of = scope:actor
 						is_enemy_of = scope:actor
 					}
+					NOR = {
+						AND = { scope:actor = c:ENG  is_allied_with = { target = c:FRA } }
+						AND = { scope:actor = c:FRA  is_allied_with = { target = c:ENG } }
+					}
 					relative_strength = {
 						target = scope:actor
 						value >= 0.1
@@ -1148,6 +1197,10 @@ request_war_entry = {	#Request War Entry
 							is_rival_of = scope:actor
 							is_enemy_of = scope:actor
 						}
+						NOR = {
+							AND = { scope:actor = c:ENG  is_allied_with = { target = c:FRA } }
+							AND = { scope:actor = c:FRA  is_allied_with = { target = c:ENG } }
+						}
 						relative_strength = {
 							target = scope:actor
 							value >= 0.1
@@ -1177,6 +1230,11 @@ request_war_entry = {	#Request War Entry
 	}
 
 	ai_will_do = {
+		add = {
+			value = -1000
+			desc = "waste of legitimacy to spam on cooldown on random countries"
+		}
+
 		add = {
 			value = 50
 			desc = BASE_VALUE
@@ -1350,6 +1408,11 @@ hyw_sign_truce = {	#Sign a Truce
 			desc = BASE_VALUE
 		}
 
+		add = {
+			value = -1000
+			desc = "waste of legitimacy to spam on cooldown on random countries"
+		}
+
 		if = {
 			limit = { exists = scope:target_country }
 			if = {
@@ -1424,8 +1487,21 @@ hyw_defect_action = {	#Betray our Allegiance
 	}
 
 	allow = {
-		scope:actor = { 
-			at_war = no
+		scope:actor = {
+			custom_tooltip = {
+				text = hyw_defect_not_at_war_outside_hyw_tt
+				trigger_if = {
+					limit = {
+						situation:hundred_years_war = { situation_is_active = yes }
+						OR = {
+							AND = { is_subject_of = c:FRA  c:FRA = { is_at_war_with = c:ENG } }
+							AND = { is_subject_of = c:ENG  c:ENG = { is_at_war_with = c:FRA } }
+						}
+					}
+					always = yes
+				}
+				trigger_else = { at_war = no }
+			}
 			custom_tooltip = {
 				text = ruler_regent_heir_not_overlord_dynasty_tt
 				trigger_if = {
@@ -1504,14 +1580,14 @@ hyw_defect_action = {	#Betray our Allegiance
 		if = {
 			limit = { c:FRA = { is_at_war_with = c:ENG } }
 			add = {
-				value = 30
+				value = 45
 				subtract = scope:actor.subject_loyalty
 				desc = "lack of loyalty (wartime threshold)"
 			}
 		}
 		else = {
 			add = {
-				value = 15
+				value = 40
 				subtract = scope:actor.subject_loyalty
 				desc = "lack of loyalty (peacetime threshold)"
 			}

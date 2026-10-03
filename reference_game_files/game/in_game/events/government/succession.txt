@@ -23,6 +23,12 @@ succession.1 = {
 		first_valid = {
 			triggered_desc = {
 				trigger = {
+					list_size = { name = rival_sons_list value = 0 }
+				}
+				desc = succession.1.desc.d
+			}
+			triggered_desc = {
+				trigger = {
 					#If there are no more alive adult sons
 					#2 or more rival sons
 					list_size = { name = rival_sons_list value >= 2 }
@@ -86,9 +92,6 @@ succession.1 = {
 		if = {
 			limit = {
 				#If there are no more alive adult sons
-				#2 or more rival sons
-				list_size = { name = rival_sons_list value >= 2 }
-				#1 or more adults
 				list_size = { name = adult_rival_sons_list value = 0 }
 			}
 			#Is there a close relative of the previous ruler?
@@ -265,6 +268,45 @@ succession.1 = {
 			}
 		}
 
+		if = {
+			limit = {
+				list_size = { name = rival_sons_list value = 0 }
+			}
+			if = {
+				limit = { exists = scope:dynastyc_succesor_scope }
+				scope:dynastyc_succesor_scope = { save_scope_as = fratricide_successor_scope }
+			}
+			else = {
+				random_owned_location = {
+					create_dynasty_from_location = random
+					last_dynasty_in_location = { save_scope_as = target_dynasty }
+				}
+				if = {
+					limit = { exists = scope:target_dynasty }
+					create_character = {
+						dynasty = scope:target_dynasty
+						religion = root.religion
+						culture = root.culture
+						estate = estate_type:nobles_estate
+						age = { 20 60 }
+						female = no
+						save_scope_as = fratricide_successor_scope
+					}
+				}
+				else = {
+					create_character = {
+						religion = root.religion
+						culture = root.culture
+						estate = estate_type:nobles_estate
+						age = { 20 60 }
+						female = no
+						save_scope_as = fratricide_successor_scope
+					}
+					scope:fratricide_successor_scope = { found_dynasty = random }
+				}
+			}
+		}
+
 	}
 
 	#2 or more sons, continue the culling
@@ -369,6 +411,18 @@ succession.1 = {
 		add_prestige = prestige_mild_bonus
 
 		set_new_ruler_with_union_fratricide = { character = scope:dynastyc_succesor_scope }
+	}
+
+	option = {
+		name = succession.1.f
+		trigger = {
+			list_size = { name = rival_sons_list value = 0 }
+		}
+
+		add_stability = stability_mild_penalty
+		add_legitimacy = legitimacy_mild_penalty
+
+		set_new_ruler_with_union_fratricide = { character = scope:fratricide_successor_scope }
 	}
 }
 
@@ -700,7 +754,7 @@ succession.5 = {
 #depending on the amount of brothers of the ruler
 # root = country; scope:old_ruler and scope:new_ruler are supplied
 scripted_trigger succession_100_option_a_trigger = {
-	list_size = { name = other_sons value > 1 }
+	list_size = { name = other_sons value > 0 }
 	any_province = {
 		NOT = { root.capital.province = this }
 		count = {
@@ -717,7 +771,7 @@ scripted_trigger succession_100_option_a_trigger = {
 	}
 }
 scripted_trigger succession_100_option_b_trigger = {
-	list_size = { name = other_sons value > 1 }
+	list_size = { name = other_sons value > 0 }
 	culture = { has_culture_group = culture_group:german_group }
 	scope:old_ruler ?= {
 		NOT = { this = scope:new_ruler }
@@ -725,7 +779,7 @@ scripted_trigger succession_100_option_b_trigger = {
 }
 scripted_trigger succession_100_option_c_trigger = {
 	#There are other sons and more than one province
-	list_size = { name = other_sons value > 1 }
+	list_size = { name = other_sons value > 0 }
 	num_provinces > 1
 	scope:old_ruler ?= {
 		NOT = { this = scope:new_ruler }
@@ -733,7 +787,7 @@ scripted_trigger succession_100_option_c_trigger = {
 }
 scripted_trigger succession_100_option_d_trigger = {
 	OR = {
-		list_size = { name = other_sons value <= 1 }
+		list_size = { name = other_sons value <= 0 }
 		num_provinces = 1
 	}
 	scope:old_ruler ?= {
@@ -755,7 +809,7 @@ succession.100 = {
 		first_valid = {
 			triggered_desc = {
 				trigger = {
-					list_size = { name = other_sons value > 1 }
+					list_size = { name = other_sons value > 0 }
 				}
 				desc = succession.100.desc.a
 			}
@@ -956,9 +1010,15 @@ succession.101 = {
 	immediate = {
 		random_known_country = {
 			limit = {
-				has_mutual_scripted_relation = {
-					type = relation_type:union_of_crowns_pact
-					target = root
+				OR = {
+					has_mutual_scripted_relation = {
+						type = relation_type:union_of_crowns_pact
+						target = root
+					}
+					has_mutual_scripted_relation = {
+						type = relation_type:iberian_wedding_pact
+						target = root
+					}
 				}
 			}
 			save_scope_as = union_partner
@@ -968,7 +1028,13 @@ succession.101 = {
 		set_new_ruler = scope:new_ruler
 	}
 	trigger = {
-		succession_law = heir_selection:union_of_crowns_succession
+		OR = {
+			succession_law = heir_selection:union_of_crowns_succession
+			AND = {
+				has_dlc = "d009_across_the_pillars"
+				succession_law = heir_selection:iberian_union_succession
+			}
+		}
 		has_heir = no
 	}
 	option = {
@@ -976,17 +1042,37 @@ succession.101 = {
 		show_as_tooltip = {
 			set_new_ruler = scope:new_ruler
 		}
-		change_heir_selection = heir_selection:salic_law	#The union is most often than not a one-time thing, and as such the heir succession gets set to the default one
-		hidden_effect = { scope:union_partner = { trigger_event_silently = { id = succession.102 } } }
-		remove_relation = {
-			first = root
-			second = scope:union_partner
-			type = relation_type:union_of_crowns_pact
+		if = {
+			limit = { succession_law = heir_selection:iberian_union_succession }
+			change_heir_selection = heir_selection:cognatic_primogeniture
+			remove_relation = {
+				first = root
+				second = scope:union_partner
+				type = relation_type:iberian_wedding_pact
+			}
 		}
+		else = {
+			change_heir_selection = heir_selection:salic_law
+			remove_relation = {
+				first = root
+				second = scope:union_partner
+				type = relation_type:union_of_crowns_pact
+			}
+		}
+		if = {
+			limit = { has_variable_list = old_union_members }
+			every_in_list = {
+				variable = old_union_members
+				limit = { NOT = { in_union_with = root } }
+				set_new_ruler = scope:new_ruler
+			}
+			clear_variable_list = old_union_members
+		}
+		hidden_effect = { scope:union_partner = { trigger_event_silently = { id = succession.102 } } }
 	}
 }
 
-#An information event that the succession pact has been fulfilled. Fires for the country which would become the "Junior" Union Partner
+#An information event that the succession pact has been fulfilled. Fires for the country which would become the "Senior" Union Partner as they have the original ruler
 succession.102 = {
 	type = country_event
 	title = succession.101.title
@@ -994,7 +1080,13 @@ succession.102 = {
 	outcome = neutral
 	option = {
 		name = succession.102.a
-		change_heir_selection = heir_selection:salic_law	#The union is most often than not a one-time thing, and as such the heir succession gets set to the default one
+		if = {
+			limit = { succession_law = heir_selection:iberian_union_succession }
+			change_heir_selection = heir_selection:cognatic_primogeniture
+		}
+		else = {
+			change_heir_selection = heir_selection:salic_law
+		}
 	}
 	immediate = {
 		event_illustration_government_estate_effect = yes

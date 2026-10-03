@@ -3,6 +3,7 @@
 # all modifiers are multiplied by 1 + (effective ability + cabinet efficiency)*0.05 (CABINET_ACTION_SKILL_MODIFIER in defines)
 #
 # ability: monarch ability that this action will use (adm/dip/mil)
+# helps_with: "tag1|tag2|..." pipe-separated free-form tags used by UI hints elsewhere in the game (e.g. the colony/subject "Helpful Cabinet Actions" tooltips) to recommend this action for a specific situation. Optional.
 # is_finished: trigger for whether the action is completed (root = country, scope:target = province)
 # select_trigger = can add multiple of these to allow selection of targets/parameters for the action. They get stored in scope:target, scope:target_1, scope:target_2....etc
 #				   format: 

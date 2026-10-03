@@ -1,4 +1,4 @@
-lateralview = {
+﻿lateralview = {
 	name = "character_lateralview"
 
 	blockoverride "lateralview_topbuttons_extra" {
@@ -65,8 +65,10 @@ lateralview = {
 			}
 
 			blockoverride "window_header_alt_color_texture"{
-				using = color_default_brown_texture
+				using = color_society_texture
 			}
+
+			datacontext = "[CharacterLateralview.GetCharacter]"
 		}
 	}
 
@@ -344,7 +346,7 @@ lateralview = {
 					hbox = {
 						visible = "[And(CharacterLateralview.GetCharacter.HasUnit,CharacterLateralview.GetCharacter.CanSelectUnit)]"
 						spacing = 5
-						maximumsize = {72 28}
+						maximumsize = {90 28}
 						position = { 10 10}
 						parentanchor = left|top
 						margin_right = 10
@@ -364,19 +366,19 @@ lateralview = {
 							}
 
 							blockoverride "icon_texture" {
-								texture = "gfx/interface/buttons/flats/ship_button.dds"
+								texture = "gfx/interface/icons/character_roles/admiral.dds"
 								texture_density = 2
-								using = icon_gold_texture_alt
 							}
 							
 							using = bg_circle_alt_brown
 
 							enabled = "[Character.HasUnit]"
+							datacontext = "[Character.GetUnitPointer]"
 							action_tooltip = {
 								title = "SELECT_UNIT_TT"
 								on_action = "[SelectUnitAndPan(Character.GetUnitPointer)]"
 							}
-							tooltipwidget = { BasicFunctionalTooltip = {} }
+							tooltipwidget = { using = Unit_tooltip }
 
 						}
 
@@ -391,26 +393,39 @@ lateralview = {
 							}
 
 							blockoverride "icon_texture" {
-								texture = "gfx/interface/buttons/flats/regiments.dds"
+								texture = "gfx/interface/icons/character_roles/general.dds"
 								texture_density = 2
-								using = icon_gold_texture_alt
 							}
 							
 							using = bg_circle_alt_brown
 
 							enabled = "[Character.HasUnit]"
+							datacontext = "[Character.GetUnitPointer]"
 							action_tooltip = {
 								title = "SELECT_UNIT_TT"
 								on_action = "[SelectUnitAndPan(Character.GetUnitPointer)]"
 							}
-							tooltipwidget = { BasicFunctionalTooltip = {} }
+							tooltipwidget = { using = Unit_tooltip }
 						}
 
-						vbox = {
+						hbox = {
 							layoutpolicy_horizontal = expanding
+							spacing = 4
+							datacontext = "[CharacterLateralview.GetCharacter.GetUnitPointer]"
+
 							text_single = {
 								layoutpolicy_horizontal = expanding
-								text = "[CharacterLateralview.GetCharacter.GetUnitPointer.GetVisualStrength]"
+								minimumsize = { -1 24 }
+								visible = "[Unit.IsArmy]"
+								raw_text = "[Unit.GetVisualStrength]@army_strength!"
+								tooltipwidget = { using = Unit_tooltip }
+							}
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								minimumsize = { -1 24 }
+								visible = "[Not(Unit.IsArmy)]"
+								raw_text = "[Unit.GetVisualStrength]@ship!"
+								tooltipwidget = { using = Unit_tooltip }
 							}
 						}
 					}
@@ -750,6 +765,37 @@ lateralview = {
 					}
 				}
 
+				hbox = {
+					layoutpolicy_horizontal = expanding
+					visible = "[GreaterThan_int32(CharacterLateralview.GetCharacter.GetBetrothedAmount, '(int32)0')]"
+
+					# BETROTHED
+					widget = {
+						visible = "[Not(GreaterThan_int32(CharacterLateralview.GetCharacter.GetBetrothedAmount, '(int32)3'))]"
+						layoutpolicy_horizontal = expanding
+						size = {-1 95}
+						using = betrothed_character_view
+					}
+
+					widget = {
+						visible = "[GreaterThan_int32(CharacterLateralview.GetCharacter.GetBetrothedAmount, '(int32)3')]"
+						layoutpolicy_horizontal = expanding
+						size = {-1 120}
+
+						blockoverride "partner_character_view_size" {
+							size = { -1 80 }
+						}
+
+						blockoverride "partner_character_view_max_size" {
+							maximumsize = { -1 80 }
+						}
+
+						using = betrothed_character_view
+					}
+
+					expand = {}
+				}
+				
 				# CHARACTER ACTIONS
 				# SIZE FOR NOT FATHER & MOTHER
 				hbox = {
@@ -856,6 +902,128 @@ template partner_character_view {
 						datamodel_wrap = 3
 
 						datamodel = "[CharacterLateralview.GetCharacter.GetSpouses]"
+						item = {
+							widget = {
+								size = {44 55}
+								visible = "[Character.IsValid]"
+
+								character_frame_small = {
+									blockoverride "character_frame_size" {
+										size = { 39 46 }
+										parentanchor = center
+										position = {3 0}
+									}
+									blockoverride "character_frame_estate_visible" {
+										visible = no
+									}
+									blockoverride "portrait_datacontext" {
+										datacontext = "[Character]"
+									}
+									blockoverride "character_portrait_visible" {
+										visible = yes
+									}
+									blockoverride "character_portrait_ani_visible" {
+										visible = no
+									}
+									blockoverride "portrait_position" {position = { 0 0 }}
+								}
+								character_ribbon_3 = {
+									datacontext = "[Character]"
+									visible = "[And(Not(Character.IsAlive), Character.WasRuler)]"
+									blockoverride "ribbon color" {
+										modify_texture = {
+											using = color_black_texture
+											blend_mode = overlay
+											alpha = 0.2
+										}
+									}
+									blockoverride "stretchable" {}
+								}
+
+								character_ribbon_3 = {
+									datacontext = "[Character]"
+									visible = "[And(Character.IsAlive, Character.IsRuler)]"										
+									blockoverride "stretchable" {}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template betrothed_character_view { 
+	vbox = {
+		using = layoutpolicy_expanding
+		using = bg_paper_card
+
+		widget = {
+			layoutpolicy_horizontal = expanding
+			size = { -1 40 }
+			using = bg_card_header_01
+			blockoverride "bg_card_header_01_bg" {
+				background = {
+					using = bg_card_header_01_default
+					alpha = 0.6
+				}
+			}
+			blockoverride "header_color" {
+				using = color_society_texture
+			}
+			blockoverride "header_pattern_texture_density" {texture_density = 1.75}
+			blockoverride "header_pattern_alpha" { alpha = 0.5 }
+			
+			hbox = {
+				ignoreinvisible = yes
+				subheader_unified_icon = {
+					blockoverride "subheader_unified_icon_texture" {
+						texture = "gfx/interface/icons/character_roles/spouse.dds"
+					}
+					
+					blockoverride "subheader_unified_top_text" {
+						text = "CHAR_BETROTHED_COV"
+						align = nobaseline
+					}
+					blockoverride "subheader_unified_bottom_text" {
+						text = "[CharacterLateralview.GetCharacter.GetBetrothedAmount]"
+						align = nobaseline		
+					}
+				}
+
+				expand = {}
+			}
+		}
+
+		widget = {
+			layoutpolicy_horizontal = expanding
+			block "partner_character_view_size" {
+				size = { -1 57 }
+			}
+
+			scrollarea = {
+				layoutpolicy_horizontal = expanding
+				block "partner_character_view_max_size" {
+					maximumsize = { -1 57 }
+				}
+				
+				scrollbarpolicy_horizontal = always_off
+
+				autoresizescrollarea = yes
+				minimumsize = { 160 0 }
+
+				scrollbar_vertical = {
+					using = Scrollbar_Vertical
+				}
+
+				scrollwidget = {
+					dynamicgridbox = {
+						layoutpolicy_horizontal = expanding
+						flipdirection = yes
+						datamodel_wrap = 3
+
+						datamodel = "[CharacterLateralview.GetCharacter.GetBetrothed]"
 						item = {
 							widget = {
 								size = {44 55}
@@ -1212,7 +1380,7 @@ template "character_actions" {
 													TooltipScrolledRequirementsList = {
 														blockoverride "block_scrollarea" { maximumsize = { -1 300 }}
 														blockoverride "block_title" { text = "game_concept_conditions" }
-														visible = "[And(DataModelHasItems(RequirementsList.GetLines), UIAction.IsEnabled)]"
+														visible = "[And(Not(StringIsEmpty(UIAction.GetConditions)), UIAction.IsEnabled)]"
 														textcontext = "[UIAction.GetConditions]"
 													}
 												}

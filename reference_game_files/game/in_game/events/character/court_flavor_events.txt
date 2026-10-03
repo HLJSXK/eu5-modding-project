@@ -11,6 +11,22 @@ scripted_trigger is_valid_neutral_country_for_culture = {
 	within_diplomatic_range = root
 }
 
+scripted_trigger is_valid_liaisons_target_for_candidate = {
+	is_valid_neutral_country_for_culture = yes
+	NOT = {
+		scope:liaisons_advisor_candidate = {
+			is_eligible_heir = prev
+		}
+	}
+	NOT = {
+		scope:liaisons_advisor_candidate = {
+			has_dynasty = yes
+			prev.ruler = { has_dynasty = yes }
+			dynasty ?= prev.ruler.dynasty
+		}
+	}
+}
+
 
 court_flavor_events.1 = {
 	hide_portraits = yes
@@ -20,17 +36,8 @@ court_flavor_events.1 = {
 	outcome = neutral
 
 	trigger = {
-		is_subject = no
-		has_regent = no
-		any_cabinet_character = {
-			culture ?= {
-				NOT = { is_primary_or_accepted_in = root }
-				any_country_in_culture = {
-					is_valid_neutral_country_for_culture = yes
-					count > 0
-				}
-			}
-		}
+		exists = scope:advisor
+		country_exists = scope:advisor_liaisons_target_country
 	}
 
 	illustration_tags = {
@@ -41,28 +48,6 @@ court_flavor_events.1 = {
 	immediate = {
 		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
 		save_scope_as = from
-		random_cabinet_character = {
-			limit = {
-				culture ?= {
-					NOT = { is_primary_or_accepted_in = root }
-					any_country_in_culture = {
-						is_valid_neutral_country_for_culture = yes
-					}
-				}
-			}
-			save_scope_as = advisor
-
-
-			culture = {
-				random_country_in_culture = {
-					limit = {
-						is_valid_neutral_country_for_culture = yes
-					}
-
-					save_scope_as = advisor_liaisons_target_country
-				}
-			}
-		}
 	}
 
 	option = {
@@ -202,11 +187,78 @@ court_flavor_events.5 = {
 	}
 }
 
+court_flavor_events.9 = {
+	type = country_event
+	title = empty_text
+	desc = empty_text
+	outcome = neutral
+	hidden = yes
+
+	trigger = {
+		is_subject = no
+		has_regent = no
+		any_cabinet_character = {
+			culture ?= {
+				NOT = { is_primary_or_accepted_in = root }
+				any_country_in_culture = {
+					is_valid_neutral_country_for_culture = yes
+				}
+			}
+		}
+	}
+
+	immediate = {
+		every_cabinet_character = {
+			limit = {
+				culture ?= { NOT = { is_primary_or_accepted_in = root } }
+			}
+			save_temporary_scope_as = liaisons_advisor_candidate
+			if = {
+				limit = {
+					culture ?= {
+						any_country_in_culture = {
+							is_valid_liaisons_target_for_candidate = yes
+						}
+					}
+				}
+				add_to_temporary_list = liaisons_advisors
+			}
+		}
+
+		random_in_list = {
+			list = liaisons_advisors
+			save_scope_as = advisor
+			save_temporary_scope_as = liaisons_advisor_candidate
+			culture = {
+				random_country_in_culture = {
+					limit = {
+						is_valid_liaisons_target_for_candidate = yes
+					}
+					save_scope_as = advisor_liaisons_target_country
+				}
+			}
+		}
+
+		if = {
+			limit = { exists = scope:advisor_liaisons_target_country }
+			trigger_event_silently = { id = court_flavor_events.1 }
+		}
+	}
+}
+
 court_flavor_events.10 = {
 	type = country_event
 	title = court_flavor_events.10.title
 	desc = court_flavor_events.10.desc
 	outcome = neutral
+
+	trigger = {
+		country_exists = scope:advisor_liaisons_target_country
+		scope:advisor = {
+			is_alive = yes
+		}
+	}
+
 	illustration_tags = {
 		10 = angry
 		10 = interior
@@ -256,6 +308,7 @@ court_flavor_events.11 = {
 	desc = court_flavor_events.11.desc
 	outcome = neutral
 	trigger = {
+		country_exists = scope:advisor_liaisons_target_country
 		scope:advisor = {
 			is_alive = yes
 		}
@@ -508,14 +561,8 @@ court_flavor_events.20 = {
 			change_development  = development_mild_bonus
 		}
 		add_legitimacy = legitimacy_mild_penalty
-
 		ai_will_select = { 
-			if = {
-				limit = {
-					legitimacy > 50		
-				}
-				value = 1
-			}
+			value = 0
 		}
 	}
 	option = {
@@ -524,6 +571,11 @@ court_flavor_events.20 = {
 		remove_from_cabinet = scope:advisor
 		scope:advisor = {
 			add_character_modifier = { modifier = arrested_character years = 3 mode = add_and_extend }
+		}
+
+		# better to pay political influence cost to replace cabinet than to pay legitimacy gold cost
+		ai_will_select = { 
+			value = 1
 		}
 	}
 }
@@ -617,8 +669,7 @@ court_flavor_events.22 = {
 
 	option = {
 		name = court_flavor_events.22.a
-		add_prestige = prestige_mild_bonus
-		add_government_power = government_power_mild_bonus
+		add_political_influence = political_influence_mild_bonus
 	}
 }
 

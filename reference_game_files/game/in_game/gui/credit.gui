@@ -82,6 +82,17 @@ template loan_entry_card_action_provider {
 		conditions = "[LoanEntry.GetRedeemBondConditions]"
 		on_action_with_params = "[LoanEntry.OnRedeemBond]"
 	}
+
+	action_tooltip = {
+		click_type = right
+		click_mode = confirm
+		visible = "[And(Not(LoanEntry.IsBond), Not(LoanEntry.GetLoan.IsEstatesLoan))]"
+		enabled = "[LoanEntry.IsDefaultOnCreditorEnabled]"
+		title = "DEFAULT_ON_CREDITOR_RIGHT_CLICK_TITLE"
+		description = "[LoanEntry.GetDefaultOnCreditorDescription]"
+		conditions = "[LoanEntry.GetDefaultOnCreditorConditions]"
+		on_action_with_params = "[LoanEntry.OnDefaultOnCreditor]"
+	}
 }
 
 template loan_entry_content {
@@ -226,11 +237,11 @@ lateralview = {
 			widget = {
 				layoutpolicy_horizontal = expanding
 				layoutpolicy_vertical = fixed
-				size = { -1 65 }
+				size = { -1 50 }
 
 				hbox = {
 					layoutpolicy_horizontal = expanding
-					margin = { 8 8 }
+					margin = { 8 4 }
 					spacing = 8
 
 					hbox = {
@@ -268,7 +279,7 @@ lateralview = {
 										blockoverride "item_bg_color" { using = color_light_paper_texture alpha = 0.1 }
 										blockoverride "color" { color = "[LoanEntry.GetColor]" }
 										blockoverride "leftside_info" { text = "[LoanEntry.GetShortNameAsBorrower]" }
-										blockoverride "rightside_info" { raw_text = "[LoanEntry.GetAmount|2]@gold!" }
+										blockoverride "rightside_info" { text = "[LoanEntry.GetAmountWithRemainingInterest]" }
 									}
 									TooltipTextBlock = {
 										visible = "[IsDataModelEmpty(CreditLateralView.GetLoansTakenMerged)]"
@@ -373,11 +384,11 @@ lateralview = {
 										blockoverride "pie_datamodel" { datamodel = "[CreditLateralView.GetLoansGivenMerged]" }
 										blockoverride "SliceTooltip" { tooltip = "[LoanEntry.GetLoan.GetShortNameAsLender]" }
 										blockoverride "SliceValue" { value = "[LoanEntry.GetAmount]" }
-										blockoverride "SliceColor" { color = "[LoanEntry.GetColor]" }
+										blockoverride "SliceColor" { color = "[LoanEntry.GetBorrowerColor]" }
 										blockoverride "Icon" { texture = "[GetConceptTexture('lender')]" }
 										blockoverride "datamodel" { datamodel = "[CreditLateralView.GetLoansGivenMerged]" }
 										blockoverride "item_bg_color" { using = color_light_paper_texture alpha = 0.1 }
-										blockoverride "color" { color = "[LoanEntry.GetColor]" }
+										blockoverride "color" { color = "[LoanEntry.GetBorrowerColor]" }
 										blockoverride "leftside_info" { text = "[LoanEntry.GetLoan.GetShortNameAsLender]" }
 										blockoverride "rightside_info" { text = "[LoanEntry.GetAmount|2][gold_i]" }
 									}
@@ -414,7 +425,7 @@ lateralview = {
 							blockoverride "PieSize" { size = { 40 40 } }
 							blockoverride "pie_datamodel" { datamodel = "[CreditLateralView.GetLoansGiven]" }
 							blockoverride "SliceValue" { value = "[LoanEntry.GetAmount]" }
-							blockoverride "SliceColor" { color = "[LoanEntry.GetColor]" }
+							blockoverride "SliceColor" { color = "[LoanEntry.GetBorrowerColor]" }
 							blockoverride "Icon" { texture = "[GetConceptTexture('lender')]" }
 							blockoverride "SliceTooltip" {
 								# tooltipwidget = {
@@ -466,12 +477,22 @@ lateralview = {
 					fittype = centercrop
 				}
 
-				using = scene_fade_horizontal
-				blockoverride "scene_fade_alpha" {
-					alpha = 0.3
+				using = bg_age_event_frame
+				hbox = {
+					ecs_scene_viewer_widget =  {
+						layoutpolicy_horizontal = expanding
+						layoutpolicy_vertical = expanding
+						name = "balance_overview_scene"
+						scene = "[Player.GenerateSceneDesc('balance')]"
+						alpha = 0.7	
+						using = scene_fade_horizontal
+						blockoverride "scene_fade_alpha" {
+							alpha = 0.8
+						}
+					}
+	
 				}
 
-				using = bg_age_event_frame
 
 				widget = {
 					parentanchor = center
@@ -713,7 +734,7 @@ lateralview = {
 								default_format = "#explanation_link_overview"
 							}
 							blockoverride "bottom_text_setup" {
-								raw_text = "[Player.GetNumBonds] / [Player.GetDoubleModifierValue('max_bonds', 'max_bonds_modifier')]"
+								raw_text = "[Player.GetNumBonds] / [Player.GetDoubleModifierValue('max_bonds', 'max_bonds_modifier')|0]"
 							}
 						}
 
@@ -997,7 +1018,8 @@ lateralview = {
 
 						header_button_right = {
 							name = "repay_all_possible_loans_button"
-							size = { -1 40 }
+							# layoutpolicy_horizontal = expanding
+							size = { 160 40 }
 
 							blockoverride "icon_overlay" {
 								size = { 80% 80% }
@@ -1005,18 +1027,18 @@ lateralview = {
 								texture = "[GetConceptTexture('debt')]"
 							}
 
-							blockoverride "adjust_to_content" {
-								set_parent_size_to_minimum = yes
-							}
-
 							blockoverride "text_top" {
+								layoutpolicy_horizontal = expanding
+								align = right
 								text = "REPAY_THIS_LOAN"
 							}
 
 							blockoverride "text_bottom" {
+								layoutpolicy_horizontal = expanding
+								align = right
 								text = "[GetRepayAllPossibleLoansCostForPlayer]"
 							}
-		
+
 							visible = "[PlayerCanRepayAnyLoan]"
 							using = repay_all_possible_loans_action_provider
 							tooltipwidget = {
@@ -1031,16 +1053,17 @@ lateralview = {
 
 									blockoverride "tooltip_content" {
 										TooltipTextBlock = {
-											blockoverride "text" { text = "[GetRepayAllLoansDescriptionForPlayer]" }
+											blockoverride "text" { text = "[GetRepayAllPossibleLoansDescriptionForPlayer]" }
 										}
 									}
 								}
 							}
 						}
-		
+
 						header_button_right = {
 							name = "repay_all_loans_button"
-							size = { -1 40 }
+							# layoutpolicy_horizontal = expanding
+							size = { 160 40 }
 
 							blockoverride "icon_overlay" {
 								size = { 80% 80% }
@@ -1048,30 +1071,28 @@ lateralview = {
 								texture = "[GetConceptTexture('debt')]"
 							}
 
-							blockoverride "adjust_to_content" {
-								set_parent_size_to_minimum = yes
-							}
-
 							blockoverride "text_top" {
+								align = right
 								text = "REPAY_ALL_LOANS_BT"
 							}
 
 							blockoverride "text_bottom" {
+								align = right
 								text = "[GetRepayAllLoansCostForPlayer]"
 							}
 
-							visible = "[IsRepayAllLoansEnabledForPlayer]"
+							visible = "[Not(PlayerCanRepayAnyLoan)]"
 							using = repay_all_loans_action_provider
 							tooltipwidget = {
 								ContextualTooltipType = {
 									blockoverride "title_text" {
 										text = "REPAY_ALL_LOANS"
 									}
-		
+
 									blockoverride "title_icon_texture" {
 										texture = "[GetConceptTexture('debt')]"
 									}
-		
+
 									blockoverride "concept_link_obj" {}
 									blockoverride "tooltip_content" {
 										TooltipTextBlock = {
@@ -1081,8 +1102,138 @@ lateralview = {
 									}
 								}
 							}
-							# text = "REPAY_ALL_LOANS"
 						}
+
+						# header_button_right = {
+						# 	name = "repay_all_possible_loans_button"
+						# 	size = { -1 40 }
+
+						# 	blockoverride "icon_overlay" {
+						# 		size = { 80% 80% }
+						# 		parentanchor = center
+						# 		texture = "[GetConceptTexture('debt')]"
+						# 	}
+
+						# 	blockoverride "adjust_to_content" {
+						# 		set_parent_size_to_minimum = yes
+						# 	}
+
+						# 	blockoverride "text_top" {
+						# 		text = "REPAY_THIS_LOAN"
+						# 	}
+
+						# 	blockoverride "text_bottom" {
+						# 		text = "[GetRepayAllPossibleLoansCostForPlayer]"
+						# 	}
+		
+						# 	# visible = "[PlayerCanRepayAnyLoan]"
+						# 	using = repay_all_possible_loans_action_provider
+						# 	tooltipwidget = {
+						# 		ContextualTooltipType = {
+						# 			blockoverride "title_text" {
+						# 				text = "REPAY_ALL_POSSIBLE_LOANS_TITLE"
+						# 			}
+
+						# 			blockoverride "title_icon_texture" {
+						# 				texture = "[GetConceptTexture('debt')]"
+						# 			}
+
+						# 			blockoverride "tooltip_content" {
+						# 				TooltipTextBlock = {
+						# 					blockoverride "text" { text = "[GetRepayAllLoansDescriptionForPlayer]" }
+						# 				}
+						# 			}
+						# 		}
+						# 	}
+						# }
+
+						# header_button_right = {
+						# 	name = "repay_all_loans_button"
+						# 	layoutpolicy_horizontal = expanding
+						# 	size = { -1 40 }
+
+						# 	blockoverride "icon_overlay" {
+						# 		size = { 80% 80% }
+						# 		parentanchor = center
+						# 		texture = "[GetConceptTexture('debt')]"
+						# 	}
+
+						# 	blockoverride "text_top" {
+						# 		text = "REPAY_ALL_LOANS_BT"
+						# 	}
+
+						# 	blockoverride "text_bottom" {
+						# 		text = "[GetRepayAllLoansCostForPlayer]"
+						# 	}
+
+						# 	visible = "[Not(PlayerCanRepayAnyLoan)]"
+						# 	using = repay_all_loans_action_provider
+						# 	tooltipwidget = {
+						# 		ContextualTooltipType = {
+						# 			blockoverride "title_text" {
+						# 				text = "REPAY_ALL_LOANS"
+						# 			}
+
+						# 			blockoverride "title_icon_texture" {
+						# 				texture = "[GetConceptTexture('debt')]"
+						# 			}
+
+						# 			blockoverride "concept_link_obj" {}
+						# 			blockoverride "tooltip_content" {
+						# 				TooltipTextBlock = {
+						# 					visible = "[Not(StringIsEmpty(GetRepayAllLoansDescriptionForPlayer))]"
+						# 					blockoverride "text" { text = "[GetRepayAllLoansDescriptionForPlayer]" }
+						# 				}
+						# 			}
+						# 		}
+						# 	}
+						# }
+		
+						# header_button_right = {
+						# 	name = "repay_all_loans_button"
+						# 	size = { -1 40 }
+
+						# 	blockoverride "icon_overlay" {
+						# 		size = { 80% 80% }
+						# 		parentanchor = center
+						# 		texture = "[GetConceptTexture('debt')]"
+						# 	}
+
+						# 	blockoverride "adjust_to_content" {
+						# 		set_parent_size_to_minimum = yes
+						# 	}
+
+						# 	blockoverride "text_top" {
+						# 		text = "REPAY_ALL_LOANS_BT"
+						# 	}
+
+						# 	blockoverride "text_bottom" {
+						# 		text = "[GetRepayAllLoansCostForPlayer]"
+						# 	}
+
+						# 	visible = "[IsRepayAllLoansEnabledForPlayer]"
+						# 	using = repay_all_loans_action_provider
+						# 	tooltipwidget = {
+						# 		ContextualTooltipType = {
+						# 			blockoverride "title_text" {
+						# 				text = "REPAY_ALL_LOANS"
+						# 			}
+		
+						# 			blockoverride "title_icon_texture" {
+						# 				texture = "[GetConceptTexture('debt')]"
+						# 			}
+		
+						# 			blockoverride "concept_link_obj" {}
+						# 			blockoverride "tooltip_content" {
+						# 				TooltipTextBlock = {
+						# 					visible = "[Not(StringIsEmpty(GetRepayAllLoansDescriptionForPlayer))]"
+						# 					blockoverride "text" { text = "[GetRepayAllLoansDescriptionForPlayer]" }
+						# 				}
+						# 			}
+						# 		}
+						# 	}
+						# 	# text = "REPAY_ALL_LOANS"
+						# }
 					}
 
 					vbox = {
@@ -1239,7 +1390,7 @@ lateralview = {
 									}
 									blockoverride "tooltip_content" {
 										TooltipTextBlock = {
-											blockoverride "text" { text = "[GetRepayAllLoansDescriptionForPlayer]" }
+											blockoverride "text" { text = "[GetRepayAllPossibleLoansDescriptionForPlayer]" }
 										}
 									}
 								}
@@ -1280,6 +1431,10 @@ lateralview = {
 					visible = "[CreditLateralView.Vars.HasValue('subtab','loans_given')]"
 					using = layoutpolicy_expanding
 					using = bg_secondary_inner_alt
+					using = bg_secondary_inner_image_alt
+					blockoverride "image" {
+						texture = "gfx/interface/economy/bg_credit.dds"
+					}
 
 					hbox = {
 						layoutpolicy_horizontal = expanding
@@ -1288,21 +1443,31 @@ lateralview = {
 						margin_top = 5
 
 						header_button_left = {
-							size = { 40 40 }
-							blockoverride "button_icon_stretch_sprite" {}
-							blockoverride "header_button_frame_inner" { visible = no }
-							blockoverride "header_button_text_layout" {}
+							blockoverride "adjust_to_content" {
+								minimumsize = { 150 40 }
+								set_parent_size_to_minimum = yes
+							}
+
 							blockoverride "icon_overlay" {}
+
 							blockoverride "icon_texture" {
-								size = { 100% 100% }
-								parentanchor = center
 								texture = "gfx/interface/icons/flat_icons/balance/foreign_loan.dds"
 							}
-							
+
+							blockoverride "text_top" {
+								text = "take_over_loan"
+								maximumsize = { 120 -1 }
+								minimumsize = { 120 -1 }
+								fontsize = 13
+							}
+
+							blockoverride "text_bottom" {
+								visible = no
+							}
+
 							datacontext = "[Player]"
-							# text = "take_over_loan"
 							enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
-							
+
 							scripted_action_tooltip = {
 								click_type = left
 								click_mode = single
@@ -1325,27 +1490,36 @@ lateralview = {
 									blockoverride "concept_link" {
 										text = "[loan|e]"
 									}
-									blockoverride "tooltip_content" {
-										using = action_tooltip_inner_content
-									}
 								}
 							}
 						}
-						
-						header_button_left = {
-							size = { 40 40 }
-							blockoverride "button_icon_stretch_sprite" {}
-							blockoverride "header_button_frame_inner" { visible = no }
-							blockoverride "header_button_text_layout" {}
+
+						expand = {}
+
+						header_button_right = {
+							blockoverride "adjust_to_content" {
+								minimumsize = { 150 40 }
+								set_parent_size_to_minimum = yes
+							}
+
 							blockoverride "icon_overlay" {}
+
 							blockoverride "icon_texture" {
-								size = { 100% 100% }
-								parentanchor = center
 								texture = "[GetConceptTexture('lender')]"
 							}
-							
+
+							blockoverride "text_top" {
+								text = "OFFER_LOANTITLE"
+								maximumsize = { 120 -1 }
+								minimumsize = { 120 -1 }
+								fontsize = 13
+							}
+
+							blockoverride "text_bottom" {
+								visible = no
+							}
+
 							datacontext = "[Player]"
-							# text = "OFFER_LOANTITLE"
 							enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
 							
 							scripted_action_tooltip = {
@@ -1376,8 +1550,6 @@ lateralview = {
 								}
 							}
 						}
-
-						expand = {}
 					}
 
 					vbox = {

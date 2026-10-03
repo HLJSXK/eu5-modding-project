@@ -16,12 +16,20 @@
 
 	allow = {
 		game_is_initialized = yes
+		scope:actor = {
+			is_subject = no
+		}
 		scope:actor ?= {
 			monthly_manpower > 0
 		}
 	}
 
-	cooldown = { 
+	ai_prerequisite_after_potential = {
+		at_war = no
+		NOT = { is_leader_of_international_organization_of_type = { type = jihad } }
+	}
+
+	cooldown = {
 		type = call_jihad
 		years = 10
 	}
@@ -47,6 +55,10 @@
 
 	select_trigger = {
 		looking_for_a = country
+		target_flag = target
+		name = "call_jihad_select_country"
+		none_available_msg_key = "call_jihad_no_countries"
+		cache_targets = yes
 		interaction_source_list = {
 			scope:actor = {
 				every_country_in_diplomatic_range = {
@@ -54,9 +66,26 @@
 				}
 			}
 		}
-		target_flag = target
-		name = "call_jihad_select_country"
-		none_available_msg_key = "call_jihad_no_countries"
+		ai_interaction_source_list = {
+			scope:actor = {
+				ordered_country_in_diplomatic_range = {
+					limit = {
+						is_valid_target_for_jihad = yes
+						scope:actor = { has_discovered = prev.capital }
+						NOR = {
+							is_allied_with = { target = scope:actor }
+							is_at_war_with = scope:actor
+							has_truce_with = scope:actor
+						}
+						NOT = { top_overlord ?= { religion = scope:actor.religion } }
+					}
+					order_by = military_strength
+					max = 10
+					check_range_bounds = no
+					add_to_list = source
+				}
+			}
+		}
 		column = {
 			data = name
 		}
@@ -70,9 +99,13 @@
 				is_allied_with = { target = scope:actor }
 				is_at_war_with = scope:actor
 				has_truce_with = scope:actor
-				is_subject_of = scope:actor
 			}
+			NOT = { top_overlord ?= { religion = scope:actor.religion } }
         }
+		pre_evaluation_sort_value = {
+			value = "scope:actor.relative_strength(root)"
+		}
+		pre_evaluation_number_to_evaluate_fully = 3
 	}
 
 	effect = {
@@ -96,7 +129,64 @@
 	}
 	
 	ai_will_do = {
-		#handled in code
-		add = -100
+		add = -25
+		add = {
+			desc = "HOLY_WAR_AGE_DAMPENER"
+			value = crusade_jihad_age_dampener
+		}
+		if = {
+			limit = { exists = scope:target }
+			add = {
+				desc = "RELATIVE_STRENGTH"
+				value = 150
+				multiply = "scope:actor.relative_strength(scope:target)"
+				subtract = 100
+			}
+		}
+		if = {
+			limit = {
+				exists = scope:target
+				scope:target = { any_neighbor_country = { this = scope:actor } }
+			}
+			add = 40
+		}
+		if = {
+			limit = {
+				exists = scope:target
+				scope:target = { is_rival_of = scope:actor }
+			}
+			add = 30
+		}
+		if = {
+			limit = {
+				exists = scope:target
+				NOT = { scope:target = { any_neighbor_country = { this = scope:actor } } }
+				NOT = { scope:target = { is_rival_of = scope:actor } }
+			}
+			add = {
+				desc = "TARGET_NOT_RELEVANT_TO_US"
+				value = -40
+			}
+		}
+		if = {
+			limit = { exists = scope:target }
+			add = {
+				desc = "DISTANCE_TO_TARGET"
+				value = "scope:actor.capital.distance_to_squared(scope:target.capital)"
+				multiply = -0.0004
+			}
+		}
+		if = {
+			limit = { scope:actor = { is_during_bankruptcy = yes } }
+			add = {
+				desc = "IS_BANKRUPT_TOOLTIP"
+				value = -1000
+			}
+		}
+		add = {
+			desc = "DIPLOREASON_IN_DEBT"
+			value = "scope:actor.num_loans"
+			multiply = -20
+		}
 	}
 }

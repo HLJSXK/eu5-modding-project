@@ -1,0 +1,529 @@
+﻿pilgrimage_expedition = {
+
+	unique = yes
+	repeatable = yes
+	dynamic_first_waypoint = yes
+	origin = capital
+	travel_mode = both
+	travel_speed = 0.5
+	category = religious
+	icon = category_religious
+	triggers_regency = yes
+	fail_if_no_leader = yes
+	returns_home = yes
+
+	variables = {
+		piety = {
+			display = piechart
+			icon = "gfx/interface/icons/modifier_types/pilgrimage_piety_cost_modifier.dds"
+			start = 50
+			min = 0
+			max = 100
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			monthly_change = {
+				subtract = {
+					desc = "EXPEDITION_PIETY_PILGRIMAGE_DECAY"
+					value = 0
+					if = {
+						limit = {
+							expedition_is_traveling = yes
+						}
+						add = 1
+					}
+				}
+			}
+		}
+		retinue = {
+			icon = "gfx/interface/icons/unit_category/army_auxiliary.dds"
+			start = 40
+			min = 0
+		}
+		provisions = {
+			display = piechart
+			icon = "gfx/interface/icons/unit_view/food.dds"
+			start = 100
+			min = 0
+			max = 100
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			monthly_change = {
+				subtract = {
+					desc = "EXPEDITION_PROVISIONS_PILGRIMAGE_DRAIN"
+					value = 0
+					if = {
+						limit = {
+							expedition_is_traveling = yes
+						}
+						add = 3
+					}
+				}
+			}
+		}
+	}
+
+	potential = {
+		religion = religion:catholic
+		has_ruler = yes
+		ruler = { religion = religion:catholic }
+		NOT = { capital.region = region:crescent_region }
+	}
+
+	leader = {
+		is_ruler = yes
+		religion = religion:catholic
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	can_start = {
+		at_war = no
+		has_ruler = yes
+		ruler = {
+			is_adult = yes
+			religion = religion:catholic
+			NOT = { has_character_modifier = character_on_pilgrimage }
+			NOT = { has_character_modifier = pilgrim_ruler }
+			save_temporary_scope_as = pilgrimage_ruler
+			custom_tooltip = {
+				text = pilgrimage_expedition_ruler_owner_tt
+				owner = root
+			}
+		}
+		NOT = { has_regent = yes }
+		NOT = { has_cooldown = pilgrimage_expedition_cooldown }
+	}
+
+	ai_leader_source_list = {
+		ruler = {
+			add_to_list = source
+		}
+	}
+
+	on_start = {
+		add_cooldown = {
+			type = pilgrimage_expedition_cooldown
+			years = 5
+		}
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+			expedition_leader ?= {
+				add_character_modifier = {
+					modifier = character_on_pilgrimage
+					months = -1
+					mode = replace
+					desc = character_on_pilgrimage_duration_desc
+				}
+			}
+		}
+		if = {
+			limit = { capital = { is_in_scripted_geography = scripted_geography:southern_italy_geography } }
+			if = {
+				limit = { NOT = { capital = location:bari } }
+				scope:expedition = { add_new_waypoint = location:bari }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:italy_region }
+			if = {
+				limit = { NOT = { capital = location:assisi } }
+				scope:expedition = { add_new_waypoint = location:assisi }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:south_german_region }
+			if = {
+				limit = { NOT = { capital = location:schwyz } }
+				scope:expedition = { add_new_waypoint = location:schwyz }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:baltic_region }
+			if = {
+				limit = { NOT = { capital = location:czestochowa } }
+				scope:expedition = { add_new_waypoint = location:czestochowa }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:carpathia_region }
+			if = {
+				limit = { NOT = { capital = location:esztergom } }
+				scope:expedition = { add_new_waypoint = location:esztergom }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:balkan_region }
+			if = {
+				limit = { NOT = { capital = location:rijeka } }
+				scope:expedition = { add_new_waypoint = location:rijeka }
+			}
+		}
+		else_if = {
+			limit = { capital.region = region:scandinavian_region }
+			if = {
+				limit = { NOT = { capital = location:nidaros } }
+				scope:expedition = { add_new_waypoint = location:nidaros }
+			}
+		}
+		else = {
+			religion:catholic = {
+				ordered_holy_site_in_religion = {
+					limit = {
+						location = {
+							region = root.capital.region
+							NOT = { this = root.capital }
+							NOT = { this = location:rome }
+							NOT = { this = location:jerusalem }
+						}
+					}
+					order_by = importance
+					max = 1
+					scope:expedition = { add_new_waypoint = prev.location }
+				}
+			}
+		}
+		if = {
+			limit = { NOT = { capital = location:rome } }
+			scope:expedition = { add_new_waypoint = location:rome }
+		}
+		scope:expedition = {
+			add_new_waypoint = location:jerusalem
+		}
+	}
+
+	on_monthly = {
+		if = {
+			limit = { scope:expedition = { var:piety <= 0 } }
+			fail_expedition = scope:expedition
+		}
+		if = {
+			limit = { scope:expedition = { var:retinue <= 0 } }
+			fail_expedition = scope:expedition
+		}
+		if = {
+			limit = { scope:expedition = { var:provisions <= 0 } }
+			scope:expedition = {
+				change_variable = { name = retinue add = -5 }
+				clamp_variable = { name = retinue min = 0 max = 9999 }
+			}
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_traveling = yes
+					NOT = { expedition_is_paused = yes }
+				}
+			}
+			random_list = {
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= {
+								is_land = yes
+								OR = {
+									topography = mountains
+									topography = hills
+								}
+							}
+							NOT = { has_variable = mountain_pass_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.18
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = no }
+							NOT = { has_variable = storm_at_sea_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.19
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = yes has_river = yes }
+							NOT = { has_variable = river_ford_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.20
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= {
+								OR = {
+									topography = wetlands
+									climate = tropical
+								}
+							}
+							NOT = { has_variable = marsh_fever_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.21
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { winter_level = severe }
+							OR = {
+								current_month = 12
+								current_month = 1
+								current_month = 2
+							}
+							NOT = { has_variable = winter_closure_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.22
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= {
+								has_owner = yes
+								top_owner != root
+								top_owner = {
+									religion = religion:catholic
+									NOT = { is_rival_of = root }
+									NOT = {
+										top_overlord ?= { is_rival_of = root }
+									}
+								}
+							}
+							NOT = { has_variable = great_lords_hospitality_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.23
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= {
+								has_owner = yes
+								top_owner != root
+								top_owner = {
+									OR = {
+										NOT = { religion = religion:catholic }
+										is_rival_of = root
+										top_overlord ?= { is_rival_of = root }
+									}
+								}
+							}
+							NOT = { has_variable = hostile_toll_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.24
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= {
+								is_land = yes
+								NOT = { dominant_religion = root.religion }
+							}
+							NOT = { has_variable = other_faith_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.25
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = bandits_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.26
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = pilgrims_join_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.27
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							expedition_current_location ?= { is_land = no }
+							NOT = { has_variable = corsairs_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.29
+				}
+				1 = {
+					trigger = {
+						scope:expedition = {
+							var:retinue < 15
+							expedition_current_location ?= { is_land = yes }
+							NOT = { has_variable = ransom_fired }
+						}
+					}
+					trigger_event_non_silently = pilgrimage_expedition_events.30
+				}
+				12 = {}
+			}
+		}
+	}
+
+	on_arrive_to_new_location = {
+		discover_area = scope:location.area
+		if = {
+			limit = {
+				scope:expedition = {
+					var:provisions <= 0
+					NOT = { has_variable = foraging_crisis_fired }
+				}
+				scope:location = {
+					is_land = yes
+					NOT = { vegetation = desert }
+				}
+			}
+			scope:expedition = { set_variable = foraging_crisis_fired }
+			trigger_event_non_silently = pilgrimage_expedition_events.28
+		}
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = { NOT = { scope:location = root.capital } }
+			if = {
+				limit = { scope:location = location:jerusalem }
+				trigger_event_non_silently = pilgrimage_expedition_events.1
+			}
+			else_if = {
+				limit = { scope:location = location:rome }
+				trigger_event_non_silently = pilgrimage_expedition_events.2
+			}
+			else_if = {
+				limit = { scope:location = location:santiago_compostela }
+				trigger_event_non_silently = pilgrimage_expedition_events.3
+			}
+			else_if = {
+				limit = { scope:location = location:cologne }
+				trigger_event_non_silently = pilgrimage_expedition_events.4
+			}
+			else_if = {
+				limit = { scope:location = location:chartres }
+				trigger_event_non_silently = pilgrimage_expedition_events.5
+			}
+			else_if = {
+				limit = { scope:location = location:canterbury }
+				trigger_event_non_silently = pilgrimage_expedition_events.6
+			}
+			else_if = {
+				limit = { scope:location = location:armagh }
+				trigger_event_non_silently = pilgrimage_expedition_events.7
+			}
+			else_if = {
+				limit = { scope:location = location:assisi }
+				trigger_event_non_silently = pilgrimage_expedition_events.10
+			}
+			else_if = {
+				limit = { scope:location = location:bari }
+				trigger_event_non_silently = pilgrimage_expedition_events.11
+			}
+			else_if = {
+				limit = { scope:location = location:schwyz }
+				trigger_event_non_silently = pilgrimage_expedition_events.12
+			}
+			else_if = {
+				limit = { scope:location = location:czestochowa }
+				trigger_event_non_silently = pilgrimage_expedition_events.13
+			}
+			else_if = {
+				limit = { scope:location = location:esztergom }
+				trigger_event_non_silently = pilgrimage_expedition_events.14
+			}
+			else_if = {
+				limit = { scope:location = location:rijeka }
+				trigger_event_non_silently = pilgrimage_expedition_events.15
+			}
+			else_if = {
+				limit = { scope:location = location:nidaros }
+				trigger_event_non_silently = pilgrimage_expedition_events.16
+			}
+			else_if = {
+				limit = { scope:location = { is_location_holy_site_for = religion:catholic } }
+				trigger_event_non_silently = pilgrimage_expedition_events.8
+			}
+		}
+	}
+
+	on_end = {
+		add_legitimacy = {
+			value = legitimacy_mild_bonus
+			multiply = scope:expedition.var:piety
+			divide = 50
+		}
+		add_estate_satisfaction = {
+			type = estate_type:clergy_estate
+			value = {
+				value = estate_satisfaction_mild_bonus
+				multiply = scope:expedition.var:piety
+				divide = 50
+			}
+		}
+		hidden_effect = {
+			c:PAP ?= {
+				add_opinion = {
+					target = root
+					modifier = opinion_great_pilgrimage
+					scale = {
+						value = scope:expedition.var:piety
+						divide = 50
+					}
+				}
+			}
+		}
+		scope:expedition = {
+			expedition_leader ?= {
+				remove_character_modifier = character_on_pilgrimage
+				add_character_modifier = { modifier = pilgrim_ruler }
+			}
+		}
+	}
+
+	on_fail = {
+		scope:expedition = {
+			expedition_leader ?= {
+				remove_character_modifier = character_on_pilgrimage
+			}
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_leader = { is_alive = yes }
+				}
+			}
+			trigger_event_non_silently = pilgrimage_expedition_events.17
+		}
+		else = {
+			trigger_event_non_silently = pilgrimage_expedition_events.9
+		}
+	}
+
+	utility = {
+		value = 3
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		multiply = 0.25
+		if = {
+			limit = {
+				has_ruler = yes
+				ruler = { 
+					OR = {
+						has_trait = zealot 
+						has_trait = pious
+					}
+				}
+			}
+			multiply = 2
+		}
+	}
+}

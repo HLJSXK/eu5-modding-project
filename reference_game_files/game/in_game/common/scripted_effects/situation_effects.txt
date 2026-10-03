@@ -357,16 +357,24 @@ rise_of_the_ottomans_recalculate_top_3 = {
 				OR = {
 					NOT = { country_exists = this }
 					is_subject = yes
+					NOR = {
+						culture = culture:turkish_culture
+						culture = culture:turkoman_culture
+					}
 				}
 			}
 		}
 		every_in_global_list = {
 			variable = eligible_beylik_list
 
-			limit = { 
+			limit = {
 				OR = {
 					NOT = { country_exists = this }
 					is_subject = yes
+					NOR = {
+						culture = culture:turkish_culture
+						culture = culture:turkoman_culture
+					}
 				}
 			}
 
@@ -508,11 +516,48 @@ council_of_trent_force_end_effect = {
 	if = {
 		limit = {
 			is_situation_active = situation:council_of_trent
-			situation:council_of_trent = {
-				council_of_trent_end_trigger = yes
+			NOT = {
+				exists = international_organization:catholic_church
 			}
 		}
-		end_situation = situation:council_of_trent 
+		end_situation = { situation = situation:council_of_trent outcome = "council_of_trent_church_dissolved" }
+	}
+	else_if = {
+		limit = {
+			is_situation_active = situation:council_of_trent
+			situation:council_of_trent = {
+				custom_tooltip = {
+					text = council_of_trent_end_trigger_passed_debates_tt
+					has_variable = council_of_trent_passed_debates
+					has_variable = council_of_trent_passed_debates_max
+					var:council_of_trent_passed_debates >= var:council_of_trent_passed_debates_max
+				}
+			}
+		}
+		end_situation = { situation = situation:council_of_trent outcome = "council_of_trent_reforms_adopted" }
+	}
+	else_if = {
+		limit = {
+			is_situation_active = situation:council_of_trent
+			situation:council_of_trent = {
+				custom_tooltip = {
+					text = council_of_trent_end_trigger_failed_debates_tt
+					has_variable = council_of_trent_failed_debates
+					has_variable = council_of_trent_failed_debates_max
+					var:council_of_trent_failed_debates >= var:council_of_trent_failed_debates_max
+				}
+			}
+		}
+		end_situation = { situation = situation:council_of_trent outcome = "council_of_trent_reforms_rejected" }
+	}
+	else_if = {
+		limit = {
+			is_situation_active = situation:council_of_trent
+			situation:council_of_trent = {
+				current_age_or_later = { age = age_5_absolutism }
+			}
+		}
+		end_situation = { situation = situation:council_of_trent outcome = "council_of_trent_council_adjourned" }
 	}
 }
 
@@ -1102,6 +1147,125 @@ iw_increase_tension_effect = {
 	}
 }
 
+change_influence_over_granada_effect = {
+	custom_description = {
+		text = change_influence_over_granada_effect_tt
+		value = $value$
+		situation:battle_for_the_strait ?= {
+			change_variable = {
+				name = influence_over_granada
+				add = $value$
+			}
+			clamp_variable = {
+				name = influence_over_granada
+				min = -100
+				max = 100
+			}
+		}
+	}
+}
+
+reset_influence_over_granada_effect = {
+	custom_description = {
+		text = reset_influence_over_granada_effect_tt
+		situation:battle_for_the_strait ?= {
+			set_variable = {
+				name = influence_over_granada
+				value = 0
+			}
+		}
+	}
+}
+
+change_granadan_sovereignty_effect = {
+	custom_description = {
+		text = change_granadan_sovereignty_effect_tt
+		value = $value$
+		situation:battle_for_the_strait ?= {
+			change_variable = {
+				name = granadan_sovereignty
+				add = $value$
+			}
+			clamp_variable = {
+				name = granadan_sovereignty
+				min = 0
+				max = 100
+			}
+		}
+	}
+}
+
+check_situation_and_change_granadan_sovereignty = {
+	if = {
+		limit = {
+			has_dlc = "d009_across_the_pillars"
+			is_situation_active = situation:battle_for_the_strait
+			has_or_had_tag = GRA
+		}
+		change_granadan_sovereignty_effect = { value = $value$ }
+	}
+}
+
+# Amplify the trend: push influence_over_granada FURTHER toward whichever pole currently leads.
+#   influence > 0 (toward MOR) -> +$value$ ; influence < 0 (toward CAS) -> -$value$.
+add_influence_over_granada_towards_trend = {
+	custom_description = {
+		text = change_influence_over_granada_effect_tt
+		value = $value$
+		situation:battle_for_the_strait ?= {
+			if = {
+				limit = { var:influence_over_granada > 0 }
+				change_variable = {
+					name = influence_over_granada
+					add = $value$
+				}
+			}
+			else_if = {
+				limit = { var:influence_over_granada < 0 }
+				change_variable = {
+					name = influence_over_granada
+					subtract = $value$
+				}
+			}
+			clamp_variable = {
+				name = influence_over_granada
+				min = -100
+				max = 100
+			}
+		}
+	}
+}
+
+# Counter the trend: push influence_over_granada toward the OTHER pole.
+#   influence < 0 (toward CAS) -> +$value$ ; influence > 0 (toward MOR) -> -$value$.
+subtract_influence_over_granada_trend = {
+	custom_description = {
+		text = change_influence_over_granada_effect_tt
+		value = $value$
+		situation:battle_for_the_strait ?= {
+			if = {
+				limit = { var:influence_over_granada < 0 }
+				change_variable = {
+					name = influence_over_granada
+					add = $value$
+				}
+			}
+			else_if = {
+				limit = { var:influence_over_granada > 0 }
+				change_variable = {
+					name = influence_over_granada
+					subtract = $value$
+				}
+			}
+			clamp_variable = {
+				name = influence_over_granada
+				min = -100
+				max = 100
+			}
+		}
+	}
+}
+
 add_italian_wars_militarization_demands = {
 	every_in_global_list = {
 		variable = iw_italian_leagues_list
@@ -1166,6 +1330,63 @@ remove_italian_wars_militarization_demands = {
 	}
 }
 
+reconcile_hre_league_leadership = {
+	international_organization:foreign_league_hre ?= {
+		if = {
+			limit = {
+				international_organization:hre.leader_country ?= {
+					NOR = {
+						is_member_of_international_organization = international_organization:foreign_league_balkan
+						is_member_of_international_organization = international_organization:foreign_league_france
+						is_member_of_international_organization = international_organization:foreign_league_iberia
+					}
+				}
+				NOT = { leader_country = international_organization:hre.leader_country }
+			}
+			international_organization:hre.leader_country = {
+				save_temporary_scope_as = new_hre_league_leader
+			}
+			scope:new_hre_league_leader = {
+				if = {
+					limit = { is_leader_of_international_organization = international_organization:italian_league_1 }
+					international_organization:italian_league_1 = { save_temporary_scope_as = absorbed_italian_league }
+				}
+				else_if = {
+					limit = { is_leader_of_international_organization = international_organization:italian_league_2 }
+					international_organization:italian_league_2 = { save_temporary_scope_as = absorbed_italian_league }
+				}
+				else_if = {
+					limit = { is_leader_of_international_organization = international_organization:italian_league_3 }
+					international_organization:italian_league_3 = { save_temporary_scope_as = absorbed_italian_league }
+				}
+			}
+			if = {
+				limit = { exists = scope:absorbed_italian_league }
+				scope:absorbed_italian_league = {
+					every_international_organization_member = {
+						add_to_temporary_list = absorbed_league_members
+					}
+				}
+				every_in_list = {
+					list = absorbed_league_members
+					international_organization:foreign_league_hre = {
+						add_country_to_international_organization = prev
+					}
+				}
+			}
+			if = {
+				limit = {
+					scope:new_hre_league_leader = {
+						NOT = { is_member_of_international_organization = international_organization:foreign_league_hre }
+					}
+				}
+				add_country_to_international_organization = scope:new_hre_league_leader
+			}
+			set_leader_country = scope:new_hre_league_leader
+		}
+	}
+}
+
 reconcile_italian_wars_league_land = {
 	#Resync each league's recorded Italian land with what its members actually own.
 	#Safety net for locations conquered during a war/peace that on_location_changed_owner missed (see common/on_action/_hardcoded.txt).
@@ -1221,4 +1442,300 @@ reconcile_single_italian_wars_league_land = {
 		}
 	}
 	
+}
+
+hussite_wars_add_country_to_side_effect = {
+	save_temporary_scope_as = hw_side_member
+	add_to_global_variable_list = {
+		name = $LIST$
+		target = scope:hw_side_member
+	}
+	situation:hussite_wars = {
+		change_variable = {
+			name = $STRENGTH$
+			add = {
+				value = scope:hw_side_member.max_manpower
+				add = scope:hw_side_member.regular_army_size
+				add = scope:hw_side_member.country_total_army_levy_size
+			}
+		}
+	}
+}
+
+hussite_wars_resolve_current_war_effect = {
+	c:BOH ?= {
+		if = {
+			limit = {
+				any_current_war = {
+					casus_belli ?= casus_belli:cb_crush_hussitism
+				}
+			}
+			random_current_war = {
+				limit = {
+					casus_belli ?= casus_belli:cb_crush_hussitism
+				}
+				situation:hussite_wars = {
+					set_variable = {
+						name = hussite_wars_current_war
+						value = prev
+					}
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				country_exists = international_organization:hre.leader_country
+				any_current_war = {
+					OR = {
+						AND = {
+							attacker_leader = c:BOH
+							defender_leader = international_organization:hre.leader_country
+						}
+						AND = {
+							attacker_leader = international_organization:hre.leader_country
+							defender_leader = c:BOH
+						}
+					}
+				}
+			}
+			random_current_war = {
+				limit = {
+					OR = {
+						AND = {
+							attacker_leader = c:BOH
+							defender_leader = international_organization:hre.leader_country
+						}
+						AND = {
+							attacker_leader = international_organization:hre.leader_country
+							defender_leader = c:BOH
+						}
+					}
+				}
+				situation:hussite_wars = {
+					set_variable = {
+						name = hussite_wars_current_war
+						value = prev
+					}
+				}
+			}
+		}
+	}
+}
+
+hussite_wars_update_sides_effect = {
+	clear_global_variable_list = hussite_wars_hussite_side_list
+	clear_global_variable_list = hussite_wars_catholic_side_list
+	situation:hussite_wars = {
+		remove_variable = hussite_wars_current_war
+		set_variable = {
+			name = hussite_wars_hussite_strength_variable
+			value = 0
+		}
+		set_variable = {
+			name = hussite_wars_catholic_strength_variable
+			value = 0
+		}
+	}
+
+	hussite_wars_resolve_current_war_effect = yes
+
+	situation:hussite_wars = {
+		if = {
+			limit = { has_variable = hussite_wars_current_war }
+			var:hussite_wars_current_war = {
+				if = {
+					limit = {
+						any_attacker = { tag = BOH }
+					}
+					defender_leader = {
+						situation:hussite_wars = {
+							set_variable = {
+								name = hussite_wars_catholic_leader
+								value = prev
+							}
+						}
+					}
+					every_attacker = {
+						hussite_wars_add_country_to_side_effect = {
+							LIST = hussite_wars_hussite_side_list
+							STRENGTH = hussite_wars_hussite_strength_variable
+						}
+					}
+					every_defender = {
+						hussite_wars_add_country_to_side_effect = {
+							LIST = hussite_wars_catholic_side_list
+							STRENGTH = hussite_wars_catholic_strength_variable
+						}
+					}
+				}
+				else = {
+					attacker_leader = {
+						situation:hussite_wars = {
+							set_variable = {
+								name = hussite_wars_catholic_leader
+								value = prev
+							}
+						}
+					}
+					every_defender = {
+						hussite_wars_add_country_to_side_effect = {
+							LIST = hussite_wars_hussite_side_list
+							STRENGTH = hussite_wars_hussite_strength_variable
+						}
+					}
+					every_attacker = {
+						hussite_wars_add_country_to_side_effect = {
+							LIST = hussite_wars_catholic_side_list
+							STRENGTH = hussite_wars_catholic_strength_variable
+						}
+					}
+				}
+			}
+		}
+		else = {
+			if = {
+				limit = { country_exists = international_organization:hre.leader_country }
+				set_variable = {
+					name = hussite_wars_catholic_leader
+					value = international_organization:hre.leader_country
+				}
+			}
+			c:BOH ?= {
+				hussite_wars_add_country_to_side_effect = {
+					LIST = hussite_wars_hussite_side_list
+					STRENGTH = hussite_wars_hussite_strength_variable
+				}
+				every_other_country = {
+					limit = {
+						OR = {
+							AND = {
+								is_subject_or_below_of = c:BOH
+								subject_loyalty > 50
+							}
+							has_mutual_scripted_relation = {
+								type = relation_type:alliance
+								target = c:BOH
+							}
+						}
+					}
+					hussite_wars_add_country_to_side_effect = {
+						LIST = hussite_wars_hussite_side_list
+						STRENGTH = hussite_wars_hussite_strength_variable
+					}
+				}
+			}
+			international_organization:hre.leader_country ?= {
+				hussite_wars_add_country_to_side_effect = {
+					LIST = hussite_wars_catholic_side_list
+					STRENGTH = hussite_wars_catholic_strength_variable
+				}
+				every_other_country = {
+					limit = {
+						NOT = { tag = BOH }
+						NOT = {
+							is_target_in_global_variable_list = {
+								name = hussite_wars_hussite_side_list
+								target = this
+							}
+						}
+						OR = {
+							AND = {
+								is_subject_or_below_of = international_organization:hre.leader_country
+								subject_loyalty > 50
+							}
+							has_mutual_scripted_relation = {
+								type = relation_type:alliance
+								target = international_organization:hre.leader_country
+							}
+						}
+					}
+					hussite_wars_add_country_to_side_effect = {
+						LIST = hussite_wars_catholic_side_list
+						STRENGTH = hussite_wars_catholic_strength_variable
+					}
+				}
+			}
+		}
+	}
+
+	hussite_wars_recompute_relative_strength_effect = yes
+}
+
+hussite_wars_recompute_relative_strength_effect = {
+	situation:hussite_wars = {
+		set_variable = {
+			name = hussite_wars_hussite_relative_strength_variable
+			value = {
+				value = var:hussite_wars_hussite_strength_variable
+				divide = {
+					value = 1
+					add = var:hussite_wars_hussite_strength_variable
+					add = var:hussite_wars_catholic_strength_variable
+				}
+			}
+		}
+		set_variable = {
+			name = hussite_wars_catholic_relative_strength_variable
+			value = {
+				value = var:hussite_wars_catholic_strength_variable
+				divide = {
+					value = 1
+					add = var:hussite_wars_hussite_strength_variable
+					add = var:hussite_wars_catholic_strength_variable
+				}
+			}
+		}
+	}
+}
+
+hussite_wars_add_war_joiner_to_side_effect = {
+	save_temporary_scope_as = hw_joiner
+	if = {
+		limit = {
+			NOT = {
+				is_target_in_global_variable_list = {
+					name = hussite_wars_hussite_side_list
+					target = scope:hw_joiner
+				}
+			}
+			NOT = {
+				is_target_in_global_variable_list = {
+					name = hussite_wars_catholic_side_list
+					target = scope:hw_joiner
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:war = {
+					OR = {
+						AND = {
+							any_attacker = { tag = BOH }
+							is_an_attacker = scope:hw_joiner
+						}
+						AND = {
+							any_defender = { tag = BOH }
+							is_a_defender = scope:hw_joiner
+						}
+					}
+				}
+			}
+			hussite_wars_add_country_to_side_effect = {
+				LIST = hussite_wars_hussite_side_list
+				STRENGTH = hussite_wars_hussite_strength_variable
+			}
+		}
+		else = {
+			hussite_wars_add_country_to_side_effect = {
+				LIST = hussite_wars_catholic_side_list
+				STRENGTH = hussite_wars_catholic_strength_variable
+			}
+		}
+		hussite_wars_recompute_relative_strength_effect = yes
+	}
+}
+
+hussite_wars_clear_sides_effect = {
+	clear_global_variable_list = hussite_wars_hussite_side_list
+	clear_global_variable_list = hussite_wars_catholic_side_list
 }

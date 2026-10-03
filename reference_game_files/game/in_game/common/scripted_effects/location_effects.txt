@@ -1,16 +1,26 @@
 ﻿#root = location
 move_building = {
 	if = {
-		limit = { $from$ = { has_building = $building_type$ } }
+		limit = { $from$ = { has_building = building_type:$type$ } }
 		custom_description = {
 			text = move_building
 			object = $from$
-			value = building_type:$building_type$
-			$from$ = { destroy_building = "building($building_type$|$owner$)" }
-			change_building_level_in_location = {
-				building = $building_type$
-				value = 1
-				owner = $owner$
+			value = building_type:$type$
+			building_type:$type$ = { save_scope_as = building_to_move }
+			$owner$ = { save_scope_as = building_owner }
+			if = {
+				limit = {
+					$from$ = { exists = "building(scope:building_to_move|scope:building_owner)" }
+				}
+				$from$ = { destroy_building = "building(scope:building_to_move|scope:building_owner)" }
+				if = {
+					limit = { owner = $owner$ }
+					change_building_level_in_location = {
+						building = building_type:$type$
+						value = 1
+						owner = $owner$
+					}
+				}
 			}
 		}
 	}
@@ -376,6 +386,142 @@ catastrophic_destroy_building_levels_in_location = {
 			add = prev.building_level
 			multiply = -0.33
 			floor = yes
+		}
+	}
+}
+
+assimilate_location = {
+	every_pop = {
+		limit = {
+			culture != $culture$
+		}
+		split_pop = {
+			fraction = $value$
+			culture = $culture$
+		}
+	}
+}
+
+assimilate_location_with_randomness = {
+	every_pop = {
+		limit = {
+			culture != $culture$
+		}
+		split_pop = {
+			fraction = {
+				value = { $min$ $max$ }
+				multiply = {
+					value = 1
+					add = {
+						value = root.modifier:global_pop_assimilation_speed_modifier
+						divide = 2
+					}
+				}
+				multiply = {
+					value = 1
+					subtract = {
+						value = root.societal_value:spiritualist_vs_humanist
+						divide = 200
+					}
+				}
+				min = 0.05
+				max = 1
+			}
+			culture = $culture$
+		}
+	}
+}
+
+change_all_pop_satisfaction = { #Should work on country scope as well
+	every_pop = {
+		limit = {
+			owner ?= root
+		}
+		add_pop_satisfaction = $value$
+	}
+}
+
+convert_location = {
+	every_pop = {
+		limit = {
+			religion != $religion$
+		}
+		split_pop = {
+			fraction = $value$
+			religion = $religion$
+		}
+	}
+}
+
+convert_location_with_randomness = {
+	every_pop = {
+		limit = {
+			religion != $religion$
+		}
+		split_pop = {
+			fraction = {
+				value = { $min$ $max$ }
+				multiply = {
+					value = 1
+					add = {
+						value = root.modifier:global_pop_conversion_speed_modifier
+						divide = 2
+					}
+				}
+				multiply = {
+					value = 1
+					subtract = {
+						value = root.societal_value:spiritualist_vs_humanist
+						divide = 200
+					}
+				}
+				min = 0.05
+				max = 1
+			}
+			religion = $religion$
+		}
+	}
+}
+
+construct_latest_fort_building = {
+	if = {
+		limit = {
+			owner ?= { has_advance = fortress_advance }
+		}
+		construct_building = {
+			building_type = building_type:fortress
+			cost_multiplier = $cost_multiplier$
+			cost_multiplier_reason = "military_cheap_sponsorship"
+		}
+	}
+	else_if = {
+		limit = {
+			owner ?= {  has_advance = star_fort_advance }
+		}
+		construct_building = {
+			building_type = building_type:star_fort
+			cost_multiplier = $cost_multiplier$
+			cost_multiplier_reason = "military_cheap_sponsorship"
+		}
+	}
+	else_if = {
+		limit = {
+			owner ?= { has_advance = bastion_advance }
+		}
+		construct_building = {
+			building_type = building_type:bastion
+			cost_multiplier = $cost_multiplier$
+			cost_multiplier_reason = "military_cheap_sponsorship"
+		}
+	}
+	else_if = {
+		limit = {
+			owner ?= { has_advance = castle_advance }
+		}
+		construct_building = {
+			building_type = building_type:castle
+			cost_multiplier = $cost_multiplier$
+			cost_multiplier_reason = "military_cheap_sponsorship"
 		}
 	}
 }

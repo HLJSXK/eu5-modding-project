@@ -52,6 +52,7 @@
 # 						secondary_map_color = <script color> striped map color for location (root = location, scope:actor/recipient etc)
 # cost = script value for war score cost, scope:winner = taker, scope:loser = giver, scope:war = war they're in, scope:target = location/country/province specified
 # base_antagonism = script value for the max amount of antagonism gained, will be adjusted by various factors per country, scope:winner = taker, scope:loser = giver, scope:war = war they're in, scope:target = location/country/province specified
+# apply_antagonism = trigger for whether or not to apply the antagonism to an antagonisee. root = antagonisee, scope:antagoniser = antagoniser
 # antagonism_type = key of a bias type for the antagonism that will be added
 # ai_desire = script value for how much the winner wants this treaty, scope:winner = taker, scope:loser = giver, scope:war = war they're in, scope:target = location/country/province specified
 # ai_force_add = yes/no - Will AI always try to add this treaty to the offer when possible

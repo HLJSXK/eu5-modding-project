@@ -4,6 +4,16 @@
 	has_target = yes
 	expel_members_who_are_targets_of_other_members = no
 
+	gold = yes
+	international_organization_modifier = {
+		unlock_contribute_to_organization_treasury = yes
+	}
+	payments_implemented = { jihad_treasury_contribution }
+
+	special_statuses_implemented = {
+		jihad_spiritual_leader
+	}
+
 	create_visible_trigger = {
 		always = no #triggered from a religious action
 	}
@@ -14,16 +24,24 @@
 
 	join_defensive_wars_always = {
 		scope:target ?= {
-			this = root.international_organization_target
+			trigger_if = {
+				limit = { exists = root.international_organization_target }
+				this = root.international_organization_target
+			}
+			trigger_else = { always = no }
 		}
 	}
 
 	join_offensive_wars_always = {
 		scope:target ?= {
-			this = root.international_organization_target
+			trigger_if = {
+				limit = { exists = root.international_organization_target }
+				this = root.international_organization_target
+			}
+			trigger_else = { always = no }
 		}
 	}
-	
+
 	can_declare_war = {
 		always = yes
 	}
@@ -38,85 +56,106 @@
 	}
 
 	can_target_trigger = {
+		NOT = {
+			any_international_organization = {
+				international_organization_type = international_organization_type:jihad
+				international_organization_target ?= this
+			}
+		}
 	}
 
 	has_military_access = {
 		#this rule only applies when countries are at war
 		scope:war = yes
 
-		scope:recipient = {
-			is_member_of_international_organization = root
+		exists = scope:recipient
+		exists = scope:actor
+		trigger_if = {
+			limit = { exists = scope:recipient }
+			scope:recipient = { is_member_of_international_organization = root }
 		}
-		scope:actor = {
-			is_member_of_international_organization = root
+		trigger_if = {
+			limit = { exists = scope:actor }
+			scope:actor = { is_member_of_international_organization = root }
 		}
 	}
 
 	modifier = {
-        scale = {
-            add = {
-                desc = "religious_zeal"
-                scope:recipient = {
-                    value = var:religious_zeal
+		scale = {
+			add = {
+				desc = "religious_zeal"
+				scope:recipient = {
+					value = var:religious_zeal
 					divide = 100
-                }
-            }
-        }
-        damage_done_versus_heathens_modifier = 0.1
+				}
+			}
+		}
+		damage_done_versus_heathens_modifier = 0.1
+		war_declaration_war_exhaustion_tolerance = 0.15
+		peace_offer_fairness = 0.25
 	}
-	
+
 	can_lead_trigger = {
 		always = yes
 	}
 
-    can_join_trigger = {
+	can_join_trigger = {
 		religion.group = religion_group:muslim
 		is_rebel_country = no
+		knows_country = scope:target
 		not = { religion.group = scope:target.religion.group }
-        not = { is_allied_with = { target = scope:target } }
-        not = { is_at_war_with = scope:target }
+		not = { is_allied_with = { target = scope:target } }
+		not = { is_at_war_with = scope:target }
 		not = { is_fighting_war_together_with = scope:target }
-        not = { has_truce_with = scope:target }
+		not = { has_truce_with = scope:target }
 		trigger_if = {
 			limit = {
 				exists = scope:recipient
 			}
-            scope:recipient = {
-                leader_country = {
-                    "opinion(root)" > 0
-                }
-            }
-            religion = "scope:recipient.var:religion"
-        }
-        trigger_else = {
-            #if not started, there's no religion or opinion to check
-            always = yes
-        }
+			scope:recipient = {
+				leader_country = {
+					"opinion(root)" > 0
+					not = { is_at_war_with = root }
+				}
+			}
+			religion = "scope:recipient.var:religion"
+		}
+		trigger_else = {
+			#if not started, there's no religion or opinion to check
+			always = yes
+		}
 	}
-	
+
 	can_leave_trigger = {
-		always = no
+		custom_tooltip = {
+			text = jihad_cannot_leave_tt
+			always = no
+		}
 	}
-	
+
 	auto_leave_trigger = {
 		always = no
 	}
-	
+
 	auto_disband_trigger = {
-        #when war ends disband the IO
-        scope:target ?= {
-            not = { is_at_war_with = root.leader_country }
-        }
-    }
+		trigger_if = {
+			limit = { var:phase = 2 }
+			scope:target ?= {
+				not = { is_at_war_with = root.leader_country }
+			}
+		}
+		trigger_else = {
+			always = no
+		}
+	}
 
 	on_joined = {
 		if = {
 			limit = {
-				scope:recipient = {
-					or = {
-						not = { has_variable = religion }
-						not = { exists = var:religion }
-					}
+				exists = scope:recipient
+				OR = {
+					not = { scope:recipient = { has_variable = religion } }
+					not = { scope:recipient = { exists = var:religion } }
 				}
 			}
 			#default the religion to that of the leader
@@ -129,113 +168,242 @@
 		}
 		if = {
 			limit = {
-				scope:recipient = {
-					total_members = 1
+				scope:recipient = { total_members = 1 }
+			}
+			scope:recipient = {
+				set_variable = {
+					name = war_target
+					value = scope:target
 				}
 			}
-            #create a WAR with the target
-			add_casus_belli = { 
-				target = scope:target
-				type = casus_belli:cb_jihad
-				province = scope:target.capital.province
+		}
+		if = {
+			limit = {
+				scope:recipient = { var:phase = 2 }
 			}
-            declare_war_with_cb = {
-                target = scope:target
-                type = casus_belli:cb_jihad
-            }
-        }
-        else = {
-            scope:target = {
-                random_current_war = {
-                    limit = {
-                        OR = {
-                            attacker_leader = scope:recipient.leader_country
-                            defender_leader = scope:recipient.leader_country
-                        }
-                    }
-                    save_scope_as = crusade_war
-                }
-            }
-            if = {
-                limit = {
-                    scope:crusade_war = { attacker_leader = scope:recipient.leader_country }
-                }
-                join_war_as_attacker = { war = scope:crusade_war }
-            }
-            else = {
-                join_war_as_defender = { war = scope:crusade_war }
-            }
-        }
+			scope:target = {
+				random_current_war = {
+					limit = {
+						OR = {
+							attacker_leader = scope:recipient.leader_country
+							defender_leader = scope:recipient.leader_country
+						}
+					}
+					save_scope_as = crusade_war
+				}
+			}
+			if = {
+				limit = {
+					exists = scope:crusade_war
+					scope:crusade_war = { attacker_leader = scope:recipient.leader_country }
+				}
+				join_war_as_attacker = { war = scope:crusade_war }
+			}
+			else_if = {
+				limit = { exists = scope:crusade_war }
+				join_war_as_defender = { war = scope:crusade_war }
+			}
+		}
 	}
 
 	on_left = {
 	}
-	
-	monthly_effect = {
+
+	on_disband = {
+		holy_war_payout_war_end = yes
 	}
-	
-	variables = {
-		religious_zeal = {
-			format = "RELIGIOUS_ZEAL_DISPLAY"
-			change_format = "VARIABLE_CHANGE_FORMAT"
-            start = 1
-			min = 0
-			max = 1
-			monthly_change = {
-				subtract = {
-					desc = "WANE_OVER_TIME"
-					value = 0.01
+
+	monthly_effect = {
+		if = {
+			limit = { var:phase = 2 }
+			holy_war_snapshot_participation = yes
+		}
+		if = {
+			limit = { var:phase = 1 }
+			jihad_track_contribution = yes
+			if = {
+				limit = {
+					var:preparation >= 100
+					exists = var:war_target
 				}
-				add = {
-					desc = "NUMBER_OF_MEMBERS"
-					value = total_members
-					multiply = 0.0075
-					divide = 10
-					subtract = 0.0075
+				set_variable = { name = phase value = 2 }
+				var:war_target = { save_scope_as = jihad_target }
+				root.leader_country = {
+					add_casus_belli = {
+						target = scope:jihad_target
+						type = casus_belli:cb_jihad
+						province = scope:jihad_target.capital.province
+					}
+					if = {
+						limit = { NOT = { is_at_war_with = scope:jihad_target } }
+						declare_war_with_cb = {
+							target = scope:jihad_target
+							type = casus_belli:cb_jihad
+							save_scope_as = hw_declared_war
+						}
+					}
 				}
+				if = {
+					limit = { exists = scope:hw_declared_war }
+					set_variable = { name = active_war value = scope:hw_declared_war }
+				}
+				holy_war_payout_equal_share = yes
 			}
 		}
 	}
 
-    ai_desire_to_join = {
-        add = {
-            desc = "OPINION_OF_TARGET"
-            scope:target = {
-                value = prev_opinion_of_this
-                multiply = -0.2
-            }
-        }
-        add = {
-            desc = "game_concept_antagonism"
-            scope:target = {
-                value = prev_antagonism_towards_this
-            }
-        }
-        add = {
-            desc = "DIPLOREASON_IN_DEBT"
-            value = num_loans
-            multiply = -20
-        }
-        add = {
-            desc = "game_concept_war_exhaustion"
-            value = war_exhaustion
-            multiply = -2
-        }
+	variables = {
+		religious_zeal = {
+			format = "RELIGIOUS_ZEAL_DISPLAY"
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			start = 100
+			min = 0
+			max = 100
+			monthly_change = {
+				if = {
+					limit = { var:phase = 2 }
+					subtract = {
+						desc = "WANE_OVER_TIME"
+						value = 1
+					}
+				}
+				add = {
+					desc = "NUMBER_OF_MEMBERS"
+					value = total_members
+					multiply = 0.75
+					divide = 10
+					subtract = 0.75
+				}
+			}
+		}
+		preparation = {
+			format = "PREPARATION_DISPLAY"
+			change_format = "VARIABLE_CHANGE_FORMAT"
+			start = 0
+			min = 0
+			max = 100
+			monthly_change = {
+				add = {
+					desc = "NATURAL_PREPARATION_PROGRESS"
+					value = 100
+					divide = 36
+				}
+			}
+		}
+		phase = {
+			hidden = yes
+			start = 1
+		}
+	}
+
+	ai_desire_to_join = {
+		add = {
+			desc = "UNAWARE_OF_TARGET"
+			if = {
+				limit = { NOT = { scope:actor = { knows_country = scope:target } } }
+				value = -1000
+			}
+		}
+		add = {
+			desc = "BASE"
+			value = -30
+		}
+		add = {
+			desc = "HOLY_WAR_AGE_DAMPENER"
+			value = crusade_jihad_age_dampener
+		}
+		add = {
+			desc = "DISTANCE_TO_TARGET"
+			value = "capital.distance_to_squared(scope:target.capital)"
+			multiply = -0.0004
+		}
+		add = {
+			desc = "TARGET_NOT_RELEVANT_TO_US"
+			if = {
+				limit = {
+					NOT = { scope:target = { any_neighbor_country = { this = scope:actor } } }
+					NOT = { scope:target = { is_rival_of = scope:actor } }
+				}
+				value = -40
+			}
+		}
+		add = {
+			desc = "ORGANIZATION_ALREADY_LARGE"
+			if = {
+				limit = {
+					exists = scope:recipient
+					scope:recipient = { total_members > 10 }
+				}
+				value = -1000
+			}
+		}
+		add = {
+			desc = "RECENTLY_PREACHED_TO"
+			if = {
+				limit = { scope:actor = { has_variable = recently_preached_to } }
+				value = 40
+			}
+		}
+		add = {
+			desc = "OPINION_OF_ACTOR"
+			if = {
+				limit = { opinion = { target = scope:actor value > 100 } }
+				scope:actor = {
+					value = prev_opinion_of_this
+					subtract = 100
+					multiply = 2
+					multiply = 0.2
+				}
+			}
+			else = {
+				scope:actor = {
+					value = prev_opinion_of_this
+					subtract = 100
+					multiply = 0.2
+				}
+			}
+		}
+		add = {
+			desc = "OPINION_OF_TARGET"
+			scope:target = {
+				value = prev_opinion_of_this
+				multiply = -0.2
+			}
+		}
+		add = {
+			desc = "ANTAGONISM_TOWARDS_TARGET"
+			if = {
+				limit = { this != scope:target }
+				scope:target = {
+					value = prev_antagonism_towards_this
+				}
+			}
+		}
+		add = {
+			desc = "DIPLOREASON_IN_DEBT"
+			value = num_loans
+			multiply = -20
+		}
+		add = {
+			desc = "game_concept_war_exhaustion"
+			value = war_exhaustion
+			multiply = -2
+		}
 		add = {
 			desc = "CONQUER_DESIRE"
 			value = "conquer_desire(scope:target)"
 		}
-        add = {
-            #get a value in range of -80..0..20
-            desc = "RELATIVE_STRENGTH_ROOT"
-            value = 100
-            multiply = "scope:actor.relative_strength(root)" #this is 0..1
-            subtract = 80
-        }
+		add = {
+			#get a value in range of -80..0..20
+			desc = "RELATIVE_STRENGTH_ROOT"
+			value = 100
+			multiply = "scope:actor.relative_strength(root)" #this is 0..1
+			subtract = 80
+		}
 		add = {
 			desc = "IS_BANKRUPT_TOOLTIP"
 			if = {
-				limit = {	
+				limit = {
 					is_during_bankruptcy = yes
 				}
 				value = -1000
@@ -244,7 +412,7 @@
 		add = {
 			desc = "IS_AT_WAR"
 			if = {
-				limit = {	
+				limit = {
 					at_war = yes
 				}
 				value = -25
@@ -253,7 +421,7 @@
 		add = {
 			desc = "game_concept_rival"
 			if = {
-				limit = {	
+				limit = {
 					is_rival_of = scope:actor
 				}
 				value = -100
@@ -262,14 +430,14 @@
 		add = {
 			desc = "game_concept_rival"
 			if = {
-				limit = {	
+				limit = {
 					is_rival_of = scope:target
 				}
 				value = 100
 			}
 		}
 	}
-	
+
 	ai_desire_to_allow_new_member = {
 		add = {
 			desc = "WE_WANT_THE_ORGANIZATION_TO_GROW"

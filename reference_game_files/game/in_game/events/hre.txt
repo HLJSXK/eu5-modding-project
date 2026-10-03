@@ -244,7 +244,7 @@ hre.104 = {
 					}
 					drop_antagonism_bomb = {
 						value = {
-							value = scope:recipient.great_power_score
+							value = this.great_power_score
 							divide = 200
 						}
 						modifier = antagonism_hre_subjugated_free_cities
@@ -323,7 +323,7 @@ hre.106 = {
 					}
 					drop_antagonism_bomb = {
 						value = {
-							value = scope:recipient.great_power_score
+							value = this.great_power_score
 							divide = 200
 						}
 						modifier = antagonism_hre_subjugated_free_cities
@@ -362,6 +362,76 @@ hre.107 = {
 			international_organization = international_organization:hre
 			target = root
 			type = subject_type:direct_imperial_free_city
+		}
+	}
+}
+
+#secularized_electors_policy on activate - archibishop electors may secularize or get their special status revoked
+hre.700 = {
+	type = country_event
+	title = hre.700.title
+	desc = hre.700.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = angry
+		10 = interior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = { foreground = estate_type:clergy_estate background = estate_type:clergy_estate }
+	}
+
+	option = {
+		name = hre.700.a
+		trigger = {
+			NOT = {
+				tag = PAP #never you, no
+			}
+		}
+
+		ai_chance = {
+			factor = 10
+			modifier = {
+				factor = 0
+				has_any_active_disaster = yes
+			}
+			modifier = {
+				factor = 0.5
+				societal_value:spiritualist_vs_humanist < -50
+			}
+		}
+
+		change_government_type = government_type:monarchy
+		international_organization:hre = {
+			international_organization_remove_special_status = { type = special_status:archbishop_elector country = root }
+			international_organization_add_special_status = { type = special_status:elector country = root }
+		}
+		
+		add_stability = stability_extreme_penalty
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_radical_penalty }
+		add_estate_satisfaction = { type = estate_type:nobles_estate value = estate_satisfaction_extreme_bonus }
+	}
+
+	option = {
+		name = hre.700.b
+
+		ai_chance = {
+			factor = 5
+			modifier = {
+				factor = 2
+				societal_value:spiritualist_vs_humanist < -50
+			}
+		}
+
+		add_estate_satisfaction = { type = estate_type:clergy_estate value = estate_satisfaction_extreme_bonus }
+		add_stability = stability_extreme_bonus
+		international_organization:hre = {
+			international_organization_remove_special_status = { type = special_status:archbishop_elector country = root }
+		}
+		if = {
+			limit = { root = { international_organization_has_leader = yes } }
+			add_opinion = { target = root.leader_country modifier = opinion_rescinded_electorship }
 		}
 	}
 }
@@ -1003,14 +1073,17 @@ hre.908 = {
 		hidden_effect = {
 			international_organization:hre = {
 				leader_country.ruler ?= { save_scope_as = hre_ruler }
-				change_variable = {
-					name = imperial_authority_change
-					add = {
-						value = scope:recipient.total_population # Emperor
-						divide = scope:war.attacker_leader.total_population # attacking nation
-						max = 2
-						min = 0.1
-						multiply = 5
+				if = {
+					limit = { country_exists = scope:war.attacker_leader }
+					change_variable = {
+						name = imperial_authority_change
+						add = {
+							value = root.total_population # Emperor
+							divide = scope:war.attacker_leader.total_population # attacking nation
+							max = 2
+							min = 0.1
+							multiply = 5
+						}
 					}
 				}
 			}

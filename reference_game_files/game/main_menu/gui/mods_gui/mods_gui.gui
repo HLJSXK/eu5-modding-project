@@ -8,8 +8,10 @@ types ModsPlayset
 
         editbox_single = {
             name = "create_playset_editbox"
+            visible = "[GetVariableSystem.Exists( 'create_playset_open' )]"
             layoutpolicy_horizontal = expanding
             layoutpolicy_vertical = fixed
+            focus_on_visible = yes
             tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "MODS_GUI_PLAYSET_LABEL_TOOLTIP" } } }
 
             blockoverride "editbox_label" {
@@ -22,14 +24,24 @@ types ModsPlayset
             tooltipwidget = {BasicFunctionalTooltip = {}}
 
             action_tooltip = {
+                visible = "[Not( GetVariableSystem.Exists( 'create_playset_open' ) )]"
+                click_type = left
+                click_mode = single
+                title = "MODS_GUI_CREATE_PLAYSET"
+                on_action = "[GetVariableSystem.Set( 'create_playset_open', 'yes' )]"
+            }
+
+            action_tooltip = {
+                visible = "[GetVariableSystem.Exists( 'create_playset_open' )]"
                 click_type = left
                 click_mode = single
                 title = "[ModsGui.CreatePlaysetTooltip(PdxGuiEditboxGetText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox')))]"
                 on_action = "[ModsGui.CreatePlayset(PdxGuiEditboxGetText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox')))]"
                 on_action = "[PdxClearEditBoxText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox'))]"
+                on_action = "[GetVariableSystem.Clear( 'create_playset_open' )]"
                 enabled = "[ModsGui.CanCreatePlayset(PdxGuiEditboxGetText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox')))]"
             }
-            enabled = "[ModsGui.CanCreatePlayset(PdxGuiEditboxGetText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox')))]"
+            enabled = "[Or( Not( GetVariableSystem.Exists( 'create_playset_open' ) ), ModsGui.CanCreatePlayset(PdxGuiEditboxGetText(PdxGuiWidget.AccessParent.FindChild('create_playset_editbox'))) )]"
             align = center|nobaseline
             using = button_resize_to_fit_text
         }
@@ -63,7 +75,7 @@ types ModsPlayset
 
     type ChecksumErrorTooltip = BasicFunctionalTooltip {
         blockoverride "tooltip_content" {
-            TooltipTextBlock = {
+            TooltipScrolledTextBlock = {
                 blockoverride "text" {
                     block "checksum_erro_tooltip_text" {
                        text = "MODS_GUI_CHECKSUM_WARNING"
@@ -116,6 +128,16 @@ types ModsPlayset
                     widget = {
                         using = layoutpolicy_expanding
                         button_drop = {}
+                        button = {
+                            size = { 100% 100%}
+                            alwaystransparent = yes
+                            tooltipwidget = { BasicFunctionalTooltip = {} }
+                            action_tooltip = {
+                                click_type = left
+                                click_mode = single
+                                title = "MODS_GUI_OPEN_PLAYSET"
+                            }
+                        }
             
                         hbox = {
                             margin = { 10 0 }
@@ -142,15 +164,14 @@ types ModsPlayset
         
                             text_single = {
                                 layoutpolicy_horizontal = expanding
+                                # alwaystransparent = yes
+                                # filter_mouse = none
                                 size = { -1 20 }
                                 autoresize = no
                                 align = right|nobaseline
                                 name = "PlaysetInfo"
                                 text = "MODS_GUI_PLAYSET_STATS"
                                 tooltip_enabled = "[DataModelHasItems(ModsPlayset.Mods)]"
-                                tooltipwidget = {
-                                    using = playset_details_tooltip
-                                }
                             }
             
                             icon = {
@@ -164,37 +185,7 @@ types ModsPlayset
                                 }
                             }
                         }
-
-                        tooltipwidget = {
-                            using = playset_details_tooltip
-                        }
                     }
-          
-                    header_button_left = {
-                        size = { 35 35 }
-                        enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
-                        blockoverride "button_icon_stretch_sprite" {}
-                        blockoverride "header_button_frame_inner" {visible = no}
-                        blockoverride "header_button_icon_size" { size = { 35 35 } }
-                        blockoverride "header_button_text_layout" {}
-
-                        blockoverride "icon_overlay" {}
-                        blockoverride "icon_texture" {
-                            texture = "gfx/interface/icons/dlc/dlc_delete.dds"
-                        }
-                        blockoverride "text_bottom" {
-                            visible = no
-                        }
-                        tooltipwidget = {BasicFunctionalTooltip = {}}
-    
-                        action_tooltip = {
-                            click_type = left
-                            click_mode = confirm
-                            title = "MODS_GUI_DELETE_PLAYSET"
-                            on_action = "[ModsGui.DeletePlayset( ModsPlayset.Id )]"
-                            enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
-                        }
-                    }        
                 }
             }
         }
@@ -203,7 +194,7 @@ types ModsPlayset
             widget = {
                 size = { 100% 100% }
                 background = {
-                    visible = "[ModsGui.IsPlaysetActive( ModsPlayset.Id )]"
+                    visible = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
                     using = color_white_texture
                     alpha = 0.2
                 }
@@ -211,21 +202,19 @@ types ModsPlayset
                 button_dropdown = {
                     focuspolicy = all
 					button_trigger = press
-                    visible = "[ModsGui.IsPlaysetActive( ModsPlayset.Id )]"
-                    enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
+                    visible = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
 
                     action_tooltip = {
                         click_type = left
                         click_mode = single
-                        title = "MODS_GUI_DEACTIVATE_PLAYSET"
-                        on_action = "[ModsGui.ClearSelectedPlayset()]"
-                        on_action = "[ModsGui.ClearActivePlayset()]"
-                        enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
+                        title = "MODS_GUI_ACTIVATE_PLAYSET"
+                        on_action = "[ModsGui.SetSelectedPlaysetId( ModsPlayset.Id )]"
+                        on_action = "[ModsGui.SetActivePlaysetId( ModsPlayset.Id )]"
                     }
 
                     action_tooltip = {
                         click_type = right
-                        click_mode = confirm
+                        click_mode = single
                         title = "MODS_GUI_RENAME_PLAYSET"
                         visible = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').IsVisible]"
                         on_action = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').Hide]"
@@ -240,7 +229,7 @@ types ModsPlayset
                 button_dropdown = {
                     focuspolicy = none
 					button_trigger = press
-                    visible = "[Not(ModsGui.IsPlaysetActive( ModsPlayset.Id ))]"
+                    visible = "[Not(ModsGui.IsPlaysetApplied( ModsPlayset.Id ))]"
 
                     action_tooltip = {
                         click_type = left
@@ -252,7 +241,7 @@ types ModsPlayset
 
                     action_tooltip = {
                         click_type = right
-                        click_mode = confirm
+                        click_mode = single
                         title = "MODS_GUI_RENAME_PLAYSET"
                         visible = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').IsVisible]"
                         on_action = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').Hide]"
@@ -279,11 +268,11 @@ types ModsPlayset
                         enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
 
                         text = "[ModsPlayset.Name]"
-                        oneditingfinished_with_changes = "[ModsPlayset.Rename]"
+                        oneditingfinished_with_changes = "[ModsPlayset.RenameChecked(PdxGuiWidget.AccessSelf)]"
                         oneditingfinished_with_changes = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').Show]"
                         onreturnpressed = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').Show]"
                     }
-                    
+
                     text_single = {
                         visible = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
                         size = {60 20}
@@ -453,7 +442,7 @@ types ModsPlayset
                                                 layoutpolicy_horizontal = expanding
 
                                                 raw_text = "[ModsPlayset.Name]"
-                                                oneditingfinished_with_changes = "[ModsPlayset.Rename]"
+                                                oneditingfinished_with_changes = "[ModsPlayset.RenameChecked(PdxGuiWidget.AccessSelf)]"
                                                 oneditingfinished_with_changes = "[PdxGuiWidget.AccessParent.FindChild('PlaysetHeader').Show]"
                                             }
 
@@ -473,7 +462,8 @@ types ModsPlayset
                                                     click_type = left
                                                     click_mode = single
                                                     title = "MODS_GUI_DELETE_PLAYSET"
-                                                    on_action = "[ModsGui.DeletePlayset( ModsPlayset.Id )]"
+                                                    on_action = "[ModsGui.ConfirmDeletePlayset( ModsPlayset.Id )]"
+                                                    enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
                                                 }
                                             }
                                         }
@@ -515,20 +505,20 @@ types ModsPlayset
                                             }
 
                                             button_checkbox = {
-                                                visible = "[ModsGui.IsPlaysetActive( ModsPlayset.Id )]"
-                                                down = "[ModsGui.IsPlaysetActive( ModsPlayset.Id )]"
+                                                visible = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
+                                                down = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
                                                 enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
                                                 action_tooltip = {
-                                                	title = "MODS_GUI_DEACTIVATE_PLAYSET"
-                                                	on_action = "[ModsGui.ClearSelectedPlayset()]"
-                                                	on_action = "[ModsGui.ClearActivePlayset()]"
+                                                	title = "MODS_GUI_ACTIVATE_PLAYSET"
+                                                	on_action = "[ModsGui.SetSelectedPlaysetId( ModsPlayset.Id )]"
+                                                	on_action = "[ModsGui.SetActivePlaysetId( ModsPlayset.Id )]"
                                                 }
                                                 tooltipwidget = { BasicFunctionalTooltip = {} }
                                             }
 
                                             button_checkbox = {
-                                                visible = "[Not( ModsGui.IsPlaysetActive( ModsPlayset.Id ) )]"
-                                                down = "[ModsGui.IsPlaysetActive( ModsPlayset.Id )]"
+                                                visible = "[Not( ModsGui.IsPlaysetApplied( ModsPlayset.Id ) )]"
+                                                down = "[ModsGui.IsPlaysetApplied( ModsPlayset.Id )]"
                                                 enabled = "[And(ModsPlayset.IsEditable, ModsGui.InteractionsAllowed)]"
                                                 action_tooltip = {
                                                 	title = "MODS_GUI_ACTIVATE_PLAYSET"
@@ -823,32 +813,31 @@ types ModsGui
         scrollwidget = {
             block "content" {
                 vbox = {
-                    fixedgridbox = {
+                    vbox = {
+                        layoutpolicy_horizontal = expanding
+                        margin_right = 0
                         datamodel = "[ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).ModifiableMods]"
-                        addcolumn = 100%
-                        addrow = 45
-                        datamodel_wrap = 1
-                        flipdirection = yes
-                        setitemsizefromcell = yes
-    
+
                         item = {
                             selected_mod_item = {
+                                layoutpolicy_horizontal = expanding
+                                size = { -1 64 }
+                                visible = "[ModsPlaysetEntry.MatchesSearch( ModsGui.SearchString )]"
                             }
-                        }                        
+                        }
                     }
                     vbox = {
-                        margin_right = 15
+                        margin_right = 0
                         using =  layoutpolicy_expanding
                         vbox = {
                             layoutpolicy_horizontal = expanding
                             datamodel = "[ModsGui.LocalMods]"
-        
+
                             item = {
                                 mod_card = {
                                     layoutpolicy_horizontal = expanding
-                                    size = { -1 45 }
-									blockoverride "mod_card_left_buttons" {}
-                                    visible = "[Not(ModsGui.ActivePlayset.ContainsMod(LocalMod.Id))]"
+                                    size = { -1 64 }
+                                    visible = "[And(Not(ModsGui.ActivePlayset.ContainsMod(LocalMod.Id)), LocalMod.MatchesSearch( ModsGui.SearchString ))]"
                                 }
                             }
                         }
@@ -860,31 +849,89 @@ types ModsGui
     }
 
 	type mod_card = widget {
-        size = { 100% 45}
+        size = { 100% 64}
 
         hbox = {
-            block "mod_card_left_buttons" {
-                hbox = {
-                    widget = {
-                        size = {50 40}
-                        using = bg_card_header_01
-                        blockoverride "bg_card_header_01_bg" {
-                            background = {
-                                using = bg_card_header_01_default
-                                alpha = 1
-                                blockoverride "header_color" {
-                                    using = color_geopolitics_texture
+            hbox = {
+                widget = {
+                    size = {50 60}
+                    using = bg_card_header_01
+                    blockoverride "bg_card_header_01_bg" {
+                        background = {
+                            using = bg_card_header_01_default
+                            alpha = 1
+                            blockoverride "header_color" {
+                                using = color_geopolitics_texture
+                            }
+                        }
+                    }
+                    hbox = {
+                        block "mod_left_text" {
+                            widget = {
+                                using = layoutpolicy_expanding
+                                button_square_plus = {
+                                    size = { 100% 100% }
+                                    blockoverride "plusminus_icon" {
+                                        visible = no
+                                    }
+                                    enabled = no
+                                    action_tooltip = {
+                                        click_mode = single
+                                        click_type = left
+                                        title = "MODS_GUI_MOD_LOAD_ORDER"
+                                        enabled = no
+                                        conditions = "MODS_GUI_MOD_NOT_ACTIVE_IN_PLAYSET"
+                                    }
+                
+                                    tooltipwidget = { BasicFunctionalTooltip = {} }
+                
+                                    blockoverride "square_icon_extra" {
+                                    }
                                 }
                             }
                         }
-                        hbox = {
-                            block "mod_left_text" {}
-                            vbox = {
-                                using = layoutpolicy_expanding
-                                block "mod_left_buttons" {
-                                    text_single = {
-                                        raw_text = "-"
+
+                        vbox = {
+                            using = layoutpolicy_expanding
+                            block "mod_left_buttons" {
+                                button_square_plus = {
+                                    layoutpolicy_horizontal = expanding
+                                    size = { -1 30 }
+                                    blockoverride "plusminus_icon" {
+                                        texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+                                        mirror = vertical
                                     }
+                                    blockoverride "square_icon_size" {
+                                        size = {12 12}
+                                    }
+                                    enabled = no
+                                    action_tooltip = {
+                                        click_mode = single
+                                        click_type = left
+                                        title = "MODS_GUI_MOD_LOAD_BEFORE"
+                                        enabled = no
+                                        conditions = "MODS_GUI_MOD_NOT_ACTIVE_IN_PLAYSET"
+                                    }
+                                    tooltipwidget = { BasicFunctionalTooltip = {} }
+                                }
+                                button_square_plus = {
+                                    layoutpolicy_horizontal = expanding
+                                    size = { -1 30 }
+                                    blockoverride "plusminus_icon" {
+                                        texture = "gfx/interface/buttons/flats/button_simple_down.dds"
+                                    }
+                                    blockoverride "square_icon_size" {
+                                        size = {12 12}
+                                    }
+                                    enabled = no
+                                    action_tooltip = {
+                                        click_mode = single
+                                        click_type = left
+                                        title = "MODS_GUI_MOD_LOAD_AFTER"
+                                        enabled = no
+                                        conditions = "MODS_GUI_MOD_NOT_ACTIVE_IN_PLAYSET"
+                                    }
+                                    tooltipwidget = { BasicFunctionalTooltip = {} }
                                 }
                             }
                         }
@@ -893,7 +940,7 @@ types ModsGui
             }
             card_header_button_01 = {
                 layoutpolicy_horizontal = expanding
-                size = { -1 40 }
+                size = { -1 60 }
                 using = bg_card_header_01_production
                 block "mod_action" {
                     enabled = "[And(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed)]"
@@ -906,95 +953,132 @@ types ModsGui
 						conditions = "MODS_GUI_CANNOT_ADD_IN_DEFAULT_PLAYSET"
                     }
                 }
-    
+
                 block "mod_tooltip" {
                     tooltipwidget = {
                         using = downloaded_mods_details_tooltip
                     }
                 }
-                    
+
                 hbox = {
-                    spacing = 5
+                    spacing = 8
                     margin_right = 7
 					margin_left = 1
 
                     icon = {
-                        size = {36 36}
+                        size = {58 58}
                         block "mod_image" {
                           texture = "[LocalMod.DisplayImage]"
                         }
                     }
 
-                    header_button_left = {
-                        size = { 26 26 }
-                        blockoverride "button_icon_stretch_sprite" {}
-                        blockoverride "header_button_frame_inner" {visible = no}
-                        blockoverride "header_button_icon_size" { size = { 25 25 } }
-                        blockoverride "header_button_text_layout" {}
-                        blockoverride "icon_overlay" {}
-        
-                        blockoverride "icon_texture" {
-                            texture = "gfx/interface/icons/dlc/dlc_folder.dds"
-                            texture_density = 2
-                        }
-        
-                        tooltipwidget = { BasicFunctionalTooltip = {} }
+                    vbox = {
+                        using = layoutpolicy_expanding
+                        spacing = 2
 
-                        block "mod_open_folder_action_tooltip" {
-                            action_tooltip = {
-                                click_type = left
-                                click_mode = single
-                                title = "MOD_OPEN_IN_FOLDER"
-                                on_action = "[LocalMod.OpenInFolder]"
+                        hbox = {
+                            layoutpolicy_horizontal = expanding
+                            spacing = 5
+
+                            text_single = {
+                                autoresize = yes
+                                fontsize = 18
+                                maximumsize = {240 -1}
+
+                                block "mod_name" {
+                                  text = "[LocalMod.DisplayName]"
+                                }
                             }
-                        }
-                    }
 
+                            expand = {}
 
-    
-                    text_single = {
-                        autoresize = yes
-                        fontsize = 18
-                        maximumsize = {280 -1}
-        
-                        block "mod_name" {
-                          text = "[LocalMod.DisplayName]"
-                        }
-                    }
-    
-                    expand = {}
-    
-                    block "mod_issues" {
-                        icon = {
-                            visible = "[LocalMod.HasIssues]"
-                            size = {20 20}
-                            using = warning_icon_texture
-                            tooltipwidget = {
-                                ChecksumErrorTooltip = {
-                                    blockoverride "checksum_erro_tooltip_text"
-                                    {
-                                        text = "[LocalMod.GetIssues]"
+                            block "mod_issues" {
+                                icon = {
+                                    visible = "[LocalMod.HasNonChecksumIssues]"
+                                    size = {20 20}
+                                    using = warning_icon_texture
+                                    tooltipwidget = {
+                                        ChecksumErrorTooltip = {
+                                            blockoverride "checksum_erro_tooltip_text"
+                                            {
+                                                text = "[LocalMod.GetNonChecksumIssues]"
+                                            }
+                                        }
                                     }
+                                }
+                                icon = {
+                                    visible = "[And(LocalMod.IsChecksumCompatibilityCalculated, LocalMod.IsAffectingChecksum)]"
+                                    size = {20 20}
+                                    texture = "gfx/interface/icons/mods/modify.dds"
+                                    texture_density = 2
+                                    tooltipwidget = {
+                                        ChecksumErrorTooltip = {
+                                            blockoverride "checksum_erro_tooltip_text"
+                                            {
+                                                raw_text = "[Localize('MODS_GUI_CHECKSUM_CONSEQUENCE')][LocalMod.GetFilesAffectingChecksum]"
+                                            }
+                                        }
+                                    }
+                                }
+                                icon = {
+                                    visible = "[Not(LocalMod.IsChecksumCompatibilityCalculated)]"
+                                    size = {20 20}
+                                    texture = "gfx/interface/icons/mods/calculate.dds"
+                                }
+                            }
+
+                            block "mod_checked" {
+                                checkbox_square_alt = {
+                                    size = { 22 22 }
+                                    enabled = "[And3(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed, Not(ModsGui.ActivePlayset.ContainsMod(LocalMod.Id)))]"
+                                    action_tooltip = {
+                                        title = "[SelectLocalization( ModsGui.ActivePlayset.ContainsMod(LocalMod.Id), 'MODS_GUI_LOCAL_MODS_SELECTED_LABEL', 'MODS_GUI_LOCAL_MODS_NOT_SELECTED_LABEL' )]"
+                                        on_action = "[ModsGui.ActivePlayset.AddMod( LocalMod.Id )]"
+                                    }
+                                    action_tooltip = {
+                                        click_type = right
+                                        click_mode = single
+                                        title = "[SelectLocalization( ModsGui.AreAllModsToggled, 'MODS_GUI_REMOVE_ALL_MODS_TO_PLAYSET', 'MODS_GUI_ADD_ALL_MODS_TO_PLAYSET' )]"
+                                        on_action = "[ModsGui.ToggleAllMods]"
+                                        enabled = "[And(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed)]"
+                                    }
+                                    tooltipwidget = { BasicFunctionalTooltip = {} }
+                                    down = "[ModsGui.ActivePlayset.ContainsMod(LocalMod.Id)]"
                                 }
                             }
                         }
-                        icon = {
-                            visible = "[Not(LocalMod.IsChecksumCompatibilityCalculated)]"
-                            size = {20 20}
-                            texture = "gfx/interface/icons/mods/calculate.dds"
-                        }
-                    }
 
-                    block "mod_checked" {
-                        checkbox_square_alt = {
-                            size = { 22 22 }
-                            enabled = "[And3(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed, Not(ModsGui.ActivePlayset.ContainsMod(LocalMod.Id)))]"
-                            action_tooltip = {
-                            	title = "[SelectLocalization( ModsGui.ActivePlayset.ContainsMod(LocalMod.Id), 'MODS_GUI_LOCAL_MODS_SELECTED_LABEL', 'MODS_GUI_LOCAL_MODS_NOT_SELECTED_LABEL' )]"
-                            	on_action = "[ModsGui.ActivePlayset.AddMod( LocalMod.Id )]"
+                        hbox = {
+                            layoutpolicy_horizontal = expanding
+                            spacing = 8
+
+                            button_regular = {
+                                size = { 118 22 }
+                                fontsize = 13
+                                align = center|nobaseline
+                                text = "MODS_GUI_OPEN_IN_FOLDER"
+                                tooltipwidget = { BasicFunctionalTooltip = {} }
+
+                                block "mod_open_folder_action_tooltip" {
+                                    action_tooltip = {
+                                        click_type = left
+                                        click_mode = single
+                                        title = "MOD_OPEN_IN_FOLDER"
+                                        on_action = "[LocalMod.OpenInFolder]"
+                                    }
+                                }
                             }
-                            tooltipwidget = { BasicFunctionalTooltip = {} }
-                            down = "[ModsGui.ActivePlayset.ContainsMod(LocalMod.Id)]"
+
+                            block "mod_version" {
+                                text_single = {
+                                    autoresize = yes
+                                    fontsize = 13
+                                    visible = "[Not(StringIsEmpty(LocalMod.SupportedGameVersion))]"
+                                    raw_text = "[Localize('MODS_GUI_CARD_VERSION_LABEL')] [LocalMod.SupportedGameVersion]"
+                                }
+                            }
+
+                            expand = {}
                         }
                     }
                 }
@@ -1079,8 +1163,8 @@ types ModsGui
 						size = {36 36}
 						icon = {
 							parentanchor = hcenter|top
-							size = {34 43}
-							position = {0 -2}
+							size = {34 34}
+							position = {0 1}
 							block "dlc_select_image" {
 							texture = "[LocalMod.DisplayImage]"
 							}
@@ -1369,14 +1453,28 @@ types ModsGui
         }
         blockoverride "mod_issues" {
             icon = {
-                visible = "[ModsPlaysetEntry.HasIssues]"
+                visible = "[ModsPlaysetEntry.HasNonChecksumIssues]"
                 size = {20 20}
                 using = warning_icon_texture
                 tooltipwidget = {
                     ChecksumErrorTooltip = {
                         blockoverride "checksum_erro_tooltip_text"
                         {
-                            text = "[ModsPlaysetEntry.GetIssues]"
+                            text = "[ModsPlaysetEntry.GetNonChecksumIssues]"
+                        }
+                    }
+                }
+            }
+            icon = {
+                visible = "[And(ModsPlaysetEntry.IsChecksumCompatibilityCalculated, ModsPlaysetEntry.IsAffectingChecksum)]"
+                size = {20 20}
+                texture = "gfx/interface/icons/mods/modify.dds"
+                texture_density = 2
+                tooltipwidget = {
+                    ChecksumErrorTooltip = {
+                        blockoverride "checksum_erro_tooltip_text"
+                        {
+                            raw_text = "[Localize('MODS_GUI_CHECKSUM_CONSEQUENCE')][ModsPlaysetEntry.GetFilesAffectingChecksum]"
                         }
                     }
                 }
@@ -1399,7 +1497,7 @@ types ModsGui
             tooltipwidget = { BasicFunctionalTooltip = {} }
         }
         blockoverride "dlc_select_action" {
-            enabled = "[DlcEntry.CanToggleEnabled]"
+            enabled = yes
             action_tooltip = {
                 click_type = left
                 click_mode = single
@@ -1432,8 +1530,15 @@ types ModsGui
                 size = { 22 22 }
                 down = "[DlcEntry.IsEnabled]"
                 action_tooltip = {
-                	title = "[SelectLocalization(DlcEntry.IsEnabled, 'MODS_GUI_LOCAL_MODS_SELECTED_LABEL', 'MODS_GUI_LOCAL_MODS_NOT_SELECTED_LABEL')]"
-                	on_action = "[DlcEntry.ToggleEnabled]"
+                    title = "[SelectLocalization(DlcEntry.IsEnabled, 'MODS_GUI_LOCAL_MODS_SELECTED_LABEL', 'MODS_GUI_LOCAL_MODS_NOT_SELECTED_LABEL')]"
+                    on_action = "[DlcEntry.ToggleEnabled]"
+                }
+                action_tooltip = {
+                    click_type = right
+                    click_mode = single
+                    title = "[SelectLocalization( ModsGui.AreAllDLCsToggled, 'MODS_GUI_REMOVE_ALL_DLCS_TO_PLAYSET', 'MODS_GUI_ADD_ALL_DLCS_TO_PLAYSET' )]"
+                    on_action = "[ModsGui.ToggleAllDLCs]"
+                    enabled = "[And(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed)]"
                 }
                 tooltipwidget = { BasicFunctionalTooltip = {} }
                 enabled = "[DlcEntry.CanToggleEnabled]"
@@ -1484,13 +1589,14 @@ types ModsGui
 						icon = {
 							parentanchor = center
 							using = color_black_texture
-							size = { 21 35 }
+							size = { 21 55 }
 							alpha = 0.5
 						}
 					}
                 }
                 text_single = {
                     autoresize = no
+                    parentanchor = center
                     size = { 100% 40 }
                     fontsize = 13
                     align = center
@@ -1501,7 +1607,7 @@ types ModsGui
         blockoverride "mod_left_buttons" {
             button_square_plus = {
                 layoutpolicy_horizontal = expanding
-                size = { -1 20 }
+                size = { -1 30 }
                 blockoverride "plusminus_icon" {
                     texture = "gfx/interface/buttons/flats/button_simple_down.dds"
 					mirror = vertical
@@ -1523,7 +1629,7 @@ types ModsGui
             }
             button_square_plus = {
                 layoutpolicy_horizontal = expanding
-                size = { -1 20 }
+                size = { -1 30 }
                 blockoverride "plusminus_icon" {
                     texture = "gfx/interface/buttons/flats/button_simple_down.dds"
                 }
@@ -1554,7 +1660,7 @@ types ModsGui
             enabled = "[And( ModsPlaysetEntry.Playset.IsEditable, ModsGui.InteractionsAllowed )]"
 
             action_tooltip = {
-                click_type = right
+                click_type = left
                 click_mode = single
                 title = "MODS_GUI_REMOVE_MOD_FROM_PLAYSET"
                 on_action = "[ModsPlaysetEntry.Playset.RemoveMod( ModsPlaysetEntry.Id )]"
@@ -1577,14 +1683,28 @@ types ModsGui
         }
         blockoverride "mod_issues" {
             icon = {
-                visible = "[ModsPlaysetEntry.HasIssues]"
+                visible = "[ModsPlaysetEntry.HasNonChecksumIssues]"
                 size = {20 20}
                 using = warning_icon_texture
                 tooltipwidget = {
                     ChecksumErrorTooltip = {
                         blockoverride "checksum_erro_tooltip_text"
                         {
-                            text = "[ModsPlaysetEntry.GetIssues]"
+                            text = "[ModsPlaysetEntry.GetNonChecksumIssues]"
+                        }
+                    }
+                }
+            }
+            icon = {
+                visible = "[And(ModsPlaysetEntry.IsChecksumCompatibilityCalculated, ModsPlaysetEntry.IsAffectingChecksum)]"
+                size = {20 20}
+                texture = "gfx/interface/icons/mods/modify.dds"
+                texture_density = 2
+                tooltipwidget = {
+                    ChecksumErrorTooltip = {
+                        blockoverride "checksum_erro_tooltip_text"
+                        {
+                            raw_text = "[Localize('MODS_GUI_CHECKSUM_CONSEQUENCE')][ModsPlaysetEntry.GetFilesAffectingChecksum]"
                         }
                     }
                 }
@@ -1595,14 +1715,29 @@ types ModsGui
                 texture = "gfx/interface/icons/mods/calculate.dds"
             }
         }
+        blockoverride "mod_version" {
+            text_single = {
+                autoresize = yes
+                fontsize = 13
+                visible = "[Not(StringIsEmpty(ModsPlaysetEntry.Version))]"
+                raw_text = "[Localize('MODS_GUI_CARD_VERSION_LABEL')] [ModsPlaysetEntry.Version]"
+            }
+        }
         blockoverride "mod_checked" {
             checkbox_square_alt = {
                 size = { 22 22 }
                 down = yes
                 enabled = "[And( ModsPlaysetEntry.Playset.IsEditable, ModsGui.InteractionsAllowed )]"
                 action_tooltip = {
-                	title = "MODS_GUI_LOCAL_MODS_SELECTED_LABEL"
-                	on_action = "[ModsPlaysetEntry.Playset.RemoveMod( ModsPlaysetEntry.Id )]"
+                    title = "MODS_GUI_LOCAL_MODS_SELECTED_LABEL"
+                    on_action = "[ModsPlaysetEntry.Playset.RemoveMod( ModsPlaysetEntry.Id )]"
+                }
+                action_tooltip = {
+                    click_type = right
+                    click_mode = single
+                    title = "[SelectLocalization( ModsGui.AreAllModsToggled, 'MODS_GUI_REMOVE_ALL_MODS_TO_PLAYSET', 'MODS_GUI_ADD_ALL_MODS_TO_PLAYSET' )]"
+                    on_action = "[ModsGui.ToggleAllMods]"
+                    enabled = "[And( ModsPlaysetEntry.Playset.IsEditable, ModsGui.InteractionsAllowed )]"
                 }
                 tooltipwidget = { BasicFunctionalTooltip = {} }
             }
@@ -1951,6 +2086,12 @@ window = {
     state = {
         name = _show
         on_start = "[ModsGui.SetSelectedPlaysetId( ModsGui.ActivePlayset.Id )]"
+        on_start = "[GetVariableSystem.Clear( 'create_playset_open' )]"
+        on_start = "[GetVariableSystem.Clear( 'mods_tab' )]"
+        on_start = "[GetVariableSystem.SetIf( 'mods_tab', 'dlc', GetVariableSystem.HasValue( 'mods_tab_request', 'dlc' ) )]"
+        on_start = "[GetVariableSystem.Clear( 'mods_tab_request' )]"
+        on_start = "[ModsGui.ClearSearchString]"
+        on_start = "[PdxClearEditBoxText( PdxGuiWidget.FindChild('mods_search_editbox') )]"
     }
 
 	vbox = {
@@ -2021,7 +2162,7 @@ window = {
 
                     vbox = {
                         using = layoutpolicy_expanding
-                        margin = {20 0}
+                        margin = {15 0}
 						margin_top = 12
 
                         vbox = {
@@ -2032,326 +2173,18 @@ window = {
                             playset_dropdown = {}
                         }
 
-                        scrollarea = {
-                            using = layoutpolicy_expanding
-                            scrollbarpolicy_horizontal = always_off
-                            autoresizeviewport = yes
-
-                            scrollbar_vertical = {
-                                using = Scrollbar_Vertical
-                            }
-                    
-                            viewportwidget = {
-                                widget = {
-                                    block "scroll_list_scissor" {
-                                        scissor = yes
-                                    }
-                                }
-                            }
-
-                            scrollwidget = {
-                                vbox = {
-                                    spacing = 5
-                                    #DLCs
-                                    widget = {
-                                        layoutpolicy_horizontal = expanding
-                                        size = { -1 50}
-                                        using = bg_paper_card
-                            
-                                        using = bg_card_header_01_government
-                                
-                                        card_header_button_01 = {
-                                            size = { 100% 100% }
-                                            tooltipwidget = {BasicFunctionalTooltip = {}}
-                                            action_tooltip = {
-                                                title = "MODS_GUI_SELECT_DLCS"
-                                                enabled = "[GreaterThan_int32( ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).DlcCount, '(int32)0' )]"
-                                                on_action = "[GetVariableSystem.Toggle( 'dlcs' )]"
-                                            }
-        
-                                            enabled = "[GreaterThan_int32( ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).DlcCount, '(int32)0' )]"
-                                            
-                                            hbox = {
-                                                spacing = 5
-                                                margin_left = 5
-                                                margin_right = 5
-        
-                                                widget = {
-                                                    size = { 50 50 }
-                                                    icon = {
-                                                        size = { 42 42 }
-                                                        parentanchor = center
-                                                        texture = "gfx/interface/icons/dlc/dlc_shield.dds" 
-                                                        
-                                                    }
-                                                }
-        
-                                                text_single = {
-                                                    layoutpolicy_horizontal = expanding
-                                                    size = { -1 20 }
-                                                    autoresize = no
-                                                    align = left|nobaseline
-                                                    text = "DLCS_GUI_SELECTED_AMOUNT"
-                                                }
-        
-                                                expand = {}
-        
-                                                icon = {
-                                                    visible = "[ModsGui.ActivePlayset.HasDLCIssues]"
-                                                    size = {22 22}
-                                                    using = warning_icon_texture
-                                                    tooltipwidget = {
-                                                        ChecksumErrorTooltip = {
-                                                            blockoverride "checksum_erro_tooltip_text" {
-                                                            text = "[ModsGui.ActivePlayset.GetDLCIssuesDesc]"
-                                                            }
-                                                        }
-                                                    }
-                                                }
-        
-                                                checkbox_square_alt = {
-                                                    size = { 22 22 }
-                                                    enabled = "[And(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed)]"
-                                                    action_tooltip = {
-                                                    	title = "[SelectLocalization( ModsGui.AreAllDLCsToggled, 'MODS_GUI_REMOVE_ALL_DLCS_TO_PLAYSET', 'MODS_GUI_ADD_ALL_DLCS_TO_PLAYSET' )]"
-                                                    	on_action = "[ModsGui.ToggleAllDLCs]"
-                                                    }
-                                                    tooltipwidget = { BasicFunctionalTooltip = {} }
-                                                    down = "[ModsGui.AreAllDLCsToggled]"
-                                                }
-        
-                                                icon = {
-                                                    visible = "[Not(GetVariableSystem.Exists( 'dlcs' ))]"
-                                                    size = { 22 22 }
-                                                    texture = "gfx/interface/buttons/flats/button_simple_right.dds"
-                                                    using = color_gold
-                                                    modify_texture = {
-                                                        using = overlay_window_texture
-                                                        blend_mode = overlay
-                                                        alpha = 1
-                                                    }
-                                                    glow = {
-                                                        name = "drop_shadow"
-                                                        glow_radius = 3
-                                                        color = {0.0 0.0 0.0 1.0}
-                                                        alpha = 0.4
-                                                    }
-                                                }
-        
-                                                icon = {
-                                                    visible = "[GetVariableSystem.Exists( 'dlcs' )]"
-                                                    size = { 22 22 }
-                                                    texture = "gfx/interface/buttons/flats/button_simple_down.dds"
-                                                    using = color_gold
-                                                    modify_texture = {
-                                                        using = overlay_window_texture
-                                                        blend_mode = overlay
-                                                        alpha = 1
-                                                    }
-                                                    glow = {
-                                                        name = "drop_shadow"
-                                                        glow_radius = 3
-                                                        color = {0.0 0.0 0.0 1.0}
-                                                        alpha = 0.4
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    playset_dlc_list = {
-                                        visible = "[GetVariableSystem.Exists( 'dlcs' )]"
-                                        layoutpolicy_horizontal = expanding
-                                    }
-                
-                                    # MODS
-                                    widget = {
-                                        layoutpolicy_horizontal = expanding
-                                        size = { -1 50}
-                                        using = bg_paper_card
-                            
-                                        using = bg_card_header_01_production
-                                
-                                        card_header_button_01 = {
-                                            size = { 100% 100% }
-                                            tooltipwidget = {BasicFunctionalTooltip = {}}
-                                            action_tooltip = {
-                                                title = "MODS_GUI_SELECT_MODS"
-                                                on_action = "[GetVariableSystem.Toggle( 'local' )]"
-                                            }
-                                            
-                                            hbox = {
-                                                spacing = 5
-                                                margin_left = 5
-                                                margin_right = 5
-        
-                                                widget = {
-                                                    size = { 50 50 }
-                                                    icon = {
-                                                        size = { 42 42 }
-                                                        parentanchor = center
-                                                        texture = "gfx/interface/icons/dlc/dlc_castle.dds"  
-                                                    }
-                                                }
-
-                                                header_button_left = {
-                                                    size = { 26 26 }
-                                                    blockoverride "button_icon_stretch_sprite" {}
-                                                    blockoverride "header_button_frame_inner" {visible = no}
-                                                    blockoverride "header_button_icon_size" { size = { 25 25 } }
-                                                    blockoverride "header_button_text_layout" {}
-                                                    blockoverride "icon_overlay" {}
-                                    
-                                                    blockoverride "icon_texture" {
-                                                        texture = "gfx/interface/icons/dlc/dlc_foldercastle.dds"
-                                                        texture_density = 2
-                                                    }
-                                    
-                                                    tooltipwidget = { BasicFunctionalTooltip = {} }
-                                                    action_tooltip = {
-                                                        click_type = left
-                                                        click_mode = single
-                                                        title = "OPEN_MOD_TOOLS"
-                                                        on_action = "[ToggleOpenModTools]"
-                                                    }
-                                                }
-        
-                                                text_single = {
-                                                    layoutpolicy_horizontal = expanding
-                                                    size = { -1 20 }
-                                                    autoresize = no
-                                                    align = left|nobaseline
-                                                    text = "MODS_GUI_SELECTED_AMOUNT"
-                                                }
-        
-                                                expand = {}
-        
-                                                icon = {
-                                                    visible = "[ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).HasPlaysetIssues]"
-                                                    size = {16 16}
-                                                    using = warning_icon_texture
-                                                    tooltipwidget = {
-                                                        ChecksumErrorTooltip = {
-                                                            blockoverride "checksum_erro_tooltip_text" {
-                                                                text = "[ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).GetPlaysetIssuesDesc]"
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                icon = {
-                                                    visible = "[Not(ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).IsChecksumCompatibilityCalculated)]"
-                                                    size = {16 16}
-                                                    texture = "gfx/interface/icons/mods/calculate.dds"
-                                                }
-                                                    
-                                                AutomationReloadCheckbox = {
-                                                    visible = "[GreaterThan_int32(GetDataModelSize(ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).ModifiableMods), '(int32)0' )]"
-                                                    name = "playset_is_automatically_sorted"
-                                                    size = { 22 22 }
-                                                    action_tooltip = {
-                                                    	title = "[SelectLocalization( ModsGui.ActivePlayset.IsAutomaticallySorted, 'MOD_PLAYSET_IS_AUTOMATICALLY_SORTED_ENABLED', 'MOD_PLAYSET_IS_AUTOMATICALLY_SORTED_DISABLED' )]"
-                                                    	on_action = "[ModsGui.ActivePlayset.ToggleIsAutomaticallySorted]"
-                                                    }
-                                                    tooltipwidget = { BasicFunctionalTooltip = {} }
-                                                    down = "[ModsGui.ActivePlayset.IsAutomaticallySorted]"
-                                                }
-        
-                                                checkbox_square_alt = {
-                                                    size = { 22 22 }
-                                                    enabled = "[And(ModsGui.ActivePlayset.IsEditable, ModsGui.InteractionsAllowed)]"
-                                                    action_tooltip = {
-                                                    	title = "[SelectLocalization( ModsGui.AreAllModsToggled, 'MODS_GUI_REMOVE_ALL_MODS_TO_PLAYSET', 'MODS_GUI_ADD_ALL_MODS_TO_PLAYSET' )]"
-                                                    	on_action = "[ModsGui.ToggleAllMods]"
-                                                    }
-                                                    tooltipwidget = { BasicFunctionalTooltip = {} }
-                                                    down = "[ModsGui.AreAllModsToggled]"
-                                                }
-        
-                                                icon = {
-                                                    visible = "[Not(GetVariableSystem.Exists( 'local' ))]"
-                                                    size = { 22 22 }
-                                                    texture = "gfx/interface/buttons/flats/button_simple_right.dds"
-                                                    using = color_gold
-                                                    modify_texture = {
-                                                        using = overlay_window_texture
-                                                        blend_mode = overlay
-                                                        alpha = 1
-                                                    }
-                                                    glow = {
-                                                        name = "drop_shadow"
-                                                        glow_radius = 3
-                                                        color = {0.0 0.0 0.0 1.0}
-                                                        alpha = 0.4
-                                                    }
-                                                }
-        
-                                                icon = {
-                                                    visible = "[GetVariableSystem.Exists( 'local' )]"
-                                                    size = { 22 22 }
-                                                    texture = "gfx/interface/buttons/flats/button_simple_down.dds"
-                                                    using = color_gold
-                                                    modify_texture = {
-                                                        using = overlay_window_texture
-                                                        blend_mode = overlay
-                                                        alpha = 1
-                                                    }
-                                                    glow = {
-                                                        name = "drop_shadow"
-                                                        glow_radius = 3
-                                                        color = {0.0 0.0 0.0 1.0}
-                                                        alpha = 0.4
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-        
-                                    downloaded_list = {
-                                        visible = "[GetVariableSystem.Exists( 'local' )]"
-                                        layoutpolicy_vertical = expanding
-                                    }
-        
-                                    expand = {}
-                                }
-                            }
-                        }
-
-                        # BOTTOM BUTTONS
                         hbox = {
-                            margin = { 5 10 }
-                            margin_bottom = 20
                             layoutpolicy_horizontal = expanding
-                            button_regular = {
-                                size = {150 30}
-                                text_single = {
-                                    parentanchor = center
-                                    size = {100% 20}
-                                    text = "SAVE"
-                                    align = center
-                                }
-
-                                tooltipwidget = {BasicFunctionalTooltip = {}}
-
-                                action_tooltip = {
-                                    click_type = left
-                                    click_mode = single
-                                    title = "MODS_GUI_SAVE_TT"
-                                    on_action = "[ModsGui.SavePlayset]"
-                                }
-                            }
+                            spacing = 5
+                            margin_bottom = 10
 
                             button_regular = {
-                                size = {150 30}
-                                text_single = {
-                                    parentanchor = center
-                                    size = {100% 20}
-                                    text = "[ModsGui.ApplyText]"
-                                    align = center
-                                }
-
+                                layoutpolicy_horizontal = expanding
+                                size = { -1 30 }
+                                text = "[ModsGui.ApplyText]"
+                                align = center|nobaseline
+                                enabled = "[ModsGui.CanApply]"
                                 tooltipwidget = {BasicFunctionalTooltip = {}}
-
                                 action_tooltip = {
                                     click_type = left
                                     click_mode = single
@@ -2359,7 +2192,202 @@ window = {
                                     on_action = "[ModsGui.DownloadAndApplyChanges]"
                                     enabled = "[ModsGui.CanApply]"
                                 }
-                                enabled = "[ModsGui.CanApply]"
+                            }
+
+                            button_regular = {
+                                layoutpolicy_horizontal = expanding
+                                size = { -1 30 }
+                                text = "MODS_GUI_SAVE"
+                                align = center|nobaseline
+                                enabled = "[ModsGui.HasPendingChanges]"
+                                tooltipwidget = {BasicFunctionalTooltip = {}}
+                                action_tooltip = {
+                                    click_type = left
+                                    click_mode = single
+                                    title = "MODS_GUI_SAVE_TT"
+                                    on_action = "[ModsGui.SavePlayset]"
+                                    enabled = "[ModsGui.HasPendingChanges]"
+                                    conditions = "MODS_GUI_SAVE_NO_CHANGES"
+                                }
+                            }
+
+                            button_regular = {
+                                layoutpolicy_horizontal = expanding
+                                size = { -1 30 }
+                                text = "MODS_GUI_DELETE_PLAYSET"
+                                align = center|nobaseline
+                                enabled = "[And( ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).IsEditable, ModsGui.InteractionsAllowed )]"
+                                tooltipwidget = {BasicFunctionalTooltip = {}}
+                                action_tooltip = {
+                                    click_type = left
+                                    click_mode = single
+                                    title = "MODS_GUI_DELETE_PLAYSET"
+                                    on_action = "[ModsGui.ConfirmDeletePlayset( ModsGui.SelectedPlaysetId )]"
+                                    enabled = "[And( ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).IsEditable, ModsGui.InteractionsAllowed )]"
+                                }
+                            }
+                        }
+
+                        header_secondary_tabs = {
+                            layoutpolicy_horizontal = expanding
+
+                            blockoverride "content" {
+                                button_secondary_tab_alt = {
+                                    using = layoutpolicy_expanding
+                                    blockoverride "tab_text" {
+                                        raw_text = "[Localize('MODS_GUI_TAB_MODS')] ([ModsGui.SelectedPlaysetModCount]/[ModsGui.LocalModCount])"
+                                    }
+                                    tooltipwidget = {BasicFunctionalTooltip = {}}
+                                    action_tooltip = {
+                                        click_type = left
+                                        click_mode = single
+                                        title = "MODS_GUI_TAB_MODS"
+                                        on_action = "[GetVariableSystem.Set( 'mods_tab', 'mods' )]"
+                                    }
+                                    down = "[Not( GetVariableSystem.HasValue( 'mods_tab', 'dlc' ) )]"
+                                }
+
+                                button_secondary_tab_alt = {
+                                    using = layoutpolicy_expanding
+                                    blockoverride "tab_text" {
+                                        raw_text = "[Localize('MODS_GUI_TAB_DLC')] ([ModsGui.SelectedPlaysetActiveDlcCount]/[ModsGui.SelectedPlaysetDlcCount])"
+                                    }
+                                    tooltipwidget = {BasicFunctionalTooltip = {}}
+                                    action_tooltip = {
+                                        click_type = left
+                                        click_mode = single
+                                        title = "MODS_GUI_TAB_DLC"
+                                        on_action = "[GetVariableSystem.Set( 'mods_tab', 'dlc' )]"
+                                    }
+                                    down = "[GetVariableSystem.HasValue( 'mods_tab', 'dlc' )]"
+                                }
+                            }
+                        }
+
+                        vbox = {
+                            using = layoutpolicy_expanding
+                            using = bg_secondary_inner_alt
+                            using = bg_secondary_inner_image_alt
+
+                            margin = {10 0}
+
+                            hbox = {
+                                layoutpolicy_horizontal = expanding
+                                spacing = 7
+                                margin = { 0 10 }
+
+                                hbox = {
+                                    layoutpolicy_horizontal = expanding
+                                    layoutstretchfactor_horizontal = 1
+                                    header_button_left = {
+                                        visible = "[ModsGui.HasExternalInterface]"
+                                        layoutpolicy_horizontal = expanding
+                                        size = { -1 40 }
+                                        blockoverride "icon_overlay" {
+                                            texture = "gfx/interface/logos/steam_logo.dds"
+                                        }
+
+                                        blockoverride "text_top" {
+                                            text = "MODS_GUI_BROWSE_WORKSHOP"
+                                        }
+                                        blockoverride "text_bottom" { visible = no }
+                                        tooltipwidget = {BasicFunctionalTooltip = {}}
+                                        action_tooltip = {
+                                            click_type = left
+                                            click_mode = single
+                                            title = "[ModsGui.BrowseModsTooltip]"
+                                            on_action = "[ModsGui.OpenExternalInterface()]"
+                                        }
+                                    }
+                                }
+
+                                widget = {
+                                    size = { 30 30 }
+                                    AutomationReloadCheckbox = {
+                                        visible = "[Not( GetVariableSystem.HasValue( 'mods_tab', 'dlc' ) )]"
+                                        name = "playset_is_automatically_sorted"
+                                        size = { 100% 100% }
+                                        action_tooltip = {
+                                            title = "[SelectLocalization( ModsGui.ActivePlayset.IsAutomaticallySorted, 'MOD_PLAYSET_IS_AUTOMATICALLY_SORTED_ENABLED', 'MOD_PLAYSET_IS_AUTOMATICALLY_SORTED_DISABLED' )]"
+                                            on_action = "[ModsGui.ActivePlayset.ToggleIsAutomaticallySorted]"
+                                        }
+                                        tooltipwidget = { BasicFunctionalTooltip = {} }
+                                        down = "[ModsGui.ActivePlayset.IsAutomaticallySorted]"
+                                        enabled = "[GreaterThan_int32(GetDataModelSize(ModsGui.GetPlayset( ModsGui.SelectedPlaysetId ).ModifiableMods), '(int32)0' )]"
+                                    }
+                                }
+
+                                hbox = {
+                                    layoutpolicy_horizontal = expanding
+                                    layoutstretchfactor_horizontal = 1
+                                    header_button_right = {
+                                        visible = "[Not( GetVariableSystem.HasValue( 'mods_tab', 'dlc' ) )]"
+                                        layoutpolicy_horizontal = expanding
+                                        layoutstretchfactor_horizontal = 1
+                                        size = { -1 40 }
+                                        blockoverride "icon_overlay" {}
+                                        blockoverride "icon_texture" {
+                                            texture = "gfx/interface/icons/dlc/dlc_foldercastle.dds"
+                                            texture_density = 2
+                                        }
+                                        blockoverride "text_top" {
+                                            text = "OPEN_MOD_TOOLS"
+                                        }
+                                        blockoverride "text_bottom" { visible = no }
+                                        tooltipwidget = { BasicFunctionalTooltip = {} }
+                                        action_tooltip = {
+                                            click_type = left
+                                            click_mode = single
+                                            title = "OPEN_MOD_TOOLS"
+                                            on_action = "[ToggleOpenModTools]"
+                                        }
+                                    }
+                                }
+
+                                icon = {
+                                    visible = "[And( GetVariableSystem.HasValue( 'mods_tab', 'dlc' ), ModsGui.ActivePlayset.HasDLCIssues )]"
+                                    size = {22 22}
+                                    using = warning_icon_texture
+                                    tooltipwidget = {
+                                        ChecksumErrorTooltip = {
+                                            blockoverride "checksum_erro_tooltip_text" {
+                                                text = "[ModsGui.ActivePlayset.GetDLCIssuesDesc]"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            vbox = {
+                                visible = "[Not( GetVariableSystem.HasValue( 'mods_tab', 'dlc' ) )]"
+                                using = layoutpolicy_expanding
+                                spacing = 8
+
+                                editbox_single = {
+                                    name = "mods_search_editbox"
+                                    layoutpolicy_horizontal = expanding
+                                    ontextedited = "[ModsGui.SetSearchString]"
+                                    tooltipwidget = { BasicFunctionalTooltip = {} }
+
+                                    blockoverride "editbox_label" {
+                                        text = "MODS_GUI_SEARCH_PLACEHOLDER"
+                                    }
+                                }
+
+                                downloaded_list = {
+                                    layoutpolicy_vertical = expanding
+                                }
+                            }
+
+                            vbox = {
+                                visible = "[GetVariableSystem.HasValue( 'mods_tab', 'dlc' )]"
+                                using = layoutpolicy_expanding
+
+                                playset_dlc_list = {
+                                    layoutpolicy_horizontal = expanding
+                                }
+
+                                expand = {}
                             }
                         }
                     }

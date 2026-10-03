@@ -1,56 +1,474 @@
 ﻿namespace = flavor_tle
 
-#Fall of Tlemcem
+# War with Morocco: Warning about Fall of Tlemcen
 flavor_tle.1 = {
 	type = country_event
 	title = flavor_tle.1.title
 	desc = flavor_tle.1.desc
 	outcome = neutral
-	fire_only_once = yes
-	
-	illustration_tags = {
-		10 = angry
-		10 = exterior
-	}
-
-	trigger = {
-		tag = TLE
-		character:tle_abu_tashufin = {
-			is_alive = yes
-			is_ruler = yes
-			is_general = no			
-		}
-		scope:target = {
-			NOT = { controller = c:TLE }
-			is_capital = yes
-		}
-	}
 
 	immediate = {
-		event_illustration_estate_effect = { foreground = estate_type:peasants_estate background = estate_type:peasants_estate }
-		capital = {
-			save_scope_as = capital_scope
+		event_illustration_estate_effect = {
+			background = estate_type:burghers_estate
+			foreground = estate_type:nobles_estate
 		}
-		character:tle_abu_tashufin = {
-			save_scope_as = ruler_scope
+		c:MOR = {
+			"war_with_country(c:TLE)" = {
+				set_variable = is_starting_morocco_war
+				save_scope_as = target_war
+			}
+			save_scope_as = mor_scope
+			ruler_or_regent = {
+				save_scope_as = mor_ruler
+			}
 		}
+		c:TLE = {
+			save_scope_as = tle_scope
+			ruler_or_regent = {
+				save_scope_as = tle_ruler
+			}
+		}
+		location:tlemcen = {
+			siege = {
+				save_scope_as = target_siege
+			}
+			save_scope_as = target_location
+		}
+	}
+
+	illustration_tags = {
+		10 = exterior
+		10 = armed
 	}
 
 	option = {
 		name = flavor_tle.1.a
-		historical_option = yes
-		scope:ruler_scope = {
-			every_child = {
-				limit = {
-					is_alive = yes
-					is_adult = yes
-					is_female = no
-					is_general = no
-				}
-				kill_character = this
+		
+		custom_tooltip = tle_morrocan_tlemcen_war
+
+		if = {
+			limit = {
+				this = scope:tle_scope
 			}
-			kill_character = this
+			custom_tooltip = tle_additional_warning
 		}
-		add_stability = stability_severe_penalty
+	}
+}
+
+scripted_effect warn_and_setup_info_about_zayyanid_pretenders = {
+	custom_tooltip = TLE_once_truce_ends_zayyanid_pretenders_tt
+	scope:target_country = {
+		set_variable = {
+			name = zayyanid_pretenders
+			value = root
+		}
+		trigger_event_non_silently = flavor_tle.3 
+	}
+}
+
+# Fall of Tlemcen - MOR
+flavor_tle.2 = {
+	type = country_event
+	title = flavor_tle.2.title
+	desc = flavor_tle.2.desc
+	outcome = positive
+
+	immediate = {
+		event_illustration_estate_effect = {
+			background = estate_type:burghers_estate
+			foreground = estate_type:nobles_estate
+		}
+		c:TLE = {
+			save_scope_as = target_country
+			ruler_or_regent ?= {
+				save_scope_as = tle_ruler
+			}
+		}
+		save_scope_as = from_country
+		ruler_or_regent ?= {
+			save_scope_as = mor_ruler
+		}
+		"war_with_country(c:TLE)" = { 
+			save_scope_as = target_war
+		}
+		dynasty:zayyanid_dynasty = {
+			save_scope_as = target_dynasty
+		}
+	}
+
+	illustration_tags = {
+		10 = armed
+		10 = exterior
+	}
+
+	major = yes
+	major_trigger = {
+		has_presence_in = region:maghreb_region	
+		NAND = { # special event for this scenario to make sure Tlemcen knows
+			this = c:TLE
+			has_local_variable = vassalized_tlemcen 
+		}
+	}
+
+	option = {
+		name = flavor_tle.2.a
+
+		historical_option = yes
+
+		ai_chance = { factor = 50 }
+		
+		if = {
+			limit = {
+				scope:target_war = {
+					is_in_war = root
+					is_in_war = scope:target_country
+				}
+			}
+			set_local_variable = vassalized_tlemcen
+			white_peace = scope:target_war
+			scope:target_country = {
+				make_subject_of = {
+					target = ROOT
+					type = subject_type:fiefdom
+				}
+			}
+
+			drop_antagonism_bomb = {
+				modifier = antagonism_peace_treaty_demands
+				target = scope:target_country.capital
+				value = 50
+			}
+			
+			change_societal_value = {
+				type = belligerent_vs_conciliatory
+				value = societal_value_move_to_left
+			}
+			warn_and_setup_info_about_zayyanid_pretenders = yes
+		}
+	}
+
+	option = {
+		name = flavor_tle.2.b
+
+		ai_chance = { factor = 50 }
+		
+		add_army_tradition = army_tradition_severe_bonus
+	}
+}
+
+# Fall of Tlemcen - TLE  (if the option to vassal was chosen)
+flavor_tle.3 = {
+	type = country_event
+	title = flavor_tle.3.title
+	desc = flavor_tle.3.desc
+	outcome = negative
+
+	illustration_tags = {
+		10 = armed
+		10 = exterior
+	}
+
+	option = {
+		name = flavor_tle.3.a
+		
+		custom_tooltip = TLE_as_per_the_warning
+		show_as_tooltip = {
+			make_subject_of = {
+				target = scope:from_country
+				type = subject_type:fiefdom
+			}
+		}
+	}
+}
+
+scripted_effect morocco_penalties_for_failing_loyalty = {
+	add_government_power = government_power_severe_penalty
+}
+
+# Zayyanid Pretenders: Warning for Morocco
+flavor_tle.4 = {
+	type = country_event
+	title = flavor_tle.4.title
+	desc = flavor_tle.4.desc
+	outcome = neutral
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	option = {
+		name = flavor_tle.4.a
+		
+		custom_tooltip = tle_rules_for_zayyanid_pretenders
+		custom_tooltip = tle_rules_part_two
+		show_as_tooltip = {
+			morocco_penalties_for_failing_loyalty = yes
+		}
+	}
+}
+
+scripted_effect tle_zayyanid_benefits = {
+	scope:from_country = {
+		capital.province = {
+			add_province_modifier = {
+				modifier = tle_zayyanid_tribe_support
+				years = 5
+			}
+		}
+		add_country_modifier = {
+			modifier = tle_support_of_the_tribes
+			years = 5
+		}
+		add_country_modifier = { modifier = parliament_approved_extra_levies years = 3 mode = add_and_extend }  
+	}
+}
+
+# Zayyanid Pretenders: War - TLE
+flavor_tle.5 = {
+	type = country_event
+	title = flavor_tle.5.title
+	desc = flavor_tle.5.desc
+	outcome = positive
+
+	illustration_tags = {
+		10 = armed
+		10 = exterior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = {
+			background = estate_type:tribes_estate
+			foreground = estate_type:nobles_estate
+		}
+		set_new_ruler = scope:target_character
+		ruler = {
+			save_scope_as = target_character
+			dynasty = {
+				save_scope_as = target_dynasty
+			}
+		}
+		overlord = {
+			save_scope_as = target_country
+		}
+		declare_war_with_cb = {
+			target = scope:target_country
+			type = casus_belli:cb_independence_war
+		}
+		"war_with_country(scope:target_country)" = {
+			save_scope_as = target_war
+		}
+		save_scope_as = from_country
+	}
+
+	option = {
+		name = flavor_tle.5.a
+		
+		tle_zayyanid_benefits = yes
+
+		scope:target_country = {
+			trigger_event_non_silently = flavor_tle.6
+		}
+	}
+}
+
+# Zayyanid Pretenders: War - MOR
+flavor_tle.6 = {
+	type = country_event
+	title = flavor_tle.6.title
+	desc = flavor_tle.6.desc
+	outcome = negative
+
+	major = yes
+	major_trigger = {
+		OR = { 
+			has_presence_in = region:iberia_region
+			has_presence_in = region:maghreb_region
+		}
+	}
+
+	illustration_tags = {
+		10 = armed
+		10 = exterior
+	}
+
+	option = {
+		name = flavor_tle.6.a
+		
+		show_as_tooltip = {
+			tle_zayyanid_benefits = yes
+		}
+
+		morocco_penalties_for_failing_loyalty = yes
+	}
+}
+
+# Zayyanid Pretenders: Truce is over
+flavor_tle.7 = {
+	type = country_event
+	title = flavor_tle.7.title
+	desc = flavor_tle.7.desc
+
+	outcome = neutral
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = TLE
+		from = 1337.1.1
+		to = 1370.1.1
+		monthly_chance = 100
+	}
+
+	trigger = {
+		is_subject = yes
+		country_exists = c:MOR
+		overlord ?= c:MOR
+		exists = capital
+		NOT = { has_truce_with = overlord }
+	}
+
+	illustration_tags = {
+		10 = exterior
+		10 = angry
+	}
+
+	immediate = {
+		event_illustration_estate_effect = {
+			background = estate_type:tribes_estate
+			foreground = estate_type:nobles_estate
+		}
+		
+		c:MOR = { 
+			save_scope_as = target_country
+		}
+		save_scope_as = from_country
+		dynasty:zayyanid_dynasty = {
+			save_scope_as = target_dynasty
+		}
+		capital = {
+			save_scope_as = target_location
+		}
+	}
+
+	option = {
+		name = flavor_tle.7.a
+		
+		scope:target_country = {
+			trigger_event_non_silently = flavor_tle.4
+		}
+	}
+
+	after = {
+		trigger_event_silently = {
+			years = 20
+			id = flavor_tle.11
+		}
+	}
+}
+
+flavor_tle.11 = {
+	type = country_event
+	title = flavor_tle.11.title
+	desc = flavor_tle.11.desc
+	outcome = positive
+
+	illustration_tags = {
+		10 = exterior
+		10 = happy
+	}
+
+	option = {
+		name = flavor_tle.11.a
+		
+		custom_tooltip = tle_secured
+	}
+}
+
+# Growth of Oran
+flavor_tle.13 = {
+	type = country_event
+	title = flavor_tle.13.title
+	desc = flavor_tle.13.desc
+	outcome = positive
+
+	fire_only_once = yes
+	dynamic_historical_event = {
+		tag = TLE
+		from = 1337.1.1
+		to = 1821.1.1
+		monthly_chance = 5
+	}
+
+	trigger = {
+		owns = location:oran
+		owns = location:tlemcen
+		location:oran = {
+			any_buildings_in_location = {
+				building_category = naval_category
+			}
+		}
+	}
+
+	illustration_tags = {
+		10 = regular
+		10 = exterior
+	}
+
+	immediate = {
+		event_illustration_estate_effect = {
+			background = estate_type:burghers_estate
+			foreground = estate_type:burghers_estate
+		}
+
+		location:oran = {
+			save_scope_as = target_location
+		}
+
+		location:tlemcen = {
+			save_scope_as = target_location2
+		}
+
+		save_scope_as = target_country
+
+		"estate(estate_type:burghers_estate)" = {
+			save_scope_as = target_estate
+		}
+	}
+
+	option = {
+		name = flavor_tle.13.a
+		
+		ai_chance = {
+			factor = 75
+		}
+
+		change_societal_value = {
+			type = land_vs_naval
+			value = societal_value_move_to_right
+		}
+
+		scope:target_location = {
+			add_location_modifier = {
+				mode = replace
+				years = -1
+				modifier = tle_wehran_privileges
+			}
+		}
+	}
+
+	option = {
+		name = flavor_tle.13.b
+
+		ai_chance = {
+			factor = 25
+		}
+		
+		location:tlemcen = {
+			change_development = development_severe_bonus
+		}
+
+		add_estate_satisfaction = {
+			type = scope:target_estate.estate_type
+			value = estate_satisfaction_severe_penalty
+		}
 	}
 }

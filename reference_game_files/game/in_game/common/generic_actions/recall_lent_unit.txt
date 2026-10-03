@@ -1,5 +1,6 @@
 ﻿recall_lent_unit = {
 	type = owncountry
+	
 
 	potential = {
 		scope:actor = {
@@ -11,17 +12,35 @@
 	}
 
 	ai_tick = monthly
+	ai_tick_frequency = 6
 
-	# Pick which lent unit to recall
+	# Pick which lent unit to recall.
+	# The default mercenary enumeration only surfaces units a country has put up for hire
+	# (_MercenariesForHire); lent units are never added there, so the candidate list must be
+	# built explicitly from the units this country has lent out.
 	select_trigger = {
 		looking_for_a = mercenary
-		source = actor
 		target_flag = lent_merc_target
+		interaction_source_list = {
+			scope:actor = {
+				every_rented_out_mercenary = {
+					limit = {
+						is_lent_unit = yes
+						# Skip embarked units — RecallLentUnit() destroys and recreates the
+						# underlying unit, which would tear the embark link and drown loaded armies.
+						NOT = { is_carrying_or_loaded_unit = yes }
+					}
+					add_to_list = source
+				}
+			}
+		}
+		cache_interaction_source_list = yes
 		name = "recall_lent_unit_choose_unit"
 		none_available_msg_key = "recall_lent_unit_no_units"
 		column = { data = name }
 		visible = {
 			is_lent_unit = yes
+			NOT = { is_carrying_or_loaded_unit = yes }
 		}
 	}
 
@@ -64,7 +83,10 @@
 		# Recall when the lender is under serious threat
 		if = {
 			limit = {
-				scope:actor = { lowest_war_score < -15 }
+				scope:actor = {
+					at_war = yes
+					lowest_war_score < -15
+				}
 			}
 			add = 100
 		}

@@ -1,0 +1,413 @@
+﻿mobilize_the_shurat_action = {
+	type = religious
+	sound = UI_action_religion_generic
+	potential = {
+		scope:actor = {
+			religion = religion:ibadi
+			NOT = {
+				ruler_or_regent = {
+					has_variable = shari_imam
+				}
+			}
+			OR = {
+				has_policy = ibadi_institutionalize_the_shurat_policy
+				has_policy = ibadi_maintain_the_status_of_imam_policy
+			}
+		}
+	}
+	allow = {
+		scope:actor = {
+			is_forced_into_kitman_state = no
+			NOT = { has_policy = ibadi_daif_imam_policy }
+		}
+	}
+
+	cooldown = { 
+		type = mobilize_the_shurat_action
+		years = 10
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	automation_tick = monthly
+	automation_tick_frequency = 6
+	player_automated_category = religiousdoctrines
+
+	price = price:mobilize_the_shurat_price
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+		interaction_source_list = {
+			religion:ibadi = {
+				add_to_list = source
+			}
+		}
+		cache_interaction_source_list = yes
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		interaction_source_list = {
+			scope:actor = {
+				every_neighbor_country = {
+					add_to_list = source
+				}
+			}
+		}
+		source = actor
+		target_flag = target
+		name = "call_jihad_select_country"
+		none_available_msg_key = "call_jihad_no_countries"
+		column = {
+			data = name
+		}
+		column = {
+			data = population
+		}
+		enabled = {
+			scope:actor = { has_discovered = prev.capital }
+			NOR = {
+				religion = scope:actor.religion
+				is_allied_with = { target = scope:actor }
+				is_at_war_with = scope:actor
+				has_truce_with = scope:actor
+				is_subject_of = scope:actor
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = province
+		target_flag = target_province
+		source = target
+		source_flags = border
+		name = "choose_province"
+		none_available_msg_key = "no_provinces_available"
+		column = { data = owner_flag }
+		column = { data = name }
+		column = { data = population }
+		enabled = {
+			any_location_in_province = {
+				is_neighbor_of = scope:actor
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = ruler_or_regent
+				}
+				if = {
+					limit = {
+						has_policy = ibadi_institutionalize_the_shurat_policy
+					}
+					ruler_or_regent = {
+						add_character_modifier = {
+							modifier = imam_al_shari_weak_modifier
+							years = -1
+						}
+						set_variable = shari_imam
+						custom_tooltip = imam_al_shari_weak_reasoning
+					}
+				}
+				else_if = {
+					limit = {
+						has_policy = ibadi_maintain_the_status_of_imam_policy
+					}
+					add_policy = policy:ibadi_shari_imam_policy
+					ruler_or_regent = {
+						set_variable = shari_imam
+					}
+				}
+				else = {
+					error_log = "Unreachable script in mobilize_the_shurat action reached or missing policy behavior"
+				}
+			}
+			add_manpower = {
+				value = "religion_population_in_country(religion:ibadi)"
+				multiply = 0.001
+			}
+			if = {
+				limit = {
+					exists = scope:target
+					exists = scope:target_province
+				}
+				add_casus_belli = { target = scope:target type = casus_belli:cb_deus_vult province = scope:target_province }
+			}
+			else = {
+				custom_tooltip = mobilize_shurat_cb_tt
+			}
+		}
+	}
+	
+	ai_will_do = {
+		value = 0
+		if = {
+			limit = { exists = scope:target }
+			add = {
+				desc = "RELATIVE_STRENGTH"
+				value = "scope:actor.relative_defensive_alliance_strength(scope:target)"
+				multiply = 150
+				subtract = 60
+			}
+
+			add = {
+				value = "scope:actor.conquer_desire(scope:target)"
+				divide = 5
+			}
+		}
+	}
+}
+
+elect_weak_imam = {
+	type = religious
+	sound = UI_action_religion_generic
+	potential = {
+		scope:actor = {
+			religion = religion:ibadi
+		}
+	}
+	allow = {
+		scope:actor = {
+			OR = {
+				has_policy = ibadi_zuhur_imam_policy
+				has_policy = ibadi_shari_imam_policy
+			}
+			country_allows_a_weak_imam = yes
+		}
+	}
+
+	cooldown = { 
+		type = elect_imam
+		years = 2
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	automation_tick = monthly
+	automation_tick_frequency = 6
+	player_automated_category = religiousdoctrines
+
+	price = price:elect_imam_price
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+		interaction_source_list = {
+			religion:ibadi = {
+				add_to_list = source
+			}
+		}
+		cache_interaction_source_list = yes
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		source = actor
+		target_flag = target
+		name = "choose_character"
+		column = {
+			data = character_info
+		}
+		# Let AI pick the char with most mil
+		pre_evaluation_number_to_evaluate_fully = 1
+		pre_evaluation_sort_value = {
+			value = mil
+		}
+		default_sort = mil
+		visible = {
+			is_eligible_heir = scope:actor
+			can_become_weak_imam = { country = scope:actor }
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = scope:target
+				}
+				scope:target = { set_variable = ibadi_elected_via_action } #Prevent on_new_ruler on action from ruining this mechanic
+				set_new_ruler = scope:target
+				on_ibadi_ruler_change = { character = scope:target policy = policy:ibadi_daif_imam_policy has_policy = yes }
+			}
+			else = {
+				add_policy = policy:ibadi_daif_imam_policy
+			}
+			custom_tooltip = ibadi_daif_imam_policy_should_be_removed_by
+		}
+	}
+	ai_will_do = {
+		value = scope:actor.war_exhaustion
+		subtract = 1
+		multiply = 5
+	}
+}
+
+return_to_zuhur_imamate = {
+	type = religious
+	sound = UI_action_religion_generic
+	potential = {
+		scope:actor = {
+			religion = religion:ibadi
+		}
+	}
+	allow = {
+		scope:actor = {
+			has_policy = ibadi_daif_imam_policy
+		}
+	}
+
+	cooldown = { 
+		type = elect_imam
+		years = 2
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 12
+
+	automation_tick = monthly
+	automation_tick_frequency = 6
+	player_automated_category = religiousdoctrines
+
+	price = price:elect_imam_price
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+		interaction_source_list = {
+			religion:ibadi = {
+				add_to_list = source
+			}
+		}
+		cache_interaction_source_list = yes
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		source = actor
+		target_flag = target
+		name = "choose_character"
+		column = {
+			data = character_info
+		}
+		# Let AI pick the char with most adm
+		pre_evaluation_number_to_evaluate_fully = 1
+		pre_evaluation_sort_value = {
+			value = adm
+		}
+		default_sort = adm
+		visible = {
+			is_eligible_heir = scope:actor
+			can_become_strong_imam = { country = scope:actor }
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			if = {
+				limit = {
+					exists = scope:target
+				}
+				scope:target = { set_variable = ibadi_elected_via_action }
+				set_new_ruler = scope:target
+				on_ibadi_ruler_change = { character = scope:target policy = policy:ibadi_zuhur_imam_policy has_policy = yes }
+			}
+			else = {
+				add_policy = policy:ibadi_zuhur_imam_policy
+			}
+		}
+	}
+	
+	ai_will_do = {
+		value = 0
+		# AI is suffering the penalty - have them remove it
+		if = {
+			limit = {
+				scope:actor = {
+					has_variable = weak_imam_penalty
+				}
+			}
+			add = 100
+		}
+	}
+}
+
+legacy_of_rustamids = {
+	type = religious
+	sound = UI_action_religion_generic
+	potential = {
+		scope:actor = {
+			religion = religion:ibadi
+			capital ?= { 
+				region = region:maghreb_region
+			}
+			NOT = { has_country_modifier = rustamid_legacy_modifier }
+		}
+	}
+	allow = {
+		scope:actor = {
+			is_forced_into_kitman_state = no
+			rustamid_legacy_trigger = yes
+			OR = {
+				has_ruler = yes
+				has_heir = yes
+			}
+		}
+	}
+
+	ai_tick = monthly
+	ai_tick_frequency = 60
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+		interaction_source_list = {
+			religion:ibadi = {
+				add_to_list = source
+			}
+		}
+		cache_interaction_source_list = yes
+	}
+
+	effect = {
+		scope:actor = {
+			show_as_tooltip = {
+				rustamid_legacy_effect = yes
+			}
+			custom_tooltip = {
+				text = may_adopt_a_different_color
+				trigger_event_non_silently = ibadi_events.1
+			}
+		}
+	}
+	
+	ai_will_do = {
+		value = 100
+	}
+}

@@ -1,4 +1,83 @@
 types SelectInteractionGovernmentCards {
+	type policy_wrapping_stringpair_list = card_list {
+		ontextcontextchanged = "[SetStringPairListFromTextContext(PdxGuiWidget.AccessSelf)]"
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			margin = { 0 2 }
+
+			datamodel = "[StringPairList.GetRows]"
+			item = {
+				hbox = {
+					layoutpolicy_horizontal = expanding
+
+					background = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						block "bg_color" { using = color_intense_bg_blue_texture }
+						alpha = 0.2
+					}
+
+					text_multi = {
+						layoutpolicy_horizontal = expanding
+						margin = { 10 5 }
+						minimumsize = { -1 30 }
+						autoresize = yes
+						multiline = yes
+						align = left|nobaseline
+						fontsize = 14
+						text = "[StringViewPair.GetLeft.GetStringView][AddTextIf(Not(StringViewPair.GetLeft.IsStringViewNotEmptyOrNull), ' ')]"
+
+						block "policy_search_highlight" {
+							sort_by_highlight = {
+								size = { 100% 100% }
+								name = "effect"
+							}
+						}
+					}
+
+					text_single = {
+						margin = { 10 5 }
+						parentanchor = top
+						autoresize = yes
+						align = right|nobaseline
+						fontsize = 14
+						text = "[StringViewPair.GetRight.GetStringView][AddTextIf(Not(StringViewPair.GetRight.IsStringViewNotEmptyOrNull), ' ')]"
+					}
+				}
+			}
+		}
+	}
+
+	type policy_wrapping_row_list = card_list {
+		ontextcontextchanged = "[SetRowListFromTextContext(PdxGuiWidget.AccessSelf)]"
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			margin = { 0 2 }
+
+			datamodel = "[RowList.GetRows]"
+			item = {
+				text_multi = {
+					visible = "[CPdxStringView.IsStringViewNotEmptyOrNull]"
+					layoutpolicy_horizontal = expanding
+					margin = { 10 5 }
+					align = nobaseline
+					fontsize = 14
+					autoresize = yes
+					max_width = 500
+
+					text = "[CPdxStringView.GetStringView]"
+
+					background = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						block "bg_color" { using = color_intense_bg_blue_texture }
+						alpha = 0.4
+					}
+				}
+			}
+		}
+	}
+
 	type estate_card_header_at_privilege_select = widget {
 		datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('estate').GetEstate]"
 		# block "estate_card_parent_size" {
@@ -127,7 +206,7 @@ types SelectInteractionGovernmentCards {
 			alpha = 0.1
 
 			modify_texture = {
-				texture = "[Law.GetBgCategoryColor]"
+				texture = "[GetLawBgCategoryColor(Law.Self)]"
 				texture_density = 2
 				blend_mode = multiply
 			}
@@ -149,7 +228,7 @@ types SelectInteractionGovernmentCards {
 					spriteBorder = { 0 0 }
 					alpha = 0.5
 					modify_texture = {
-						texture = "[Law.GetBgCategoryColor]"
+						texture = "[GetLawBgCategoryColor(Law.Self)]"
 						texture_density = 2
 						blend_mode = multiply
 					}
@@ -236,11 +315,12 @@ types SelectInteractionGovernmentCards {
 		}
 	}
 
-	type law_card_header_at_policy_select = widget {
+	type law_card_header_at_policy_select = vbox {
 		layoutpolicy_horizontal = expanding
-		size = { -1 55 }
+		set_parent_size_to_minimum = yes
 		datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('law').GetLaw]"
-		
+		spacing = 10
+
 		widget = {
 			layoutpolicy_horizontal = expanding
 			size = { 540 45 }
@@ -260,9 +340,9 @@ types SelectInteractionGovernmentCards {
 							texture_density = 2
 							mirror = horizontal
 						}
-					
+
 						enabled = "[CanSelectPolicyPrevLaw(Law.Self)]"
-					
+
 						action_tooltip = {
 							click_type = left
 							click_mode = single
@@ -277,7 +357,7 @@ types SelectInteractionGovernmentCards {
 						}
 					}
 				}
-				
+
 				law_card_header_common = {}
 
 				widget = {
@@ -292,9 +372,9 @@ types SelectInteractionGovernmentCards {
 							texture = "gfx/interface/buttons/flats/button_simple_right.dds"
 							texture_density = 2
 						}
-					
+
 						enabled = "[CanSelectPolicyNextLaw(Law.Self)]"
-					
+
 						action_tooltip = {
 							click_type = left
 							click_mode = single
@@ -309,6 +389,52 @@ types SelectInteractionGovernmentCards {
 						}
 					}
 				}
+			}
+		}
+
+		# Active policy preview — modifier list for the law's current policy.
+		# Hidden during first-time enactment when the player has no policy yet.
+		vbox = {
+			visible = "[Player.GetGovernment.HasPolicyForLaw(Law.Self)]"
+			layoutpolicy_horizontal = expanding
+			set_parent_size_to_minimum = yes
+			maximumsize = { 540 -1 }
+			margin = { 5 5 }
+			spacing = 8
+			using = bg_paper_card
+
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 5
+				margin = { 5 5 }
+				background = {
+					using = bg_card_header_01_default
+					alpha = 0.5
+					margin = { 4 4 }
+				}
+				using = bg_cabinet_card_frame
+				blockoverride "cabinet_card_frame" { margin = { 5 5 } }
+
+				text_single = {
+					autoresize = yes
+					using = Font_Size_Small
+					default_format = "#yellow_titles"
+					text = "POLICY_PICKER_ACTIVE_HEADER"
+				}
+
+				expand = {}
+			}
+
+			card_block_list = {
+				visible = "[Not(StringIsEmpty(Player.GetGovernment.GetPolicyForLaw(Law.Self).GetModifierText))]"
+				textcontext = "[Player.GetGovernment.GetPolicyForLaw(Law.Self).GetModifierText]"
+				blockoverride "field_highlight" {}
+			}
+
+			card_block_list = {
+				visible = "[Not(StringIsEmpty(Player.GetGovernment.GetPolicyForLaw(Law.Self).GetEffectOnlyText))]"
+				textcontext = "[Player.GetGovernment.GetPolicyForLaw(Law.Self).GetEffectOnlyText]"
+				blockoverride "field_highlight" {}
 			}
 		}
 	}
@@ -543,7 +669,6 @@ types SelectInteractionGovernmentCards {
 								}
 
 								blockoverride "tooltip_content" {
-									datacontext = "[Player]"
 									TooltipTextBlock = {
 										blockoverride "text" {
 											text = "UNIQUE_POLICY_DESC"
@@ -608,31 +733,72 @@ types SelectInteractionGovernmentCards {
 				margin = { 5 5 }
 
 				using = flexible_interaction_target_entry_setup
-				card_stringpair_list = {
+				card_block_list = {
 					visible = "[Not(StringIsEmpty(InteractionTarget.GetPolicy.GetModifierText))]"
 					textcontext =  "[InteractionTarget.GetPolicy.GetModifierText]"
 				}
-				card_row_list = {
+				card_block_list = {
 					visible = "[Not(StringIsEmpty(InteractionTarget.GetPolicy.GetEffectOnlyText))]"
 					textcontext =  "[InteractionTarget.GetPolicy.GetEffectOnlyText]"
+					blockoverride "field_highlight" {}
 				}
 			}
 		}
 	}
 
-	type law_card_header_at_parlaiment_policy_select = widget {
+	type law_card_header_at_parlaiment_policy_select = vbox {
 		layoutpolicy_horizontal = expanding
-		size = { -1 55 }
+		set_parent_size_to_minimum = yes
 		datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('target_law').GetLaw]"
-		
+
 		widget = {
 			layoutpolicy_horizontal = expanding
 			size = { 540 45 }
 
 			hbox = {
 				margin_top = 7
-				
+
 				law_card_header_common = {}
+			}
+		}
+
+		spacing = 10
+		# Active policy preview — modifier list for the law's current policy.
+		# Hidden during first-time enactment when the player has no policy yet.
+		vbox = {
+			visible = "[Player.GetGovernment.HasPolicyForLaw(Law.Self)]"
+			layoutpolicy_horizontal = expanding
+			set_parent_size_to_minimum = yes
+			maximumsize = { 540 -1 }
+			margin = { 5 5 }
+			margin_top = 0
+			spacing = 5
+
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 5
+				margin = { 5 0 }
+
+				text_single = {
+					autoresize = yes
+					using = Font_Size_Small
+					default_format = "#yellow_titles"
+					text = "POLICY_PICKER_ACTIVE_HEADER"
+				}
+
+				expand = {}
+			}
+
+			card_block_list = {
+				visible = "[Not(StringIsEmpty(Player.GetGovernment.GetPolicyForLaw(Law.Self).GetModifierText))]"
+				textcontext = "[Player.GetGovernment.GetPolicyForLaw(Law.Self).GetModifierText]"
+				blockoverride "field_highlight" {}
+			}
+
+			card_block_list = {
+				visible = "[Not(StringIsEmpty(Player.GetGovernment.GetPolicyForLaw(Law.Self).GetEffectOnlyText))]"
+				textcontext = "[Player.GetGovernment.GetPolicyForLaw(Law.Self).GetEffectOnlyText]"
+				blockoverride "field_highlight" {}
 			}
 		}
 	}

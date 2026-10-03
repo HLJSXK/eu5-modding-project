@@ -1,4 +1,4 @@
-@topbar_decoration_width = 50
+﻿@topbar_decoration_width = 50
 @topbar_inner_vertical_margin = 3
 @mapselector_width = 670
 @mapselector_height = 85
@@ -58,8 +58,8 @@ template mapmode_slot_tooltip {
 				lowpriotextcontext = "[MapMode.GetTooltip]"
 				ontextcontextchanged = "[SetTitleDescTooltipFromTextContext(PdxGuiWidget.AccessSelf)]"
 				
-				TooltipListScrollArea = {
-					blockoverride "scrollarea_content" {
+				TooltipScrolledContentSection = {
+					blockoverride "section_content" {
 						hbox = {
 							set_parent_dimension_to_minimum = height
 							layoutpolicy_horizontal = expanding
@@ -543,6 +543,8 @@ template bg_mapmenu_tab {
 			using = color_black_texture
 			blend_mode = normal
 		}
+
+		block "bg_mapmenu_texture_setup" {}
 	}
 
 	background = {
@@ -557,6 +559,8 @@ template bg_mapmenu_tab {
 
 		using = overlay_window
 		using = overlay_leather
+
+		block "bg_mapmenu_texture_setup" {}
 	}
 
 	background = {
@@ -565,6 +569,8 @@ template bg_mapmenu_tab {
 		spriteType = Corneredstretched
 		spriteborder = { 50 0 }
 		alpha = 0.1
+
+		block "bg_mapmenu_texture_setup" {}
 	}
 
 	background = {
@@ -580,6 +586,8 @@ template bg_mapmenu_tab {
 			spriteborder = { 50 0 }
 			blend_mode = alphamultiply
 		}
+
+		block "bg_mapmenu_texture_setup" {}
 	}
 
 	background = {
@@ -597,13 +605,14 @@ template bg_mapmenu_tab {
 			spriteborder = { 50 0 }
 			blend_mode = alphamultiply
 		}
+
+		block "bg_mapmenu_texture_setup" {}
 	}
 }
 
 template button_mapmode_actions {
 	visible = "[CanChangeMapMode]"
 	input_action = "[MapMode.GetInputAction]"
-	use_global_input_instance = yes
 
 	action_tooltip = {
 		click_type = left
@@ -838,7 +847,7 @@ types BottomTypes
 		}
 
 		modify_texture = {
-			visible = "[MapMode.IsSet]"
+			visible = "[And(MapMode.IsSet, MapMode.IsNotRoadBuilder)]"
 			using = color_white_texture
 			alpha = 0.5
 			blend_mode = overlay
@@ -977,10 +986,7 @@ types BottomTypes
 					}
 				}
 				
-				texture = "gfx/interface/buttons/map_modes/banner.dds"
-				texture_density = 2
-				spriteType = Corneredstretched
-				spriteborder = { 10 10 }
+				using = bg_map_banner_texture
 				using = mapmode_color
 
 				glow = {
@@ -991,10 +997,7 @@ types BottomTypes
 				}
 				icon = {
 					size = { 100% 100% }
-					texture = "gfx/interface/buttons/map_modes/banner_frame.dds"
-					texture_density = 2
-					spriteType = Corneredstretched
-					spriteborder = { 10 10 }
+					using = bg_map_banner_frame_texture
 				}
 			}
 		}
@@ -1089,10 +1092,7 @@ types BottomTypes
 				}
 			}
 
-			texture = "gfx/interface/buttons/map_modes/banner.dds"
-			texture_density = 2
-			spriteType = Corneredstretched
-			spriteborder = { 10 10 }
+			using = bg_map_banner_texture
 
 			using = mapmode_color
 			blockoverride "mapmode_color_modify_texture_setup" {
@@ -1107,10 +1107,7 @@ types BottomTypes
 			}
 			icon = {
 				size = { 100% 100% }
-				texture = "gfx/interface/buttons/map_modes/banner_frame.dds"
-				texture_density = 2
-				spriteType = Corneredstretched
-				spriteborder = { 10 10 }
+				using = bg_map_banner_frame_texture
 			}
 		}
 
@@ -1255,6 +1252,7 @@ types BottomTypes
 		}
 
 		icon = {
+			visible = "[HasMapColorLedger]"
 			size = { 100% 100% }
 			position = { 2 0 }
 			parentanchor = vcenter|left
@@ -1433,16 +1431,16 @@ types BottomTypes
 			spacing = 5
 
 			icon = {
-				visible = "[MapColorLedger.HasIcon]"
-				size = { 18 18 }
-				texture = "[MapColorLedger.GetIcon]"
-			}
-
-			icon = {
 				texture = "gfx/interface/pie_charts/piechart_legend.dds"
 				texture_density = 2
 				size = { 18 18 }
 				color = "[MapColorLedger.GetColor]"
+			}
+
+			icon = {
+				visible = "[MapColorLedger.HasIcon]"
+				size = { 18 18 }
+				texture = "[MapColorLedger.GetIcon]"
 			}
 
 			text_single = {
@@ -1460,6 +1458,12 @@ types BottomTypes
 		min_height = "[Min_int32('(int32)300', Add_int32('(int32)84', Multiply_int32(GetDataModelSize(GetMapColorLedger), '(int32)33')))]"
 		using = bg_paper_card
 		datacontext = "[GetMapColorLedgerSearchBar]"
+
+		state = {
+			name = _show
+			duration = 0
+			on_start = "[SearchBar.ClearTextFilter(PdxGuiWidget.FindChild('searchbar_editbox'))]"
+		}
 
 		vbox = {
 			using = layoutpolicy_expanding
@@ -1703,7 +1707,6 @@ types BottomTypes
 								{
 									visible = "[CanChangeMapMode]"
 									input_action = "[MapModeSlot.GetInputAction]"
-									use_global_input_instance = yes
 								
 									action_tooltip = {
 										click_type = left
@@ -2190,7 +2193,6 @@ types BottomTypes
 					onclick = "[MapModeSelectorVars.Clear('tab')]"
 					tooltip_enabled = no
 
-					use_global_input_instance = yes
 					on_input_action_shortcut = "[MapModeSelectorVars.Toggle('action')]"
 					on_input_action_shortcut = "[MapModeSelectorVars.SetOrToggle('tab', 'search')]"
 					input_action = "mapmode_menu"

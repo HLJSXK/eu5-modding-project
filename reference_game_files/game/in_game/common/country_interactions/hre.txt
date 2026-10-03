@@ -11,6 +11,21 @@ bestow_elector_status = {
 		}
 	}
 
+	ai_prerequisite_after_potential = {
+		international_organization:hre = {
+			OR = {
+				num_countries_with_special_status = {
+					type = special_status:elector
+					value < "max_countries_with_special_status(special_status:elector)"
+				}
+				num_countries_with_special_status = {
+					type = special_status:archbishop_elector
+					value < "max_countries_with_special_status(special_status:archbishop_elector)"
+				}
+			}
+		}
+	}
+
 	allow = {
 	}	
 
@@ -18,8 +33,9 @@ bestow_elector_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -82,35 +98,7 @@ bestow_elector_status = {
 	}
 
 	effect = {
-		international_organization:hre = {
-			if = {
-				limit = { 
-					special_status_can_be_bestowed = {
-						type = special_status:elector
-						country = scope:recipient
-					}
-				}
-				international_organization_add_special_status = {
-					type = special_status:elector
-					country = scope:recipient
-				}
-			}
-			if = {
-				limit = { 
-					special_status_can_be_bestowed = {
-						type = special_status:archbishop_elector
-						country = scope:recipient
-					}
-				}
-				international_organization_add_special_status = {
-					type = special_status:archbishop_elector
-					country = scope:recipient
-				}
-			}
-		}
-		scope:recipient = {
-			add_opinion = { target = scope:actor modifier = opinion_granted_electorship }
-		}
+		hre_grant_elector_role = { country = scope:recipient }
 	}
 	ai_will_do = {
 		add = {
@@ -138,8 +126,9 @@ rescind_elector_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			international_organization:hre = {
@@ -236,6 +225,21 @@ request_elector_status = {
 		}
 	}
 
+	terminate_pending_offers_if = {
+		international_organization:hre = {
+			OR = {
+				AND = {
+					special_status_can_be_bestowed = { type = special_status:elector country = scope:actor }
+					num_countries_with_special_status = { type = special_status:elector value >= "max_countries_with_special_status(special_status:elector)" }
+				}
+				AND = {
+					special_status_can_be_bestowed = { type = special_status:archbishop_elector country = scope:actor }
+					num_countries_with_special_status = { type = special_status:elector value >= "max_countries_with_special_status(special_status:archbishop_elector)" }
+				}
+			}
+		}
+	}
+
 	allow = {
 		international_organization:hre = {
 			OR = {
@@ -261,8 +265,9 @@ request_elector_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -272,35 +277,7 @@ request_elector_status = {
 	}
 
 	effect = {
-		international_organization:hre = {
-			if = {
-				limit = { 
-					special_status_can_be_bestowed = {
-						type = special_status:elector
-						country = scope:actor
-					}
-				}
-				international_organization_add_special_status = {
-					type = special_status:elector
-					country = scope:actor
-				}
-			}
-			if = {
-				limit = { 
-					special_status_can_be_bestowed = {
-						type = special_status:archbishop_elector
-						country = scope:actor
-					}
-				}
-				international_organization_add_special_status = {
-					type = special_status:archbishop_elector
-					country = scope:actor
-				}
-			}
-		}
-		scope:actor = {
-			add_opinion = { target = scope:recipient modifier = opinion_granted_electorship }
-		}
+		hre_grant_elector_role = { country = scope:actor }
 	}
 	ai_will_do = {
 		add = {
@@ -523,8 +500,9 @@ bestow_free_city_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -677,8 +655,17 @@ rescind_free_city_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
+		}
+		ai_interaction_source_list = {
+			international_organization:hre = {
+				every_country_with_special_status_of_type = {
+					type = free_city
+					add_to_list = source
+				}
+			}
 		}
 		visible = {
 			international_organization:hre = {
@@ -746,8 +733,9 @@ request_free_city_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -861,8 +849,9 @@ bestow_kingdom_title = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -871,7 +860,13 @@ bestow_kingdom_title = {
 			is_subject = no
 			OR = {
 				NOT = { has_global_variable_map = hre_kingdoms_map }
-				NOT = { is_value_in_global_variable_map = { name = hre_kingdoms_map target = root } }
+				# TODO: test in game, was is_value_in_global_variable_map (trigger never existed in engine, silently evaluated false) [SD]
+				NOT = {
+					any_key_in_global_variable_map = {
+						variable = hre_kingdoms_map
+						"global_variable_map(hre_kingdoms_map|this)" = root
+					}
+				}
 			}
 		}
         enabled = {
@@ -894,7 +889,13 @@ bestow_kingdom_title = {
 		visible = {
 			OR = {
 				NOT = { has_global_variable_map = hre_kingdoms_map }
-				NOT = { is_key_in_global_variable_map = { name = hre_kingdoms_map target = root } }
+				# TODO: test in game, was is_key_in_global_variable_map (trigger never existed in engine, silently evaluated false) [SD]
+				NOT = {
+					any_key_in_global_variable_map = {
+						variable = hre_kingdoms_map
+						this = root
+					}
+				}
 			}
 			scope:recipient.capital = { is_in_scripted_geography = root }
 		}
@@ -933,7 +934,13 @@ request_kingdom_title = {
 			is_subject = no
 			OR = {
 				NOT = { has_global_variable_map = hre_kingdoms_map }
-				NOT = { is_value_in_global_variable_map = { name = hre_kingdoms_map target = scope:actor } }
+				# TODO: test in game, was is_value_in_global_variable_map (trigger never existed in engine, silently evaluated false) [SD]
+				NOT = {
+					any_key_in_global_variable_map = {
+						variable = hre_kingdoms_map
+						"global_variable_map(hre_kingdoms_map|this)" = scope:actor
+					}
+				}
 			}
 		}
 	}
@@ -949,8 +956,9 @@ request_kingdom_title = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -976,7 +984,13 @@ request_kingdom_title = {
 		visible = {
 			OR = {
 				NOT = { has_global_variable_map = hre_kingdoms_map }
-				NOT = { is_key_in_global_variable_map = { name = hre_kingdoms_map target = root } }
+				# TODO: test in game, was is_key_in_global_variable_map (trigger never existed in engine, silently evaluated false) [SD]
+				NOT = {
+					any_key_in_global_variable_map = {
+						variable = hre_kingdoms_map
+						this = root
+					}
+				}
 			}
 			scope:actor.capital = { is_in_scripted_geography = root }
 		}
@@ -1084,12 +1098,8 @@ request_kingdom_title = {
 			}
 		}
 		add = {
-			desc = "OUR_OPINION_TOOLTIP"
-			value = "scope:actor.opinion(scope:actor)"
-		}
-		add = {
 			desc = "THEIR_OPINION_TOOLTIP"
-			value = "scope:actor.opinion(scope:recipient)"
+			value = "scope:recipient.opinion(scope:actor)"
 		}
 		if = {
 			limit = { scope:actor.culture.language = scope:recipient.culture.language }
@@ -1130,8 +1140,9 @@ ask_for_dukedom = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -1231,8 +1242,9 @@ elevate_county = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -1289,8 +1301,9 @@ request_county_privileges = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -1454,8 +1467,9 @@ grant_county_privileges = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -1548,8 +1562,9 @@ enforce_landfriede = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -1573,12 +1588,12 @@ enforce_landfriede = {
 		target_flag = target
 		name = "enforce_landfriede_select_title"
 		none_available_msg_key = "enforce_landfriede_no_wars"
-		default_sort = select_target_acceptance_total
+		default_sort = select_target_acceptance_frame
 		column = {
 			data = name
 		}
 		column = {
-			data = select_target_acceptance_total
+			data = select_target_acceptance_frame
 		}
 		visible = {
 			attacker_leader = scope:recipient
@@ -1774,8 +1789,9 @@ enforce_religious_unity = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -1949,8 +1965,9 @@ demand_unlawful_territory = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_subject = no
@@ -2091,12 +2108,6 @@ demand_unlawful_territory = {
 							save_scope_as = target_country
 						}
 						change_location_owner = previous_owner
-						hidden_effect = {
-							if = {
-								limit = { integration_level = conquered }
-								change_integration_level = integrated
-							}
-						}
 					}
 					else_if = {
 						limit = {
@@ -2121,12 +2132,6 @@ demand_unlawful_territory = {
 							save_scope_as = target_country
 						}
 						change_location_owner = scope:target_country
-						hidden_effect = {
-							if = {
-								limit = { integration_level = conquered }
-								change_integration_level = integrated
-							}
-						}
 					}
 					else = {
 						hidden_effect = {
@@ -2175,12 +2180,6 @@ demand_unlawful_territory = {
 						limit = { owner != scope:target_country }
 						list = hre_locations_to_give_away
 						change_location_owner = scope:target_country
-						hidden_effect = {
-							if = {
-								limit = { integration_level = conquered }
-								change_integration_level = integrated
-							}
-						}
 					}
 				}
 				scope:target_country = {
@@ -2383,8 +2382,9 @@ ask_to_vote_for_me_as_emperor = {
 			}
 		}
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_elector = yes
@@ -2581,8 +2581,9 @@ bribe_elector_to_vote_for_candidate = {
 			}
 		}
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_elector = yes
@@ -2721,8 +2722,9 @@ bolster_imperial_army = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -2743,12 +2745,12 @@ bolster_imperial_army = {
 		target_flag = target
 		name = "bolster_imperial_army_select_title"
 		none_available_msg_key = "bolster_imperial_army_no_wars"
-		default_sort = select_target_acceptance_total
+		default_sort = select_target_acceptance_frame
 		column = {
 			data = name
 		}
 		column = {
-			data = select_target_acceptance_total
+			data = select_target_acceptance_frame
 		}
 		visible = {
 			NOT = {
@@ -2964,8 +2966,9 @@ bestow_legatus_natus_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -3122,8 +3125,17 @@ rescind_legatus_natus_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
+		}
+		ai_interaction_source_list = {
+			international_organization:hre = {
+				every_country_with_special_status_of_type = {
+					type = legatus_natus
+					add_to_list = source
+				}
+			}
 		}
 		visible = {
 			international_organization:hre = {
@@ -3198,8 +3210,9 @@ request_legatus_natus_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -3315,8 +3328,9 @@ bestow_primas_germaniae_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_member_of_international_organization = international_organization:hre
@@ -3445,8 +3459,17 @@ rescind_primas_germaniae_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
+		}
+		ai_interaction_source_list = {
+			international_organization:hre = {
+				every_country_with_special_status_of_type = {
+					type = primas_germaniae
+					add_to_list = source
+				}
+			}
 		}
 		visible = {
 			international_organization:hre = {
@@ -3515,8 +3538,9 @@ request_primas_germaniae_status = {
 		looking_for_a = country
 		target_flag = recipient
 		name = "choose_country"
+		default_sort = will
 		column = {
-			data = name
+			data = country_diplomacy_info
 		}
 		visible = {
 			is_emperor = yes
@@ -3604,6 +3628,114 @@ request_primas_germaniae_status = {
 					type = ai_spam_protection_request_primas_germaniae_status
 					years = 5
 				}
+			}
+		}
+	}
+}
+
+remove_location_from_hre = {
+	type = diplomacy
+	category = CATEGORY_HRE_ACTIONS
+
+	ai_tick = monthly
+	ai_limit_per_check = 1
+
+	potential = {
+		scope:actor = {
+			is_emperor = yes
+		}
+	}
+
+	allow = {
+		exists = international_organization:hre
+	}
+
+	select_trigger = {
+		looking_for_a = country
+		target_flag = recipient
+		name = "choose_country"
+		default_sort = name
+		column = {
+			data = country_diplomacy_info
+		}
+		visible = {
+			NOT = {
+				is_member_of_international_organization = international_organization:hre
+			}
+			any_owned_location = {
+				is_owned_by_international_organization = international_organization:hre
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		source = recipient
+		target_flag = target
+		source_flags = only_actual_locations
+		name = "remove_location_from_international_organization_select_location"
+		none_available_msg_key = "remove_location_from_international_organization_no_locations"
+		column = {
+			data = name
+		}
+		visible = {
+			is_owned_by_international_organization = international_organization:hre
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+			}
+			international_organization:hre = {
+				remove_location_from_international_organization = scope:target
+			}
+			change_imperial_authority = {
+				value = imperial_authority_very_weak_penalty
+			}
+		}
+		else = {
+			custom_tooltip = remove_location_from_international_organization_tt
+		}
+	}
+
+	ai_will_do = {
+		add = {
+			desc = "VOTE_BASE_VALUE"
+			value = 100
+		}
+		# Emperor should remove land from people they like
+		add = {
+			desc = "OUR_OPINION_TOOLTIP"
+			value = "scope:actor.opinion(scope:recipient)"
+			multiply = 0.2
+		}
+		
+		# The Emperor should not want to remove land for someone who is overly aggressive against the HRE
+		add = {
+			value = "scope:actor.antagonism(scope:recipient)"
+			multiply = -10
+		}
+		if = {
+			limit = {
+				scope:actor = { opinion = { target = scope:recipient value > 50 } }
+			}
+			subtract = {
+				desc = "THEIR_OPINION_TOOLTIP"
+				value = "scope:recipient.opinion(scope:actor)"
+			}
+		}
+		if = {
+			limit = {
+				OR = {
+					scope:target.region = region:north_german_region
+					scope:target.region = region:south_german_region
+				}
+			}
+			add = {
+				desc = "HRE_CORE_TERRITORY"
+				value = -75
 			}
 		}
 	}

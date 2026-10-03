@@ -20,3 +20,4 @@
 # - country_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to whole countries
 # - province_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to provinces
 # - location_modifier: <scaled and triggered modifier (scale = script for the scale, potential_trigger = trigger for if the modifier applies)> which is applied to locations
+# - ai_will_do: <script value> adds a bonus / penalty to the gov reform for the AI to take. The ai will try to remove gov reforms with a negative ai will do

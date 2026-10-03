@@ -24,8 +24,22 @@ types OrganizationPanel
 						}
 
 						icon = {
+							visible = "[Not(InternationalOrganization.MakeScope.GetVariable('iberian_union_active').IsSet)]"
 							size = {30 30}
 							texture = "[InternationalOrganization.GetIcon]"
+							texture_density = 2
+							glow = {
+								name = "drop_shadow"
+								glow_radius = 3
+								color = {0.0 0.0 0.0 1.0}
+								alpha = 0.3
+							}
+						}
+
+						icon = {
+							visible = "[InternationalOrganization.MakeScope.GetVariable('iberian_union_active').IsSet]"
+							size = {30 30}
+							texture = "[InternationalOrganization.GetIberianUnionCenterArt]"
 							texture_density = 2
 							glow = {
 								name = "drop_shadow"
@@ -216,7 +230,9 @@ types OrganizationPanel
 							}
 
 							blockoverride "tab_text"{
-								text = "OVERVIEW"
+								block "organization_overview_tab_text" {
+									text = "OVERVIEW"
+								}
 							}
 							tooltipwidget = {
 								using = SubTabIOOverviewTooltip
@@ -240,9 +256,11 @@ types OrganizationPanel
 							tooltipwidget = {
 								using = SubTabIOTreasuryTooltip
 							}
-							action_tooltip = {
-								title = "OPEN_TAB"
-								on_action = "[InternationalOrganizationsView.Vars.Set( 'organizations', 'treasury' )]"
+							block "organization_treasury_tab_action_tooltip" {
+								action_tooltip = {
+									title = "OPEN_TAB"
+									on_action = "[InternationalOrganizationsView.Vars.Set( 'organizations', 'treasury' )]"
+								}
 							}
 							down = "[InternationalOrganizationsView.Vars.HasValue( 'organizations', 'treasury' )]"
 						}
@@ -438,10 +456,13 @@ types OrganizationPanel
 							block "organization_custom_tab_tooltip" {
 								tooltip_enabled = no
 							}
-							# block "organization_custom_tab_click" {
-								onclick = "[InternationalOrganizationsView.Vars.Set( 'organizations', 'custom' )]"
-								down = "[InternationalOrganizationsView.Vars.HasValue( 'organizations', 'custom' )]"
-							# }
+							block "organization_custom_tab_action_tooltip" {
+								action_tooltip = {
+									title = "OPEN_TAB"
+									on_action = "[InternationalOrganizationsView.Vars.Set( 'organizations', 'custom' )]"
+								}
+							}
+							down = "[InternationalOrganizationsView.Vars.HasValue( 'organizations', 'custom' )]"
 						}
 						
 						button_secondary_tab_alt = {
@@ -653,7 +674,39 @@ types OrganizationPanel
 					window_bottom_paper_template = {}
 				}
 			}
-			lateralview_topbuttons = {}
+			lateralview_topbuttons = {
+				# RULING HISTORY
+				blockoverride "topbuttons_extra_left" {
+					widget = {
+						parentanchor = left|vcenter
+						position = { 30 0 }
+						size = { 40 40 }
+						allow_outside = yes
+
+						button = {
+							parentanchor = vcenter
+							size = { 25 25 }
+							datacontext = "[InternationalOrganizationsView.GetInternationalOrganization]"
+							visible = "[ShouldShowRulingHistoryForInternationalOrganization(InternationalOrganizationsView.GetInternationalOrganization.Self)]"
+
+							texture = "gfx/interface/buttons/flats/rulinghistory.dds"
+							texture_density = 2
+
+							background = {
+								using = bg_button_light_round_texture
+								modify_texture = { using = color_dark_blue_texture }
+							}
+							using = ui_direction_button_overlay
+
+							action_tooltip = {
+								title = "RULING_HISTORY_INTERNATIONAL_ORGANIZATION_SIDEMENU"
+								on_action = "[ShowRulingHistoryForInternationalOrganization(InternationalOrganizationsView.GetInternationalOrganization.Self)]"
+							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+						}
+					}
+				}
+			}
 			# }
 		}
 
@@ -662,6 +715,10 @@ types OrganizationPanel
 			name = "io_subheader_select_menu"
 		}
 		blockoverride "close_on_action" { on_action = "[IoSubheaderSelectMenu.OnClose]" }
+		blockoverride "select_header_text" {
+			text = "LAWS"
+		}
+
 		blockoverride "select_content" {
 			minimumsize = { 350 -1 }
 			spacing = 0
@@ -718,23 +775,21 @@ types OrganizationPanel
 						vbox = {
 							layoutpolicy_horizontal = expanding
 	
-							card_list_action_button = {
+							button = {
 								layoutpolicy_horizontal = expanding
 								size = { -1 44 }
 								visible = "[Not(StringIsEmpty(ResolutionGlue.GetEnactResolution.GetKey))]"
-								blockoverride "texture" {
-									gfxtype = framedbuttongfx
-									effectname = "NoHighlight"
-									upframe = 1
-									overframe = 2
-									downframe = 3
-									disableframe = 4
-									texture = "gfx/interface/buttons/list_card_button.dds"
-									frame_grid = {4 1}
-									spriteType = Corneredstretched
-									spriteborder = { 0 0 }
-									texture_density = 2
-								}
+								gfxtype = framedbuttongfx
+								effectname = "NoHighlight"
+								upframe = 1
+								overframe = 2
+								downframe = 3
+								disableframe = 4
+								texture = "gfx/interface/buttons/list_card_button.dds"
+								frame_grid = {4 1}
+								spriteType = Corneredstretched
+								spriteborder = { 0 0 }
+								texture_density = 2
 								icon = {
 									ignore_layout = yes
 									size = {99% 97%}
@@ -752,24 +807,24 @@ types OrganizationPanel
 										blend_mode = multiply
 									}
 								}
-								block "law_action_button_setup" {
-									enabled = "[UIAction.IsEnabled]"
+								enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+								datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
+								scripted_action_tooltip = {
+									click_type = left
+									click_mode = single
+									action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
 									proposer = "[ResolutionGlue.GetProposer]"
 									actor = "[IoSubheaderSelectMenu.Parent.GetPlayer]"
-									left_action = {
-										action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
-										parameter = {
-											parameter_name = "recipient"
-											parameter_value = "[IoSubheaderSelectMenu.Parent.GetInternationalOrganization]"
-										}
-										parameter = {
-											parameter_name = "target"
-											parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
-										}
+									parameter = {
+										parameter_name = "recipient"
+										parameter_value = "[IoSubheaderSelectMenu.Parent.GetInternationalOrganization]"
 									}
-									datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
-									tooltipwidget = { using = IO_Law_tooltip }
+									parameter = {
+										parameter_name = "target"
+										parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+									}
 								}
+								tooltipwidget = { using = IO_Law_tooltip }
 								hbox = {
 									margin = { 4 0 }
 									spacing = 10
@@ -866,7 +921,22 @@ types OrganizationPanel
 												alpha = 0.7
 												margin = { 10 10 }
 											}
-											header_action_button_left = {
+											background = {
+												visible = "[And(IoSubheaderSelectMenu.Parent.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), ObjectsEqual(IoSubheaderSelectMenu.Parent.GetInternationalOrganization.GetPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), Policy.Self))]"
+												texture = "gfx/interface/component_effects/effect_tutorial_highlight.dds"
+												texture_density = 2
+												spriteType = Corneredtiled
+												spriteborder = { 15 15 }
+												margin = { 7 7 }
+												alpha = 0.8
+
+												modify_texture = {
+													using = color_yellow_texture
+													blend_mode = add
+													alpha = 0.3
+												}
+											}
+											header_action_button_left_uber = {
 												size = { 100% 100% }
 												blockoverride "icon_overlay"{}
 												blockoverride "button_icon_stretch_sprite" {}
@@ -878,23 +948,26 @@ types OrganizationPanel
 													texture_density = 2
 												}
 												title = "[Policy.GetNameWithNoTooltip]"
-												actor = "[IoSubheaderSelectMenu.Parent.GetPlayer]"
-												enabled = "[UIAction.IsEnabled]"
-												proposer = "[ResolutionGlue.GetProposer]"
-												parameter = {
-													parameter_name = "recipient"
-													parameter_value = "[IoSubheaderSelectMenu.Parent.GetInternationalOrganization]"
-												}
-												parameter = {
-													parameter_name = "target"
-													parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
-												}
-												parameter = {
-													parameter_name = "vote"
-													parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetPolicyAtIndex(PdxGuiWidget.GetIndexInDataModel)]"
-												}
-												left_click_and_hold_action = {
+												button_tooltip_override = { title = "[Policy.GetNameWithNoTooltip]" }
+												enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+												scripted_action_tooltip = {
+													click_type = left
+													click_mode = single
 													action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+													proposer = "[ResolutionGlue.GetProposer]"
+													actor = "[IoSubheaderSelectMenu.Parent.GetPlayer]"
+													parameter = {
+														parameter_name = "recipient"
+														parameter_value = "[IoSubheaderSelectMenu.Parent.GetInternationalOrganization]"
+													}
+													parameter = {
+														parameter_name = "target"
+														parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+													}
+													parameter = {
+														parameter_name = "vote"
+														parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetPolicyAtIndex(PdxGuiWidget.GetIndexInDataModel)]"
+													}
 												}
 												tooltipwidget = {
 													using = action_tooltip_pop_out
@@ -909,8 +982,7 @@ types OrganizationPanel
 															blockoverride "block_title" {
 																text = "game_concept_effects"
 															}
-															visible = "[ConditionList.HasItems]"
-															datacontext = "[StringToConditionListOnlyPassedAndNeutral(UIAction.GetEffects)]"
+															visible = no
 														}
 														TooltipStringPairList = {
 															visible = "[Not(StringIsEmpty(Policy.GetModifierTextFor(IoSubheaderSelectMenu.Parent.GetPlayer.Self)))]"
@@ -919,7 +991,8 @@ types OrganizationPanel
 															}
 															textcontext = "[Policy.GetModifierTextFor(IoSubheaderSelectMenu.Parent.GetPlayer.Self)]"
 														}
-														TooltipRowList = {
+														TooltipScrolledRowList = {
+															blockoverride "block_scrollarea" { maximumsize = { -1 250 }}
 															visible = "[Not(StringIsEmpty(Policy.GetEffectOnlyText))]"
 															blockoverride "rowlist_footer_visibility" {
 																visible = no
@@ -1144,22 +1217,21 @@ types OrganizationPanel
 									widget = {
 										layoutpolicy_horizontal = expanding
 										size = { -1 40 }
-										card_list_action_button = {
+										button = {
 											size = { 96% 100% }
+											parentanchor = center
 											visible = "[Not(StringIsEmpty(ResolutionGlue.GetEnactResolution.GetKey))]"
-											blockoverride "texture" {
-												gfxtype = framedbuttongfx
-												effectname = "NoHighlight"
-												upframe = 1
-												overframe = 2
-												downframe = 3
-												disableframe = 4
-												texture = "gfx/interface/buttons/list_card_button.dds"
-												frame_grid = {4 1}
-												spriteType = Corneredstretched
-												spriteborder = { 0 0 }
-												texture_density = 2
-											}
+											gfxtype = framedbuttongfx
+											effectname = "NoHighlight"
+											upframe = 1
+											overframe = 2
+											downframe = 3
+											disableframe = 4
+											texture = "gfx/interface/buttons/list_card_button.dds"
+											frame_grid = {4 1}
+											spriteType = Corneredstretched
+											spriteborder = { 0 0 }
+											texture_density = 2
 											icon = {
 												ignore_layout = yes
 												size = {99% 97%}
@@ -1178,11 +1250,13 @@ types OrganizationPanel
 												}
 											}
 											title = "[Policy.GetNameWithNoTooltip]"
-											enabled = "[UIAction.IsEnabled]"
-											proposer = "[ResolutionGlue.GetProposer]"
-											actor = "[IoSubheaderSelectMenu.Parent.GetPlayer]"
-											left_click_and_hold_action = {
+											enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+											scripted_action_tooltip = {
+												click_type = left
+												click_mode = single
 												action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+												proposer = "[ResolutionGlue.GetProposer]"
+												actor = "[IoSubheaderSelectMenu.Parent.GetPlayer]"
 												parameter = {
 													parameter_name = "recipient"
 													parameter_value = "[IoSubheaderSelectMenu.Parent.GetInternationalOrganization]"
@@ -1196,6 +1270,7 @@ types OrganizationPanel
 													parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetPolicyAtIndex(PdxGuiWidget.GetIndexInDataModel)]"
 												}
 											}
+											button_tooltip_override = { title = "[Policy.GetNameWithNoTooltip]" }
 											tooltipwidget = {
 												datacontext = "[Policy]"
 												using = action_tooltip_pop_out

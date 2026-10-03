@@ -8,6 +8,7 @@
 # voters = <global_list_tag> list of people eligible to vote in the resolution above
 # can_start = <trigger> can the situation start now (root = situation)
 # can_end = <trigger> can the situation end (root = situation)
+# warning_string_key = <scripted text> an optional warning loc key to show about the situation if something needs your attention
 # visible = <trigger> can the player country see the situation and participate in it (root = country, scope:target = situation)
 # on_start = <effect> effect when the situation starts, used for general set up (root = situation)
 # on_monthly = <effect> effect every month (root = situation)
@@ -16,3 +17,14 @@
 # tooltip = <effect> used to generate a tooltip for the map, not actually executed (root = location, scope:target = situation)
 # map_color = <script color> map color for location (root = location, scope:target = situation)
 # secondary_map_color = <script color> striped map color for location (root = location, scope:target = situation)
+# variables = list of variables attached to this situation. 
+#       <var name> = {
+#           format = <string> how you want this variable to be displayed
+#           change_format = <string> how you want monthly changes to this variable to be displayed
+#           monthly_change = <scripted value> how this variable changes per month
+#           start = <script> initial value when the organization is created
+#           min = <float> min value if it's a number
+#           max = <float> max value if it's a number
+#		    hidden = <yes/no> if we want to display this var to the world
+#		    monthly_change_hidden = <yes/no> if we want to display any monthly change of this var to the world
+#       }

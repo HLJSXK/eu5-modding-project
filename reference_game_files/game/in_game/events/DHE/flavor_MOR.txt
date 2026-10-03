@@ -404,7 +404,7 @@ flavor_mor.6 = { #CONSPIRATION
 	option = {
 		name = flavor_mor.6.b
 
-		add_government_power = government_power_weak_penalty
+		add_political_influence = political_influence_weak_penalty
 	}
 
 	after = {
@@ -1055,7 +1055,18 @@ flavor_mor.18 = {
 		create_rebel = {
 			category = pretender
 			name = marinid_pretender_rebels
+			rebel_demand = rebel_demand_flavor_mor_18
 			save_scope_as = target_rebel
+		}
+		scope:target_rebel = {
+			set_variable = {
+				name = var_target_ruler
+				value = scope:target_ruler
+			}
+			set_variable = {
+				name = var_target_character2
+				value = scope:target_character2
+			}
 		}
 		set_variable = {
 			name = current_ruler_power_variable
@@ -1140,14 +1151,8 @@ flavor_mor.18 = {
 	option = {
 		name = flavor_mor.18.b
 
+		apply_rebel_demands = scope:target_rebel
 		hidden_effect = { destroy_rebel = scope:target_rebel }
-		kill_character = {
-			target = scope:target_ruler
-			reason = execution
-			killer = scope:target_character2
-		}
-		add_government_power = government_power_ultimate_penalty
-		add_stability = stability_ultimate_penalty
 
 	}
 
@@ -1725,6 +1730,14 @@ flavor_mor.27 = {#"The just defense of [GetCountry('TUN').GetLongNameWithNoToolt
 		monthly_chance = 100
 	}
 
+	trigger = {
+		OR = {
+			country_exists = c:TLE
+			country_exists = c:ALG
+		}
+		country_exists = c:TUN
+	}
+
 	illustration_tags = {
 		10 = regular
 		10 = exterior
@@ -1732,10 +1745,18 @@ flavor_mor.27 = {#"The just defense of [GetCountry('TUN').GetLongNameWithNoToolt
 
 	immediate = {
 		event_illustration_poptype_effect = { foreground = pop_type:soldiers background = pop_type:soldiers }
-		c:TLE.capital = {
+		# TLE may have formed Algiers (ALG) by the time this fires; target whichever exists.
+		if = {
+			limit = { country_exists = c:TLE }
+			c:TLE = { save_scope_as = tlemcen_country_scope }
+		}
+		else = {
+			c:ALG = { save_scope_as = tlemcen_country_scope }
+		}
+		scope:tlemcen_country_scope.capital = {
 			save_scope_as = tle_capital_scope
 		}
-		ruler = {
+		ruler_or_regent = {
 			save_scope_as = ruler_scope
 		}
 	}
@@ -1745,6 +1766,22 @@ flavor_mor.27 = {#"The just defense of [GetCountry('TUN').GetLongNameWithNoToolt
 		historical_option = yes
 
 		add_prestige = prestige_mild_bonus
+		change_gold_effect = { scale = -2 }
+	}
+
+	option = {
+		name = flavor_mor.27.b
+
+		add_political_influence = political_influence_ultimate_bonus
+		change_gold_effect = { scale = -3 }
+	}
+
+	option = {
+		name = flavor_mor.27.c
+
+		add_stability = stability_mild_bonus
+		change_gold_effect = { scale = 1 }
+		add_prestige = prestige_weak_penalty
 	}
 }
 
@@ -2192,6 +2229,16 @@ flavor_mor.33 = {
 	option = {
 		name = flavor_mor.33.a
 
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:golden_century
+				has_global_variable = battle_for_the_strait_winner_country
+				this = global_var:battle_for_the_strait_winner_country
+			}
+			gc_change_colonial_dominance = { value = 0.1 }
+		}
+
 		scope:target_location = {
 			create_art = {
 				artist = scope:target_artist
@@ -2368,12 +2415,48 @@ flavor_mor.36 = {
 	option = {
 		name = flavor_mor.36.a
 
-		custom_tooltip = {
-			text = mor_demand_granada_submission_tt
-			scope:target_country = {
-				trigger_event_silently = flavor_mor.37
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:golden_century
+				has_global_variable = battle_for_the_strait_winner_country
+				this = global_var:battle_for_the_strait_winner_country
+			}
+			gc_change_european_dominance = { value = 0.5 }
+		}
+
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:battle_for_the_strait
+				country_exists = c:GRA
+			}
+			change_influence_over_granada_effect = { value = bfts_pull_toward_mor_large }
+		}
+
+		if = {
+			limit = { 
+				scope:target_country = { 
+					NOT = { is_subject_of = ROOT }
+				}
+			}
+
+			custom_tooltip = {
+				text = mor_demand_granada_submission_tt
+				scope:target_country = {
+					trigger_event_silently = flavor_mor.37
+				}
 			}
 		}
+
+		else = {
+			add_country_modifier = {
+				modifier = andalusia_resurgent_modifier
+				years = modifier_duration_years_long
+				mode = replace
+			}
+		}
+
 	}
 }
 
@@ -2382,6 +2465,16 @@ flavor_mor.37 = {
 	title = flavor_mor.37.title
 	desc = flavor_mor.37.desc
 	outcome = neutral
+
+	major = yes
+	major_trigger = {
+		OR = {
+			has_or_had_tag = POR
+			has_or_had_tag = CAS
+			has_or_had_tag = ARA
+			has_or_had_tag = NAV
+		}
+	}
 
 	illustration_tags = {
 		10 = angry
@@ -2395,15 +2488,12 @@ flavor_mor.37 = {
 	option = {
 		name = flavor_mor.37.a
 
-		trigger = {
-			is_ai = yes
-		}
-
 		scope:prev_country = {
-			annex_country = {
-				country = root
+			add_country_modifier = {
+				modifier = mor_granadan_submission_modifier
+				years = modifier_duration_years_long
+				mode = replace
 			}
-			form_country = formable_country:ADU_f
 		}
 	}
 
@@ -2733,6 +2823,16 @@ flavor_mor.1100 = {
 	option = {
 		name = flavor_mor.1100.a
 
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:golden_century
+				has_global_variable = battle_for_the_strait_winner_country
+				this = global_var:battle_for_the_strait_winner_country
+			}
+			gc_change_colonial_dominance = { value = 0.1 }
+		}
+
 		show_as_tooltip = {
 			add_migration = {
 				amount = 0.05
@@ -2842,9 +2942,7 @@ flavor_mor.1200 = {
 		country_exists = c:GRA
 		country_exists = c:CAS
 
-		c:GRA = {
-			is_subject = no
-		}
+		NOT = { has_dlc = "d009_across_the_pillars" }
 		is_subject = no
 		at_war = no
 

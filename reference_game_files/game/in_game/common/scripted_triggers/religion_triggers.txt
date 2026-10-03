@@ -50,19 +50,36 @@ crusade_allow_trigger = {
 }
 
 is_valid_target_for_jihad = {
+	is_rebel_country = no
 	NOT = { religion.group = religion_group:muslim }
 	OR = {
 		country_rank = country_rank:rank_kingdom
 		country_rank = country_rank:rank_empire
 	}
 	OR = {
+		any_neighbor_country = {
+			religion.group = religion_group:muslim
+		}
 		religion_group_percentage_in_country = {
 			religion_group = religion_group:muslim
 			value > 0.05
 		}
+	}
+	OR = {
 		any_neighbor_country = {
 			religion.group = religion_group:muslim
 		}
+		any_owned_location = {
+			is_coastal = yes
+		}
+	}
+}
+
+has_meaningful_holy_war_participation = {
+	custom_description = {
+		text = has_meaningful_holy_war_participation_text
+		has_variable = holy_war_participation
+		var:holy_war_participation > 0.05
 	}
 }
 
@@ -70,6 +87,7 @@ is_valid_target_for_crusade = {
 	exists = yes
 	country_exists = this
 	save_temporary_scope_as = this_country
+	is_rebel_country = no
 	NOT = { religion.group = religion_group:christian }
 	OR = {
 		country_rank = country_rank:rank_kingdom
@@ -87,10 +105,43 @@ is_valid_target_for_crusade = {
 			not = { is_subject_of = scope:this_country }
 		}
 	}
-	religion:catholic = {
-		any_holy_site_in_religion = {
-			location = {
-				owner = scope:this_country
+	OR = {
+		scope:this_country = {
+			any_owned_location = {
+				OR = {
+					dominant_religion.group = religion_group:christian
+					sub_continent = sub_continent:western_europe
+					region = region:balkan_region
+					region = region:carpathia_region
+					region = region:scandinavian_region
+					region = region:baltic_region
+					region = region:russian_region
+					region = region:ruthenia_region
+				}
+			}
+		}
+		religion:catholic = {
+			any_holy_site_in_religion = {
+				location = {
+					owner = scope:this_country
+				}
+			}
+		}
+	}
+	OR = {
+		scope:this_country = {
+			any_owned_location = {
+				any_neighbor_location = {
+					exists = owner
+					owner = { religion = religion:catholic }
+				}
+			}
+		}
+		scope:this_country = {
+			any_owned_location = {
+				any_neighbor_location = {
+					is_in_scripted_geography = scripted_geography:mediterranean_sea_geography
+				}
 			}
 		}
 	}
@@ -184,17 +235,19 @@ papacy_active = {
 	}
 }
 
-no_papal_bull_active = {
-	religion:catholic = {
-		NOT = { has_religion_modifier = apostolicae_servitutis }
-		NOT = { has_religion_modifier = benedictus_deus }
-		NOT = { has_religion_modifier = christiana_pietas }
-		NOT = { has_religion_modifier = dei_gratia_rex }
-		NOT = { has_religion_modifier = illius_qui_se_pro_divini }
-		NOT = { has_religion_modifier = immensa_aeterni_dei }
-		NOT = { has_religion_modifier = in_coena_domini }
-		NOT = { has_religion_modifier = inter_gravissimas }
-		NOT = { has_religion_modifier = libertas_ecclesiae }
+no_papal_bull_debate_active = {
+	international_organization:catholic_church = {
+		NOT = { resolution_is_active = resolution:apostolicae_servitutis }
+		NOT = { resolution_is_active = resolution:benedictus_deus }
+		NOT = { resolution_is_active = resolution:call_crusade }
+		NOT = { resolution_is_active = resolution:christiana_pietas }
+		NOT = { resolution_is_active = resolution:crusade_privileges_bull }
+		NOT = { resolution_is_active = resolution:dei_gratia_rex }
+		NOT = { resolution_is_active = resolution:illius_qui_se_pro_divini }
+		NOT = { resolution_is_active = resolution:immensa_aeterni_dei }
+		NOT = { resolution_is_active = resolution:in_coena_domini }
+		NOT = { resolution_is_active = resolution:inter_gravissimas }
+		NOT = { resolution_is_active = resolution:libertas_ecclesiae }
 	}
 }
 
@@ -427,7 +480,7 @@ country_has_sufism = { #Country scope
 		text = country_has_sufism_text
 		OR = {
 			AND = {
-				religion = { has_religious_schools = yes }
+				religion = { has_country_religious_schools = yes }
 				religious_school ?= { is_sufi_school = yes }
 			}
 			any_invited_religious_figure ?= {

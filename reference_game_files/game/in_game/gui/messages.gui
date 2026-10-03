@@ -6,7 +6,8 @@ template message_template {
 	layer = top # match events
 	
 	# using = bg_window_message_t3
-
+	visible = "[ShouldShowMessages]"
+	
 	vbox = {
 		block "msg_size" {
 			minimumsize = { 600 300 }
@@ -131,13 +132,15 @@ template message_template {
 								# 	datacontext = "[MessagePopup.GetLockableInfo]"
 								# }
 				
-								enabled = "[MessagePopup.GetLockableInfo.IsUnlocked]"
+								block "decline_enabled" {
+									enabled = "[MessagePopup.GetLockableInfo.IsUnlocked]"
+								}
 								name = "decline_button"
 								tooltip_enabled = no
 								text = "[MessagePopup.GetDeclineText]"
 								using = button_resize_to_fit_text
 								using = snd_UI_close
-				
+
 								block "decline_title" {
 									text = "CANCEL_BUTTON"
 								}
@@ -172,9 +175,8 @@ template message_template {
 								# 	datacontext = "[MessagePopup.GetLockableInfo]"
 								# }
 				
-								enabled = "[MessagePopup.GetLockableInfo.IsUnlocked]"
+								enabled = "[And(MessagePopup.GetLockableInfo.IsUnlocked, Not(IsShowingDialog))]"
 								name = "accept_button"
-								tooltip_enabled = no
 								text = "[MessagePopup.GetAgreeText]"
 								using = button_resize_to_fit_text
 								using = snd_UI_popup_confirm
@@ -183,11 +185,14 @@ template message_template {
 									text = "OK_BUTTON"
 								}
 				
-								# block "accept_input_action" {
-									onclick = "[MessagePopup.OnAccept]"
-									# input_action = "confirm"
-									# use_global_input_instance = yes
-								# }
+								action_tooltip = {
+									title = "OK_BUTTON"
+									on_action = "[MessagePopup.OnAccept]"
+								}
+
+								input_action = "confirm"
+
+								tooltipwidget = { BasicFunctionalTooltip = {} }
 							}
 						}
 					}
@@ -294,6 +299,7 @@ template message_template {
 
 	block "message_close_button" {
 		widget = {
+			visible = "[ShouldShowMessages]"
 			ignore_layout = yes
 			allow_outside = yes
 			parentanchor = top|right
@@ -302,6 +308,7 @@ template message_template {
 			
 			# Avoiding using cancel input action in go-to button
 			button_close_alt = {
+				enabled = "[Not(IsShowingDialog)]"
 				name = "dummy_button"
 				tooltip_enabled = no
 				parentanchor = left|top
@@ -311,30 +318,28 @@ template message_template {
 				using = bg_circle
 
 				input_action = "close_window"
-				use_global_input_instance = yes
 				action_tooltip = {
 					title = "MESSAGE_SETTINGS_POPUP"
-					on_action = "[MessagePopup.OnAccept]"
+					on_action = "[MessagePopup.OnAcceptAll]"
 				}
 				tooltipwidget = { BasicFunctionalTooltip = {} }
 				# using = snd_UI_confirm
 				using = bg_circle_piechart
 			}
 
-			button_menu_alt = {
+			button_list = {
 				name = "message_settings"
 				parentanchor = left|top
 				position = {25 20}
- 
-				blockoverride "close_inputaction" {}
-				blockoverride "button_texture" {
-					texture = "gfx/interface/buttons/flats/list_button.dds"
-				}
 
-				onclick = "[MessagePopup.OpenMessagePopup]"
 				size = { 22 22 }
-				using = bg_circle
 				using = bg_circle_piechart
+				action_tooltip = {
+					title = "MESSAGE_SETTINGS_POPUP"
+					on_action = "[PdxGuiWidget.ToggleContextMenu]"
+				}
+				tooltipwidget = { BasicFunctionalTooltip = {} }
+				contextmenu_widget = { MessageSettingsContextMenu = {} }
 			}
 		}
 	}
@@ -719,260 +724,6 @@ template peace_piechart_defender_side_block {
 		}
 	}
 }
-
-# template message_template_t3 {
-# 	name = "basic_message_template"
-# 	parentanchor = center
-# 	allow_outside = yes
-
-# 	using = bg_window_message
-# 	background = {
-# 		texture = "gfx/interface/component_tiles/tile_shadow_squared_dark.dds"
-# 		texture_density = 2
-# 		spriteType = corneredstretched
-# 		spriteborder = { 5 5 }
-# 		margin = { 5 5 }
-# 	}
-# 	using = bg_inside_decor_t1
-# 	blockoverride "bg_inside_margins" {
-# 		margin = {-20 -20}
-# 	}
-# 	#using = bg_thick_border_decor
-
-# 	glow = {
-# 		name = "drop_shadow"
-# 		glow_radius = 4
-# 		color = {0.0 0.0 0.0 1.0}
-# 		alpha = 0.8
-# 	}
-
-# 	vbox = {
-# 		#minimumsize = { 650 300 }
-# 		#using = window_margin_alt
-# 		#spacing = 10
-# 		set_parent_size_to_minimum = yes
-# 		using = snd_UI_popup_show
-# 		margin_bottom = 25
-		
-# 		#header
-# 		vbox = {
-# 			using = layoutpolicy_expanding
-
-# 			hbox = {
-# 				layoutpolicy_horizontal = expanding
-# 				margin = { 10 5 }
-# 				#spacing = 10
-	
-# 				using = high_cloth_header
-# 				using = bg_stripe_pattern
-
-# 				block "message_decoration_left" {}
-				
-# 				vbox = {
-# 					margin = { 0 10 }
-# 					#spacing = 10
-	
-# 					textbox = {
-# 						using = text_multi_template
-	
-# 						name = "subtitle"
-# 						minimumsize = { 400 -1 }
-# 						maximumsize = { 400 -1 }
-# 						autoresize = yes
-	
-# 						using = Font_Size_Medium
-# 						default_format = "#subtle_name"
-# 						align = center
-# 						text = "[MessagePopup.GetSubtitle]"
-# 					}
-	
-# 					textbox = {
-# 						using = text_multi_template
-	
-# 						minimumsize = { 400 -1 }
-# 						maximumsize = { 400 -1 }
-# 						autoresize = yes
-	
-# 						using = Font_Size_Big
-# 						default_format = "#yellow_titles"
-# 						fontsize = 30
-# 						align = center|nobaseline
-# 						text = "[MessagePopup.GetTitle]"
-# 					}
-# 				}
-	
-# 				block "message_decoration_right" {}
-# 			}
-# 			divider_solid_gold = {}
-# 			icon = {
-# 				layoutpolicy_horizontal = expanding
-# 				size = {-1 15}
-# 				using = hanging_cloth_deco
-# 				#using = hanging_cloth_deco_corners
-# 			}
-# 		}
-		
-# 		hbox = {
-# 			margin = { 10 0 }
-# 			using = layoutpolicy_expanding
-
-# 			vbox = {
-# 				using = layoutpolicy_expanding
-				
-# 				scrollarea = {
-# 					layoutpolicy_horizontal = expanding
-# 					maximumsize = { -1 650 }
-	
-# 					autoresizescrollarea = yes
-# 					alwaystransparent = no
-# 					scrollbarpolicy_horizontal = always_off
-	
-# 					scrollbar_vertical = {
-# 						using = Scrollbar_Vertical
-# 					}
-	
-# 					scrollwidget = {
-# 						vbox = {
-# 							layoutpolicy_horizontal = expanding
-# 							margin =  { 20 0 }
-# 							margin_top = 15
-	
-# 							text_multi = {
-	
-# 								name = "description"
-# 								margin = { 20 0 }
-# 								minimumsize = { 650 -1 }
-# 								maximumsize = { 650 -1 }
-# 								autoresize = yes
-	
-# 								using = Font_Type_Standard
-# 								fontsize = 17
-# 								default_format = "#medium"
-# 								#align = center
-# 								text = "[MessagePopup.GetDescription]"
-# 							}
-# 						}
-# 					}
-# 				}
-	
-# 				expand = {}
-	
-# 				hbox = {
-# 					margin = { 0 10 }
-# 					spacing = 50
-		
-# 					button_regular_diamond = {
-# 						DefaultButtonLockingProgress = {
-# 							datacontext = "[MessagePopup.GetLockableInfo]"
-# 						}
-		
-# 						enabled = "[MessagePopup.GetLockableInfo.IsUnlocked]"
-# 						name = "decline_button"
-# 						tooltip_enabled = no
-# 						text = "[MessagePopup.GetDeclineText]"
-# 						using = button_resize_to_fit_text
-		
-# 						block "decline_title" {
-# 							text = "CANCEL_BUTTON"
-# 						}
-		
-# 						block "decline_visible" {
-# 							visible = no
-# 						}
-		
-# 						# block "decline_input_action" {
-# 							onclick = "[MessagePopup.OnDecline]"
-# 						# }
-# 					}
-		
-# 					button_regular_diamond = {
-# 						name = "goto_button"
-# 						tooltip_enabled = no
-# 						using = button_resize_to_fit_text
-		
-# 						block "goto_title" {
-# 							text = "GOTO_GOTO"
-# 						}
-		
-# 						block "goto_visible" {
-# 							visible = "[MessagePopup.CanGoTo]"
-# 						}
-		
-# 						onclick = "[MessagePopup.OnGoTo]"
-# 					}
-		
-# 					button_regular_diamond = {
-# 						DefaultButtonLockingProgress = {
-# 							datacontext = "[MessagePopup.GetLockableInfo]"
-# 						}
-		
-# 						enabled = "[MessagePopup.GetLockableInfo.IsUnlocked]"
-# 						name = "accept_button"
-# 						tooltip_enabled = no
-# 						text = "[MessagePopup.GetAgreeText]"
-# 						using = button_resize_to_fit_text
-# 						using = snd_UI_popup_confirm
-		
-# 						block "accept_title" {
-# 							text = "OK_BUTTON"
-# 						}
-		
-# 						# block "accept_input_action" {
-# 							onclick = "[MessagePopup.OnAccept]"
-# 							input_action = "confirm"
-# 							use_global_input_instance = yes
-# 						# }
-# 					}
-# 				}
-# 			}
-# 		}
-# 	}
-
-# 	icon = {
-# 		size = {35 60}
-# 		parentanchor = top|right
-# 		position = { 23 -7 }
-# 		using = messages_top_decoration
-# 	}
-# 	icon = {
-# 		size = {35 60}
-# 		parentanchor = top|left
-# 		position = { -23 -7 }
-# 		using = messages_top_decoration
-# 		blockoverride "mirror" {}
-# 	}
-
-# 	# Avoiding using cancel input action in go-to button
-# 	ui_direction_button = {
-# 		name = "dummy_button"
-# 		tooltip_enabled = no
-# 		parentanchor = top|right
-# 		position = { -10 15 }
-
-# 		size = { 22 22 }
-# 		using = bg_circle
-
-# 		input_action = "close_window"
-# 		use_global_input_instance = yes
-# 		onclick = "[MessagePopup.OnAccept]"
-# 		#using = snd_UI_confirm
-# 	}
-
-# 	ui_direction_button = {
-# 		name = "message_settings"
-# 		tooltipwidget = { LeftClickButtonTooltip = { blockoverride "onclick_text" { text = "MESSAGE_SETTINGS_POPUP" } } }
-# 		parentanchor = top|right
-# 		position = { -10 15 }
-
-# 		blockoverride "button_texture" {
-# 			texture = "gfx/interface/buttons/flats/list_button.dds"
-# 		}
-
-# 		onclick = "[MessagePopup.OpenMessagePopup]"
-# 		size = { 22 22 }
-# 		using = bg_circle
-# 	}
-# }
 
 window = {
 	name = "basic_message_popup"
@@ -1812,20 +1563,9 @@ window = {
 					maximumsize = { 1070 -1 }
 					margin = { 0 5 }
 					background = {
-						texture = "gfx/interface/buttons/button_banner_02.dds"
-						texture_density = 2
-						alpha = 1
-						spriteType = corneredstretched
-						spriteborder = { 40 0 }
-						frame_grid = {4 1}
+						using = bg_banner_02_cloth_texture
 						frame = 1
 						margin = { 13 3 }
-
-						modify_texture = {
-							using = overlay_cloth_texture
-							blend_mode = overlay
-							alpha = 0.1
-						}
 					}
 					text_single = {
 						text = "game_concept_peace_treaty"
@@ -2047,6 +1787,10 @@ window = {
 		visible = yes
 	}
 
+	blockoverride "decline_enabled" {
+		enabled = "[And(MessagePopup.GetLockableInfo.IsUnlocked, AskRepayLoanMessagePopup.CanRepayLoan)]"
+	}
+
 	blockoverride "accept_title" {
 		text = "ASK_REPAY_LOAN_BTN2"
 	}
@@ -2142,6 +1886,31 @@ window = {
 }
 
 window = {
+	name = "work_of_art_message_popup"
+	using = message_template
+
+	blockoverride "snd_popup_type" { soundeffect = "UI_popup_country_message" }
+
+	blockoverride "message_decoration_left" {
+		icon = {
+			size = { 148 65 }
+			visible = "[WorkOfArtMessage.HasWorkOfArt]"
+			datacontext = "[WorkOfArtMessage.GetWorkOfArt]"
+			texture = "[GetWorkOfArtIllustration(WorkOfArt.Self)]"
+
+			tooltipwidget = {
+				using = WorkOfArt_tooltip
+			}
+
+			widget = {
+				size = { 100% 100% }
+				using = bg_expeditions_illustration_frame
+			}
+		}
+	}
+}
+
+window = {
 	using = message_template
 	name = "newborn_message_popup"
 
@@ -2231,6 +2000,317 @@ window = {
 }
 
 window = {
+	name = "expedition_message_popup"
+	parentanchor = center
+	movable = yes
+	layer = top
+	allow_outside = yes
+	using = snd_UI_event_expedition
+
+	visible = "[ShouldShowMessages]"
+
+	state = {
+		name = _show
+		duration = 0.1
+		on_finish = "[PdxGuiWidget.TriggerAllChildrenAnimation('on_open')]"
+	}
+
+	vbox = {
+		set_parent_size_to_minimum = yes
+		bottomtotop = yes
+		allow_outside = yes
+
+		vbox = {
+			margin = { 5 10 }
+			layoutpolicy_horizontal = expanding
+			using = bg_expedition_event_inner
+			allow_outside = yes
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				margin = { 20 15 }
+				margin_top = 10
+				spacing = 15
+				allow_outside = yes
+
+				widget = {
+					size = { 540 160 }
+					allow_outside = yes
+
+					icon = {
+						size = { 324 132 }
+						parentanchor = center
+						texture = "[GetExpeditionTypeIllustration(ExpeditionMessage.GetExpeditionType)]"
+						widget = {
+							parentanchor = center
+							size = { 324 132 }
+							using = bg_expeditions_illustration_frame
+						}
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = left|vcenter
+						widgetanchor = left|vcenter
+						position = { -90 -35 }
+						size = { 200 300 }
+						visible = "[ExpeditionMessage.HasLeader]"
+
+						portrait_standard_full_body_center_button = {
+							datacontext = "[ExpeditionMessage.GetLeader]"
+							size = { 100% 100% }
+							mask = "gfx/portraits/portrait_mask_full_gradient.dds"
+							portrait_texture = "[Character.GetAnimatedPortrait( 'full_torso', 'camera_torso_right', 'idle', PdxGetWidgetScreenSize(PdxGuiWidget.Self) )]"
+						}
+
+						widget = {
+							parentanchor = hcenter|bottom
+							widgetanchor = hcenter|bottom
+							ignore_layout = yes
+							allow_outside = yes
+							position = { 12 -40 }
+
+							hbox = {
+								set_parent_size_to_minimum = yes
+								
+								margin_bottom = 1
+								using = bg_name_banner
+								datacontext = "[ExpeditionMessage.GetLeader]"
+								
+								text_single = {
+									margin = { 25 10 }
+									margin_bottom = 12
+									maximumsize = { 180 35 }
+									text = "[Character.GetNameToFit('(int32)22', '(bool)yes')]"
+									using = Font_Type_Headers
+									using = Font_Size_Small
+									default_format = "#yellow_titles"
+									autoresize = yes
+								}
+							}
+						}
+					}
+
+					country_flag_big = {
+						parentanchor = right|vcenter
+						widgetanchor = right|vcenter
+						datacontext = "[GetPlayer]"
+					}
+				}
+
+				vbox = {
+					bottomtotop = yes
+					layoutpolicy_horizontal = expanding
+					spacing = -15
+					
+
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						margin = { 0 15 }
+						alwaystransparent = no
+
+						widget = {
+							layoutpolicy_horizontal = expanding
+	
+							AnimatedScrollBackground = {}
+	
+							scrollvbox = {
+								set_parent_dimension_to_minimum = height
+								maximumsize = { -1 235 }
+								alwaystransparent = no
+		
+								scrollbar_vertical = {
+									ScrollbarVertical = {
+										parentanchor = right
+										using = AnimatedScrollFadeInOut_template
+									}
+								}
+								
+								text_multi = {
+									name = "description"
+									visible = "[MessagePopup.HasDescription]"
+									autoresize = yes
+									minimumsize = { 515 -1 }
+									maximumsize = { 515 -1 }
+									margin = { 15 6 }
+									text = "[MessagePopup.GetDescription]"
+
+									using = AnimatedScrollFadeInOut_template
+								}
+	
+								text_multi = {
+									visible = "[MessagePopup.HasEffect]"
+									autoresize = yes
+									minimumsize = { 515 -1 }
+									maximumsize = { 515 -1 }
+									margin = { 15 6 }
+	
+									text = "[MessagePopup.GetEffect]"
+
+									using = AnimatedScrollFadeInOut_template
+								}
+	
+								text_multi = {
+									visible = "[MessagePopup.HasFlavor]"
+									autoresize = yes
+									using = Font_Type_Flavor
+									minimumsize = { 515 -1 }
+									maximumsize = { 515 -1 }
+									margin = { 15 6 }
+									text = "[MessagePopup.GetFlavor]"
+
+									using = AnimatedScrollFadeInOut_template
+								}
+							}
+						}
+					}
+					
+
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 42 }
+
+						background = {
+							using = bg_banner_02_cloth_texture
+							blockoverride "button_texture" {texture = "gfx/interface/buttons/button_banner_03.dds"}
+							frame = 1
+							margin = { 13 3 }
+						}
+
+						text_single = {
+							margin_top = 6
+							parentanchor = hcenter
+							text = "[MessagePopup.GetTitle]"
+							default_format = "#yellow_titles"
+						}
+					}
+				}
+
+				hbox = {
+					margin = { 0 10 }
+					spacing = 50
+
+					expeditions_button = {
+						name = "goto_button"
+						tooltip_enabled = no
+						visible = "[MessagePopup.CanGoTo]"
+
+						onclick = "[MessagePopup.OnGoTo]"
+
+						text_single = {
+							parentanchor = center
+							maximumsize = { 180 36 }
+							fontsize_min = 10
+							text = "GOTO_GOTO"
+						}
+					}
+
+					expeditions_button = {
+						enabled = "[And(MessagePopup.GetLockableInfo.IsUnlocked, Not(IsShowingDialog))]"
+						name = "accept_button"
+						using = snd_UI_popup_confirm
+
+						action_tooltip = {
+							title = "OK_BUTTON"
+							on_action = "[MessagePopup.OnAccept]"
+						}
+
+						input_action = "confirm"
+
+						tooltipwidget = { BasicFunctionalTooltip = {} }
+
+						text_single = {
+							parentanchor = center
+							maximumsize = { 180 36 }
+							fontsize_min = 10
+							text = "OK_BUTTON"
+						}
+					}
+				}
+			}
+		}
+
+		vbox = {
+			margin_bottom = -10
+			layoutpolicy_horizontal = expanding
+			ExpeditionEventTitle = {
+				allow_outside = yes
+				autoresize = yes
+				align = center|nobaseline
+				default_format = "#yellow_titles"
+				text = "[ExpeditionMessage.GetExpeditionType.GetNameWithNoTooltip]"
+			}
+		}
+	}
+
+	icon = {
+		texture = "[GetGraphicalCultureTexture('circle_frame')]"
+		texture_density = 2
+		size = { 45 45 }
+
+		parentanchor = top|hcenter
+		widgetanchor = center
+
+		datacontext = "[ExpeditionMessage.GetExpeditionType]"
+
+		icon = {
+			size = { 100% 100% }
+			texture = "gfx/interface/advance/backgrounds/blue.dds"
+
+			widget = {
+				parentanchor = center
+				size = { 75% 75% }
+				using = expedition_category_icon
+			}
+		}
+	}
+
+	widget = {
+		visible = "[ShouldShowMessages]"
+		ignore_layout = yes
+		allow_outside = yes
+		parentanchor = top|right
+		position = { -10 5 }
+		size = { 55 55 }
+
+		button_close_alt = {
+			enabled = "[Not(IsShowingDialog)]"
+			name = "dummy_button"
+			tooltip_enabled = no
+			parentanchor = left|top
+			position = { 0 75 }
+
+			size = { 22 22 }
+			using = bg_circle
+
+			input_action = "close_window"
+			action_tooltip = {
+				title = "MESSAGE_SETTINGS_POPUP"
+				on_action = "[MessagePopup.OnAcceptAll]"
+			}
+			tooltipwidget = { BasicFunctionalTooltip = {} }
+			using = bg_circle_piechart
+		}
+
+		button_list = {
+			name = "message_settings"
+			parentanchor = left|top
+			position = { -30 75 }
+
+			size = { 22 22 }
+			using = bg_circle_piechart
+			action_tooltip = {
+				title = "MESSAGE_SETTINGS_POPUP"
+				on_action = "[PdxGuiWidget.ToggleContextMenu]"
+			}
+			tooltipwidget = { BasicFunctionalTooltip = {} }
+			contextmenu_widget = { MessageSettingsContextMenu = {} }
+		}
+	}
+}
+
+window = {
 	using = message_template
 	name = "religion_message_popup"
 
@@ -2239,6 +2319,12 @@ window = {
 	blockoverride "message_decoration_left" {
 		icon = {
 			size = { 80 80 }
+			visible = "[ReligionMessage.HasReligiousOrder]"
+			texture = "[ReligionMessage.GetReligiousOrder.GetIconPath]"
+		}
+		icon = {
+			size = { 80 80 }
+			visible = "[Not(ReligionMessage.HasReligiousOrder)]"
 			texture = "[GetReligionIcon(ReligionMessage.GetReligion)]"
 			tooltipwidget = {
 				using = religion_tooltip
@@ -2250,6 +2336,12 @@ window = {
 	blockoverride "message_decoration_right" {
 		icon = {
 			size = { 80 80 }
+			visible = "[ReligionMessage.HasReligiousOrder]"
+			texture = "[ReligionMessage.GetReligiousOrder.GetIconPath]"
+		}
+		icon = {
+			size = { 80 80 }
+			visible = "[Not(ReligionMessage.HasReligiousOrder)]"
 			texture = "[GetReligionIcon(ReligionMessage.GetReligion)]"
 			tooltipwidget = {
 				using = religion_tooltip

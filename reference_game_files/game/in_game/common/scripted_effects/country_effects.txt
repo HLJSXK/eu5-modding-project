@@ -30,6 +30,7 @@ create_newborn_female_ruler_child = {
 
 parliament_debate_failed_effect = {
 	add_stability = stability_mild_penalty
+	add_government_power = government_power_extreme_penalty
 }
 
 unlock_advance_effect = {
@@ -1765,53 +1766,16 @@ disable_treasure_voyages = {
 	}
 }
 
-chinese_treasure_sail_to = {
-
-	$to$ = { save_scope_as = next_tile } # Necessary for the variable calculation and for the next event in line to know where the fleet's location is supposed to be set to
-	set_local_variable = {
-		name = time_to_travel
-		value = {
-			if = {
-				limit = {
-					exists = scope:expedition_initiator
-					scope:expedition_initiator = {
-						has_variable = chinese_treasure_fleet_location
-					}
-					exists = scope:next_tile
-				}
-				value = "scope:next_tile.distance_to(scope:expedition_initiator.var:chinese_treasure_fleet_location)"
-				divide = 5
-				if = {
-					limit = { exists = scope:target_character }
-					multiply = { # Leader's military skill can speed up the expedition travel time greatly
-						value = 1
-						subtract = {
-							value = scope:target_character.mil
-							divide = 100
-							multiply = 0.5
-						}
-					}
-				}
-				min = 1
-			}
-			else = {
-				value = 1
-			}
-		}
-	}
-	trigger_event_silently = {
-		id = flavor_chi.2003
-		days = local_var:time_to_travel
-	}
-}
-
 chinese_treasure_depart_from_port = {
 	custom_tooltip = chi_fleet_will_depart
-	
+
 	grant_effects_of_opinion = yes
 
-	scope:expedition_initiator ?= {
-		trigger_event_silently = flavor_chi.2003
+	if = {
+		limit = { is_current_treasure_fleet_host = yes }
+		scope:expedition_initiator ?= {
+			remove_variable = chinese_treasure_visited_port_location
+		}
 	}
 }
 
@@ -1819,8 +1783,7 @@ chinese_expedition_calculate_gift_for_this = {
 	set_variable = {
 		name = gift_value
 		value = {
-			value = total_population
-			divide = 1000
+			value = monthly_income_trade_and_tax
 			multiply = { #multiply by 0.5 to 1.5
 				value = 1
 				add = {
@@ -1833,6 +1796,97 @@ chinese_expedition_calculate_gift_for_this = {
 			max = scope:expedition_initiator.var:chinese_treasure_voyage_cargo
 		}
 	}
+}
+
+make_into_expedition_leader = {
+	remove_commander = $target$
+	$target$ = {
+		add_character_modifier = {
+			modifier = chi_leading_expedition
+			years = -1
+			desc = chi_leading_expedition_duration_desc
+		}
+	}
+}
+
+update_chinese_treasure_leg_progress = {
+	if = {
+		limit = {
+			has_variable = chinese_treasure_route_tiles
+			var:chinese_treasure_route_tiles > 0
+		}
+		change_variable = { name = chinese_treasure_tiles_traveled add = 1 }
+		set_variable = {
+			name = chinese_treasure_leg_progress
+			value = {
+				value = var:chinese_treasure_tiles_traveled
+				divide = var:chinese_treasure_route_tiles
+				min = 0
+				max = 1
+			}
+		}
+	}
+}
+
+set_chinese_expedition_scopes = {
+	global_var:chinese_treasure_voyage_running = {
+		save_scope_as = expedition_initiator
+		random_expedition = {
+			limit = { expedition_type = expedition_type:treasure_fleet_expedition }
+			save_scope_as = treasure_expedition
+		}
+		var:chinese_treasure_visited_port_location ?= {
+			save_scope_as = target_stop
+		}
+	}
+	scope:treasure_expedition ?= {
+		expedition_current_location = { save_scope_as = coastal_sea_tile }
+		expedition_leader = { save_scope_as = character_expedition_leader_target }
+	}
+}
+
+cleanup_chinese_treasure_voyage_state = {
+	every_in_list = {
+		variable = visited_ports
+		owner ?= {
+			if = {
+				limit = { has_variable = visited_by_expedition }
+				remove_variable = visited_by_expedition
+			}
+		}
+	}
+	every_in_list = {
+		variable = visited_countries
+		if = {
+			limit = { has_variable = chinese_expedition_opinion }
+			remove_variable = chinese_expedition_opinion
+		}
+		if = {
+			limit = { has_variable = being_visited_by_expedition_from }
+			remove_variable = being_visited_by_expedition_from
+		}
+		if = {
+			limit = { has_variable = visitation_event_count }
+			remove_variable = visitation_event_count
+		}
+	}
+	remove_global_variable = chinese_treasure_voyage_running
+	remove_variable = chinese_treasure_voyage_cargo
+	remove_variable = chinese_treasure_visited_port_location
+	remove_variable = chinese_treasure_target_location
+	remove_variable = chinese_treasure_target_area
+	remove_variable = chinese_treasure_start_location
+	remove_variable = chinese_treasure_leg_progress
+	remove_variable = chinese_treasure_route_tiles
+	remove_variable = chinese_treasure_tiles_traveled
+	remove_variable = chinese_treasure_extraditions_accepted
+	remove_variable = chinese_treasure_low_funds_notified
+	remove_variable = gifts_received
+	clear_variable_list = visited_ports
+	clear_variable_list = visited_countries
+	clear_variable_list = potential_enemy_list
+	clear_variable_list = characters_on_board
+	clear_variable_list = nations_to_make_tributary
 }
 
 chi_expedition_resolution_very_positive = {
@@ -2247,6 +2301,19 @@ set_revolution_target_effect = {
 	}
 }
 
+rustamid_legacy_effect = {
+	add_country_modifier = {
+		modifier = rustamid_legacy_modifier
+		years = -1
+	}
+	if = {
+		limit = {
+			has_policy = ibadi_kitman_imam_policy
+		}
+		add_policy = policy:ibadi_zuhur_imam_policy
+	}
+}
+
 start_parliament_effect = {
 	if = {
 		limit = { is_active_parliament = no }
@@ -2412,6 +2479,45 @@ on_bribe_default_effect = {
 	}
 }
 
+change_culture_for_ruler_and_family = {
+	hidden_effect = {
+		$country$ = {
+			if = {
+				limit = {
+					ruler ?= {
+						owner = $country$ 
+					}
+				}
+				heir ?= {
+					if = {
+						limit = {
+							owner = $country$
+						}
+						change_character_culture = $culture$
+					}
+				}
+				ruler ?= {
+					change_character_culture = $culture$
+					every_descendant = {
+						limit = {
+							owner = $country$
+						}
+						change_character_culture = $culture$
+					}
+					every_spouse = {
+						limit = {
+							owner = $country$
+							this != $country$.heir
+						}
+						change_character_culture = $culture$
+					}
+				}
+			}
+		}
+	}
+}
+
+
 change_religion_for_ruler_and_family = {
 	hidden_effect = {
 		$country$ = {
@@ -2430,17 +2536,39 @@ change_religion_for_ruler_and_family = {
 					}
 				}
 				ruler ?= {
-					change_character_religion = $religion$
+					if = {
+						limit = {
+							or = {
+								is_religious_figure = no
+								religious_figure != religious_figure:cardinal
+							}
+							NOT = { owner = religion:catholic.religious_head }
+						}
+						change_character_religion = $religion$
+					}
 					every_descendant = {
 						limit = {
 							owner = $country$
+							or = {
+								is_religious_figure = no
+								religious_figure != religious_figure:cardinal
+							}
+							NOT = { owner = religion:catholic.religious_head }
 						}
 						change_character_religion = $religion$
 					}
 					every_spouse = {
 						limit = {
 							owner = $country$
-							this != $country$.heir
+							or = {
+								is_religious_figure = no
+								religious_figure != religious_figure:cardinal
+							}
+							NOT = { owner = religion:catholic.religious_head }
+							trigger_if = {
+								limit = { exists = $country$.heir }
+								this != $country$.heir
+							}
 						}
 						change_character_religion = $religion$
 					}
@@ -2986,9 +3114,122 @@ ai_international_organization_diplo_action_cooldown = {
 	}
 }
 
-reset_complacency = {
+cas_appoint_adelantado_mayor_effect = {
+	set_variable = {
+		name = cas_adelantado_mayor_character
+		value = $target$
+		years = modifier_duration_years_normal
+	}
+	# Clear a previous appointee's estate modifier so re-appointment doesn't stack them.
+	if = { limit = { has_country_modifier = cas_adelantado_crown_estate_modifier } remove_country_modifier = cas_adelantado_crown_estate_modifier }
+	else_if = { limit = { has_country_modifier = cas_adelantado_nobles_estate_modifier } remove_country_modifier = cas_adelantado_nobles_estate_modifier }
+	if = {
+		limit = { $target$ = { has_estate = estate_type:crown_estate } }
+		add_country_modifier = { 
+			modifier = cas_adelantado_crown_estate_modifier 
+			years = modifier_duration_years_normal
+			mode = add_and_extend 
+		}
+	}
+	else_if = { 
+		limit = { 
+			$target$ = { has_estate = estate_type:nobles_estate } 
+		}
+		add_country_modifier = { 
+			modifier = cas_adelantado_nobles_estate_modifier 
+			years = modifier_duration_years_normal 
+			mode = add_and_extend 
+		}
+	}
+}
+
+# Lapses the Adelantado Mayor appointment: clears the office variable and removes whichever estate modifier it granted.
+cas_repeal_adelantado_mayor_effect = {
+	remove_variable = cas_adelantado_mayor_character
+	if = { limit = { has_country_modifier = cas_adelantado_crown_estate_modifier } remove_country_modifier = cas_adelantado_crown_estate_modifier }
+	if = { limit = { has_country_modifier = cas_adelantado_nobles_estate_modifier } remove_country_modifier = cas_adelantado_nobles_estate_modifier }
+}
+
+cancel_bfts_gold_trade = {
+	c:GRA ?= {
+		every_trade = {
+			limit = {
+				goods     = goods:goods_gold
+				is_locked = yes
+			}
+			cancel_trade = {}
+		}
+	}
+}
+
+cas_create_cultural_revolt = {
 	custom_tooltip = {
-		text = reset_complacency_tt
-		add_complacency = -200
+		text = cas_create_cultural_revolt_tt
+		every_owned_location = {
+			limit = { dominant_culture = $CULTURE$ }
+			every_pop = {
+				limit = {
+					owner = root
+					culture = $CULTURE$
+				}
+				add_pop_satisfaction = pop_satisfaction_ultimate_penalty
+				change_pop_allegiance = scope:$REBEL$
+			}
+		}
+		scope:$REBEL$ ?= {
+			start_civil_war = { save_scope_as = revolt_country }
+		}
+		scope:revolt_country ?= {
+			raise_all_levies = {
+				type = army
+				instant = yes
+			}
+			if = {
+				limit = { NOT = { culture = $CULTURE$ } }
+				change_culture = $CULTURE$
+			}
+			set_new_ruler = scope:target_character
+		}
+	}
+}
+
+select_or_create_braganca_ruler = {
+	if = {
+		limit = { character:por_john_braganza ?= { is_alive = yes } }
+		character:por_john_braganza = { save_scope_as = target_character }
+	}
+	else_if = {
+		limit = { NOT = { exists = character:por_john_braganza } }
+		create_character = {
+			first_name = name_john
+			dynasty = dynasty:braganca_dynasty
+			estate = estate_type:nobles_estate
+			adm = 44
+			dip = 60
+			mil = 25
+			birth_date = 1604.3.19
+			birth_location = location:vila_vicosa
+			script = por_john_braganza
+			save_scope_as = target_character
+		}
+	}
+	else = {
+		random_character = {
+			limit = {
+				culture = culture:portuguese
+				is_alive = yes
+			}
+			save_scope_as = target_character
+		}
+		if = {
+			limit = { NOT = { exists = scope:target_character } }
+			create_character = {
+				culture = culture:portuguese
+				religion = root.religion
+				age = 40
+				estate = estate_type:nobles_estate
+				save_scope_as = target_character
+			}
+		}
 	}
 }

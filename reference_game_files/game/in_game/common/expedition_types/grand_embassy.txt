@@ -1,0 +1,358 @@
+﻿grand_embassy_expedition = {
+
+	unique = yes
+	repeatable = no
+	dynamic_first_waypoint = yes
+	travel_speed = 0.75
+	origin = capital
+	category = diplomatic
+	icon = category_diplomatic
+	triggers_regency = yes
+	fail_if_no_leader = yes
+	show_start_message = no
+	should_end_at_last_waypoint = no
+	stalled_status_text = grand_embassy_expedition_stalled_status
+
+	variables = {
+		discretion = {
+			start = 0
+			min = 0
+			max = 100
+			display = piechart
+			icon = "gfx/interface/icons/flat_icons/discretion.dds"
+		}
+		modernization = {
+			start = 0
+			min = 0
+			max = 100
+			icon = "gfx/interface/icons/flat_icons/modernization.dds"
+		}
+		opportunities = {
+			start = 0
+			min = 0
+			max = 4
+			display = fraction
+			icon = "gfx/interface/icons/flat_icons/opportunities.dds"
+		}
+	}
+
+	potential = {
+		has_variable = grand_embassy_setup
+	}
+
+	can_start = {
+		has_ruler = yes
+		ruler ?= { owner = root }
+	}
+
+	leader = {
+		is_ruler = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	ai_leader_source_list = {
+		ruler = {
+			add_to_list = source
+		}
+	}
+
+	on_start = {
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+		}
+		remove_variable = grand_embassy_setup
+		ruler ?= { save_scope_as = target_ruler }
+		ordered_courtier = {
+			order_by = adm
+			limit = {
+				NOT = { in_cabinet = yes }
+				NOT = { is_general = yes }
+				NOT = { is_admiral = yes }
+				NOT = { has_exploration = yes }
+			}
+			max = 1
+			save_scope_as = figurehead
+		}
+		scope:figurehead ?= {
+			set_variable = { name = grand_embassy_figurehead value = 1 }
+		}
+		ordered_known_country = {
+			order_by = "capital.distance_to(root.capital)"
+			limit = { is_valid_embassy_country = yes }
+			max = 1
+			save_scope_as = first_host
+		}
+		if = {
+			limit = { exists = scope:first_host }
+			scope:expedition = {
+				add_new_waypoint = scope:first_host.capital
+			}
+		}
+		else = {
+			scope:expedition = {
+				add_new_waypoint = location:amsterdam
+			}
+			location:amsterdam.owner = { save_scope_as = first_host }
+		}
+		ruler ?= {
+			add_character_modifier = {
+				modifier = on_grand_embassy
+				months = -1
+				mode = add_and_extend
+				desc = on_grand_embassy_duration_desc
+			}
+		}
+		scope:expedition = { save_scope_as = active_expedition }
+		trigger_event_non_silently = { id = grand_embassy.1 }
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = { scope:location = root.capital }
+			end_expedition = scope:expedition
+		}
+		else = {
+			if = {
+				limit = {
+					scope:location.owner ?= { NOT = { this = root } }
+				}
+				scope:location.owner = {
+					save_scope_as = embassy_country
+				}
+				ROOT = { save_scope_as = from }
+				ruler ?= { save_scope_as = target_ruler }
+				random_courtier = {
+					limit = { has_variable = grand_embassy_figurehead }
+					save_scope_as = figurehead
+				}
+				scope:expedition = {
+					save_scope_as = active_expedition
+					set_variable = { name = opportunities value = 0 }
+					remove_variable = grand_embassy_discovered
+					remove_variable = grand_embassy_awaiting_departure
+					remove_variable = grand_embassy_presented
+				}
+				if = {
+					limit = { scope:location = { is_port = yes } }
+					scope:expedition = {
+						set_variable = { name = grand_embassy_visited_port value = 1 }
+					}
+				}
+				trigger_event_non_silently = { id = grand_embassy.2 }
+				stall_expedition = scope:expedition
+			}
+			else = {
+				scope:expedition = { add_new_waypoint = root.capital }
+			}
+		}
+	}
+
+	on_monthly = {
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_stalled = yes
+					expedition_is_paused = no
+					has_variable = grand_embassy_presented
+					var:opportunities > 0
+					var:discretion < 90
+					NOT = { has_variable = grand_embassy_discovered }
+				}
+			}
+			scope:expedition = {
+				set_variable = { name = grand_embassy_discovered value = 1 }
+				save_scope_as = active_expedition
+				expedition_current_location = {
+					owner = { save_scope_as = embassy_country }
+				}
+			}
+			ROOT = { save_scope_as = from }
+			ruler ?= { save_scope_as = target_ruler }
+			trigger_event_non_silently = { id = grand_embassy.6 }
+		}
+		else_if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_stalled = yes
+					expedition_is_paused = no
+					has_variable = grand_embassy_presented
+					var:opportunities > 0
+				}
+			}
+			scope:expedition = {
+				save_scope_as = active_expedition
+				expedition_current_location = {
+					owner = { save_scope_as = embassy_country }
+				}
+			}
+			ROOT = { save_scope_as = from }
+			ruler ?= { save_scope_as = target_ruler }
+			random_list = {
+				6 = { trigger_event_non_silently = { id = grand_embassy.9 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.10 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.11 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.12 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.13 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.14 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.15 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.16 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.24 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.25 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.26 } }
+				4 = { trigger_event_non_silently = { id = grand_embassy.17 } }
+				4 = { trigger_event_non_silently = { id = grand_embassy.18 } }
+				4 = { trigger_event_non_silently = { id = grand_embassy.19 } }
+				4 = { trigger_event_non_silently = { id = grand_embassy.20 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.21 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.22 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.23 } }
+				6 = { trigger_event_non_silently = { id = grand_embassy.4 } }
+				80 = {}
+			}
+		}
+		if = {
+			limit = {
+				scope:expedition = {
+					expedition_is_stalled = yes
+					expedition_is_paused = no
+					has_variable = grand_embassy_presented
+					var:opportunities <= 0
+					NOT = { has_variable = grand_embassy_awaiting_departure }
+				}
+			}
+			scope:expedition = {
+				set_variable = { name = grand_embassy_awaiting_departure value = 1 }
+				save_scope_as = active_expedition
+				expedition_current_location = {
+					owner = { save_scope_as = embassy_country }
+				}
+			}
+			trigger_event_non_silently = { id = grand_embassy.7 }
+		}
+	}
+
+	on_end = {
+		scope:expedition = {
+			expedition_leader ?= {
+				remove_character_modifier = on_grand_embassy
+			}
+		}
+		random_courtier = {
+			limit = { has_variable = grand_embassy_figurehead }
+			remove_variable = grand_embassy_figurehead
+		}
+
+		root = { save_temporary_scope_as = grand_embassy_traveler }
+		if = {
+			limit = { scope:expedition = { has_variable_list = grand_embassy_visited_countries } }
+			scope:expedition = {
+				random_in_list = {
+					variable = grand_embassy_visited_countries
+					limit = {
+						any_institutions_embraced = {
+							NOT = { scope:grand_embassy_traveler = { has_embraced_institution = prev } }
+						}
+					}
+					random_institutions_embraced = {
+						limit = {
+							NOT = { scope:grand_embassy_traveler = { has_embraced_institution = prev } }
+						}
+						save_scope_as = target_institution
+					}
+				}
+			}
+		}
+
+		if = {
+			limit = { exists = scope:target_institution }
+			set_variable = {
+				name = grand_embassy_institution_progress_amount
+				value = {
+					value = 5
+					multiply = {
+						value = 1
+						add = { value = scope:expedition.var:modernization multiply = 0.01 }
+					}
+					round = yes
+				}
+			}
+			set_variable = {
+				name = grand_embassy_institution_progress_capital_amount
+				value = {
+					value = var:grand_embassy_institution_progress_amount
+					multiply = 1.5
+					round = yes
+				}
+			}
+			custom_tooltip = {
+				text = grand_embassy_expedition_institution_spread_tt
+				every_owned_location = {
+					limit = {
+						NOT = { has_institution = scope:target_institution }
+					}
+					change_institution_progress = {
+						type = scope:target_institution
+						value = {
+							if = {
+								limit = { is_capital = yes }
+								value = ROOT.var:grand_embassy_institution_progress_capital_amount
+							}
+							else = {
+								value = ROOT.var:grand_embassy_institution_progress_amount
+							}
+						}
+					}
+				}
+			}
+		}
+
+		add_army_tradition = {
+			value = 1
+			multiply = {
+				value = 1
+				add = { value = scope:expedition.var:modernization multiply = 0.01 }
+			}
+		}
+
+		if = {
+			limit = { scope:expedition = { has_variable = grand_embassy_visited_port } }
+			add_navy_tradition = {
+				value = 1
+				multiply = {
+					value = 1
+					add = { value = scope:expedition.var:modernization multiply = 0.01 }
+				}
+			}
+		}
+	}
+
+	on_fail = {
+		remove_variable = grand_embassy
+		scope:expedition = {
+			expedition_leader ?= {
+				remove_character_modifier = on_grand_embassy
+			}
+		}
+		random_courtier = {
+			limit = { has_variable = grand_embassy_figurehead }
+			remove_variable = grand_embassy_figurehead
+		}
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		multiply = 0.25
+		multiply = {
+			value = ruler.dip
+			divide = 25
+		}
+	}
+
+	utility = {
+		value = 5
+	}
+}

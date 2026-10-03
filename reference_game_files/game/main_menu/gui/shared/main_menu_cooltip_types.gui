@@ -4,10 +4,7 @@
 @tooltip_inner_wide =  @[tooltip_title_wide - tooltip_inner_margin * 2]
 
 template tooltip_title_icon_size { size = { 42 42 } }
-# template tooltip_min_width_title_wide { min_width = @tooltip_title_wide }
 template tooltip_max_width_title_wide { max_width = @tooltip_title_wide }
-# template tooltip_min_width_inner_wide { min_width = @tooltip_inner_wide }
-# template tooltip_max_width_inner_wide { max_width = @tooltip_inner_wide }
 
 template tooltip_table_field_texture {
 	using = text_mask_container_texture
@@ -27,8 +24,9 @@ template click_modifier_bg_texture {
 
 types ScrollbarTypes 
 {
-	type Scrollbar_Vertical_Tooltips = scrollbar {
+	type ScrollbarVertical_Tooltips = scrollbar {
 		name = "vertical_scrollbar_messages"
+		ignore_layout = yes
 		size = { 4 12 }
 		wheelstep = 60
 		direction = vertical
@@ -95,7 +93,7 @@ template Background_Area {
 }
 
 template Scrollbar_Vertical_Tooltips {
-	Scrollbar_Vertical_Tooltips = {}
+	ScrollbarVertical_Tooltips = {}
 }
 
 template tooltip_left_click_template {
@@ -524,57 +522,19 @@ types BuildingBlocksTooltipsTypes
 			block "no_icon_size" { size = { 80% 80% } }
 			parentanchor = center
 		}
+
+		icon = {
+			block "warning_visible" { visible = no }
+			texture = "gfx/interface/icons/icon_warning.dds"
+			block "warning_icon_size" { size = { 80% 80% } }
+			parentanchor = center
+		}
 	}
 
 	type TooltipFunctionalBlock = hbox {
 		layoutpolicy_horizontal = expanding
-		# background = {
-		# 	using = bg_round_corners_alt_texture
-		# 	alpha = 0.3
-
-		# 	modify_texture = {
-		# 		using = color_blue_texture
-		# 	}
-		# }
-		# background = {
-		# 	texture = "gfx/interface/component_tiles/round_corners_frame_thin_alt.dds"
-		# 	texture_density = 2
-		# 	spriteType = corneredstretched
-		# 	spriteBorder = {15 15}
-		# 	alpha = 0.3
-
-		# 	modify_texture = {
-		# 		using = color_blue_texture
-		# 	}
-		# 	modify_texture = {
-		# 		using = overlay_watercolor_texture
-		# 		blend_mode = multiply
-		# 		using = color_blue_texture
-		# 	}
-		# }
-		# background = {
-		# 	texture = "gfx/interface/component_tiles/round_corners_frame_thin_alt.dds"
-		# 	texture_density = 2
-		# 	spriteType = corneredstretched
-		# 	spriteBorder = {15 15}
-		# 	alpha = 0.3
-
-		# 	modify_texture = {
-		# 		using = color_blue_texture
-		# 	}
-		# 	modify_texture = {
-		# 		using = overlay_watercolor_texture
-		# 		blend_mode = multiply
-		# 		alpha = 0.8
-		# 	}
-		# }
 
 		spacing = 10
-
-		# blockoverride "tooltip_text_block_size" {
-		# 	using = tooltip_min_width_title_wide
-		# 	using = tooltip_max_width_title_wide
-		# }
 	}
 
 	type TooltipContentSection = vbox {
@@ -586,7 +546,7 @@ types BuildingBlocksTooltipsTypes
 		block "section_content"	{}
 	}
 
-	type TooltipScrolledContentSection = scrollarea {
+	type TooltipListScrollArea = scrollarea {
 		block "block_scrollarea" {
 			maximumsize = { -1 600 }
 		}
@@ -609,14 +569,29 @@ types BuildingBlocksTooltipsTypes
 			}
 		}
 	}
+
+	type TooltipScrolledContentSection = scrollvbox {
+		block "block_scrollarea" {
+			maximumsize = { -1 600 }
+		}
+
+		scrollbar_vertical = {
+			ScrollbarVertical_Tooltips = {
+				parentanchor = right
+			}
+		}
+
+		layoutpolicy_horizontal = expanding
+		spacing = 10
+		ignoreinvisible = yes
+		allow_outside = yes
+
+		block "section_content"	{}
+	}
 }
 
 types CooltipsBaseTypes
 {
-	# type tooltip_text_block = textbox {
-	# 	using = tooltip_text_block_template
-	# }
-
 	type tooltip_debug_text_block = debug_textbox {
 		visible_at_creation = no
 		using = tooltip_text_block_template
@@ -641,6 +616,369 @@ types CooltipsBaseTypes
 		}
 
 		ontextchanged = "[UpdateVisibilityIfThereIsAnyText(PdxGuiWidget.AccessSelf)]"
+	}
+}
+
+template tooltip_columnlist_content {
+	block "columnlist_datamodel" {
+		datamodel = "[TableColumnList.GetColumns]"
+		ignoreinvisible = yes
+	}
+
+	block "columnlist_content_extra" {}
+
+	item = {
+		TooltipTableColumn = {
+			layoutpolicy_horizontal = "[TableColumn.GetHorizontalLayoutPolicy]"
+
+			blockoverride "column_datamodel" {
+				datamodel = "[TableColumn.GetRows]"
+				ignoreinvisible = yes
+			}
+
+			blockoverride "column_title" {
+				visible = "[TableColumn.GetTitle.IsStringViewNotEmptyOrNull]"
+			}
+
+			blockoverride "column_title_text" {
+				autoresize = yes
+				text = "[TableColumn.GetTitle.GetStringView]"
+				align = "[TableColumn.GetTextAlignment]"
+			}
+
+			blockoverride "column_title_left" {
+				expand = {
+					visible = "[TableColumn.IsTextRight]"
+				}
+			}
+
+			blockoverride "column_title_right" {
+				expand = {
+					visible = "[TableColumn.IsTextLeft]"
+				}
+			}
+
+			blockoverride "field_text" {
+				autoresize = yes
+				text = "[CPdxStringView.GetStringView]"
+				align = "[TableColumn.GetTextAlignment]"
+			}
+
+			blockoverride "field_left" {
+				expand = {
+					visible = "[TableColumn.IsTextRight]"
+				}
+			}
+
+			blockoverride "field_right" {
+				expand = {
+					visible = "[TableColumn.IsTextLeft]"
+				}
+			}
+		}
+	}
+}
+
+template tooltip_rowlist_content {
+	block "rowlist_datamodel" {
+		datamodel = "[RowList.GetRows]"
+		ignoreinvisible = yes
+	}
+
+	item = {
+		TooltipTableField = {
+			blockoverride "field_content" {
+				block "rowlist_content" {
+					textbox = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+						margin = { 0 5 }
+
+						using = text_multi_template
+						align = nobaseline
+						elide = right
+
+						block "rowlist_item" {
+							text = "[CPdxStringView.GetStringView]"
+							block "field_text_format" {}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+template tooltip_conditionlist_content {
+	block "conditionlist_datamodel" {
+		datamodel = "[ConditionList.GetLines]"
+		ignoreinvisible = yes
+	}
+
+	item = {
+		TooltipTableField = {
+			blockoverride "field_background" {
+				background = {
+					visible = "[ConditionLine.HasPassed]"
+					using = color_mid_light_green_texture
+					alpha = 0.3
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[ConditionLine.HasFailed]"
+					using = color_mid_red_texture
+					alpha = 0.2
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[ConditionLine.IsNeutral]"
+					using = color_mid_blue_texture
+					alpha = 0.2
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+			}
+
+			blockoverride "field_content" {
+					block "conditionlist_item_setup" {}
+						margin = { 10 5 }
+						margin_left = "[Add_int32(Multiply_int32(ConditionLine.GetIndent,'(int32)5'),'(int32)10')]"
+						spacing = 10
+
+					TooltipYesNoCheckbox = {
+						visible = "[Or3(ConditionLine.HasPassed, ConditionLine.HasFailed, ConditionLine.IsWarning)]"
+						blockoverride "yes_visible" { visible = "[ConditionLine.HasPassed]" }
+						blockoverride "no_visible" { visible = "[ConditionLine.HasFailed]" }
+						blockoverride "warning_visible" { visible = "[ConditionLine.IsWarning]" }
+					}
+
+					textbox = {
+						layoutpolicy_horizontal = expanding
+						autoresize = yes
+
+						align = nobaseline
+						using = text_multi_template
+						elide = right
+
+							text = "[ConditionLine.GetText]"
+							block "field_text_format" {}
+
+						block "conditionlist_collapsed_tooltip" {
+							tooltip_enabled = "[ConditionList.HasCollapsedText]"
+							tooltipwidget = {
+								ContextualTooltipTypeBase = {
+									datacontext = "[StringToRequirementsList(ConditionList.GetCollapsedText)]"
+									TooltipScrolledRequirementsList = {
+										blockoverride "block_title" {
+											text = "LIST_TITLE_REQUIREMENTS"
+										}
+
+										set_parent_size_to_minimum = yes
+										margin = { 5 5 }
+									}
+
+									widget = { using = bg_tooltip_frame }
+								}
+							}
+						}
+					}
+			}
+		}
+	}
+}
+
+template tooltip_requirementslist_content {
+	block "requirementslist_datamodel" {
+		datamodel = "[RequirementsList.GetLines]"
+	}
+
+	item = {
+		TooltipTableField = {
+			datacontext = "[GetRequirementLineAux(RequirementLine.Self, PdxGuiWidget.AccessSelf, PdxGuiWidget.GetIndexInDataModel)]"
+
+			blockoverride "field_background" {
+				background = {
+					visible = "[RequirementLine.HasPassed]"
+					using = color_mid_light_green_texture
+					alpha = 0.3
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[RequirementLine.HasFailed]"
+					using = color_mid_red_texture
+					alpha = 0.4
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[RequirementLine.IsSkipped]"
+					using = color_mid_blue_texture
+					alpha = 0.3
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[RequirementLine.IsBlocker]"
+					using = color_mid_red_texture
+					alpha = 0.2
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					visible = "[RequirementLine.IsUndefined]"
+					using = color_mid_blue_texture
+					alpha = 0.2
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0.1
+					}
+				}
+
+				background = {
+					texture = "gfx/interface/component_tiles/floral_container_frame.dds"
+					texture_density = 2
+					spriteType = corneredstretched
+					spriteborder = { 15 10 }
+					margin_top = 1
+
+					modify_texture = {
+						using = color_dark_brown_texture
+						blend_mode = multiply
+					}
+
+					modify_texture = {
+						visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+						using = color_white_texture
+						alpha = 0
+					}
+				}
+			}
+
+			blockoverride "field_content" {
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 5
+
+						# Hierarchy arrows
+						hbox = {
+							layoutpolicy_vertical = expanding
+
+							# Indent spacing
+							hbox = {
+								datamodel = "[DataModelRepeatedItem(RequirementLine.GetIndent)]"
+								item = {
+									widget = {
+										size = { 25 3 }
+									}
+								}
+							}
+
+							# First element root line
+							widget = {
+								size = { 10 2 }
+								icon = {
+									visible = "[EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0')]"
+									size = { 100% 100% }
+									parentanchor = right|vcenter
+									using = color_requirementlist_arrow_white_texture
+								}
+							}
+
+							# Vertical line to parent/sibling
+							icon = {
+								size = { 2 2 }
+								using = color_requirementlist_arrow_white_texture
+
+								icon = {
+									visible = "[Not(EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0'))]"
+									size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0', '(float)10')]"
+									parentanchor = bottom
+									using = color_requirementlist_arrow_white_texture
+								}
+							}
+
+							# Last mile arrow to text
+							icon = {
+								size = { 10 2 }
+								using = color_requirementlist_arrow_white_texture
+							}
+						}
+
+						widget = {
+							size = { 20 20 }
+
+							TooltipYesNoCheckbox = {
+								visible = "[Not(RequirementLine.IsUndefined)]"
+								blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
+								blockoverride "no_visible" { visible = "[Or(RequirementLine.HasFailed, RequirementLine.IsBlocker)]" }
+							}
+
+							icon = {
+								size = { 35% 40% }
+								parentanchor = center
+								visible = "[RequirementLine.IsUndefined]"
+								texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds"
+								modify_texture = {
+									using = color_white_texture
+									alpha = 0.6
+								}
+							}
+						}
+
+						textbox = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							margin = { 0 5 }
+
+							align = nobaseline
+							using = text_multi_template
+							elide = right
+
+							text = "[RequirementLine.GetText]"
+							block "field_text_format" {}
+						}
+					}
+			}
+		}
 	}
 }
 
@@ -707,11 +1045,9 @@ types ContextualTooltipTypes
 						fontsize_min = 12
 						align = left|nobaseline
 
-						# block "title_font_size" {
-							using = Font_Type_Headers
-							using = Font_Size_Medium
-							default_format = "#T"
-						# }
+						using = Font_Type_Headers
+						using = Font_Size_Medium
+						default_format = "#T"
 
 						block "title_text" {
 							visible = "[PdxGuiWidget.HasTooltipMetaTitle]"
@@ -744,13 +1080,25 @@ types ContextualTooltipTypes
 			}
 
 			block "title_button" {}
-
-			# TooltipHotkeyIcon = {}
 		}
 	}
 
+	type TooltipOnlyTextType = ContextualTooltipTypeBase {
+		ontextcontextchanged = "[SetCStringFromTextContext(PdxGuiWidget.AccessSelf)]"
+		TooltipTextBlock = {
+			set_parent_size_to_minimum = yes
+			margin = { 5 5 }
+		}
+
+		widget = { using = bg_tooltip_frame }
+	}
+
 	type TooltipConditionListType = ContextualTooltipTypeBase {
-		TooltipConditionList = {
+		ontextcontextchanged = "[SetRequirementsListFromTextContextWithTitle(PdxGuiWidget.AccessSelf)]"
+		# ontextcontextchanged = "[SetCStringFromTextContext(PdxGuiWidget.AccessSelf)]"
+
+		TooltipRequirementsList = {
+		# TooltipTextBlock = {
 			set_parent_size_to_minimum = yes
 			margin = { 5 5 }
 		}
@@ -909,24 +1257,26 @@ types ContextualTooltipTypes
 			using = tooltip_left_click_conditions_template
 
 			visible = "[And3(UIAction.IsLeftClickVisible, Not(UIAction.IsLeftClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetLeftClickTooltip).GetOutput)))]"
-			datacontext = "[StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickTooltip)]"
-			# tooltipwidget = {
-			# 	TooltipConditionListType = {
-			# 		datacontext = "[StringToConditionList(UIAction.GetLeftClickTooltip)]"
-			# 	}
-			# }
+			datacontext = "[StringToConditionListOnlyFailAndWarningCollapseRequirement(UIAction.GetLeftClickTooltip)]"
+			blockoverride "conditionlist_collapsed_tooltip" {}
+			tooltipwidget = {
+				TooltipConditionListType = {
+					textcontext = "[UIAction.GetLeftClickTooltip]"
+				}
+			}
 		}
 
 		TooltipConditionList = {
 			using = tooltip_left_click_conditions_template
 
 			visible = "[And3(UIAction.IsLeftClickAndConfirmVisible, Not(UIAction.IsLeftClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetLeftClickAndConfirmTooltip).GetOutput)))]"
-			datacontext = "[StringToConditionListOnlyFailCollapseRequirement(UIAction.GetLeftClickAndConfirmTooltip)]"
-			# tooltipwidget = {
-			# 	TooltipConditionListType = {
-			# 		datacontext = "[StringToConditionList(UIAction.GetLeftClickAndConfirmTooltip)]"
-			# 	}
-			# }
+			datacontext = "[StringToConditionListOnlyFailAndWarningCollapseRequirement(UIAction.GetLeftClickAndConfirmTooltip)]"
+			blockoverride "conditionlist_collapsed_tooltip" {}
+			tooltipwidget = {
+				TooltipConditionListType = {
+					textcontext = "[UIAction.GetLeftClickAndConfirmTooltip]"
+				}
+			}
 		}
 
 		TooltipFunctionalBlock = {
@@ -949,12 +1299,7 @@ types ContextualTooltipTypes
 			blockoverride "conditionlist_item_setup" { righttoleft = yes }
 
 			visible = "[And3(UIAction.IsRightClickVisible, Not(UIAction.IsRightClickEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetRightClickTooltip).GetOutput)))]"
-			datacontext = "[StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickTooltip)]"
-			# tooltipwidget = {
-			# 	TooltipConditionListType = {
-			# 		datacontext = "[StringToConditionList(UIAction.GetRightClickTooltip)]"
-			# 	}
-			# }
+			datacontext = "[StringToConditionListOnlyFailAndWarningCollapseRequirement(UIAction.GetRightClickTooltip)]"
 		}
 
 		TooltipConditionList = {
@@ -962,12 +1307,7 @@ types ContextualTooltipTypes
 			blockoverride "conditionlist_item_setup" { righttoleft = yes }
 
 			visible = "[And3(UIAction.IsRightClickAndConfirmVisible, Not(UIAction.IsRightClickAndConfirmEnabled), Not(StringIsEmpty(StringToConditionListOnlyFail(UIAction.GetRightClickAndConfirmTooltip).GetOutput)))]"
-			datacontext = "[StringToConditionListOnlyFailCollapseRequirement(UIAction.GetRightClickAndConfirmTooltip)]"
-			# tooltipwidget = {
-			# 	TooltipConditionListType = {
-			# 		datacontext = "[StringToConditionList(UIAction.GetRightClickAndConfirmTooltip)]"
-			# 	}
-			# }
+			datacontext = "[StringToConditionListOnlyFailAndWarningCollapseRequirement(UIAction.GetRightClickAndConfirmTooltip)]"
 		}
 
 		blockoverride "action_left" {
@@ -993,7 +1333,7 @@ types ContextualTooltipTypes
 			tooltip_enabled = "[Not(StringIsEmpty(Concatenate(UIAction.GetLeftClickTooltip, UIAction.GetLeftClickAndConfirmTooltip)))]"
 			tooltipwidget = {
 				TooltipConditionListType = {
-					datacontext = "[StringToConditionList(Concatenate(UIAction.GetLeftClickTooltip, UIAction.GetLeftClickAndConfirmTooltip))]"
+					textcontext = "[Concatenate(UIAction.GetLeftClickTooltip, UIAction.GetLeftClickAndConfirmTooltip)]"
 				}
 			}
 		}
@@ -1001,8 +1341,8 @@ types ContextualTooltipTypes
 		blockoverride "left_icon_object" {
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_TOOLTIP')]"
 					}
 				}
 				visible = "[Not(UIAction.IsLeftClickAndConfirmVisible)]"
@@ -1013,8 +1353,8 @@ types ContextualTooltipTypes
 
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_HOLD_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_HOLD_TOOLTIP')]"
 					}
 				}
 				visible = "[And(IsActionConfirmAndHoldMode,UIAction.IsLeftClickAndConfirmVisible)]"
@@ -1025,8 +1365,8 @@ types ContextualTooltipTypes
 
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_CONFIRM_DIALOG_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_CONFIRM_DIALOG_TOOLTIP')]"
 					}
 				}
 				visible = "[And(IsActionDialogMode,UIAction.IsLeftClickAndConfirmVisible)]"
@@ -1100,7 +1440,7 @@ types ContextualTooltipTypes
 			tooltip_enabled = "[Not(StringIsEmpty(Concatenate(UIAction.GetRightClickTooltip, UIAction.GetRightClickAndConfirmTooltip)))]"
 			tooltipwidget = {
 				TooltipConditionListType = {
-					datacontext = "[StringToConditionList(Concatenate(UIAction.GetRightClickTooltip, UIAction.GetRightClickAndConfirmTooltip))]"
+					textcontext = "[Concatenate(UIAction.GetRightClickTooltip, UIAction.GetRightClickAndConfirmTooltip)]"
 				}
 			}
 		}
@@ -1108,8 +1448,8 @@ types ContextualTooltipTypes
 		blockoverride "right_icon_object" {
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_TOOLTIP')]"
 					}
 				}
 				visible = "[Not(UIAction.IsRightClickAndConfirmVisible)]"
@@ -1120,8 +1460,8 @@ types ContextualTooltipTypes
 
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_HOLD_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_HOLD_TOOLTIP')]"
 					}
 				}
 				visible = "[And(IsActionConfirmAndHoldMode,UIAction.IsRightClickAndConfirmVisible)]"
@@ -1132,8 +1472,8 @@ types ContextualTooltipTypes
 
 			icon = {
 				tooltipwidget = {
-					TooltipConditionListType = {
-						datacontext = "[StringToConditionList(Localize('CLICK_CONFIRM_DIALOG_TOOLTIP'))]"
+					TooltipOnlyTextType = {
+						textcontext = "[Localize('CLICK_CONFIRM_DIALOG_TOOLTIP')]"
 					}
 				}
 				visible = "[And(IsActionDialogMode,UIAction.IsRightClickAndConfirmVisible)]"
@@ -1217,111 +1557,6 @@ types ContextualTooltipTypes
 		blockoverride "action_text_wide" { using = tooltip_max_width_title_wide }
 	}
 
-	# type BasicConditionListTooltip = ContextualTooltipType {
-	# 	blockoverride "tooltip_title" {}
-	# 	blockoverride "tooltip_content" {
-	# 		TooltipConditionList = {
-	# 			# block "condition_list_setup" {}
-	# 		}
-	# 	}
-	# }
-
-	# type ToolTipHintBox = vbox {
-	# 	block "show_hint" { visible = yes }
-
-	# 	background = {
-	# 		using = bg_round_corners
-	# 		alpha = 0.3
-	# 	}
-
-	# 	margin = { 20 20 }
-
-	# 	ignoreinvisible = yes
-	# 	spacing = 10
-
-	# 	widget = {
-	# 		size = { @[tooltip_inner_wide - 40] 40 }
-	# 		hbox = {
-	# 			spacing = 10
-	# 			icon = {
-	# 				texture = "gfx/interface/icons/flat_icons/europedia_flat_icon.dds"
-	# 				size = { 32 32 }
-
-	# 				modify_texture = {
-	# 					using = color_gold_texture
-	# 				}
-	# 			}
-
-	# 			text_single = {
-	# 				using = layoutpolicy_expanding
-	# 				default_format = "#help"
-	# 				using = Font_Size_Medium
-	# 				autoresize = no
-	# 				align = nobaseline
-	# 				block "hint_title" {}
-	# 			}
-	# 		}
-	# 	}
-
-	# 	tooltip_text_block = {
-	# 		min_width = @[tooltip_inner_wide - 40]
-	# 		max_width = @[tooltip_inner_wide - 40]
-	# 		default_format = "#help"
-	# 		block "hint_text" {}
-	# 	}
-	# }
-
-	# type TooltipTutorialTextBlock = vbox {
-	# 	layoutpolicy_horizontal = expanding
-
-	# 	background = {
-	# 		using = color_turquoise_texture
-	# 		alpha = 0.1
-	# 	}
-
-	# 	margin = { @tooltip_inner_margin @[tooltip_inner_margin + 10] }
-	# 	spacing = 10
-
-	# 	widget = {
-	# 		size = { @tooltip_inner_wide 40 }
-
-	# 		hbox = {
-	# 			set_parent_size_to_minimum = yes
-	# 			spacing = 10
-
-	# 			vbox = {
-	# 				layoutpolicy_vertical = expanding
-	# 				icon = {
-	# 					texture = "gfx/interface/icons/flat_icons/europedia_flat_icon.dds"
-	# 					size = { 32 32 }
-	# 					modify_texture = {
-	# 						using = color_white_texture
-	# 						blend_mode = normal
-	# 						alpha = 0.7
-	# 					}
-	# 				}
-
-	# 				expand = {}
-	# 			}
-
-	# 			textbox = {
-	# 				using = tooltip_text_block_template
-	# 				# blockoverride "tooltip_text_block_size" {}
-	# 				default_format = "#help"
-	# 				using = Font_Size_Medium
-	# 				align = nobaseline
-	# 				block "tutorial_title_text" {}
-	# 			}
-	# 		}
-	# 	}
-
-	# 	tooltip_text_block = {
-	# 		# blockoverride "tooltip_text_block_size" {}
-	# 		default_format = "#help"
-	# 		block "tutorial_text" {}
-	# 	}
-	# }
-
 	type TooltipListBase = vbox {
 		layoutpolicy_horizontal = expanding
 		block "tooltip_minimumsize" { minimumsize = { @tooltip_inner_wide -1 } }
@@ -1353,15 +1588,9 @@ types ContextualTooltipTypes
 			}
 		}
 
-		TooltipListScrollArea = {
+		TooltipScrolledColumnListContent = {
 			visible = "[DataModelHasItems(TableColumnList.GetColumns)]"
-
-			blockoverride "scrollarea_content" {
-				TooltipColumnListContent = {
-					set_parent_dimension_to_minimum = height
-					layoutpolicy_horizontal = expanding
-				}
-			}
+			layoutpolicy_horizontal = expanding
 		}
 
 		TooltipListEmptyContent = {
@@ -1371,7 +1600,6 @@ types ContextualTooltipTypes
 
 	type TooltipTableHeader = hbox {
 		layoutpolicy_horizontal = expanding
-		# block "table_header_icon" {}
 		block "table_header_background" {
 			using = bg_text_mask_container_turquoise
 		}
@@ -1384,8 +1612,6 @@ types ContextualTooltipTypes
 
 		block "table_header_extra" {}
 	}
-
-	type TooltipListScrollArea = TooltipScrolledContentSection {}
 
 	type ConceptTooltipType = widget {
 		alwaystransparent = no
@@ -1430,10 +1656,6 @@ types ContextualTooltipTypes
 
 	type ConceptTooltipDefaultIcon = widget {
 		size = { 1 32 }
-		# block "title_icon_texture" {
-		# 	texture = "gfx/interface/icons/flat_icons/tabicons/europedia_flat_icon.dds"
-		# 	texture_density = 2
-		# }
 	}
 
 	type ConceptTooltipHeader = hbox {
@@ -1462,11 +1684,9 @@ types ContextualTooltipTypes
 						layoutpolicy_horizontal = expanding
 						autoresize = no
 						align = left|nobaseline
-						# block "title_font_size" {
-							using = Font_Type_Headers
-							using = Font_Size_Medium
-							default_format = "#T"
-						# }
+						using = Font_Type_Headers
+						using = Font_Size_Medium
+						default_format = "#T"
 						block "title_text" {
 							visible = "[PdxGuiWidget.HasTooltipMetaTitle]"
 							text = "[PdxGuiWidget.GetTooltipMetaTitle]"
@@ -1483,9 +1703,7 @@ types ContextualTooltipTypes
 						autoresize = no
 						align = left|nobaseline
 
-						# block "concept_link_font_size" {
-							using = Font_Type_Flavor
-						# }
+						using = Font_Type_Flavor
 						block "concept_link" {
 							visible = "[PdxGuiWidget.HasTooltipMetaGameConcept]"
 							text = "[PdxGuiWidget.GetTooltipMetaGameConcept]"
@@ -1497,8 +1715,6 @@ types ContextualTooltipTypes
 			}
 
 			block "title_button" {}
-
-			# TooltipHotkeyIcon = {}
 		}
 	}
 
@@ -1550,17 +1766,12 @@ types ContextualTooltipTypes
 			}
 		}
 
-		TooltipListScrollArea = {
+		TooltipScrolledRowListContent = {
 			block "rowlist_datamodel_has_items" {
 				visible = "[DataModelHasItems(RowList.GetRows)]"
 			}
 
-			blockoverride "scrollarea_content" {
-				TooltipRowListContent = {
-					set_parent_dimension_to_minimum = height
-					layoutpolicy_horizontal = expanding
-				}
-			}
+			layoutpolicy_horizontal = expanding
 		}
 
 		TooltipListEmptyContent = {
@@ -1582,85 +1793,10 @@ types ContextualTooltipTypes
 			}
 
 			blockoverride "tableheader_text" {
-				# block "block_footer" {
 					visible = no
-				# }
 			}
 		}
 	}
-
-	# type ScrolledTooltipTableColumn = vbox {
-	# 	layoutpolicy_horizontal = expanding
-
-	# 	TooltipTableField = {
-	# 		block "column_title" {
-	# 			visible = no
-	# 		}
-
-	# 		blockoverride "field_background" {
-	# 			background = {
-	# 				using = tile_background_squared_texture
-	# 				frame_grid = { 1 2 }
-	# 				spriteborder_bottom = 0
-	# 				alpha = 0.4
-	# 				modify_texture = {
-	# 					using = color_turquoise_texture
-	# 				}
-	# 			}
-	# 		}
-
-	# 		blockoverride "field_content" {
-	# 			block "column_title_left" {}
-
-	# 			text_single = {
-	# 				using = Font_Type_Headers
-	# 				block "column_title_text" {}
-	# 			}
-
-	# 			block "column_title_right" {}
-	# 		}
-	# 	}
-	# 	TooltipScrolledContentSection = {
-	# 		block "block_scrollarea" {
-	# 			blockoverride "block_scrollarea" {
-	# 				maximumsize = { -1 600 }
-	# 			}
-	# 		}
-	# 		blockoverride "scrollarea_content" {
-	# 			TooltipContentSection = {
-	# 				spacing = 0
-	# 				set_parent_dimension_to_minimum = height
-	# 				block "column_datamodel" {}
-	# 				item = {
-	# 				# block "tablefield_item" {
-	# 					TooltipTableField = {
-	# 						blockoverride "field_content" {
-	# 							block "table_field_margin" {
-	# 								margin = { 10 0 }
-	# 							}
-	# 							block "table_field_spacing" {
-	# 								spacing = 5
-	# 							}
-
-	# 							block "field_left" {}
-
-	# 							block "tooltip_table_text_single" {
-	# 								text_single = {
-	# 									block "field_text_visibility" {}
-	# 									block "field_text" {}
-	# 								}
-	# 							}
-
-	# 							block "field_right" {}
-	# 						}
-	# 					}
-	# 				# }
-	# 				}
-	# 			}
-	# 		}
-	# 	}
-		
-	# }
 
 	type TooltipTableColumn = vbox {
 		layoutpolicy_horizontal = expanding
@@ -1697,7 +1833,6 @@ types ContextualTooltipTypes
 		}
 
 		item = {
-			# block "tablefield_item" {
 				TooltipTableField = {
 					blockoverride "field_content" {
 						block "table_field_margin" {
@@ -1717,7 +1852,6 @@ types ContextualTooltipTypes
 						block "field_right" {}
 					}
 				}
-			# }
 		}
 	}
 
@@ -1730,62 +1864,22 @@ types ContextualTooltipTypes
 	}
 
 	type TooltipColumnListContent = TooltipListColumnContent {
-		block "columnlist_datamodel" {
-			datamodel = "[TableColumnList.GetColumns]"
-			ignoreinvisible = yes
+		using = tooltip_columnlist_content
+	}
+
+	type TooltipScrolledColumnListContent = scrollvbox {
+		alwaystransparent = no
+		block "block_scrollarea" { maximumsize = { -1 600 }}
+
+		scrollbar_vertical = {
+			ScrollbarVertical_Tooltips = {
+				parentanchor = right
+			}
 		}
 
-		block "columnlist_content_extra" {}
-
-		item = {
-			TooltipTableColumn = {
-				layoutpolicy_horizontal = "[TableColumn.GetHorizontalLayoutPolicy]"
-
-				blockoverride "column_datamodel" {
-					datamodel = "[TableColumn.GetRows]"
-					ignoreinvisible = yes
-				}
-
-				blockoverride "column_title" {
-					visible = "[TableColumn.GetTitle.IsStringViewNotEmptyOrNull]"
-				}
-
-				blockoverride "column_title_text" {
-					autoresize = yes
-					text = "[TableColumn.GetTitle.GetStringView]"
-					align = "[TableColumn.GetTextAlignment]"
-				}
-
-				blockoverride "column_title_left" {
-					expand = {
-						visible = "[TableColumn.IsTextRight]"
-					}
-				}
-
-				blockoverride "column_title_right" {
-					expand = {
-						visible = "[TableColumn.IsTextLeft]"
-					}
-				}
-
-				blockoverride "field_text" {
-					autoresize = yes
-					text = "[CPdxStringView.GetStringView]"
-					align = "[TableColumn.GetTextAlignment]"
-				}
-
-				blockoverride "field_left" {
-					expand = {
-						visible = "[TableColumn.IsTextRight]"
-					}
-				}
-
-				blockoverride "field_right" {
-					expand = {
-						visible = "[TableColumn.IsTextLeft]"
-					}
-				}
-			}
+		TooltipListColumnContent = {
+			using = tooltip_columnlist_content
+			set_parent_dimension_to_minimum = height
 		}
 	}
 
@@ -1845,8 +1939,8 @@ types ContextualTooltipTypes
 			ontextcontextchanged = "[SetCStringFromTextContext(PdxGuiWidget.AccessSelf)]"
 		}
 
-		TooltipListScrollArea = {
-			blockoverride "scrollarea_content" {
+		TooltipScrolledContentSection = {
+			blockoverride "section_content" {
 				vbox = {
 					set_parent_dimension_to_minimum = height
 					layoutpolicy_horizontal = expanding
@@ -1903,39 +1997,84 @@ types ContextualTooltipTypes
 			}
 
 			blockoverride "tableheader_text" {
-				# block "block_footer" {
 					visible = no
-				# }
 			}
 		}
 	}
 
 	type TooltipRowListContent = vbox {
-		block "rowlist_datamodel" {
-			datamodel = "[RowList.GetRows]"
+		using = tooltip_rowlist_content
+	}
+
+	type TooltipScrolledGroupedRowList = TooltipListBase {
+		ontextcontextchanged = "[SetGroupedRowListFromTextContext(PdxGuiWidget.AccessSelf)]"
+
+		scrollvbox = {
+			layoutpolicy_horizontal = expanding
+			alwaystransparent = no
 			ignoreinvisible = yes
-		}
+			visible = "[DataModelHasItems(GroupedRowList.GetGroups)]"
+			block "block_scrollarea" { maximumsize = { -1 450 }}
 
-		item = {
-			TooltipTableField = {
-				blockoverride "field_content" {
-					block "rowlist_content" {
-						textbox = {
-							layoutpolicy_horizontal = expanding
-							autoresize = yes
-							margin = { 0 5 }
+			datamodel = "[GroupedRowList.GetGroups]"
 
-							using = text_multi_template
-							align = nobaseline
-							elide = right
+			scrollbar_vertical = {
+				ScrollbarVertical_Tooltips = {
+					parentanchor = right
+				}
+			}
 
-							block "rowlist_item" {
-								text = "[CPdxStringView.GetStringView]"
-								block "field_text_format" {}
+			item = {
+				vbox = {
+					layoutpolicy_horizontal = expanding
+
+					TooltipTableField = {
+						visible = "[GroupedRowListGroup.GetTitle.IsStringViewNotEmptyOrNull]"
+
+						blockoverride "field_background" {
+							background = {
+								using = tooltip_table_field_texture
+							}
+						}
+
+						blockoverride "field_content" {
+							textbox = {
+								layoutpolicy_horizontal = expanding
+								autoresize = yes
+								using = text_multi_template
+								align = nobaseline
+								elide = right
+								text = "[GroupedRowListGroup.GetTitle.GetStringView]"
 							}
 						}
 					}
+
+					TooltipRowListContent = {
+						layoutpolicy_horizontal = expanding
+
+						blockoverride "rowlist_datamodel" {
+							datamodel = "[GroupedRowListGroup.GetRows]"
+							ignoreinvisible = yes
+						}
+					}
 				}
+			}
+		}
+
+		TooltipListEmptyContent = {
+			visible = "[IsDataModelEmpty(GroupedRowList.GetGroups)]"
+		}
+	}
+
+	type TooltipScrolledRowListContent = scrollvbox {
+		using = tooltip_rowlist_content
+
+		alwaystransparent = no
+		block "block_scrollarea" { maximumsize = { -1 600 }}
+
+		scrollbar_vertical = {
+			ScrollbarVertical_Tooltips = {
+				parentanchor = right
 			}
 		}
 	}
@@ -1959,289 +2098,42 @@ types ContextualTooltipTypes
 	}
 
 	type TooltipConditionListContent = vbox {
-		block "conditionlist_datamodel" {
-			datamodel = "[ConditionList.GetLines]"
-			ignoreinvisible = yes
-		}
+		using = tooltip_conditionlist_content
+	}
 
-		item = {
-			TooltipTableField = {
-				blockoverride "field_background" {
-					background = {
-						visible = "[ConditionLine.HasPassed]"
-						using = color_mid_light_green_texture
-						alpha = 0.3
+	type TooltipScrolledConditionListContent = scrollvbox {
+		using = tooltip_conditionlist_content
 
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
+		alwaystransparent = no
+		block "block_scrollarea" { maximumsize = { -1 600 }}
 
-					background = {
-						visible = "[ConditionLine.HasFailed]"
-						using = color_mid_red_texture
-						alpha = 0.2
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						visible = "[ConditionLine.IsNeutral]"
-						using = color_mid_blue_texture
-						alpha = 0.2
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-				}
-
-				blockoverride "field_content" {
-					# block "conditionlist_content" {
-						block "conditionlist_item_setup" {}
-						# block "conditionlist_item_margin" {
-							margin = { 10 5 }
-							spacing = 10
-						# }
-
-						TooltipYesNoCheckbox = {
-							visible = "[Or(ConditionLine.HasPassed, ConditionLine.HasFailed)]"
-							blockoverride "yes_visible" { visible = "[ConditionLine.HasPassed]" }
-							blockoverride "no_visible" { visible = "[ConditionLine.HasFailed]" }
-						}
-
-						textbox = {
-							layoutpolicy_horizontal = expanding
-							autoresize = yes
-
-							align = nobaseline
-							using = text_multi_template
-							elide = right
-
-							# block "conditionlist_item" {
-								text = "[ConditionLine.GetText]"
-								block "field_text_format" {}
-							# }
-
-							block "conditionlist_collapsed_tooltip" {
-								tooltip_enabled = "[ConditionList.HasCollapsedText]"
-								tooltipwidget = {
-									ContextualTooltipTypeBase = {
-										datacontext = "[StringToRequirementsList(ConditionList.GetCollapsedText)]"
-										TooltipScrolledRequirementsList = {
-											blockoverride "block_title" {
-												text = "LIST_TITLE_REQUIREMENTS"
-											}
-
-											set_parent_size_to_minimum = yes
-											margin = { 5 5 }
-										}
-
-										widget = { using = bg_tooltip_frame }
-									}
-								}
-							}
-						}
-					# }
-				}
+		scrollbar_vertical = {
+			ScrollbarVertical_Tooltips = {
+				parentanchor = right
 			}
 		}
 	}
 
 	type TooltipRequirementsListContent = vbox {
-		block "requirementslist_datamodel" {
-			datamodel = "[RequirementsList.GetLines]"
-		}
+		using = tooltip_requirementslist_content
+	}
 
-		item = {
-			TooltipTableField = {
-				datacontext = "[GetRequirementLineAux(RequirementLine.Self, PdxGuiWidget.AccessSelf, PdxGuiWidget.GetIndexInDataModel)]"
+	type TooltipScrolledRequirementsListContent = scrollvbox {
+		using = tooltip_requirementslist_content
 
-				blockoverride "field_background" {
-					background = {
-						visible = "[RequirementLine.HasPassed]"
-						using = color_mid_light_green_texture
-						alpha = 0.3
+		alwaystransparent = no
+		block "block_scrollarea" { maximumsize = { -1 600 }}
 
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						visible = "[RequirementLine.HasFailed]"
-						using = color_mid_red_texture
-						alpha = 0.4
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						visible = "[RequirementLine.IsSkipped]"
-						using = color_mid_blue_texture
-						alpha = 0.3
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						visible = "[RequirementLine.IsBlocker]"
-						using = color_mid_red_texture
-						alpha = 0.2
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						visible = "[RequirementLine.IsUndefined]"
-						using = color_mid_blue_texture
-						alpha = 0.2
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0.1
-						}
-					}
-
-					background = {
-						texture = "gfx/interface/component_tiles/floral_container_frame.dds"
-						texture_density = 2
-						spriteType = corneredstretched
-						spriteborder = { 15 10 }
-						margin_top = 1
-
-						modify_texture = {
-							using = color_dark_brown_texture
-							blend_mode = multiply
-						}
-
-						modify_texture = {
-							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-							using = color_white_texture
-							alpha = 0
-						}
-					}
-				}
-
-				blockoverride "field_content" {
-					# block "requirementslist_content" {
-						hbox = {
-							layoutpolicy_horizontal = expanding
-							spacing = 5
-
-							# Hierarchy arrows
-							hbox = {
-								layoutpolicy_vertical = expanding
-
-								# Indent spacing
-								hbox = {
-									datamodel = "[DataModelRepeatedItem(RequirementLine.GetIndent)]"
-									item = {
-										widget = {
-											size = { 25 3 }
-										}
-									}
-								}
-
-								# First element root line
-								widget = {
-									size = { 10 2 }
-									icon = {
-										visible = "[EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0')]"
-										size = { 100% 100% }
-										parentanchor = right|vcenter
-										using = color_requirementlist_arrow_white_texture
-									}
-								}
-
-								# Vertical line to parent/sibling
-								icon = {
-									size = { 2 2 }
-									using = color_requirementlist_arrow_white_texture
-
-									icon = {
-										visible = "[Not(EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0'))]"
-										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0', '(float)10')]"
-										parentanchor = bottom
-										using = color_requirementlist_arrow_white_texture
-									}
-								}
-
-								# Last mile arrow to text
-								icon = {
-									size = { 10 2 }
-									using = color_requirementlist_arrow_white_texture
-								}
-							}
-
-							widget = {
-								size = { 20 20 }
-
-								TooltipYesNoCheckbox = {
-									visible = "[Not(RequirementLine.IsUndefined)]"
-									blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
-									blockoverride "no_visible" { visible = "[RequirementLine.HasFailed]" }
-								}
-	
-								icon = {
-									size = { 35% 40% }
-									parentanchor = center
-									visible = "[RequirementLine.IsUndefined]"
-									texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds"
-									modify_texture = {
-										using = color_white_texture
-										alpha = 0.6
-									}
-								}
-							}
-
-							textbox = {
-								layoutpolicy_horizontal = expanding
-								autoresize = yes
-								margin = { 0 5 }
-
-								align = nobaseline
-								using = text_multi_template
-								elide = right
-
-								# block "requirement_item" {
-								text = "[RequirementLine.GetText]"
-								block "field_text_format" {}
-								# }
-							}
-						}
-					# }
-				}
+		scrollbar_vertical = {
+			ScrollbarVertical_Tooltips = {
+				parentanchor = right
 			}
 		}
 	}
 
-		type TooltipRequirementsList = TooltipListBase {
+	type TooltipRequirementsList = TooltipListBase {
 		block "set_textcontext" {
-			ontextcontextchanged = "[SetRequirementsListFromTextContext(PdxGuiWidget.AccessSelf)]"
+			ontextcontextchanged = "[SetRequirementsListFromTextContextWithTitle(PdxGuiWidget.AccessSelf)]"
 		}
 
 		blockoverride "bg_listbase" {
@@ -2268,9 +2160,7 @@ types ContextualTooltipTypes
 		}
 
 		TooltipRequirementsListContent = {
-			# block "requirementslist_datamodel_has_items" {
-				visible = "[DataModelHasItems(RequirementsList.GetLines)]"
-			# }
+			visible = "[DataModelHasItems(RequirementsList.GetLines)]"
 
 			layoutpolicy_horizontal = expanding
 			layoutpolicy_vertical = preferred
@@ -2311,22 +2201,11 @@ types ContextualTooltipTypes
 			}
 		}
 
-		TooltipListScrollArea = {
-			# block "stringpair_datamodel_has_items" {
-				visible = "[DataModelHasItems(RequirementsList.GetLines)]"
-			# }
+		TooltipScrolledRequirementsListContent = {
+			visible = "[DataModelHasItems(RequirementsList.GetLines)]"
 
-			blockoverride "scrollarea_content" {
-				TooltipRequirementsListContent = {
-					# block "requirementslist_datamodel_has_items" {
-						visible = "[DataModelHasItems(RequirementsList.GetLines)]"
-					# }
-
-					set_parent_dimension_to_minimum = height
-					layoutpolicy_horizontal = expanding
-					layoutpolicy_vertical = preferred
-				}
-			}
+			layoutpolicy_horizontal = expanding
+			layoutpolicy_vertical = preferred
 		}
 
 		TooltipListEmptyContent = {
@@ -2346,16 +2225,12 @@ types ContextualTooltipTypes
 			}
 		}
 
-		TooltipListScrollArea = {
-			# block "stringpair_datamodel_has_items" {
-				visible = "[DataModelHasItems(ConditionList.GetLines)]"
-			# }
+		TooltipScrolledContentSection = {
+			visible = "[DataModelHasItems(ConditionList.GetLines)]"
 
-			blockoverride "scrollarea_content" {
+			blockoverride "section_content" {
 				TooltipConditionListContent = {
-					# block "requirementslist_datamodel_has_items" {
-						visible = "[DataModelHasItems(ConditionList.GetLines)]"
-					# }
+					visible = "[DataModelHasItems(ConditionList.GetLines)]"
 
 					set_parent_dimension_to_minimum = height
 					layoutpolicy_horizontal = expanding
@@ -2365,9 +2240,7 @@ types ContextualTooltipTypes
 		}
 
 		TooltipListEmptyContent = {
-			# block "conditionlist_datamodel_is_empty" {
-				visible = "[IsDataModelEmpty(ConditionList.GetLines)]"
-			# }
+			visible = "[IsDataModelEmpty(ConditionList.GetLines)]"
 		}
 	}
 
@@ -2381,23 +2254,14 @@ types ContextualTooltipTypes
 			}
 		}
 
-		TooltipListScrollArea = {
-			# block "conditionlist_datamodel_has_items" {
-				visible = "[DataModelHasItems(ConditionList.GetLines)]"
-			# }
+		TooltipScrolledConditionListContent = {
+			visible = "[DataModelHasItems(ConditionList.GetLines)]"
 
-			blockoverride "scrollarea_content" {
-				TooltipConditionListContent = {
-					set_parent_dimension_to_minimum = height
-					layoutpolicy_horizontal = expanding
-				}
-			}
+			layoutpolicy_horizontal = expanding
 		}
 
 		TooltipListEmptyContent = {
-			# block "conditionlist_datamodel_is_empty" {
-				visible = "[IsDataModelEmpty(ConditionList.GetLines)]"
-			# }
+			visible = "[IsDataModelEmpty(ConditionList.GetLines)]"
 		}
 	}
 }

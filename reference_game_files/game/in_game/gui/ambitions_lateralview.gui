@@ -1,0 +1,373 @@
+types AmbitionsTypes {
+	type ambitions_section_header = hbox {
+		layoutpolicy_horizontal = expanding
+		margin = { 10 4 }
+
+		using = bg_card_header_01
+
+		text_single = {
+			layoutpolicy_horizontal = expanding
+			align = left|nobaseline
+			margin_left = 10
+			block "header_label" {}
+		}
+
+		text_single = {
+			align = right|nobaseline
+			margin_right = 10
+			default_format = "#L"
+			block "header_counter" {}
+		}
+	}
+
+	type ambition_slot = widget {
+		size = { 84 84 }
+
+		button_regular = {
+			size = { 100% 100% }
+			visible = "[AmbitionSlotItem.IsFilled]"
+			datacontext = "[AmbitionSlotItem.GetAmbition]"
+
+			widget = {
+				size = { 100% 100% }
+
+				piechart = {
+					parentanchor = center
+					size = { 74 74 }
+					visible = "[Ambition.HasDeadline]"
+					using = piechart_angles
+					alwaystransparent = yes
+
+					pieslice_no_highlight = {
+						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+						value = "[Multiply_float(Ambition.GetTimeRemainingFraction, '(float)100.0')]"
+						using = color_value_progress_blue
+						alwaystransparent = yes
+					}
+
+					pieslice_no_highlight = {
+						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+						value = "[Subtract_float('(float)100.0', Multiply_float(Ambition.GetTimeRemainingFraction, '(float)100.0'))]"
+						using = color_value_progress_gray
+						alwaystransparent = yes
+					}
+				}
+
+				icon = {
+					parentanchor = center
+					size = { 44 44 }
+					texture = "[GetAmbitionDefinitionIcon(Ambition.GetAmbitionDefinition)]"
+				}
+			}
+
+			action_tooltip = {
+				click_type = right
+				click_mode = single
+				title = "AMBITION_CANCEL_BUTTON"
+				enabled = "[AmbitionSlotItem.IsCancelEnabled]"
+				cost = "[AmbitionSlotItem.GetCancelCost]"
+				description = "[AmbitionSlotItem.GetCancelTooltip]"
+				on_action = "[AmbitionSlotItem.Cancel]"
+			}
+
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				title = "AMBITION_SELECT_BUTTON"
+				on_action = "[AmbitionSlotItem.OnClick]"
+			}
+
+			tooltipwidget = {
+				using = Ambition_tooltip
+			}
+		}
+
+		button_regular = {
+			size = { 100% 100% }
+			visible = "[Not(AmbitionSlotItem.IsFilled)]"
+			enabled = "[AmbitionSlotItem.IsAddEnabled]"
+
+			text_single = {
+				parentanchor = center
+				autoresize = yes
+				text = "AMBITION_EMPTY_SLOT"
+			}
+
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				title = "AMBITION_ADD_TITLE"
+				enabled = "[AmbitionSlotItem.IsAddEnabled]"
+				on_action = "[AmbitionSlotItem.OnClick]"
+			}
+			tooltipwidget = {
+				BasicFunctionalTooltip = {}
+			}
+		}
+	}
+
+	type ambition_detail_panel = vbox {
+		using = layoutpolicy_expanding
+		margin = { 10 6 }
+
+		using = bg_paper_card
+
+		scrollarea = {
+			layoutpolicy_horizontal = expanding
+			layoutpolicy_vertical = expanding
+			scrollbarpolicy_horizontal = always_off
+
+			scrollbar_vertical = {
+				using = Scrollbar_Vertical
+			}
+
+			scrollwidget = {
+			vbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 6
+
+			block "detail_selection" {
+				visible = "[AmbitionsLateralView.HasSelectedProclaim]"
+				datacontext = "[AmbitionsLateralView.GetSelectedProclaim]"
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				align = left|nobaseline
+				text = "[AmbitionItem.GetAmbition.GetNameWithNoTooltip]"
+			}
+
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				margin = { 4 2 }
+				spacing = 12
+				visible = "[Not(StringIsEmpty(AmbitionItem.GetModifierTooltip))]"
+
+				HorizontalModifiersList = {
+					layoutpolicy_horizontal = expanding
+					blockoverride "modifiers_list_size"{
+						size = { -1 33 }
+						margin_top = 3
+						margin_bottom = 3
+					}
+					blockoverride "datamodel" {
+						datamodel = "[StringToRowList(AmbitionItem.GetModifierTooltip).GetRows]"
+					}
+					blockoverride "modifiers_list_bg" {
+						background = {
+							using = color_dark_brown_texture
+							texture_density = 2
+							alpha = 0.6
+						}
+						using = bg_cabinet_card_frame
+					}
+				}
+
+				text_single = {
+					visible = "[GreaterThan_int32(AmbitionItem.GetModifierCount, '(int32)4')]"
+					autoresize = yes
+					align = left|nobaseline
+					default_format = "#weak"
+					raw_text = "[AmbitionItem.GetModifierOverflow]"
+					tooltip = "[AmbitionItem.GetModifierTooltip]"
+				}
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				align = left|nobaseline
+				margin = { 4 2 }
+				visible = "[Not(StringIsEmpty(AmbitionItem.GetRequirementsTooltip))]"
+				text = "[AmbitionItem.GetRequirementsLabel]"
+			}
+
+			RequirementsList = {
+				visible = "[Not(StringIsEmpty(AmbitionItem.GetRequirementsTooltip))]"
+				textcontext = "[AmbitionItem.GetRequirementsTooltip]"
+				blockoverride "requirementslist_datamodel_is_empty" {
+					visible = no
+				}
+			}
+	
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 20
+				margin = { 4 2 }
+	
+				text_single = {
+					align = left|nobaseline
+					text = "[AmbitionItem.GetRewardLabel]"
+					tooltip = "[AmbitionItem.GetRewardTooltip]"
+				}
+
+				text_single = {
+					align = left|nobaseline
+					visible = "[And(Not(AmbitionItem.IsContest), GreaterThan_int32(AmbitionItem.GetCompleteModifierCount, '(int32)0'))]"
+					text = "AMBITION_COMPLETE_MODIFIERS_LABEL"
+					tooltip = "[AmbitionItem.GetCompleteModifierTooltip]"
+				}
+			}
+	
+			hbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 8
+				margin = { 4 2 }
+
+				widget = {
+					size = { 26 26 }
+					visible = "[AmbitionItem.GetAmbition.HasDeadline]"
+					datacontext = "[AmbitionItem.GetAmbition]"
+
+					piechart = {
+						size = { 100% 100% }
+						using = piechart_angles
+						alwaystransparent = yes
+
+						pieslice_no_highlight = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[Multiply_float(Ambition.GetTimeRemainingFraction, '(float)100.0')]"
+							using = color_value_progress_blue
+							alwaystransparent = yes
+						}
+
+						pieslice_no_highlight = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[Subtract_float('(float)100.0', Multiply_float(Ambition.GetTimeRemainingFraction, '(float)100.0'))]"
+							using = color_value_progress_gray
+							alwaystransparent = yes
+						}
+					}
+				}
+
+				text_single = {
+					align = left|nobaseline
+					text = "[AmbitionItem.GetConsequenceLabel]"
+				}
+				tooltip = "[AmbitionItem.GetConsequenceTooltip]"
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				align = left|nobaseline
+				margin = { 4 2 }
+				visible = "[Not(AmbitionItem.IsContest)]"
+				text = "[AmbitionItem.GetDurationText]"
+			}
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				align = left|nobaseline
+				margin = { 4 2 }
+				visible = "[Not(StringIsEmpty(AmbitionItem.GetDiplomacyTooltip))]"
+				text = "AMBITION_DIPLO_LABEL"
+				tooltip = "[AmbitionItem.GetDiplomacyTooltip]"
+			}
+
+			expand = {}
+		}
+			}
+			}
+	}
+}
+
+lateralview = {
+	name = "ambitions_lateralview"
+	widgetid = "ambitions_lateralview"
+
+	blockoverride "panel_header" {
+		window_header_alt = {
+			blockoverride "header_text" {
+				text = "AMBITIONS_TEXT"
+			}
+			blockoverride "window_header_alt_color_texture" {
+				using = color_government_texture
+			}
+		}
+	}
+
+	blockoverride "panel_content" {
+		header_main_tabs = {
+			blockoverride "content" {
+				using = content_main_tabs
+			}
+		}
+
+		vbox = {
+			using = layoutpolicy_expanding
+			using = bg_main_inner_alt
+			using = window_main_tabs_margin_alt
+			margin_top = 2
+
+			
+			vbox = {
+				using = layoutpolicy_expanding
+				spacing = 10
+				layoutstretchfactor_vertical = 1
+				ambitions_section_header = {
+					blockoverride "header_label" {
+						text = "AMBITION_PROCLAIMED_HEADER"
+					}
+					blockoverride "header_counter" {
+						text = "[AmbitionsLateralView.GetProclaimSlotCounter]"
+					}
+				}
+	
+				fixedgridbox = {
+					layoutpolicy_horizontal = expanding
+					addcolumn = 90
+					addrow = 90
+					datamodel_wrap = 3
+					maxhorizontalslots = 3
+					setitemsizefromcell = yes
+					flipdirection = yes
+	
+					datamodel = "[AmbitionsLateralView.GetProclaimSlots]"
+					item = {
+						ambition_slot = {}
+					}
+				}
+	
+				ambition_detail_panel = {}
+			}
+
+			vbox = {
+				using = layoutpolicy_expanding
+				layoutstretchfactor_vertical = 1
+				spacing = 10
+
+				ambitions_section_header = {
+					blockoverride "header_label" {
+						text = "AMBITION_CONTESTED_HEADER"
+					}
+					blockoverride "header_counter" {
+						text = "[AmbitionsLateralView.GetContestSlotCounter]"
+					}
+				}
+
+				fixedgridbox = {
+					layoutpolicy_horizontal = expanding
+					addcolumn = 90
+					addrow = 90
+					datamodel_wrap = 3
+					maxhorizontalslots = 3
+					setitemsizefromcell = yes
+					flipdirection = yes
+
+					datamodel = "[AmbitionsLateralView.GetContestSlots]"
+					item = {
+						ambition_slot = {}
+					}
+				}
+
+				ambition_detail_panel = {
+					blockoverride "detail_selection" {
+						visible = "[AmbitionsLateralView.HasSelectedContest]"
+						datacontext = "[AmbitionsLateralView.GetSelectedContest]"
+					}
+				}
+
+				expand = {}
+			}
+		}
+	}
+}

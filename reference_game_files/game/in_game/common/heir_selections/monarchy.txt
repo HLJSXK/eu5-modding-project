@@ -517,7 +517,11 @@ mamluk_succesion = {
 				if = {
 					limit = {
 						any_parent = {
-							this = scope:target.ruler
+							trigger_if = {
+								limit = { exists = scope:target.ruler }
+								this = scope:target.ruler
+							}
+							trigger_else = { always = no }
 						}
 					}
 					add = {
@@ -754,7 +758,11 @@ tanistry_elective = {
 				if = {
 					limit = {
 						any_parent = {
-							this = scope:target.ruler
+							trigger_if = {
+								limit = { exists = scope:target.ruler }
+								this = scope:target.ruler
+							}
+							trigger_else = { always = no }
 						}
 					}
 					add = {
@@ -951,7 +959,11 @@ elective_succession = {
 				if = {
 					limit = {
 						any_parent = {
-							this = scope:target.ruler
+							trigger_if = {
+								limit = { exists = scope:target.ruler }
+								this = scope:target.ruler
+							}
+							trigger_else = { always = no }
 						}
 					}
 					add = {
@@ -1203,16 +1215,39 @@ union_of_crowns_succession = {
 	ignore_ruler = yes
 	allowed_estates = { nobles_estate }
 	custom_tags = { cannot_be_transferred }
-	custom_eligibility_rules = { no_female_heirs_for_poland }
+	custom_eligibility_rules = {
+		no_female_heirs_for_poland
+		own_characters_first_rule
+	}
 	heir_is_allowed = {
+		trigger_if = {
+			limit = { scope:target = { has_or_had_tag = POL } }
+			is_female = no
+		}
 		OR = {
 			estate_type = estate_type:crown_estate
 			estate_type = estate_type:nobles_estate
 			is_ruler = yes
+			AND = {
+				has_dynasty = yes
+				scope:target = {
+					exists = last_valid_ruler
+					last_valid_ruler ?= {
+						has_dynasty = yes
+						dynasty ?= root.dynasty
+					}
+				}
+			}
 		}
 		OR = {
 			owner ?= scope:target
 			is_ruler = yes
+			scope:target = {
+				exists = last_valid_ruler
+				last_valid_ruler ?= {
+					is_parent_of = root
+				}
+			}
 		}
 	}
 	traverse_family_tree = yes
@@ -1227,6 +1262,16 @@ union_of_crowns_succession = {
 				if = {
 					limit = { is_ruler = yes }
 					value = 100
+				}
+			}
+			add = {
+				desc = "HEIR_SELECTION_UNION_OF_CROWNS_PACT"
+				if = {
+					limit = {
+						is_ruler = yes
+						owner = { has_mutual_scripted_relation = { type = relation_type:union_of_crowns_pact target = scope:target } }
+					}
+					value = 200
 				}
 			}
 			add = {
@@ -1270,7 +1315,7 @@ union_of_crowns_succession = {
 				limit = {
 					is_female = yes
 					owner ?= {
-						tag = POL
+						has_or_had_tag = POL
 					}
 				}
 				add = {
@@ -1314,7 +1359,20 @@ union_of_crowns_succession = {
 		}
 	}
 	include_other_countries = {
-		has_mutual_scripted_relation = { type = relation_type:union_of_crowns_pact target = scope:target }
+		OR = {
+			has_mutual_scripted_relation = { type = relation_type:union_of_crowns_pact target = scope:target }
+			AND = {
+				scope:target = {
+					exists = last_valid_ruler
+					last_valid_ruler ?= { has_dynasty = yes }
+				}
+				has_ruler = yes
+				ruler ?= {
+					has_dynasty = yes
+					dynasty ?= scope:target.last_valid_ruler.dynasty
+				}
+			}
+		}
 	}
 
 	locked = {
@@ -1440,6 +1498,7 @@ matrilineal_salic_law = {
 								is_ruler = yes
 								AND = {
 									has_dynasty = yes
+									exists = root.dynasty
 									dynasty = root.dynasty
 								}
 							}
@@ -1484,6 +1543,255 @@ matrilineal_salic_law = {
 				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
 				value = 1
 			}
+		}
+	}
+}
+
+ibadi_zuhur_heir_selection = {
+	all_in_country = yes
+	ignore_ruler = yes
+	allow_female = no
+	show_candidates = yes
+	potential = {
+		religion = religion:ibadi
+	}
+	heir_is_allowed = {
+	}
+	calc = {
+		if = {
+			limit = {
+				exists = root
+			}
+			add = {
+				desc = "HEIR_SELECTION_ADM_DESC"
+				value = root.adm
+				multiply = 1.5
+			}
+			add = {
+				desc = "HEIR_SELECTION_DIP_DESC"
+				value = root.dip
+			}
+			add = {
+				desc = "HEIR_SELECTION_MIL_DESC"
+				value = root.mil
+				multiply = 0.25
+			}
+			if = {
+				limit = {
+					scope:target = { has_ruler = yes }
+					scope:target.ruler = {
+						is_close_relative = root
+					}
+				}
+				add = {
+					desc = "HEIR_SELECTION_FAMILY_DESC"
+					value = 100
+				}
+			}
+			if = {
+				limit = {
+					religion:ibadi = root.religion
+				}
+				add = {
+					desc = "HEIR_SELECTION_RELIGION_DESC"
+					value = 150
+				}
+			}
+
+			if = {
+				limit = { 
+					has_trait = just
+				}
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_just"
+					value = 150
+				}
+			}
+			if = {
+				limit = { 
+					has_trait = cruel
+				}
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_cruel"
+					value = -1000
+				}
+			}
+			if = {
+				limit = { 
+					has_trait = kind_hearted
+				}
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_kind_hearted"
+					value = 50
+				}
+			}
+			if = {
+				limit = { 
+					has_trait = calm
+				}
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_calm"
+					value = 25
+				}
+			}
+			if = {
+				limit = { 
+					has_trait = benevolent
+				}
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_benevolent"
+					value = 50
+				}
+			}
+			if = {
+				limit = { has_trait = zealot }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_zealot"
+					value = 25
+				}
+			}
+			if = {
+				limit = { has_trait = pious }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_pious"
+					value = 50
+				}
+			}
+			if = {
+				limit = { has_trait = incorruptible }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_incorruptible"
+					value = 25
+				}
+			}
+			if = {
+				limit = { has_trait = scholar }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_scholar"
+					value = 50
+				}
+			}
+			if = {
+				limit = { has_trait = embezzler }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_embezzler"
+					value = -50
+				}
+			}
+			if = {
+				limit = { has_trait = drunkard }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_drunkard"
+					value = -50
+				}
+			}
+			if = {
+				limit = { has_trait = sinner }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_sinner"
+					value = -50
+				}
+			}
+			if = {
+				limit = { has_trait = greedy }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_greedy"
+					value = -50
+				}
+			}
+			if = {
+				limit = { has_trait = malevolent }
+				add = {
+					desc = "HEIR_SELECTION_TRAIT_DESC_malevolent"
+					value = -200
+				}
+			}
+		}
+		if = {
+			limit = {
+				not = { exists = root }
+			}
+			add = {
+				desc = "HEIR_SELECTION_ADM_DESC"
+				value = 1.5
+			}
+			add = {
+				desc = "HEIR_SELECTION_DIP_DESC"
+				value = 1
+			}
+			add = {
+				desc = "HEIR_SELECTION_MIL_DESC"
+				value = 0.25
+			}
+			add = {
+				desc = "HEIR_SELECTION_RELIGION_DESC"
+				value = 150
+			}
+			add = {
+				desc = "HEIR_SELECTION_FAMILY_DESC"
+				value = 100
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_just"
+				value = 150
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_cruel"
+				value = -1000
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_kind_hearted"
+				value = 50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_calm"
+				value = 25
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_benevolent"
+				value = 50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_zealot"
+				value = 25
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_pious"
+				value = 50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_incorruptible"
+				value = 25
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_scholar"
+				value = 50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_embezzler"
+				value = -50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_drunkard"
+				value = -50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_sinner"
+				value = -50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_greedy"
+				value = -50
+			}
+			add = {
+				desc = "HEIR_SELECTION_TRAIT_DESC_malevolent"
+				value = -200
+			}
+		}
+	}
+	succession_effect = {
+		scope:new_ruler = {
+			change_character_estate = estate_type:crown_estate
 		}
 	}
 }
@@ -1533,9 +1841,11 @@ byzantine_succession = {
 			has_or_had_tag = BYZ
 			culture = culture:greek_culture
 		}
+		government_type = government_type:monarchy
 	}
 
 	locked = {
+		government_type = government_type:monarchy
 		has_or_had_tag = BYZ
 	}
 
@@ -1556,6 +1866,20 @@ byzantine_succession = {
 		if = {
 			limit = { exists = root }
 
+			#bonus for males
+			add = {
+				desc = "HEIR_SELECTION_MALE_DESC"
+				if = {
+					limit = {
+						OR = {
+							not = { exists = root }
+							is_female = no
+						}
+					}
+					value = 50
+				}
+			}
+			
 			# seniority preference (but not as absolute as in western primogeniture)
 			add = {
 				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
@@ -1572,6 +1896,7 @@ byzantine_succession = {
 			}
 
 			# disqualifying impairments 
+			add = 1000
 			if = {
 				limit = { has_trait = blind }
 				add = {
@@ -1608,26 +1933,6 @@ byzantine_succession = {
 				}
 			}
 
-			# preference for ruler's own sons
-			if = {
-				limit = {
-					exists = father
-					father ?= scope:target.ruler
-				}
-				add = {
-					desc = "HEIR_SELECTION_IS_RULER_SON_DESC"
-					value = 200
-				}
-			}
-
-			if = {
-				limit = { is_female = yes }
-				add = {
-					desc = "HEIR_SELECTION_FEMALE_DESC"
-					value = -50
-				}
-			}
-
 			# block unsuitable candidates
 			add = {
 				desc = "HEIR_SELECTION_IS_UNSUITED_TO_RULE_DESC"
@@ -1637,16 +1942,20 @@ byzantine_succession = {
 		else = {
 			# Description for UI when no root exists
 			add = {
+				desc = "script_value_base"
+				value = 1000
+			}
+			add = {
+				desc = "HEIR_SELECTION_MALE_DESC"
+				value = 50
+			}
+			add = {
 				desc = "HEIR_SELECTION_OLDER_HEIR_DESC"
 				value = 1
 			}
 			add = {
 				desc = "HEIR_SELECTION_BORN_IN_THE_PURPLE_DESC"
 				value = 2
-			}
-			add = {
-				desc = "HEIR_SELECTION_IS_RULER_SON_DESC"
-				value = 200
 			}
 			add = {
 				desc = "HEIR_SELECTION_BLIND_DESC"
@@ -1668,10 +1977,7 @@ byzantine_succession = {
 				desc = "HEIR_SELECTION_MAIMED_DESC"
 				value = -200
 			}			
-			add = { 
-				desc = "HEIR_SELECTION_FEMALE_DESC"
-				value = -50
-			}
 		}
 	}
 }
+

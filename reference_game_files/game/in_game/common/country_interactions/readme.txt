@@ -15,6 +15,8 @@
 # payer = script to determine who is paying the price. By default, the actor
 # payee = script to determine who gets paid. By default, nobody, the price disappears into the ether
 # ai_limit_per_check = <int> #Limit the amount of countries Ai will use this on per month
+# terminate_pending_offers_if = trigger, scope:recipient is the country for who all the other offers should be terminated, scope:actor is the country which originally sent that action; this trigger is checked on each of the country who sent that diplo action. If the trigger is fulfilled for them, their action becomes invalid, neither triggering an accepted nor rejected effect. doesn't do anything if not defined for the action
+# potential_diplomatic_capacity_used = calculated value of diplomatic capacity the recipient will get after accepting this interaction, used for acceptance reasons to calculate things like transfering of subjects
 #
 # select_trigger = can add multiple of these to allow selection of targets/parameters for the action. They get stored in scope:target, scope:target_1, scope:target_2....etc
 #				   format: 
@@ -59,12 +61,14 @@
 # 						secondary_map_color = <script color> striped map color for location (root = location, scope:actor/recipient etc)
 # ai_tick = <never/daily/monthly> use to ban the AI from using an action that is already handled in code OR to indicate how often to process
 # ai_tick_frequency = <scripted value> how many ticks until next. script to determine how often this action should be checked for each country. root is the country. This is just a per-country check. So ai_tick = monthly and ai_tick_frequency = 6 means "check every 6 months"
+# use_in_automation = <yes/no> default no. Whether a human player who has turned on Diplomacy automation lets the AI run this interaction. Only opt in benign, low-stakes actions; the full AI ignores this field and still runs the action per ai_tick
 # show_message = no, optional, to prevent messages showing
 # show_message_to_target = no, optional, to prevent messages to show to the target
 # should_execute_price = no, optional, to prevent the price of the action to be paid
 # show_in_gui_list = no, optional, to prevent the action to be listed automatically in the GUI. Useful when you want to have very specific buttons for this action
 # ai_will_do = effect script for the AI to use, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc
 # ai_prerequisite - only scope:actor is available, should ai check this interaction at all, helps performance
+# ai_prerequisite_after_potential - only scope:actor is available, should ai check this interaction after checking potential, helps performance
 # effect = effect, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc
 # reject_effect = effect, scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc, is executed only when the diplo action has acceptance
 # cooldown = { type = <any tag> days/weeks/months/years = <integer> } adds a cooldown for the action during which time it cannot be performed again
@@ -72,38 +76,86 @@
 #
 #
 # A GUI widget to use these exists. Here's an example:
-# action_button_default = {
+# button = {
 #     size = { 115 30 }
 #     text = "Test"
-#     title = "OFFERMILACCTITLE"
-#     description = "OFFERMILACCDESC"
-#     actor = "[ForeignCountryView.GetPlayer]"
-#     recipient = "[ForeignCountryView.GetCountry]"
-#     left_action = {
-#		action_name = "invite_to_international_organization"
-#     	action_direction = "offer" (request, offer, cancellation, break)
-#		parameter = {
-#			parameter_name = international_organization_type
-#			parameter_value = "[GetInternationalOrganizationType('defensive_league')]"
-#		}
-#	  }
-#     left_click_and_hold_action = {
-#		action_name = "scripted_relation"
-#		parameter = {
-#			parameter_name = scripted_relation_type
-#			parameter_value = "[GetScriptedRelationType('alliance')]"
-#		}
-#     	action_direction = "cancellation"
-#	  }
-#     right_action = {
-#		action_name = "subject_diplomacy_action"
-#     	action_direction = "break"
-#		parameter = {
-#			parameter_name = target
-#			parameter_value = "[ForeignCountryView.GetCountry.GetDiplomacy.GetSubjectType]"
-#		}
-#	  }
-#	  right_click_and_hold_action = { action_name = "create_market" }
+#     visible = "[PdxGuiWidget.IsUberButtonVisible]"
+#     enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+#     tooltipwidget = { using = action_tooltip_pop_out }
+#     button_tooltip_override = {
+#         title = "OFFERMILACCTITLE"
+#         description = "OFFERMILACCDESC"
+#     }
+#
+#     scripted_action_tooltip = {
+#         click_type = left
+#         click_mode = single
+#         action_name = "invite_to_international_organization"
+#         action_direction = "offer" (request, offer, cancellation, break)
+#         actor = "[ForeignCountryView.GetPlayer]"
+#         parameter = {
+#             parameter_name = "recipient"
+#             parameter_value = "[ForeignCountryView.GetCountry]"
+#         }
+#         parameter = {
+#             parameter_name = international_organization_type
+#             parameter_value = "[GetInternationalOrganizationType('defensive_league')]"
+#         }
+#     }
+#     scripted_action_tooltip = {
+#         click_type = left
+#         click_mode = confirm
+#         action_name = "scripted_relation"
+#         action_direction = "cancellation"
+#         actor = "[ForeignCountryView.GetPlayer]"
+#         parameter = {
+#             parameter_name = "recipient"
+#             parameter_value = "[ForeignCountryView.GetCountry]"
+#         }
+#         parameter = {
+#             parameter_name = scripted_relation_type
+#             parameter_value = "[GetScriptedRelationType('alliance')]"
+#         }
+#     }
+#     scripted_action_tooltip = {
+#         click_type = right
+#         click_mode = single
+#         action_name = "subject_diplomacy_action"
+#         action_direction = "break"
+#         actor = "[ForeignCountryView.GetPlayer]"
+#         parameter = {
+#             parameter_name = "recipient"
+#             parameter_value = "[ForeignCountryView.GetCountry]"
+#         }
+#         parameter = {
+#             parameter_name = target
+#             parameter_value = "[ForeignCountryView.GetCountry.GetDiplomacy.GetSubjectType]"
+#         }
+#     }
+#     scripted_action_tooltip = {
+#         click_type = right
+#         click_mode = confirm
+#         action_name = "create_market"
+#         actor = "[ForeignCountryView.GetPlayer]"
+#         parameter = {
+#             parameter_name = "recipient"
+#             parameter_value = "[ForeignCountryView.GetCountry]"
+#         }
+#     }
+# }
+#
+# Add one scripted_action_tooltip per click direction and mode you want the button to support:
+#     click_type = left / right    click_mode = single (plain click) / confirm (click-and-hold or dialog)
+#
+# Each block is independent, which is why actor and the recipient parameter appear in all four blocks above.
+# recipient and target are parameter blocks, not properties of their own.
+#
+# scripted_action_tooltip accepts only: action_name, action_direction, proposer, actor, params, parameter,
+# click_type, click_mode, click_modifier, lateral_view_position. It has no visible and no enabled.
+#
+# Country interactions have their own database, so generic_action_tooltip does not apply to them. Use
+# action_tooltip_pop_out - it fills the title, description, effects and conditions from the interaction the
+# button resolves, so you do not have to wire any of them yourself.
 # }
 #
 #
@@ -232,6 +284,7 @@
 # conquer_desire
 # produced_goods
 # price_percentage_of_treasury_funds
+# price_payback_period
 # betrayed_ally
 # too_much_antagonism
 # antagonism

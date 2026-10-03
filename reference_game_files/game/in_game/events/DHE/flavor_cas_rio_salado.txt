@@ -22,9 +22,9 @@ flavor_cas_rio_salado.1 = { #Río Salado Prelude
 	}
 
 	immediate = {
-		event_illustration_estate_effect = { foreground = estate_type:nobles_estate
-		background = estate_type:nobles_estate 
-		} 
+		c:MOR = {
+			event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate }
+		}
 		#event_illustration_estate_background_effect = { background = type:army }
 
 		ruler = {
@@ -93,12 +93,10 @@ flavor_cas_rio_salado.2 = { #Moroccos response
 	immediate = {
 		event_illustration_estate_effect = { foreground = estate_type:nobles_estate background = estate_type:nobles_estate } #event_illustration_estate_background_effect = { background = type:army }
 
-		ruler = {
+		ruler_or_regent = {
 			save_scope_as = target_ruler
 		}
-		c:MOR = {
-			save_scope_as = target_ally
-		}#show the portrair of the MOR ally
+		save_scope_as = target_ally
 	}
 
 	option = {
@@ -108,8 +106,33 @@ flavor_cas_rio_salado.2 = { #Moroccos response
 			add_opinion = { target = root modifier = claimed_our_land }
 		}
 		add_casus_belli =  { type = casus_belli:cb_insulted_us target = c:CAS }
-		c:GRA = {
-			trigger_event_non_silently = flavor_cas_rio_salado.3
+
+		if = {
+			limit = {
+				c:GRA ?= {
+					at_war = no
+					OR = {
+						is_subject = no
+						AND = {
+							is_subject_of = c:CAS
+							is_disloyal_subject = yes
+						}
+					}
+				}
+				trigger_if = {
+					limit = {
+						has_dlc = "d009_across_the_pillars"
+						is_situation_active = situation:battle_for_the_strait
+					}
+					situation:battle_for_the_strait = {
+						has_variable = influence_over_granada
+						var:influence_over_granada > -50
+					}
+				}
+			}
+			c:GRA ?= {
+				trigger_event_non_silently = flavor_cas_rio_salado.3
+			}
 		}
 	}
 }
@@ -119,8 +142,14 @@ flavor_cas_rio_salado.3 = { #Granadas response
 	title = flavor_cas_rio_salado_response.34.title
 	desc = flavor_cas_rio_salado_response.34.desc
 	outcome = neutral
-	
-	fire_only_once = yes
+
+	major = yes
+	major_trigger = {
+		OR = {
+			has_or_had_tag = CAS
+			has_or_had_tag = MOR
+		}
+	}
 	
 	illustration_tags = {
 		10 = armed
@@ -142,6 +171,34 @@ flavor_cas_rio_salado.3 = { #Granadas response
 	option = {
 		name = flavor_cas_rio_salado_response.34.a
 
+		ai_will_select = {
+			value = 200
+			add = "opinion(c:MOR)"
+		}
+
+		if = {
+			limit = { is_subject_of = c:CAS }
+			c:CAS = {
+				cancel_subject = root
+				add_casus_belli = {
+					target = root
+					type = casus_belli:cb_conquer_province
+					province = root.capital.province
+				}
+			}
+			if = {
+				limit = {
+					has_dlc = "d009_across_the_pillars"
+					is_situation_active = situation:battle_for_the_strait
+					situation:battle_for_the_strait = {
+						has_variable = influence_over_granada
+						var:influence_over_granada < 0
+					}
+				}
+				reset_influence_over_granada_effect = yes
+			}
+		}
+
 		if = {
 			limit = {
 				NOT = {
@@ -160,13 +217,46 @@ flavor_cas_rio_salado.3 = { #Granadas response
 			}
 			add_opinion = { target = c:MOR modifier = opinion_diplomatic_move }
 		}
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:battle_for_the_strait
+			}
+			change_influence_over_granada_effect = { value = bfts_pull_toward_mor_mid }
+			change_granadan_sovereignty_effect = { value = 5 }
+		}
+		
 	}
 
 	option = {
 		name = flavor_cas_rio_salado_response.34.b
 
-		add_prestige = prestige_extreme_penalty
-		add_legitimacy = legitimacy_extreme_penalty
+		ai_will_select = {
+			value = 200
+			add = "opinion(c:CAS)"
+		}
+
+		if = {
+			limit = { is_subject_of = c:CAS }
+			add_opinion_mutual_effect = {
+				modifier = gra_maintained_tributary
+				target = c:CAS
+			}
+		}
+
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				is_situation_active = situation:battle_for_the_strait
+			}
+			change_influence_over_granada_effect = { value = bfts_pull_toward_cas_mid }
+			change_granadan_sovereignty_effect = { value = -10 }
+		}
+		else_if = {
+			limit = { is_subject = no }
+			add_prestige = prestige_extreme_penalty
+			add_legitimacy = legitimacy_extreme_penalty
+		}
 
 	}
 }
@@ -215,6 +305,9 @@ flavor_cas_rio_salado.4 = { #Portugals response
 				is_allied_with = { target = c:CAS }
 			}
 			add_opinion = { target = c:CAS modifier = opinion_diplomatic_move }
+		}
+		c:CAS = {
+			add_area_preference = castile_no_portugal_conquest
 		}
 	}
 
@@ -315,7 +408,6 @@ flavor_cas_rio_salado.6 = { #Monastery Guadalupe
 		name = flavor_cas_rio_salado.6.a
 		historical_option = yes
 
-		change_gold_effect = { scale = -1 }
 		location:guadalupe = {
 			create_art = {
 				quality = 72
@@ -331,6 +423,16 @@ flavor_cas_rio_salado.6 = { #Monastery Guadalupe
 				construct_building = {
 					building_type = building_type:monastery
 				}
+			}
+		}
+
+		religion:catholic = {
+			create_holy_site = {
+				name = guadalupe_monastery
+				type = christian_holy_site
+				importance = 2
+				location = location:guadalupe
+				religions = { religion:catholic }
 			}
 		}
 	}
@@ -383,7 +485,6 @@ flavor_cas_rio_salado.7 = { #Monastery Tordesillas
 		name = flavor_cas_rio_salado.7.a
 		historical_option = yes
 
-		change_gold_effect = { scale = -1 }
 		location:valladolid = {
 			create_art = {
 				quality = 78
@@ -398,6 +499,37 @@ flavor_cas_rio_salado.7 = { #Monastery Tordesillas
 				}
 				construct_building = {
 					building_type = building_type:monastery
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				has_dlc = "d009_across_the_pillars"
+				religion = {
+					any_religious_order_in_religion = {
+						any_location_in_religious_order = { this = location:assisi }
+					}
+				}
+			}
+			religion = {
+				random_religious_order_in_religion = {
+					limit = {
+						any_location_in_religious_order = { this = location:assisi }
+					}
+					save_scope_as = target_order
+				}
+				every_religious_order_in_religion = {
+					limit = {
+						any_location_in_religious_order = { this = location:assisi }
+					}
+					change_religious_order_zeal = religious_order_mild_bonus
+				}
+			}
+			if = {
+				limit = { exists = scope:target_order }
+				location:valladolid = {
+					attach_to_religious_order = scope:target_order
 				}
 			}
 		}

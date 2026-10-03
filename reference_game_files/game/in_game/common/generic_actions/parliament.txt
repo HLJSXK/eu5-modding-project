@@ -2,6 +2,7 @@
 call_parliament = {
 	type = owncountry
 	
+	
 	ai_tick = never
 	automation_tick = never
 	player_automated_category = parliament
@@ -20,7 +21,10 @@ call_parliament = {
 	select_trigger = {
 		show_if = {
 			scope:actor = {
-				country_type = location
+				NOR = {
+					country_type = building
+					country_type = pop
+				}
 				modifier:permanent_parliament_location = no
 			}
 		}
@@ -38,16 +42,16 @@ call_parliament = {
 		name = "select_parliament_location"
 		none_available_msg_key = "call_parliament_no_locations"
 		column = {
-			data = name
+			data = rank
+		}
+		column = {
+			data = name_no_rank
 		}
 		column = {
 			data = population
 		}
 		column = {
 			data = control
-		}
-		column = {
-			data = rank
 		}
 		visible = {
 			has_owner = yes
@@ -63,7 +67,7 @@ call_parliament = {
 					}
 					OR = {
 						is_province_capital = yes
-						modifier:fort_level > 0
+						has_fort = yes
 					}
 					OR = {
 						is_city = yes
@@ -142,6 +146,13 @@ call_parliament = {
 			else = {
 				custom_tooltip = select_parliament_location_inform_choice_tt
 				set_parliament_location = scope:actor.capital
+				scope:actor.capital = {
+					add_location_modifier = {
+						modifier = parliament_location
+						mode = replace
+						days = 180
+					}
+				}
 			}
 			
 
@@ -220,6 +231,7 @@ call_parliament = {
 					exists = scope:parliament_issue
 				}
 				add = "parliament_issue_chance(scope:parliament_issue)"
+				add = "object_bias(scope:parliament_issue)"
 			}
 		}
 		if = {
@@ -373,19 +385,53 @@ prepare_for_war = {
 		looking_for_a = country
 		ai_interaction_source_list = {
 			scope:actor = {
-				every_country_in_diplomatic_range = {
+				every_country_wants_casus_belli_with = {
 					limit = {
+						NOT = { this = scope:actor }
 						scope:actor = {
-							or = {
-								wants_casus_belli_with = prev
-								and = {
-									NOT = { has_casus_belli_on = prev }
-									wants_to_attack = prev
+							NOT = {
+								has_casus_belli_of_type_on = {
+									type = casus_belli:cb_parliament_conquer_province
+									target = prev
 								}
+								is_at_war_with = prev
 							}
 						}
 					}
 					add_to_list = source
+				}
+				every_country_wants_to_attack = {
+					limit = {
+						NOT = { this = scope:actor }
+						scope:actor = {
+							NOT = {
+								has_casus_belli_on = prev
+								is_at_war_with = prev
+							}
+						}
+					}
+					add_to_list = source
+				}
+				if = {
+					limit = {
+						scope:actor = {
+							OR = {
+								ai_personality = ai_personality:ai_expansionist 
+								ai_personality = ai_personality:ai_aggressive
+							}
+						}
+					}
+					every_potential_expansion_target = { #Countries we want some CBs against
+						limit = {
+							scope:actor = {
+								NOT = { 
+									has_casus_belli_on = prev 
+									is_at_war_with = prev
+								}
+							}
+						}
+						add_to_list = source
+					}
 				}
 			}
 		}
@@ -431,7 +477,7 @@ prepare_for_war = {
 			scope:actor = {
 				within_diplomatic_range = root
 			}
-			capital = {
+			capital ?= {
 				is_discovered_by = scope:actor
 			}
 		}
@@ -447,7 +493,7 @@ prepare_for_war = {
 					capital = {
 						add = {
 							value = "border_distance_to(scope:actor)" # capital location only — one cache lookup vs O(locations_per_province)
-							multiply = -1
+							multiply = -10
 						}
 					}
 				}
@@ -491,44 +537,47 @@ prepare_for_war = {
 	}
 	
 	ai_will_do = {
-		add = {
-			value = 50 #we don't like these people
-		}
-
+		# we are aggressive and dont have any CBs
 		if = {
 			limit = {
-				scope:actor = { ai_personality = ai_personality:ai_aggressive }
+				or = {
+					scope:actor = { ai_personality = ai_personality:ai_expansionist }
+					scope:actor = { ai_personality = ai_personality:ai_aggressive }
+				}
+				scope:actor.num_cbs < 1
 			}
-			
-			add = 250
-		}
 
-		if = {
-			limit = {
-				scope:actor = { ai_personality = ai_personality:ai_expansionist }
+			add = {
+				value = 100
+				desc = "we want CBs"
 			}
-			
-			add = 100
 		}
 
+		# we want to attack specifically this target and we dont have any CBs, or we want a CB
 		if = {
 			limit = {
-				NOT = {
-					scope:actor = {
-						wants_to_attack = scope:target
+				scope:actor = {
+					or = {
+						and = {
+							wants_to_attack = scope:target
+							not = { 
+								scope:actor = { has_casus_belli_on = scope:target_country }
+							}
+						}
+						wants_casus_belli_with = scope:target
 					}
 				}
 			}
-			add = {
-				value = -1000
-				desc = "doesnt want CB"
-			}
-		}
-		else = {
+
 			add = {
 				value = 1000
 				desc = "we want to attack"
 			}
+		}
+		
+		add = {
+			value = -1
+			desc = "base reluctance"
 		}
 	}
 }
@@ -625,7 +674,10 @@ ask_for_law_changes = {
 		ai_interaction_source_list = {
 			scope:actor = {
 				every_current_law = {
-					limit = { is_ai_preferred_parliament_change_law = scope:actor }
+					limit = { 
+						NOT = { is_locked_for = scope:actor }
+						is_ai_preferred_parliament_change_law = scope:actor
+					}
 					add_to_list = source
 				}
 			}
@@ -679,7 +731,12 @@ ask_for_law_changes = {
 			}
 			else = {
 				custom_tooltip = ask_for_law_changes_select_law_title
-			}			
+			}
+			pay_scaled_price = {
+				price = price:change_policy
+				scale = 0.2
+				reason = ask_for_law_changes_price_reason
+			}
 			change_parliament_issue_support = {
 				value = modifier:parliament_request_issue_support_needed
 				multiply = -1
@@ -703,13 +760,6 @@ ask_for_law_changes = {
 change_parliament_type = {
 	type = owncountry
 	
-	ai_prerequisite = {
-		at_war = no
-		stability >= 40
-		legitimacy >= 90
-	}
-
-
 	allow = {
 		scope:actor = {
 			is_active_parliament = no
@@ -718,7 +768,6 @@ change_parliament_type = {
 	}
 	
 	price = price:change_parliament_type
-
 
 	select_trigger = {
 		looking_for_a = parliament_type
@@ -749,22 +798,11 @@ change_parliament_type = {
 		}
 	}
 	
-	ai_tick = daily
-	ai_tick_frequency = 365
+	ai_tick = never #done in code
 
 	automation_tick = daily
 	automation_tick_frequency = 365
 	player_automated_category = parliament
-	ai_will_do = {
-		# base reluctance
-		subtract = {
-			value = 10
-		}
-
-		scope:actor = {
-			add = "parliament_type_utility(scope:parliament_type|yes)"
-		}
-	}
 }
 
 force_parliament_issue = {
@@ -998,11 +1036,156 @@ declare_holidays_request = {
 	}
 }
 
+force_parliament_support = {
+	type = parliament
+
+	sound = PARLIAMENT_REQUEST_MORE_TAXES
+
+	ai_tick = daily
+	ai_tick_frequency = 100
+	automation_tick = daily
+	automation_tick_frequency = 7
+	player_automated_category = parliament
+
+	allow = {
+		scope:actor = {
+			is_active_parliament = yes
+			political_influence >= 75
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			add_political_influence = -75
+			change_parliament_issue_support = {
+				value = 0.25
+			}
+			if = {
+				limit = {
+					modifier:nobles_estate_can_participate_in_parliament = yes
+					country_has_estate = estate_type:nobles_estate
+				}
+				add_estate_satisfaction = {
+					type = estate_type:nobles_estate
+					value = -0.10
+				}
+			}
+			if = {
+				limit = {
+					modifier:clergy_estate_can_participate_in_parliament = yes
+					country_has_estate = estate_type:clergy_estate
+				}
+				add_estate_satisfaction = {
+					type = estate_type:clergy_estate
+					value = -0.10
+				}
+			}
+			if = {
+				limit = {
+					modifier:burghers_estate_can_participate_in_parliament = yes
+					country_has_estate = estate_type:burghers_estate
+				}
+				add_estate_satisfaction = {
+					type = estate_type:burghers_estate
+					value = -0.10
+				}
+			}
+			if = {
+				limit = {
+					modifier:peasants_estate_can_participate_in_parliament = yes
+					country_has_estate = estate_type:peasants_estate
+				}
+				add_estate_satisfaction = {
+					type = estate_type:peasants_estate
+					value = -0.10
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		# Base negative — costs 75 PI and upsets every participating estate
+		subtract = {
+			value = 2
+			desc = "base reluctance"
+		}
+
+		# Never waste this if support is already above the request threshold
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						or = {
+							parliament_issue_support >= modifier:parliament_request_issue_support_needed
+							parliament_issue_support < 0.25
+						}
+					}
+				}
+				value = -1000
+			}
+			desc = "too high or too low support"
+		}
+
+		# Core value: support is below threshold and we cannot act without a boost
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						parliament_issue_support < modifier:parliament_request_issue_support_needed
+					}
+				}
+				value = 5
+			}
+			desc = "below threshold"
+		}
+
+		# Urgency when at war — need taxes and levies from parliament
+		add = {
+			if = {
+				limit = {
+					scope:actor = { at_war = yes }
+				}
+				value = 3
+			}
+			desc = "at war"
+		}
+
+		# Strong urgency when losing — every parliamentary tool matters
+		add = {
+			if = {
+				limit = {
+					scope:actor = { is_in_losing_war = yes }
+				}
+				value = 5
+			}
+			desc = "losing war"
+		}
+
+		# Caution: avoid compounding estate grievances when multiple estates already discontented
+		add = {
+			if = {
+				limit = {
+					scope:actor = {
+						calc_true_if = {
+							amount >= 2
+							estate_satisfaction:nobles_estate < 0.5
+							estate_satisfaction:clergy_estate < 0.5
+							estate_satisfaction:burghers_estate < 0.5
+						}
+					}
+				}
+				value = -4
+			}
+			desc = "low estate satisfaction"
+		}
+	}
+}
+
 iw_militarize_country = {
 	type = parliament
 
 	sound = PARLIAMENT_ASK_FOR_LARGER_LEVIES
-	
+
 	ai_tick = daily
 	ai_tick_frequency = 100
 	automation_tick = daily
@@ -1069,6 +1252,155 @@ iw_militarize_country = {
 			value = scope:actor.military_strength
 			desc = "military_strength"
 		}
-		
+
+	}
+}
+
+seat_the_itinerant_court = {
+	type = parliament
+
+	ai_tick = daily
+	ai_tick_frequency = 100
+
+	potential = {
+		scope:actor = { has_policy = itinerant_court_policy }
+	}
+
+	allow = {
+		scope:actor = {
+			is_active_parliament = yes
+			has_policy = itinerant_court_policy
+			parliament_issue_support > modifier:parliament_request_issue_support_needed
+		}
+	}
+
+	cooldown = {
+		type = seat_the_itinerant_court
+		years = 5
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		source = actor
+		ai_interaction_source_list = {
+			scope:actor = {
+				every_owned_non_rural_location = {
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = court_seat_location
+		name = "seat_the_itinerant_court_select_title"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		column = { data = control }
+		column = { data = rank }
+		visible = {
+			owner ?= scope:actor
+			controller ?= scope:actor
+			local_control > 0
+			is_core_of = scope:actor
+			# Cannot Seat the Itinerant Court where a Local Governor or a Lieutenancy already sits
+			NOR = {
+				has_building = building_type:local_governor
+				has_building = building_type:lieutenancy
+			}
+			OR = {
+				is_city = yes
+				# Rural locations qualify only if they are a province capital.
+				is_province_capital = yes
+			}
+		}
+	}
+
+	effect = {
+		scope:actor = {
+			custom_tooltip = {
+				text = seat_the_itinerant_court_passed_tt
+				if = {
+					limit = { any_owned_location = { has_building = building_type:itinerant_court_seat } }
+					random_owned_location = {
+						limit = { has_building = building_type:itinerant_court_seat }
+						save_scope_as = old_court_seat
+					}
+					scope:court_seat_location ?= {
+						move_building = {
+							from = scope:old_court_seat
+							type = itinerant_court_seat
+							owner = scope:actor
+						}
+					}
+				}
+				else = {
+					scope:court_seat_location = {
+						change_building_level_in_location = {
+							building = building_type:itinerant_court_seat
+							value = 1
+							owner = scope:actor
+						}
+					}
+				}
+			}
+			custom_tooltip = {
+				text = seat_the_itinerant_court_in_session_tt
+				scope:court_seat_location ?= {
+					add_location_modifier = {
+						modifier = itinerant_court_in_session
+						years = 1
+					}
+				}
+			}
+			change_parliament_issue_support = {
+				value = modifier:parliament_request_issue_support_needed
+				multiply = -1
+			}
+			hidden_effect = {
+				remove_variable = seat_the_itinerant_court_ai_cd
+				set_variable = {
+					name = seat_the_itinerant_court_ai_cd
+					value = yes
+					days = 7300
+				}
+			}
+		}
+	}
+
+	ai_will_do = {
+		value = -250
+		if = {
+			limit = { scope:court_seat_location = { is_city = no } }
+			subtract = {
+				desc = "not a city"
+				value = 1000
+			}
+		}
+		add = {
+			desc = "distance to capital"
+			value = "scope:actor.capital.distance_to(scope:court_seat_location)"
+			divide = 2
+		}
+		add = {
+			desc = "target control"
+			value = 100
+			subtract = scope:court_seat_location.max_control
+			divide = 2
+		}
+		add = {
+			desc = "location ranks"
+			value = scope:court_seat_location.rank_index
+			multiply = 10
+		}
+		if = {
+			limit = {
+				scope:actor = {
+					has_variable = seat_the_itinerant_court_ai_cd
+				}
+			}
+			subtract = {
+				desc = "ai already moved the itinerant court before"
+				value = 1000
+			}
+		}
 	}
 }

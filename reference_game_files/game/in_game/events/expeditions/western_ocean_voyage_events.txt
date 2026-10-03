@@ -1,0 +1,324 @@
+﻿namespace = western_ocean_voyage_events
+
+# western_ocean_voyage_events.1 — Departure (on_start)
+western_ocean_voyage_events.1 = {
+	type = country_event
+	title = western_ocean_voyage_events.1.title
+	desc = western_ocean_voyage_events.1.desc
+	historical_info = western_ocean_voyage_events.1.historical_info
+	outcome = neutral
+
+	location_backdrop = { backdrop_preset = backdrop_home_departure }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+		}
+		capital ?= { save_scope_as = target_location }
+	}
+
+	# Columbus-specific departure
+	option = {
+		name = western_ocean_voyage_events.1.columbus
+		trigger = {
+			exists = character:christopher_columbus
+			scope:target_leader = character:christopher_columbus
+		}
+		add_prestige = prestige_weak_bonus
+	}
+
+	# Generic departure
+	option = {
+		name = western_ocean_voyage_events.1.a
+		trigger = {
+			OR = {
+				NOT = { exists = character:christopher_columbus }
+				NOT = { scope:target_leader = character:christopher_columbus }
+			}
+		}
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+# western_ocean_voyage_events.2 — The Canary Islands (on_arrive_to_waypoint)
+western_ocean_voyage_events.2 = {
+	type = country_event
+	title = western_ocean_voyage_events.2.title
+	desc = western_ocean_voyage_events.2.desc
+	historical_info = western_ocean_voyage_events.2.historical_info
+	outcome = neutral
+
+	location_backdrop = { backdrop_preset = backdrop_foreign_port_arrival }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+			expedition_current_location ?= { save_scope_as = current_location }
+		}
+		stall_expedition = scope:expedition
+	}
+
+	option = {
+		name = western_ocean_voyage_events.2.a
+		change_gold_effect = { scale = -2 }
+	}
+
+	option = {
+		name = western_ocean_voyage_events.2.b
+		ai_chance = { base = 0 }
+		end_expedition = scope:expedition
+	}
+
+	after = {
+		resume_expedition = scope:expedition
+	}
+}
+
+# western_ocean_voyage_events.3 — The Men Demand We Turn Back (on_arrive_to_waypoint, mid-Atlantic)
+western_ocean_voyage_events.3 = {
+	type = country_event
+	title = western_ocean_voyage_events.3.title
+	desc = western_ocean_voyage_events.3.desc
+	historical_info = western_ocean_voyage_events.3.historical_info
+	outcome = negative
+
+	location_backdrop = { backdrop_preset = backdrop_at_sea }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+			expedition_current_location ?= { save_scope_as = current_location }
+		}
+		stall_expedition = scope:expedition
+	}
+
+	# Columbus falsifies the log
+	option = {
+		name = western_ocean_voyage_events.3.columbus
+		trigger = {
+			exists = character:christopher_columbus
+			scope:target_leader = character:christopher_columbus
+		}
+		add_prestige = prestige_weak_bonus
+	}
+
+	# Generic — press on
+	option = {
+		name = western_ocean_voyage_events.3.a
+		trigger = {
+			OR = {
+				NOT = { exists = character:christopher_columbus }
+				NOT = { scope:target_leader = character:christopher_columbus }
+			}
+		}
+		change_gold_effect = { scale = -2 }
+	}
+
+	# Turn back
+	option = {
+		name = western_ocean_voyage_events.3.b
+		ai_chance = { base = 0 }
+		add_prestige = prestige_weak_penalty
+		end_expedition = scope:expedition
+	}
+
+	after = {
+		resume_expedition = scope:expedition
+	}
+}
+
+# western_ocean_voyage_events.4 — Land! (on_arrive_to_waypoint, Caribbean landfall)
+western_ocean_voyage_events.4 = {
+	type = country_event
+	title = western_ocean_voyage_events.4.title
+	desc = western_ocean_voyage_events.4.desc
+	historical_info = western_ocean_voyage_events.4.historical_info
+	outcome = positive
+
+	location_backdrop = { backdrop_preset = backdrop_wilderness_landing }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		set_variable = { name = landfall_set value = 2 }
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+		}
+		stall_expedition = scope:expedition
+		scope:location = {
+			save_scope_as = target_location
+			random_neighbor_location = {
+				limit = { is_land = yes }
+				save_scope_as = adjacent_land_loc
+			}
+		}
+	}
+
+	# Columbus plants the flag — we have found the Indies
+	option = {
+		name = western_ocean_voyage_events.4.columbus
+		trigger = {
+			exists = character:christopher_columbus
+			scope:target_leader = character:christopher_columbus
+		}
+		add_prestige = prestige_mild_bonus
+		if = {
+			limit = { exists = scope:adjacent_land_loc }
+			discover_area = scope:adjacent_land_loc.area
+		}
+		trigger_event_non_silently = western_ocean_voyage_events.6
+	}
+
+	# Generic — claim the land for the crown
+	option = {
+		name = western_ocean_voyage_events.4.a
+		trigger = {
+			OR = {
+				NOT = { exists = character:christopher_columbus }
+				NOT = { scope:target_leader = character:christopher_columbus }
+			}
+		}
+		add_prestige = prestige_mild_bonus
+		if = {
+			limit = { exists = scope:adjacent_land_loc }
+			discover_area = scope:adjacent_land_loc.area
+		}
+		trigger_event_non_silently = western_ocean_voyage_events.6
+	}
+
+	# Something is different — not the Indies
+	option = {
+		name = western_ocean_voyage_events.4.b
+		add_prestige = prestige_mild_bonus
+		add_legitimacy = legitimacy_mild_bonus
+		if = {
+			limit = { exists = scope:adjacent_land_loc }
+			discover_area = scope:adjacent_land_loc.area
+		}
+		trigger_event_non_silently = western_ocean_voyage_events.6
+	}
+
+	after = {
+		resume_expedition = scope:expedition
+	}
+}
+
+western_ocean_voyage_events.5 = {
+	type = country_event
+	title = western_ocean_voyage_events.5.title
+	desc = western_ocean_voyage_events.5.desc
+	historical_info = western_ocean_voyage_events.5.historical_info
+	outcome = neutral
+
+	location_backdrop = { backdrop_preset = backdrop_at_sea }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+			expedition_current_location ?= { save_scope_as = current_location }
+		}
+	}
+
+	option = {
+		name = western_ocean_voyage_events.5.a
+		add_navy_tradition = navy_tradition_weak_bonus
+	}
+
+	option = {
+		name = western_ocean_voyage_events.5.b
+		add_prestige = prestige_weak_bonus
+	}
+}
+
+western_ocean_voyage_events.6 = {
+	type = country_event
+	title = western_ocean_voyage_events.6.title
+	desc = western_ocean_voyage_events.6.desc
+	historical_info = western_ocean_voyage_events.6.historical_info
+	outcome = neutral
+
+	location_backdrop = { backdrop_preset = backdrop_wilderness_landing }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+			expedition_current_location ?= { save_scope_as = current_location }
+		}
+	}
+
+	option = {
+		name = western_ocean_voyage_events.6.a
+		add_research_progress = research_progress_weak_bonus
+	}
+
+	option = {
+		name = western_ocean_voyage_events.6.b
+		add_prestige = prestige_mild_bonus
+	}
+}
+
+western_ocean_voyage_events.7 = {
+	type = country_event
+	title = western_ocean_voyage_events.7.title
+	desc = western_ocean_voyage_events.7.desc
+	historical_info = western_ocean_voyage_events.7.historical_info
+	outcome = positive
+
+	location_backdrop = { backdrop_preset = backdrop_home_departure }
+
+	trigger = {
+		exists = scope:expedition.expedition_leader
+	}
+
+	immediate = {
+		scope:expedition = {
+			expedition_leader = {
+				save_scope_as = target_leader
+			}
+			expedition_current_location ?= { save_scope_as = current_location }
+		}
+	}
+
+	option = {
+		name = western_ocean_voyage_events.7.a
+		add_legitimacy = legitimacy_mild_bonus
+		if = {
+			limit = { has_dlc = "d009_across_the_pillars" }
+			custom_tooltip = western_ocean_voyage_mythical_cities_tt
+		}
+	}
+}

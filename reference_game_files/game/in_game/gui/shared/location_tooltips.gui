@@ -463,18 +463,14 @@ template location_simple_tooltip {
                 widget = {
                     size = { 27 27 }
                     tagtooltip_enabled = yes
+                    using = bg_paper_card
 
                     icon = {
-                        size = { 100% 100% }
+                        parentanchor = center
+                        size = { 95% 95% }
                         texture = "[Location.GetSpecificBaseModifier.GetModifier.GetIcon]"
                         texture_density = 2
                         alpha = 1
-                        glow = {
-                            name = "drop_shadow"
-                            glow_radius = 3
-                            color = {0.0 0.0 0.0 1.0}
-                            alpha = 0.5
-                        }
                     }
                 }
                 text_multi = {
@@ -660,13 +656,13 @@ template location_tooltip_alt {
             }
             
             block "tooltip_location_specific" {
-                TooltipListScrollArea = {
+                TooltipScrolledContentSection = {
                     visible = "[Location.HasMapmodeSpecificTooltip]"
                     blockoverride "block_scrollarea" {
                         maximumsize = { -1 300 }
                     }
                     
-                    blockoverride "scrollarea_content" {
+                    blockoverride "section_content" {
                         TooltipTextBlock = {
                             set_parent_dimension_to_minimum = height
                             layoutpolicy_horizontal = expanding
@@ -1064,7 +1060,7 @@ types LocationDetailsTypes {
                 #     }
                 # }
                 icon_pie_left = {
-                    visible = "[GreaterThan_CFixedPoint(Location.GetTotalPossibleTaxBase, '(CFixedPoint)0')]"
+                    visible = "[And(Location.HasOwner, GreaterThan_CFixedPoint(Location.GetTotalPossibleTaxBase, '(CFixedPoint)0'))]"
                     tooltipwidget = {
                         using = location_tax_base_tooltip
                     }
@@ -1952,6 +1948,11 @@ template LocationBuildingLevels_tooltip {
 
             TooltipStringPairList = {
                 datacontext = "[Location]"
+                textcontext = "LOCATION_TOTAL_LEVELS"
+            }
+
+            TooltipStringPairList = {
+                datacontext = "[Location]"
                 textcontext = "LOCATION_CURR_LEVELS"
 
                 tooltipwidget = {
@@ -2080,6 +2081,117 @@ template LocationProximity_tooltip {
                     text = "LIST_TITLE_EFFECTS"
                 }
                 textcontext = "[Location.GetProximityEffect]"
+            }
+        }
+    }
+}
+
+template LocationUncontrolledWealth_tooltip {
+    ContextualTooltipType = {
+        block "location_proximity_widgetid" {}
+        blockoverride "title_icon" {
+            icon = {
+                using = tooltip_title_icon_size
+                texture = "gfx/interface/icons/location_icons/distance_capital.dds"
+            }
+        }
+
+        blockoverride "title_text" {
+            text = "mapmode_uncontrolled_wealth_name"
+        }
+
+        blockoverride "concept_link" {
+            text = [wealth|E]
+        }
+
+        blockoverride "tooltip_content" {
+            TooltipTextBlock = {
+                blockoverride "text" {
+                    text = "MAPMODE_UNCONTROLLED_WEALTH_TT_HEADER"
+                }
+            }
+
+            TooltipListBase = { ### SIDE TABLE
+                TooltipListRowContent = {
+                    TooltipManualTableField = {
+                        blockoverride "field_content" {
+                            text_single = {
+                                layoutpolicy_horizontal = expanding
+                                autoresize = no
+                                text = "[wealth|e]"
+                            }
+                            text_single = {
+                                autoresize = yes
+                                raw_text = "[Location.GetTotalPossibleTaxBase|W2] [wealth_icon]"
+                                tagtooltip_enabled = yes
+                                tooltip = "[wealth|e]"
+                            }
+                        }
+                    }
+
+                    TooltipManualTableField = {
+                        blockoverride "field_content" {
+                            text_single = {
+                                layoutpolicy_horizontal = expanding
+                                autoresize = no
+                                text = "TAX_BASE_TT_LIST"
+                                tooltipwidget = {
+                                    using = location_control_tooltip
+                                }
+                            }
+                            text_single = {
+                                autoresize = yes
+                                raw_text = "[Location.GetTotalTaxBase|W2] [tax_base_icon]"
+
+                                tagtooltip_enabled = yes
+                                tooltip = "[tax_base|e]"
+                            }
+                        }
+                    }
+
+                }
+            }
+            
+            tooltipmeta = {
+                game_concept = [proximity|e]
+                texture = "[GetConceptTexture('proximity')]"
+            }
+            TooltipTextBlock = {
+                visible = "[Location.IsCapital]"
+                blockoverride "text" {
+                    text = "PROXIMITY_CAPITAL_TEXT"
+                }
+            }
+
+            TooltipTextBlock = {
+                visible = "[And(Location.IsCapital, Location.GetOwner.IsPlayer)]"
+                blockoverride "text" {
+                    text = "PROXIMITY_CAPITAL_TEXT_2"
+                }
+                blockoverride "textblock_background_tint"  {
+                    modify_texture = {
+                        using = color_light_green_texture
+                    }
+                }
+            }
+            TooltipTextBlock = { #PROXIMITY = 0
+                visible = "[And(Not(Location.IsCapital), EqualTo_CFixedPoint(Location.GetProximityToOwnerCapital, '(CFixedPoint)0'))]"
+                blockoverride "text" {
+                    text = "NO_PROXIMITY_TT_TEXT"
+                }
+                blockoverride "textblock_background_tint"  {
+                    modify_texture = {
+                        using = color_dark_red_texture
+                    }
+                }
+            }
+            TooltipScrolledStringPairList = { #PROXIMITY PATH
+                visible = "[And(Not(Location.IsCapital), Not(EqualTo_CFixedPoint(Location.GetProximityToOwnerCapital, '(CFixedPoint)0')))]"
+                blockoverride "block_title" {
+                    text = "PROXIMITY_LIST_TITLE"
+                }
+                blockoverride "block_scrollarea" { maximumsize = { -1 420 }}
+                textcontext = "[Location.GetProximityInfo]"
             }
         }
     }
@@ -2696,6 +2808,33 @@ template Inland_tooltip {
     }
 }
 
+template canal_tooltip {
+    ContextualTooltipType = {
+        blockoverride "title_text" {
+            text = "CANAL_LOCATION"
+        }
+
+        blockoverride "title_icon_texture" {
+            texture = "gfx/interface/icons/buildings/pound_lock_canal_infrastructure.dds"
+        }
+
+        blockoverride "tooltip_content" {
+            TooltipTextBlock = {
+                blockoverride "text" {
+                    text = "CANAL_LOCATION_DESC"
+                }
+            }
+
+            TooltipTextBlock = {
+                visible = "[Location.IsCanalRestricted]"
+                blockoverride "text" {
+                    text = "CANAL_LOCATION_RESTRICTED"
+                }
+            }
+        }
+    }
+}
+
 template coastal_tooltip {
     ContextualTooltipType = {
         blockoverride "title_text" {
@@ -2836,13 +2975,13 @@ template offer_peace_location_tooltip {
             }
             
             block "tooltip_location_specific" {
-                TooltipListScrollArea = {
+                TooltipScrolledContentSection = {
                     visible = "[Not(StringIsEmpty(Location.GetMapmodeSpecificTooltip))]"
                     blockoverride "block_scrollarea" {
                         maximumsize = { -1 300 }
                     }
                     
-                    blockoverride "scrollarea_content" {
+                    blockoverride "section_content" {
                         TooltipScrolledConditionList = {
 							blockoverride "block_scrollarea" { maximumsize = { -1 400 }}
 							ontextcontextchanged = "[SetConditionListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
@@ -3203,6 +3342,7 @@ template location_control_tooltip {
 
 template location_tax_base_details {
     hbox = {
+        margin_bottom = 10
         layoutpolicy_horizontal = expanding
         spacing = 10
         widget = { ### POWER PIECHART
@@ -3325,7 +3465,6 @@ template location_tax_base_details {
                 }
             }
         }
-
     }
 
     TooltipListBase = { ### ESTATES TAXES
@@ -3551,6 +3690,10 @@ template location_town_rights_tooltip {
         blockoverride "tooltip_content" {
 			
 
+			TooltipStringPairList = {
+				textcontext = "[Location.GetPossibleTownRightsInfo]"
+			}
+
 			TooltipScrolledContentSection = { 
                 blockoverride "block_scrollarea" {
                     maximumsize = { -1 550 }
@@ -3611,6 +3754,7 @@ template location_peasant_enfranchisement_tooltip {
 template location_tax_base_tooltip {
     ContextualTooltipType = {
         widgetid = "location_tax_base_tooltip"
+        name = "LocationWealthTooltip"
 
         blockoverride "title_icon" {
             icon = {
@@ -3644,8 +3788,14 @@ template location_tax_base_tooltip {
 
         blockoverride "tooltip_content" {
             vbox = {
-                visible = "[HasLocationTaxBaseIntelOn(Location.Self)]"
+                visible = "[And(Location.HasOwner, HasLocationTaxBaseIntelOn(Location.Self))]"
                 using = location_tax_base_details
+            }
+            TooltipTextBlock = {
+                visible = "[Not(Location.HasOwner)]"
+                blockoverride "text" {
+                    text = "TAX_BASE_TT_ESTATES_NOT_OWNER"
+                }
             }
             text_single = {
                 visible = "[Not(HasLocationTaxBaseIntelOn(Location.Self))]"
@@ -4135,7 +4285,15 @@ template location_rgo_max_level_breakdown_tooltip {
                 blockoverride "block_title" {
                     text = "RAW_MATERIAL_LOCATION_TABLE_MAX_LEVEL_TT_TITLE"
                 }
-                textcontext = "[Location.GetMaximumMaxRGOWorkersInfoForUI][Localize('RAW_MATERIAL_LOCATION_TABLE_MAX_LEVEL_POP_DISPLAY')]"
+                textcontext = "[Location.GetMaximumMaxRGOWorkersInfoForUI]"
+            }
+        }
+
+        blockoverride "extra_tooltip_content" {
+            TooltipTextBlock = {
+                blockoverride "text" {
+                    text = "RAW_MATERIAL_LOCATION_TABLE_MAX_LEVEL_POP_DISPLAY"
+                }
             }
         }
     }
@@ -4552,6 +4710,65 @@ template location_rgo_button_tooltip {
                                         tooltipwidget = {
                                             using = goods_market_price_tooltip
                                         }
+                                    }
+                                }
+                            }
+
+                            TooltipManualTableField = {
+                                blockoverride "field_content" {
+                                    text_single = {
+                                        layoutpolicy_horizontal = expanding
+                                        autoresize = no
+                                        text = "[market_access_with_icon|e]"
+                                    }
+                                    text_single = {
+
+                                        autoresize = yes
+                                        raw_text = "[Location.GetMarketAccess|0%]"
+                                        default_format = "#R"
+                                        visible = "[LessThan_CFixedPoint(Location.GetMarketAccess, '(CFixedPoint)0.5')]"
+                                    }
+                                    text_single = {
+                                        autoresize = yes
+                                        raw_text = "[Location.GetMarketAccess|0%]"
+                                        default_format = "#O"
+                                        visible = "[And(GreaterThanOrEqualTo_CFixedPoint(Location.GetMarketAccess, '(CFixedPoint)0.5'), LessThan_CFixedPoint(Location.GetMarketAccess, '(CFixedPoint)0.9'))]"
+                                    }
+                                    text_single = {
+                                        autoresize = yes
+                                        raw_text = "[Location.GetMarketAccess|0%]"
+                                        default_format = "#G"
+                                        visible = "[GreaterThanOrEqualTo_CFixedPoint(Location.GetMarketAccess, '(CFixedPoint)0.9')]"
+                                    }
+                                    tooltipwidget = {
+                                    	ContextualTooltipType = {
+                                    		blockoverride "title_icon" {
+                                    			icon = {
+                                    				using = tooltip_title_icon_size
+                                    				texture = "[GetConceptTexture('market_access')]"
+                                    			}
+                                    		}
+                                        
+                                    		blockoverride "title_text" {
+                                    			text = "[market_access]"
+                                    		}
+                                    		blockoverride "concept_link" {
+                                    			text = "[market_access|e]"
+                                    		}
+                                    		blockoverride "tooltip_content" {
+                                    			TooltipTextBlock = {
+                                    				blockoverride "text" {
+                                    					text = "BUILDING_MARKET_ACCESS_HERE_DESC"
+                                    				}
+                                    			}
+                                    			TooltipTextBlock = {
+                                    				blockoverride "text" {
+                                    					text = "RGO_MARKET_ACCESS_MECHANIC_DESC"
+                                    					default_format = "#flavor"
+                                    				}
+                                    			}
+                                    		}
+                                    	}
                                     }
                                 }
                             }
@@ -5036,7 +5253,7 @@ template adjacency_distance_tooltip {
             text = [proximity|E]
         }
         blockoverride "tooltip_content" {
-            TooltipStringPairList = {
+            TooltipBlockList = {
                 textcontext = "[AdjacencyDistanceWrap.GetTooltip]"
             }
             TooltipTextBlock = {
@@ -7037,17 +7254,21 @@ template TownRightsType_tooltip {
 				}
 			}
 		}
-		blockoverride "extra_tooltip_content" {
-			TooltipScrolledRequirementsList = {
-				blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
-				blockoverride "block_title" {
-					text = "game_concept_conditions"
-					visible = "[DataModelHasItems(RequirementsList.GetLines)]"
-				}
-				blockoverride "requirementslist_datamodel_is_empty" { visible = no }
-				visible = "[UIAction.IsLeftClickAndConfirmEnabled]"
-				textcontext = "[UIAction.GetConditions]"
+	}
+}
+
+template TownRightsTypeSelectInteractionTargetGlue_tooltip {
+	using = TownRightsType_tooltip
+	blockoverride "extra_tooltip_content" {
+		TooltipScrolledRequirementsList = {
+			blockoverride "block_scrollarea" { maximumsize = { -1 300 } }
+			blockoverride "block_title" {
+				text = "game_concept_conditions"
+				visible = "[DataModelHasItems(RequirementsList.GetLines)]"
 			}
+			blockoverride "requirementslist_datamodel_is_empty" { visible = no }
+			visible = "[SelectInteractionTargetGlue.IsLeftClickAndConfirmEnabled]"
+			textcontext = "[SelectInteractionTargetGlue.GetUIActionConditions]"
 		}
 	}
 }

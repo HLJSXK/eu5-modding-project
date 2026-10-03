@@ -742,10 +742,10 @@ apply_union_levels = {
 	}
 	#Same law
 	if = {
-		limit = { local_var:union_levels = 6 }
+		limit = { local_var:union_levels >= 6 }
 		add_policy_to_international_organization = policy:union_crown_unification_policy
 	}
-	else_if = {
+	if = {
 		limit = { local_var:union_levels = 7 }
 		add_policy_to_international_organization = policy:union_swift_crown_unification_policy
 	}
@@ -787,7 +787,9 @@ apply_same_inheritance_policy_effect = {
 		}
 	}
 	if = {
-		limit = { exists = scope:target_heir_selection }
+		limit = {
+			exists = scope:target_heir_selection
+		}
 		custom_tooltip = {
 			text = union_codified_inheritance_policy_at
 				every_international_organization_member = {
@@ -809,8 +811,14 @@ apply_same_inheritance_policy_effect = {
 				}
 		}
 	}
-	else = {
+	else_if = {
+		limit = {
+			exists = scope:senior_partner_country
+		}
 		custom_tooltip = union_codified_inheritance_policy_dt
+	}
+	else = {
+		custom_tooltip = union_codified_inheritance_policy_no_sp_dt
 	}
 	custom_tooltip = {
 		text = union_codified_inheritance_policy_ct
@@ -822,7 +830,11 @@ apply_same_inheritance_policy_effect = {
 						is_implementable_in = prev
 						NOT = { is_locked_for = prev }
 					}
-					"law_policy(law:heir_religion_law)" != scope:target_heir_religion_policy
+					trigger_if = {
+						limit = { exists = scope:target_heir_religion_policy }
+						"law_policy(law:heir_religion_law)" != scope:target_heir_religion_policy
+					}
+					trigger_else = { always = no }
 					NOT = {
 						has_special_status_in_international_organization = {
 							type = special_status:senior_partner
@@ -891,9 +903,11 @@ apply_same_laws_policy_effect = {
 					limit = {
 						NOT = { is_fully_implemented_in = scope:target_country }
 						is_implementable_in = scope:target_country
+						is_available_for = scope:target_country
 						law = {
 							NOT = { is_fully_implemented_in = scope:target_country }
 							is_implementable_in = scope:target_country
+							is_available_for = scope:target_country
 						}
 					}
 					scope:target_country = { add_policy = PREV }
@@ -1555,6 +1569,55 @@ subtract_imperial_authority = {
 	}
 }
 
+hre_grant_elector_role = {
+	international_organization:hre = {
+		if = {
+			limit = { 
+				special_status_can_be_bestowed = {
+					type = special_status:elector
+					country = $country$
+				}
+				num_countries_with_special_status = {
+					type = special_status:elector
+					value < "max_countries_with_special_status(special_status:elector)"
+				}
+			}
+			international_organization_add_special_status = {
+				type = special_status:elector
+				country = $country$
+			}
+			if = {
+				limit = { exists = leader_country }
+				$country$ = {
+					add_opinion = { target = international_organization:hre.leader_country modifier = opinion_granted_electorship }
+				}
+			}
+		}
+		if = {
+			limit = { 
+				special_status_can_be_bestowed = {
+					type = special_status:archbishop_elector
+					country = $country$
+				}
+				num_countries_with_special_status = {
+					type = special_status:archbishop_elector
+					value < "max_countries_with_special_status(special_status:archbishop_elector)"
+				}
+			}
+			international_organization_add_special_status = {
+				type = special_status:archbishop_elector
+				country = $country$
+			}
+			if = {
+				limit = { exists = leader_country }
+				$country$ = {
+					add_opinion = { target = international_organization:hre.leader_country modifier = opinion_granted_electorship }
+				}
+			}
+		}
+	}
+}
+
 ##############################################
 # Middle Kingdome International Organization #
 ##############################################
@@ -1864,4 +1927,10 @@ apply_independent_patriarchate_default_policies = {
 	add_policy_to_international_organization = policy:allow_double_sabbath_tenet
 	add_policy_to_international_organization = policy:independent_acting_patriarchs_tenet
 	add_policy_to_international_organization = policy:independent_authorities_tenet
+}
+remove_high_kingship_reclamation_cb_effect = {
+	if = {
+		limit = { has_casus_belli_of_type = casus_belli:cb_high_kingship_reclamation }
+		remove_all_casus_belli_of_type = casus_belli:cb_high_kingship_reclamation
+	}
 }

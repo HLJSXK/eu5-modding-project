@@ -43,7 +43,7 @@ template trade_details {
 	TooltipTextBlock = {
 		visible = "[And(Trade.IsLocked, Not(Trade.IsFromTradeOrder))]"
 		blockoverride "text" {
-			text = "TRADE_ORIGIN_MANUAL"
+			text = "TRADE_ORIGIN_PROTECTED"
 		}
 	}
 
@@ -111,6 +111,7 @@ template trade_details {
 						raw_text = "[Trade.GetDesiredGoodsShipped|V2]@good!"
 						tooltipwidget = {
 							container = {
+								alwaystransparent = no
 								container = {						
 									visible = "[And(Trade.HasTradeHappened, Trade.IsTradeInefficient)]"
 									ContextualTooltipType = {
@@ -209,6 +210,74 @@ template trade_details {
 					expand = {}									
 				}
 			}
+			# slaves_goods can be exported beyond what real slave pops back; surface the pop-backed
+			# share of the export supply and the slave pool behind it (see slavery.cpp export factor).
+			TooltipManualTableField = {
+				visible = "[Trade.GetGoods.IsSlaves]"
+				blockoverride "field_content" {
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
+						text = "TRADE_SLAVE_BACKED_SUPPLY"
+						default_format = "#subtle_name"
+						tooltipwidget = {
+								ContextualTooltipType = {
+									blockoverride "title_text" { text = "TRADE_SLAVE_BACKED_SUPPLY" }
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[GetConceptTexture('slavery')]"
+										}
+									}
+									blockoverride "concept_link" { text = "[slavery|E]" }
+									blockoverride "tooltip_content" {
+										TooltipTextBlock = {
+											blockoverride "text" { text = "TRADE_SLAVE_BACKED_SUPPLY_DESC" }
+										}
+									}
+								}
+							}
+					}
+					text_single = {
+						autoresize = yes
+						raw_text = "[Trade.GetFromMarket.GetBackedSlaveSupply|V2] / [Trade.GetFromMarket.GetSlaveExportSupply|V2]@good!"
+					}
+				}
+			}
+			TooltipManualTableField = {
+				visible = "[Trade.GetGoods.IsSlaves]"
+				blockoverride "field_content" {
+					datacontext = "[Trade.GetFromMarket]"
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						autoresize = no
+						text = "TRADE_UNEMPLOYED_SLAVE_POPS"
+						default_format = "#subtle_name"
+						tooltipwidget = {
+								ContextualTooltipType = {
+									blockoverride "title_text" { text = "TRADE_UNEMPLOYED_SLAVE_POPS" }
+									blockoverride "title_icon" {
+										icon = {
+											using = tooltip_title_icon_size
+											texture = "[GetConceptTexture('slavery')]"
+										}
+									}
+									blockoverride "concept_link" { text = "[slavery|E]" }
+									blockoverride "tooltip_content" {
+										TooltipTextBlock = {
+											blockoverride "text" { text = "TRADE_UNEMPLOYED_SLAVE_POPS_DESC" }
+										}
+									}
+								}
+							}
+					}
+					text_single = {
+						autoresize = yes
+						raw_text = "[Trade.GetFromMarket.GetUnemployedSlavePopsInMarketText]"
+					}
+				}
+			}
+
 			TooltipManualTableField = {
 				datacontext = "[Trade.GetFromMarket.GetMarketEntry(Trade.GetGoods)]"
 				datacontext = "[Trade.GetFromMarket]"
@@ -270,17 +339,34 @@ template trade_details {
 			}
 
 			TooltipManualTableField = {
-				visible = "[GreaterThan_CFixedPoint(Trade.GetSoundTollFee,'(CFixedPoint)0')]"
+				visible = "[And(Trade.IsExport, GreaterThan_CFixedPoint(Trade.GetSoundTollFee,'(CFixedPoint)0'))]"
 				blockoverride "field_content" {
 					text_single = {
 						layoutpolicy_horizontal = expanding
 						autoresize = no
 						text = "TRADE_TT_SOUND_TOLL"
 					}
+					expand = {}
 					text_single = {
 						autoresize = yes
 						raw_text = "-[Trade.GetSoundTollFee|2]@gold!"
 						default_format = "#R"
+					}
+				}
+			}
+
+			TooltipManualTableField = {
+				visible = "[And(Trade.IsExport, Not(EqualTo_CFixedPoint(Trade.GetTariffValue,'(CFixedPoint)0')))]"
+				blockoverride "field_content" {
+					text_single = {
+						text = "[Trade.GetTariffLabel]"
+					}
+					expand = {}
+					text_single = {
+						raw_text = "[Trade.GetTariffValue|+=2]@gold!"
+						tooltipwidget = {
+							using = trade_tariff_tooltip
+						}
 					}
 				}
 			}
@@ -364,10 +450,27 @@ template trade_details {
 						autoresize = no
 						text = "TRADE_TT_SOUND_TOLL"
 					}
+					expand = {}
 					text_single = {
 						autoresize = yes
 						raw_text = "-[Trade.GetSoundTollFee|2]@gold!"
 						default_format = "#R"
+					}
+				}
+			}
+
+			TooltipManualTableField = {
+				visible = "[And(Not(Trade.IsExport), Not(EqualTo_CFixedPoint(Trade.GetTariffValue,'(CFixedPoint)0')))]"
+				blockoverride "field_content" {
+					text_single = {
+						text = "[Trade.GetTariffLabel]"
+					}
+					expand = {}
+					text_single = {
+						raw_text = "[Trade.GetTariffValue|+=2]@gold!"
+						tooltipwidget = {
+							using = trade_tariff_tooltip
+						}
 					}
 				}
 			}
@@ -452,29 +555,25 @@ template trade_maintenance_tooltip {
 		}
 	}
 }
-template PossibleTrade_maintenance_tooltip {
+template trade_tariff_tooltip {
 	ContextualTooltipType = {
 		blockoverride "title_text" {
-			datacontext = "[PossibleTrade]"
-			text = "POSSIBLE_TRADE_MAINTENANCE_TITLE"
+			datacontext = "[Trade]"
+			text = "TRADE_TARIFF_TITLE"
 		}
 		blockoverride "title_icon" {
 			icon = {
 				using = tooltip_title_icon_size
-				texture = "gfx/interface/icons/flat_icons/trade_maintenance.dds"
+				texture = "[GetConceptTexture('tariff')]"
 			}
 		}
-		blockoverride "concept_link" {
-			text = [merchant_maintenance|E]
-		}
 		blockoverride "tooltip_content" {
-			TooltipStringPairList = {
-				textcontext = "[PossibleTrade.GetMaintenanceInfo]"
+			TooltipScrolledRowList = {
+				textcontext = "[Trade.GetTariffInfo]"
 			}
 		}
 	}
 }
-
 template TradeProfitSummary {
 	TooltipListBase = { ### TC
 		visible = "[Trade.HasTradeHappened]"
@@ -544,12 +643,34 @@ template TradeProfitSummary {
 					text_single = {
 						layoutpolicy_horizontal = expanding
 						autoresize = no
-						text = "[sound_toll|e]"
+						text = "[sound_toll_with_icon|e]"
 					}
+					expand = {}
 					text_single = {
 						autoresize = yes
 						raw_text = "-[Trade.GetSoundTollFee|2]@gold!"
 						default_format = "#R"
+					}
+				}
+			}
+
+			TooltipManualTableField = {
+				visible = "[Not(EqualTo_CFixedPoint(Trade.GetTariffValue,'(CFixedPoint)0'))]"
+				blockoverride "field_content" {
+					text_single = {
+						visible = "[GreaterThan_CFixedPoint(Trade.GetTariffValue,'(CFixedPoint)0')]"
+						text = "[subventions_with_icon|e]"
+					}
+					text_single = {
+						visible = "[LessThan_CFixedPoint(Trade.GetTariffValue,'(CFixedPoint)0')]"
+						text = "[tariffs_with_icon|e]"
+					}
+					expand = {}
+					text_single = {
+						raw_text = "[Trade.GetTariffValue|+=2]@gold!"
+					}
+					tooltipwidget = {
+						using = trade_tariff_tooltip
 					}
 				}
 			}

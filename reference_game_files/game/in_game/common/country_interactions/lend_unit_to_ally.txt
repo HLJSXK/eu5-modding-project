@@ -9,10 +9,16 @@
 	potential = {
 		scope:actor = {
 			at_war = yes
+			NOT = { country_type = army }
 		}
 	}
 
 	allow = {
+	}
+
+	cooldown = {
+		type = lend_unit_to_ally
+		months = 6
 	}
 
 	# Step 1: Pick the war ally to receive the unit
@@ -22,8 +28,22 @@
 		interaction_source_list = {
 			scope:actor = {
 				every_current_war = {
+					"top_overlord_in_war(scope:actor)" ?= {
+						save_temporary_scope_as = top_overlord_here
+					}
 					if = {
-						limit = { is_an_attacker = scope:actor }
+						limit = {
+							exists = scope:top_overlord_here
+						}
+						scope:top_overlord_here = {
+							add_to_list = source
+						}
+					}
+
+					if = {
+						limit = {
+							is_an_attacker = scope:actor
+						}
 						attacker_leader = {
 							if = {
 								limit = { NOT = { this = scope:actor } }
@@ -45,7 +65,8 @@
 		}
 		cache_interaction_source_list = yes
 		name = "choose_country"
-		column = { data = name }
+		default_sort = will
+		column = { data = country_diplomacy_info_military }
 		visible = {
 			always = yes
 		}
@@ -70,6 +91,7 @@
 			# CAESAR-67774.
 			NOT = { any_sub_unit = { is_condottieri = yes } }
 			NOT = { any_sub_unit = { is_mercenary = yes } }
+			has_prisoners = no
 			# Exclude levy-containing units — levy subunits are tied to the pops they were
 			# raised from and cannot transfer ownership; the lend silently no-ops on them.
 			# CAESAR-67972.
@@ -158,7 +180,7 @@
 						target = scope:recipient
 						value < 0.5
 					}
-					scope:recipient = { lowest_war_score < 0 }
+					scope:recipient = { lowest_war_score <= 0 }
 					calc_true_if = {
 						any_unit = { is_army = yes }
 						amount >= 2
@@ -177,12 +199,7 @@
 					liberty_desire < 25
 					relative_military_strength = {
 						target = scope:recipient
-						value < 0.3
-					}
-					scope:recipient = { lowest_war_score < 0 }
-					calc_true_if = {
-						any_unit = { is_army = yes }
-						amount >= 2
+						value < 0.45
 					}
 				}
 			}

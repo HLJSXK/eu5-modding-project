@@ -5,6 +5,113 @@
 @paymentwithcontext_title_wide = @[tooltip_title_wide * 1.33]
 @paymentwithcontext_inner_wide =  @[paymentwithcontext_title_wide - tooltip_inner_margin * 2]
 
+types EconomyTooltipTypes
+{
+	type building_expansion_risk_badge = hbox {
+		ignoreinvisible = yes
+
+		block "building_expansion_risk_badge_visible" {
+			visible = "[BuildingType.IsProducing]"
+		}
+
+		text_single = {			
+			autoresize = yes
+			maximumsize = {55 -1}
+			fontsize = 10
+			visible = "[IsExpansionRiskNoRisk(BuildingType.Self, Location.Self)]"
+			block "building_expansion_risk_badge_no_risk_label" {
+				text = "BUILDING_CONSTRUCTION_RISK_LABEL_NONE"
+			}
+		}
+
+		text_single = {		
+			maximumsize = {55 -1}	
+			autoresize = yes
+			fontsize = 10
+			visible = "[IsExpansionRiskGreen(BuildingType.Self, Location.Self)]"
+			block "building_expansion_risk_badge_green_label" {
+				text = "BUILDING_CONSTRUCTION_RISK_LABEL_GREEN"
+			}
+		}
+
+		text_single = {	
+			maximumsize = {55 -1}		
+			autoresize = yes
+			fontsize = 10
+			visible = "[IsExpansionRiskYellow(BuildingType.Self, Location.Self)]"
+			block "building_expansion_risk_badge_yellow_label" {
+				text = "BUILDING_CONSTRUCTION_RISK_LABEL_YELLOW"
+			}
+		}
+
+		text_single = {	
+			maximumsize = {55 -1}		
+			autoresize = yes
+			fontsize = 10
+			visible = "[IsExpansionRiskRed(BuildingType.Self, Location.Self)]"
+			block "building_expansion_risk_badge_red_label" {
+				text = "BUILDING_CONSTRUCTION_RISK_LABEL_RED"
+			}
+		}
+
+		tooltipwidget = {
+			ContextualTooltipType = {
+				blockoverride "title_text" {
+					text = "BUILDING_CONSTRUCTION_RISK_TITLE"
+				}
+
+				blockoverride "concept_link" {
+					text = [expansion_volatility|E]
+				}
+
+				blockoverride "title_icon" {
+					icon = {
+						using = tooltip_title_icon_size
+						texture = "[GetBuildingIcon(BuildingType.Self)]"
+					}
+				}
+
+				blockoverride "tooltip_content" {
+					TooltipStringPairList = {
+						blockoverride "block_title" {
+							text = "BUILDING_CONSTRUCTION_PROFITABILITY_ESTIMATE_TEXT_TITLE"
+						}
+						textcontext = "[GetBuildingExpansionProfitabilityDropInfo(BuildingType.Self, Location.Self)]"
+					}
+
+					TooltipScrolledTableRowList = {
+						blockoverride "block_title" {
+							text = "BUILDING_CONSTRUCTION_PRICE_IMPACT_TITLE"
+						}
+						textcontext = "[GetPriceImpactInfoFinishedBuildingConstructions(BuildingType.Self, Location.Self)]"
+					}
+
+					TooltipTextBlock = {
+						block "building_expansion_risk_badge_impact_warning_visible" {
+							visible = no
+						}
+						blockoverride "text" {
+							text = "BUILDING_CONSTRUCTION_IMPACT_WARNING"
+						}
+						blockoverride "textblock_background_tint" {
+							modify_texture = {
+								using = color_yellow_texture
+							}
+						}
+					}
+
+					TooltipTextBlock = {
+						visible = "[MarketHasGoodsImpactingConstructions(BuildingType.Self, Location.Self)]"
+						blockoverride "text" {
+							text = "BUILDING_CONSTRUCTION_IMPACT_MARKER_EXPLANATION"
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 template PaymentWithContext_tooltip {
 	ContextualTooltipType = {
 		blockoverride "title_icon_texture" {
@@ -177,6 +284,41 @@ template PaymentWithContext_tooltip {
 
 							blockoverride "column_datamodel" {
 								datamodel = "[PaymentWithContextWrap.GetPayerProportions]"
+							}
+						}
+					}
+
+					TooltipListBase = {
+						visible = "[GreaterThan_int32(GetDataModelSize(PaymentWithContextWrap.GetIncomingPayments), '(int32)0')]"
+						blockoverride "block_title" { text = "IO_PAYMENT_DIVERTED_INCOME" }
+						TooltipListColumnContent = {
+							TooltipTableColumn = {
+								layoutpolicy_horizontal = expanding
+								blockoverride "column_title" { visible = yes }
+								blockoverride "column_title_text" { text = "PAYER" }
+								blockoverride "column_title_left" {}
+								blockoverride "column_title_right" { expand = {} }
+								blockoverride "field_text" {
+									default_format = "#subtle_name"
+									raw_text = "[Concatenate(IncomingPaymentItem.GetPaymentName, Concatenate(' - ', IncomingPaymentItem.GetSourceName))]"
+								}
+								blockoverride "field_left" {}
+								blockoverride "field_right" { expand = {} }
+							}
+							TooltipTableColumn = {
+								layoutpolicy_horizontal = fixed
+								blockoverride "column_title" { visible = yes }
+								blockoverride "column_title_text" { text = "PAYMENT" }
+								blockoverride "column_title_left" { expand = {} }
+								blockoverride "column_title_right" {}
+								blockoverride "field_text" {
+									raw_text = "[IncomingPaymentItem.GetAmount]"
+								}
+								blockoverride "field_left" { expand = {} }
+								blockoverride "field_right" {}
+							}
+							blockoverride "column_datamodel" {
+								datamodel = "[PaymentWithContextWrap.GetIncomingPayments]"
 							}
 						}
 					}
@@ -712,7 +854,7 @@ template ExpenseSettingTooltip {
 
 			TooltipStringPairList = {
 				name = "GetModifierDesc"
-				visible = "[MaintenanceSetting.ShowModifier]"
+				visible = "[And(MaintenanceSetting.ShowModifier, Not(MaintenanceSetting.IsCourt))]"
 				textcontext = "[MaintenanceSetting.GetModifierDesc]"
 			}
 
@@ -805,6 +947,61 @@ template ExpenseSettingTooltip {
 				}
 				textcontext = "[GetPlayer.GetBuildingUpkeepGoodsCostInfo]"
 			}
+
+			TooltipScrolledStringPairList = {
+				visible = "[MaintenanceSetting.IsBureaucracy]"
+				blockoverride "block_scrollarea" { maximumsize = { -1 150 } }
+				blockoverride "block_title" {
+					text = "BUREAUCRACY_AVAILABLE_ALTERNATIVES_TITLE"
+				}
+				textcontext = "[GetPlayer.GetAvailableBureaucraciesDesc]"
+			}
+
+			caesar_plotline = {
+				visible = "[MaintenanceSetting.HasMaintenanceHistory]"
+				layoutpolicy_horizontal = expanding
+				size = { -1 180 }
+
+				blockoverride "header" {
+					text = "MAINTENANCE_LAST_YEAR"
+				}
+				blockoverride "line_color" {
+					color = { .9 .9 .9 1.0 }
+				}
+				blockoverride "line_plotpoints" {
+					plotpoints = "[MaintenanceSetting.GetMaintenanceHistoryTrend]"
+				}
+				blockoverride "tooltip" {
+					marker = {
+						text_single = {
+							position = { 0 -20 }
+							autoresize = yes
+
+							margin_right = 4
+							margin_top = 4
+							align = left|nobaseline
+							using = bg_number_container_bckg
+							default_format = "#t"
+
+							text = "[MaintenanceSetting.GetMaintenanceDataPointValue(PlotLine.GetSnappedIndexNearMouse)]"
+						}
+					}
+				}
+				blockoverride "maxvalue" {
+					raw_text = "[MaintenanceSetting.GetMaxMaintenanceForPlot|1]@gold!"
+				}
+				blockoverride "minvalue" {
+					raw_text = "[MaintenanceSetting.GetMinMaintenanceForPlot|1]@gold!"
+				}
+				blockoverride "startdate" {
+					text = "[MaintenanceSetting.GetMaintenanceHistoryStartDate]"
+				}
+				blockoverride "enddate" {
+					text = "[MaintenanceSetting.GetMaintenanceHistoryEndDate]"
+				}
+				blockoverride "multiitem" {}
+			}
+
 		}
 	}
 }
@@ -1065,6 +1262,34 @@ template OneBuildingInMarketUpkeep_tooltip {
 					maximumsize = { -1 420 }
 				}
 				datacontext = "[StringToStringPairList(OneBuildingInMarketUpkeepWrap.GetTooltip)]"
+			}
+		}
+	}
+}
+
+template ConstructionPriceImpact_tooltip {
+	ContextualTooltipType = {
+
+		blockoverride "title_text" {
+			text = "[ConstructionPriceImpactWrap.GetName]"
+		}
+
+		blockoverride "concept_link" {
+			text = "[market|e]"
+		}
+
+		blockoverride "tooltip_content" {
+			TooltipTextBlock = {
+				blockoverride "text" {
+					text = "ESTIMATED_PROFIT_TARGET_PRICES_BUILDING_BREAKDOWN"
+				}
+			}
+
+			TooltipScrolledTableRowList = {
+				blockoverride "block_scrollarea" {
+					maximumsize = { -1 420 }
+				}
+				textcontext = "[ConstructionPriceImpactWrap.GetTooltip]"
 			}
 		}
 	}

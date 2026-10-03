@@ -290,12 +290,9 @@ promote_urbanization = {
 		is_ai = no
 		modifier:can_build_cities = yes
 		num_locations > 1
-		any_owned_rural_location = {
-			NOT = {
-				any_neighbor_location = {
-					is_city = yes
-				}
-			}
+		num_of_non_rural <= {
+			value = num_locations
+			multiply = 0.1
 		}
 	}
 
@@ -334,27 +331,69 @@ promote_urbanization = {
 	
 	on_debate_passed = {
 		ordered_owned_rural_location = {
-			limit = {
-				NOT = {
-					any_neighbor_location = {
-						is_city = yes
-					}
-				}
-			}
 			order_by = {
-				value = development
-				add = population
-				add = num_buildings
-			}
-			max = 1
-			change_location_rank_effect = { location_rank = location_rank:town }
-			every_pop = {
-				limit = {
-					owner = root
+				value = population
+				multiply = proximity
+				if = {
+					limit = {
+						NOT = { is_core_of = ROOT }
+					}
+					multiply = 0.1
 				}
+			}
+			max = 4
+			check_range_bounds = no
+
+			add_to_list = promote_urbanization_list
+		}
+
+		random_in_list = {
+			list = promote_urbanization_list
+
+			change_location_rank_effect = { location_rank = location_rank:town }
+			ordered_pop = {
+				limit = { 
+					owner = ROOT 
+					estate_type = estate_type:burghers_estate
+				}
+				order_by = pop_size
+				max = 1
+				check_range_bounds = no
 				add_pop_satisfaction = pop_satisfaction_ultimate_bonus 
 			}
-			
+			ordered_pop = {
+				limit = { 
+					owner = ROOT 
+					estate_type = estate_type:nobles_estate
+				}
+				order_by = pop_size
+				max = 1
+				check_range_bounds = no
+				add_pop_satisfaction = pop_satisfaction_ultimate_bonus 
+			}
+			ordered_pop = {
+				limit = { 
+					owner = ROOT 
+					estate_type = estate_type:clergy_estate
+				}
+				order_by = pop_size
+				max = 1
+				check_range_bounds = no
+				add_pop_satisfaction = pop_satisfaction_ultimate_bonus 
+			}
+			ordered_pop = {
+				limit = { 
+					owner = ROOT
+					OR = {
+						estate_type = estate_type:peasants_estate
+						estate_type = estate_type:dhimmi_estate
+					}
+				}
+				order_by = pop_size
+				max = 2
+				check_range_bounds = no
+				add_pop_satisfaction = pop_satisfaction_ultimate_bonus 
+			}
 		}
 	}
 	on_debate_failed = {
@@ -385,6 +424,7 @@ grant_city_rights = {
 			location_rank = location_rank:town
 			NOT = {
 				any_neighbor_location = {
+					owner ?= root
 					OR = { location_rank = location_rank:city  location_rank = location_rank:megalopolis }
 				}
 			}
@@ -420,7 +460,8 @@ grant_city_rights = {
 				location_rank = location_rank:town
 				NOT = {
 					any_neighbor_location = {
-						is_city = yes
+						owner ?= root
+						OR = { location_rank = location_rank:city  location_rank = location_rank:megalopolis }
 					}
 				}
 			}
@@ -706,8 +747,8 @@ expand_docks = {
 				cost_multiplier = 0.5
 				cost_multiplier_reason = "game_concept_parliament_issue"
 			}
-			
 		}
+		change_societal_value = { type = land_vs_naval value = societal_value_tiny_move_to_right }
 	}
 	on_debate_failed = {
 		parliament_debate_failed_effect = yes
@@ -792,8 +833,8 @@ expand_dry_docks = {
 				cost_multiplier = 0.5
 				cost_multiplier_reason = "game_concept_parliament_issue"
 			}
-			
 		}
+		change_societal_value = { type = land_vs_naval value = societal_value_tiny_move_to_right }
 	}
 	on_debate_failed = {
 		parliament_debate_failed_effect = yes
@@ -876,8 +917,8 @@ expand_shipyards = {
 				cost_multiplier = 0.5
 				cost_multiplier_reason = "game_concept_parliament_issue"
 			}
-			
 		}
+		change_societal_value = { type = land_vs_naval value = societal_value_tiny_move_to_right }
 	}
 	on_debate_failed = {
 		parliament_debate_failed_effect = yes
@@ -958,8 +999,8 @@ expand_grand_shipyards = {
 				cost_multiplier = 0.5
 				cost_multiplier_reason = "game_concept_parliament_issue"
 			}
-			
 		}
+		change_societal_value = { type = land_vs_naval value = societal_value_tiny_move_to_right }
 	}
 	on_debate_failed = {
 		parliament_debate_failed_effect = yes
@@ -1034,8 +1075,8 @@ expand_naval_bases = {
 				cost_multiplier = 0.5
 				cost_multiplier_reason = "game_concept_parliament_issue"
 			}
-			
 		}
+		change_societal_value = { type = land_vs_naval value = societal_value_tiny_move_to_right }
 	}
 	on_debate_failed = {
 		parliament_debate_failed_effect = yes
@@ -1108,7 +1149,7 @@ balance_the_budget = {
 	estate = burghers_estate
 
 	modifier_when_in_debate = {
-		monthly_inflation = -0.004
+		monthly_creditworthiness_change = 0.01
 		bank_interest = -0.02
 	}
 
@@ -1218,6 +1259,10 @@ promote_burghers_member = {
 expand_our_market = {
 	estate = burghers_estate
 
+	allow = {
+		NOT = { has_country_modifier = rush_of_merchants }
+	}
+
 	modifier_when_in_debate = {
 		merchant_maintenance_efficiency = 0.50
 	}
@@ -1266,8 +1311,12 @@ expand_our_market = {
 protect_our_market = {
 	estate = burghers_estate
 
+	allow = {
+		NOT = { has_country_modifier = merchant_benefits }
+	}
+
 	modifier_when_in_debate = {
-		selling_efficiency = tiny_trade_efficiency_bonus
+		selling_efficiency = tiny_selling_efficiency_bonus
 	}
 
 	chance = {

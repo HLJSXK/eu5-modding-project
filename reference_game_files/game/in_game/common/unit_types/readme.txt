@@ -21,6 +21,9 @@
 # combat = { <topography> / <vegetation> / <climate> / coastal / inland / river }    # Modifies the damage the unit deals when fighting in certain terrain
 # impact = { <topography> / <vegetation> / <climate> / coastal / inland / river }    # Modifies the movement speed of the unit when in certain terrain.
 # copy_from = <unit_type>                               # The unit type will copy all its value from the specified unit template. All traits can be then further modified later
+# force_culture = <culture>                             # Forces every regiment of this type to this culture regardless of the pop it was raised from (affects tooltip, visuals, and all culture-driven gameplay)
+# force_religion = <religion>                           # Forces every regiment of this type to this religion regardless of the pop it was raised from
+# force_culture_gfx = yes / no                        # Forces the 3D model (and 2D) to use this regiment culture graphical identity, ignoring the country/language uniformity look
 # gfx_tags = {}
 # color = color 										# override primary color in visuals
 # modifiers:

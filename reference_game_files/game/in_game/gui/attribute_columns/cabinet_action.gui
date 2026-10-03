@@ -40,11 +40,9 @@ types SelectionCardsTypes
 	type card_field = hbox {
 		layoutpolicy_horizontal = expanding
 
-		background = {
-			visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
-			block "bg_color" { using = color_intense_bg_blue_texture }
-			alpha = 0.2
-		}
+		block "field_datacontext" {}
+
+		block "field_background" {}
 
 		block "field_content" {}
 	}
@@ -56,6 +54,18 @@ types SelectionCardsTypes
 
 		item = {
 			card_field = {
+				blockoverride "field_datacontext" { block "field_datacontext" {} }
+
+				blockoverride "field_background" {
+					block "field_background" {
+						background = {
+							visible = "[IsOdd_int32(PdxGuiWidget.GetIndexInDataModel)]"
+							block "bg_color" { using = color_intense_bg_blue_texture }
+							alpha = 0.2
+						}
+					}
+				}
+
 				blockoverride "field_content" {
 					block "field_left" {}
 
@@ -126,16 +136,179 @@ types SelectionCardsTypes
 						visible = "[BlockListBlock.IsSingle]"
 						layoutpolicy_horizontal = expanding
 						blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetSingleRows]" }
+
+						blockoverride "field_background" {
+							background = {
+								visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+								using = color_intense_bg_blue_texture
+								alpha = 0.2
+							}
+
+							background = {
+								visible = "[ConditionLine.HasPassed]"
+								using = color_mid_light_green_texture
+								alpha = 0.3
+							}
+
+							background = {
+								visible = "[ConditionLine.HasFailed]"
+								using = color_mid_red_texture
+								alpha = 0.2
+							}
+
+							background = {
+								visible = "[ConditionLine.IsNeutral]"
+								using = color_mid_blue_texture
+								alpha = 0.2
+							}
+						}
+
 						blockoverride "field_text" {
 							layoutpolicy_horizontal = expanding
 							minimumsize = { -1 30 }
 							autoresize = yes
 							align = left|nobaseline
 							multiline = yes
+							# Line text is trimmed, so nesting depth comes from GetIndent instead.
+							margin_left = "[Add_int32(Multiply_int32(ConditionLine.GetIndent,'(int32)5'),'(int32)10')]"
 							text = "[ConditionLine.GetText]"
 						}
 
-						blockoverride "field_left" {}
+						blockoverride "field_left" {
+							hbox = {
+								ignoreinvisible = yes
+
+								TooltipYesNoCheckbox = {
+									visible = "[Or(ConditionLine.HasPassed, ConditionLine.HasFailed)]"
+									blockoverride "yes_visible" { visible = "[ConditionLine.HasPassed]" }
+									blockoverride "no_visible" { visible = "[ConditionLine.HasFailed]" }
+								}
+							}
+						}
+						blockoverride "field_right" { expand = {} }
+					}
+
+					# Requirement rows — lines carrying a trigger state tag such as #trigger_pass.
+					card_column = {
+						visible = "[BlockListBlock.IsRequirements]"
+						layoutpolicy_horizontal = expanding
+						blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetRequirementsRows]" }
+
+						blockoverride "field_datacontext" {
+							datacontext = "[GetRequirementLineAux(RequirementLine.Self, PdxGuiWidget.AccessSelf, PdxGuiWidget.GetIndexInDataModel)]"
+						}
+
+						blockoverride "field_background" {
+							background = {
+								visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+								using = color_intense_bg_blue_texture
+								alpha = 0.2
+							}
+
+							background = {
+								visible = "[RequirementLine.HasPassed]"
+								using = color_mid_light_green_texture
+								alpha = 0.3
+							}
+
+							background = {
+								visible = "[RequirementLine.HasFailed]"
+								using = color_mid_red_texture
+								alpha = 0.4
+							}
+
+							background = {
+								visible = "[RequirementLine.IsSkipped]"
+								using = color_mid_blue_texture
+								alpha = 0.3
+							}
+
+							background = {
+								visible = "[RequirementLine.IsBlocker]"
+								using = color_mid_red_texture
+								alpha = 0.2
+							}
+
+							background = {
+								visible = "[RequirementLine.IsUndefined]"
+								using = color_mid_blue_texture
+								alpha = 0.2
+							}
+						}
+
+						blockoverride "field_text" {
+							layoutpolicy_horizontal = expanding
+							minimumsize = { -1 30 }
+							autoresize = yes
+							align = left|nobaseline
+							multiline = yes
+							text = "[RequirementLine.GetText]"
+						}
+
+						blockoverride "field_left" {
+							hbox = {
+								layoutpolicy_vertical = expanding
+
+								# Indent spacing per nesting level
+								hbox = {
+									datamodel = "[DataModelRepeatedItem(RequirementLine.GetIndent)]"
+									item = {
+										widget = {
+											size = { 12 3 }
+										}
+									}
+								}
+
+								widget = {
+									size = { 10 2 }
+									icon = {
+										visible = "[EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0')]"
+										size = { 100% 100% }
+										parentanchor = right|vcenter
+										using = color_requirementlist_arrow_white_texture
+									}
+								}
+
+								icon = {
+									size = { 2 2 }
+									using = color_requirementlist_arrow_white_texture
+
+									icon = {
+										visible = "[Not(EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, '(int32)0'))]"
+										size = "[RequirementLineAux.GetAuxParentArrowSize('(float)3', '(float)0', '(float)10')]"
+										parentanchor = bottom
+										using = color_requirementlist_arrow_white_texture
+									}
+								}
+
+								icon = {
+									size = { 10 2 }
+									using = color_requirementlist_arrow_white_texture
+								}
+							}
+
+							# Wrapped so a hidden checkbox reserves no space
+							widget = {
+								size = { 20 20 }
+
+								TooltipYesNoCheckbox = {
+									visible = "[Not(RequirementLine.IsUndefined)]"
+									blockoverride "yes_visible" { visible = "[RequirementLine.HasPassed]" }
+									blockoverride "no_visible" { visible = "[RequirementLine.HasFailed]" }
+								}
+
+								icon = {
+									size = { 35% 40% }
+									parentanchor = center
+									visible = "[RequirementLine.IsUndefined]"
+									texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds"
+									modify_texture = {
+										using = color_white_texture
+										alpha = 0.6
+									}
+								}
+							}
+						}
 						blockoverride "field_right" { expand = {} }
 					}
 
@@ -146,11 +319,21 @@ types SelectionCardsTypes
 						card_column = {
 							layoutpolicy_horizontal = expanding
 							blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetPairRows]" }
+
+							blockoverride "field_background" {
+								background = {
+									visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+									using = color_intense_bg_blue_texture
+									alpha = 0.2
+								}
+							}
+
 							blockoverride "field_text" {
 								maximumsize = { -1 30 }
 								minimumsize = { -1 30 }
 								autoresize = yes
 								align = left|nobaseline
+								margin_left = "[Add_int32(Multiply_int32(StringViewPair.GetIndent,'(int32)5'),'(int32)10')]"
 								text = "[StringViewPair.GetLeft.GetStringView]"
 							}
 
@@ -161,6 +344,15 @@ types SelectionCardsTypes
 						card_column = {
 							layoutpolicy_horizontal = fixed
 							blockoverride "column_datamodel" { datamodel = "[BlockListBlock.GetPairRows]" }
+
+							blockoverride "field_background" {
+								background = {
+									visible = "[IsOdd_int32(Add_int32(PdxGuiWidget.GetIndexInDataModel, BlockListBlock.GetAccumCount))]"
+									using = color_intense_bg_blue_texture
+									alpha = 0.2
+								}
+							}
+
 							blockoverride "field_text" {
 								maximumsize = { -1 30 }
 								minimumsize = { -1 30 }

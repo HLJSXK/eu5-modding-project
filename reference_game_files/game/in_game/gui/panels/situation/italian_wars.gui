@@ -18,6 +18,7 @@ types ItalianWarsTypes {
 				parentanchor = center
 				fontsize = 13
 				block "tension_threshold_text" {}
+				default_format = "#yellow_titles"
 			}
 		}
 	}
@@ -56,18 +57,22 @@ types ItalianWarsTypes {
 		blockoverride "situation_member_opinion" {}
 		blockoverride "situation_member_extra_columns" {
 			divider_flavor_01 = { size = { 8 -1 } }
-			action_button_regular = {
+			targetted_button_regular = {
 				visible = yes
 				size = { 60 25 }
 				fontsize = 13
 				text = "bribe_voter_short"
-				actor = "[SituationView.GetPlayer]"
-				parameter = {
-					parameter_name = "recipient"
-					parameter_value = "[ItalianWarsCountryItem.GetCountry]"
+				scripted_action_tooltip = {
+					click_type = left
+					click_mode = confirm
+					action_name = "italian_wars_bribe_country"
+					actor = "[SituationView.GetPlayer]"
+					parameter = {
+						parameter_name = "recipient"
+						parameter_value = "[ItalianWarsCountryItem.GetCountry]"
+					}
 				}
-				left_click_and_hold_action = { action_name = "italian_wars_bribe_country" }
-				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, And(Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer), UIAction.IsEnabled))]"
+				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, And(Not(ItalianWarsCountryItem.IsInSameLeagueAsPlayer), PdxGuiWidget.IsUberButtonEnabled))]"
 				tooltipwidget = {
 					ContextualTooltipType = {
 						blockoverride "title_text" { text = "italian_wars_bribe_country" }
@@ -98,15 +103,17 @@ types ItalianWarsTypes {
 				}
 			}
 			divider_flavor_01 = { size = { 8 -1 } }
-			action_button_regular = {
+			targetted_button_regular = {
 				visible = "[Not(ObjectsEqual(Country.Self, SituationView.GetPlayer))]"
 				size = { 60 25 }
 				fontsize = 13
 				text = "IW_INVITE_SHORT"
-				actor = "[SituationView.GetPlayer]"
-				left_action = {
+				scripted_action_tooltip = {
+					click_type = left
+					click_mode = single
 					action_name = "invite_to_international_organization"
 					action_direction = "offer"
+					actor = "[SituationView.GetPlayer]"
 					parameter = {
 						parameter_name = "international_organization"
 						parameter_value = "[SituationView.GetItalianWarsPlayerLeagueIO]"
@@ -116,7 +123,7 @@ types ItalianWarsTypes {
 						parameter_value = "[ItalianWarsCountryItem.GetCountry]"
 					}
 				}
-				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, UIAction.IsEnabled)]"
+				enabled = "[And(SituationView.IsPlayerItalianWarsLeagueLeader, PdxGuiWidget.IsUberButtonEnabled)]"
 				tooltipwidget = {
 					ContextualTooltipType = {
 						blockoverride "title_text" { text = "IW_INVITE_TO_LEAGUE_TITLE" }
@@ -253,6 +260,7 @@ situation_panel = {
 					maximumsize = { 24 -1 }
 					fontsize = 13
 					raw_text = "[FixedPointToInt(SituationView.GetActiveSituation.GetSituation.MakeScope.GetVariable('iw_tension').GetValue)]%"
+					default_format = "#yellow_titles"
 				}
 				tooltipwidget = {
 					ContextualTooltipType = {
@@ -505,7 +513,14 @@ situation_panel = {
 	}
 	##################################### MAIN CONTENT #####################################
 
+	blockoverride "situation_panel_outcome_hint" {
+		action_tooltip = {
+			title = "OPEN_HINT"
+			on_action = "[OpenLateralViewWithParams('hints', 'selected_hint = hint_italian_wars')]"
+		}
+	}
 	blockoverride "situation_panel_main_content" {
+
 
 		widget = {
 			size = { 510 160 }
@@ -535,19 +550,30 @@ situation_panel = {
 				blockoverride "datamodel" {	datamodel = "[SituationView.GetItalianWarsPieSlices]" }
 				blockoverride "color" { color = "[ItalianWarsLeaguePieSlice.GetColor]" }
 				blockoverride "tooltip" {
+					alwaystransparent = no
+					onmousehierarchyenter = "[ItalianWarsLeaguePieSlice.HighlightOnMap(PdxGuiWidget.AccessSelf)]"
 					tooltipwidget = {
 						using = iw_league_entry_tooltip
 					}
 				}
-				blockoverride "leftside_info" { 
-					text = "[ItalianWarsLeaguePieSlice.GetTitle]" 
+				blockoverride "leftside_info" {
+					text = "[ItalianWarsLeaguePieSlice.GetTitle]"
 					default_format = "#yellow_titles"
+					alwaystransparent = no
+					onmousehierarchyenter = "[ItalianWarsLeaguePieSlice.HighlightOnMap(PdxGuiWidget.AccessSelf)]"
 				}
-				blockoverride "rightside_info" { text = "[SelectLocalization(ItalianWarsLeaguePieSlice.HasIO, 'IW_PIE_LOCATION_COUNT', 'IW_PIE_LOCATION_COUNT_NO_IO')]" }
+				blockoverride "rightside_info" {
+					text = "[SelectLocalization(ItalianWarsLeaguePieSlice.HasIO, 'IW_PIE_LOCATION_COUNT', 'IW_PIE_LOCATION_COUNT_NO_IO')]"
+					alwaystransparent = no
+					onmousehierarchyenter = "[ItalianWarsLeaguePieSlice.HighlightOnMap(PdxGuiWidget.AccessSelf)]"
+				}
 			}
 		}
+	}
 
+	blockoverride "situation_panel_main_content_bottom" {
 		vbox = {
+			visible = "[Not(IsDataModelEmpty(SituationView.GetItalianWarsWarItems))]"
 			widget = {
 				layoutpolicy_horizontal = expanding
 				size = {510 40}
@@ -598,12 +624,6 @@ situation_panel = {
 							margin = { 8 6 }
 							margin_left = 12
 							datamodel = "[SituationView.GetItalianWarsWarItems]"
-							text_single = {
-								visible = "[IsDataModelEmpty(SituationView.GetItalianWarsWarItems)]"
-								text = "IW_NO_CURRENT_WARS"
-								align = center
-								minimumsize = { 490 48 }
-							}
 							item = {
 								hbox = {
 									using = bg_paper_card
@@ -612,13 +632,15 @@ situation_panel = {
 									spacing = 2
 									margin = { 4 6 }
 
-									action_button_regular = {
+									targetted_button_regular = {
 										visible = yes
 										size = { 50 28 }
 										text = "IW_JOIN_WAR_SHORT"
-										actor = "[SituationView.GetPlayer]"
-										left_action = {
+										scripted_action_tooltip = {
+											click_type = left
+											click_mode = single
 											action_name = "iw_intervene_in_war"
+											actor = "[SituationView.GetPlayer]"
 											parameter = {
 												parameter_name = "recipient"
 												parameter_value = "[SituationView.GetActiveSituation.GetSituation]"
@@ -632,7 +654,7 @@ situation_panel = {
 												parameter_value = "[ItalianWarsWarItem.GetAttackerLeader]"
 											}
 										}
-										enabled = "[UIAction.IsEnabled]"
+										enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
 										tooltipwidget = {
 											ContextualTooltipType = {
 												blockoverride "title_text" { text = "iw_intervene_in_war" }
@@ -723,13 +745,15 @@ situation_panel = {
 									}
 
 
-									action_button_regular = {
+									targetted_button_regular = {
 										visible = yes
 										size = { 50 28 }
 										text = "IW_JOIN_WAR_SHORT"
-										actor = "[SituationView.GetPlayer]"
-										left_action = {
+										scripted_action_tooltip = {
+											click_type = left
+											click_mode = single
 											action_name = "iw_intervene_in_war"
+											actor = "[SituationView.GetPlayer]"
 											parameter = {
 												parameter_name = "recipient"
 												parameter_value = "[SituationView.GetActiveSituation.GetSituation]"
@@ -743,7 +767,7 @@ situation_panel = {
 												parameter_value = "[ItalianWarsWarItem.GetDefenderLeader]"
 											}
 										}
-										enabled = "[UIAction.IsEnabled]"
+										enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
 										tooltipwidget = {
 										ContextualTooltipType = {
 											blockoverride "title_text" { text = "iw_intervene_in_war" }

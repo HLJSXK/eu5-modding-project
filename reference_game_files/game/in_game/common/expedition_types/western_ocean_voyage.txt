@@ -1,0 +1,124 @@
+﻿western_ocean_voyage_expedition = {
+
+	unique = yes
+	returns_home = yes
+	travel_speed = 1
+	origin = closest_non_rural_port
+	travel_mode = sea
+	show_start_message = no
+
+	waypoints = {
+		northern_fuerteventura_coast
+		atlantic_north_equatorial_current10
+		atlantic_north_equatorial_current25
+	}
+
+	potential = {
+		capital = { sub_continent = sub_continent:western_europe }
+		has_ports = yes
+		NOT = { discovered_any_in_americas_trigger = yes }
+	}
+
+	can_start = {
+		has_advance = open_sea_exploration
+		has_non_rural_port = yes
+		NOT = { has_cooldown = western_ocean_voyage_cooldown }
+	}
+
+	leader = {
+		is_explorer = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	on_start = {
+		add_cooldown = {
+			type = western_ocean_voyage_cooldown
+			years = 5
+		}
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+		}
+		set_variable = { name = landfall_set value = 0 }
+		trigger_event_non_silently = western_ocean_voyage_events.1
+	}
+
+	on_arrive_to_new_location = {
+		discover_area = scope:location.area
+	}
+
+	on_arrive_to_waypoint = {
+		discover_area = scope:location.area
+		if = {
+			limit = {
+				scope:location = location:northern_fuerteventura_coast
+				NOT = { var:landfall_set >= 1 }
+			}
+			trigger_event_non_silently = western_ocean_voyage_events.2
+		}
+		if = {
+			limit = {
+				scope:location = location:atlantic_north_equatorial_current10
+				NOT = { var:landfall_set >= 1 }
+			}
+			trigger_event_non_silently = western_ocean_voyage_events.5
+		}
+		if = {
+			limit = {
+				scope:location = location:atlantic_north_equatorial_current25
+				NOT = { var:landfall_set >= 1 }
+			}
+			random_list = {
+				25 = { scope:expedition = { add_new_waypoint = location:samana_cay } }
+				25 = { scope:expedition = { add_new_waypoint = location:inagua } }
+				25 = { scope:expedition = { add_new_waypoint = location:bahama } }
+				25 = { scope:expedition = { add_new_waypoint = location:san_salvador_coast } }
+			}
+			set_variable = { name = landfall_set value = 1 }
+			trigger_event_non_silently = western_ocean_voyage_events.3
+		}
+		else_if = {
+			limit = {
+				var:landfall_set = 1
+				scope:location = {
+					OR = {
+						this = location:samana_cay
+						this = location:inagua
+						this = location:bahama
+						this = location:san_salvador_coast
+					}
+				}
+			}
+			trigger_event_non_silently = western_ocean_voyage_events.4
+		}
+	}
+
+	on_end = {
+		remove_variable = landfall_set
+		if = {
+			limit = { discovered_any_in_americas_trigger = yes }
+			add_prestige = prestige_extreme_bonus
+			trigger_event_non_silently = western_ocean_voyage_events.7
+		}
+	}
+
+	on_fail = {
+		remove_variable = landfall_set
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		multiply = 0.5
+		if = {
+			limit = { character:christopher_columbus ?= { is_alive = yes } }
+			multiply = 10
+		}
+	}
+
+	utility = {
+		value = 8
+	}
+}

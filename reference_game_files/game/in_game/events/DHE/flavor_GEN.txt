@@ -478,18 +478,63 @@ flavor_gen.9 = {
 		c:FRA = {
 			num_of_non_rural >= 10
 		}
+		NOR = {
+			situation:guelphs_and_ghibellines = { situation_has_ended = yes }
+			is_member_of_international_organization = international_organization:guelphs_io
+			is_member_of_international_organization = international_organization:ghibellines_io
+		}
 	}
 
 	option = {
 		name = flavor_gen.9.a
 		historical_option = yes
+		ai_chance = {
+			base = 10
+		}
 		c:FRA = { add_opinion = { target = root modifier = gen_pro_guelph }	}
 		international_organization:hre.leader_country = {	add_opinion = { target = root modifier = gen_anti_ghibellines }	}
+		if = {
+			limit = {
+				situation:guelphs_and_ghibellines = { situation_is_active = yes }
+				NOT = { is_member_of_international_organization = international_organization:guelphs_io }
+				can_join_international_organization = international_organization:guelphs_io
+			}
+			international_organization:guelphs_io = {
+				add_country_to_international_organization = root
+			}
+			custom_tooltip = {
+				text = flavor_gen.9.a.tt
+				c:FRA = { set_variable = gag_france_backs_guelphs }
+			}
+		}
 	}
 	option = {
 		name = flavor_gen.9.b
+		ai_chance = {
+			base = 10
+			modifier = {
+				factor = 0
+				is_allied_with = { target = c:FRA }
+			}
+		}
 		international_organization:hre.leader_country = {	add_opinion = { target = root modifier = gen_pro_ghibellines } 	}
 		c:FRA = {	add_opinion = { target = root modifier = gen_anti_guelph } }
+		if = {
+			limit = {
+				situation:guelphs_and_ghibellines = { situation_is_active = yes }
+				NOT = { is_member_of_international_organization = international_organization:ghibellines_io }
+				can_join_international_organization = international_organization:ghibellines_io
+			}
+			international_organization:ghibellines_io = {
+				add_country_to_international_organization = root
+			}
+		}
+	}
+	option = {
+		name = flavor_gen.9.c
+		ai_chance = {
+			base = 1
+		}
 	}
 }
 
@@ -1689,7 +1734,7 @@ flavor_gen.26 = {
 	}
 	#Fortune favors the bold!
 	option = {
-		name = flavor_gen.19.a
+		name = flavor_gen.26.a
 		historical_option = yes
 		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_move_to_left }
 		add_casus_belli = {
@@ -1705,7 +1750,7 @@ flavor_gen.26 = {
 	}
 	#It might be too risky to keep this conflict open.
 	option = {
-		name = flavor_gen.19.b
+		name = flavor_gen.26.b
 		change_societal_value = { type = belligerent_vs_conciliatory value = societal_value_move_to_right }
 	}
 	after = {
@@ -1831,12 +1876,11 @@ flavor_gen.28 = {
 		monthly_chance = 5
 	}
 	trigger = {
-		OR = {
-			owns = location:nice
-			location:nice = {
-				owner = {
-					NOT = { is_at_war_with = root }
-				}
+		location:nice = { has_owner = yes }
+		NOT = { owns = location:nice }
+		location:nice = {
+			owner = {
+				NOT = { is_at_war_with = root }
 			}
 		}
 	}
@@ -1865,6 +1909,21 @@ flavor_gen.28 = {
 		name = flavor_gen.28.b
 		add_estate_satisfaction = { type = estate_type:nobles_estate
 			value = estate_satisfaction_extreme_penalty
+		}
+		if = {
+			limit = {
+				NOT = {
+					has_scripted_relation = {
+						type = relation_type:trade_access
+						target = location:nice.owner
+					}
+				}
+			}
+			create_relation = {
+				type = relation_type:trade_access
+				first = scope:nice_owner
+				second = root
+			}
 		}
 		location:nice = {
 			change_building_level_in_location = {
@@ -2376,12 +2435,71 @@ flavor_gen.35 = {
 				add_pop_satisfaction = pop_satisfaction_radical_penalty
 			}
 		}
-		custom_tooltip = {
-			text = can_sell_corsica_via_diplo_action
-			set_variable = { name = yeet_corsica }
-			set_global_variable = {
-				name = saved_pumonte
-				value = location:ajaccio.province
+		if = {
+			limit = {
+				is_ai = yes
+			}
+			if = {
+				limit = {
+					country_exists = c:FRA
+					c:FRA = {
+						is_subject = no
+						NOT = { is_at_war_with = root }
+						num_of_ports >= 1
+					}
+				}
+				c:FRA = {
+					save_scope_as = corsica_buyer
+				}
+				every_owned_location = {
+					limit = {
+						is_corsica = yes
+					}
+					if = {
+						limit = { is_core_of = root }
+						remove_core = root
+					}
+					if = {
+						limit = { NOT = { is_core_of = scope:corsica_buyer } }
+						add_core = scope:corsica_buyer
+					}
+					change_location_owner = scope:corsica_buyer
+				}
+				trigger_event_non_silently = {
+					id = flavor_gen.36
+				}
+			}
+			else = {
+				every_owned_location = {
+					limit = {
+						is_corsica = yes
+					}
+					if = {
+						limit = { is_core_of = root }
+						remove_core = root
+					}
+					change_location_owner = c:COR
+				}
+				c:COR = {
+					if = {
+						limit = {
+							exists = character:pasquale_paoli
+							character:pasquale_paoli = { is_alive = yes }
+						}
+						set_new_ruler = character:pasquale_paoli
+					}
+					change_government_type = government_type:republic
+				}
+			}
+		}
+		else = {
+			custom_tooltip = {
+				text = can_sell_corsica_via_diplo_action
+				set_variable = { name = yeet_corsica }
+				set_global_variable = {
+					name = saved_pumonte
+					value = location:ajaccio.province
+				}
 			}
 		}
 	}
@@ -2957,8 +3075,8 @@ flavor_gen.46 = { # Formation of the Bank of Saint George https://en.wikipedia.o
 				hidden_effect = {
 					change_country_flag = SAINT_GEORGE
 					define_unique_country_tag = SAGEO
-					change_heir_selection = heir_selection:bank_selection
 					change_government_type = government_type:republic
+					change_heir_selection = heir_selection:bank_selection
 				}
 			}
 			scope:saint_george_bank_hq = {
@@ -3298,8 +3416,8 @@ flavor_gen.52 = { # The Grimaldi Bank
 				hidden_effect = {
 					change_country_flag = GRIMALDI
 					define_unique_country_tag = GRIML
-					change_heir_selection = heir_selection:bank_selection
 					change_government_type = government_type:republic
+					change_heir_selection = heir_selection:bank_selection
 				}
 			}
 			scope:grimaldi_bank_hq = {
@@ -3448,8 +3566,8 @@ flavor_gen.54 = { # The Spinola Bank
 				hidden_effect = {
 					change_country_flag = SPINOLA
 					define_unique_country_tag = SPINL
-					change_heir_selection = heir_selection:bank_selection
 					change_government_type = government_type:republic
+					change_heir_selection = heir_selection:bank_selection
 				}
 			}
 			scope:spinola_bank_hq = {
@@ -3596,10 +3714,10 @@ flavor_gen.56 = { # The Pallavicino Bank
 				set_new_ruler = scope:target_character
 
 				hidden_effect = {
-					change_country_flag = PALLAVICINO
+					change_country_flag = PALLAVICINO_BANK
 					define_unique_country_tag = PALLV
-					change_heir_selection = heir_selection:bank_selection
 					change_government_type = government_type:republic
+					change_heir_selection = heir_selection:bank_selection
 				}
 			}
 			scope:pallavicino_bank_hq = {

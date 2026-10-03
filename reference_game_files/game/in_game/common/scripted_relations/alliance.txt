@@ -129,9 +129,9 @@
             }
         }
         scope:recipient = {
-            add_trust = {
+            add_trust_equilibrium = {
                 target = scope:actor
-                value = -15
+                modifier = trust_broke_alliance
             }
         }
     }
@@ -198,28 +198,6 @@
         threatening_rivals = 20
     }
     wants_to_give = {
-        if = {
-            #Actor needs to be close and relativly big
-            limit = {
-                scope:recipient = {
-                    border_distance_to = {
-                        country = scope:actor
-                        value < 150
-                    }
-                    relative_strength = {
-                        target = scope:actor
-                        value < 0.60
-                    }
-                }
-            }
-            add = {
-                desc = "NEEDS_ALLIES_AGAINST_STRONG_RIVALS_AND_NEIGHBOURS"
-                # Check if the country needs allies at all
-                value = scope:recipient.country_needs_allies_value
-                max = 25
-                min = 0
-            }
-        }
         scope:actor = {
             add = {
                 desc = "COALITION_GRADE_ANTAGONISM_TOWARDS_THEM"
@@ -229,52 +207,87 @@
                             not = { is_subject_or_below_of = scope:actor }
                         }
                         subtract = {
+                            desc = "[country_strength|e]"
                             value = country_strength
+                            #countries further away mean less
+                            divide = {
+                                value = 1
+                                add = {
+                                    value = "border_distance_to(scope:actor)"
+                                    divide = 600
+                                }
+                                min = 1
+                            }
                         }
                     }
                     if = {
                         limit = {
                             NOT = {
-                                country_strength <= 0 
+                                country_strength <= 0
                             }
                         }
                         divide = country_strength
-                    } 
+                    }
                     multiply = 10
                 }
             }
         }
         if = {
-            limit = {
-                scope:actor = {
-                    any_current_war = {
-                        NOT = {
-                            is_on_same_side = {
-                                country = scope:actor
-                                target = scope:recipient
+            limit = { exists = scope:recipient }
+            if = {
+                #Actor needs to be close and relativly big
+                limit = {
+                    scope:recipient = {
+                        border_distance_to = {
+                            country = scope:actor
+                            value < 150
+                        }
+                        relative_strength = {
+                            target = scope:actor
+                            value < 0.60
+                        }
+                    }
+                }
+                add = {
+                    desc = "NEEDS_ALLIES_AGAINST_STRONG_RIVALS_AND_NEIGHBOURS"
+                    # Check if the country needs allies at all
+                    value = scope:recipient.country_needs_allies_value
+                    max = 25
+                    min = 0
+                }
+            }
+            if = {
+                limit = {
+                    scope:actor = {
+                        any_current_war = {
+                            NOT = {
+                                is_on_same_side = {
+                                    country = scope:actor
+                                    target = scope:recipient
+                                }
                             }
                         }
                     }
                 }
-            }
-            add = {
-                desc = "ACTOR_IS_IN_DIFFERENT_WARS"
-                value = -100
-            }
-        }
-
-        if = {
-            limit = {
-                "scope:recipient.opinion(scope:actor)" < 150
-                "scope:recipient.conquer_desire(scope:actor)" > 20
-                scope:recipient = {
-                    is_neighbor_of = scope:actor
+                add = {
+                    desc = "ACTOR_IS_IN_DIFFERENT_WARS"
+                    value = -100
                 }
             }
-            add = {
-                desc = "RECIPIENTS_DESIRES_ACTORS_LOCATIONS"
-                value = "scope:recipient.conquer_desire(scope:actor)"
-                multiply = -1
+
+            if = {
+                limit = {
+                    "scope:recipient.opinion(scope:actor)" < 150
+                    "scope:recipient.conquer_desire(scope:actor)" > 20
+                    scope:recipient = {
+                        is_neighbor_of = scope:actor
+                    }
+                }
+                add = {
+                    desc = "RECIPIENTS_DESIRES_ACTORS_LOCATIONS"
+                    value = "scope:recipient.conquer_desire(scope:actor)"
+                    multiply = -1
+                }
                 if = {
                     limit = {
                         scope:recipient = {
@@ -282,46 +295,47 @@
                         }
                     }
                     add = {
+                        desc = "DESIRES_LOCATIONS_TT_DESC"
                         value = "scope:recipient.num_of_locations_with_high_conquer_desire(scope:actor)"
                         multiply = -5
                     }
                 }
             }
-        }
 
-        if = {
-            limit = {
-                exists = situation:rise_of_the_ottomans.var:strongest_beylik_variable
-                scope:actor ?= situation:rise_of_the_ottomans.var:strongest_beylik_variable
-                exists = situation:rise_of_the_ottomans.var:second_strongest_strongest_beylik_variable
-                scope:recipient ?= situation:rise_of_the_ottomans.var:second_strongest_strongest_beylik_variable
-            }
-            add = {
-                value = -1000
-                desc = "CHALLENGER_BEYLIK"
-            }
-        }
-
-        add = {
-            desc = "RECIPIENT_WOULD_NEED_TO_PAY_FOR_DIPLOMACY"
-            value = scope:recipient.diplomatic_capacity_without_maintenance
-            subtract = scope:recipient.used_diplomatic_capacity
-            subtract = "scope:recipient.diplomatic_capacity_of_new_relation(scope:actor|scope:scripted_relation_type)"
             if = {
                 limit = {
-                    NOT = { scope:recipient.diplomatic_capacity_without_maintenance <= 0 }
+                    situation:rise_of_the_ottomans = { has_variable = strongest_beylik_variable }
+                    situation:rise_of_the_ottomans = { has_variable = second_strongest_strongest_beylik_variable }
+                    scope:actor ?= situation:rise_of_the_ottomans.var:strongest_beylik_variable
+                    scope:recipient ?= situation:rise_of_the_ottomans.var:second_strongest_strongest_beylik_variable
                 }
-                divide = scope:recipient.diplomatic_capacity_without_maintenance
+                add = {
+                    value = -1000
+                    desc = "CHALLENGER_BEYLIK"
+                }
             }
-            max = 0
-            multiply = 100
-        }
 
-        add = {
-            desc = "COMMON_RIVALS"
-            value = "scope:recipient.num_of_common_rivals(scope:actor)"
-            max = 3
-            multiply = 5
+            add = {
+                desc = "RECIPIENT_WOULD_NEED_TO_PAY_FOR_DIPLOMACY"
+                value = scope:recipient.diplomatic_capacity_without_maintenance
+                subtract = scope:recipient.used_diplomatic_capacity
+                subtract = "scope:recipient.diplomatic_capacity_of_new_relation(scope:actor|scope:scripted_relation_type)"
+                if = {
+                    limit = {
+                        NOT = { scope:recipient.diplomatic_capacity_without_maintenance <= 0 }
+                    }
+                    divide = scope:recipient.diplomatic_capacity_without_maintenance
+                }
+                max = 0
+                multiply = 100
+            }
+
+            add = {
+                desc = "COMMON_RIVALS"
+                value = "scope:recipient.num_of_common_rivals(scope:actor)"
+                max = 3
+                multiply = 5
+            }
         }
     }
 
@@ -386,6 +400,7 @@
                         }
                     }
                     add = {
+                        desc = "DESIRES_LOCATIONS_TT_DESC"
                         value = "scope:actor.num_of_locations_with_high_conquer_desire(scope:recipient)"
                         multiply = -2.5
                     }

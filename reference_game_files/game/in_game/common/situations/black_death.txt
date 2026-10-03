@@ -7,8 +7,17 @@
 		disease_is_active = disease:bubonic_plague
 	}
 	
-	can_end = {
-		NOT = { disease_outbreak_is_active = var:original_outbreak }
+	outcome = {
+		name = "black_death_plague_burns_out"
+		trigger = {
+			OR = {
+				custom_tooltip = {
+					text = black_death_no_original_outbreak_tt
+					NOT = { has_variable = original_outbreak }
+				}
+				NOT = { disease_outbreak_is_active = var:original_outbreak }
+			}
+		}
 	}
 	
 	visible = {
@@ -71,6 +80,7 @@
 				country_has_disease_outbreak = root.var:original_outbreak
 			}
 			set_variable = { name = had_black_death value = yes }
+			set_variable = { name = black_death_months_without_outbreak value = 0 }
 			random_list = {
 				10 = { trigger_event_non_silently = black_death.101 }
 				10 = { trigger_event_non_silently = black_death.102 }
@@ -102,8 +112,6 @@
 				500 = { }
 			}
 		}
-		#Auto Remove modifiers that don't make sense for noninfected countries
-		# from countries that no longer have the disease		
 		every_country = {
 			limit = {
 				NOT = {
@@ -111,19 +119,32 @@
 				}
 				has_variable = had_black_death
 			}
-			every_owned_non_rural_location = {
-				limit = { has_location_modifier = isolating_cities }
-				remove_location_modifier = isolating_cities
+			if = {
+				limit = { has_variable = black_death_months_without_outbreak }
+				change_variable = { name = black_death_months_without_outbreak add = 1 }
 			}
-			
-			if = { limit = { has_country_modifier = hiding_from_black_death } remove_country_modifier = hiding_from_black_death }
-			if = { limit = { has_country_modifier = control_the_food_market } remove_country_modifier = control_the_food_market }
-			if = { limit = { has_country_modifier = foodstuffs_exports_banned } remove_country_modifier = foodstuffs_exports_banned }
-			if = { limit = { has_country_modifier = segregate_the_infected } remove_country_modifier = segregate_the_infected }
-			if = { limit = { has_country_modifier = strict_quarantines } remove_country_modifier = strict_quarantines }
-			if = { limit = { has_country_modifier = sponsor_sin_forgiveness_bonus } remove_country_modifier = sponsor_sin_forgiveness_bonus }
-			if = { limit = { has_country_modifier = sponsor_sin_forgiveness_cost } remove_country_modifier = sponsor_sin_forgiveness_cost }
-			if = { limit = { has_country_modifier = blame_the_minorities } remove_country_modifier = blame_the_minorities }
+			else = {
+				set_variable = { name = black_death_months_without_outbreak value = 1 }
+			}
+
+			if = {
+				limit = {
+					var:black_death_months_without_outbreak >= BLACK_DEATH_ACTION_GRACE_MONTHS
+				}
+				every_owned_non_rural_location = {
+					limit = { has_location_modifier = isolating_cities }
+					remove_location_modifier = isolating_cities
+				}
+
+				if = { limit = { has_country_modifier = hiding_from_black_death } remove_country_modifier = hiding_from_black_death }
+				if = { limit = { has_country_modifier = control_the_food_market } remove_country_modifier = control_the_food_market }
+				if = { limit = { has_country_modifier = foodstuffs_exports_banned } remove_country_modifier = foodstuffs_exports_banned }
+				if = { limit = { has_country_modifier = segregate_the_infected } remove_country_modifier = segregate_the_infected }
+				if = { limit = { has_country_modifier = strict_quarantines } remove_country_modifier = strict_quarantines }
+				if = { limit = { has_country_modifier = sponsor_sin_forgiveness_bonus } remove_country_modifier = sponsor_sin_forgiveness_bonus }
+				if = { limit = { has_country_modifier = sponsor_sin_forgiveness_cost } remove_country_modifier = sponsor_sin_forgiveness_cost }
+				if = { limit = { has_country_modifier = blame_the_minorities } remove_country_modifier = blame_the_minorities }
+			}
 		}
 	}
 
@@ -142,6 +163,11 @@
 
 	on_ended = {
 		set_situation_end_flag_effect = { situation = black_death }
+		add_timeline_note = {
+			key = timeline_note_black_death_end
+			show_in_pop_graph = yes
+			unique = yes
+		}
 		every_country = {
 			remove_country_modifier = hiding_from_black_death
 			remove_country_modifier = control_the_food_market
@@ -182,6 +208,7 @@
 			if = { limit = { has_variable = bd1024_cd } remove_variable = bd1024_cd }
 			if = { limit = { has_variable = bd1025_cd } remove_variable = bd1025_cd }
 			if = { limit = { has_variable = bd1026_cd } remove_variable = bd1026_cd }
+			if = { limit = { has_variable = black_death_months_without_outbreak } remove_variable = black_death_months_without_outbreak }
 		}
 		every_country = {
 			limit = {

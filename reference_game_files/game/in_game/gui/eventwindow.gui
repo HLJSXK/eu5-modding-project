@@ -1,9 +1,8 @@
-@illustration_wide = 560
+﻿@illustration_wide = 560
 @illustration_height = @[illustration_wide * 0.4]
 @illustration_text_wide = @[illustration_wide * 1.2]
 @banner_wide = 180
 @banner_height = @[banner_wide * 2.17]
-
 
 types EventWindows
 {
@@ -78,11 +77,8 @@ types EventWindows
 				align = center
 				block "modifiers_list_bg" {
 					background = {
-						texture = "gfx/interface/component_tiles/omen_modifier_bg.dds"
-						texture_density = 2
+						using = bg_omen_modifier_texture
 						alpha = 0.6
-						spriteType = CorneredStretched
-						spriteborder = { 104 22 }
 						margin = {0 4}
 					}
 				}
@@ -101,6 +97,29 @@ types EventWindows
 				# 		blend_mode = alphamultiply
 				# 	}
 				# }
+			}
+		}
+	}
+
+	type HorizontalModifiersList = hbox {
+		block "datamodel" {}
+		item = {
+			text_multi = {
+				layoutpolicy_horizontal = expanding
+				block "modifiers_list_size"{
+					size = { -1 27 }
+				}
+				autoresize = no
+				align = center
+				block "modifiers_list_bg" {
+					background = {
+						using = bg_omen_modifier_texture
+						alpha = 0.6
+						margin = {0 4}
+					}
+				}
+
+				raw_text = "[CPdxStringView.GetStringView]"
 			}
 		}
 	}
@@ -134,9 +153,25 @@ types EventWindows
 		}
 	}
 
+	type ExpeditionEventTitle = text_single {
+		using = bg_expeditions_dialog_header
+		autoresize = yes
+		minimumsize = { 351 -1 }
+		maximumsize = { 351 -1 }
+
+		margin = { 30 10 }
+		margin_top = 20
+
+		align = center|nobaseline
+		using = Font_Type_Headers
+		using = Font_Size_Big
+	}
+
 	type AgeEventWindow = window {
 		allow_outside = yes
 		using = snd_UI_event_age
+
+		visible = "[ShouldShowMessages]"
 
 		vbox = {
 			set_parent_size_to_minimum = yes
@@ -247,6 +282,12 @@ types EventWindows
 		
 							using = Font_Type_Flavor
 							block "description_text" {}
+
+
+							TimelineButton = {
+								position = { 5 5 }
+								size = { 30 30 }
+							}
 						}
 					}
 		
@@ -292,9 +333,12 @@ types EventWindows
 			}
 		}
 	}
+
 	type OmensEventWindow = window {
 		allow_outside = yes
 		# using = snd_UI_event_omen_god
+
+		visible = "[ShouldShowMessages]"
 
 		vbox = {
 			set_parent_size_to_minimum = yes
@@ -463,6 +507,97 @@ types EventWindows
 			}
 		}
 	}
+
+	type AnimatedScrollBackground = hbox {
+		widget = {
+			layoutpolicy_vertical = expanding
+			size = { 0 -1 }
+
+			state = {
+				name = "on_open"
+				size = { 269 -1 }
+				next = "open_scroll"
+			}
+
+			state = {
+				name = "open_scroll"
+				size = { 0 -1 }
+				duration = 0.15
+				bezier = { 0.05 0.4 0.6 0.95 }
+			}
+
+			state = {
+				name = "close_scroll"
+				size = { 269 -1 }
+				duration = 0.15
+			}
+		}
+
+		widget = {
+			using = layoutpolicy_expanding
+			size = { -1 -1 }
+			using = bg_expedition_scroll_bg
+
+			blockoverride "bg_expedition_scroll_extra" {
+				margin = {40 30}
+			}
+
+			blockoverride "bg_expedition_scroll_shadow_extra" {
+				margin = {34 32}
+			}
+		}
+
+		widget = {
+			layoutpolicy_vertical = expanding
+			size = { 0 -1 }
+
+			state = {
+				name = "on_open"
+				size = { 269 -1 }
+				next = "open_scroll"
+			}
+
+			state = {
+				name = "open_scroll"
+				size = { 0 -1 }
+				duration = 0.15
+				bezier = { 0.05 0.4 0.6 0.95 }
+			}
+
+			state = {
+				name = "close_scroll"
+				size = { 269 -1 }
+				duration = 0.15
+			}
+		}
+	}					
+}
+
+template AnimatedScrollFadeInOut_template {
+	state = {
+		name = "on_open"
+		alpha = 0
+		next = "open_scroll"
+	}
+
+	state = {
+		name = "open_scroll"
+		duration = 0.1
+		alpha = 0
+		next = "to_visible"
+	}
+
+	state = {
+		name = "to_visible"
+		duration = 0.1
+		alpha = 1
+	}
+
+	state = {
+		name = "close_scroll"
+		duration = 0.1
+		alpha = 0
+	}
 }
 
 window = {
@@ -472,6 +607,8 @@ window = {
 	using = Animation_Show_Hide_UI
 	movable = yes
 	layer = top
+
+	visible = "[ShouldShowMessages]"
 
 	vbox = {
 		set_parent_size_to_minimum = yes
@@ -599,7 +736,7 @@ window = {
 						ignore_layout = yes
 						size = {100% 100%}
 						# using = bg_event_illustration_frame
-						using = bg_age_event_frame
+						using = bg_expeditions_illustration_frame
 						#using = bg_hegemony_base_frame
 						# modify_texture = {
 						# 	using = color_new_gold_texture
@@ -608,11 +745,49 @@ window = {
 						# }
 					}
 
+					# Floating character portrait, anchored just outside the right
+					# edge of the illustration (mockup red-circle position). Bound to
+					# the first saved character scope (the expedition leader for
+					# expedition events). ignore_layout + allow_outside let it render
+					# past the window frame; gated on IsValid so character-less events
+					# in this shared window show nothing.
+					text_single = {
+						visible = "[IsBuildDebug]"
+						parentanchor = top|left
+						position = { 4 4 }
+						autoresize = yes
+						align = left|nobaseline
+						using = Font_Type_Console
+						raw_text = "#debug [EventWindow.GetEventKey]#!"
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = right|vcenter
+						widgetanchor = left|vcenter
+						position = { -60 0 }
+						size = { 200 300 }
+						visible = "[And(EventWindow.IsExpeditionEvent, EventWindow.GetFirstCharacter.IsValid)]"
+
+						# Bare torso portrait: camera_torso view with no frame, no
+						# background and no name banner. portrait_standard_full_body_center_button
+						# already renders on a transparent background with no decoration;
+						# we only swap the camera from camera_body to camera_torso.
+						portrait_standard_full_body_center_button = {
+							datacontext = "[EventWindow.GetFirstCharacter]"
+							size = { 100% 100% }
+							# Override the inherited portrait_mask_superbig with a gradient fade.
+							mask = "gfx/portraits/portrait_mask_full_gradient.dds"
+							portrait_texture = "[Character.GetAnimatedPortrait( 'full_torso', 'camera_torso', EventWindow.GetPortraitAnimation, PdxGetWidgetScreenSize(PdxGuiWidget.Self) )]"
+						}
+					}
+
 				}
 
 				scrollarea = {
 					layoutpolicy_horizontal = expanding
-					maximumsize = { -1 235 }
+					maximumsize = { -1 352 }
 
 					autoresizescrollarea = yes
 					alwaystransparent = no
@@ -897,6 +1072,431 @@ window = {
 	}
 }
 
+window = {
+	name = "expeditions_event_window"
+	parentanchor = center
+	# using = bg_event_card
+	using = Animation_Show_Hide_UI
+	movable = yes
+	layer = top
+	allow_outside = yes
+	using = snd_UI_event_expedition
+
+	state = {
+		name = _show
+		trigger_on_create = yes
+		duration = 0.2
+		on_finish = "[PdxGuiWidget.TriggerAllChildrenAnimation('on_open')]"
+	}
+
+	visible = "[ShouldShowMessages]"
+
+	vbox = {
+		set_parent_size_to_minimum = yes
+		# using = bg_event_card_frame
+		bottomtotop = yes
+		allow_outside = yes
+		
+		vbox = {
+			margin = {5 10}
+			layoutpolicy_horizontal = expanding
+			using = bg_expedition_event_inner
+			# using = bg_expedition_event_frame
+			allow_outside = yes
+	
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				margin = { 20 15 }
+				margin_top = 10
+				allow_outside = yes
+				
+				widget = {
+					size = { 540 220 }
+					tooltip = "[EventWindow.GetDebugInfo]"
+					allow_outside = yes
+
+					icon = {
+						size = { 540 220 }
+						visible = "[EventWindow.HasUniqueImage]"
+						texture = "[EventWindow.GetUniqueImage]"
+					}				
+
+					ecs_scene_viewer_widget =  {
+						size = { 540 220 }
+						visible = "[And(Not(EventWindow.HasUniqueImage), GreaterThan_float(PdxGuiWidget.GetAlpha, '(float)0.5'))]"
+						name = "event_window_scene_viewer"
+						scene = "[EventWindow.GenerateSceneDesc]"						
+					}
+					
+					icon = {
+						size = {100% 100%}
+						texture_density = 2
+
+						background = {
+							texture = "gfx/interface/component_masks/mask_events_texture_full.dds"
+							texture_density = 2
+							fittype = fill
+
+							modify_texture = {
+								using = color_dark_brown_texture
+							}
+						}
+					}	
+
+					text_single = {
+						visible = "[GameIsMultiplayer]"
+						parentanchor = hcenter|top
+						align = right|nobaseline
+						autoresize = yes
+						fontsize = 15
+						text = "age_event_timeout"
+						tooltip = "age_event_timeout_tt"
+						background = {
+							using = button_banner_02_texture
+							blockoverride "button_banner_02_texture" {
+								margin = {21 8}
+								margin_bottom = 8
+								margin_top = 5
+							}
+						}
+					}
+
+					widget = {
+						ignore_layout = yes
+						size = {100% 100%}
+						# using = bg_event_illustration_frame
+						using = bg_expeditions_illustration_frame
+						#using = bg_hegemony_base_frame
+						# modify_texture = {
+						# 	using = color_new_gold_texture
+						# 	blend_mode = add
+						# 	alpha = 0.2
+						# }
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = right|vcenter
+						widgetanchor = right|vcenter
+						position = { 110 -10 }
+						size = { 200 300 }
+						visible = "[And(EventWindow.IsExpeditionEvent, EventWindow.GetSecondCharacter.IsValid)]"
+
+						portrait_standard_full_body_center_button = {
+							datacontext = "[EventWindow.GetSecondCharacter]"
+							size = { 100% 100% }
+							mask = "gfx/portraits/portrait_mask_full_gradient.dds"
+							portrait_texture = "[Character.GetAnimatedPortrait( 'full_torso', 'camera_torso_left_further_out', EventWindow.GetPortraitAnimation, PdxGetWidgetScreenSize(PdxGuiWidget.Self) )]"
+						}
+
+						widget = {
+							parentanchor = hcenter|bottom
+							ignore_layout = yes
+							allow_outside = yes
+							widgetanchor = hcenter|bottom
+							position = { -20 -20 }
+
+							datacontext = "[EventWindow.GetSecondCharacter]"
+							vbox = {
+								using = expedition_name_and_role_banner
+							}
+						}
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = left|vcenter
+						widgetanchor = left|vcenter
+						position = { -110 -10 }
+						size = { 200 300 }
+						visible = "[And(EventWindow.IsExpeditionEvent, EventWindow.GetFirstCharacter.IsValid)]"
+						
+						portrait_standard_full_body_center_button = {
+							datacontext = "[EventWindow.GetFirstCharacter]"
+							size = { 100% 100% }
+							mask = "gfx/portraits/portrait_mask_full_gradient.dds"
+							portrait_texture = "[Character.GetAnimatedPortrait( 'full_torso', 'camera_torso_right_further_out', EventWindow.GetPortraitAnimation, PdxGetWidgetScreenSize(PdxGuiWidget.Self) )]"
+						}
+
+						widget = {
+							parentanchor = hcenter|bottom
+							ignore_layout = yes
+							allow_outside = yes
+							widgetanchor = hcenter|bottom
+							position = { 20 -20 }
+
+							datacontext = "[EventWindow.GetFirstCharacter]"
+
+							vbox = {
+								using = expedition_name_and_role_banner
+							}
+						}
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = bottom|hcenter
+						position = { 0 20 }
+						size = { 148 65 }
+						visible = "[EventWindow.HasWorkOfArt]"
+
+						icon = {
+							size = { 100% 100% }
+							datacontext = "[EventWindow.GetWorkOfArt]"
+							texture = "[GetWorkOfArtIllustration(WorkOfArt.Self)]"
+
+							
+						}
+
+						widget = {
+							size = { 100% 100% }
+							using = bg_expeditions_illustration_frame
+							datacontext = "[EventWindow.GetWorkOfArt]"
+
+							tooltipwidget = {
+								using = WorkOfArt_tooltip
+							}
+						}
+					}
+
+					widget = {
+						ignore_layout = yes
+						allow_outside = yes
+						parentanchor = bottom|hcenter
+						position = { 0 20 }
+						size = { 178 65 }
+						visible = "[EventWindow.HasHolySite]"
+
+						icon = {
+							size = { 100% 100% }
+							datacontext = "[EventWindow.GetHolySite]"
+							texture = "[HolySite.GetIllustration]"
+						}
+
+						widget = {
+							size = { 100% 100% }
+							using = bg_expeditions_illustration_frame
+							datacontext = "[EventWindow.GetHolySite]"
+							tooltipwidget = {
+								using = HolySite_tooltip
+							}
+						}
+					}
+				}
+
+				vbox = {
+					margin_top = 15
+					margin_bottom = -10
+					layoutpolicy_horizontal = expanding
+					allow_outside = yes
+
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 40 }
+	
+						ExpeditionRouteRow = {
+							datacontext = "[EventWindow.GetExpeditionItem]"
+							visible = "[EventWindow.IsExpeditionEvent]"
+	
+							using = AnimatedScrollFadeInOut_template
+						}
+					}
+				}
+
+				vbox = {
+					layoutpolicy_horizontal = expanding
+					bottomtotop = yes
+					spacing = -10
+					margin = { 0 20 }
+
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						margin = { 0 15 }
+
+						alwaystransparent = no
+
+						widget = {
+							layoutpolicy_horizontal = expanding
+
+							AnimatedScrollBackground = {}
+							
+							scrollvbox = {
+								set_parent_dimension_to_minimum = height
+								layoutpolicy_horizontal = expanding
+								maximumsize = { -1 235 }
+								alwaystransparent = no
+		
+								scrollbar_vertical = {
+									ScrollbarVertical = {
+										parentanchor = right
+										using = AnimatedScrollFadeInOut_template
+									}
+								}
+								
+								text_multi = {
+									name = "description"
+									layoutpolicy_horizontal = expanding
+									autoresize = yes
+									margin = { 20 6 }
+									alpha = 1
+									text = "[EventWindow.GetDescription]"
+
+									using = AnimatedScrollFadeInOut_template
+								}
+							}
+						}
+					}
+
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 42 }
+						# using = bg_card_header_01
+						background = {
+							using = bg_banner_02_cloth_texture
+							blockoverride "button_texture" {texture = "gfx/interface/buttons/button_banner_03.dds"}
+							frame = 1
+							margin = { 13 3 }
+						}
+
+						text_single = {
+							margin_top = 6º
+							parentanchor = hcenter
+							text = "[EventWindow.GetTitle]"
+							tooltip = "[EventWindow.GetDebugInfo]"
+							tooltip_enabled = "[IsBuildDebug]"
+							default_format = "#yellow_titles"
+						}
+						widget = {
+							parentanchor = hcenter|top
+							position = {0 -22}
+							size = {35 35}
+							visible = "[EventWindow.HasEventCategoryIcon]"
+				
+							using = event_window_category_icon
+						}
+
+						widget = {
+							parentanchor = hcenter|top
+							position = { -5 -20 }
+							size = {35 35}
+							visible = "[And(EventWindow.IsDynamicHistoricalEvent, Not(EventWindow.HasEventCategoryIcon))]"
+				
+							using = event_window_dhe_icon
+						}
+					}
+				}
+
+				vbox = {
+					visible = "[EventWindow.ShouldShowScrollBar]"
+					layoutpolicy_horizontal = expanding
+					spacing = 10
+					
+					scrollarea = {
+						size = { 520 210 }
+						scrollbarpolicy_horizontal = always_off
+
+						scrollbar_vertical = {
+							using = Scrollbar_Vertical
+						}
+
+						scrollbar_horizontal = {
+							using = editor_horizontal_scrollbar
+						}
+
+						scrollwidget = {
+							fixedgridbox = {
+								name = "option_grid"
+
+								addcolumn = 514
+								addrow = 42
+								datamodel = "[EventWindow.GetOptions]"
+
+								item = {
+									using = expedition_event_option_entry
+								}
+							}
+						}
+					}
+				}
+
+				vbox = {
+					visible = "[Not(EventWindow.ShouldShowScrollBar)]"
+					layoutpolicy_horizontal = expanding
+					spacing = 10
+
+					fixedgridbox = {
+						name = "option_grid"
+						addcolumn = 514
+						addrow = 42
+						datamodel = "[EventWindow.GetOptions]"
+
+						item = {
+							using = expedition_event_option_entry
+						}
+					}
+				}
+			}
+		}
+		
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			margin = {0 0}
+			
+			ExpeditionEventTitle = {
+				allow_outside = yes
+				align = center|nobaseline
+				default_format = "#yellow_titles"
+				text = "[EventWindow.GetExpeditionItem.GetExpedition.GetName]"
+				tooltip = "[EventWindow.GetDebugInfo]"
+
+				widget = {
+					parentanchor = hcenter|top
+					position = {0 -22}
+					size = {35 35}
+					visible = "[EventWindow.HasEventCategoryIcon]"
+		
+					using = event_window_category_icon
+				}
+
+				widget = {
+					parentanchor = hcenter|top
+					position = { -5 -20 }
+					size = {35 35}
+					visible = "[And(EventWindow.IsDynamicHistoricalEvent, Not(EventWindow.HasEventCategoryIcon))]"
+		
+					using = event_window_dhe_icon
+				}
+
+				icon = {
+					texture = "[GetGraphicalCultureTexture('circle_frame')]"
+					texture_density = 2
+					size = { 45 45 }
+
+					parentanchor = top|hcenter
+					widgetanchor = center
+
+					datacontext = "[EventWindow.GetExpeditionItem.GetExpeditionType]"
+
+					icon = {
+						size = { 100% 100% }
+						texture = "gfx/interface/advance/backgrounds/blue.dds"
+
+						widget = {
+							parentanchor = center
+							size = { 75% 75% }
+							using = expedition_category_icon
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 template event_option_entry_button_normal {
 	# DefaultButtonLockingProgress = {
 	# 	datacontext = "[EventWindow.GetLockableInfo]"
@@ -922,12 +1522,12 @@ template event_option_entry_button_normal {
 			
 			blockoverride "tooltip_content" {
 				TooltipScrolledDebugTextBlock = {
-					blockoverride "block_scrollarea" { maximumsize = { -1 450 }}
+					blockoverride "block_scrollarea" { maximumsize = { -1 400 }}
 					textcontext = "[EventOption.GetTooltip]"
 				}
 
-				TooltipScrolledConditionList = {
-					blockoverride "block_scrollarea" { maximumsize = { -1 450 }}
+				TooltipScrolledBlockList = {
+					blockoverride "block_scrollarea" { maximumsize = { -1 600 }}
 					textcontext = "[EventOption.GetTooltip]"
 				}
 			}
@@ -956,24 +1556,26 @@ template event_option_entry_button_normal {
 		tooltip = "[historical_option|e]"
 	}
 
-	flowcontainer = {
-		parentanchor = center
-		margin = { 10 0 }
+	vbox = {
+		margin = { 30 0 }
 		spacing = 5
-		ignoreinvisible = yes
-		layoutpolicy_horizontal = expanding
 
 		text_single = {
 			visible = "[And(EventOption.IsHistorical, Not(EventWindow.IsSingleOptionEvent))]"
-			parentanchor = center
-			maximumsize = { 460 36 }
+			align = center
+			layoutpolicy_horizontal = expanding
+			size = { -1 36 }
+			autoresize = no
 			fontsize_min = 10
 			text = "[EventOption.GetText]"
 		}
 
 		text_single = {
 			visible = "[Or(Not(EventOption.IsHistorical), EventWindow.IsSingleOptionEvent)]"
-			maximumsize = { 494 36 }
+			align = center
+			layoutpolicy_horizontal = expanding
+			size = { -1 36 }
+			autoresize = no
 			fontsize_min = 10
 			text = "[EventOption.GetText]"
 		}
@@ -1050,10 +1652,46 @@ template event_option_entry {
 			visible = "[And(Not(EventOption.IsTooltipEmpty), Not(EventOption.IsHighRisk))]"
 			using = event_option_entry_button_normal
 		}
-		
+
 		button_regular_diamond = {
 			visible = "[EventOption.IsTooltipEmpty]"
 			using = event_option_entry_button_empty_tt
+		}
+	}
+}
+
+template expedition_event_option_entry {
+	container = {
+		widget = {
+			size = { 514 42 }
+
+			expeditions_button = {
+				parentanchor = center
+				widgetanchor = center
+				visible = "[Not(EventOption.IsTooltipEmpty)]"
+				using = event_option_entry_button_normal
+				size = { 490 36 }
+				blockoverride "expeditions_button_hover_size" {
+					size = { 514 36 }
+				}
+				blockoverride "expeditions_button_rest_size" {
+					size = { 490 36 }
+				}
+			}
+
+			expeditions_button = {
+				parentanchor = center
+				widgetanchor = center
+				visible = "[EventOption.IsTooltipEmpty]"
+				using = event_option_entry_button_empty_tt
+				size = { 490 36 }
+				blockoverride "expeditions_button_hover_size" {
+					size = { 514 36 }
+				}
+				blockoverride "expeditions_button_rest_size" {
+					size = { 490 36 }
+				}
+			}
 		}
 	}
 }
@@ -1588,18 +2226,22 @@ OmensEventWindow = {
 						using = bg_circle_alt_brown
 					}
 
-					action_button_wax = {
+					button_wax = {
 						layoutpolicy_horizontal = expanding
 						blockoverride "button_texture" {
 							texture = "gfx/interface/buttons/button_wax_yellow.dds"
 						}
+
 						size = { -1 55 }
 						fontsize = 14
-	
+
 						align = center|nobaseline
 						using = Font_Type_Headers
 						using = Font_Size_Small
 						using = snd_UI_event_age_option_administrative
+
+						visible = "[PdxGuiWidget.IsUberButtonVisible]"
+						enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
 
 						text_single = {
 							text = "[Omen.GetNameWithNoTooltip]"
@@ -1609,24 +2251,26 @@ OmensEventWindow = {
 							align = center
 						}
 
-						title = "select_omen"
-						
-						actor = "[Player]"
-						parameter = {
-							parameter_name = "target"
-							parameter_value = "[Player.GetGodInvokingOmen]"
+						scripted_action_tooltip = {
+							click_type = left
+							click_mode = single
+							action_name = "select_omen"
+							actor = "[Player]"
+							parameter = {
+								parameter_name = "target"
+								parameter_value = "[Player.GetGodInvokingOmen]"
+							}
+							parameter = {
+								parameter_name = "recipient"
+								parameter_value = "[Player.GetReligion]"
+							}
+							parameter = {
+								parameter_name = "target_2"
+								parameter_value = "[Omen.MakeScope]"
+							}
 						}
-						parameter = {
-							parameter_name = "recipient"
-							parameter_value = "[Player.GetReligion]"
-						}
-						parameter = {
-							parameter_name = "target_2"
-							parameter_value = "[Omen.MakeScope]"
-						}
-						left_action = { action_name = "select_omen" }
 
-						tooltipwidget = { 
+						tooltipwidget = {
 							using = action_tooltip_pop_out
 
 							blockoverride "title_icon_texture" {

@@ -8,8 +8,11 @@
 # potential = trigger, scope:actor is the country attempting to perform the action
 # allow = trigger, scope:actor is the country attempting to perform the action
 # ai_prerequisite = trigger to check if the AI should do this action, root is the country attempting to perform the action, no scopes or targets are available at this early stage
+# ai_prerequisite_after_potential = trigger to check if the AI should do this action after checking the potential, use this if the potential check is cheaper than ai_prerequisite, root is the country attempting to perform the action, no scopes or targets are available at this early stage
 # price = a scripted standard price, listed in \common\prices\ and referenced by name (like price:<price_id>) or as a result of a script (like scope:target.price)
 # price_modifier = calculated value, multiplies the price; scope:actor is the country, scope:recipient, scope:target, scope:target_1, scope:target_2....etc
+# goods_demand = goods demand that is required for the action
+# price_location = scripted location, where the price will be paid
 # payer = script to determine who is paying the price. By default, the actor
 # payee = script to determine who gets paid. By default, nobody, the price disappears into the ether
 # select_trigger = can add multiple of these to allow selection of targets/parameters for the action. They get stored in scope:target, scope:target_1, scope:target_2....etc
@@ -76,20 +79,40 @@
 # force_click_and_confirm_or_hold = yes, optional, to always show confirmation dialog. Useful for tweaking dangerous IO actions like declaring wars without redoing UI layout
 # To use the action in GUI script, use this sort of thing:
 #
-#action_button_default = {
-#	title = "<optional title for action tooltip>"
-#	description = "<optional description for action tooltip. By default, uses the generic action description>"
-#	effects = "<optional description of the effects for action tooltip. By default, uses the generic action effects but you can override>"
-#	conditions = "<optional description of the conditions for action tooltip. By default, uses the generic action trigger but you can override>"
-#	actor = "[GUI script to get the country that is performing the action]"
-#	recipient = "[<GUI script to get the recipient of the action>]"
-#	target = "[<GUI script to get the target of the action>]"
-#   target = ... (you can add as many targets as you want in case the action has several)
-#	left_action = "<id of the action to perform with a click of the left button>"
-#	left_click_and_hold_action = "<id of the action to perform with a click and hold of the left button>"
-#	right_action = "<id of the action to perform with a click of the right button>"
-#	right_click_and_hold_action = "<id of the action to perform with a click and hold of the right button>"
+#button = {
+#	datacontext = "[GetGenericAction('<action key>')]"	gives the tooltip the action's own name and icon for free
+#	visible = "[PdxGuiWidget.IsUberButtonVisible]"
+#	enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+#	tooltipwidget = { using = generic_action_tooltip }
+#
+#	scripted_action_tooltip = {
+#		click_type = left		left (default) or right
+#		click_mode = single		single for a plain click, confirm for click-and-hold / confirmation dialog
+#		action_name = "<id of the action to perform>"
+#		actor = "[GUI script to get the country that is performing the action]"
+#		parameter = { parameter_name = "recipient" parameter_value = "[<GUI script to get the recipient of the action>]" }
+#		parameter = { parameter_name = "target" parameter_value = "[<GUI script to get the target of the action>]" }
+#		parameter = ... (add one parameter block per target in case the action has several)
+#	}
+#
+#	button_tooltip_override = {
+#		title = "<optional title for action tooltip>"
+#		description = "<optional description for action tooltip. By default, uses <action key>_desc>"
+#		effects = "<optional description of the effects. By default, uses the action's effect block>"
+#		conditions = "<optional description of the conditions. By default, uses the action's allow trigger>"
+#	}
 #}
+#
+# Add one scripted_action_tooltip per click direction and mode you want the button to support:
+#	click_type = left / right	click_mode = single (plain click) / confirm (click-and-hold or dialog)
+#
+# Each block is independent. actor, and any parameter both blocks need, must be written inside every
+# scripted_action_tooltip that uses them.
+#
+# scripted_action_tooltip accepts only: action_name, action_direction, proposer, actor, params, parameter,
+# click_type, click_mode, click_modifier, lateral_view_position. It has no visible and no enabled, so you
+# cannot switch a block on and off. To offer an action only in one mode, use an action_name expression that
+# returns an empty string in the other mode - see GetLeftClickKey / GetLeftClickAndHoldKey.
 #
 #
 # As for message types that get sent to the player, the format is as follows. At the very least, the generic version should be provided. If the more specific ones are available, they will be used.

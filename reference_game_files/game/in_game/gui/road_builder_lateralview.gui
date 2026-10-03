@@ -1,3 +1,83 @@
+template avoid_rivers_actions {
+	down = "[Not(RoadBuilder.GetAvoidRivers)]"
+	action_tooltip = {
+		title = "ROAD_BUILDER_AVOID_RIVERS"
+		on_action = "[RoadBuilder.ToggleAvoidRivers]"
+	}
+
+	tooltipwidget = {
+		ContextualTooltipType = {
+			blockoverride "title_icon_texture" { texture = "gfx/interface/icons/map_modes/rivers.dds" }
+			blockoverride "title_text" { text = "ROAD_BUILDER_AVOID_RIVERS" }
+			blockoverride "tooltip_content" {
+				TooltipTextBlock = {
+					textcontext = "ROAD_BUILDER_AVOID_RIVERS_TOOLTIP"
+				}
+			}
+		}
+	}
+}
+
+template avoid_sea_actions {
+	down = "[Not(RoadBuilder.GetAvoidSea)]"
+	action_tooltip = {
+		title = "ROAD_BUILDER_AVOID_SEA"
+		on_action = "[RoadBuilder.ToggleAvoidSea]"
+	}
+	
+	tooltipwidget = {
+		ContextualTooltipType = {
+			blockoverride "title_icon_texture" {	texture = "gfx/interface/icons/flat_icons/geopolitics/exploration_sea.dds" }
+			blockoverride "title_text" { text = "ROAD_BUILDER_AVOID_SEA" }
+			blockoverride "tooltip_content" {
+				TooltipTextBlock = {
+					textcontext = "ROAD_BUILDER_AVOID_SEA_TOOLTIP"
+				}
+			}
+		}
+	}
+}
+
+template save_money_actions {
+	down = "[RoadBuilder.GetSaveMoney]"
+	action_tooltip = {
+		title = "ROAD_BUILDER_SAVE_MONEY"
+		on_action = "[RoadBuilder.ToggleSaveMoney]"
+	}
+	
+	tooltipwidget = {
+		ContextualTooltipType = {
+			blockoverride "title_icon_texture" { texture = "[GetConceptTexture('road')]" }
+			blockoverride "title_text" { text = "ROAD_BUILDER_SAVE_MONEY" }
+			blockoverride "tooltip_content" {
+				TooltipTextBlock = {
+					textcontext = "ROAD_BUILDER_SAVE_MONEY_TOOLTIP"
+				}
+			}
+		}
+	}
+}
+
+template select_mode_actions {
+	down = "[RoadBuilder.GetSelectMode]"
+	action_tooltip = {
+		title = "ROAD_BUILDER_SELECT_MODE"
+		on_action = "[RoadBuilder.ToggleSelectMode]"
+	}
+	
+	tooltipwidget = {
+		ContextualTooltipType = {
+			blockoverride "title_icon_texture" { texture = "gfx/interface/icons/flat_icons/building_panel/build.dds" }
+			blockoverride "title_text" { text = "ROAD_BUILDER_SELECT_MODE" }
+			blockoverride "tooltip_content" {
+				TooltipTextBlock = {
+					textcontext = "ROAD_BUILDER_SELECT_MODE_TOOLTIP"
+				}
+			}
+		}
+	}
+}
+
 lateralview = {
 	name = "road_builder_lateralview"
 
@@ -18,6 +98,7 @@ lateralview = {
 
 		# Road type buttons
 		header_main_tabs = {
+			visible = no
 			blockoverride "content" {
 				datamodel = "[RoadBuilder.GetRoadTypes]"
 
@@ -39,7 +120,7 @@ lateralview = {
 								title = "OPEN_TAB"
 								on_action = "[RoadBuilder.SelectRoadType(RoadTypeItem.GetRoadType)]"
 								enabled = "[RoadTypeItem.IsEnabled]"
-								conditions = "LOC_BUILD_ROAD_TYPE_CONDITIONS"
+								conditions = "[RoadTypeItem.GetRoadType.GetUnlockConditionsTooltip(Player.Self)]"
 							}
 								
 							down = "[RoadTypeItem.GetIsSelected]"
@@ -47,7 +128,7 @@ lateralview = {
 
 							size = { 125 40 }
 							
-							blockoverride "tab_text"{
+							blockoverride "tab_text" {
 								text = "[RoadTypeItem.GetRoadType.GetNameWithNoTooltip]"
 							}
 						}
@@ -59,172 +140,843 @@ lateralview = {
 
 	blockoverride "panel_content" {
 		vbox = {
+			name = "road_builder_content"
 			using = layoutpolicy_expanding
 			using = bg_main_inner_alt
 			using = window_main_tabs_margin_alt
 
 			vbox = {
 				layoutpolicy_horizontal = expanding
+				margin = { 0 10 }
+				spacing = 5
 
-				# Calculation type buttons
-				hbox = {
-					datamodel = "[RoadBuilder.GetRoadCostCalculations]"
-					spacing = 5
-					margin_top = 13
-					margin_left = 10
-					item = {
-						button = {
-							size = {30 30}
-							using = header_button_template
-							blockoverride "header_button_template_push_properties"{using = button_tab_toggle_properties_template}
-							blockoverride "header_button_full_content"{}
-							blockoverride "header_button_template_texture"{using = pressed_button_texture}
-							tooltipwidget = {
-								ContextualTooltipType = {
-									blockoverride "title_text" {
-										text = "[RoadCostCalculation.GetName]"
-									}
-									blockoverride "title_icon" {
-										icon = {
-											size = { 50 50 }
-											texture = "[GetRoadCostCalculationIcon(RoadCostCalculation.Self)]"
-										}
-									}
-									blockoverride "tooltip_content" {
-										TooltipTextBlock = {
-											blockoverride "text" {
-												text = "[RoadCostCalculation.GetDescription]"
-											}
-										}
-									}
+				#Road type buttons
+				vbox = {
+					layoutpolicy_horizontal = expanding
+					size = { -1 40 }
+					spacing = 10
+
+					hbox = {
+						datamodel = "[RoadBuilder.GetRoadTypes]"
+						spacing = 5
+						layoutpolicy_horizontal = expanding
+						item = {
+							button = {
+								layoutpolicy_horizontal = expanding
+								size = { -1 35 }
+								using = header_button_template
+								blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+								blockoverride "header_button_full_content" {}
+								blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+
+								datacontext = "[RoadTypeItem.GetRoadType]"
+								tooltipwidget = {
+									using = RoadType_tooltip
+								}
+								
+								action_tooltip = {
+									click_type = left
+									click_mode = single
+									title = "OPEN_TAB"
+									on_action = "[RoadBuilder.SelectRoadType(RoadTypeItem.GetRoadType)]"
+									enabled = "[RoadTypeItem.IsEnabled]"
+									conditions = "[RoadTypeItem.GetRoadType.GetUnlockConditionsTooltip(Player.Self)]"
+								}
+									
+								down = "[RoadTypeItem.GetIsSelected]"
+								enabled = "[RoadTypeItem.IsEnabled]"
+
+								icon = {
+									size = { 28 28 }
+									parentanchor = center
+									texture = "[GetRoadTypeIcon(RoadType.Self)]"
 								}
 							}
+						}
+					}
+					
+					# expand = {}
 
+					# Exclude subjects toggle
+					hbox = {
+						# visible = "[RoadBuilder.GetShouldShowUpgradeButton]"
+						layoutpolicy_horizontal = expanding
+						spacing = 5
+						button = {
+							size = { 40 40 }
+							using = header_button_template
+							blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+							blockoverride "header_button_full_content" {}
+							blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+							
 							action_tooltip = {
-								title = "[RoadCostCalculation.GetActionName]"
-								on_action = "[RoadCostCalculation.OnClick]"
+								title = "ROAD_BUILDER_EXCLUDE_SUBJECTS_TOOLTIP"
+								on_action = "[RoadBuilder.ToggleExcludeSubjects]"
 							}
-							down = "[RoadCostCalculation.GetIsSelected]"
+
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+							down = "[RoadBuilder.GetExcludeSubjects]"
 
 							icon = {
 								size = {70% 70%}
 								parentanchor = center
-								texture = "[GetRoadCostCalculationIcon(RoadCostCalculation.Self)]"
+								texture = "gfx/interface/buttons/flats/subjects.dds"
 								modify_texture = {
 									using = color_gold_texture
 									alpha = 0.4
 								}
 							}
+
+							icon = {
+								size = { 12 12 }
+								parentanchor = bottom|right
+								widgetanchor = bottom|right
+								position = { -2 -2 }
+								visible = "[Not(RoadBuilder.GetExcludeSubjects)]"
+								texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
+							}
+
+							icon = {
+								size = { 12 12 }
+								parentanchor = bottom|right
+								widgetanchor = bottom|right
+								position = { -2 -2 }
+								visible = "[RoadBuilder.GetExcludeSubjects]"
+								texture = "gfx/interface/icons/text_icons/trigger_no.dds"
+							}
+						}
+
+						button_regular = {
+							layoutpolicy_horizontal = expanding
+							layoutpolicy_vertical = expanding
+							enabled = "[RoadBuilder.CanUpgradeCandidates]"
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								enabled = "[RoadBuilder.CanUpgradeCandidates]"
+								title = "ROAD_BUILDER_UPGRADE_ROAD"
+								on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)0')]"
+								cost = "[RoadBuilder.GetUpgradeCost('(int32)0')]"
+							}
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								click_modifier = ctrl
+								enabled = "[RoadBuilder.CanUpgradeCandidates]"
+								title = "ROAD_BUILDER_UPGRADE_ROADS_CTRL"
+								on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)1')]"
+								cost = "[RoadBuilder.GetUpgradeCost('(int32)1')]"
+							}
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								click_modifier = shift
+								enabled = "[RoadBuilder.CanUpgradeCandidates]"
+								title = "ROAD_BUILDER_UPGRADE_ROADS_SHIFT"
+								on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)2')]"
+								cost = "[RoadBuilder.GetUpgradeCost('(int32)2')]"
+							}
+
+							tooltipwidget = {
+								using = upgrade_road_ranking_tt
+							}
+
+							hbox = {
+								layoutpolicy_horizontal = expanding
+								layoutpolicy_vertical = expanding
+								spacing = 5
+
+								margin_left = 8
+								margin_right = 5
+
+								text_single = {
+									align = center|nobaseline
+									layoutpolicy_horizontal = expanding
+									autoresize = no
+									fontsize_min = 12
+									text = "ROAD_BUILDER_UPGRADE_ROADS"
+								}
+							}
+						}
+					}
+				}
+
+				# Toggle buttons with text
+				vbox = {
+					visible = yes
+					using = bg_dynasty_header
+					using = wood_square_tile
+					blockoverride "wood_texture_extra" {
+						modify_texture = {
+							using = color_black_texture
+							alpha = 0.2
+							blend_mode = multiply
+						}
+					}
+					using = bg_loans_card_frame
+					layoutpolicy_horizontal = expanding
+					margin = { 10 10 }
+					spacing = 3
+	
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 8
+						
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							spacing = 8
+							button = {
+								size = { 40 40 }
+								using = header_button_template
+								blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+								blockoverride "header_button_full_content" {}
+								blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+
+								using = avoid_rivers_actions
+
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/map_modes/rivers.dds"
+									visible = "[RoadBuilder.GetAvoidRivers]"
+									alpha = 0.4
+									modify_texture = {
+										using = color_black_texture
+										alpha = 0.5
+										blend_mode = multiply
+									}
+								}
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/map_modes/rivers.dds"
+									visible = "[Not(RoadBuilder.GetAvoidRivers)]"
+								}
+
+								icon = {
+									size = { 12 12 }
+									parentanchor = bottom|right
+									widgetanchor = bottom|right
+									position = { -4 -4 }
+									visible = "[Not(RoadBuilder.GetAvoidRivers)]"
+									texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
+								}
+							}
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								using = Font_Type_Standard
+								text = "ROAD_BUILDER_AVOID_RIVERS"
+							}
+						}
+	
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							spacing = 8
+							button = {
+								size = { 40 40 }
+								using = header_button_template
+								blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+								blockoverride "header_button_full_content" {}
+								blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+
+								using = avoid_sea_actions
+
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/flat_icons/geopolitics/exploration_sea.dds"
+									visible = "[RoadBuilder.GetAvoidSea]"
+									alpha = 0.4
+									modify_texture = {
+										using = color_black_texture
+										alpha = 0.5
+										blend_mode = multiply
+									}
+								}
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/flat_icons/geopolitics/exploration_sea.dds"
+									visible = "[Not(RoadBuilder.GetAvoidSea)]"
+								}
+
+								icon = {
+									size = { 12 12 }
+									parentanchor = bottom|right
+									widgetanchor = bottom|right
+									position = { -4 -4 }
+									visible = "[Not(RoadBuilder.GetAvoidSea)]"
+									texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
+								}
+							}
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								using = Font_Type_Standard
+								text = "ROAD_BUILDER_AVOID_SEA"
+							}
+						}
+					}
+	
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 8
+						
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							spacing = 8
+							button = {
+								size = { 40 40 }
+								using = header_button_template
+								blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+								blockoverride "header_button_full_content" {}
+								blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+
+								using = save_money_actions
+
+								icon = {
+									position = { 1 0 }
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/roads/roads.dds"
+									visible = "[Not(RoadBuilder.GetSaveMoney)]"
+									alpha = 0.4
+									modify_texture = {
+										using = color_black_texture
+										alpha = 0.5
+										blend_mode = multiply
+									}
+								}
+								icon = {
+									position = { 1 0 }
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/roads/roads.dds"
+									visible = "[RoadBuilder.GetSaveMoney]"
+								}
+							}
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								using = Font_Type_Standard
+								text = "ROAD_BUILDER_SAVE_MONEY"
+							}
+						}
+	
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							spacing = 8
+							button = {
+								size = { 40 40 }
+								using = header_button_template
+								blockoverride "header_button_template_push_properties"{ using = button_tab_toggle_properties_template }
+								blockoverride "header_button_full_content" {}
+								blockoverride "header_button_template_texture"{ using = pressed_button_texture }
+
+								using = select_mode_actions
+
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/unit_actions/build_to_navy.dds"
+									alpha = 0.4
+									modify_texture = {
+										using = color_black_texture
+										alpha = 0.5
+										blend_mode = multiply
+									}
+									visible = "[Not(RoadBuilder.GetSelectMode)]"
+								}
+
+								icon = {
+									size = { 70% 70% }
+									parentanchor = center
+									texture = "gfx/interface/icons/unit_actions/build_to_navy.dds"
+									visible = "[RoadBuilder.GetSelectMode]"
+								}
+							}
+							text_single = {
+								layoutpolicy_horizontal = expanding
+								using = Font_Type_Standard
+								text = "ROAD_BUILDER_SELECT_MODE"
+							}
+						}
+					}
+				}
+
+				# Toggle buttons with icons
+				hbox = {
+					visible = no
+					layoutpolicy_horizontal = expanding
+					margin = { 0 5 }
+					spacing = 5
+
+					button = {
+						size = { 40 40 }
+						using = header_button_template
+						blockoverride "header_button_template_push_properties" { using = button_tab_toggle_properties_template }
+						blockoverride "header_button_full_content" {}
+						blockoverride "header_button_template_texture" { using = pressed_button_texture }
+
+						using = avoid_rivers_actions
+
+						icon = {
+							size = { 75% 75% }
+							parentanchor = center
+							texture = "gfx/interface/icons/map_modes/rivers.dds"
+						}
+
+						icon = {
+							visible = "[RoadBuilder.GetAvoidRivers]"
+							texture = "gfx/interface/icons/flat_icons/disable_icon.dds"
+							size = { 100% 100% }
+							parentanchor = center
+							alpha = 0.8
+							
+							modify_texture = {
+								using = color_red_texture
+								alpha = 1.0
+								blend_mode = lighten
+							}
+
+							modify_texture = {
+								using = color_white_texture
+								blend_mode = add
+								alpha = 0.1
+							}
+						}
+					}
+
+					button = {
+						size = { 40 40 }
+						using = header_button_template
+						blockoverride "header_button_template_push_properties" { using = button_tab_toggle_properties_template }
+						blockoverride "header_button_full_content" {}
+						blockoverride "header_button_template_texture" { using = pressed_button_texture }
+
+						using = avoid_sea_actions
+
+						icon = {
+							size = { 75% 75% }
+							parentanchor = center
+							texture = "[GetConceptTexture('strait')]"
+						}
+
+						icon = {
+							visible = "[RoadBuilder.GetAvoidSea]"
+							texture = "gfx/interface/icons/flat_icons/disable_icon.dds"
+							size = { 100% 100% }
+							parentanchor = center
+
+							modify_texture = {
+								using = color_red_texture
+								alpha = 1.0
+								blend_mode = lighten
+							}
+						}
+					}
+
+					button = {
+						size = { 40 40 }
+						using = header_button_template
+						blockoverride "header_button_template_push_properties" { using = button_tab_toggle_properties_template }
+						blockoverride "header_button_full_content" {}
+						blockoverride "header_button_template_texture" { using = pressed_button_texture }
+						using = save_money_actions
+
+						icon = {
+							size = { 75% 75% }
+							parentanchor = center
+							texture = "[GetConceptTexture('road')]"
+						}
+
+						icon = {
+							size = { 16 16 }
+							position = { -2 -2 }
+							parentanchor = bottom|right
+							visible = "[RoadBuilder.GetSaveMoney]"
+							texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
+						}
+					}
+
+					button = {
+						size = { 40 40 }
+						using = header_button_template
+						blockoverride "header_button_template_push_properties" { using = button_tab_toggle_properties_template }
+						blockoverride "header_button_full_content" {}
+						blockoverride "header_button_template_texture" { using = pressed_button_texture }
+
+						using = select_mode_actions
+
+						icon = {
+							size = { 75% 75% }
+							parentanchor = center
+							texture = "[GetConceptTexture('location')]"
+						}
+
+						icon = {
+							size = { 20 20 }
+							parentanchor = bottom|right
+							visible = "[RoadBuilder.GetSelectMode]"
+							texture = "[GetConceptTexture('action')]"
+						}
+					}
+					
+					expand = {}
+
+					hbox = {
+						spacing = 5
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('control')]"
+						}
+		
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('proximity')]"
+						}
+		
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('market_access')]"
+						}
+		
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('potential_tax_base')]"
+						}
+		
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('tax_base')]" 
+						}
+		
+						mapmode_tooltip_button = {
+							datacontext = "[GetMapMode('uncontrolled_wealth')]"
 						}
 					}
 				}
 
 				vbox = {
 					layoutpolicy_horizontal = expanding
-					margin_top = 5
-				}
+					margin = { 5 5 }
+					margin_bottom = 8
+					spacing = 5
+					using = bg_dynasty_header
+					using = wood_square_tile
+					using = bg_loans_card_frame
+		
+					hbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = 7
+						margin = {5 7}
 
-				hbox = {
-					visible = "[RoadBuilder.GetShouldShowUpgradeButton]"
-					layoutpolicy_horizontal = expanding
-					size = { -1 35 }
-					margin_left = 5
-
-					# Exclude subjects toggle
-					button = {
-						size = {30 30}
-						using = header_button_template
-						blockoverride "header_button_template_push_properties"{using = button_tab_toggle_properties_template}
-						blockoverride "header_button_full_content"{}
-						blockoverride "header_button_template_texture"{using = pressed_button_texture}
-						action_tooltip = {
-							title = "ROAD_BUILDER_EXCLUDE_SUBJECTS_TOOLTIP"
-							on_action = "[RoadBuilder.ToggleExcludeSubjects]"
-						}
-						tooltipwidget = { BasicFunctionalTooltip = {} }
-						down = "[RoadBuilder.GetExcludeSubjects]"
+						using = bg_paper_card
+						using = bg_card_header_01_production
 
 						icon = {
-							size = {70% 70%}
-							parentanchor = center
-							texture = "gfx/interface/buttons/flats/subjects.dds"
-							modify_texture = {
-								using = color_gold_texture
-								alpha = 0.4
+							size = { 24 24 }
+							texture = "gfx/interface/icons/buildings/roads.dds"
+						}
+		
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							using = Font_Size_Medium
+							text = "SELECTED_PATH"
+							default_format = "#yellow_titles"
+						}
+		
+						expand = {}
+		
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('proximity')]"
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
+							}
+						}
+		
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('market_access')]"
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
 							}
 						}
 
-						icon = {
-							size = { 12 12 }
-							parentanchor = bottom|right
-							widgetanchor = bottom|right
-							position = { -2 -2 }
-							visible = "[Not(RoadBuilder.GetExcludeSubjects)]"
-							texture = "gfx/interface/icons/text_icons/trigger_yes.dds"
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('uncontrolled_wealth')]"
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
+							}
+						}					
+		
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('potential_tax_base')]"
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
+							}
+						}
+		
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('tax_base')]" 
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
+							}
 						}
 
-						icon = {
-							size = { 12 12 }
-							parentanchor = bottom|right
-							widgetanchor = bottom|right
-							position = { -2 -2 }
-							visible = "[RoadBuilder.GetExcludeSubjects]"
-							texture = "gfx/interface/icons/text_icons/trigger_no.dds"
+						mapmode_tooltip_button = {
+							size = { 32 32 }
+							datacontext = "[GetMapMode('control')]"
+							icon = {
+								ignore_layout = yes
+								parentanchor = center
+								size = {35 35}
+								using = bg_loans_card_frame
+							}
 						}
 					}
-
-					button_regular = {
+		
+					vbox = {
+						visible = "[Not(RoadBuilder.GetIsHoverPainting)]"
 						layoutpolicy_horizontal = expanding
-						layoutpolicy_vertical = expanding
-						enabled = "[RoadBuilder.CanUpgradeCandidates]"
-
-						action_tooltip = {
-							click_type = left
-							click_mode = single
-							enabled = "[RoadBuilder.CanUpgradeCandidates]"
-							title = "ROAD_BUILDER_UPGRADE_ROAD"
-							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)0')]"
-							cost = "[RoadBuilder.GetUpgradeCost('(int32)0')]"
-						}
-
-						action_tooltip = {
-							click_type = left
-							click_mode = single
-							click_modifier = ctrl
-							enabled = "[RoadBuilder.CanUpgradeCandidates]"
-							title = "ROAD_BUILDER_UPGRADE_ROADS_CTRL"
-							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)1')]"
-							cost = "[RoadBuilder.GetUpgradeCost('(int32)1')]"
-						}
-
-						action_tooltip = {
-							click_type = left
-							click_mode = single
-							click_modifier = shift
-							enabled = "[RoadBuilder.CanUpgradeCandidates]"
-							title = "ROAD_BUILDER_UPGRADE_ROADS_SHIFT"
-							on_action = "[RoadBuilder.UpgradeRoadCandidatesToSelectedType('(int32)2')]"
-							cost = "[RoadBuilder.GetUpgradeCost('(int32)2')]"
-						}
-
-						tooltipwidget = {
-							using = upgrade_road_ranking_tt
-						}
-
-						hbox = {
+						widget = {
+							datacontext = "[RoadBuilder.GetLocation]"
 							layoutpolicy_horizontal = expanding
-							layoutpolicy_vertical = expanding
-							spacing = 5
+							size = { -1 40 }
+			
+							hbox = {
+								spacing = 5
+								margin = {4 0}
+								icon = {
+									layoutpolicy_horizontal = expanding
+									size = { -1 40 }
+			
+									using = card_list_button_texture
 
-							margin_left = 8
-							margin_right = 5
+									onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLocation(Location.Self)]"
 
-							text_single = {
-								align = center|nobaseline
+									tooltipwidget = {
+										using = location_simple_tooltip
+									}
+									
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										using = road_destination_entry_content
+										blockoverride "road_destination_entry_distance" {}
+										blockoverride "road_destination_entry_cost" {
+											
+										}
+										blockoverride "road_destination_entry_autotablewidth" {}
+										blockoverride "road_destination_entry_highlights" {}
+										blockoverride "road_destination_entry_content_pre" {
+											text_single = {
+												margin = { 10 0 }
+												size = { 100 -1 }
+												autoresize = no
+												text = "ORIGIN"
+												default_format = "#yellow_titles"
+											}
+										}
+									}
+								}
+			
+								card_list_button = {
+									size = { 40 40 }
+		
+									action_tooltip = {
+										click_type = left
+										click_mode = single
+										title = "ROAD_BUILDER_SELECT_ORIGIN"
+										on_action = "[RoadBuilder.ToggleRoadBuilderSelectOrigin(PdxGuiWidget.Self)]"
+									}
+		
+									tooltipwidget = { BasicFunctionalTooltip = {} }
+									down = "[RoadBuilder.IsRoadBuilderSelectOriginOpened(PdxGuiWidget.Self)]"
+		
+									icon = {
+										size = { 66% 66% }
+										parentanchor = center
+										texture = "gfx/interface/buttons/flats/filter.dds"
+		
+										modify_texture = {
+											using = overlay_window_texture
+											blend_mode = overlay
+											alpha = 0.7
+										}
+		
+										modify_texture = {
+											using = color_new_gold_texture
+										}
+		
+										modify_texture = {
+											texture = "gfx/interface/buttons/buttons_texture.dds"
+											texture_density = 2
+											blend_mode = overlay
+											alpha = 0.2
+										}
+		
+										modify_texture = {
+											using = overlay_stone_texture
+											blend_mode = overlay
+											alpha = 0.4
+										}
+									}
+								}
+							}
+						}
+		
+						widget = {	
+							layoutpolicy_horizontal = expanding
+							size = { -1 40 }
+			
+							hbox = {
+								margin = {4 0}
+								spacing = 5
+		
+								icon = {
+									layoutpolicy_horizontal = expanding
+									size = { -1 40 }
+			
+									using = card_list_button_texture
+									
+									hbox = {
+										onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLocation(Location.Self)]"
+
+										tooltipwidget = {
+											using = location_simple_tooltip
+										}
+										visible = "[RoadBuilder.HasDestinationLocation]"					
+										datacontext = "[RoadBuilder.GetDestinationLocation]"
+										layoutpolicy_horizontal = expanding
+										using = road_destination_entry_content
+										blockoverride "road_destination_entry_distance" {}
+										blockoverride "road_destination_entry_cost" {
+											
+										}
+										blockoverride "road_destination_entry_autotablewidth" {}
+										blockoverride "road_destination_entry_highlights" {}
+										blockoverride "road_destination_entry_content_pre" {
+											text_single = {
+												margin = { 10 0 }
+												size = { 100 -1 }
+												autoresize = no
+												text = "ADD_MIGRATION_EFFECT_DESTINATION"
+												default_format = "#yellow_titles"
+											}
+										}
+									}
+
+									hbox = {
+										visible = "[Not(RoadBuilder.HasDestinationLocation)]"	
+										text_single = {
+											margin = { 10 0 }
+											size = { 100 -1 }
+											autoresize = no
+											text = "ADD_MIGRATION_EFFECT_DESTINATION"
+											default_format = "#yellow_titles"
+										}				
+										text_single = {
+											layoutpolicy_horizontal = expanding
+											margin = { 15 0 }
+											# size = { 100 -1 }
+											autoresize = no
+											align = right
+											text = "ROAD_BUILDER_SELECT_DESTINATION"
+											default_format = "#flavor"
+										}
+									}
+								}
+			
+								card_list_button = {
+									size = { 40 40 }
+		
+									datacontext = "[RoadBuilder.GetDestinationLocationItem]"
+									enabled = "[And3(RoadBuilder.HasDestinationLocation, RoadDestinationItem.IsValid, RoadDestinationItem.CanBuildRoad) ]"
+		
+									action_tooltip = {
+										enabled = no
+										title = "ROAD_BUILDER_ACTION_TT"
+										conditions = "ROAD_BUILDER_ACTION_INVALID"
+									}
+		
+									action_tooltip = {
+										visible = "[And(RoadBuilder.HasDestinationLocation, RoadDestinationItem.IsValid)]"
+										enabled = "[RoadDestinationItem.CanBuildRoad]"
+										title = "[RoadDestinationItem.GetTitle]"
+										cost = "[RoadDestinationItem.GetCostString]"
+										description = "[RoadDestinationItem.GetCanBuildRoadInfo]"
+										on_action = "[RoadDestinationItem.BuildRoad]"
+										conditions = "[RoadBuilder.GetConditionsForLocation(RoadDestinationItem.GetLocation)]"
+									}
+		
+									icon = {
+										size = { 66% 66% }
+										parentanchor = center
+										texture = "gfx/interface/icons/flat_icons/building_panel/build.dds"
+									}
+		
+									tooltipwidget = {
+										container = {
+											container = {
+												visible = "[And(RoadBuilder.HasDestinationLocation, RoadDestinationItem.IsValid)]"
+												using = road_destination_entry_tooltip
+											}
+											container = {
+												visible = "[Or(Not(RoadBuilder.HasDestinationLocation), Not(RoadDestinationItem.IsValid))]"
+												BasicFunctionalTooltip = {}
+											}
+										}
+										
+									}
+								}
+							}
+						}
+					
+					}
+
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						visible = "[RoadBuilder.GetIsHoverPainting]"
+						datamodel = "[RoadBuilder.GetRoadPathLocations]"
+						item = {
+							widget = {
 								layoutpolicy_horizontal = expanding
-								autoresize = no
-								fontsize_min = 12
-								text = "ROAD_BUILDER_UPGRADE_ROADS"
+								size = { -1 40 }
+
+								icon = {
+									size = { 100% 100% }
+			
+									using = card_list_button_texture
+									tooltipwidget = {
+										using = location_simple_tooltip
+									}
+									
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										using = road_destination_entry_content
+										blockoverride "road_destination_entry_distance" {}
+										blockoverride "road_destination_entry_cost" {}
+										blockoverride "road_destination_entry_autotablewidth" {}
+										blockoverride "road_destination_entry_highlights" {}
+										blockoverride "road_destination_entry_content_pre" {}
+									}
+								}
 							}
 						}
 					}
@@ -233,7 +985,8 @@ lateralview = {
 
 			# Searchbar and location list
 			filtered_sorted_list = {
-				datacontext = "[RoadBuilder.GetRoadDestinationsSearch]"
+				visible = "[Not(RoadBuilder.GetIsHoverPainting)]"
+				datacontext = "[RoadBuilder.GetRoadDestinationsSearch.WithFilterTags('road_destination')]"
 
 				blockoverride "scroll_list_is_empty" {
 					visible = "[IsDataModelEmpty(RoadBuilder.GetRoadDestinationsItems)]"
@@ -243,23 +996,341 @@ lateralview = {
 					text = "ROADBUILDER_LIST_EMPTY"
 				}
 
+				blockoverride "sort_buttons_filtered_list" {
+					datacontext = "[FilteredSortedList.GetAutoTableWidth]"
+					minimumsize = "[AutoTableWidth.GetTableMinimumSize('(float)420', '(float)20', PdxGuiWidget.Self)]"
+					sort_by_key_button = {
+						name = "name"
+						using = layoutpolicy_expanding
+					}
+
+					sort_by_key_button = {
+						size = "[AutoTableWidth.GetMinimumHeader('(int32)2','(float)30.0','(float)35.0' )]"
+						name = "proximity"
+						layoutpolicy_vertical = expanding
+						blockoverride "sort_by_key_button_texture"{
+							texture = "gfx/interface/icons/sort/access.dds"
+						}
+					}
+
+					sort_by_key_button = {
+						size = { 35 -1 }
+						name = "market_access"
+						layoutpolicy_vertical = expanding
+					}
+
+					sort_by_key_button = {
+						size = "[AutoTableWidth.GetMinimumHeader('(int32)3','(float)30.0','(float)5.0' )]"
+						name = "market"
+						layoutpolicy_vertical = expanding
+					}
+
+					sort_by_key_button = {
+						size = { 43 -1 }
+						name = "distance"
+						layoutpolicy_vertical = expanding
+					}
+
+					sort_by_key_button = {
+						size = "[AutoTableWidth.GetMinimumHeader('(int32)5','(float)30.0','(float)45.0' )]"
+						name = "cost"
+						layoutpolicy_vertical = expanding
+					}
+				}
+
 				blockoverride "scroll_list_content" {
 					addcolumn = 100%
-					addrow = 40
+					addrow = 43
 
 					datamodel = "[RoadBuilder.GetRoadDestinationsItems]"
 
 					item = {
 						widget = {
 							size = { 100% 40 }
-					
-							widget = {
-								parentanchor = hcenter|vcenter
-								size = { 98% 40 }
-								using = road_destination_entry
+							hbox = {
+								margin = { 5 0 }
+								widget = {
+									layoutpolicy_horizontal = expanding
+									size = { -1 43 }
+									using = road_destination_entry
+								}
 							}
 						}
 					}
+				}
+			}
+		
+			expand = {
+				visible = "[RoadBuilder.GetIsHoverPainting]"
+			}
+		}
+	}
+}
+
+template road_destination_entry_content {
+
+	block "road_destination_entry_content_pre" {}
+
+	hbox = {
+		layoutpolicy_horizontal = expanding
+		margin = { 10 0 }
+		spacing = 3
+
+		widget = {
+			visible = "[Location.HasRank]"
+			size = { 20 20 }
+			background = {
+				texture = "[Location.GetRankIcon]"
+			}
+		}
+
+		widget = {
+			visible = "[Not(Location.HasRank)]"
+			size = { 20 20 }
+			background = {
+				texture = "[GetTopographyIcon(Location.GetTopography)]"
+			}
+		}
+
+		text_single = {
+			layoutpolicy_horizontal = expanding
+
+			block "road_destination_entry_autotablewidth" { 
+				minimumsize = "[AutoTableWidth.GetMinimumSize('(int32)1', PdxGuiWidget.Self)]"
+			}
+
+			autoresize = yes
+			default_format = "#yellow_titles"
+			text = "[Location.GetNameWithNoTooltip]"
+		}
+
+		block "road_destination_entry_highlights" { 
+			sort_by_highlight = {
+				size = { 100% 100% }
+				name = "name"
+			}
+		}
+	}
+
+	hbox = {
+		visible = "[Location.HasRank]"
+		margin = { 10 0 }
+
+		icon = {
+			visible = "[Location.IsCapital]"
+			tooltipwidget = {
+				SimpleContextualTooltipType = {
+					blockoverride "title_icon_texture" {
+						texture = "gfx/interface/icons/location_icons/capital.dds"
+					}
+					lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_CAPITAL_TT"
+				}
+			}
+			size = { 18 18 }
+			texture = "gfx/interface/icons/location_icons/capital.dds"
+		}
+
+		icon = {
+			visible = "[And(Not(Location.IsCapital), Location.IsProximitySource)]"
+			tooltipwidget = {
+				SimpleContextualTooltipType = {
+					blockoverride "title_icon_texture" {
+						texture = "gfx/interface/icons/roads/proximity.dds"
+					}
+					lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_PROXIMITY_SOURCE_TT"
+				}
+			}
+			size = { 18 18 }
+			texture = "gfx/interface/icons/roads/proximity.dds"
+		}
+
+		icon = {
+			visible = "[Location.IsMarketCenter]"
+			tooltipwidget = {
+				SimpleContextualTooltipType = {
+					blockoverride "title_icon_texture" {
+						texture = "gfx/interface/icons/location_icons/market.dds"
+					}
+					lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_MARKET_CENTER_TT"
+				}
+			}
+			size = { 18 18 }
+			texture = "gfx/interface/icons/location_icons/market.dds"
+		}
+	}
+
+	hbox = {
+		visible = "[Location.HasRank]"
+		margin = { 10 0 }
+		spacing = 3
+
+		tooltipwidget = {
+			using = LocationProximity_tooltip
+		}
+
+		text_single = {
+			block "road_destination_entry_autotablewidth" { 
+				minimumsize = "[AutoTableWidth.GetMinimumSize('(int32)2', PdxGuiWidget.Self)]"
+			}
+			autoresize = yes
+			fontsize = 14
+			align = right|nobaseline
+			raw_text = "[Location.GetProximityToOwnerCapitalCapped|+1%]"
+		}
+
+		icon = {
+			size = { 18 18 }
+			texture = "gfx/interface/icons/location_icons/distance_capital.dds"
+		}
+
+		block "road_destination_entry_highlights" {
+			sort_by_highlight = {
+				size = { 100% 100% }
+				name = "proximity"
+			}
+		}
+	}
+
+	hbox = {
+		visible = "[Location.HasRank]"
+		margin = { 10 0 }
+		spacing = 3
+
+		tooltipwidget = {
+			using = location_market_tooltip
+		}
+
+
+		widget = {
+			size = {28 28}
+			piechart = {
+				parentanchor = center
+				size = { 25 25 }
+				alwaystransparent = yes
+				using = piechart_angles
+
+				pieslice_no_highlight = {
+					texture = "gfx/interface/pie_charts/pie_chart_alpha_80_green.dds"
+					value = "[FixedPointToFloat(Location.GetMarketAccess)]"
+					color = { 1 1 1 1 }
+					alwaystransparent = yes
+				}
+
+				pieslice_no_highlight = {
+					texture = "gfx/interface/pie_charts/pie_chart_alpha_80_red.dds"
+					value = "[Subtract_float('(float)1.0', FixedPointToFloat(Location.GetMarketAccess))]"
+					color = { 1 1 1 1 }
+					alwaystransparent = yes
+				}
+
+				icon = {
+					size = { 61% 61% }
+					parentanchor = center
+					texture = "gfx/interface/icons/location_icons/market.dds"
+				}
+
+				using = bg_circle_piechart
+			}
+
+			block "road_destination_entry_highlights" {
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "market_access"
+				}
+			}
+		}
+
+		text_single = {
+			visible = "[Location.HasRank]"
+			block "road_destination_entry_autotablewidth" { 
+				minimumsize = "[AutoTableWidth.GetMinimumSize('(int32)3', PdxGuiWidget.Self)]"
+			}
+			autoresize = yes
+			using = Font_Size_Very_Small
+			raw_text = "[Location.GetMarket.GetShortNameWithNoTooltip]"
+			default_format = "#yellow_titles"
+		}
+
+		block "road_destination_entry_highlights" {
+			sort_by_highlight = {
+				size = { 100% 100% }
+				name = "market"
+			}
+		}
+	}
+
+	block "road_destination_entry_distance" {
+		text_single = {
+			visible = "[Location.HasRank]"
+			margin = { 10 0 }
+			size = { 50 -1 }
+
+			default_format = "#yellow_titles"
+			text = "[RoadDestinationItem.GetDistance]"
+			using = Font_Size_Very_Small
+			align = right|nobaseline
+			
+			block "road_destination_entry_highlights" {
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "distance"
+				}
+			}
+		}
+	}
+
+	block "road_destination_entry_cost" {
+		text_single = {
+			margin = { 10 0 }
+			autoresize = yes
+			block "road_destination_entry_autotablewidth" { 
+				minimumsize = "[AutoTableWidth.GetMinimumSize('(int32)4', PdxGuiWidget.Self)]"
+			}
+			default_format = "#yellow_titles"
+			raw_text = "[RoadDestinationItem.GetCost|2]@gold!"
+			using = Font_Size_Very_Small
+			align = right|nobaseline
+			
+			block "road_destination_entry_highlights" {
+				sort_by_highlight = {
+					size = { 100% 100% }
+					name = "cost"
+				}
+			}
+		}
+	}
+}
+
+template road_destination_entry_tooltip {
+	ContextualTooltipType = {
+		blockoverride "title_text" {
+			text = "ROAD_BUILDER_DESTINATION_TITLE_TT"
+		}
+		blockoverride "concept_link" {
+			text = [road|e]
+		}
+		blockoverride "title_icon" {
+			icon = {
+				using = tooltip_title_icon_size
+				texture = "[GetRoadTypeIcon(RoadBuilder.GetSelectedRoadType)]"
+			}
+		}
+		blockoverride "tooltip_content" {
+			TooltipContentSection = {
+				visible = "[And(RoadDestinationItem.IsValid, Not(RoadBuilder.GetIsHoverPainting))]"
+				
+				TooltipScrolledStringPairList = {
+					blockoverride "block_scrollarea" { maximumsize = { -1 300 }}
+					textcontext = "[RoadDestinationItem.GetSegmentsNeedingRoadInfo]"
+				}
+
+				TooltipScrolledStringPairList = {
+					blockoverride "block_scrollarea" { maximumsize = { -1 300 }}
+					textcontext = "[RoadDestinationItem.GetProximityBreakdownInfo]"
+				}
+
+				TooltipStringPairList = {
+					textcontext = "[StringToConditionListOnlyPassedAndNeutralIfNot(RoadDestinationItem.CanBuildRoad, RoadBuilder.GetTooltipForLocation(RoadDestinationItem.GetLocation)).GetOutput]"
 				}
 			}
 		}
@@ -270,142 +1341,66 @@ template road_destination_entry {
 	onmousehierarchyenter = "[RoadDestinationItem.OnMouseHierarchyEnter]"
   	onmousehierarchyleave = "[RoadDestinationItem.OnMouseHierarchyLeave]"
 
-	background = {
-		using = paper_card_texture
-		margin = { 1 1 }
-		margin_bottom = 1
-		alpha = 0.3
-		block "card_shadow_margin" {}
-	}
-
-	card_list_button = {
+	widget = {
 		size = {100% 40}
-		enabled = "[RoadDestinationItem.CanBuildRoad]"
-		onclick = "[RoadDestinationItem.BuildRoad]"
-		tooltipwidget = {
-			ContextualTooltipType = {
-				blockoverride "title_text" {
-					text = "ROAD_BUILDER_DESTINATION_TITLE_TT"
-				}
-				blockoverride "concept_link" {
-					text = [road|e]
-				}
-				blockoverride "title_icon" {
-					icon = {
-						using = tooltip_title_icon_size
-						texture = "[GetRoadTypeIcon(RoadDestinationItem.GetRoadType)]"
-					}
-				}
-				blockoverride "tooltip_content" {							
-					TooltipStringPairList = {
-						textcontext = "[StringToConditionListOnlyPassedAndNeutralIfNot(RoadDestinationItem.CanBuildRoad, RoadBuilder.GetTooltipForLocation(RoadDestinationItem.GetLocation)).GetOutput]"
-					}
-					
-					TooltipStringPairList = {
-						blockoverride "block_title" {
-							text = "HAS_ROAD_IN_BOTH_LOC"
-						}
-						
-						textcontext = "[ShowModifierEffect('has_road')]"
-					}
-				}				
-			}
-		}
-
-		action_tooltip = {
-			click_type = left
-			click_mode = single
-			title = "[RoadDestinationItem.GetTitle]"
-			cost = "[RoadDestinationItem.GetCostString]"
+		card_list_button = {
+			size = {100% 100%}
 			enabled = "[RoadDestinationItem.CanBuildRoad]"
-			visible = yes
-			on_action = "[PlayAudioEffect('UI_action_road_build')]"
-			conditions = "[RoadBuilder.GetConditionsForLocation(RoadDestinationItem.GetLocation)]"
-		}		
-		
-		modify_texture = {
-			using = color_dark_blue_texture
-			blend_mode = multiply
-			alpha = 0.1
+	
+			tooltipwidget = {
+				using = road_destination_entry_tooltip
+			}
+	
+			action_tooltip = {
+				click_type = left
+				click_mode = single
+				title = "[RoadDestinationItem.GetTitle]"
+				cost = "[RoadDestinationItem.GetCostString]"
+				description = "[RoadDestinationItem.GetCanBuildRoadInfo]"
+				enabled = "[RoadDestinationItem.CanBuildRoad]"
+				on_action = "[RoadDestinationItem.BuildRoad]"
+				conditions = "[RoadBuilder.GetConditionsForLocation(RoadDestinationItem.GetLocation)]"
+			}
+			
+			action_tooltip = {
+				click_type = right
+				on_action = "[PdxGuiWidget.ToggleContextMenu]"
+				cursor = "location_menu"
+				title = "CLICK_ACTION_LOCATION_CONTEXT_MENU"
+			}
+	
+			contextmenu_widget = {
+				LocationContextMenu = {}
+			}
+			
+			modify_texture = {
+				using = color_dark_blue_texture
+				blend_mode = multiply
+				alpha = 0.1
+			}
+	
+			datacontext = "[RoadDestinationItem.GetLocation]"
+			datacontext = "[FilteredSortedList.GetAutoTableWidth]"
+			
+			hbox = {			
+				using = road_destination_entry_content
+			}
+			widget = {
+				ignore_layout = yes
+				alwaystransparent = yes
+				size = {100% 100%}
+				using = bg_loans_card_frame
+			}
 		}
 
-		hbox = {
-			# using = layoutpolicy_expanding
-			spacing = 5
-			margin = {5 0}
-			margin_left = 10
-
-			widget = {
-				size = {200 18}
-				hbox = {
-					spacing = 5
-
-					icon = {
-						size = { 18 18 }
-						texture = "[RoadDestinationItem.GetLocation.GetRankIcon]"
-					}
-
-					text_single = {
-						maximumsize = { 180 -1 }
-						default_format = "#yellow_titles"
-						using = Font_Type_Standard
-						text = "[RoadDestinationItem.GetLocation.GetNameWithNoTooltip]"
-						autoresize = yes
-
-						sort_by_highlight = {
-							size = { 100% 100% }
-							name = "name"
-						}
-					}
-
-					expand = {}
-				}
-			}
-
-			text_single = {
-				size = {35 18}
-				autoresize = no
-				align = left|nobaseline
-				default_format = "#yellow_titles"
-				using = Font_Type_Standard
-				text = "[RoadDestinationItem.GetDistance]"
-				
-				sort_by_highlight = {
-					size = { 100% 100% }
-					name = "distance"
-				}
-			}
-
-			text_single = {
-				size = {55 18}
-				align = right|nobaseline
-				default_format = "#yellow_titles"
-				using = Font_Type_Standard
-				text = "[RoadDestinationItem.GetLocation.GetTopography.GetIcon][RoadDestinationItem.GetLocation.GetTopography.GetNameNoUnderline]"
-				
-				sort_by_highlight = {
-					size = { 100% 100% }
-					name = "topography"
-				}
-			}
-
-			text_single = {
-				layoutpolicy_horizontal = expanding
-				autoresize = no
-				size = {20 18}
-				margin_right = 5
-				align = right|nobaseline
-				default_format = "#yellow_titles"
-				using = Font_Type_Standard
-				raw_text = "[RoadDestinationItem.GetCost|2]@gold!"
-				
-				sort_by_highlight = {
-					size = { 100% 100% }
-					name = "cost"
-				}
-			}
+		datacontext = "[RoadDestinationItem.GetLocation]"
+		datacontext = "[FilteredSortedList.GetAutoTableWidth]"
+		
+		hbox = {			
+			using = road_destination_entry_content
 		}
 	}
+
 }
 
 template upgrade_road_ranking_tt {
@@ -424,4 +1419,130 @@ template upgrade_road_ranking_tt {
             }
         }
     }
+}
+
+select_menu_left = {
+	blockoverride "menu_setup" {
+		name = "road_builder_select_origin"
+	}
+
+	blockoverride "close_on_action" { on_action = "[RoadBuilderSelectOrigin.OnClose]" }
+
+	blockoverride "select_header_text" {
+		text = "ROAD_BUILDER_PROXIMITY_SOURCES_HEADER"
+	}
+
+	blockoverride "select_content" {
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 10
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 3
+				datamodel = "[RoadBuilderSelectOrigin.Parent.GetProximitySourceOrigins]"
+
+				item = {
+					card_list_button = {
+						size = { 320 40 }
+
+						action_tooltip = {
+							click_type = left
+							click_mode = single
+							title = "[Location.GetName]"
+							on_action = "[RoadBuilderSelectOrigin.Parent.SelectOriginLocation(Location.Self)]"
+						}
+
+						action_tooltip = {
+							click_type = right
+							click_mode = single
+
+							cursor = "location_menu"
+							title = "CLICK_ACTION_LOCATION_CONTEXT_MENU"
+							on_action = "[PdxGuiWidget.ToggleContextMenu]"
+						}
+
+						onmousehierarchyenter = "[PdxGuiWidget.SetHighlightLocation(Location.Self)]"
+
+						tooltipwidget = {
+							using = location_tooltip_alt
+						}
+						contextmenu_widget = {
+							LocationContextMenu = {}
+						}
+
+
+						hbox = {
+							layoutpolicy_horizontal = expanding
+							hbox = {
+								layoutpolicy_horizontal = expanding
+								margin = { 10 0 }
+								spacing = 3
+
+								widget = {
+									size = { 20 20 }
+									background = {
+										texture = "[Location.GetRankIcon]"
+									}
+								}
+
+								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = yes
+									default_format = "#yellow_titles"
+									text = "[Location.GetNameWithNoTooltip]"
+								}
+							}
+
+							hbox = {
+								margin = { 10 0 }
+
+								icon = {
+									visible = "[Location.IsCapital]"
+									tooltipwidget = {
+										SimpleContextualTooltipType = {
+											blockoverride "title_icon_texture" {
+												texture = "gfx/interface/icons/location_icons/capital.dds"
+											}
+											lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_CAPITAL_TT"
+										}
+									}
+									size = { 18 18 }
+									texture = "gfx/interface/icons/location_icons/capital.dds"
+								}
+
+								icon = {
+									visible = "[And(Not(Location.IsCapital), Location.IsProximitySource)]"
+									tooltipwidget = {
+										SimpleContextualTooltipType = {
+											blockoverride "title_icon_texture" {
+												texture = "gfx/interface/icons/roads/proximity.dds"
+											}
+											lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_PROXIMITY_SOURCE_TT"
+										}
+									}
+									size = { 18 18 }
+									texture = "gfx/interface/icons/roads/proximity.dds"
+								}
+
+								icon = {
+									visible = "[Location.IsMarketCenter]"
+									tooltipwidget = {
+										SimpleContextualTooltipType = {
+											blockoverride "title_icon_texture" {
+												texture = "gfx/interface/icons/location_icons/market.dds"
+											}
+											lowpriotextcontext = "ROAD_BUILDER_LOCATION_IS_MARKET_CENTER_TT"
+										}
+									}
+									size = { 18 18 }
+									texture = "gfx/interface/icons/location_icons/market.dds"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }

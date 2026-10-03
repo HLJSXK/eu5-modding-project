@@ -10,12 +10,33 @@ template select_interaction_target_map_tooltip {
 		ContextualTooltipType = {
 			datacontext = "[GetLastSelectInteractionTargetGlue(Location.Self)]"
 			blockoverride "title_text" { text = "[SelectInteractionTargetGlue.GetUIActionTitle]" }
-			blockoverride "title_icon_texture" { texture = "[SelectInteractionTargetGlue.GetObject.GetGameConceptTexture]" }
+			blockoverride "title_icon_texture" { texture = "[SelectInteractionTargetGlue.GetObject.GetIconTexture]" }
 			blockoverride "concept_link" { text = "[SelectInteractionTargetGlue.GetObject.GetGameConceptName|e]" }
-			blockoverride "tooltip_content" { 
+			blockoverride "tooltip_content" {
 				TooltipContentSection = {
 					visible = "[LastSelectInteractionTargetGlueWasTarget(Location.Self)]"
 					using = action_tooltip_inner_content_select_interaction_target_map
+
+					TooltipScrolledStringPairList = {
+						ontextcontextchanged = "[SetStringPairListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+						visible = "[SelectInteractionTargetGlue.GetParentView.RequiresAcceptance]"
+						blockoverride "block_scrollarea" { maximumsize = { -1 200 }}
+						textcontext = "[SelectInteractionTargetGlue.GetUIActionAcceptance]"
+					}
+
+					TooltipTextBlock = {
+						visible = "[SelectInteractionTargetGlue.GetParentView.RequiresAcceptance]"
+						blockoverride "text" {
+							text = "GOOD_BAD_RATIO_T"
+						}
+					}
+
+					TooltipTableHeader = {
+						visible = "[SelectInteractionTargetGlue.GetParentView.RequiresAcceptance]"
+						blockoverride "tableheader_text" {
+							raw_text = "[SelectLocalization( SelectInteractionTargetGlue.GetUIActionWillAIAccept, '@trigger_yes!', '@trigger_no!' )]  [SelectLocalization( SelectInteractionTargetGlue.GetUIActionWillAIAccept, 'DIPLOMACY_WILL_ACCEPT', 'DIPLOMACY_WILL_NOT_ACCEPT' )]"
+						}
+					}
 				}
 				TooltipContentSection = {
 					visible = "[Not(LastSelectInteractionTargetGlueWasTarget(Location.Self))]"
@@ -33,7 +54,7 @@ types SelectInteractionTargetTypes
 {
 	type interaction_target_table_entry = widget {
 		tooltipmeta = {
-			texture = "[SelectInteractionTargetGlue.GetObject.GetGameConceptTexture]"
+			texture = "[SelectInteractionTargetGlue.GetObject.GetIconTexture]"
 			game_concept = "[SelectInteractionTargetGlue.GetObject.GetGameConceptName|e]"
 		}
 
@@ -190,11 +211,128 @@ template select_interaction_target {
 			visible = "[Not(SelectInteractionTargetView.IsValue)]"
 			datacontext = "[SelectInteractionTargetView.GetTargetObjectSortSearch]"
 
+			blockoverride "searchbar_extra_pre_content" {
+				hbox = {
+					visible = "[SelectInteractionTargetView.IsCharacter]"
+					layoutpolicy_horizontal = expanding
+					spacing = 2
+					margin = { 5 5 }
+					margin_top = 0
+					datacontext = "[SelectInteractionTargetView.GetTargetObjectSortSearch.GetSearchBar]"
+					datamodel = "[Player.GetGovernment.GetEstates]"
+					item = {
+						goods_quickfilter_button = {
+							visible = "[Not(StringIsEmpty(GetCharacterEstateSearchFilterKey(Estate.GetType)))]"
+							layoutpolicy_horizontal = expanding
+							blockoverride "goods_quickfilter_button_size" {
+								size = { -1 30 }
+							}
+							blockoverride "goods_quickfilter_button_background" {
+								background = {
+									using = paper_card_texture
+									margin = {-3 -3}
+
+									modify_texture = {
+										using = color_paper_texture
+									}
+
+									modify_texture = {
+										using = overlay_paper_03
+									}
+								}
+								background = {
+									using = color_grey_texture
+									margin = {-3 -3}
+
+									modify_texture = {
+										texture = "[GetGraphicalCultureTexture('header_pattern')]"
+										texture_density = 2
+										spriteType = corneredtiled
+										blend_mode = overlay
+										alpha = 0.6
+									}
+
+									modify_texture = {
+										color = "[Estate.GetType.GetMapColor]"
+										alpha = 0.7
+										blend_mode = overlay
+									}
+								}
+							}
+							blockoverride "goods_quickfilter_button_highlight" {
+								visible = "[SearchBar.IsFilterEnabledByKey(GetCharacterEstateSearchFilterKey(Estate.GetType))]"
+							}
+							blockoverride "goods_quickfilter_button_title" {
+								title = "[Estate.GetType.GetName]"
+							}
+							blockoverride "goods_quickfilter_button_on_action" {
+								on_action = "[SearchBar.ToggleFilterByKey(GetCharacterEstateSearchFilterKey(Estate.GetType))]"
+							}
+							blockoverride "goods_quickfilter_button_tooltip" {
+								tooltipwidget = { BasicFunctionalTooltip = {} }
+							}
+							blockoverride "goods_quickfilter_button_icon" {
+								texture = "[GetEstateIcon(Estate.GetType)]"
+							}
+							blockoverride "goods_quickfilter_button_icon_size" { size = { 28 28 } }
+						}
+					}
+				}
+
+				hbox = {
+					visible = "[SelectInteractionTargetView.IsTownRightsType]"
+					layoutpolicy_horizontal = expanding
+					spacing = 3
+					margin = { 10 5 }
+					margin_top = 0
+					datacontext = "[SelectInteractionTargetView.GetTargetObjectSortSearch.GetSearchBar]"
+
+					goods_quickfilter_button = {
+						layoutpolicy_horizontal = expanding
+
+						datacontext = "[SearchBar.FindFilterByKey('specialization')]"
+						blockoverride "goods_quickfilter_button_highlight" {
+							visible = "[SearchBar.IsFilterEnabledByKey('specialization')]"
+						}
+						blockoverride "goods_quickfilter_button_icon" {
+							texture = "gfx/interface/icons/flat_icons/produced_goods.dds"
+						}
+						blockoverride "goods_quickfilter_button_label" {
+							text = "TOWN_RIGHTS_FILTER_SPECIALIZATION"
+						}
+						blockoverride "goods_quickfilter_button_on_action" {
+							on_action = "[SearchBar.ToggleFilterByKey('specialization')]"
+						}
+					}
+
+					goods_quickfilter_button = {
+						layoutpolicy_horizontal = expanding
+
+						datacontext = "[SearchBar.FindFilterByKey('not_specialization')]"
+						blockoverride "goods_quickfilter_button_highlight" {
+							visible = "[SearchBar.IsFilterEnabledByKey('not_specialization')]"
+						}
+						blockoverride "goods_quickfilter_button_icon" {
+							texture = "gfx/interface/icons/town_rights/_default.dds"
+						}
+						blockoverride "goods_quickfilter_button_label" {
+							text = "TOWN_RIGHTS_FILTER_NOT_SPECIALIZATION"
+						}
+						blockoverride "goods_quickfilter_button_on_action" {
+							on_action = "[SearchBar.ToggleFilterByKey('not_specialization')]"
+						}
+					}
+				}
+			}
+
 			blockoverride "scroll_list_vbox" {
-				using = layoutpolicy_expanding
-				allow_outside = yes
-				margin = { -10 0 }
-				margin_bottom = 5
+				vbox = {
+					using = layoutpolicy_expanding
+					allow_outside = yes
+					margin = { -10 0 }
+					margin_bottom = 5
+					scroll_list = {}
+				}
 			}
 
 			blockoverride "scroll_list_is_empty" {
@@ -203,6 +341,261 @@ template select_interaction_target {
 
 			blockoverride "scroll_list_is_empty_text" {
 				text = "[SelectInteractionTargetView.GetNoneAvailableTextOnlyHeader]"
+			}
+
+			blockoverride "subheader_upper_divider" {
+				hbox = {
+					visible = "[SelectInteractionTargetView.IsCabinetAction]"
+					layoutpolicy_horizontal = expanding
+					spacing = 2
+					margin = { 2 5 }
+
+					# ADM filter toggle
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 30 }
+						using = bg_building_card_colors
+						blockoverride "building_color" {
+							using = color_yellow_texture
+							alpha = 0.8
+							blend_mode = overlay
+						}
+						card_header_button_04 = {
+							allow_outside = yes
+							size = { 100% 100% }
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								on_action = "[SelectInteractionTargetView.ToggleCabinetActionAbilityFilter('adm')]"
+								title = "CABINET_ACTION_FILTER_ADM_TITLE"
+								description = "CABINET_ACTION_FILTER_ADM_DESC"
+							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+
+							icon = {
+								visible = "[SelectInteractionTargetView.IsAbilityFilterActive('adm')]"
+								size = { 100% 100% }
+								using = color_white_texture
+								alpha = 0.15
+							}
+
+							hbox = {
+								margin = { 3 0 }
+								spacing = 4
+								parentanchor = vcenter
+
+								widget = {
+									size = { 20 20 }
+									using = bg_circle_piechart
+									icon = {
+										size = { 92% 92% }
+										parentanchor = center
+										texture = "gfx/interface/icons/abilities/adm.dds"
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 3
+											color = { 0.0 0.0 0.0 1.0 }
+											alpha = 0.3
+										}
+									}
+								}
+
+								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
+									using = Font_Type_Headers
+									fontsize = 13
+									text = "CABINET_ACTION_FILTER_ADM"
+								}
+
+								widget = {
+									layoutpolicy_horizontal = fixed
+									layoutpolicy_vertical = fixed
+									size = { 55 26 }
+									datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('cabinet').GetCabinet]"
+									visible = "[Cabinet.IsCharacterSet]"
+									tooltipwidget = {
+										using = effective_skill_tooltip_adm
+									}
+									text_single = {
+										align = right|nobaseline
+										widgetanchor = right|vcenter
+										parentanchor = right|vcenter
+										margin = { 3 2 }
+										using = Font_Type_Headers
+										fontsize = 12
+										text = "[Cabinet.GetEffectiveSkillByAbilityType('adm')|2%+=]"
+									}
+								}
+							}
+						}
+					}
+
+					# DIP filter toggle
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 30 }
+						using = bg_building_card_colors
+						blockoverride "building_color" {
+							using = color_blue_texture
+							alpha = 0.8
+							blend_mode = overlay
+						}
+						card_header_button_04 = {
+							allow_outside = yes
+							size = { 100% 100% }
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								on_action = "[SelectInteractionTargetView.ToggleCabinetActionAbilityFilter('dip')]"
+								title = "CABINET_ACTION_FILTER_DIP_TITLE"
+								description = "CABINET_ACTION_FILTER_DIP_DESC"
+							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+
+							icon = {
+								visible = "[SelectInteractionTargetView.IsAbilityFilterActive('dip')]"
+								size = { 100% 100% }
+								using = color_white_texture
+								alpha = 0.15
+							}
+
+							hbox = {
+								margin = { 3 0 }
+								spacing = 4
+								parentanchor = vcenter
+
+								widget = {
+									size = { 20 20 }
+									using = bg_circle_piechart
+									icon = {
+										size = { 92% 92% }
+										parentanchor = center
+										texture = "gfx/interface/icons/abilities/dip.dds"
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 3
+											color = { 0.0 0.0 0.0 1.0 }
+											alpha = 0.3
+										}
+									}
+								}
+
+								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
+									using = Font_Type_Headers
+									fontsize = 13
+									text = "CABINET_ACTION_FILTER_DIP"
+								}
+
+								widget = {
+									layoutpolicy_horizontal = fixed
+									layoutpolicy_vertical = fixed
+									size = { 55 26 }
+									datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('cabinet').GetCabinet]"
+									visible = "[Cabinet.IsCharacterSet]"
+									tooltipwidget = {
+										using = effective_skill_tooltip_dip
+									}
+									text_single = {
+										align = right|nobaseline
+										widgetanchor = right|vcenter
+										parentanchor = right|vcenter
+										margin = { 3 2 }
+										using = Font_Type_Headers
+										fontsize = 12
+										text = "[Cabinet.GetEffectiveSkillByAbilityType('dip')|2%+=]"
+									}
+								}
+							}
+						}
+					}
+
+					# MIL filter toggle
+					widget = {
+						layoutpolicy_horizontal = expanding
+						size = { -1 30 }
+						using = bg_building_card_colors
+						blockoverride "building_color" {
+							using = color_red_texture
+							alpha = 0.8
+							blend_mode = overlay
+						}
+						card_header_button_04 = {
+							allow_outside = yes
+							size = { 100% 100% }
+
+							action_tooltip = {
+								click_type = left
+								click_mode = single
+								on_action = "[SelectInteractionTargetView.ToggleCabinetActionAbilityFilter('mil')]"
+								title = "CABINET_ACTION_FILTER_MIL_TITLE"
+								description = "CABINET_ACTION_FILTER_MIL_DESC"
+							}
+							tooltipwidget = { BasicFunctionalTooltip = {} }
+
+							icon = {
+								visible = "[SelectInteractionTargetView.IsAbilityFilterActive('mil')]"
+								size = { 100% 100% }
+								using = color_white_texture
+								alpha = 0.15
+							}
+
+							hbox = {
+								margin = { 3 0 }
+								spacing = 4
+								parentanchor = vcenter
+
+								widget = {
+									size = { 20 20 }
+									using = bg_circle_piechart
+									icon = {
+										size = { 92% 92% }
+										parentanchor = center
+										texture = "gfx/interface/icons/abilities/mil.dds"
+										glow = {
+											name = "drop_shadow"
+											glow_radius = 3
+											color = { 0.0 0.0 0.0 1.0 }
+											alpha = 0.3
+										}
+									}
+								}
+
+								text_single = {
+									layoutpolicy_horizontal = expanding
+									autoresize = no
+									using = Font_Type_Headers
+									fontsize = 13
+									text = "CABINET_ACTION_FILTER_MIL"
+								}
+
+								widget = {
+									layoutpolicy_horizontal = fixed
+									layoutpolicy_vertical = fixed
+									size = { 55 26 }
+									datacontext = "[SelectInteractionTargetView.GetCurrentParams.GetTargetObjectFromFlag('cabinet').GetCabinet]"
+									visible = "[Cabinet.IsCharacterSet]"
+									tooltipwidget = {
+										using = effective_skill_tooltip_mil
+									}
+									text_single = {
+										align = right|nobaseline
+										widgetanchor = right|vcenter
+										parentanchor = right|vcenter
+										margin = { 3 2 }
+										using = Font_Type_Headers
+										fontsize = 12
+										text = "[Cabinet.GetEffectiveSkillByAbilityType('mil')|2%+=]"
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 
 			blockoverride "sort_buttons_filtered_list" {

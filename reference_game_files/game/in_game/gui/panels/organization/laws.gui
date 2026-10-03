@@ -2,12 +2,14 @@ types OrganizationPanel
 {
 	type organization_panel_laws_area = vbox {
 		# block "organization_laws_content" {
-			margin = {5 10}
-			spacing = 10
+			block "organization_panel_laws_area" {
+				margin = {5 10}
+				spacing = 10
+			}
 			block "organization_laws_subheader" {
 			}
 
-			# block "contribute_to_org_treasury" {
+			block "contribute_to_org_treasury" {
 				dynamicgridbox = {
 					datamodel = "[InternationalOrganizationsView.GetActions]"
 					item = {
@@ -120,7 +122,7 @@ types OrganizationPanel
 						}
 					}
 				}
-			# }
+			}
 
 			## block "withdraw_from_org_treasury" {
 			#	dynamicgridbox = {
@@ -239,6 +241,10 @@ types OrganizationPanel
 							visible = no
 						}
 
+						blockoverride "searchbar_visible" {
+							visible = "[And(Or(SearchBar.HasSearchFilterCategories, SearchBar.HasTextSearchFilters), Not(InternationalOrganizationsView.HasCoreLaws))]"
+						}
+
 						blockoverride "scroll_list_is_empty" {
 							visible = "[IsDataModelEmpty(InternationalOrganizationsView.GetLawCategories)]"
 						}
@@ -250,14 +256,16 @@ types OrganizationPanel
 
 						blockoverride "scroll_list_layout" {
 							vbox = {
-								spacing = 10
-								block "organization_laws_list_custom_top" {}
+								block "organization_laws_list_custom_top" { spacing = 10 }
 								vbox = {
 									spacing = 10
 									layoutpolicy_horizontal = expanding
+									ignoreinvisible = yes
+									visible = "[Not(InternationalOrganizationsView.HasCoreLaws)]"
 									datamodel = "[InternationalOrganizationsView.GetLawCategories]"
 									item = {
 										io_laws_list_item = {
+											visible = "[Not(InternationalOrganizationLawCategory.IsCoreCategory)]"
 											blockoverride "law_type_button" {
 												action_tooltip = {
 													title = "TOGGLE_LAW_CATEGORY"
@@ -298,13 +306,21 @@ types OrganizationPanel
 												visible = yes
 											}
 											blockoverride "law_action_button_setup" {
-												enabled = "[Or(ResolutionGlue.EnactResolutionIsActive, And(UIAction.IsEnabled, Not(InternationalOrganizationsView.HasActiveParliamentResolution)))]"
-												proposer = "[ResolutionGlue.GetProposer]"
-												actor = "[InternationalOrganizationsView.GetPlayer]"
+												visible = "[PdxGuiWidget.IsUberButtonVisible]"
+												enabled = "[And3(PdxGuiWidget.IsUberButtonEnabled, Not(ResolutionGlue.EnactResolutionIsActive), Not(InternationalOrganizationsView.HasActiveParliamentResolution))]"
+												datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
 
-												left_action = {
+												tooltipmeta = {
+													title = "[ResolutionGlue.GetTarget('target').GetLaw.GetNameWithNoTooltip]"
+													texture = "[GetLawIcon(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+												}
+
+												scripted_action_tooltip = {
+													click_type = left
+													click_mode = single
 													action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
-
+													proposer = "[ResolutionGlue.GetProposer]"
+													actor = "[InternationalOrganizationsView.GetPlayer]"
 													parameter = {
 														parameter_name = "recipient"
 														parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
@@ -314,8 +330,6 @@ types OrganizationPanel
 														parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
 													}
 												}
-
-												datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
 
 												tooltipwidget = {
 													using = IO_Law_tooltip
@@ -343,113 +357,6 @@ types OrganizationPanel
 												visible = "[Not(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self))]"
 												text = "NO_POLICY_SELECTED"
 											}
-											# blockoverride "law_piechart" {
-												# widget = {
-												# 	size = { 30 30 }
-												# 	using = bg_circle
-												# 	visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
-
-												# 	piechart = {
-												# 		size = { 100% 100% }
-												# 		using = piechart_angles
-												# 		parentanchor = center
-
-												# 		icon = {
-												# 			parentanchor = center
-												# 			size = { 70% 70% }
-												# 			texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
-												# 			texture_density = 2
-												# 		}
-
-												# 		pieslice = {
-												# 			texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-												# 			value = "[FixedPointToFloat(ResolutionGlue.GetProgressToDeadline)]"
-												# 			using = color_value_progress_blue
-												# 		}
-
-												# 		pieslice = {
-												# 			texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-												# 			value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetProgressToDeadline))]"
-												# 			using = color_value_progress_gray
-												# 		}
-
-												# 		datacontext = "[ResolutionGlue.GetVoteToEnactAction]"
-
-												# 		tooltipwidget = {
-												# 			using = international_organization_resolution_voting_tooltip
-												# 		}
-												# 	}
-												# }
-											# }
-											# blockoverride "law_piechart" {
-											# 	widget = {
-											# 		size = { 30 30 }
-											# 		using = bg_circle
-											# 		visible = "[ResolutionGlue.GetOwner.ShouldDisplayProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
-
-											# 		piechart = {
-											# 			size = { 100% 100% }
-											# 			parentanchor = center
-											# 			using = piechart_angles
-
-											# 			icon = {
-											# 				parentanchor = center
-											# 				size = { 70% 70% }
-											# 				texture = "gfx/interface/icons/situations/_default.dds"
-											# 				texture_density = 2
-											# 			}
-
-											# 			pieslice = {
-											# 				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-											# 				value = "[FixedPointToFloat(ResolutionGlue.GetOwner.GetPolicyProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self))]"
-											# 				using = color_value_progress_blue
-											# 			}
-
-											# 			pieslice = {
-											# 				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-											# 				value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetOwner.GetPolicyProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)))]"
-											# 				using = color_value_progress_gray
-											# 			}
-											# 		}
-											# 	}									
-
-											# 	widget = {
-											# 		size = { 30 30 }
-											# 		using = bg_circle
-											# 		visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
-
-											# 		piechart = {
-											# 			size = { 100% 100% }
-											# 			using = piechart_angles
-											# 			parentanchor = center
-
-											# 			icon = {
-											# 				parentanchor = center
-											# 				size = { 70% 70% }
-											# 				texture = "gfx/interface/icons/laws/resolutions/law_voting.dds"
-											# 				texture_density = 2
-											# 			}
-
-											# 			pieslice = {
-											# 				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-											# 				value = "[FixedPointToFloat(ResolutionGlue.GetProgressToDeadline)]"
-											# 				using = color_value_progress_blue
-											# 			}
-
-											# 			pieslice = {
-											# 				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
-											# 				value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetProgressToDeadline))]"
-											# 				using = color_value_progress_gray
-											# 			}
-
-											# 			datacontext = "[ResolutionGlue.GetVoteToEnactAction]"
-
-											# 			tooltipwidget = {
-											# 				using = international_organization_resolution_voting_tooltip
-											# 			}										
-											# 		}
-											# 	}
-											# }
 										}
 									}
 								}
@@ -463,132 +370,693 @@ types OrganizationPanel
 			expand = {}
 		# }
 	}
-}
 
-# template laws_entry {
-# 	hbox = {
-# 		layoutpolicy_horizontal = expanding
-# 		margin = { 20 0 }
-# 		spacing = 10
-# 		widget = {
-# 			size = { 32 32 }
-# 			background = {
-# 				texture = "gfx/interface/component_tiles/laws_background_frame.dds"
-# 				texture_density = 2
-# 				spriteType = corneredstretched
-# 				spriteBorder = { 0 0 }
-# 				alpha = 1
-# 				modify_texture = {
-# 					texture = "[GetLawBgCategoryColor(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
-# 					texture_density = 2
-# 					blend_mode = multiply
-# 				}
-# 				modify_texture = {
-# 					using = overlay_leather_texture
-# 					blend_mode = overlay
-# 					alpha = 0.3
-# 				}
-# 			}
-# 			icon = {
-# 				size = { 75% 75% }
-# 				parentanchor = center
-# 				texture = "[GetLawIcon(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
-# 				glow = {
-# 					name = "drop_shadow"
-# 					glow_radius = 3
-# 					color = {0.0 0.0 0.0 1.0}
-# 					alpha = 0.3
-# 				}
-# 			}
-# 		}
-# 		vbox = {
-# 			spacing = 5
-# 			hbox = {
-# 				layoutpolicy_horizontal = expanding
-# 				# start debate/revoke law
-# 				action_button_regular = {
-# 					size = { 300 30 }
-# 					name = "start debate or enact policy"
-# 					title = "[ResolutionGlue.GetTarget('target').GetLaw.GetNameWithContext(InternationalOrganizationsView.GetInternationalOrganization)]"
-# 					description = "[ResolutionGlue.GetTarget('target').GetLaw.GetDesc]"
-# 					proposer = "[ResolutionGlue.GetProposer]"
-# 					actor = "[InternationalOrganizationsView.GetPlayer]"
-# 					parameter = {
-# 						parameter_name = "recipient"
-# 						parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
-# 					}
-# 					parameter = {
-# 						parameter_name = "target"
-# 						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
-# 					}
-# 					left_action = { action_name = "[ResolutionGlue.GetEnactResolution.GetKey]" }
-# 					right_click_and_hold_action = { action_name = "[ResolutionGlue.GetRepealResolution.GetKey]" }
-# 					enabled = "[And(And(UIAction.IsEnabled,Not(ResolutionGlue.EnactResolutionIsActive)),Not(ResolutionGlue.RepealResolutionIsActive))]"
-# 					text_single = {
-# 						parentanchor = center
-# 						align = nobaseline|right
-# 						maximumsize = {280 30}
-# 						text = "[ResolutionGlue.GetTarget('target').GetLaw.GetNameWithNoTooltip]"
-# 					}
-# 				}
-# 				expand = {}
-# 			}
-# 			hbox = {
-# 				layoutpolicy_horizontal = expanding
-# 				hbox = {
-# 					layoutpolicy_horizontal = expanding
-# 					visible = "[Not(ResolutionGlue.EnactResolutionIsActive)]"
-# 					#what policy is already enacted
-# 					text_single = {
-# 						layoutpolicy_horizontal = expanding
-# 						size = { -1 30 }
-# 						align = left|nobaseline
-# 						visible = "[InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw)]"
-# 						text = "[InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw).GetNameWithContext(InternationalOrganizationsView.GetInternationalOrganization)]"
-# 					}
-# 					expand = {}
-# 				}
-# 				hbox = {
-# 					layoutpolicy_horizontal = expanding
-# 					spacing = 5
-# 					# vote on law
-# 					button_regular = {
-# 						size = { 300 30 }
-# 						name = "enact policy"
-# 						datacontext = "[ResolutionGlue.GetVoteToEnactAction]"
-# 						using = button_action_provider
-# 						text = "[ResolutionGlue.GetButtonText]"
-# 						title = "[ResolutionGlue.GetVoteTitle]"
-# 						description = "[ResolutionGlue.GetVoteDesc]"
-# 						visible = "[And(UIActionProvider.IsVisible,ResolutionGlue.EnactResolutionIsActive)]"
-# 						enabled = "[And(UIActionProvider.IsEnabled,ResolutionGlue.EnactResolutionIsActive)]"
-# 					}
-# 					button_regular = {
-# 						size = { 300 30 }
-# 						name = "repeal law"
-# 						datacontext = "[ResolutionGlue.GetVoteToRepealAction]"
-# 						using = button_action_provider
-# 						text = "[ResolutionGlue.GetButtonText]"
-# 						title = "[ResolutionGlue.GetVoteTitle]"
-# 						description = "[ResolutionGlue.GetVoteDesc]"
-# 						visible = "[And(UIActionProvider.IsVisible,ResolutionGlue.RepealResolutionIsActive)]"
-# 						enabled = "[And(UIActionProvider.IsEnabled,ResolutionGlue.RepealResolutionIsActive)]"
-# 					}
-# 					#active debate
-# 					text_single = {
-# 						layoutpolicy_horizontal = expanding
-# 						align = left|nobaseline
-# 						size = { -1 30 }
-# 						visible = "[ResolutionGlue.EnactResolutionIsActive]"
-# 						text = "ACTIVE_DEBATE"
-# 						tooltipwidget = {
-# 							using = international_organization_resolution_voting_tooltip
-# 						}
-# 					}
-# 					expand = {}
-# 				}
-# 			}
-# 		}
-# 		expand = {}
-# 	}
-# }
+	type union_law_vote_indicator_icon = widget {
+		size = { 16 30 }
+		icon = {
+			size = { 16 10 }
+			parentanchor = vcenter
+			block "vote_indicator_icon_mirror" {}
+			texture = "gfx/interface/icons/government_reforms/soc_value_indicator.dds"
+		}
+	}
+
+	type union_law_vote_count = flowcontainer {
+		ignoreinvisible = yes
+		datamodel = "[ResolutionGlue.GetPossibleVotes]"
+		item = {
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				visible = "[ObjectsEqual(VoteGlue.GetVoteObject.GetPolicy, Policy.Self)]"
+				autoresize = yes
+				block "union_law_vote_count_size" {
+					minimumsize = { 20 -1 }
+					maximumsize = { 20 -1 }
+					align = right
+				}
+				parentanchor = vcenter
+				default_format = "#yellow_titles"
+				text = "[VoteGlue.GetTotalNumVotes|0L]"
+				tooltipwidget = {
+					using = VoteGlue_List_tooltip
+				}
+			}
+		}
+	}
+
+	type union_law_vote_indicator = widget {
+		size = { 48 30 }
+		ignore_layout = yes
+
+		hbox = {
+			spacing = 2
+
+			block "vote_indicator_left_slot" {}
+
+			widget = {
+				size = { 30 30 }
+				using = bg_circle
+				piechart = {
+					size = { 100% 100% }
+					using = piechart_angles
+					icon = {
+						visible = "[Not(ResolutionGlue.HasCountryVotedFromPointer(Player.Self))]"
+						parentanchor = center
+						size = { 70% 70% }
+						texture = "gfx/interface/icons/international_organizations/law_voting.dds"
+						texture_density = 2
+					}
+					icon = {
+						visible = "[ResolutionGlue.HasCountryVotedFromPointer(Player.Self)]"
+						parentanchor = center
+						size = { 70% 70% }
+						texture = "gfx/interface/icons/international_organizations/law_voting_yes.dds"
+						texture_density = 2
+					}
+					pieslice_no_highlight = {
+						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+						value = "[FixedPointToFloat(ResolutionGlue.GetProgressToDeadline)]"
+						using = color_value_progress_blue
+					}
+					pieslice_no_highlight = {
+						texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+						value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetProgressToDeadline))]"
+						using = color_value_progress_gray
+					}
+					datacontext = "[ResolutionGlue.GetVoteToEnactAction]"
+					tooltipwidget = {
+						using = international_organization_resolution_voting_tooltip
+					}
+				}
+			}
+
+			block "vote_indicator_right_slot" {}
+		}
+	}
+
+	type union_core_law_item = hbox {
+		layoutpolicy_horizontal = expanding
+		size = { -1 52 }
+		margin = { 8 0 }
+		spacing = 1
+		datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
+
+		# LEFT
+		widget = {
+			size = { 42 42 }
+			visible = "[Law.HasFederalizingPolicy]"
+			datacontext = "[Law.GetFederalizingPolicy]"
+
+			background = {
+				visible = "[And(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(Law.Self), ObjectsEqual(InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(Law.Self), Policy.Self))]"
+				texture = "gfx/interface/advance/advances_glow/advances_glow_yellow.dds"
+				texture_density = 2
+				alpha = 0.7
+				margin = { 8 8 }
+			}
+
+			header_action_button_left_uber = {
+				visible = "[PdxGuiWidget.IsUberButtonVisible]"
+				size = { 100% 100% }
+				blockoverride "icon_overlay" {}
+				blockoverride "button_icon_stretch_sprite" {}
+				blockoverride "header_button_frame_inner" { visible = no }
+				blockoverride "header_button_icon_size" { size = { 42 42 } }
+				blockoverride "header_button_text_layout" {}
+				blockoverride "icon_texture" {
+					texture = "[GetLawIcon(Law.Self)]"
+					texture_density = 2
+				}
+				blockoverride "header_button_left_extra_texture" {
+					icon = {
+						visible = "[InternationalOrganizationsView.GetInternationalOrganization.MakeScope.GetVariable('iberian_union_active').IsSet]"
+						size = { 100% 100% }
+						parentanchor = center
+						texture = "gfx/interface/component_decoration/ios/union/iberian_union/union_button_red.dds"
+						texture_density = 2
+						frame = 1
+						frame_grid = { 5 1 }
+						spriteType = corneredstretched
+						spriteborder = { 12 12 }
+					}
+				}
+				scripted_action_tooltip = {
+					click_type = left
+					click_mode = confirm
+					action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+					proposer = "[ResolutionGlue.GetProposer]"
+					actor = "[InternationalOrganizationsView.GetPlayer]"
+					parameter = {
+						parameter_name = "recipient"
+						parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+					}
+					parameter = {
+						parameter_name = "target"
+						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+					}
+					parameter = {
+						parameter_name = "vote"
+						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetFederalizingPolicy]"
+					}
+				}
+				enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+				tooltipwidget = {
+					using = Policy_tooltip
+					blockoverride "policy_tooltip_requirements" {}
+				}
+			}
+		}
+
+		# CENTER
+		widget = {
+			layoutpolicy_horizontal = expanding
+			layoutpolicy_vertical = expanding
+
+			button = {
+				size = { 100% 100% }
+
+				gfxtype = framedbuttongfx
+				effectname = "NoHighlight"
+				upframe = 1
+				overframe = 2
+				downframe = 3
+				disableframe = 4
+				texture = "gfx/interface/buttons/list_card_button.dds"
+				frame_grid = {4 1}
+				spriteType = Corneredstretched
+				spriteborder = { 0 0 }
+				texture_density = 2
+
+				block "law_action_button_setup" {
+					visible = "[PdxGuiWidget.IsUberButtonVisible]"
+					enabled = "[And3(PdxGuiWidget.IsUberButtonEnabled, Not(ResolutionGlue.EnactResolutionIsActive), Not(InternationalOrganizationsView.HasActiveParliamentResolution))]"
+					datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
+					scripted_action_tooltip = {
+						click_type = left
+						click_mode = single
+						action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+						proposer = "[ResolutionGlue.GetProposer]"
+						actor = "[InternationalOrganizationsView.GetPlayer]"
+						parameter = {
+							parameter_name = "recipient"
+							parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+						}
+						parameter = {
+							parameter_name = "target"
+							parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+						}
+					}
+					tooltipwidget = { using = IO_Law_tooltip }
+				}
+
+				vbox = {
+					parentanchor = center
+					layoutpolicy_horizontal = expanding
+					ignoreinvisible = yes
+
+					margin_bottom = 2
+
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						align = center|nobaseline
+						using = Font_Size_Small
+						default_format = "#yellow_titles"
+						text = "[Law.GetNameWithNoTooltip]"
+					}
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						align = center|nobaseline
+						fontsize = 12
+						visible = "[InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(Law.Self)]"
+						text = "[InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(Law.Self).GetNameWithNoTooltip]"
+					}
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						align = center|nobaseline
+						fontsize = 12
+						default_format = "#subtle_name"
+						visible = "[Not(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(Law.Self))]"
+						text = "NO_POLICY_SELECTED"
+					}
+				}
+
+				union_law_vote_indicator = {
+					parentanchor = left|vcenter
+					position = { 26 0 }
+					visible = "[And(Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive), InternationalOrganizationsView.GetInternationalOrganization.GetParliament.GetLawDebatePassPolicy.IsFederalizing)]"
+					blockoverride "vote_indicator_left_slot" {
+						union_law_vote_indicator_icon = {}
+					}
+				}
+				union_law_vote_indicator = {
+					parentanchor = right|vcenter
+					position = { -24 0 }
+					visible = "[And(Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive), InternationalOrganizationsView.GetInternationalOrganization.GetParliament.GetLawDebatePassPolicy.IsCentralizing)]"
+					blockoverride "vote_indicator_right_slot" {
+						union_law_vote_indicator_icon = {
+							blockoverride "vote_indicator_icon_mirror" { mirror = horizontal }
+						}
+					}
+				}
+
+				union_law_vote_count = {
+					ignore_layout = yes
+					parentanchor = left|vcenter
+					position = { 7 0 }
+					blockoverride "union_law_vote_count_size" {
+						minimumsize = { 20 -1 }
+						maximumsize = { 20 -1 }
+					}
+					datacontext = "[Law.GetFederalizingPolicy]"
+					visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
+				}
+				union_law_vote_count = {
+					ignore_layout = yes
+					parentanchor = right|vcenter
+					position = { -5 0 }
+					datacontext = "[Law.GetPrimaryCentralizingPolicy]"
+					visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
+				}
+			}
+		}
+
+		# RIGHT
+		widget = {
+			size = { 42 42 }
+			visible = "[Law.HasCentralizingPolicy]"
+			datacontext = "[Law.GetPrimaryCentralizingPolicy]"
+
+			background = {
+				visible = "[And(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(Law.Self), ObjectsEqual(InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(Law.Self), Policy.Self))]"
+				texture = "gfx/interface/advance/advances_glow/advances_glow_yellow.dds"
+				texture_density = 2
+				alpha = 0.7
+				margin = { 8 8 }
+			}
+			background = {
+				visible = "[And(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(Law.Self), ObjectsEqual(InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(Law.Self), Policy.Self))]"
+				texture = "gfx/interface/component_effects/effect_tutorial_highlight.dds"
+				texture_density = 2
+				spriteType = Corneredtiled
+				spriteborder = { 15 15 }
+				margin = { 5 5 }
+				alpha = 0.8
+
+				modify_texture = {
+					using = color_yellow_texture
+					blend_mode = add
+					alpha = 0.3
+				}
+			}
+
+			header_action_button_left_uber = {
+				visible = "[PdxGuiWidget.IsUberButtonVisible]"
+				size = { 100% 100% }
+				blockoverride "icon_overlay" {}
+				blockoverride "button_icon_stretch_sprite" {}
+				blockoverride "header_button_frame_inner" { visible = no }
+				blockoverride "header_button_icon_size" { size = { 42 42 } }
+				blockoverride "header_button_text_layout" {}
+				blockoverride "icon_texture" {
+					texture = "[GetLawIcon(Law.Self)]"
+					texture_density = 2
+				}
+				blockoverride "header_button_left_extra_texture" {
+					icon = {
+						visible = "[InternationalOrganizationsView.GetInternationalOrganization.MakeScope.GetVariable('iberian_union_active').IsSet]"
+						size = { 100% 100% }
+						parentanchor = center
+						texture = "gfx/interface/component_decoration/ios/union/iberian_union/union_button_purple.dds"
+						texture_density = 2
+						frame = 1
+						frame_grid = { 4 1 }
+						spriteType = corneredstretched
+						spriteborder = { 12 12 }
+					}
+				}
+				scripted_action_tooltip = {
+					click_type = left
+					click_mode = confirm
+					action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+					proposer = "[ResolutionGlue.GetProposer]"
+					actor = "[InternationalOrganizationsView.GetPlayer]"
+					parameter = {
+						parameter_name = "recipient"
+						parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+					}
+					parameter = {
+						parameter_name = "target"
+						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+					}
+					parameter = {
+						parameter_name = "vote"
+						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetPrimaryCentralizingPolicy]"
+					}
+				}
+				enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+				tooltipwidget = {
+					using = Policy_tooltip
+					blockoverride "policy_tooltip_requirements" {}
+				}
+			}
+		}
+	}
+
+	type union_common_law_item = hbox {
+		layoutpolicy_horizontal = expanding
+		margin = { 6 0 }
+		margin_bottom = 8
+
+		button = {
+			layoutpolicy_horizontal = expanding
+			minimumsize = { 260 44 }
+			maximumsize = { 260 50 }
+			visible = "[Not(StringIsEmpty(ResolutionGlue.GetEnactResolution.GetKey))]"
+			gfxtype = framedbuttongfx
+			effectname = "NoHighlight"
+			upframe = 1
+			overframe = 2
+			downframe = 3
+			disableframe = 4
+			texture = "gfx/interface/buttons/list_card_button.dds"
+			frame_grid = {4 1}
+			spriteType = Corneredstretched
+			spriteborder = { 0 0 }
+			texture_density = 2
+			icon = {
+				ignore_layout = yes
+				size = {99% 97%}
+				parentanchor = center
+				block "law_unique_flavor_visible" {
+					visible = "[ResolutionGlue.GetTarget('target').GetLaw.IsUnique]"
+				}
+				texture = "gfx/interface/component_masks/mask_fade_horizontal.dds"
+				texture_density = 2
+				mirror = horizontal
+				alpha = 0.1
+				modify_texture = {
+					texture = "[ResolutionGlue.GetBgCategoryColor]"
+					texture_density = 2
+					blend_mode = multiply
+				}
+			}
+			block "law_action_button_setup" {
+				scripted_action_tooltip = {
+					click_type = left
+					click_mode = single
+					action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+					proposer = "[ResolutionGlue.GetProposer]"
+					actor = "[InternationalOrganizationsView.GetPlayer]"
+					parameter = {
+						parameter_name = "recipient"
+						parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+					}
+					parameter = {
+						parameter_name = "target"
+						parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+					}
+				}
+				enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+				datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
+				tooltipwidget = { using = IO_Law_tooltip }
+			}
+			hbox = {
+				margin = { 4 0 }
+				spacing = 3
+				layoutpolicy_horizontal = expanding
+				widget = {
+					size = { 36 36 }
+					background = {
+						texture = "gfx/interface/component_tiles/laws_background_frame.dds"
+						texture_density = 2
+						spriteType = corneredstretched
+						spriteBorder = { 0 0 }
+						modify_texture = {
+							texture = "[ResolutionGlue.GetBgCategoryColor]"
+							blend_mode = multiply
+						}
+						modify_texture = {
+							using = overlay_cloth_texture
+							blend_mode = overlay
+							alpha = 0.2
+						}
+						modify_texture = {
+							using = color_black_texture
+							blend_mode = overlay
+							alpha = 0.3
+						}
+					}
+					icon = {
+						size = { 90% 90% }
+						parentanchor = center
+						texture = "[GetLawIcon(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+					}
+				}
+
+				vbox = {
+					layoutpolicy_horizontal = expanding
+					ignoreinvisible = yes
+					spacing = -4
+					text_single = {
+						layoutpolicy_horizontal = expanding
+						using = Font_Size_Small
+						align = nobaseline|left
+						default_format = "#yellow_titles"
+						text = "[ResolutionGlue.GetTarget('target').GetLaw.GetNameWithNoTooltip]"
+					}
+					vbox = {
+						layoutpolicy_horizontal = expanding
+						spacing = -4
+
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							maximumsize = { -1 8 }
+							align = nobaseline|left
+							fontsize = 12
+							visible = "[InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+							text = "[InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self).GetNameWithNoTooltip]"
+						}
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							align = nobaseline|left
+							fontsize = 12
+							visible = "[Not(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self))]"
+							text = "NO_POLICY_SELECTED"
+						}
+
+						text_single = {
+							layoutpolicy_horizontal = expanding
+							autoresize = yes
+							maximumsize = { -1 8 }
+							fontsize = 9
+							align = nobaseline|left
+							visible = "[InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+							text = "[InternationalOrganizationsView.GetInternationalOrganization.GetPolicyImplementedDateStringForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+						}
+					}
+				}
+			}
+		}
+		hbox = {
+			layoutpolicy_horizontal = expanding
+			ignoreinvisible = yes
+			using = bg_paper_card
+			margin = { 4 2 }
+
+			hbox = {
+				allow_outside = yes
+				spacing = 8
+				datacontext = "[ResolutionGlue.GetTarget('target').GetLaw]"
+				datamodel = "[Law.GetPoliciesDataModel]"
+				item = {
+					hbox = {
+						size = { 44 34 }
+						using = bg_paper_card_situations
+						using = bg_cabinet_card_frame
+						widget = {
+							size = { 34 34 }
+							background = {
+								visible = "[And(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), ObjectsEqual(InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), Policy.Self))]"
+								texture = "gfx/interface/advance/advances_glow/advances_glow_yellow.dds"
+								texture_density = 2
+								alpha = 0.7
+								margin = { 10 10 }
+							}
+							background = {
+								visible = "[And(InternationalOrganizationsView.GetInternationalOrganization.HasPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), ObjectsEqual(InternationalOrganizationsView.GetInternationalOrganization.GetPolicyForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self), Policy.Self))]"
+								texture = "gfx/interface/component_effects/effect_tutorial_highlight.dds"
+								texture_density = 2
+								spriteType = Corneredtiled
+								spriteborder = { 15 15 }
+								margin = { 5 5 }
+								alpha = 0.8
+
+								modify_texture = {
+									using = color_yellow_texture
+									blend_mode = add
+									alpha = 0.3
+								}
+							}
+							header_action_button_left_uber = {
+								size = { 100% 100% }
+								blockoverride "icon_overlay"{}
+								blockoverride "button_icon_stretch_sprite" {}
+								blockoverride "header_button_frame_inner" { visible = no }
+								blockoverride "header_button_icon_size" { size = { 32 32 } }
+								blockoverride "header_button_text_layout" {}
+								blockoverride "icon_texture" {
+									texture = "[GetLawIcon(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+									texture_density = 2
+								}
+								scripted_action_tooltip = {
+									click_type = left
+									click_mode = confirm
+									action_name = "[ResolutionGlue.GetEnactResolution.GetKey]"
+									actor = "[InternationalOrganizationsView.GetPlayer]"
+									proposer = "[ResolutionGlue.GetProposer]"
+									parameter = {
+										parameter_name = "recipient"
+										parameter_value = "[InternationalOrganizationsView.GetInternationalOrganization]"
+									}
+									parameter = {
+										parameter_name = "target"
+										parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw]"
+									}
+									parameter = {
+										parameter_name = "vote"
+										parameter_value = "[ResolutionGlue.GetTarget('target').GetLaw.GetPolicyAtIndex(PdxGuiWidget.GetIndexInDataModel)]"
+									}
+								}
+								enabled = "[PdxGuiWidget.IsUberButtonEnabled]"
+								button_tooltip_override = { title = "[Policy.GetNameWithNoTooltip]" }
+								blockoverride "header_button_left_extra_texture" {
+									icon = {
+										visible = "[InternationalOrganizationsView.GetInternationalOrganization.MakeScope.GetVariable('iberian_union_active').IsSet]"
+										size = { 100% 100% }
+										parentanchor = center
+										texture = "gfx/interface/component_decoration/ios/union/iberian_union/union_button_blue.dds"
+										texture_density = 2
+										frame = 1
+										frame_grid = { 5 1 }
+										spriteType = corneredstretched
+										spriteborder = { 12 12 }
+									}
+								}
+								tooltipwidget = {
+									using = action_tooltip_pop_out
+									blockoverride "title_icon_texture" {
+										texture = "[GetLawIcon(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+									}
+									blockoverride "concept_link" {
+										text = "[policy|e]"
+									}
+									blockoverride "effects_list" {
+										TooltipConditionList = {
+											blockoverride "block_title" {
+												text = "game_concept_effects"
+											}
+											visible = "[ConditionList.HasItems]"
+											datacontext = "[StringToConditionListOnlyPassedAndNeutral(UIAction.GetEffects)]"
+										}
+										TooltipStringPairList = {
+											visible = "[Not(StringIsEmpty(Policy.GetModifierTextFor(InternationalOrganizationsView.GetPlayer.Self)))]"
+											blockoverride "block_title" {
+												text = "[modifiers|e]"
+											}
+											textcontext = "[Policy.GetModifierTextFor(InternationalOrganizationsView.GetPlayer.Self)]"
+										}
+										TooltipRowList = {
+											visible = "[Not(StringIsEmpty(Policy.GetEffectOnlyText))]"
+											blockoverride "rowlist_footer_visibility" {
+												visible = no
+											}
+											blockoverride "block_title" {
+												text = "WHEN_IMPLEMENTED"
+											}
+											ontextcontextchanged = "[SetRowListWithTitleFromTextContext(PdxGuiWidget.AccessSelf)]"
+											textcontext = "[Policy.GetEffectOnlyText]"
+										}
+									}
+								}
+							}
+						}
+						union_law_vote_count = {
+							margin_right = 4
+							datacontext = "[Law.GetFederalizingPolicy]"
+							visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
+						}
+					}
+				}
+			}
+			expand = {}
+			hbox = {
+				widget = {
+					size = { 31 31 }
+					using = bg_circle
+					visible = "[ResolutionGlue.GetOwner.ShouldDisplayProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)]"
+					piechart = {
+						size = { 100% 100% }
+						parentanchor = center
+						using = piechart_angles
+						icon = {
+							parentanchor = center
+							size = { 70% 70% }
+							texture = "gfx/interface/icons/situations/_default.dds"
+							texture_density = 2
+						}
+						pieslice = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[FixedPointToFloat(ResolutionGlue.GetOwner.GetPolicyProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self))]"
+							using = color_value_progress_blue
+						}
+						pieslice = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetOwner.GetPolicyProgressForLaw(ResolutionGlue.GetTarget('target').GetLaw.Self)))]"
+							using = color_value_progress_gray
+						}
+						using = bg_circle_piechart
+					}
+				}
+				widget = {
+					size = { 31 31 }
+					using = bg_circle
+					visible = "[Or(ResolutionGlue.EnactResolutionIsActive, ResolutionGlue.RepealResolutionIsActive)]"
+					piechart = {
+						size = { 100% 100% }
+						using = piechart_angles
+						parentanchor = center
+						icon = {
+							visible = "[Not(ResolutionGlue.HasCountryVotedFromPointer(Player.Self))]"
+							parentanchor = center
+							size = { 70% 70% }
+							texture = "gfx/interface/icons/international_organizations/law_voting.dds"
+							texture_density = 2
+						}
+						icon = {
+							visible = "[ResolutionGlue.HasCountryVotedFromPointer(Player.Self)]"
+							parentanchor = center
+							size = { 70% 70% }
+							texture = "gfx/interface/icons/international_organizations/law_voting_yes.dds"
+							texture_density = 2
+						}
+						pieslice = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[FixedPointToFloat(ResolutionGlue.GetProgressToDeadline)]"
+							using = color_value_progress_blue
+						}
+						pieslice = {
+							texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+							value = "[Subtract_float('(float)100.0', FixedPointToFloat(ResolutionGlue.GetProgressToDeadline))]"
+							using = color_value_progress_gray
+						}
+						datacontext = "[ResolutionGlue.GetVoteToEnactAction]"
+						tooltipwidget = {
+							using = international_organization_resolution_voting_tooltip
+						}
+					}
+				}
+			}
+		}
+	}
+}

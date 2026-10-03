@@ -1,0 +1,212 @@
+﻿mining_survey_expedition = {
+
+	unique = yes
+	travel_speed = 0.75
+	dynamic_first_waypoint = yes
+	origin = capital
+
+	potential = {
+		any_owned_location = {
+			OR = {
+				topography = mountains
+				topography = hills
+			}
+			OR = {
+				raw_material = goods:iron
+				raw_material = goods:copper
+				raw_material = goods:tin
+				raw_material = goods:lead
+				raw_material = goods:silver
+				raw_material = goods:goods_gold
+				raw_material = goods:coal
+				raw_material = goods:stone
+				raw_material = goods:marble
+				raw_material = goods:gems
+				raw_material = goods:mercury
+				raw_material = goods:salt
+				raw_material = goods:alum
+				raw_material = goods:saltpeter
+			}
+		}
+	}
+
+	can_start = {
+		at_war = no
+		gold >= 40
+		NOT = { has_country_modifier = thorough_survey }
+		NOT = { has_cooldown = mining_survey_cooldown }
+		any_owned_location = {
+			OR = {
+				topography = mountains
+				topography = hills
+			}
+			OR = {
+				raw_material = goods:iron
+				raw_material = goods:copper
+				raw_material = goods:tin
+				raw_material = goods:lead
+				raw_material = goods:silver
+				raw_material = goods:goods_gold
+				raw_material = goods:coal
+				raw_material = goods:stone
+				raw_material = goods:marble
+				raw_material = goods:gems
+				raw_material = goods:mercury
+				raw_material = goods:salt
+				raw_material = goods:alum
+				raw_material = goods:saltpeter
+			}
+		}
+	}
+
+	leader = {
+		is_adult = yes
+		is_expedition_leader = no
+		has_exploration = no
+	}
+
+	on_start = {
+		add_cooldown = {
+			type = mining_survey_cooldown
+			years = 5
+		}
+		scope:expedition = {
+			if = {
+				limit = { exists = expedition_leader }
+				remove_commander = expedition_leader
+			}
+		}
+		set_variable = { name = prospects_struck value = 0 }
+		set_variable = { name = highlands_surveyed value = 0 }
+
+		ordered_owned_location = {
+			limit = {
+				OR = {
+					topography = mountains
+					topography = hills
+				}
+				OR = {
+					raw_material = goods:iron
+					raw_material = goods:copper
+					raw_material = goods:tin
+					raw_material = goods:lead
+					raw_material = goods:silver
+					raw_material = goods:goods_gold
+					raw_material = goods:coal
+					raw_material = goods:stone
+					raw_material = goods:marble
+					raw_material = goods:gems
+					raw_material = goods:mercury
+					raw_material = goods:salt
+					raw_material = goods:alum
+					raw_material = goods:saltpeter
+				}
+				NOT = { this = root.capital }
+			}
+			order_by = relative_raw_material_price
+			max = 4
+			check_range_bounds = no
+			scope:expedition = {
+				add_new_waypoint = prev
+			}
+		}
+
+		scope:expedition = { add_new_waypoint = root.capital }
+
+		trigger_event_non_silently = { id = mining_survey_events.1 days = 5 }
+	}
+
+	on_arrive_to_new_location = {
+		scope:location = {
+			discover_location = root
+		}
+	}
+
+	on_arrive_to_waypoint = {
+		if = {
+			limit = {
+				scope:location = {
+					OR = {
+						topography = mountains
+						topography = hills
+					}
+				}
+				scope:location.owner ?= root
+				NOT = { scope:location = root.capital }
+			}
+			change_variable = { name = highlands_surveyed add = 1 }
+			random_list = {
+				60 = { dispatch_good_mining_event = yes }
+				40 = { dispatch_bad_mining_event = yes }
+			}
+			scope:expedition = {
+				start_expedition_wait_construction = {
+					duration = 30
+					goods_demand = demand:upgrade_rgo_demand_mining
+				}
+			}
+		}
+	}
+
+	on_construction_finished = {
+		add_prestige = prestige_weak_bonus
+	}
+
+
+	on_end = {
+		add_country_modifier = {
+			modifier = thorough_survey
+			days = 7300
+		}
+		if = {
+			limit = { var:prospects_struck >= 2 }
+			add_prestige = prestige_mild_bonus
+		}
+		else_if = {
+			limit = { var:highlands_surveyed >= 1 }
+			add_prestige = prestige_weak_bonus
+		}
+		remove_variable = prospects_struck
+		remove_variable = highlands_surveyed
+	}
+
+	ai_chance_to_check = {
+		value = define:NAI|EXPEDITION_DEFAULT_CHANCE_TO_CHECK
+		multiply = 0.1
+		if = {
+			limit = {
+				has_ruler = yes
+				ruler = { 
+					OR = {
+						has_trait = midas_touched 
+						has_trait = entrepreneur
+						has_trait = industrious
+					}
+				}
+			}
+			multiply = 10
+		}
+
+		if = {
+			limit = {
+				gold >= {
+					save_temporary_value_as = {
+						name = scale
+						value = 10
+					}
+					value = scaled_gold_for_effect
+				}
+			}
+			multiply = 2
+		}
+
+	}
+
+	utility = {
+		value = 3
+		if = {
+			limit = { gold >= 100 }
+			add = 2
+		}
+	}
+}

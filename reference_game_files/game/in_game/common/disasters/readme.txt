@@ -10,4 +10,5 @@
 # on_end: effect fired when the disaster ends (root = country, scope:disaster = disaster type)
 # map_mode: <map mode tag> optional link to the map mode to show while looking at this disaster
 # fire_only_once: yes/no - whether or not the disaster can occur multiple times to the same country
+# ends_on_regime_change: yes/no - when the owner is annexed by their civil-war winner, end this disaster cleanly on the loser's last tick instead of migrating it onto the new regime. Requires fire_only_once = yes (audited at load)
 

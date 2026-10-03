@@ -262,6 +262,23 @@ request_cardinal_seat = {
 				country_rank = country_rank:rank_empire
 				is_emperor = yes
 			}
+			total_effective_building_levels:cathedral > 0
+			any_owned_location = {
+				has_building = building_type:cathedral
+				NOT = { has_building = building_type:seat_of_cardinal }
+			}
+			custom_tooltip = {
+				text = request_cardinal_seat_opinion_tt
+				OR = {
+					tag = PAP
+					c:PAP = {
+						opinion = {
+							target = scope:actor
+							value >= 0
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -360,6 +377,139 @@ request_cardinal_seat = {
 	}
 }
 
+appoint_dynasty_cardinal = {
+	icon = remove_cardinal_seat
+
+	ai_tick = monthly
+	ai_tick_frequency = 24
+	automation_tick = monthly
+	automation_tick_frequency = 6
+	player_automated_category = religiousdoctrines
+
+	type = religious
+
+	sound = UI_action_religion_generic
+
+	potential = {
+		scope:actor.religion = religion:catholic
+	}
+	allow = {
+		papacy_active = yes
+		country_exists = c:PAP
+		scope:actor = {
+			total_effective_building_levels:seat_of_cardinal > 0
+			has_ruler = yes
+			ruler = { has_dynasty = yes }
+			any_character = {
+				is_alive = yes
+				is_adult = yes
+				is_female = no
+				has_estate = estate_type:clergy_estate
+				religion = religion:catholic
+				is_artist = no
+				has_dynasty = yes
+				dynasty = prev.ruler.dynasty
+				or = {
+					is_religious_figure = no
+					religious_figure != religious_figure:cardinal
+				}
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = religion
+		source = actor
+		target_flag = recipient
+		name = "choose_religion"
+		column = {
+			data = name
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = character
+		source = actor
+		target_flag = target
+		name = "appoint_dynasty_cardinal_select_character"
+		none_available_msg_key = "no_valid_characters"
+		column = {
+			data = character_info
+		}
+		visible = {
+			is_alive = yes
+			is_adult = yes
+			is_female = no
+			has_estate = estate_type:clergy_estate
+			religion = scope:actor.religion
+			is_artist = no
+			has_dynasty = yes
+			dynasty = scope:actor.ruler.dynasty
+			or = {
+				is_religious_figure = no
+				religious_figure != religious_figure:cardinal
+			}
+		}
+	}
+
+	select_trigger = {
+		looking_for_a = location
+		interaction_source_list = {
+			scope:actor = {
+				every_owned_location = {
+					limit = {
+						has_building = building_type:seat_of_cardinal
+					}
+					add_to_list = source
+				}
+			}
+		}
+		target_flag = target_location
+		name = "choose_location"
+		none_available_msg_key = "no_locations_available"
+		column = { data = name }
+		column = { data = population }
+		column = { data = rank }
+		visible = {
+			has_owner = yes
+			owner ?= scope:actor
+			has_building = building_type:seat_of_cardinal
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = scope:target
+				exists = scope:target_location
+			}
+			scope:target_location = {
+				if = {
+					limit = { exists = cardinal }
+					cardinal = { remove_cardinal_variables = yes }
+				}
+			}
+			scope:target = {
+				set_character_location = scope:target_location
+				set_character_religious_figure = religious_figure:cardinal
+			}
+			scope:actor = {
+				add_prestige = prestige_mild_penalty
+			}
+		}
+	}
+
+	ai_will_do = {
+		value = -100
+		add = {
+			if = {
+				limit = { scope:target = { total_abilities > 60 } }
+				value = 100
+			}
+		}
+	}
+}
+
 remove_cardinal_seat = {
 	ai_tick = never
 
@@ -374,9 +524,7 @@ remove_cardinal_seat = {
 		papacy_active = yes
 		country_exists = c:PAP
 		scope:actor = {
-			any_owned_location = {
-				has_building = building_type:seat_of_cardinal
-			}
+			total_effective_building_levels:seat_of_cardinal > 0
 		}
 		situation:western_schism = {
 			situation_is_active = no
@@ -426,15 +574,15 @@ remove_cardinal_seat = {
 			scope:target_location = {
 				destroy_building_forcefully = "building(building_type:seat_of_cardinal|owner)"
 			}
-			scope:actor = {
-				add_estate_satisfaction = { 
-					type = estate_type:clergy_estate
-					value = estate_satisfaction_severe_penalty
-				}
-			}
 		}
 		else = {
 			custom_tooltip = remove_cardinal_tt
+		}
+		scope:actor = {
+			add_estate_satisfaction = { 
+				type = estate_type:clergy_estate
+				value = estate_satisfaction_severe_penalty
+			}
 		}
 	}
 

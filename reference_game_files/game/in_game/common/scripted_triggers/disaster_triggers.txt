@@ -177,42 +177,6 @@ revolutionary_chaos_end_trigger = {
 	}
 }
 
-rise_of_the_szlachta_end_trigger = {
-	trigger_if = {
-		limit = {
-			has_variable = target_nobles_power_variable
-			has_variable = target_burghers_power_variable
-			has_variable = target_crown_power_variable
-		}
-		OR = {
-			AND = {
-				"estate_power(estate_type:nobles_estate)" > var:target_nobles_power_variable
-				societal_value:aristocracy_vs_plutocracy <= -99
-			} 
-			AND = {
-				"estate_power(estate_type:burghers_estate)" > var:target_burghers_power_variable
-				societal_value:aristocracy_vs_plutocracy > 50
-			}
-			"estate_power(estate_type:crown_estate)" > var:target_crown_power_variable
-			has_estate_privilege = estate_privilege:golden_liberty
-		}
-	}
-	trigger_else = {
-		OR = {
-			AND = {
-				custom_tooltip = given_more_estate_power_nobles_estate_power_tt
-				societal_value:aristocracy_vs_plutocracy <= -99
-			} 
-			AND = {
-				custom_tooltip = given_more_estate_power_burghers_estate_power_tt
-				societal_value:aristocracy_vs_plutocracy > 50
-			}
-			custom_tooltip = given_more_estate_power_crown_estate_power_tt
-			has_estate_privilege = estate_privilege:golden_liberty
-		}
-	}
-}
-
 savonarola_disaster_end_trigger = {
 	OR = {
 		character:flo_savonarola ?= { is_alive = no }
@@ -393,14 +357,23 @@ war_of_the_roses_end_trigger = {
 }
 
 death_of_hayan_wuruk_end_trigger = {
-	stability > 50
-	government_power > 90
-	trigger_if = {
-		limit = { num_subjects > 0 }
-		NOT = {
-			any_subject = { liberty_desire > 50 }
+	OR = {
+		AND = {
+			stability > 50
+			government_power > 90
+			trigger_if = {
+				limit = { num_subjects > 0 }
+				NOT = {
+					any_subject = { liberty_desire > 50 }
+				}
+			}
+		}
+		had_disaster_for_years = {
+			disaster_type = disaster_type:death_of_hayan_wuruk
+			years >= 30
 		}
 	}
+	
 }
 
 decline_of_majapahit_trigger = {
@@ -623,7 +596,6 @@ decline_of_mali_end_trigger = {
 
 decline_of_empire_end_trigger = {
 	stability > 0
-	complacency_percentage < 0.1
 	had_disaster_for_years = {
 		disaster_type = disaster_type:decline_of_empire
 		years >= 10
@@ -672,6 +644,107 @@ coup_attempt_end_trigger = {
 				is_ruler_of = root
 			}
 		}			
+	}
+}
+
+oligarchic_capture_end_trigger = {
+	OR = {
+		NOT = { government_type = government_type:republic }
+		custom_tooltip = {
+			text = oligarchic_capture_faction_won_civil_war_tt
+			has_variable = oligarchic_faction_civil_war_won_variable
+		}
+		AND = {
+			custom_tooltip = {
+				text = oligarchic_faction_not_active_tt
+				NOT = { exists = var:oligarchic_faction_rebel }
+			}
+			republican_tradition >= {
+				value = 60
+				add = {
+					value = stability
+					multiply = -0.15
+					ceiling = yes
+				}
+				max = 99	#High stability makes the disaster slightly easier and low stability makes it slightly harder
+			}
+			stability > 25
+			in_civil_war = no
+		}
+	}
+}
+
+oligarchic_capture_qualifies_trigger = {
+	has_any_active_disaster = no
+	government_type = government_type:republic
+	num_provinces > 2
+	in_civil_war = no
+	is_revolutionary = no
+	trigger_if = {
+		limit = {
+			OR = {
+				"estate_power(estate_type:crown_estate)" < 0.4
+				any_estate = {
+					estate_type != estate_type:crown_estate
+					power > "root.estate_power(estate_type:crown_estate)"
+				}
+			}
+		}
+		republican_tradition < 50
+		stability < 50
+	}
+	trigger_else = {
+		republican_tradition < 30
+		stability < 0
+	}
+}
+
+crisis_of_faith_end_trigger = {
+	OR = {
+		NOT = { government_type = government_type:theocracy }
+		custom_tooltip = {
+			text = crisis_of_faith_schismatic_clergy_won_civil_war_tt
+			has_variable = schismatic_clergy_civil_war_won_variable
+		}
+		AND = {
+			custom_tooltip = {
+				text = schismatic_clergy_not_active_tt
+				NOT = { exists = var:schismatic_clergy_rebel }
+			}
+			devotion >= {
+				value = 60
+				add = {
+					value = stability
+					multiply = -0.15
+					ceiling = yes
+				}
+				max = 99	#High stability makes the disaster slightly easier and low stability makes it slightly harder
+			}
+			stability > 25
+			in_civil_war = no
+		}
+	}
+}
+
+crisis_of_faith_qualifies_trigger = {
+	has_any_active_disaster = no
+	government_type = government_type:theocracy
+	NOT = { tag = PAP }
+	num_provinces > 2
+	in_civil_war = no
+	trigger_if = {
+		limit = {
+			OR = {
+				estate_satisfaction:clergy_estate < 0.40
+				"estate_power(estate_type:clergy_estate)" < 0.35
+			}
+		}
+		devotion < 50
+		stability < 50
+	}
+	trigger_else = {
+		devotion < 30
+		stability < 0
 	}
 }
 

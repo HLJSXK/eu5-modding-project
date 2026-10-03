@@ -1,0 +1,120 @@
+types BookmarkTypes
+{
+	# A bookmark card IS the selection button — clicking commits the choice and
+	# advances to the next screen. No intermediate "selected" state; hover gives
+	# the visual cue.
+	type BookmarkCard = button {
+		# Matches the 1080×440 illustration aspect (≈ 2.45:1). texture_density = 2
+		# means the source texture renders at half its pixel size, so 540×220 fits
+		# the asset 1:1 without scaling.
+		size = { 540 220 }
+
+		# Dim by default; brighten on hover so the cursor target is unambiguous.
+		alpha = 0.6
+		state = {
+			name = _mouse_enter
+			alpha = 1.0
+		}
+		state = {
+			name = _mouse_leave
+			alpha = 0.6
+		}
+
+		# Full-bleed illustration auto-resolved from SBookmarkIllustrationDatabase
+		# (asset path: gfx/interface/illustrations/bookmark/<bookmark_key>.dds).
+		background = {
+			texture = "[GetBookmarkIllustration(Bookmark.Self)]"
+			texture_density = 2
+		}
+
+		# Bottom gradient for text legibility (covers the lower 65% of the card)
+		background = {
+			parentanchor = bottom
+			widgetanchor = bottom
+			size = { 100% 65% }
+			texture = "gfx/interface/component_masks/gradient_vertical_double.dds"
+			texture_density = 2
+			modify_texture = { using = color_black_texture }
+		}
+
+		onclick = "[BookmarkView.SelectAndContinue(Bookmark.Self)]"
+
+		action_tooltip = {
+			title = "[Bookmark.GetName]"
+			on_action = "[BookmarkView.SelectAndContinue(Bookmark.Self)]"
+		}
+		tooltipwidget = { BasicFunctionalTooltip = {} }
+
+		vbox = {
+			parentanchor = bottom|hcenter
+			widgetanchor = bottom|hcenter
+			margin_bottom = 12
+			spacing = 2
+
+			text_single = {
+				text = "[Bookmark.GetStartDateStr]"
+				fontsize = 24
+				default_format = "#yellow_titles"
+				align = center
+			}
+			text_single = {
+				text = "[Bookmark.GetName]"
+				fontsize = 16
+				align = center
+			}
+			text_multi = {
+				maximumsize = { 500 50 }
+				autoresize = yes
+				text = "[Bookmark.GetDesc]"
+				fontsize = 12
+				align = center
+			}
+		}
+	}
+}
+
+widget = {
+	name = "mainmenu_bookmark_select"
+	size = { 100% 100% }
+	visible_at_creation = no
+	using = Animation_ShowHide_Standard
+
+	state = {
+		name = _hide
+		using = Animation_FadeOut_Standard
+	}
+
+	FrontEndBackground = {}
+
+	# Card row, centered on screen, expands with bookmark count.
+	# `hbox` is auto-sized; the parentanchor + widgetanchor center it on the screen.
+	# (No wrapper widget — an unsized wrapper has 0×0 click area which clips hits.)
+	hbox = {
+		parentanchor = center
+		widgetanchor = center
+		spacing = 20
+		datamodel = "[GetBookmarkList]"
+		item = {
+			BookmarkCard = {}
+		}
+	}
+
+	# Back to main menu
+	button_regular = {
+		parentanchor = left|top
+		position = { 20 20 }
+		using = button_resize_to_fit_text
+
+		name = "back_button"
+		text = "BACK"
+		enabled = "[Not(IsShowingDialog)]"
+
+		input_action = "close_window"
+
+		action_tooltip = {
+			title = "BACK_TOOLTIP_LEFT"
+			on_action = "[BookmarkView.OnBack]"
+		}
+		tooltipwidget = { BasicFunctionalTooltip = {} }
+	}
+}
