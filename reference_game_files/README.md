@@ -17,13 +17,15 @@ reference_game_files/
     │   ├── gui/           # User interface definitions
     │   ├── map_data/      # Map-related data
     │   └── setup/         # Game setup files
-    └── main_menu/         # Main menu and global definitions
-        ├── common/
-        │   ├── modifier_type_definitions/  # All valid modifier types
-        │   └── static_modifiers/           # Predefined modifiers
-        ├── gui/           # Shared GUI (font_icons.gui, etc.)
-        ├── setup/         # Initial game state (countries, pops, characters)
-        └── localization/  # Text localization (english + simp_chinese only)
+    ├── main_menu/         # Main menu and global definitions
+    │   ├── common/
+    │   │   ├── modifier_type_definitions/  # All valid modifier types
+    │   │   └── static_modifiers/           # Predefined modifiers
+    │   ├── gui/           # Shared GUI (font_icons.gui, etc.)
+    │   ├── setup/         # Initial game state (countries, pops, characters)
+    │   └── localization/  # Text localization (english + simp_chinese only)
+    ├── loading_screen/    # Engine defines, shared GUI, settings and other text
+    └── dlc/               # Official DLC scripts, metadata and localization
 ```
 
 ## Key Files for Modding
@@ -124,36 +126,41 @@ adm = 2                           # +2 administrative skill (character)
 
 **Directory prunes (before walking):**
 - Any directory named `gfx/` is skipped (asset descriptors, not modding scripts).
-- Inside any `localization/` directory, only `english/` and `simp_chinese/` are descended into.
+- Inside any `localization/` directory, other known language directories are pruned. `english/`, `simp_chinese/`, and non-language containers such as `jomini/`, `music_player_gui/`, and `dlc/` are kept.
 
 **File-level filters:**
 1. Binary/media extension blocklist — `.png`, `.dat`, `.mp3`, and similar asset/binary extensions (see `BINARY_EXTENSIONS` in `sync_reference.py`) are dropped without opening the file.
 2. Binary content sniff — any remaining file is read and dropped if a NUL byte appears in its first 8 KB. Everything else is treated as text and kept **regardless of extension**, so small unrecognized text-format files (e.g. `.font`, `.map`, `.csv`, `.settings`, `.guistateset`, `.guianimset`) are not silently dropped just because they weren't anticipated.
-3. Per-file size cap — default **10 MB** (`--max-file-mb`).
-4. Per-leaf-dir size cap — default **30 MB** (`--max-dir-mb`); a single directory whose post-filter, non-recursive size exceeds this is skipped entirely. This is a safety net against unexpected bloat in future game versions.
+3. Flat locale-suffixed files (`*_l_<language>.yml`) are kept only for English and Simplified Chinese, regardless of their directory.
+4. Per-directory size cap — default **30 MB** (`--max-dir-mb`); a directory whose own filtered files exceed this total is skipped. Subdirectories are evaluated independently. This cap is checked before the per-file cap, matching `eu5-towards-victory`.
+5. Per-file size cap — default **10 MB** (`--max-file-mb`).
 
-Sync stats (most recent run) are appended to [`data/sync_reference.log`](../data/sync_reference.log).
+The filter policy and synchronization behavior match `eu5-towards-victory/scripts/sync_reference.py`. Sync stats are appended to [`data/sync_reference.log`](../data/sync_reference.log), including on dry runs. A dry run reports paths to add/remove and paths present in both trees; it does not compare file contents.
+
+Files are copied byte-for-byte from the install. This repository pins reference text checkouts to LF in `.gitattributes`, matching the installed files and avoiding CRLF checkout/sync churn; UTF-8 BOMs are preserved.
 
 ## Updating to a new EU5 version
 
-```bash
+```powershell
+$env:EU5_PYTHON = 'C:\Users\Hades\anaconda3\envs\eu5\python.exe'
+$env:PYTHONUTF8 = '1'
+
 # Preview what would change
-conda run -n eu5 python scripts/sync_reference.py --dry-run
+& $env:EU5_PYTHON scripts/sync_reference.py --dry-run --verbose
 
 # Wipe game/ and re-mirror with the current filter policy
-conda run -n eu5 python scripts/sync_reference.py
+& $env:EU5_PYTHON scripts/sync_reference.py --verbose
 
 # Refresh derived indexes and BRIEF.md (required after sync)
-conda run -n eu5 python scripts/gen_index.py --verbose
-conda run -n eu5 python scripts/gen_brief.py
+& $env:EU5_PYTHON scripts/gen_brief.py  # Also runs gen_index.py
 ```
 
-If the EU5 install lives at a non-default path, set `EU5_GAME_PATH` or pass `--source <path>`.
+If the EU5 install lives at a non-default path, set `EU5_GAME_PATH` or pass `--source <path>`. Both now take the **install root containing `game/`**, for example `C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V`. The old script took the `game/` directory itself. The destination is fixed at this repository's `reference_game_files/game/`, matching the target project; `--dest` is no longer supported.
 
 ## Version Information
 
-- **Game Version**: Europa Universalis 5 1.2
-- **Baseline Update Date**: May 7, 2026
+- **Reference Baseline**: Europa Universalis 5 1.3.11 (commit `e2800c57`)
+- **Last Verified Against Local Install**: October 3, 2026 — all 4,200 reference files match the installed game
 - **Purpose**: Modding reference and documentation
 
 ## Related Documentation
