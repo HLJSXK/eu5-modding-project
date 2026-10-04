@@ -74,6 +74,31 @@ The standalone `location_window.gui` override is generated from the vanilla
 reference by `scripts/generate_sol_location_window.py`, which is called by the
 chain for `sol_standalone` and `all`.
 
+### `sol_1_4_compatibility_submod/`
+
+Draft manual compatibility overlay for EUV 1.4 and full SOL `260813`, imported
+without modifying its supplied payload. Install it as a separate mod and load
+CMF `2.5.*`, full SOL, then this overlay so its exact-path overrides take
+precedence. It is not standalone; combined PP/M&T/JTG compatibility is untested.
+
+The overlay recalibrates 55 goods and their consumption constants, moves SOL
+initialization to new-game/save-load hooks, and provides a vanilla/CMF-based
+location window with the SOL tooltip. Its `tools/target_demand.csv` is the
+calibration manifest; `tools/gen_sol14_demand.py` is an artifact generator with
+a read-only `--check` mode. From the repository root, check it with:
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON src/sol_1_4_compatibility_submod/tools/gen_sol14_demand.py --sol-root src/stable --game-root "C:/Program Files (x86)/Steam/steamapps/common/Europa Universalis V/game" --check
+```
+
+This manual overlay is not registered in `build.bat` or `gen_sol_chain.py`.
+Do not apply the legacy build's BOM normalization to its generated artifacts;
+their exact LF/no-BOM bytes are checked by the overlay generator. The draft
+retains seven six-decimal masonry literals flagged by the project validator.
+New-game/save-load, GUI, injection order, and actual load-order behavior still
+require in-game verification before release.
+
 ## Build
 
 From the repository root:

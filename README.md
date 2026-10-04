@@ -25,7 +25,8 @@ This repository keeps only mod-related content and documentation.
 5. Use `src/sol_mnt_compatibility_submod/` for the SOL / MEIOU and Taxes compatibility layer
 6. Use `src/sol_jtg_compatibility_submod/` for the SOL / Just Trade Goods compatibility layer
 7. The full `stable` target contains a self-contained Glorp UI-based location window; Glorp UI and Construction Manager are not required
-8. Read technical docs in `docs/technical/`
+8. For EUV 1.4, `src/sol_1_4_compatibility_submod/` contains a draft manual overlay for full SOL `260813` and CMF `2.5.*`; it is not standalone or part of `build.bat`
+9. Read technical docs in `docs/technical/`
 
 ## Build / Deploy
 
