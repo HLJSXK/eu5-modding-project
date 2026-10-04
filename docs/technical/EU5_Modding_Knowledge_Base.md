@@ -142,6 +142,8 @@ Price objects are a critical exception to the static-modifier rule. When an inje
 
 Compatibility generators must distinguish engine schema from vanilla balance. In 1.4, `inverse_control` loses three military penalties, but `local_levy_size_modifier`, `local_manpower_modifier`, and `local_sailors_modifier` remain defined; preserve M&T's explicit values instead of treating those fields as invalid. Conversely, lumber's removed `location_wants_lumber_trigger` needs the verified current vegetation condition. New goods such as camels need a vanilla fallback when absent from M&T, and newly added wealth/development thresholds must be checked independently of calibrated demand quantities (wine gains a wealth gate in 1.4). Whole action removals need entry-point tracing: the old `create_colonial_charter` generic action is absent while the GUI now calls `ColonialCharterItem.CreateColonialCharter`, so the old `TRY_REPLACE` restriction cannot be certified from a successful script-generation check.
 
+The 1.4 GUI migration is another schema boundary. `header_action_button_left` was removed in favor of `header_action_button_left_uber`; copied 1.3 buttons must be converted to `scripted_action_tooltip` with the verified Uber visibility/enabled expressions. A generator that only renames the type still leaves obsolete action fields and is not a valid compatibility patch. Keep this conversion in the source generator and assert the expected button count so future reference snapshots fail closed.
+
 For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts

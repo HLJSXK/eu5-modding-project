@@ -24,6 +24,7 @@ from gen_market_unit_consumption import (  # noqa: E402
     _generate_refresh_block,
     _generate_values,
 )
+from gui_14_migration import migrate_location_gui  # noqa: E402
 from tools.sol_demand_simulator.parser import (  # noqa: E402
     _collect_brace_block,
     load_vanilla_goods,
@@ -1199,6 +1200,7 @@ SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-stan
 
 def _render_location_gui() -> str:
     text = _read(MNT_LOCATION_GUI)
+    text = migrate_location_gui(text, "M&T")
     text = _replace_once(
         text,
         'raw_text = "[Location.GetTotalIncome|g2]@income!"',
