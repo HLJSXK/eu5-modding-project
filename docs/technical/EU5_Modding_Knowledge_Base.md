@@ -144,6 +144,8 @@ Compatibility generators must distinguish engine schema from vanilla balance. In
 
 The 1.4 GUI migration is another schema boundary. `header_action_button_left` was removed in favor of `header_action_button_left_uber`; copied 1.3 buttons must be converted to `scripted_action_tooltip` with the verified Uber visibility/enabled expressions. A generator that only renames the type still leaves obsolete action fields and is not a valid compatibility patch. Keep this conversion in the source generator and assert the expected button count so future reference snapshots fail closed.
 
+The same audit must include GUI global functions, not just widget types. Official 1.4 data-type changes remove `ShowRoadbuilder( Arg0 )` and add `ShowRoadBuilder( Arg0 )`; vanilla's location-window road button uses `ShowRoadBuilder(LocationView.GetLocation)`. A copied 1.3 Glorp or M&T window must migrate that call in its generator, with an exact match count, or its road button remains bound to a removed function.
+
 For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts

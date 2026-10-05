@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate 1.3 location action buttons to the EU5 1.4 GUI API."""
+"""Migrate 1.3 location action buttons and road links to the EU5 1.4 GUI API."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _replace_all(text: str, pattern: str, replacement: str, expected: int, label
 
 
 def migrate_location_gui(text: str, label: str = "location window") -> str:
-    """Convert the four legacy header action buttons in a 1.3 location window."""
+    """Convert legacy header actions and the road-builder call in a 1.3 window."""
 
     header_count = len(re.findall(r"header_action_button_left(?=\s*(?:=|\{))", text))
     if header_count not in (4, 5):
@@ -149,6 +149,14 @@ def migrate_location_gui(text: str, label: str = "location window") -> str:
         r'\g<i>\t}\n'
         r'\g<i>}',
         f"{label} periphora action",
+    )
+
+    text = _replace_all(
+        text,
+        r"\[ShowRoadbuilder\(LocationView\.GetLocation\)\]",
+        "[ShowRoadBuilder(LocationView.GetLocation)]",
+        1,
+        f"{label} road builder action",
     )
 
     return text
