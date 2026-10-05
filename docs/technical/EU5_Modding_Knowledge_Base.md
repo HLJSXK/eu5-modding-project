@@ -284,7 +284,11 @@ For example, `muslim_monarchy.txt` grants several Dhimmi privileges, while
 `no_abrahamic_dhimmi` suffix only means that the template omits the starting
 `dhimmi_abrahamic_communities` privilege; it does not disable the Dhimmi estate.
 
-### 6.8. Localization
+### 6.8. Resolutions
+
+Resolution AI scoring uses two script values: `ai_will_propose` for proposal frequency and `ai_will_do` (or `ai_vote_weight`) for votes. The resolution schema does not list `ai_will_select`. A player-only resolution can set both documented values to `0`, as vanilla does for vote suppression in `repeal_law.txt`.
+
+### 6.9. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
 
