@@ -111,6 +111,9 @@
 # - can_build_roads_in_members = yes/no: whether members can build roads in locations owned by other members
 # - can_build_buildings_in_members = yes/no: whether members can build buildings in locations owned by other members
 # - can_build_rgos_in_members = yes/no: whether members can build rgos in locations owned by other members
+# - embargo = yes/no: whether members will embargo the target of the IO
+# - assists_in_rebellions = yes/no: whether members will assist fellow members in rebellions
+# - assists_in_civil_wars = yes/no: whether members will assist fellow members in civil wars
 # - has_buildings = yes/no: whether this organization can have buildings be linked to it. These linked buildings will always be owned by the IO leader if one exists, get destroyed if the IO gets destroyed, and the IO pays for them
 # - annulled_by_peace_treaty = yes/no: if yes, an annull treaties peace treaty will force a country out of this IO if the other country is also in it
 # - annullment_favours_required = <integer> number of favours needed to annul this membership diplomatically

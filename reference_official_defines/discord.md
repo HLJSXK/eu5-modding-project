@@ -1,28 +1,44 @@
-# Release 1.3.10
+# Release 1.4.0 - Beta
 ## Breaking Changes
- - Replace many `_cost` modifiers with `_efficiency` modifiers, see [script documentation](changes_script_docs.md) for details
- - Removed all mercenary modifier scripting
+- Removed complacency mechanic
 ## Type Documentation
 Selected changes and additions
-### AI scripted expansion score and target
- - New types
-### Artist types
- - Added `modifier` block, which applies to hiring country
-## Casus belli
- - Added `ai_wait_with_sending_peace` trigger block, which makes ai wait with sending peace unless the war is stalled out
-### Chivalric orders
- - New type (no readme file)
-### International organization land ownership
- - Added `removed_by_peace_treaty` and `remove_war_score_modifier`
-### International organizations and IO laws
- - Added `owned_location_modifier` block
-### Peace treaties
- - Changed `ai_desire` applies to winner now, instead of loser
- - Added `ai_force_add`
-### Rebel demands
- - New type (no readme file)
-### Unit types
- - Added `coastal`, `inland`, and `river` terrain types to `combat` and `impact` blocks
+### Building types
+ - Added `ai_construct_weight` and `ai_destroy_weight` script values
+### Country interactions
+ - Added `terminate_pending_offers_if` trigger and `potential_diplomatic_capacity_used` script value
+ - Changed GUI widget script to use `scripted_action_tooltip` with specialized parameters
+### Disasters
+ - Added `ends_on_regime_change` boolean
+### Expedition types
+ - New type
+### Generic actions
+ - Added `ai_prerequisite_after_potential` trigger, `goods_demand` goods list, and `price_location` scripted location
+ - Changed GUI widget script to use `scripted_action_tooltip` with specialized parameters
+### Industry types
+ - New type
+### International organizations
+ - Added `embargo`, `assists_in_rebellions`, and `assists_in_civil_wars` booleans
+### Religious order types
+ - New type
+### Resolutions
+ - Added `validate_vote_trigger` trigger and `ai_vote_weight` as alternative name for `ai_will_do` script value
+ - Renamed `ai_will_select` script value to `ai_will_propose`
+ - Changed GUI widget script to use `scripted_action_tooltip` with specialized parameters
+### Road types
+ - Added `ai_construct_weight` script value
+ - Added `on_construction_started`, `on_construction_ended`, and `on_built` effect blocks
+### Scripted relations
+ - Added `dangerous_relation`, `can_get_without_buying`, `always_shown_when_unaffordable`, `diplomatic_map_stripe`, and `use_with_enemies` booleans
+ - Clarified effect of `wants_to_keep` script value when negative
+### Situations
+ - Added `warning_string_key` localization and `variables` list
+### Subject types
+ - Removed `overlord_protects_external`, `overlord_protects_other_subjects`, and `counts_as_external` booleans
+ - Added `ai_biases` script value
+### Unit families
+ - New type
+
 ## Data Type Documentation 
  * [Table of Contents](changes_data_types.md#table-of-contents)
  * [Types](changes_data_types.md#types)
@@ -35,6 +51,7 @@ Selected changes and additions
  * [Triggers](changes_script_docs.md#triggers)
  * [Event Targets](changes_script_docs.md#event-targets)
  * [Iterators](changes_script_docs.md#iterators)
+ * [Modifiers](changes_script_docs.md#modifiers)
  * [On Actions](changes_script_docs.md#on-actions)
 
 ## File Changes
