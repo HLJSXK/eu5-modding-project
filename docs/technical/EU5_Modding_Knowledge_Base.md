@@ -119,12 +119,16 @@ depends on UI mod A and B's file already contains A's hooks, start from B's
 file, add the third mod's minimal changes, and load the compatibility layer
 last. Starting from vanilla would make the compatibility file syntactically
 valid while silently deleting both B's layout and A's integrated controls.
-If the merged result is intended to be Built-in rather than dependency-based,
-source provenance must not be confused with runtime ownership: copy required
-support files, rename shared custom types to a mod-owned namespace, and remove
-external widgets, scripted-GUI calls, map modes, and assets that are not also
-being internalized. A whole-file copy that still references the source mods is
-not self-contained.
+Source provenance and runtime ownership are separate decisions. A merged file
+may intentionally retain references to optional definitions supplied by another
+mod when the compatibility contract is load-order based. For the SOL/Glorp UI/
+Construction Manager location window, the correct result is the complete Glorp
+file plus SOL's button, including its `cm_*` references; Construction Manager
+being absent makes those lookups fail, but does not invalidate the Glorp/SOL
+layout. Do not strip optional references merely to make a copied file appear
+self-contained. Internalize or remove external widgets, scripted-GUI calls,
+map modes, or assets only when the feature is explicitly being removed or the
+compatibility contract requires a genuinely standalone implementation.
 
 The database operation order, from earliest to latest, is:
 

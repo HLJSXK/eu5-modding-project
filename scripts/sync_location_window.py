@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate Glorp UI's location window to 1.4 and insert one SOL tooltip button."""
+"""Build SOL's unified Glorp UI location window with its optional CM references."""
 
 from __future__ import annotations
 
