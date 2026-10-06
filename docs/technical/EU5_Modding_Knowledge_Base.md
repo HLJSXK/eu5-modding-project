@@ -317,6 +317,8 @@ All text displayed to the player is handled through the localization system. Loc
 
 The user interface is highly moddable through `.gui` files. The system is modular, using templates and types to create reusable UI components. Creating new windows and widgets allows for the development of complex new game features. [10]
 
+In EU5 1.4 beta, `panels/situation/common.gui` creates the Outcome card outside the `Situation.GetOutcomes` datamodel. A situation with no outcomes therefore still shows an empty header. The outer card has no dedicated `blockoverride`; an information-only situation must hide it in a scoped copy of the common template, using `SituationView.GetActiveSituation.GetSituation.GetKey` so other situations keep their outcomes. Keep that copy synchronized with the current game GUI when updating versions.
+
 ### 7.2. Map Modding
 
 EU5 includes a powerful map editor for modifying the game world. This tool allows for editing the heightmap, terrain textures, and location setup. However, it has high system requirements, recommending at least 32GB of RAM. [11]
