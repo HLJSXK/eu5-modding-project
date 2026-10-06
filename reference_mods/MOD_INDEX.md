@@ -85,12 +85,12 @@ Complete index of all community mods included in this directory.
 
 ---
 
-### 3601047146 - Glorp UI
+### 3812518640 - Glorp UI
 
 **Type:** UI Overhaul  
 **Size:** 18M  
-**Version:** "im straight glorping it"  
-**Game Version:** 1.0.10  
+**Version:** 04.10.26
+**Game Version:** 1.4.*
 **Tags:** Fixes, Overhaul, User Interface
 
 **Description:** Comprehensive UI modification and overhaul
@@ -274,7 +274,7 @@ Complete index of all community mods included in this directory.
 - 3606278744 - Mission Trees - Ambi (11M) ⭐⭐⭐⭐⭐
 
 ### UI Mods (3)
-- 3601047146 - Glorp UI (18M) ⭐⭐⭐⭐⭐
+- 3812518640 - Glorp UI (current 1.4 snapshot) ⭐⭐⭐⭐⭐
 - 3605677866 - Better Road Builder (1.3M) ⭐⭐⭐⭐
 - 3610757528 - Expanded Build View (496K) ⭐⭐⭐⭐
 
@@ -296,7 +296,7 @@ Complete index of all community mods included in this directory.
 
 ### Advanced
 7. Deep dive into **3606278744** (Mission Trees) - Complex systems
-8. Study **3601047146** (Glorp UI) - Comprehensive UI overhaul
+8. Study **3812518640** (Glorp UI) - Comprehensive 1.4 UI overhaul
 9. Analyze **3599116549** (Europa Expanded) - Full gameplay expansion
 
 ---

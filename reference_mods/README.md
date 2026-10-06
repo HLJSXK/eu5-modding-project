@@ -39,7 +39,7 @@ These mods are included to help developers:
 
 | ID | Name | Size | Description |
 |----|------|------|-------------|
-| 3601047146 | Glorp UI | 18M | UI overhaul - extensive GUI modifications |
+| 3812518640 | Glorp UI | 18M | UI overhaul - current 1.4 GUI snapshot |
 | 3605677866 | Better Road Builder | 1.3M | UI improvement - interface enhancements |
 | 3610757528 | Expanded Build View | 496K | UI extension - build interface modifications |
 
@@ -70,7 +70,7 @@ These mods are included to help developers:
 
 3. **Study complex mods** (5M+):
    - `3606278744` (Mission Trees - Ambi)
-   - `3601047146` (Glorp UI)
+   - `3812518640` (Glorp UI)
 
 ### For Finding Vanilla Variables
 
@@ -105,7 +105,7 @@ grep -r "^[[:space:]]*[a-zA-Z_].*:.*\"" reference_mods/ --include="*.yml"
 - Look at: `3599706198/main_menu/localization/`
 
 #### GUI
-- Look at: `3601047146/in_game/gui/`
+- Look at: `3812518640/in_game/gui/`
 - Look at: `3610757528/in_game/gui/`
 
 #### Missions
@@ -241,7 +241,7 @@ These mods are created by community members and are included here for **educatio
    - Find complex pattern examples
 
 2. **Study advanced features**
-   - GUI modifications in `3601047146`
+   - GUI modifications in `3812518640`
    - Mission systems in `3606278744`
 
 3. **Adapt patterns**

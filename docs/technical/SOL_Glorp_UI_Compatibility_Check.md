@@ -1,12 +1,12 @@
 # SOL / Construction Manager / Glorp UI Compatibility Check
 
-Audit date: 2026-10-05
+Audit date: 2026-10-06
 
 ## Scope
 
 - Standard of Living `260726` (`hades.sol`)
 - Workshop `3736668860`: Construction Manager `2.2.11`
-- Workshop `3601047146`: Glorp UI `1.3.10.1`
+- Workshop `3812518640`: Glorp UI `04.10.26` (`glorp.ui.rio`)
 
 ## Conflict audit
 
@@ -48,7 +48,8 @@ provided by whichever mods are enabled.
 
 1. copying Glorp UI's extracted vanilla location types into SOL at the same
    relative path;
-2. migrating Glorp UI's 1.3 action-button and road-builder APIs to 1.4;
+2. accepting the current Glorp UI 1.4 action-button and road-builder APIs,
+   while migrating those APIs when an older reference snapshot is supplied;
 3. replacing the shared `zoom_to_button` type with the SOL-owned
    `sol_zoom_to_button` type;
 4. replacing `Location.GetTotalIncome` with SOL's
@@ -66,7 +67,7 @@ references from the unified window.
 ## Runtime requirements
 
 Only Community Mod Framework remains a formal dependency of full SOL. Neither
-Workshop `3601047146` nor `3736668860` is declared as a SOL metadata
+Workshop `3812518640` nor `3736668860` is declared as a SOL metadata
 dependency. Their definitions remain optional runtime inputs to the unified
 location window.
 
@@ -104,5 +105,5 @@ enabled-mod combination, not on the presence of a `cm_` prefix alone.
 | `ShowRoadbuilder` | Real error in the logged deployment | 1.4 uses `ShowRoadBuilder`; the current generator migrates this, so this line indicates an old deployed window or stale log and must be rechecked after deployment. |
 | `GetArmyLevyPercentage`, `GetNavyLevyPercentage` | Real error | The current 1.4 API exposes the `...ForCountry(Arg0)` forms; old getter calls remain in the affected GUI snapshot. |
 | `cm_is_auto_expand_on_icon`, `cm_auto_food_widget_location_window`, `cm_auto_expand_rgo_widget_location_window` | Optional Construction Manager dependency missing | Expected when Construction Manager is not enabled. Keep these references in the unified Glorp/SOL window; removing them would break the SOL + Glorp UI + Construction Manager combination. |
-| `use_global_input_instance` | Real error | The property was removed from the 1.4 engine and must be migrated or removed from the copied support type. |
+| `use_global_input_instance` | Real error | The property was removed from the 1.4 engine. The current Glorp snapshot still carries it in shared types, so SOL's copied zoom-button support must remove it; updating the location-window source alone cannot fix this file. |
 | `PERFORM_global_living_standard_recalculate_ACTION` | Deployment/load-state issue requiring retest | The message type exists in both stable and standalone SOL message files. Re-deploy and collect a fresh log after fixing metadata and stale GUI output before treating it as a missing definition. |

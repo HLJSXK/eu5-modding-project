@@ -150,6 +150,19 @@ The 1.4 GUI migration is another schema boundary. `header_action_button_left` wa
 
 The same audit must include GUI global functions, not just widget types. Official 1.4 data-type changes remove `ShowRoadbuilder( Arg0 )` and add `ShowRoadBuilder( Arg0 )`; vanilla's location-window road button uses `ShowRoadBuilder(LocationView.GetLocation)`. A copied 1.3 Glorp or M&T window must migrate that call in its generator, with an exact match count, or its road button remains bound to a removed function.
 
+Upstream GUI snapshots do not all arrive at the same migration stage. A current
+source may already use the 1.4 API, while an older compatibility snapshot still
+needs conversion. Shared migration helpers must therefore be idempotent: apply
+the legacy conversion when legacy markers exist, accept a fully migrated source
+after checking that removed APIs are absent, and fail on mixed old/new content.
+
+The 1.4 input-action reimplementation also removed the GUI property
+`use_global_input_instance`. Current Glorp UI snapshots may still contain this
+stale field in shared types, so copying a current upstream file does not prove
+that every property is valid. Audit each active copied widget against vanilla's
+removal comments and runtime logs; SOL's local zoom-button support must omit the
+property.
+
 For the full decision procedure and compatibility checklist, see [EU5 Multi-Mod Compatibility](EU5_Multi_Mod_Compatibility.md).
 
 ## 5. Core Modding Concepts

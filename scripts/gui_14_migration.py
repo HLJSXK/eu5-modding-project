@@ -30,6 +30,12 @@ def migrate_location_gui(text: str, label: str = "location window") -> str:
     """Convert legacy header actions and the road-builder call in a 1.3 window."""
 
     header_count = len(re.findall(r"header_action_button_left(?=\s*(?:=|\{))", text))
+    if header_count == 0 and "header_action_button_left_uber" in text:
+        if "ShowRoadbuilder(" in text:
+            raise ValueError(f"{label} is marked as 1.4 but still contains ShowRoadbuilder")
+        if re.search(r"(?:left_click_and_hold_action|right_click_and_hold_action)\s*=", text):
+            raise ValueError(f"{label} is marked as 1.4 but still contains legacy action fields")
+        return text
     if header_count not in (4, 5):
         raise ValueError(
             f"Expected 4 location action buttons (or 5 including garrison), found {header_count}"
@@ -164,6 +170,14 @@ def migrate_location_gui(text: str, label: str = "location window") -> str:
 
 def migrate_location_types(text: str, label: str = "location types") -> str:
     """Migrate the standalone garrison action type extracted from Glorp UI."""
+
+    if (
+        re.search(r"header_action_button_left(?!_uber)", text) is None
+        and "header_action_button_left_uber" in text
+    ):
+        if re.search(r"(?:left_click_and_hold_action|right_click_and_hold_action)\s*=", text):
+            raise ValueError(f"{label} is marked as 1.4 but still contains legacy action fields")
+        return text
 
     text = _replace_all(
         text,

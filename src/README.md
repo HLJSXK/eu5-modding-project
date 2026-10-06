@@ -8,11 +8,13 @@ This directory contains deployable EU5 mod source targets.
 
 The full stable mod used for MP balance work. It includes the broader gameplay
 balance package, including SOL, war/economy balance, UI, and supporting systems.
-The built-in `location_window.gui` starts from Glorp UI's version, vendors the
-required extracted vanilla type definitions under SOL, replaces the shared zoom
-button with a SOL-owned type, removes external Construction Manager automation
-calls, then restores SOL's income display and Living Standard tooltip entry.
-Glorp UI and Construction Manager are not runtime dependencies.
+The built-in `location_window.gui` starts from the current Glorp UI version,
+vendors the extracted vanilla type definitions under SOL, replaces the shared
+zoom button with a SOL-owned type, and inserts the SOL Living Standard tooltip
+entry. It preserves Glorp UI's integrated optional Construction Manager
+references: missing CM definitions are expected when CM is disabled, while CM
+supplies them when enabled. Glorp UI and Construction Manager are not SOL
+metadata dependencies.
 
 ### `sol_standalone/`
 
