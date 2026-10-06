@@ -1,11 +1,72 @@
 ﻿# CMM GUI Macros: Core Helpers
 
+# Returns: country
+macro = {
+    description = "Country the menu reads and writes: the player, the last country held, or the storage country"
+    definition = "CMMHomeCountry"
+    replace_with = "GetCountry(GetVariableSystem.Get('cmm_home_tag'))"
+}
+
+# A country being observed reports as the player's, so the observer test is what separates a
+# country this client controls from one it is only watching. Vanilla pairs them the same way.
+# Returns: boolean
+macro = {
+    description = "True when this client controls a country of its own"
+    definition = "CMFHasPlayerCountry"
+    replace_with = "And(GetPlayer.IsValid, Not(IsPlayerObserver))"
+}
+
+# Args: Tag (string)
+# Returns: boolean
+macro = {
+    description = "True when a tag names a country carrying this game's registrations"
+    definition = "CMMTagIsRegistered(Tag)"
+    replace_with = "Not(IsDataModelEmpty(GetCountry(Tag).MakeScope.GetList('cmm_registered_mod_ids')))"
+}
+
+# Returns: boolean
+macro = {
+    description = "True when the stored player tag belongs to this game"
+    definition = "CMFStoredPlayerTagIsCurrent"
+    replace_with = "CMMTagIsRegistered(GetVariableSystem.Get('cmf_player_tag'))"
+}
+
+# Returns: boolean
+macro = {
+    description = "True when the menu has a country to read from"
+    definition = "CMMHomeCountryValid"
+    replace_with = "CMMHomeCountry.IsValid"
+}
+
+# Returns: boolean
+macro = {
+    description = "True when this save carries the storage country"
+    definition = "CMMStorageCountryReady"
+    replace_with = "GetCountry('CMF').IsValid"
+}
+
+# Returns: string
+macro = {
+    description = "Tag of the storage country"
+    definition = "CMMStorageCountryTag"
+    replace_with = "'CMF'"
+}
+
+# Resolves without a datacontext, so the accessors below also work from localization, where
+# only the Container context is supplied.
+# Returns: scope
+macro = {
+    description = "Scope the menu reads its settings from"
+    definition = "CMMHomeScope"
+    replace_with = "CMMHomeCountry.MakeScope"
+}
+
 # Args: Name (string)
 # Returns: variable
 macro = {
     description = "Country variable accessor"
     definition = "CMMVar(Name)"
-    replace_with = "Player.MakeScope.GetVariable(Name)"
+    replace_with = "CMMHomeScope.GetVariable(Name)"
 }
 
 # Args: Name (string)
@@ -56,20 +117,12 @@ macro = {
     replace_with = "EqualTo_CFixedPoint(Value, '(CFixedPoint)1')"
 }
 
-# Args: Prefix (string), Key (string)
-# Returns: boolean
-macro = {
-    description = "True when one metadata value equals 1"
-    definition = "CMMMetadataEqualsOne(Prefix,Key)"
-    replace_with = "CMMValueEqualsOne(CMMMetadataValue(Prefix, Key))"
-}
-
 # Args: MapName (string), SettingKey (string)
 # Returns: value
 macro = {
     description = "Read a value from a country-scoped variable map by setting key"
     definition = "CMMMapValue(MapName,SettingKey)"
-    replace_with = "Player.MakeScope.GetVariableFromVariableMap(MapName, MakeScopeFlag(SettingKey)).GetValue"
+    replace_with = "CMMHomeScope.GetVariableFromVariableMap(MapName, MakeScopeFlag(SettingKey)).GetValue"
 }
 
 # Args: MapName (string), SettingKey (string)
@@ -198,7 +251,7 @@ macro = {
 macro = {
     description = "Execute one scripted GUI callback"
     definition = "CMMExecuteGui(Name)"
-    replace_with = "GetScriptedGui(Name).Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)"
+    replace_with = "GetScriptedGui(Name).Execute(GuiScope.SetRoot(CMMHomeScope).End)"
 }
 
 # Args: Prefix (string), Suffix (string)
@@ -214,7 +267,7 @@ macro = {
 macro = {
     description = "Execute an auto-apply scripted GUI with setting scope"
     definition = "CMMExecuteAutoApply(GuiName,SettingKey)"
-    replace_with = "GetScriptedGui(GuiName).Execute(GuiScope.SetRoot(GetPlayer.MakeScope).AddScope('setting', MakeScopeFlag(SettingKey)).End)"
+    replace_with = "GetScriptedGui(GuiName).Execute(GuiScope.SetRoot(CMMHomeScope).AddScope('setting', MakeScopeFlag(SettingKey)).End)"
 }
 
 # Args: Name (string)
@@ -222,7 +275,7 @@ macro = {
 macro = {
     description = "Execute one scripted GUI callback with the selected mod as mod scope"
     definition = "CMMExecuteGuiWithSelectedMod(Name)"
-    replace_with = "GetScriptedGui(Name).Execute(GuiScope.SetRoot(GetPlayer.MakeScope).AddScope('mod', MakeScopeFlag(GetVariableSystem.Get('cmm_selected_mod'))).End)"
+    replace_with = "GetScriptedGui(Name).Execute(GuiScope.SetRoot(CMMHomeScope).AddScope('mod', MakeScopeFlag(GetVariableSystem.Get('cmm_selected_mod'))).End)"
 }
 
 # Args: Name (string)
@@ -230,7 +283,7 @@ macro = {
 macro = {
     description = "True when one scripted GUI callback is shown"
     definition = "CMMGuiIsShown(Name)"
-    replace_with = "GetScriptedGui(Name).IsShown(GuiScope.SetRoot(GetPlayer.MakeScope).End)"
+    replace_with = "GetScriptedGui(Name).IsShown(GuiScope.SetRoot(CMMHomeScope).End)"
 }
 
 # Args: Name (string)
@@ -238,7 +291,7 @@ macro = {
 macro = {
     description = "True when one scripted GUI callback is valid"
     definition = "CMMGuiIsValid(Name)"
-    replace_with = "GetScriptedGui(Name).IsValid(GuiScope.SetRoot(GetPlayer.MakeScope).End)"
+    replace_with = "GetScriptedGui(Name).IsValid(GuiScope.SetRoot(CMMHomeScope).End)"
 }
 
 # Args: ModId (string), TabKey (string)
@@ -321,11 +374,131 @@ macro = {
 }
 
 # Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a numeric value (arg mode 2)"
+    definition = "CMFLogIsValueEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)2')"
+}
+
+# Args: Index (int32)
 # Returns: string
 macro = {
-    description = "Full formatted log entry text: [arg1?] action [arg2?]"
+    description = "Numeric value text for a value log entry, shown as a whole number"
+    definition = "CMFLogNumText(Index)"
+    replace_with = "ToString_int32(FixedPointToInt(GetVariableFromGlobalVariableMap('cmf_log_num', CMFLogKey(Index)).GetValue))"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Full formatted log entry text: [arg1?] action [arg2?] [value?]"
     definition = "CMFLogEntryText(Index)"
-    replace_with = "Concatenate(AddTextIf(CMFLogHasArg1(Index), Concatenate(CMFLogArg1Name(Index), ' ')), Concatenate(CMFLogAction(Index), AddTextIf(CMFLogHasArg2(Index), Concatenate(' ', CMFLogArg2Name(Index)))))"
+    replace_with = "Concatenate(Concatenate(AddTextIf(CMFLogHasArg1(Index), Concatenate(CMFLogArg1Name(Index), ' ')), Concatenate(CMFLogAction(Index), AddTextIf(CMFLogHasArg2(Index), Concatenate(' ', CMFLogArg2Name(Index))))), AddTextIf(CMFLogIsValueEntry(Index), Concatenate(' ', CMFLogNumText(Index))))"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a decimal value (arg mode 5)"
+    definition = "CMFLogIsDecimalValueEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)5')"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a location and one labelled value (arg mode 4)"
+    definition = "CMFLogIsLocationEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)4')"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Leading text of a location log entry: action, location, then the value's label"
+    definition = "CMFLogLocationText(Index)"
+    replace_with = "Concatenate(Concatenate(CMFLogAction(Index), ' '), Concatenate(Concatenate(GetVariableFromGlobalVariableMap('cmf_log_loc', CMFLogKey(Index)).GetLocation.GetName, ' '), CMFLogArg1Label(Index)))"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a location and no value (arg mode 7)"
+    definition = "CMFLogIsAtLocationEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)7')"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Text of a location log entry that carries no value: action then location"
+    definition = "CMFLogAtLocationText(Index)"
+    replace_with = "Concatenate(Concatenate(CMFLogAction(Index), ' '), GetVariableFromGlobalVariableMap('cmf_log_loc', CMFLogKey(Index)).GetLocation.GetName)"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a location and three labelled values (arg mode 6)"
+    definition = "CMFLogIsLocationValuesEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)6')"
+}
+
+# Args: Index (int32)
+# Returns: boolean
+macro = {
+    description = "True when a log entry carries a building type and a location (arg mode 3)"
+    definition = "CMFLogIsBuildingLocationEntry(Index)"
+    replace_with = "EqualTo_CFixedPoint(GetVariableFromGlobalVariableMap('cmf_log_arg_mode', CMFLogKey(Index)).GetValue, '(CFixedPoint)3')"
+}
+
+# Args: Index (int32)
+# Returns: CFixedPoint
+macro = {
+    description = "First numeric value of a log entry, for a caller that formats it itself"
+    definition = "CMFLogNumValue(Index)"
+    replace_with = "GetVariableFromGlobalVariableMap('cmf_log_num', CMFLogKey(Index)).GetValue"
+}
+
+# Args: Index (int32)
+# Returns: CFixedPoint
+macro = {
+    description = "Second numeric value of a log entry, for a caller that formats it itself"
+    definition = "CMFLogNum2Value(Index)"
+    replace_with = "GetVariableFromGlobalVariableMap('cmf_log_num2', CMFLogKey(Index)).GetValue"
+}
+
+# Args: Index (int32)
+# Returns: CFixedPoint
+macro = {
+    description = "Third numeric value of a log entry, for a caller that formats it itself"
+    definition = "CMFLogNum3Value(Index)"
+    replace_with = "GetVariableFromGlobalVariableMap('cmf_log_num3', CMFLogKey(Index)).GetValue"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Localized arg1 text of a log entry that stores arg1 as a localization key"
+    definition = "CMFLogArg1Label(Index)"
+    replace_with = "Localize(GetVariableFromGlobalVariableMap('cmf_log_arg1', CMFLogKey(Index)).GetFlagName)"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Localized arg2 text of a log entry that stores arg2 as a localization key"
+    definition = "CMFLogArg2Label(Index)"
+    replace_with = "Localize(GetVariableFromGlobalVariableMap('cmf_log_arg2', CMFLogKey(Index)).GetFlagName)"
+}
+
+# Args: Index (int32)
+# Returns: string
+macro = {
+    description = "Leading text of a building type and location log entry: action, building type, location, then the first value's label"
+    definition = "CMFLogBuildingLocationText(Index)"
+    replace_with = "Concatenate(Concatenate(Concatenate(CMFLogAction(Index), ' '), Concatenate(GetVariableFromGlobalVariableMap('cmf_log_bt', CMFLogKey(Index)).GetBuildingType.GetName, ', ')), Concatenate(Concatenate(GetVariableFromGlobalVariableMap('cmf_log_loc', CMFLogKey(Index)).GetLocation.GetName, ' '), CMFLogArg1Label(Index)))"
 }
 
 # Returns: boolean

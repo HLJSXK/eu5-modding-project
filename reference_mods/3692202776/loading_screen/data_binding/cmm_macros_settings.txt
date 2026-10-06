@@ -80,12 +80,14 @@ macro = {
     replace_with = "CMMValueEqualsOne(CMMMapValue('cmm_requires_unrestricted_tools_enabled', SettingKey))"
 }
 
+# A console-command setting is exempt from needing a player country, because the console
+# delivers it rather than a scripted GUI Execute.
 # Args: SettingKey (string)
 # Returns: boolean
 macro = {
     description = "True when local player can edit this setting"
     definition = "CMMCanEditSetting(SettingKey)"
-    replace_with = "And(Or(Not(CMMSettingIsGlobal(SettingKey)), Or(Not(GameIsMultiplayer), IsHost)), Or(Not(CMMSettingRequiresUnrestrictedToolsEnabled(SettingKey)), Or(EqualTo_string(SettingKey, 'cmf_core__enable_unrestricted_tools'), And(CMMSettingIsRegistered('cmf_core__enable_unrestricted_tools'), CMMValueEqualsOne(CMMSettingValue('cmf_core__enable_unrestricted_tools'))))))"
+    replace_with = "And(Or(CMFHasPlayerCountry, CMMSettingHasConsoleCommand(SettingKey)), And(Or(Not(CMMSettingIsGlobal(SettingKey)), Or(Not(GameIsMultiplayer), IsHost)), Or(Not(CMMSettingRequiresUnrestrictedToolsEnabled(SettingKey)), Or(EqualTo_string(SettingKey, 'cmf_core__enable_unrestricted_tools'), And(CMMSettingIsRegistered('cmf_core__enable_unrestricted_tools'), CMMValueEqualsOne(CMMSettingValue('cmf_core__enable_unrestricted_tools')))))))"
 }
 
 # Args: SettingKey (string)
@@ -93,7 +95,7 @@ macro = {
 macro = {
     description = "Read current setting value from country or global scope"
     definition = "CMMSettingValue(SettingKey)"
-    replace_with = "Select_CFixedPoint(CMMSettingIsGlobal(SettingKey), GetVariableFromGlobalVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue, Player.MakeScope.GetVariableFromVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue)"
+    replace_with = "Select_CFixedPoint(CMMSettingIsGlobal(SettingKey), GetVariableFromGlobalVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue, CMMHomeScope.GetVariableFromVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue)"
 }
 
 # Args: SettingKey (string)
@@ -102,14 +104,6 @@ macro = {
     description = "True when a setting has a registered scripted GUI"
     definition = "CMMHasScriptedGui(SettingKey)"
     replace_with = "CMMValueEqualsOne(CMMMapValue('cmm_has_sgui', SettingKey))"
-}
-
-# Args: SettingKey (string)
-# Returns: boolean
-macro = {
-    description = "Visibility rule for one setting row"
-    definition = "CMMSettingRowVisible(SettingKey)"
-    replace_with = "And(CMMMatchesSelectedModAndTab(CMMMetadataFlag('cmm_setting_owner_mod_id_', SettingKey), CMMMetadataFlag('cmm_setting_owner_tab_key_', SettingKey)), And(CMMSettingIsRegistered(SettingKey), Or(Not(CMMHasScriptedGui(SettingKey)), CMMGuiIsShown(Concatenate(SettingKey, '_on_changed')))))"
 }
 
 # Args: SettingKey (string)
@@ -164,7 +158,7 @@ macro = {
 macro = {
     description = "True when text settings may be edited in the current session"
     definition = "CMMCanEditTextSetting"
-    replace_with = "Not(GameIsMultiplayer)"
+    replace_with = "And(Not(GameIsMultiplayer), CMFHasPlayerCountry)"
 }
 
 # Args: SettingKey (string)
@@ -242,9 +236,17 @@ macro = {
 # Args: SettingKey (string)
 # Returns: value
 macro = {
-    description = "Setting value by key (works in localization [expr] context; uses Player.MakeScope because Scope is unavailable)"
+    description = "Setting value by key, taking the key as an argument so it does not need the Scope datacontext localization has no access to"
     definition = "CMMV(SettingKey)"
-    replace_with = "Select_CFixedPoint(EqualTo_CFixedPoint(Player.MakeScope.GetVariableFromVariableMap('cmm_is_global', MakeScopeFlag(SettingKey)).GetValue, '(CFixedPoint)1'), GetVariableFromGlobalVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue, Player.MakeScope.GetVariableFromVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue)"
+    replace_with = "Select_CFixedPoint(EqualTo_CFixedPoint(GetCountry(GetVariableSystem.Get('cmm_home_tag')).MakeScope.GetVariableFromVariableMap('cmm_is_global', MakeScopeFlag(SettingKey)).GetValue, '(CFixedPoint)1'), GetVariableFromGlobalVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue, GetCountry(GetVariableSystem.Get('cmm_home_tag')).MakeScope.GetVariableFromVariableMap('cmm', MakeScopeFlag(SettingKey)).GetValue)"
+}
+
+# Args: SettingKey (string)
+# Returns: boolean
+macro = {
+    description = "True when a button setting opens the log view"
+    definition = "CMMSettingTogglesLogView(SettingKey)"
+    replace_with = "EqualTo_string(SettingKey, 'cmf_core__open_log')"
 }
 
 # Args: SettingKey (string)
@@ -343,7 +345,7 @@ macro = {
 macro = {
     description = "Cached edit-permission rule for one setting row; the unrestricted-tools-enabled state stays live"
     definition = "CMMCachedCanEditSetting(SettingKey)"
-    replace_with = "And(Or(Not(GetVariableSystem.HasValue(Concatenate(SettingKey, '_srisg'), 'yes')), Or(Not(GameIsMultiplayer), IsHost)), Or(Not(GetVariableSystem.HasValue(Concatenate(SettingKey, '_srrut'), 'yes')), Or(EqualTo_string(SettingKey, 'cmf_core__enable_unrestricted_tools'), And(CMMSettingIsRegistered('cmf_core__enable_unrestricted_tools'), CMMValueEqualsOne(CMMSettingValue('cmf_core__enable_unrestricted_tools'))))))"
+    replace_with = "And(Or(CMFHasPlayerCountry, CMMSettingHasConsoleCommand(SettingKey)), And(Or(Not(GetVariableSystem.HasValue(Concatenate(SettingKey, '_srisg'), 'yes')), Or(Not(GameIsMultiplayer), IsHost)), Or(Not(GetVariableSystem.HasValue(Concatenate(SettingKey, '_srrut'), 'yes')), Or(EqualTo_string(SettingKey, 'cmf_core__enable_unrestricted_tools'), And(CMMSettingIsRegistered('cmf_core__enable_unrestricted_tools'), CMMValueEqualsOne(CMMSettingValue('cmf_core__enable_unrestricted_tools')))))))"
 }
 
 # Args: SettingKey (string)

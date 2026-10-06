@@ -2,19 +2,7 @@
 # Scope: country
 CMM_RegisterCoreMod = {
 	effect = {
-		clear_variable_list = cmm_registered_mod_ids
-		clear_variable_list = cmm_registered_tab_keys
-		clear_variable_list = cmm_registered_group_keys
-		clear_variable_list = cmm_registered_setting_keys
-		clear_variable_list = cmm_conditional_setting_keys
-		_cmm_clear_registration_pass_state = yes
-		clear_global_variable_list = cmf_active_mod_ids
-		_cmm_register_menu_settings = yes
-		trigger_event_silently = {
-			on_action = cmf_on_mod_registration
-		}
-		_cmf_prune_stale_action_bar_elements = yes
-		_cmm_register_menu_settings_late = yes
+		_cmm_run_registration_pass = yes
 	}
 }
 
@@ -23,19 +11,7 @@ CMM_RegisterCoreMod = {
 CMM_SetHostAndRegisterCoreMod = {
 	effect = {
 		_cmm_mark_host_country = yes
-		clear_variable_list = cmm_registered_mod_ids
-		clear_variable_list = cmm_registered_tab_keys
-		clear_variable_list = cmm_registered_group_keys
-		clear_variable_list = cmm_registered_setting_keys
-		clear_variable_list = cmm_conditional_setting_keys
-		_cmm_clear_registration_pass_state = yes
-		clear_global_variable_list = cmf_active_mod_ids
-		_cmm_register_menu_settings = yes
-		trigger_event_silently = {
-			on_action = cmf_on_mod_registration
-		}
-		_cmf_prune_stale_action_bar_elements = yes
-		_cmm_register_menu_settings_late = yes
+		_cmm_run_registration_pass = yes
 	}
 }
 
@@ -58,42 +34,80 @@ CMM_ResetModToDefaults = {
 	}
 }
 
+# Toggle whether one settings group renders its settings box.
+# Scope: country
+# Args: scope:cmm_group (flag) - the group key to toggle.
+CMM_ToggleGroupCollapsed = {
+	scope = country
+	saved_scopes = { cmm_group }
+	effect = {
+		if = {
+			limit = { is_key_in_variable_map = { name = cmm_group_collapsed target = scope:cmm_group } }
+			remove_from_variable_map = { name = cmm_group_collapsed key = scope:cmm_group }
+		}
+		else = {
+			add_to_variable_map = { name = cmm_group_collapsed key = scope:cmm_group value = 1 }
+		}
+	}
+}
+
+# Apply the state scope:cmm_group is about to take to every group in its tab.
+# Scope: country
+# Args: scope:cmm_group (flag) - the group key whose next state the tab follows.
+CMM_ToggleTabGroupsCollapsed = {
+	scope = country
+	saved_scopes = { cmm_group }
+	effect = {
+		"variable_map(cmm_group_owner_tab|scope:cmm_group)" = { save_scope_as = _cmm_gc_tab }
+
+		set_local_variable = { name = _cmm_gc_collapse value = 1 }
+		if = {
+			limit = { is_key_in_variable_map = { name = cmm_group_collapsed target = scope:cmm_group } }
+			set_local_variable = { name = _cmm_gc_collapse value = 0 }
+		}
+
+		every_in_list = {
+			variable = cmm_registered_group_keys
+			save_scope_as = _cmm_gc_group
+			root = {
+				if = {
+					limit = { "variable_map(cmm_group_owner_tab|scope:_cmm_gc_group)" = scope:_cmm_gc_tab }
+					if = {
+						limit = { local_var:_cmm_gc_collapse = 1 }
+						add_to_variable_map = { name = cmm_group_collapsed key = scope:_cmm_gc_group value = 1 }
+					}
+					else = {
+						remove_from_variable_map = { name = cmm_group_collapsed key = scope:_cmm_gc_group }
+					}
+				}
+			}
+		}
+	}
+}
+
+# Hides the debug mode row in multiplayer, where the console command it runs does not work.
+# Scope: country
+cmf_core__enable_debug_mode_on_changed = {
+	scope = country
+	is_shown = {
+		has_multiple_players = no
+	}
+}
+
 # List _on_changed for the action-bar visible-buttons list.
-# Mirrors the toggled row to cmf_action_bar_active_elements before applying
-# the change to the bool field's stored value.
+# Mirrors the stored bool field values to cmf_action_bar_active_elements.
 # Scope: country
 cmf_core__action_bar_buttons_on_changed = {
 	scope = country
 
 	effect = {
-		if = {
-			limit = {
-				has_variable = cmm_list_position_to_apply
-				has_variable = cmm_list_field_slot_to_apply
-				has_variable = cmm_list_field_value_to_apply
-				var:cmm_list_field_slot_to_apply = 1
-			}
-			set_variable = { name = _cmm_action_bar_change_pos value = var:cmm_list_position_to_apply }
-			set_variable = { name = _cmm_action_bar_change_val value = var:cmm_list_field_value_to_apply }
-
-			cmm_for_each_list_item = {
-				setting = cmf_core__action_bar_buttons
-				effect = _cmm_handle_action_bar_button_change
-			}
-
-			remove_variable = _cmm_action_bar_change_pos
-			remove_variable = _cmm_action_bar_change_val
-		}
-
 		cmm_apply_list_change = {
 			setting = cmf_core__action_bar_buttons
 		}
 
-		# Benign warning suppression
-		if = {
-			limit = { always = no }
-			cmf_suppress = { v = _cmm_action_bar_change_pos }
-			cmf_suppress = { v = _cmm_action_bar_change_val }
+		cmm_for_each_list_item = {
+			setting = cmf_core__action_bar_buttons
+			effect = _cmm_sync_action_bar_active_from_field
 		}
 	}
 }

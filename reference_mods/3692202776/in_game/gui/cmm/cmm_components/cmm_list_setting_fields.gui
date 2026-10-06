@@ -4,7 +4,8 @@
 	# Reads:
 	# - Scope.GetFlagName [string]: current list setting key (`<mod_id>__<setting_id>`).
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated header datamodel.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_name_', Scope.GetFlagName)) [flag]: localized field header key.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_name_', Scope.GetFlagName)) [flag]: localized field header key.
+	# - GetVariableSystem.Get(Concatenate(Scope.GetFlagName, '_cel')) [string]: cached interactive state for the owner setting.
 	# Writes:
 	# - GetVariableSystem.Set('cmm_list_hover_field_slot', ...) [effect]: caches the hovered header field slot.
 	# - GetScriptedGui('CMM_MarkListColumnApplyAll').Execute(...) [effect]: marks the column apply-to-all action.
@@ -40,8 +41,8 @@
 					size = { 100% 100% }
 					alpha = 0
 					effectname = "NoHighlight"
-					enabled = "[GetVariableSystem.HasValue('cmm_can_edit_list', 'yes')]"
-					visible = "[Not(CMMListFieldIsData(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))))]"
+					enabled = "[CMMListCanEdit(Scope.GetFlagName)]"
+					visible = "[Not(Or3(CMMListFieldIsData(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))), CMMListFieldIsButton(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))), CMMListFieldIsText(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))))]"
 					tagtooltip_enabled = yes
 					tooltip = "[CMMListFieldDescText(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
 					tooltip_enabled = "[CMMListFieldHasDesc(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
@@ -66,8 +67,8 @@
 	# Ordered list row field cells rendered from the owner setting field count.
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key (`<mod_id>__<setting_id>_item_<index>`).
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_item_owner_setting_', Scope.GetFlagName)) [flag]: owner setting key for the row item.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_count_', <setting_key>)) [value]: registered field count.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_item_owner_setting_', Scope.GetFlagName)) [flag]: owner setting key for the row item.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_count_', <setting_key>)) [value]: registered field count.
 	type cmm_list_setting_row_fields = hbox {
 		ignoreinvisible = yes
 		spacing = 8
@@ -83,7 +84,8 @@
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key.
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_type_', <setting_key>)) [value]: field type metadata.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_type_', <setting_key>)) [value]: field type metadata.
+	# - GetVariableSystem.Get(Concatenate(<setting_key>, '_cel')) [string]: cached interactive state for the owner setting.
 	# Writes:
 	# - GetVariableSystem.Set('cmm_list_hover_field_slot', ...) [effect]: caches the currently hovered field slot.
 	type cmm_list_setting_field_cell = widget {
@@ -106,7 +108,7 @@
 		widget = {
 			size = { 100% 100% }
 			visible = "[CMMListItemFieldIsEnabled(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
-			enabled = "[GetVariableSystem.HasValue('cmm_can_edit_list', 'yes')]"
+			enabled = "[CMMListItemCanEdit(Scope.GetFlagName)]"
 
 			cmm_list_setting_bool_field = {
 				visible = "[GetVariableSystem.HasValue(Concatenate(Scope.GetFlagName, Concatenate('_tp_', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))), '1')]"
@@ -127,24 +129,36 @@
 			cmm_list_setting_data_field = {
 				visible = "[GetVariableSystem.HasValue(Concatenate(Scope.GetFlagName, Concatenate('_tp_', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))), '5')]"
 			}
+
+			cmm_list_setting_button_field = {
+				visible = "[GetVariableSystem.HasValue(Concatenate(Scope.GetFlagName, Concatenate('_tp_', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))), '6')]"
+			}
+
+			cmm_list_setting_text_field = {
+				visible = "[GetVariableSystem.HasValue(Concatenate(Scope.GetFlagName, Concatenate('_tp_', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))), '7')]"
+			}
 		}
 	}
 
-	# Ordered list bool field control with optional right-click-apply-to-all behavior.
+	# Ordered list bool field control with column, row and whole-list bulk toggles.
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key.
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel.
-	# - Player.MakeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current bool field value for this row item.
+	# - CMMHomeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current bool field value for this row item.
 	# - GetVariableSystem.Get('cmm_list_hover_field_slot') [string]: cached hovered field slot for nested button actions.
 	# Writes:
 	# - GetScriptedGui('CMM_MarkListPosition_<index>').Execute(...) [effect]: marks the hovered row position.
 	# - GetScriptedGui('CMM_MarkListFieldSlot_<slot>').Execute(...) [effect]: marks the clicked field slot.
 	# - GetScriptedGui('CMM_MarkListFieldToggle').Execute(...) [effect]: marks a single-row bool toggle.
-	# - GetScriptedGui('CMM_MarkListFieldToggleAll').Execute(...) [effect]: marks a bulk bool toggle.
+	# - GetScriptedGui('CMM_MarkListFieldToggleAll').Execute(...) [effect]: marks a column bool toggle.
+	# - GetScriptedGui('CMM_MarkListFieldToggleRow').Execute(...) [effect]: marks a row bool toggle.
+	# - GetScriptedGui('CMM_MarkListFieldToggleList').Execute(...) [effect]: marks a whole-list bool toggle.
 	# - GetScriptedGui(Concatenate(<setting_key>, '_on_changed')).Execute(...) [effect]: applies the queued list change.
 	type cmm_list_setting_bool_field = widget {
 		size = { 48 28 }
 		minimumsize = { 48 28 }
+		parentanchor = center
+		widgetanchor = center
 
 		checkbox_square_alt = {
 			parentanchor = center
@@ -163,10 +177,35 @@
 			action_tooltip = {
 				click_mode = single
 				click_type = left
+				click_modifier = default
 				title = "CMM_LIST_TOGGLE"
 				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListPosition_', GetVariableSystem.Get('cmm_list_hover_index'))]"
 				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListFieldSlot_', GetVariableSystem.Get('cmm_list_hover_field_slot'))]"
 				on_action = "[CMMExecuteGui('CMM_MarkListFieldToggle')]"
+				on_action = "[CMMExecuteListItemSettingChanged(Scope.GetFlagName)]"
+				on_action = "[PdxGuiTriggerAllAnimations('cmm_recache_delay')]"
+			}
+
+			action_tooltip = {
+				click_mode = single
+				click_type = left
+				click_modifier = ctrl
+				title = "CMM_LIST_TOGGLE_ROW"
+				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListPosition_', GetVariableSystem.Get('cmm_list_hover_index'))]"
+				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListFieldSlot_', GetVariableSystem.Get('cmm_list_hover_field_slot'))]"
+				on_action = "[CMMExecuteGui('CMM_MarkListFieldToggleRow')]"
+				on_action = "[CMMExecuteListItemSettingChanged(Scope.GetFlagName)]"
+				on_action = "[PdxGuiTriggerAllAnimations('cmm_recache_delay')]"
+			}
+
+			action_tooltip = {
+				click_mode = single
+				click_type = left
+				click_modifier = shift
+				title = "CMM_LIST_TOGGLE_LIST"
+				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListPosition_', GetVariableSystem.Get('cmm_list_hover_index'))]"
+				on_action = "[CMMExecuteGuiSuffix('CMM_MarkListFieldSlot_', GetVariableSystem.Get('cmm_list_hover_field_slot'))]"
+				on_action = "[CMMExecuteGui('CMM_MarkListFieldToggleList')]"
 				on_action = "[CMMExecuteListItemSettingChanged(Scope.GetFlagName)]"
 				on_action = "[PdxGuiTriggerAllAnimations('cmm_recache_delay')]"
 			}
@@ -192,9 +231,9 @@
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key.
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel.
-	# - Player.MakeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current numeric field value for this row item.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_min_', <setting_key>)) [value]: numeric minimum bound.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_max_', <setting_key>)) [value]: numeric maximum bound.
+	# - CMMHomeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current numeric field value for this row item.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_min_', <setting_key>)) [value]: numeric minimum bound.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_max_', <setting_key>)) [value]: numeric maximum bound.
 	# - GetVariableSystem.Get('cmm_list_hover_field_slot') [string]: cached hovered field slot for nested button actions and tooltip text.
 	# Writes:
 	# - GetScriptedGui('CMM_MarkListPosition_<index>').Execute(...) [effect]: marks the hovered row position.
@@ -370,9 +409,9 @@
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key.
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel or current 0-based widget dropdown option index in option rows.
-	# - Player.MakeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current 1-based dropdown field ordinal for this row item.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_dropdown_count_', <setting_key>)) [value]: dropdown option count.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_option_root_', <setting_key>)) [flag]: dropdown option localization root.
+	# - CMMHomeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current 1-based dropdown field ordinal for this row item.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_dropdown_count_', <setting_key>)) [value]: dropdown option count.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_option_root_', <setting_key>)) [flag]: dropdown option localization root.
 	# - GetVariableSystem.Get('cmm_dropdown_hover_index') [string]: cached hovered 0-based widget dropdown option index.
 	# Writes:
 	# - GetVariableSystem.Set('cmm_dropdown_hover_index', ...) [effect]: caches the hovered 0-based widget dropdown option index.
@@ -1012,9 +1051,9 @@
 	# Reads:
 	# - Scope.GetFlagName [string]: current ordered list item key.
 	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the parent repeated field datamodel, or overlay slider point index in the track hbox.
-	# - Player.MakeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current slider field value for this row item.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_min_', <setting_key>)) [value]: slider minimum bound.
-	# - Player.MakeScope.GetVariable(Concatenate('cmm_list_field_<slot>_max_', <setting_key>)) [value]: slider maximum bound.
+	# - CMMHomeScope.GetVariable(Concatenate(Scope.GetFlagName, '_field_<slot>')) [value]: current slider field value for this row item.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_min_', <setting_key>)) [value]: slider minimum bound.
+	# - CMMHomeScope.GetVariable(Concatenate('cmm_list_field_<slot>_max_', <setting_key>)) [value]: slider maximum bound.
 	# - GetVariableSystem.Get('cmm_list_hover_field_slot') [string]: cached hovered field slot for button click actions and overlay points.
 	# Writes:
 	# - GetScriptedGui('CMM_MarkListPosition_<index>').Execute(...) [effect]: marks the hovered row position.
@@ -1055,7 +1094,7 @@
 						size = { 140 20 }
 						position = { -10 0 }
 						minimumsize = { -1 14 }
-						enabled = "[GetVariableSystem.HasValue('cmm_can_edit_list', 'yes')]"
+						enabled = "[CMMListItemCanEdit(Scope.GetFlagName)]"
 						min = 0
 						max = "[CMMListFieldSliderNormalizedMax(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
 						step = "[CMMListFieldMetadataValue(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)), '_step_')]"
@@ -1412,6 +1451,79 @@
 				visible = "[Not(GetVariableSystem.HasValue(Concatenate(Scope.GetFlagName, Concatenate('_hf_', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))), '0'))]"
 				text = "[CMMCachedResolvedPrefix(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))][CMMListItemFieldValue(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))][CMMCachedResolvedPostfix(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
 			}
+		}
+	}
+
+	# Ordered list button field control, either reporting a per-row press or opening a tab.
+	# Reads:
+	# - Scope.GetFlagName [string]: current ordered list item key.
+	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel.
+	# - GetVariableSystem.Get('cmm_list_hover_field_slot') [string]: cached hovered field slot for nested button actions.
+	# - CMMListItemButtonOpensTab [boolean]: whether this row's button carries a tab target.
+	# Writes:
+	# - GetScriptedGui('CMM_MarkListPosition_<index>').Execute(...) [effect]: marks the hovered row position.
+	# - GetScriptedGui('CMM_MarkListFieldSlot_<slot>').Execute(...) [effect]: marks the clicked field slot.
+	# - GetScriptedGui('CMM_MarkListButtonPress').Execute(...) [effect]: marks a button-field press.
+	# - GetScriptedGui(Concatenate(<setting_key>, '_on_changed')).Execute(...) [effect]: applies the queued list change.
+	# - GetVariableSystem.Set('cmm_selected_tab') [string]: selects the tab a targeted button opens.
+	# - GetVariableSystem.Set('<mod_id>__<parent_tab_id>_lsub') [string]: records that tab as its parent's open sub-tab.
+	type cmm_list_setting_button_field = widget {
+		size = { 100 28 }
+		minimumsize = { 100 28 }
+
+		button_regular = {
+			visible = "[Not(CMMListItemButtonOpensTab(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))))]"
+			size = { 100% 24 }
+			parentanchor = center
+			widgetanchor = center
+			text = "[CMMListFieldButtonText(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tagtooltip_enabled = yes
+			tooltip = "[CMMListFieldDescText(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tooltip_enabled = "[CMMListFieldHasDesc(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tooltipwidget = {
+				BasicFunctionalTooltip = {}
+			}
+			onclick = "[CMMExecuteGuiSuffix('CMM_MarkListPosition_', GetVariableSystem.Get('cmm_list_hover_index'))]"
+			onclick = "[CMMExecuteGuiSuffix('CMM_MarkListFieldSlot_', GetVariableSystem.Get('cmm_list_hover_field_slot'))]"
+			onclick = "[CMMExecuteGui('CMM_MarkListButtonPress')]"
+			onclick = "[CMMExecuteListItemSettingChanged(Scope.GetFlagName)]"
+			onclick = "[PdxGuiTriggerAllAnimations('cmm_recache_delay')]"
+		}
+
+		# Selecting a tab is client-local, so a targeted button reports no press and keeps
+		# working without a player country, where a scripted GUI Execute would be dropped.
+		button_regular = {
+			visible = "[CMMListItemButtonOpensTab(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			size = { 100% 24 }
+			parentanchor = center
+			widgetanchor = center
+			text = "[CMMListFieldButtonText(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tagtooltip_enabled = yes
+			tooltip = "[CMMListFieldDescText(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tooltip_enabled = "[CMMListFieldHasDesc(CMMListItemOwnerSettingKey(Scope.GetFlagName), ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))]"
+			tooltipwidget = {
+				BasicFunctionalTooltip = {}
+			}
+			onclick = "[GetVariableSystem.Set('cmm_selected_tab', CMMListItemButtonTabLeaf(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))))]"
+			onclick = "[GetVariableSystem.Set(CMMListItemButtonSubTabKey(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))), CMMListItemButtonTabLeaf(Scope.GetFlagName, ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))))]"
+		}
+	}
+
+	# Ordered list display-only text field localizing a per-item key.
+	# Reads:
+	# - Scope.GetFlagName [string]: current ordered list item key.
+	# - PdxGuiWidget.GetIndexInDataModel [int32]: current field slot index in the repeated field datamodel.
+	# - CMMHomeScope.GetVariable(Concatenate(Scope.GetFlagName, '_tf<slot>')) [flag]: localization key for this row's cell.
+	type cmm_list_setting_text_field = widget {
+		size = { 150 28 }
+		minimumsize = { 120 28 }
+
+		text_single = {
+			size = { 100% 100% }
+			align = center|nobaseline
+			autoresize = no
+			default_format = "#medium"
+			text = "[AddTextIf(CMMVar(Concatenate(Scope.GetFlagName, Concatenate('_tf', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel))))).IsSet, CMMLocalizedSuffix(Scope.GetFlagName, Concatenate('_tf', ToString_int32(CMMWidgetIndexToOrdinal(PdxGuiWidget.GetIndexInDataModel)))))]"
 		}
 	}
 }
