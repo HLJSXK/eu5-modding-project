@@ -1,5 +1,7 @@
 # EU5 SOL 替代组需求曲线设计 Prompt
 
+> 历史草案：本文的十组划分不代表 v1.1 最终二十组实现，也不是当前国家级接口的实施规格。恢复工作请先读 [v1.1 与国家级方案审计](SOL_Substitute_Groups_Global_Modifier_Audit.md) 和 [修订规格](SOL_Substitute_Groups_Global_Modifier_Implementation.md)。
+
 ## 目标
 
 为 EU5 SOL（生活水平）mod 的每个替代组设计独立的线性需求曲线，使得**千均支出恒等于千均收入**。

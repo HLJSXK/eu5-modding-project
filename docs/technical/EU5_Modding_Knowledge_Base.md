@@ -270,6 +270,12 @@ Runtime testing shows that `NPop.POP_NEEDS_INCOME_SCALE` multiplies the expendit
 
 An income-closed demand system must override it with `NPop = { POP_NEEDS_INCOME_SCALE = 1 }`; otherwise measured stratum income and nominal basket costs cannot balance. Apply the override in every base deploy target that can run independently. Compatibility submods that require the full SOL target inherit its define and do not need a duplicate.
 
+### 6.5.1. Country-Level Per-Good Demand (1.4 Source Audit)
+
+`main_menu/common/modifier_type_definitions/00_modifier_types.txt:12773` onward declares generic `global_pop_demand` (country), `local_pop_demand` (location), and country-scoped `global_<good>_pop_demand` types. New country static modifiers belong under `main_menu/common/static_modifiers/`; vanilla `printing_press_books` is a concrete per-good example. The current SOL core's 56 goods have corresponding declarations. The audited vanilla/PP snapshots lack `global_victuals_pop_demand`, whereas Just Goods declares the types for all 26 of its direct-demand goods in its own modifier-type files. Audit the final loaded definitions rather than vanilla alone, then test actual custom-good demand linkage.
+
+`percent=yes` does not establish how same-type sources, per-good demand, generic country demand, and location demand combine. A model that accounts for an intended multiplier M must verify the effective engine factor before charging that basket internally. Under an additive same-type model with external offset e, the increment for relative factor M would be `(1+e)*(M-1)`, not always `M-1`; this is a conditional derivation, not a runtime finding. Goods without a working demand interface must retain neutral substitution in both the transfer model and accounting. See [the source audit](SOL_Substitute_Groups_Global_Modifier_Audit.md) for evidence and migration boundaries.
+
 ### 6.6. Countries
 
 Countries are defined in two parts: a **country definition** file in `in_game/setup/countries/` that sets the tag, color, and culture, and a **country setup** file in `<top_folder>/setup/start/` that defines the starting situation, including owned provinces, capital, and ruler. [8]
