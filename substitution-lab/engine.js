@@ -1,97 +1,137 @@
+// Pure math for the substitution explainer. Works in the browser (window.Sub)
+// and in Node (require) so the numbers on the page are unit-tested.
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.SOLEngine = api;
+  else root.Sub = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
-  function tier(r) {
-    if (r > 2.30) return { weight:0.25, label:'严重昂贵', key:'severe' };
-    if (r > 1.70) return { weight:0.50, label:'明显昂贵', key:'moderate' };
-    if (r > 1.30) return { weight:0.75, label:'轻度昂贵', key:'mild' };
-    if (r < 0.40) return { weight:2.00, label:'非常便宜', key:'vcheap' };
-    if (r < 0.65) return { weight:1.50, label:'明显便宜', key:'cheap' };
-    if (r < 0.85) return { weight:1.25, label:'较为便宜', key:'affordable' };
-    return { weight:1, label:'中性', key:'neutral' };
-  }
-  const sum = a => a.reduce((s,x)=>s+x,0);
+
+  // Current core catalogue (data/goods_weights.csv). v1.1 differed only in
+  // luxury_food (+victuals) and mounts (no camels).
+  const GROUPS = [
+    ['basic_clothing', '基本衣物', ['cloth', 'leather']],
+    ['crude_goods', '粗制品', ['lumber', 'masonry', 'tools', 'pottery']],
+    ['staple', '主食', ['wheat', 'rice', 'millet', 'maize', 'potato', 'legumes']],
+    ['condiments', '调味品', ['sugar', 'salt', 'olives']],
+    ['heating', '取暖燃料', ['lumber', 'coal', 'beeswax']],
+    ['household', '家居用品', ['furniture', 'pottery', 'glass', 'paper', 'beeswax']],
+    ['standard_clothing', '标准衣物', ['cloth', 'fine_cloth']],
+    ['intoxicants', '嗜好饮料', ['wine', 'beer', 'liquor', 'tobacco']],
+    ['luxury_drinks', '奢侈饮品', ['tea', 'coffee', 'wine', 'cocoa']],
+    ['luxury_food', '奢侈食物', ['wild_game', 'fruit', 'fish']],
+    ['luxury_goods', '奢侈商品', ['fine_cloth', 'fur', 'porcelain', 'lacquerware', 'marble', 'glass']],
+    ['protein', '蛋白食物', ['fish', 'wild_game', 'livestock']],
+    ['spices', '香料', ['saffron', 'pepper', 'cloves', 'chili']],
+    ['precious', '贵重品', ['goods_gold', 'silver', 'jewelry']],
+    ['treasures', '珍宝', ['amber', 'gems', 'ivory', 'pearls']],
+    ['medicine', '药品', ['medicaments', 'mercury']],
+    ['ritual', '祭祀物品', ['incense', 'mercury']],
+    ['weapons', '武器', ['weaponry', 'firearms']],
+    ['mounts', '坐骑', ['horses', 'camels', 'elephants']],
+    ['knowledge', '知识用品', ['paper', 'books']],
+  ].map(([id, name, members]) => ({ id, name, members, n: members.length }));
+
+  const GOOD_NAMES = {
+    cloth: '布料', leather: '皮革', lumber: '木材', masonry: '石材', tools: '工具', pottery: '陶器',
+    wheat: '小麦', rice: '稻米', millet: '小米', maize: '玉米', potato: '马铃薯', legumes: '豆类',
+    sugar: '糖', salt: '盐', olives: '橄榄', coal: '煤炭', beeswax: '蜂蜡', furniture: '家具',
+    glass: '玻璃', paper: '纸张', fine_cloth: '精细布料', wine: '葡萄酒', beer: '啤酒', liquor: '烈酒',
+    tobacco: '烟草', tea: '茶叶', coffee: '咖啡', cocoa: '可可', wild_game: '野味', victuals: '加工食品',
+    fruit: '水果', fish: '鱼类', fur: '毛皮', porcelain: '瓷器', lacquerware: '漆器', marble: '大理石',
+    livestock: '牲畜', saffron: '藏红花', pepper: '胡椒', cloves: '丁香', chili: '辣椒',
+    goods_gold: '黄金', silver: '白银', jewelry: '珠宝', amber: '琥珀', gems: '宝石', ivory: '象牙',
+    pearls: '珍珠', medicaments: '药材', mercury: '水银', incense: '熏香', weaponry: '兵器',
+    firearms: '火器', horses: '马匹', camels: '骆驼', elephants: '大象', books: '书籍',
+  };
+
+  // Strict comparisons, checked in this order (v1.1 SOL_substitute_effects).
+  const TIERS = [
+    { test: r => r > 2.30, weight: 0.25, label: '严重昂贵', range: '> 2.30' },
+    { test: r => r > 1.70, weight: 0.50, label: '明显昂贵', range: '1.70 – 2.30' },
+    { test: r => r > 1.30, weight: 0.75, label: '轻度昂贵', range: '1.30 – 1.70' },
+    { test: r => r < 0.40, weight: 2.00, label: '非常便宜', range: '< 0.40' },
+    { test: r => r < 0.65, weight: 1.50, label: '明显便宜', range: '0.40 – 0.65' },
+    { test: r => r < 0.85, weight: 1.25, label: '较便宜', range: '0.65 – 0.85' },
+  ];
+  const NEUTRAL = { weight: 1, label: '正常', range: '0.85 – 1.30' };
+  function tier(ratio) { return TIERS.find(t => t.test(ratio)) || NEUTRAL; }
+
+  const sum = a => a.reduce((s, x) => s + x, 0);
+
   function memberships(groups) {
-    const result = {};
-    for (const g of groups) for (const i of g.members) (result[i] ||= []).push(g.id);
-    return result;
+    const m = {};
+    for (const g of groups) for (const i of g.members) (m[i] ||= []).push(g.id);
+    return m;
   }
-  // Values B are monetary baselines before any location SOL factor.
-  function substitute(groups, values, mode = 'A') {
-    const member = memberships(groups), output = {}, details = {};
-    const baseline = i => values[i]?.supply === false ? 0 : values[i]?.b || 0;
-    for (const i of Object.keys(member)) output[i] = { baseline:baseline(i), target:0, response:1, ht:0, h1:0 };
-    const eligible = i => values[i] && values[i].b > 0 && values[i].supply !== false && values[i].supported !== false;
+
+  // goods[i] = { ratio, active }. active=false means no supply / no modifier
+  // interface: frozen at 1 and not counted when the group shares out demand.
+  // Returns D(i) = H_T / H_1 with per-group detail.
+  function planA(groups, goods) {
+    const member = memberships(groups);
+    const isActive = i => goods[i]?.active !== false;
+    const w = i => tier(goods[i]?.ratio ?? 1).weight;
+    const acc = {};
+    for (const i of Object.keys(member)) acc[i] = { ht: 0, h1: 0, groups: [] };
     for (const g of groups) {
-      const active = g.members.filter(eligible);
-      const w = i => tier(values[i].ratio ?? 1).weight * (values[i].v ?? 1);
-      const v = i => values[i].v ?? 1;
-      const totalW = sum(active.map(w)), totalV = sum(active.map(v));
-      const budget = sum(active.map(i=>baseline(i) / member[i].length));
-      const weightedBudget = sum(active.map(i=>baseline(i) / member[i].length * tier(values[i].ratio ?? 1).weight));
-      details[g.id] = {};
+      const active = g.members.filter(isActive);
+      const totalW = sum(active.map(w));
+      const substitutes = active.length >= 2;
       for (const i of g.members) {
-        const valid = active.includes(i) && active.length >= 2 && totalW > 0 && totalV > 0;
-        const f1 = eligible(i) && totalV > 0 ? g.n * v(i) / totalV : 0;
-        const ft = valid ? g.n * w(i) / totalW : f1;
-        output[i].ht += ft / member[i].length;
-        output[i].h1 += f1 / member[i].length;
-        const b = baseline(i) / member[i].length;
-        const bt = eligible(i) && active.length >= 2 && weightedBudget > 0 ? budget * b * tier(values[i].ratio ?? 1).weight / weightedBudget : b;
-        if (mode === 'B') output[i].target += bt;
-        details[g.id][i] = { ft, f1, b, bt, active:eligible(i), members:active.length };
+        if (!isActive(i)) { acc[i].groups.push({ group: g.id, d: 1, skipped: true }); continue; }
+        const f1 = g.n / active.length;
+        const ft = substitutes ? g.n * w(i) / totalW : f1;
+        acc[i].ht += ft / member[i].length;
+        acc[i].h1 += f1 / member[i].length;
+        acc[i].groups.push({ group: g.id, d: ft / f1, share1: 1 / active.length, shareT: ft / g.n, skipped: !substitutes });
       }
     }
-    for (const [i,o] of Object.entries(output)) {
-      if (mode === 'A') { o.response = eligible(i) && o.h1 > 0 ? o.ht / o.h1 : 1; o.target = o.baseline * o.response; }
-      else o.response = o.baseline > 0 ? o.target / o.baseline : 1;
-    }
-    return { goods:output, details };
+    const out = {};
+    for (const [i, a] of Object.entries(acc)) out[i] = { d: a.h1 > 0 ? a.ht / a.h1 : 1, groups: a.groups };
+    return out;
   }
+
+  // goods[i] = { ratio, b, active }. Split each good's baseline evenly over its
+  // groups, then reshare every group's budget by b × weight. Budget-conserving.
+  function planB(groups, goods) {
+    const member = memberships(groups);
+    const isActive = i => goods[i]?.active !== false && (goods[i]?.b || 0) > 0;
+    const w = i => tier(goods[i]?.ratio ?? 1).weight;
+    const out = {};
+    for (const i of Object.keys(member)) out[i] = { base: goods[i]?.b || 0, target: 0 };
+    for (const g of groups) {
+      const part = i => (goods[i]?.b || 0) / member[i].length;
+      const active = g.members.filter(isActive);
+      const budget = sum(active.map(part));
+      const weighted = sum(active.map(i => part(i) * w(i)));
+      for (const i of g.members) {
+        const ok = isActive(i) && active.length >= 2 && weighted > 0;
+        out[i].target += ok ? budget * part(i) * w(i) / weighted : part(i);
+      }
+    }
+    for (const o of Object.values(out)) o.d = o.base > 0 ? o.target / o.base : 1;
+    return out;
+  }
+
+  // rows = [{ q, d }]. q is a neutral-priced reference quantity, so weighting
+  // by q equals weighting by q × default_price for one good.
   function aggregate(rows, epsilon = 0.001) {
-    const baseline = sum(rows.map(r=>r.b)), target = sum(rows.map(r=>r.b*r.d));
-    const m = baseline > epsilon ? target/baseline : 1;
-    return { baseline, target, m, size:m-1, fallback:baseline <= epsilon };
+    const base = sum(rows.map(r => r.q));
+    const target = sum(rows.map(r => r.q * r.d));
+    return base > epsilon ? target / base : 1;
   }
-  function piecewise(spec, y) { return spec.base + sum(spec.changes.filter(([threshold])=>y>=threshold).map(([,delta])=>delta)); }
-  function historicalBase(curve, y) {
-    if (!curve) return 0;
-    if (curve.constantBase != null) return curve.constantBase;
-    if (curve.price === 0) return 1;
-    return y * piecewise(curve.share,y) / curve.price + piecewise(curve.offset,y);
+
+  // What size to write so the good ends up at M relative to the outside
+  // offset e, under two engine hypotheses that still need in-game testing.
+  function modifierSize(m, e, stacking) {
+    return stacking === 'additive' ? (1 + e) * (m - 1) : m - 1;
   }
-  function modifierSize(m, external, semantics) { return semantics === 'additive' ? (1+external)*(m-1) : m-1; }
-  function nationalBasket(groups, units, populations, values, mode = 'A', rule = 'neutral', epsilon = 0.001) {
-    const goods=Object.keys(memberships(groups)),records=[];
-    populations.forEach((population,market)=>{
-      for(const [stratum,people] of Object.entries(population)){
-        const local={};
-        for(const i of goods){
-          const v=values[i] || {},ratioA=v.ratio ?? 1;
-          const ratio=market===0 || rule==='same'?ratioA:rule==='inverse'?1/ratioA:1;
-          // The substitution baseline is neutral: market price belongs only in the
-          // price ratio that produces D. The current SOL spending cache has a
-          // separate high-price cap and must not become the baseline weight here.
-          const unit=units[i]?.[stratum] || 0,price=units[i]?.price || 0;
-          const q=people*unit*(v.supply===false?0:1);
-          local[i]={b:q*price,ratio,supply:v.supply!==false,supported:v.supported!==false,v:1};
-        }
-        const response=substitute(groups,local,mode);
-        for(const i of goods){
-          const o=response.goods[i],ratio=local[i].ratio;
-          records.push({market,stratum,good:i,population:people,unit:units[i]?.[stratum] || 0,ratio,referencePrice:units[i]?.price || 0,baseline:o.baseline,target:o.target,d:o.response});
-        }
-      }
-    });
-    const result=goods.map(good=>{
-      const rows=records.filter(r=>r.good===good),total=aggregate(rows.map(r=>({b:r.baseline,d:r.d})),epsilon);
-      const local=populations.map((_,market)=>{const subset=rows.filter(r=>r.market===market),baseline=sum(subset.map(r=>r.baseline)),target=sum(subset.map(r=>r.target));return {baseline,target,d:baseline>0?target/baseline:1,error:baseline*total.m-target};});
-      return {good,...total,local};
-    });
-    return {goods:result,records,baseline:sum(result.map(g=>g.baseline)),target:sum(result.map(g=>g.target)),realized:sum(result.map(g=>g.baseline*g.m)),mode,rule,epsilon};
+  // Resulting multiplier relative to "without SOL" for a given size.
+  function realised(size, e, stacking) {
+    if (stacking === 'additive') return 1 + e > 0 ? Math.max(0, 1 + e + size) / (1 + e) : 1;
+    return Math.max(0, 1 + size);
   }
-  return { tier, memberships, substitute, aggregate, piecewise, historicalBase, modifierSize, nationalBasket, sum };
+
+  return { GROUPS, GOOD_NAMES, TIERS, NEUTRAL, tier, sum, memberships, planA, planB, aggregate, modifierSize, realised };
 });
