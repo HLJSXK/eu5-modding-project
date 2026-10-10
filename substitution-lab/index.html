@@ -11,7 +11,7 @@
 <body>
 <header class="hero">
   <div class="wrap">
-    <p class="kicker">SOL · 商品替代组恢复方案</p>
+    <p class="kicker">SOL · 商品替代组恢复方案 · <a href="pipeline.html">人口需求完整计算链 →</a></p>
     <h1>东西贵了，就换着买</h1>
     <p class="lead">商品替代组只做一件事：<strong>同一类东西里，某样变贵了，人们少买它，转去多买同类里便宜的。</strong>下面把恢复方案从价格一路算到游戏里的 modifier，每一步都能自己改数字看结果。</p>
     <ol class="flow" aria-label="计算链">
@@ -119,7 +119,7 @@
 </section>
 
 <section id="s6">
-  <h2><span class="num">6</span>写成 modifier <span class="tag test">叠加方式待实测</span></h2>
+  <h2><span class="num">6</span>写成 modifier <span class="tag new">已实测</span></h2>
   <p>每个商品定义一个国家静态 modifier，每月用 <code>mode = replace</code> 重写一次 size：</p>
 <pre><code># main_menu/common/static_modifiers/SOL_substitute_global_modifiers.txt
 sol_substitute_liquor = {
@@ -134,14 +134,17 @@ add_country_modifier = {
     mode = replace
     size = <span id="m-code-size">-0.2</span>
 }</code></pre>
-  <p>直觉是 <strong>size = M − 1</strong>。问题在于同一商品可能已经有别的修正，例如原版时代 1 给烈酒 −75%。引擎是把它们<em>相加</em>还是<em>相乘</em>，目前没人测过。</p>
+  <p>2026-10 在游戏里看人口需求明细实测（匈牙利贵族，布达），引擎的规则是：</p>
+  <p class="formula">需求 = 基础 × (1 + Σ同商品修正) × (1 + global_pop_demand) × (1 + local_pop_demand) × (1 + Σ原版百分比) × 各"×"项</p>
+  <ul class="plain">
+    <li><b>同一商品的多个修正相加</b>：两个 +50% 得到 ×2.0，不是 ×2.25；+25% 和 −75% 得到 ×0.5。</li>
+    <li><b>不同类型的修正相乘</b>：商品修正、全局、地点各是一个独立系数。所以替代倍率和 SOL 的 <code>local_pop_demand</code> 互不干扰。</li>
+    <li><b>系数低于 0 截断为 0</b>：−150% 时该商品直接从需求列表消失。</li>
+  </ul>
+  <p>因此 <strong>size 不能直接写 M − 1</strong>。若同一商品已有别的修正 e（时代、思潮等），要写 <strong>size = (1 + e) × (M − 1)</strong>。e 要从实际生效的修正读，测试中时代 1 的商品修正并未出现在明细里，不能照抄时代文件。</p>
   <div class="panel">
     <label class="slider-row"><span>目标 M</span><input type="range" id="m-m" min="0.2" max="2.5" step="0.01" value="0.5"><output id="m-m-out"></output></label>
     <label class="slider-row"><span>已有修正</span><input type="range" id="m-e" min="-0.9" max="1" step="0.05" value="-0.75"><output id="m-e-out"></output></label>
-    <div class="seg" role="radiogroup" aria-label="引擎叠加假设">
-      <label><input type="radio" name="m-stack" value="additive" checked> 假设：同类修正相加</label>
-      <label><input type="radio" name="m-stack" value="multiplicative"> 假设：各来源相乘</label>
-    </div>
     <div id="m-result" class="twin"></div>
   </div>
 </section>
@@ -153,7 +156,7 @@ add_country_modifier = {
     <li><b>每年 · 市场刷新</b>按校准消费量算每个市场的支出。<span class="chg">改：必须保留"每商品"明细，不能只存阶层总和——不同国家的 M 不同，总和没法复用。</span></li>
     <li><b>国家 · 算替代</b>遍历自己拥有的地点，算出全部商品的 M，算完再统一提交。<span class="chg">新增</span></li>
     <li><b>国家 · 写 modifier</b>每个商品写一次 size，每月重写。<span class="chg">新增</span></li>
-    <li><b>地点 · 算支出</b><code>sol_compute_location_pop_demand</code> 里每个商品支出乘上国家的实际倍率，再合计。<span class="chg">改，前提是第 6 步的叠加方式已经测清楚</span></li>
+    <li><b>地点 · 算支出</b><code>sol_compute_location_pop_demand</code> 里每个商品支出乘上国家的实际倍率，再合计。<span class="chg">改：已实测商品修正与地点修正相乘，直接乘 M 即可</span></li>
     <li><b>国家 · 阶层求解器</b>不变。</li>
     <li><b>地点 · local_pop_demand</b>不变，继续只调总量；不再乘一次商品倍率。</li>
   </ol>
@@ -189,12 +192,12 @@ add_country_modifier = {
       </ul>
     </div>
     <div>
-      <b>必须进游戏测</b>
+      <b>还要进游戏测</b>
       <ul class="plain">
-        <li><code>size = 0.25</code> 是否真的让需求 +25%</li>
-        <li>与时代等同商品修正相加还是相乘</li>
-        <li>与 <code>local_pop_demand</code>、<code>global_pop_demand</code> 怎么组合</li>
-        <li>负 size 和截断、人口需求多久滚动更新到位</li>
+        <li>时代 <code>goods_demand</code> 修正为何没出现在需求明细里，e 该从哪读</li>
+        <li>市场实际需求多久跟上 modifier（明细立即变，市场刷新慢且不规律）</li>
+        <li>国家 modifier 对奴隶等账本外人口的附带影响</li>
+        <li><s>同类相加还是相乘</s>、<s>与地点/全局怎么组合</s>、<s>负值截断</s>：已实测，见第 6 步</li>
       </ul>
     </div>
   </div>

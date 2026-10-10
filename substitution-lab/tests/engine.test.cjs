@@ -69,9 +69,37 @@ test('country aggregation is quantity weighted with a neutral fallback', () => {
   close(S.aggregate([{ q: 0.0005, d: 0.2 }]), 1);
 });
 
-test('modifier size under the additive hypothesis', () => {
-  close(S.modifierSize(0.5, -0.75, 'additive'), -0.125);
-  close(S.realised(-0.125, -0.75, 'additive'), 0.5);
-  close(S.realised(-0.5, -0.75, 'additive'), 0);
-  close(S.realised(S.modifierSize(1.3, 0, 'multiplicative'), 0, 'multiplicative'), 1.3);
+test('modifier size follows the measured same-type additive rule', () => {
+  close(S.modifierSize(0.5, -0.75), -0.125);
+  close(S.realised(-0.125, -0.75), 0.5);
+  close(S.realised(-0.5, -0.75), 0);
+  close(S.realised(S.modifierSize(1.3, 0), 0), 1.3);
+  close(S.realised(-1.5, 0), 0);
+});
+
+const locTotal = (l, k) => S.sum(S.STRATA.map(s => l[k][s]));
+
+test('pipeline alpha closes every location total but not strata', () => {
+  const r = S.pipeline(S.DEMO, {});
+  for (const l of r.loc) close(locTotal(l, 'spend'), locTotal(l, 'funds'), 1e-9);
+  assert.ok(Math.abs(r.strata.nobles.spend - r.strata.nobles.funds) > 1);
+});
+
+test('pipeline beta closes every country stratum exactly in the demo', () => {
+  for (const substitution of [false, true]) {
+    const r = S.pipeline(S.DEMO, { solver: true, substitution, savings: 0.2 });
+    assert.equal(r.solverStatus, 'exact');
+    for (const s of S.STRATA) close(r.strata[s].spend, r.strata[s].funds, 1e-7);
+  }
+});
+
+test('substitution M preserves the chosen country total, single market is exact', () => {
+  const q = S.pipeline(S.DEMO, { substitution: true });
+  const m = S.pipeline(S.DEMO, { substitution: true, weight: 'money' });
+  close(q.check.wheat.qActual, q.check.wheat.qTarget, 1e-9);
+  close(m.check.wheat.mActual, m.check.wheat.mTarget, 1e-9);
+  const one = JSON.parse(JSON.stringify(S.DEMO));
+  one.locations.forEach(l => { l.market = 'A'; });
+  const r = S.pipeline(one, { substitution: true });
+  close(r.M.wheat, r.market.A.d.wheat);
 });

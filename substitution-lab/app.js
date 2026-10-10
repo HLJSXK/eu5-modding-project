@@ -174,28 +174,24 @@
   // ---- Step 6 -------------------------------------------------------------
   function renderModifier() {
     const M = Number($('m-m').value), e = Number($('m-e').value);
-    const stack = document.querySelector('input[name="m-stack"]:checked').value;
     $('m-m-out').textContent = x(M);
     $('m-e-out').textContent = pct(e);
-    const fixed = S.modifierSize(M, e, stack);
+    const fixed = S.modifierSize(M, e);
     const card = (title, size, desc) => {
-      const got = S.realised(size, e, stack), ok = Math.abs(got - M) < 1e-6;
+      const got = S.realised(size, e), ok = Math.abs(got - M) < 1e-6;
       return `<div class="mini ${ok ? 'good' : 'bad'}">
         <h4>${title}</h4>
         <p>写 size = <b>${size.toFixed(3)}</b></p>
         <p>结果：需求是"没有 SOL 时"的 <b>${x(got)}</b></p>
-        <p class="verdict">${ok ? '✓ 等于目标 M' : `✗ 目标是 ${x(M)}${got === 0 ? '，需求被压到 0' : ''}`}</p>
+        <p class="verdict">${ok ? '✓ 等于目标 M' : `✗ 目标是 ${x(M)}${got === 0 ? '，需求被截断为 0' : ''}`}</p>
         <p class="caption">${desc}</p>
       </div>`;
     };
-    $('m-result').innerHTML = card('直接写 M − 1', M - 1, '最直观的写法')
-      + (stack === 'additive'
-        ? card('按假设换算', fixed, '若相加：size = (1 + 已有修正) × (M − 1)')
-        : card('相乘时不用换算', fixed, '若各来源相乘，M − 1 就是对的'));
+    $('m-result').innerHTML = card('直接写 M − 1', M - 1, '只在该商品没有其他修正（e = 0）时正确')
+      + card('正确写法', fixed, 'size = (1 + 已有修正) × (M − 1)');
     $('m-code-size').textContent = fixed.toFixed(3);
   }
   ['m-m', 'm-e'].forEach(id => $(id).addEventListener('input', renderModifier));
-  all('input[name="m-stack"]').forEach(el => el.addEventListener('change', renderModifier));
 
   // ---- Sandbox ------------------------------------------------------------
   $('x-groups').innerHTML = S.GROUPS.map(g => `

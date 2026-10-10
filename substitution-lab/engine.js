@@ -122,16 +122,132 @@
     return base > epsilon ? target / base : 1;
   }
 
-  // What size to write so the good ends up at M relative to the outside
-  // offset e, under two engine hypotheses that still need in-game testing.
-  function modifierSize(m, e, stacking) {
-    return stacking === 'additive' ? (1 + e) * (m - 1) : m - 1;
-  }
+  // Measured in-game (1.4): sources of the same per-good modifier add inside
+  // one factor (1 + sum), different modifier types multiply, and a factor
+  // below 0 clamps demand to 0. Size that makes the good end up at M relative
+  // to "without SOL", given the existing same-good offset e:
+  function modifierSize(m, e) { return (1 + e) * (m - 1); }
   // Resulting multiplier relative to "without SOL" for a given size.
-  function realised(size, e, stacking) {
-    if (stacking === 'additive') return 1 + e > 0 ? Math.max(0, 1 + e + size) / (1 + e) : 1;
-    return Math.max(0, 1 + size);
+  function realised(size, e) { return 1 + e > 0 ? Math.max(0, 1 + e + size) / (1 + e) : 1; }
+
+  // ---- Whole SOL demand pipeline on a toy country --------------------------
+  // Mirrors A_SOL_economy_effects.txt: yearly market unit spending, location
+  // raw closure (result alpha), country class solver (result beta), plus the
+  // planned country substitution factor M. Four strata as in the solver:
+  // nobles, clergy, burghers, lower (= commoners + tribesmen).
+  const STRATA = ['nobles', 'clergy', 'burghers', 'lower'];
+  const DEMO = {
+    goods: { wheat: { price: 1 }, rice: { price: 1 }, cloth: { price: 2 } },
+    groups: [{ id: 'staple', n: 2, members: ['wheat', 'rice'] }, { id: 'cloth', n: 1, members: ['cloth'] }],
+    // Per-capita quantity: a constant table computed outside the game.
+    unit: {
+      nobles: { wheat: 4, rice: 2, cloth: 3 },
+      clergy: { wheat: 3, rice: 2, cloth: 2 },
+      burghers: { wheat: 3, rice: 3, cloth: 2 },
+      lower: { wheat: 1, rice: 1, cloth: 0.3 },
+    },
+    markets: { A: { wheat: 2.0, rice: 1, cloth: 1 }, B: { wheat: 0.6, rice: 1, cloth: 1 } },
+    locations: [
+      { id: 'L1', market: 'A', pop: { nobles: 0.2, clergy: 0.1, burghers: 4, lower: 10 }, income: { nobles: 5, clergy: 2, burghers: 45, lower: 24 } },
+      { id: 'L2', market: 'A', pop: { nobles: 0.2, clergy: 0.1, burghers: 0.3, lower: 30 }, income: { nobles: 5, clergy: 1, burghers: 4, lower: 72 } },
+      { id: 'L3', market: 'B', pop: { nobles: 0.1, clergy: 2, burghers: 0.3, lower: 6 }, income: { nobles: 3, clergy: 22, burghers: 3, lower: 10 } },
+      { id: 'L4', market: 'B', pop: { nobles: 2, clergy: 0.1, burghers: 0.3, lower: 6 }, income: { nobles: 45, clergy: 2, burghers: 3, lower: 10 } },
+    ],
+  };
+
+  function solve4(A, b) {
+    const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      if (Math.abs(M[p][c]) < 1e-12) return null;
+      [M[c], M[p]] = [M[p], M[c]];
+      for (let r = 0; r < n; r++) if (r !== c) {
+        const f = M[r][c] / M[c][c];
+        for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+      }
+    }
+    return M.map((r, i) => r[n] / r[i]);
   }
 
-  return { GROUPS, GOOD_NAMES, TIERS, NEUTRAL, tier, sum, memberships, planA, planB, aggregate, modifierSize, realised };
+  // opts: { substitution, weight: 'quantity'|'money', solver, savings }
+  function pipeline(cfg, opts = {}) {
+    const goods = Object.keys(cfg.goods);
+    const sub = !!opts.substitution, weight = opts.weight || 'quantity';
+    // 1. Yearly market refresh: effective price min(market, default) and D.
+    const market = {};
+    for (const [id, ratios] of Object.entries(cfg.markets)) {
+      const D = planA(cfg.groups, Object.fromEntries(goods.map(g => [g, { ratio: ratios[g] }])));
+      market[id] = {
+        pEff: Object.fromEntries(goods.map(g => [g, Math.min(ratios[g], 1) * cfg.goods[g].price])),
+        d: Object.fromEntries(goods.map(g => [g, D[g].d])),
+      };
+    }
+    // 2. Quantities before any scaling: pop x constant unit table.
+    const loc = cfg.locations.map(l => ({
+      ...l,
+      q: Object.fromEntries(STRATA.map(s => [s, Object.fromEntries(goods.map(g => [g, l.pop[s] * cfg.unit[s][g]]))])),
+    }));
+    const qOf = (l, g) => sum(STRATA.map(s => l.q[s][g]));
+    // 3. Country substitution factor M(g), one per good.
+    const M = {}, check = {};
+    for (const g of goods) {
+      let base = 0, target = 0;
+      for (const l of loc) {
+        const mk = market[l.market], w = weight === 'money' ? mk.pEff[g] : 1;
+        base += qOf(l, g) * w; target += qOf(l, g) * mk.d[g] * w;
+      }
+      M[g] = sub && base > 1e-9 ? target / base : 1;
+      const dd = l => (sub ? market[l.market].d[g] : 1);
+      check[g] = {
+        qTarget: sum(loc.map(l => qOf(l, g) * dd(l))),
+        qActual: sum(loc.map(l => qOf(l, g) * M[g])),
+        mTarget: sum(loc.map(l => qOf(l, g) * dd(l) * market[l.market].pEff[g])),
+        mActual: sum(loc.map(l => qOf(l, g) * M[g] * market[l.market].pEff[g])),
+        perMarket: Object.keys(market).map(m => {
+          const ls = loc.filter(l => l.market === m);
+          return { market: m, target: sum(ls.map(l => qOf(l, g) * dd(l))), actual: sum(ls.map(l => qOf(l, g) * M[g])) };
+        }),
+      };
+    }
+    // 4. Location closure (result alpha): k = liquid funds / base spending.
+    const fundsMul = Math.max(0, 1 + (opts.savings || 0));
+    for (const l of loc) {
+      const mk = market[l.market];
+      l.base = Object.fromEntries(STRATA.map(s => [s, sum(goods.map(g => l.q[s][g] * M[g] * mk.pEff[g]))]));
+      l.funds = Object.fromEntries(STRATA.map(s => [s, l.income[s] * fundsMul]));
+      const B = sum(STRATA.map(s => l.base[s])), F = sum(STRATA.map(s => l.funds[s]));
+      l.k = B > 0 ? F / B : 1;
+    }
+    // 5. Country class solver (result beta). Class = most over-represented
+    // stratum by base-spending share; the real code adds confidence ordering
+    // and capacity penalties, and a vertex sweep when the exact solve fails.
+    const country = Object.fromEntries(STRATA.map(s => [s, sum(loc.map(l => l.base[s]))]));
+    const cTotal = sum(Object.values(country));
+    for (const l of loc) {
+      const B = sum(STRATA.map(s => l.base[s]));
+      let best = -Infinity;
+      STRATA.forEach((s, i) => {
+        const score = (l.base[s] / B - country[s] / cTotal) / Math.max(country[s] / cTotal, 0.02);
+        if (score > best) { best = score; l.cls = i; }
+      });
+    }
+    const A = STRATA.map(s => STRATA.map((_, c) => sum(loc.filter(l => l.cls === c).map(l => l.base[s] * l.k))));
+    const target = STRATA.map(s => sum(loc.map(l => l.funds[s])));
+    let coef = [1, 1, 1, 1], solverStatus = 'off';
+    if (opts.solver) {
+      const x = solve4(A, target);
+      if (x && x.every(v => v > 0)) { coef = x; solverStatus = 'exact'; }
+      else solverStatus = 'fallback';
+    }
+    for (const l of loc) {
+      l.c = coef[l.cls];
+      l.scale = l.k * l.c;
+      l.spend = Object.fromEntries(STRATA.map(s => [s, l.base[s] * l.scale]));
+    }
+    const strata = Object.fromEntries(STRATA.map((s, i) => [s, { funds: target[i], spend: sum(loc.map(l => l.spend[s])) }]));
+    return { goods, market, loc, M, check, coef, solverStatus, strata };
+  }
+
+  return { STRATA, DEMO, pipeline, solve4, GROUPS, GOOD_NAMES, TIERS, NEUTRAL, tier, sum, memberships, planA, planB, aggregate, modifierSize, realised };
 });

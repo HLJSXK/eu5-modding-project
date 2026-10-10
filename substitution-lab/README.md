@@ -6,11 +6,13 @@
 
 页面上每个结论都标注来源性质：**v1.1 原样**（旧版行为）、**新方案**（本次恢复新定的规则）、**待实测**（必须进游戏验证）。它是离线演示，不代表游戏内已实现。
 
+另有 `pipeline.html`：SOL 人口需求完整计算链（消费常量表 → 市场有效价格 → 国家替代倍率 M → 地点闭合 α → 国家求解器 β → 写入 modifier），用 4 地点 2 市场的示例国家逐步演示，并对比 v1.1 / α / β / β+替代组的精确与近似范围。
+
 ## 文件
 
 - `index.html` / `styles.css`：页面与样式（支持深色模式、手机宽度）
 - `engine.js`：全部数学（档位、方案 A/B、国家聚合、modifier size 换算），浏览器与 Node 共用
-- `app.js`：交互
-- `tests/engine.test.cjs`：`npm.cmd test`，核对规格里的数值例子（90/10 → 60/13.33 与 81.82/18.18、跨组平均、预算守恒、e=-0.75 时 size=-0.125 等）
+- `app.js`：替代组页交互；`pipeline.js`：计算链页交互
+- `tests/engine.test.cjs`：`npm.cmd test`，核对规格里的数值例子（90/10 → 60/13.33 与 81.82/18.18、跨组平均、预算守恒、e=-0.75 时 size=-0.125、α 地点闭合、β 阶层闭合、单市场 M=D 等）
 
 依据：[实施规格](../docs/technical/SOL_Substitute_Groups_Global_Modifier_Implementation.md)、[审计报告](../docs/technical/SOL_Substitute_Groups_Global_Modifier_Audit.md)。商品清单取当前 `data/goods_weights.csv`（v1.1 差异：奢侈食物多加工食品，坐骑无骆驼）。
