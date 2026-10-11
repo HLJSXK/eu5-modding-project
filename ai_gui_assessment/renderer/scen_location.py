@@ -1,23 +1,38 @@
+import colorsys
+
 from scenarios import COMMON
 
-POPS = [  # type, name, color, power, literacy, size, total, growth
-    ("nobles", "贵族", (0.62, 0.45, 0.80), 1.2, 0.62, 0.013, "410", "+0.01"),
-    ("clergy", "神职人员", (0.93, 0.89, 0.74), 0.6, 0.71, 0.038, "1.20K", "+0.02"),
-    ("burghers", "市民", (0.86, 0.60, 0.25), 0.9, 0.48, 0.149, "4.71K", "+0.05"),
-    ("laborers", "劳工", (0.55, 0.65, 0.75), 0.3, 0.12, 0.180, "5.69K", "+0.04"),
-    ("peasants", "农民", (0.50, 0.75, 0.40), 0.4, 0.06, 0.540, "17.06K", "+0.09"),
-    ("soldiers", "士兵", (0.75, 0.38, 0.38), 0.1, 0.09, 0.080, "2.53K", "+0.01"),
+
+def _hsv360(h, s, v):
+    return colorsys.hsv_to_rgb(h / 360, s / 100, v / 100)
+
+
+# main_menu/common/named_colors/02_map.txt:4245-4252 (pop_nobles ... pop_tribes)
+POP_COLORS = {
+    "nobles": _hsv360(224, 59, 80), "clergy": _hsv360(217, 13, 90), "burghers": _hsv360(40, 87, 79),
+    "laborers": colorsys.hsv_to_rgb(0.6, 0.3, 0.2), "peasants": _hsv360(78, 44, 47),
+    "soldiers": _hsv360(0, 74, 88), "tribesmen": _hsv360(20, 44, 47),
+}
+
+POPS = [  # type, name, color, power, literacy, size, total, growth  (format copied from the 1080p screenshot)
+    ("nobles", "贵族", (0.62, 0.45, 0.80), 48, 0.35, 0.013, "476", "#G +3#!"),
+    ("clergy", "教士", (0.93, 0.89, 0.74), 17, 0.55, 0.033, "1,134", "#G +3#!"),
+    ("burghers", "市民", (0.86, 0.60, 0.25), 14, 0.10, 0.046, "1,600", ""),
+    ("laborers", "劳工", (0.55, 0.65, 0.75), 1, 0.10, 0.103, "3,550", "#G +1#!"),
+    ("soldiers", "士兵", (0.75, 0.38, 0.38), 1, 0.10, 0.036, "1,250", ""),
+    ("peasants", "农民", (0.50, 0.75, 0.40), 1, 0.09, 0.766, "26,264", ""),
+    ("tribesmen", "部落民", (0.70, 0.50, 0.35), 0, 0.0, 0.0, "0", ""),  # game lists zero-size pop types too
 ]
 CULTURES = [("奥地利人", 0.81, "25.60K"), ("波希米亚人", 0.12, "3.79K"), ("匈牙利人", 0.07, "2.21K")]
 RELIGIONS = [("天主教", 0.96, "30.34K"), ("东正教", 0.04, "1.26K")]
 
 
 def location(tab="demography"):
-    pops = [{"__type__": "LocationPopItem", "GetType.GetNameWithNoTooltip": n, "GetColor": c, "GetPoliticalPower": pw,
+    pops = [{"__type__": "LocationPopItem", "GetType.GetNameWithNoTooltip": n, "GetColor": POP_COLORS[t], "GetPoliticalPower": pw,
              "GetLiteracy": lit * 100, "GetSize": sz, "GetTotalSize": tot, "GetGrowthForUI": g, "GetType": t,
              "PopType.Self": t, "PopType.GetNameWithNoTooltip": n}
             for (t, n, c, pw, lit, sz, tot, g) in POPS]
-    poptypes = [{"__type__": "PopTypeItem", "GetPercentage": p["GetSize"], "GetColor": p["GetColor"]} for p in pops]
+    poptypes = [{"__type__": "PopTypeItem", "GetPercentage": p["GetSize"], "GetColor": POP_COLORS[p["GetType"]]} for p in pops]
     politics = [{"__type__": "PopPoliticsItem", "GetPercentage": v, "GetColor": c} for v, c in
                 ((0.38, (0.62, 0.45, 0.80)), (0.12, (0.93, 0.89, 0.74)), (0.21, (0.86, 0.60, 0.25)), (0.29, (0.50, 0.75, 0.40)))]
     cultures = [{"__type__": "PopCultureItem", "GetNameWithNoTooltip": n, "GetPercentage": p, "GetAbsoluteSize": a,

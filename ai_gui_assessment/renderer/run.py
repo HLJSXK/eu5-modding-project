@@ -21,6 +21,8 @@ from gui import Expander, GuiDB, dump
 from textures import TEXTURES
 
 OUT = Path(__file__).resolve().parents[1] / "images"
+if os.environ.get("RENDER_OUT"):
+    OUT = OUT / os.environ["RENDER_OUT"]
 # 1080p, UI scale 100%: 1 GUI unit = 1 screen pixel; lateral panel height = 1080 - topbar 40 - panel bar 90
 SCREEN_H = 1080
 PANEL_H = SCREEN_H - 130
@@ -75,7 +77,7 @@ def situation(panel_h=PANEL_H):
     path, n = find_root(db, "panels/situation/global_living_standard.gui")
     el = ex.build(n.key, n.value, {}, path, n.line)
     img = render_panel(eng, el, 570, panel_h, extra_bottom=130)
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     img.save(OUT / "r1_situation_panel.png")
     # unclipped variant: grow the panel until the scroll area shows everything
     sa = [e for e in walk(el) if e.kind == "scrollarea" and e.w > 0]
@@ -91,7 +93,7 @@ def location(panel_h=PANEL_H, tab="demography", tag="r2"):
     path, n = find_root(db, "in_game/gui/location_window.gui", "lateralview")
     el = ex.build(n.key, n.value, {}, path, n.line)
     img = render_panel(eng, el, 570, panel_h, extra_bottom=130)
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     img.save(OUT / f"{tag}_location_window.png")
     sa = [e for e in walk(el) if e.kind == "scrollarea" and e.w > 0]
     grow = max([max([c.h for c in s_.children if c.h] or [0]) - s_.h for s_ in sa] or [0])

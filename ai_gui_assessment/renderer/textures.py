@@ -99,10 +99,13 @@ def sprite(img: Image.Image, spec: dict, w: int, h: int, scale: float) -> Image.
         bb = int(_f(spec.get("spriteborder_bottom", bb)))
         tiled = st == "corneredtiled"
         W, H = img.size
-        bl, br = min(bl, W // 2), min(br, W // 2)
-        bt, bb = min(bt, H // 2), min(bb, H // 2)
-        # output border sizes
-        obl, obr, obt, obb = [int(round(v * k)) for v in (bl, br, bt, bb)]
+        # spriteborder is in GUI (screen) units, not texture pixels: source border = border * texture_density.
+        # Confirmed in game: pattern_bevel_vertical_bis (52px, density 2, border 12) shows a 12px strip, empty middle.
+        obl, obr, obt, obb = [int(round(v * scale)) for v in (bl, br, bt, bb)]
+        bl, br, bt, bb = [int(round(v * dens)) for v in (bl, br, bt, bb)]
+        # keep at least a 1px middle slice when the borders cover the whole texture (e.g. paper_card: 400px, border 200)
+        bl, br = min(bl, (W - 1) // 2), min(br, (W - 1) // 2)
+        bt, bb = min(bt, (H - 1) // 2), min(bb, (H - 1) // 2)
         # avoid borders bigger than target
         if obl + obr > w:
             f = w / max(obl + obr, 1)
@@ -185,7 +188,7 @@ def parse_color(v):
 def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Image | None:
     """Render a background/icon texture spec to an RGBA image of w_px x h_px."""
     spec = lower_spec(spec)
-    tex = resolve(spec.get("texture"))
+    tex = resolve(spec.get("texture")) if spec.get("texture") is not None else None
     img = TEXTURES.load(tex) if isinstance(tex, str) else None
     if img is None:
         return None
@@ -193,13 +196,21 @@ def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Im
     out = to_np(sprite(img, spec, w_px, h_px, scale))
     for ms in spec.get("modifies", []):
         ms = lower_spec(ms)
-        mt = resolve(ms.get("texture"))
+        col = ms.get("color")
+        if isinstance(col, str):
+            col = resolve(col)
+            col = list(col) if isinstance(col, (list, tuple)) else None
+        col = parse_color(col) if isinstance(col, list) else None
+        mt = resolve(ms.get("texture")) if ms.get("texture") is not None else None
         mimg = TEXTURES.load(mt) if isinstance(mt, str) else None
         if mimg is None:
-            continue
-        mimg = select_frame(mimg, ms)
-        m = to_np(sprite(mimg, ms, out.shape[1], out.shape[0], scale))
-        col = parse_color(ms.get("color"))
+            if col is None or ms.get("texture"):
+                continue
+            # colour-only modify_texture: flat colour layer (e.g. bg_building_card_colors' "building_color")
+            m = np.ones((out.shape[0], out.shape[1], 4), np.float32)
+        else:
+            mimg = select_frame(mimg, ms)
+            m = to_np(sprite(mimg, ms, out.shape[1], out.shape[0], scale))
         if col:
             m[..., :3] *= np.array(col[:3], dtype=np.float32)
             m[..., 3] *= col[3]

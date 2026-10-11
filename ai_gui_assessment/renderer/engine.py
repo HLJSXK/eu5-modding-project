@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 
 import numpy as np
@@ -13,6 +14,7 @@ from text import RichText, TextStyle
 from textures import TEXTURES, compose, lower_spec, sprite, select_frame, to_np, from_np, blend, parse_color
 
 INF = 1e9
+ZERO = {"hint": (0.0, 0.0), "min": (0.0, 0.0), "max": (0.0, 0.0)}
 BOX = ("hbox", "vbox")
 TEXT = ("textbox", "editbox")
 
@@ -139,14 +141,14 @@ class Engine:
             return self.process(el.props["text"])
         return None
 
-    def richtext(self, el, max_width=None):
-        key = ("rt", max_width)
+    def richtext(self, el, max_width=None, size_override=None):
+        key = ("rt", max_width, size_override)
         cache = el.__dict__.setdefault("_rt", {})
         if key in cache:
             return cache[key]
         s = self.text_of(el) or ""
         font = el.props.get("font", "StandardGameFont")
-        size = num(el.props.get("fontsize"), 15)
+        size = size_override or num(el.props.get("fontsize"), 15)
         df = el.props.get("default_format")
         df = df[1:] if isinstance(df, str) and df.startswith("#") else df
         st = TextStyle(self.formats, font, size, df)
@@ -173,6 +175,17 @@ class Engine:
                     ch.ctx_item = it
                     ch.props["__dm_item__"] = True
                     el.children.append(ch)
+
+    def layout_children(self, el):
+        """Children taking part in box layout. Hidden children take neither size nor spacing, with or without
+        `ignoreinvisible` (confirmed in game: situation panel card sits directly under the tab bar)."""
+        return self.vis_children(el)
+
+    def _shown(self, c):
+        p = self.push(c)
+        v = self.visible(c)
+        self.pop(p)
+        return v
 
     def vis_children(self, el):
         self.realize(el)
@@ -244,10 +257,10 @@ class Engine:
         hw = hh = 0.0
         kind = el.kind
         if kind in BOX:
-            kids = self.vis_children(el)
+            kids = self.layout_children(el)
             sp = num(el.props.get("spacing"), 0)
             inner_avail = None if avail_w is None else max(0, avail_w - l - r)
-            ms = [self.measure(c, inner_avail if kind == "vbox" else None) for c in kids]
+            ms = [self.measure(c, inner_avail if kind == "vbox" else None) if self._shown(c) else ZERO for c in kids]
             if kind == "hbox":
                 hw = sum(m["hint"][0] for m in ms) + sp * max(0, len(ms) - 1)
                 hh = max([m["hint"][1] for m in ms] or [0])
@@ -274,7 +287,8 @@ class Engine:
                 hw = min(hw, num(el.props["max_width"]) + l + r)
             if el.props.get("min_width"):
                 hw = max(hw, num(el.props["min_width"]))
-            hh = max(sh or 0, th) if (autoresize or el.props.get("multiline") == "yes") else (sh if sh is not None else th)
+            # autoresize text takes its own line height (fontsize 15 -> 21) and ignores the template's size {0 23}
+            hh = th if (autoresize or el.props.get("multiline") == "yes") else (sh if sh is not None else th)
             mw, mh = (hw if autoresize else 0), hh
         elif kind in ("fixedgridbox",):
             n = self._dm_count(el)
@@ -332,7 +346,10 @@ class Engine:
             hw = sw
             mw = sw
         if sh is not None and kind not in BOX:
-            hh = max(sh, hh) if kind in TEXT else sh
+            if not (kind in TEXT and (el.props.get("autoresize") == "yes" or el.props.get("multiline") == "yes")):
+                hh = sh
+            elif kind in TEXT and el.props.get("multiline") == "yes" and el.props.get("autoresize") != "yes":
+                hh = max(sh, hh)
             mh = hh
         elif sh is not None:
             hh = mh = sh
@@ -454,7 +471,10 @@ class Engine:
             self.pop(pu)
 
     def _place_box(self, el, x, y, w, h, axis):
-        kids = self.vis_children(el)
+        kids = self.layout_children(el)
+        rev = el.props.get("righttoleft" if axis == 0 else "bottomtotop") == "yes"
+        if rev:
+            kids = list(reversed(kids))
         if not kids:
             return
         sp = num(el.props.get("spacing"), 0)
@@ -463,8 +483,8 @@ class Engine:
         items = []
         for c in kids:
             pu = self.push(c)
-            m = self.measure(c, w if axis == 1 else None)
-            pol = self.policy(c, axis)
+            m = self.measure(c, w if axis == 1 else None) if self._shown(c) else ZERO
+            pol = self.policy(c, axis) if m is not ZERO else "fixed"
             cpol = self.policy(c, 1 - axis)
             hint = m["hint"][axis]
             mn = m["min"][axis]
@@ -579,8 +599,9 @@ class Engine:
         img.alpha_composite(layer, (X, Y))
 
     def _res_tex(self, v):
+        """Resolver handed to compose(): strings for textures, tuples/lists for data-bound colours."""
         r = self.resolve(v)
-        return r if isinstance(r, str) else None
+        return r if isinstance(r, (str, tuple, list)) else None
 
     def _render(self, el, img, alpha, clip):
         a = alpha * num(el.props.get("alpha"), 1.0)
@@ -688,6 +709,13 @@ class Engine:
         rt = self.richtext(el, maxw)
         align = str(el.props.get("align", "left")).lower()
         bw, bh = el.w - l - r, el.h - t - b
+        # fontsize_min: fixed-size single-line text shrinks until it fits (confirmed in game: long culture names)
+        if maxw is None and el.props.get("autoresize") != "yes" and rt.width > bw + 0.5:
+            size = num(el.props.get("fontsize"), 15)
+            fmin = num(el.props.get("fontsize_min"), 8)
+            while rt.width > bw + 0.5 and size > fmin:
+                size -= 1
+                rt = self.richtext(el, maxw, size)
         # per-line horizontal alignment
         line_w = {}
         for (x, line, kind, payload, st, w) in rt.items:
@@ -713,46 +741,41 @@ class Engine:
         self._paste(img, layer, el.x - 20, el.y - 10, clip if clip else None)
 
     def _pie(self, el, img, a, clip):
+        """Pie slices are drawn through each slice's texture (e.g. piechart_alpha.dds is a ring), tinted by its color."""
         slices = []
         for c in self.vis_children(el):
-            for s in ([c] if c.kind == "pieslice" else []):
-                pu = self.push(s)
-                v = self.ev.eval_str(str(s.props.get("value", "0")))
-                col = None
-                tex = self._res_tex(s.props.get("texture"))
-                if isinstance(s.props.get("color"), list):
-                    col = parse_color(s.props.get("color"))
-                    if isinstance(s.props.get("color"), str):
-                        col = None
-                cv = self.resolve(s.props.get("color")) if isinstance(s.props.get("color"), str) else None
-                if isinstance(cv, tuple):
-                    col = list(cv)
-                if tex:
-                    timg = TEXTURES.load(tex)
-                    if timg is not None:
-                        arr = np.asarray(timg.convert("RGBA"), dtype=np.float32)
-                        msk = arr[..., 3] > 128
-                        if msk.any():
-                            tc = arr[msk][:, :3].mean(0) / 255
-                            col = [tc[0] * (col[0] if col else 1), tc[1] * (col[1] if col else 1), tc[2] * (col[2] if col else 1), 1]
-                self.pop(pu)
-                try:
-                    v = float(v)
-                except (TypeError, ValueError):
-                    v = 0
-                slices.append((max(0.0, v), col or [0.6, 0.6, 0.6, 1]))
-        tot = sum(s[0] for s in slices)
-        if tot <= 0:
-            return
+            if c.kind != "pieslice":
+                continue
+            pu = self.push(c)
+            v = self.ev.eval_str(str(c.props.get("value", "0")))
+            col = c.props.get("color")
+            col = parse_color(col) if isinstance(col, list) else self.resolve(col)
+            col = list(col) + [1.0] * (4 - len(col)) if isinstance(col, (list, tuple)) else [1, 1, 1, 1]
+            tex = self._res_tex(c.props.get("texture"))
+            salpha = num(c.props.get("alpha"), 1.0)
+            self.pop(pu)
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                v = 0.0
+            slices.append((max(0.0, v), col, tex, salpha))
+        tot = sum(sl[0] for sl in slices)
         W, H = self.px(el.w), self.px(el.h)
-        layer = Image.new("RGBA", (max(W, 1), max(H, 1)))
-        d = ImageDraw.Draw(layer)
-        ang = -90.0
-        for v, col in slices:
+        if tot <= 0 or W <= 0 or H <= 0:
+            return
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        ang = (np.degrees(np.arctan2(xx - W / 2 + 0.5, -(yy - H / 2 + 0.5))) + 360) % 360  # 0 = up, clockwise
+        out = np.zeros((H, W, 4), np.float32)
+        start = 0.0
+        for v, col, tex, salpha in slices:
             sweep = 360 * v / tot
-            d.pieslice((0, 0, W - 1, H - 1), ang, ang + sweep, fill=tuple(int(c * 255) for c in col[:3]) + (int(230 * a),))
-            ang += sweep
-        self._paste(img, layer, el.x, el.y, clip)
+            m = (ang >= start) & (ang < start + sweep)
+            start += sweep
+            timg = TEXTURES.load(tex) if tex else None
+            t = to_np(timg.resize((W, H), Image.BILINEAR)) if timg is not None else np.ones((H, W, 4), np.float32)
+            out[m, :3] = t[m, :3] * np.array(col[:3], np.float32)
+            out[m, 3] = t[m, 3] * col[3] * salpha * a
+        self._paste(img, from_np(out), el.x, el.y, clip)
 
     def _scene(self, el, img, clip):
         W, H = self.px(el.w), self.px(el.h)

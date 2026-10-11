@@ -22,6 +22,7 @@
 | `data.py` | 本地化、文本格式、表达式求值、数字格式 |
 | `scenarios.py` / `scen_location.py` | 示例数据 |
 | `guidef.py` | 调试工具：`guidef.py NAME...` 打印某个 type 或 template 的完整定义 |
+| `compare.py` | 截图与渲染图的并排 / 放大比对 |
 
 ## 输出 `images/`
 
@@ -34,20 +35,15 @@
 | `r3_location_sol_tooltip.png` | 地点 SOL 按钮 tooltip |
 | `r*_tree.txt` | 展开后的元素树和每个元素的布局结果，用于和实机截图比对 |
 
-## 已由实机确认的规则
+## 实机比对
 
-- 没有 `expand` 的 expanding hbox 中，固定尺寸的子元素会均匀分布，首尾贴边（商品网格）。
-- expanding 子元素先于 growing 子元素（`expand`）获得多余空间（人口页签的三个图表会撑满）。
+截图在 `screenshots/`，比对结果和已确认的规则见 **`06_screenshot_requests.md`**。比对命令：
 
-## 仍属推断的部分
+```
+python renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
+```
 
-- modify_texture 未写 blend_mode 时，默认模式为 normal；
-- `widgetanchor` 不写时默认等于 `parentanchor`；
-- 行高、文字发光的粗细；
-- 数字格式后缀（只有 `+=` / `=+` 才显示正号并着色）；
-- 滚动条是否占用内容宽度。
-
-3D 场景和程序生成的国旗画不出来，图中是占位。
+修正后，tooltip 高度与实机完全一致，各文字行的纵向位置误差在 0–1px 以内。3D 场景、插画、国旗以及具体数值无法复现（示例数据）。
 
 ## 文档
 
@@ -58,3 +54,4 @@
 | `03_sol_screens_anatomy.md` | 三个界面的结构树与设计决定 |
 | `04_community_patterns.md` | reference_mods 中的社区 GUI 技法 |
 | `05_ai_gaps.md` | AI 欠缺的根因、项目内证据、新发现的问题、自评与改进建议 |
+| `06_screenshot_requests.md` | **实机比对结果**：已确认的引擎规则、修正前后的差异、仍未确认的项 |

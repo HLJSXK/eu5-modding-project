@@ -103,7 +103,9 @@ class TextIcons:
             return self.d[name]
         # goods icons are registered by the engine from the goods database
         tex = f"gfx/interface/icons/trade_goods/icon_goods_{name}.dds"
-        return {"texture": tex, "size": [20, 20], "offset": [0, 4], "__goods__": True}
+        # engine-registered goods icon: NJominiIcons MODIFIER_TEXT_ICON_SIZE {32 32} at font size 18, scaled to the
+        # text's font size (measured in game: ~27px at fontsize 15)
+        return {"texture": tex, "size": [32, 32], "offset": [0, 4], "fontsize": 18, "__goods__": True}
 
 
 # ------------------------------------------------------------------ expressions
@@ -381,13 +383,17 @@ class Evaluator:
 # ------------------------------------------------------------------ concept textures
 def load_concept_textures():
     out = {}
-    for p in (GAME / "in_game" / "common" / "game_concepts").glob("*.txt"):
+    for p in (GAME / "main_menu" / "common" / "game_concepts").glob("*.txt"):
         nodes = parse(p.read_text(encoding="utf-8-sig", errors="replace"), str(p), {})
         for n in nodes:
             if n.is_block():
                 for c in n.value:
                     if c.key == "texture" and isinstance(c.value, str):
-                        out[n.key] = c.value
+                        # short form "location_icons/x" -> gfx/interface/icons/location_icons/x.dds
+                        v = c.value
+                        if not v.startswith("gfx/"):
+                            v = f"gfx/interface/icons/{v}.dds"
+                        out[n.key] = v
     return out
 
 
@@ -396,16 +402,19 @@ CONCEPT_TEXTURES = load_concept_textures()
 
 # ------------------------------------------------------------------ number formatting
 def format_number(v, spec: str):
-    """Best-effort implementation of the |format suffix (semantics inferred, see 02 doc)."""
+    """|format suffix. Confirmed in game (1080p screenshots 2026-10-11):
+    '+'  colours the number by sign (positive green, negative red, zero uncoloured) but prints no '+';
+    '='  prints an explicit '+' on positive values (so '+=' gives "+5.5%" in green, zero "0.0%" uncoloured);
+    digit = decimals; '%' multiplies by 100.  '-' (reverse colours) and letter suffixes remain inferred.
+    """
     x = _num(v)
     digits = re.findall(r"\d", spec)
     dec = int(digits[0]) if digits else None
     pct = "%" in spec
-    # '+' alone does not print a sign (vanilla writes "+[X|+0]"); '+=' / '=+' does
-    sign = "+=" in spec or "=+" in spec
+    sign = "=" in spec
     color = None
-    if "=" in spec:
-        neg = "-=" in spec
+    if "+" in spec or "-" in spec:
+        neg = "-" in spec and "+" not in spec
         if x > 0:
             color = "R" if neg else "G"
         elif x < 0:
@@ -413,7 +422,7 @@ def format_number(v, spec: str):
     if pct:
         x *= 100
     if dec is None:
-        dec = 0 if not pct else 0
+        dec = 0
         if not digits and not pct and abs(x - round(x)) > 1e-9:
             dec = 2
     s = f"{abs(x):,.{dec}f}" if "<" not in spec else f"{abs(x):.{dec}f}"
@@ -421,7 +430,7 @@ def format_number(v, spec: str):
         s = s.replace(",", "")
     if x < 0 and round(abs(x), dec) != 0:
         s = "-" + s
-    elif sign and x > 0:
+    elif sign and x > 0 and round(abs(x), dec) != 0:
         s = "+" + s
     if pct:
         s += "%"

@@ -47,10 +47,10 @@ def font_pair(fontname: str, style: str, px: int):
 
 def is_cjk(ch: str) -> bool:
     o = ord(ch)
-    return o >= 0x2E80 or 0x2190 <= o <= 0x21FF or 0x2500 <= o <= 0x257F or o in (0x00D7,) or 0x2010 <= o <= 0x206F
+    return o >= 0x2E80 or 0x2190 <= o <= 0x21FF or 0x2500 <= o <= 0x257F or 0x2010 <= o <= 0x206F
 
 
-TOKEN = re.compile(r"(#![ ]?|#[A-Za-z_][A-Za-z0-9_]*[ ]?|@[A-Za-z0-9_]+!|\n)")
+TOKEN = re.compile(r"(#!|#[A-Za-z_][A-Za-z0-9_]*[ ]?|@[A-Za-z0-9_]+!|\n)")
 
 
 def parse_runs(s: str):
@@ -146,7 +146,7 @@ class RichText:
         x = 0.0
         line = 0
         self.width = 0.0
-        lh = self._line_h(style.resolve(()))
+        lh = self._line_h(style.resolve(()), multiline)
         maxw = max_width if (multiline and max_width) else None
 
         def newline():
@@ -163,6 +163,9 @@ class RichText:
             st = style.resolve(r[2])
             if r[0] == "icon":
                 info = icons.get(r[1])
+                if info.get("__goods__"):
+                    k = st.get("size", 15) / float(info.get("fontsize", 18))
+                    info = dict(info, size=[info["size"][0] * k, info["size"][1] * k])
                 w = (info.get("size") or [20, 20])[0]
                 if maxw and x + w > maxw and x > 0:
                     newline()
@@ -185,9 +188,12 @@ class RichText:
         self.line_h = lh
         self.height = self.nlines * lh
 
-    def _line_h(self, st):
+    def _line_h(self, st, multiline=False):
+        # Measured in game at fontsize 15: autoresized text is 21px per line, both single-line (table rows: 23px
+        # pitch with spacing 2) and multi-line (TooltipTextBlock = 1+10+21+10+1 = 43px). Font_Size_Small's
+        # size {0 23} does not apply to autoresized text.
         sz = st.get("size", 15)
-        return round(sz * 1.45)
+        return round(sz * 1.4)
 
     def draw(self, img: Image.Image, ox, oy, scale, alpha=1.0, align_x=0.0):
         """ox, oy in UI units of the text box top-left; align_x is extra x offset (UI units) per line handled by caller."""
