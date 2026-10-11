@@ -27,7 +27,8 @@ You MUST go directly to Step 2 or Step 3 before writing or modifying any code:
 | Any `scripted_trigger` or `scripted_effect` not defined in this mod | Vanilla names change between patches |
 | Localization key format rules (YAML encoding, quote characters) | PDX parser rejects non-ASCII quotes; encoding errors cascade silently |
 | GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.) | Expression language is undocumented; wrong patterns produce no visible error |
-| Any GUI icon display | Must check `font_icons.gui` for `@xxx!` inline texticon before using widget or custom approach |
+| Any GUI icon display | Must check `font_icons.gui` for `@xxx!` inline texticon before using widget or custom approach (goods icons `@<goods_key>!` are engine-registered and absent from that file) |
+| Any `type` / `template` used in a `.gui` file | Block names and placement are type-specific; print the resolved definition with `ai_gui_assessment/renderer/guidef.py <name>` |
 
 ### Declarative Verification Requirement
 
@@ -53,6 +54,8 @@ Then stop and ask the user for guidance. Do NOT guess.
 ## Path Mapping In This Repository
 
 - `docs/` -> project docs and technical notes
+- `docs/guides/EU5_GUI_Modding_Guide.md` -> verified GUI rules; read before any GUI work
+- `ai_gui_assessment/renderer/` -> GUI renderer that reproduces game screens from the real game files
 - `reference_official_defines/` -> official define/type reference files
 - `reference_game_files/` -> vanilla script source files
 - `reference_mods/` -> some representative community mods
@@ -70,7 +73,7 @@ When displaying an icon in any UI context, AI tools MUST follow this priority an
 
 | Tier | Method | When to use |
 |---|---|---|
-| 1 | `@icon_name!` inline syntax | Icon exists in `font_icons.gui`; context is `raw_text`/`text`/localization YAML |
+| 1 | `@icon_name!` inline syntax | Icon exists in `font_icons.gui`, or is a goods key (`@wheat!`, engine-registered); context is `raw_text`/`text`/localization YAML |
 | 2 | Icon widget (`icon = { texture = "..." }`) | Standalone widget needed, or icon absent from `font_icons.gui` |
 | 3 | From scratch (new `texticon` / new sprite) | Tiers 1 and 2 both inapplicable; must justify explicitly |
 
@@ -82,6 +85,8 @@ The following violations occurred and informed the Mandatory Reference Categorie
 
 | Date | Violation | Root cause | Correct behavior |
 |---|---|---|---|
+| 2026-10 | GUI mockups assumed a left-aligned hbox, `\|+N` printing a plus sign, `spriteborder`/`framesize` in texture pixels, and goods icons missing because they are absent from `font_icons.gui` | Applied CSS/web layout intuition and treated the documented file list as complete, with no in-game screenshot to check against | Read the type with `guidef.py`, check rules in `docs/guides/EU5_GUI_Modding_Guide.md` (each marked in-game / source / inferred), and render with `ai_gui_assessment/renderer/` before launching the game. |
+| 2026-10 | Expected a SOL resolution to appear as a situation action card | Equated `select_trigger { looking_for_a = situation }` with a situation action without checking the data source of `SituationView.GetActionGroups` | Situation action cards come from `generic_actions` with `type = situation`; resolutions need the situation's `resolution =`/`voters =` or a custom `scripted_action_tooltip` button. |
 | 2026-10 | Country substitute specification summed v1.1 overlapping groups, broke neutrality for unequal baselines, and proposed changing unsupported victuals only inside SOL accounting | Read formula headers instead of final divide-by-two blocks, mixed quantity and expenditure weights, and assumed percent=yes established demand composition | Audit fixed-commit runtime code; distinguish multiplier averages from budgets; define one aggregation unit; verify same-type and per-good/global/local composition in-game; freeze unsupported goods consistently in both transfers and accounting. See SOL_Substitute_Groups_Global_Modifier_Audit.md. |
 | 2026-10 | Demand-stacking test planned around time-based readings (debug.log, 7-day waits) and goods the test pop did not consume | Assumed pop demand refreshes on a fixed short tick and did not check the pop's needs list first | Read the per-pop demand breakdown tooltip, which updates immediately; pick goods present in that pop's needs list; result: same-type sources add, different modifier types multiply, below -100% clamps to 0. |
 | 2026-10 | Left an empty Outcome header in the information-only SOL situation after moving to 1.4 beta | Assumed an empty `Situation.GetOutcomes` list would hide its parent card | The 1.4 `panels/situation/common.gui` always creates the outer card. Hide that card for `global_living_standard` by situation key, while preserving outcomes for other situations. |

@@ -1,57 +1,64 @@
-# AI 对 EU5 GUI 的理解评估
+# ai_gui_assessment — EU5 GUI 渲染器与研究资料
 
-本目录是诊断用的交付物，目的是暴露 AI 在 EU5 GUI 上的欠缺，**不是**后续开发的指导文件（因此没有放进 `docs/knowledge/`，也没有更新 BRIEF）。
+**做 GUI 工作请先读 [`docs/guides/EU5_GUI_Modding_Guide.md`](../docs/guides/EU5_GUI_Modding_Guide.md)。**
+那份指南汇总了已验证的规则（每条都标了证据等级）；本目录存放支撑这些规则的工具和证据。
+`CLAUDE.md` 的 Session Start 会把所有 GUI 任务路由到那份指南，再由指南路由到这里。
 
-## 渲染器 `renderer/`
+## 目录
 
-这是一个最小的 Jomini GUI 渲染器，直接读取游戏目录（`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game`）和 SOL 的 `src/stable` 文件：
-- 解析原版加 SOL 覆盖后的全部 `.gui` 文件，展开 type / template / block / blockoverride；
-- 盒布局：fixed / expanding / growing、min/max；多余空间先分给 expanding，再分给 growing（`expand = {}` 属于 growing）；没有弹性元素时，剩余空间均分到间隙；
-- 从游戏目录解码 DDS 贴图，实现九宫格拉伸和平铺、texture_density、modify_texture 混合；
-- 使用游戏自带的 Noto 字体（按 simp_chinese 的回退顺序选字），文字格式取自 `textformatting.gui`，本地化取自游戏和 SOL；
-- 数据表达式由 mock 数据求值（`scenarios.py`、`scen_location.py`）。
-
-| 文件 | 作用 |
+| 路径 | 内容 |
 |---|---|
-| `run.py` | 入口：`python renderer/run.py situation\|location\|tooltip` |
-| `pdx.py` | Paradox 脚本 / GUI 解析器 |
-| `gui.py` | type / template / block 数据库与展开 |
-| `engine.py` | 布局与绘制 |
-| `textures.py` | DDS 加载、九宫格、混合模式 |
-| `text.py` | 富文本、字体、文本图标 |
-| `data.py` | 本地化、文本格式、表达式求值、数字格式 |
+| `renderer/` | Jomini GUI 渲染器（Python，PIL + numpy） |
+| `screenshots/` | 1080p 实机截图（比对的真值）：`A_/B_/C_*.png` 为 SOL 三个界面；`ui_library/` 为 UI Library 全部 26 页（对应关系见 `INDEX.txt`）；`round2/` 为事件、市场、地点 tooltip、政府、战斗 |
+| `images/` | 渲染结果：`r1` 局势面板、`r2` 地点窗口人口页签、`r3` 地点 SOL tooltip（各带 `*_tree.txt` 元素树）；`ui_library/` 为 UI Library 26 页 |
+| `01`–`05_*.md` | **截图之前**写的研究笔记（引擎模型、数据绑定、SOL 界面结构、社区技法、AI 欠缺分析）。与指南冲突时以指南为准 |
+| `06_screenshot_requests.md` | 第一轮实机比对结果（SOL 三个界面） |
+| `07_next_screenshots.md` | 第二轮截图需求（已完成） |
+| `08_round2_results.md` | 第二轮比对结果，以及尚未解决的差异清单 |
+
+## 运行
+
+前提：`eu5` conda 环境（`$env:EU5_PYTHON`），游戏安装在
+`C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V`（贴图和字体从游戏目录读取，`reference_game_files/` 里没有二进制文件）。
+按 1080p、UI 缩放 100% 渲染，1 个 GUI 单位 = 1 个屏幕像素；设置 `RENDER_SCALE=2` 可输出 2 倍图。
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py situation      # images/r1_*
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py location       # images/r2_*
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py tooltip        # images/r3_*
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py ui_library cards ui_library_text_tabs=cards1
+& $env:EU5_PYTHON ai_gui_assessment/renderer/lib_batch.py          # UI Library 全部 26 页（约 2–3 分钟）
+& $env:EU5_PYTHON ai_gui_assessment/renderer/guidef.py situation_card_common   # 打印 type/template 的完整定义
+& $env:EU5_PYTHON ai_gui_assessment/renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
+```
+
+每次运行会输出 `unknown expressions`，即没有示例数据的绑定表达式。新界面的示例数据写在
+`renderer/scenarios.py`（局势、UI Library）或 `renderer/scen_location.py`（地点窗口、tooltip）。
+`ui_library/` 的元素树可再生成，未保存。
+
+| 模块 | 作用 |
+|---|---|
+| `pdx.py` | Paradox 脚本 / GUI 解析器（`@常量`、`@[表达式]`、block/type/template） |
+| `gui.py` | type/template 数据库（原版 + SOL 按相对路径覆盖），元素展开（block/blockoverride、`buttonText`） |
+| `engine.py` | 盒布局、自由定位、滚动区、网格、绘制、饼图、滚动条 |
+| `textures.py` | DDS 加载、九宫格（`spriteborder` 按界面单位）、帧、`modify_texture` 混合、纯色图层 |
+| `text.py` | 富文本（`#格式#!`、`##`、`@图标!`）、字体与中文回退、行高 |
+| `data.py` | 本地化、文本格式、表达式求值、数字格式后缀、概念图标 |
 | `scenarios.py` / `scen_location.py` | 示例数据 |
-| `guidef.py` | 调试工具：`guidef.py NAME...` 打印某个 type 或 template 的完整定义 |
+| `guidef.py` | 打印 type / template 的完整定义 |
 | `compare.py` | 截图与渲染图的并排 / 放大比对 |
+| `lib_batch.py` | 一次性渲染 UI Library 的全部或指定页 |
 
-## 输出 `images/`
+## 精度与局限
 
-按 1080p、UI 缩放 100% 渲染：1 个 GUI 单位 = 1 个屏幕像素，与游戏截图逐像素对应。左侧面板为 570×950（1080 减去顶栏 40 和面板栏 90，见 `ingame_topbar.gui`）。如需放大查看细节，设置环境变量 `RENDER_SCALE=2`。
+已用实机截图验证：SOL 三个界面误差约 1 像素；UI Library 的文字格式、窗口、按钮、卡片各页基本一致。
+无法复现：3D 场景与插画、程序生成的国旗和纹章、人物肖像、动画与悬停状态、真实存档数据。
+尚未实现：`dropdown`、`slider`、引擎生成的 tooltip 表格（`TooltipBlockList` + `textcontext`）。
+已知差异见 `08_round2_results.md`。
 
-| 文件 | 内容 |
-|---|---|
-| `r1_situation_panel.png` / `r1_situation_panel_full.png` | 局势面板：1080p 实际效果（滚动区被裁切）/ 加高后完整展开 |
-| `r2_location_window.png` | 地点窗口「人口」页签 |
-| `r3_location_sol_tooltip.png` | 地点 SOL 按钮 tooltip |
-| `r*_tree.txt` | 展开后的元素树和每个元素的布局结果，用于和实机截图比对 |
+## 后续工作方法
 
-## 实机比对
-
-截图在 `screenshots/`，比对结果和已确认的规则见 **`06_screenshot_requests.md`**。比对命令：
-
-```
-python renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
-```
-
-修正后，tooltip 高度与实机完全一致，各文字行的纵向位置误差在 0–1px 以内。3D 场景、插画、国旗以及具体数值无法复现（示例数据）。
-
-## 文档
-
-| 文件 | 内容 |
-|---|---|
-| `01_engine_model.md` | 文件加载、type/template/block、布局、状态与生命周期、交互、Vars、ui_library |
-| `02_data_binding_and_text.md` | 表达式与类型、datacontext/datamodel、GUI↔脚本桥、文本格式、文本图标 |
-| `03_sol_screens_anatomy.md` | 三个界面的结构树与设计决定 |
-| `04_community_patterns.md` | reference_mods 中的社区 GUI 技法 |
-| `05_ai_gaps.md` | AI 欠缺的根因、项目内证据、新发现的问题、自评与改进建议 |
-| `06_screenshot_requests.md` | **实机比对结果**：已确认的引擎规则、修正前后的差异、仍未确认的项 |
+1. 准备目标界面的 1080p、UI 缩放 100% 全屏截图，放入 `screenshots/`。
+2. 渲染并用 `compare.py` 比对，找到第一处结构性差异，借助元素树和 `guidef.py` 追溯到具体的引擎规则。
+3. 修正渲染器，重新渲染三个基线界面确认没有回退，再把规则及证据等级写进指南。

@@ -4,7 +4,7 @@ Expansion rules implemented (see 01_engine_model.md):
   * `type a = b { ... }` inherits b; body appended after base body.
   * `using = tpl` splices a template body in place.
   * `block "x" { default }` is replaced by the active `blockoverride "x"`.
-  * Blockoverrides propagate into nested type instances; the OUTERMOST declaration wins.
+  * Blockoverrides propagate into nested type instances; an instance's own blockoverride beats inherited ones.
   * Override content is expanded in the context where it is spliced, minus itself.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pdx import Node, parse, tokenize, scalars
+from pdx import Node, parse, tokenize, scalars  # noqa: F401
 
 GAME = Path(r"C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game")
 REPO = Path(__file__).resolve().parents[2]
@@ -182,7 +182,13 @@ class Expander:
                     content, _ = ctx[name]
                     sub = dict(ctx)
                     del sub[name]
-                    out.extend(self.expand_entries(content, sub, depth + 1))
+                    # nodes spliced from an override keep the reduced context: an override never applies to
+                    # elements inside its own content (otherwise scrollbox-in-scrollbox recurses forever)
+                    for x in self.expand_entries(content, sub, depth + 1):
+                        if x.is_block() and getattr(x, "ctx", None) is None:
+                            x = Node(x.key, x.op, x.value, x.src, x.line)
+                            x.ctx = sub
+                        out.append(x)
                 else:
                     out.extend(self.expand_entries(n.value, ctx, depth + 1))
                 continue
@@ -199,24 +205,35 @@ class Expander:
             base = self.db.type_base[chain[-1]]
             kind = PRIMITIVE_ALIAS.get(base, base)
         kind = PRIMITIVE_ALIAS.get(kind, kind)
-        # override priority: base types lowest ... instance ... outer ctx highest
+        # override priority: base types lowest < outer ctx < this instance's own blockoverride.
+        # A nested instance that re-declares an override must get its own content (ui_library nests a
+        # scrollbox inside a scrollbox's "scrollbox_content"; outer-wins would recurse forever).
         new_ctx: dict = {}
         for tname in reversed(chain):
             for n in self.splice_usings(self.db.types[tname]):
                 if n.key.startswith("blockoverride:"):
                     new_ctx[n.key[14:]] = (n.value, None)
-        new_ctx.update(inst_over)
         new_ctx.update(ctx)
+        new_ctx.update(inst_over)
         entries = []
         for tname in reversed(chain):
             entries.extend(self.expand_entries(self.db.types[tname], new_ctx))
         entries.extend(self.expand_entries(body, new_ctx))
         el = Element(kind=kind, typename=key, src=src, line=line)
         self.fill(el, entries, new_ctx)
+        bt = el.props.pop("__buttontext__", None)
+        if bt and ("text" in el.props or "raw_text" in el.props):
+            tb = self.build(*bt)
+            for k in ("text", "raw_text"):
+                if k in el.props:
+                    tb.props[k] = el.props.pop(k)
+            tb.props.setdefault("size", ["100%", "100%"])
+            el.children.insert(0, tb)
         return el
 
-    def fill(self, el: Element, entries: list[Node], ctx: dict):
+    def fill(self, el: Element, entries: list[Node], outer_ctx: dict):
         for n in entries:
+            ctx = getattr(n, "ctx", None) or outer_ctx
             k = n.key
             if k == "background" and n.is_block():
                 el.backgrounds.append(self.texture_spec(n.value, ctx))
@@ -241,7 +258,12 @@ class Expander:
                         ch = self.build(c.key, c.value, ctx, c.src, c.line)
                         ch.props["__wrapper__"] = k
                         el.children.append(ch)
-            elif k in ("scrollbar_vertical", "scrollbar_horizontal", "contextmenu_widget", "buttonText", "slider"):
+            elif k == "buttonText" and n.is_block():
+                # button label: the button's own text/raw_text is rendered by this textbox child
+                for c in self.expand_entries(n.value, ctx):
+                    if c.is_block() and self.is_element_key(c.key):
+                        el.props["__buttontext__"] = (c.key, c.value, ctx, c.src, c.line)
+            elif k in ("scrollbar_vertical", "scrollbar_horizontal", "contextmenu_widget", "slider"):
                 el.props[k] = True
             elif n.is_block() and self.is_element_key(k):
                 el.children.append(self.build(k, n.value, ctx, n.src, n.line))

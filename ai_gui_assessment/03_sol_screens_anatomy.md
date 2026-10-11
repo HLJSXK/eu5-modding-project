@@ -1,5 +1,7 @@
 # 03 · SOL 三个界面的结构解剖（对应三张图）
 
+> **注意**：本文写于 2026-10-11 实机截图之前。已验证的规则以 [`docs/guides/EU5_GUI_Modding_Guide.md`](../docs/guides/EU5_GUI_Modding_Guide.md) 为准；与之冲突的推断（如 hbox 对齐、`|+N` 格式、`spriteborder` 单位、商品图标）已被实机推翻。
+
 ## 图 1：情势面板 `global_living_standard`
 
 文件：`src/stable/in_game/gui/panels/situation/global_living_standard.gui`（254 行）+ SOL 复制并修改的 `panels/situation/common.gui`（1.4 模板，696 行）。

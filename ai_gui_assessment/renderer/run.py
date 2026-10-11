@@ -11,6 +11,9 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.setrecursionlimit(20000)
+import threading
+threading.stack_size(256 * 1024 * 1024 - 4096)
 
 from PIL import Image
 
@@ -121,6 +124,29 @@ def tooltip():
     Path(OUT / "r3_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
 
 
-if __name__ == "__main__":
+
+def ui_library(tab="cards", *subs, w=1920, h=1080):
+    """run.py ui_library TAB [var=value ...]  e.g. ui_library cards ui_library_text_tabs=cards1"""
+    sub = dict(x.split("=", 1) for x in subs) or None
+    db, ex, ev, eng, log = setup(scenarios.ui_library(tab, sub))
+    path, n = find_root(db, "in_game/gui/ui_library.gui", "window")
+    el = ex.build(n.key, n.value, {}, path, n.line)
+    eng.place(el, 0, 0, w, h)
+    img = Image.new("RGBA", (int(w * SCALE), int(h * SCALE)), (0, 0, 0, 255))
+    eng.render(el, img)
+    OUT.mkdir(parents=True, exist_ok=True)
+    tag = f"lib_{tab}" + ("_" + "_".join(sub.values()) if sub else "")
+    img.save(OUT / f"{tag}.png")
+    report(eng, log, el)
+    Path(OUT / f"{tag}_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
+
+def _main():
     which = sys.argv[1] if len(sys.argv) > 1 else "situation"
-    globals()[which]()
+    globals()[which](*sys.argv[2:])
+
+
+if __name__ == "__main__":
+    # deep GUI trees (e.g. the 19k-line ui_library) need a big stack
+    t = threading.Thread(target=_main)
+    t.start()
+    t.join()

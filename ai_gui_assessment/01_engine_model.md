@@ -1,5 +1,7 @@
 # 01 · EU5 GUI 引擎模型（Jomini GUI）
 
+> **注意**：本文写于 2026-10-11 实机截图之前。已验证的规则以 [`docs/guides/EU5_GUI_Modding_Guide.md`](../docs/guides/EU5_GUI_Modding_Guide.md) 为准；与之冲突的推断（如 hbox 对齐、`|+N` 格式、`spriteborder` 单位、商品图标）已被实机推翻。
+
 > 本文是 AI 在阅读本项目全部 GUI 相关资源后整理的**理解**，不是权威规范。
 > 每条结论标注证据等级：**[源]** = 直接引用游戏/模组源码或官方文档；**[推]** = 由多处用法推断，未见文档；**[疑]** = 有矛盾或无法验证。
 > 路径缩写：`IG` = `reference_game_files/game/in_game/gui/`，`MM` = `reference_game_files/game/main_menu/gui/`，`LS` = `reference_game_files/game/loading_screen/gui/`，`DT` = `reference_official_defines/docs/`。

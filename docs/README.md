@@ -7,6 +7,7 @@ Mod-focused documentation for the EU5 Modding Project.
 ### AI Workflow
 
 - [AI Tool Workflow Prompt (EU5)](guides/AI_Tool_Workflow_Prompt.md) — 3-Step Rule, Mandatory Reference Categories, Verification format
+- [EU5 GUI Modding Guide](guides/EU5_GUI_Modding_Guide.md) — in-game-verified GUI layout, texture, text and number-format rules; entry point for all GUI work and for the GUI renderer in `../ai_gui_assessment/`
 
 ### Knowledge (machine-readable, used by scripts)
 

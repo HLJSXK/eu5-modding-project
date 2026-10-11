@@ -4,6 +4,11 @@
 
 For any non-trivial task, read `docs/knowledge/BRIEF.md` first. It is a compact summary of all known EU5 gotchas, valid enums, and scope rules. This avoids re-exploring docs for patterns already discovered.
 
+**GUI work** (any `.gui` file, GUI expression, tooltip, panel layout, or GUI-displayed localization): also read
+`docs/guides/EU5_GUI_Modding_Guide.md` before writing code. It holds the in-game-verified layout, texture, text and
+number-format rules, and routes to the GUI renderer in `ai_gui_assessment/renderer/`, which reproduces the game's
+GUI from the real game files so a change can be checked before launching the game.
+
 ## EU5 Syntax Rules
 
 EU5 uses the Jomini engine. Do NOT assume EU4 syntax works.
@@ -28,6 +33,8 @@ For the categories below, you MUST go to Step 2 or 3 before writing any code. No
 - Any `scripted_trigger` or `scripted_effect` not defined in this mod
 - Localization YAML encoding and quote character rules
 - GUI expression syntax (`GetVariable`, `.IsSet`, `MakeScope`, etc.)
+- Any `type` / `template` used in a `.gui` file — print its resolved definition with
+  `& $env:EU5_PYTHON ai_gui_assessment/renderer/guidef.py <name>` instead of guessing its blocks
 - Any GUI icon display — check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
   for `@xxx!` inline syntax **before** using icon widgets or custom solutions
 
@@ -46,6 +53,8 @@ When displaying an icon in the UI, follow this exact priority order and stop at 
 1. **`@icon_name!` inline syntax** — Check `reference_game_files/game/main_menu/gui/shared/font_icons.gui`
    for the icon name. Use in `raw_text` / `text` GUI fields and localization YAML values.
    Requires zero new code and no widget overhead.
+   **Goods icons are the exception:** `@<goods_key>!` (e.g. `@wheat!`, `@camels!`) is registered by the engine
+   from the goods database and is NOT listed in `font_icons.gui`; check `in_game/common/goods/` instead.
 2. **Icon widget** — Use `icon = { texture = "..." }` or equivalent widget when the display context
    cannot use inline text (e.g. standalone widget placement), or when the icon is not in `font_icons.gui`.
 3. **From scratch** — Only if tiers 1 and 2 both fail: define a new `texticon` block in a `.gui` file
@@ -85,10 +94,12 @@ Also, always run scripts by directly invoking the `eu5` environment's `python.ex
 ## Path Mapping
 
 - `docs/` — project docs; full workflow guide at `docs/guides/AI_Tool_Workflow_Prompt.md`
+- `docs/guides/EU5_GUI_Modding_Guide.md` — verified GUI rules and the entry point for all GUI work
 - `docs/knowledge/` — structured anti-patterns and enum whitelists; `BRIEF.md` is the compact session reference
+- `ai_gui_assessment/` — GUI renderer (`renderer/`), in-game reference screenshots, and the GUI research notes behind the guide
 - `reference_official_defines/` — official define/type reference files
-- `reference_game_files/` — vanilla script source files
-- `reference_mods/` — community mod examples
+- `reference_game_files/` — vanilla script source files (text only; textures/fonts are read from the installed game folder)
+- `reference_mods/` — community mod examples (`3698931463` is an old published copy of SOL itself, not independent evidence)
 
 ## Knowledge Capture
 
@@ -102,6 +113,8 @@ When triggered, do ALL of:
 1. Add an entry to `docs/knowledge/anti_patterns.yaml` (copy the format of existing entries).
 2. Add a row to the "Documented Violations" table in `docs/guides/AI_Tool_Workflow_Prompt.md`.
 3. Update `docs/technical/EU5_Modding_Knowledge_Base.md` if the pattern is broadly applicable.
+   For GUI rules, update `docs/guides/EU5_GUI_Modding_Guide.md` instead, marking the evidence level
+   (in-game screenshot / source / inferred); if the GUI renderer got it wrong, fix the renderer too.
 4. Run `$env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py` to regenerate `docs/knowledge/BRIEF.md`.
 
 For minor discoveries (single modifier name, single typo fix), steps 1 and 4 only.

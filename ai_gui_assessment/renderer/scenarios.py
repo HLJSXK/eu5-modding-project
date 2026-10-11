@@ -69,3 +69,19 @@ def situation():
 
 
 from scen_location import location, tooltip  # noqa: E402,F401
+
+
+def ui_library(tab="cards", sub=None):
+    """Vanilla UI library window (in_game/gui/ui_library.gui): no game data, ideal for engine calibration."""
+    sel = {"ui_library_tabs": tab}
+    if sub:
+        sel.update(sub)
+    def hv(m):
+        return sel.get(m.group(1)) == m.group(2)
+    def nev(m):
+        return m.group(1) not in sel or sel.get(m.group(1)) == m.group(2)
+    return [
+        (r"GetVariableSystem\.HasValue\('(\w+)','(\w+)'\)", hv),
+        (r"GetVariableSystem\.NotExistOrHasValue\('(\w+)','(\w+)'\)", nev),
+        (r"GetVariableSystem\.Exists\('(\w+)'\)", lambda m: m.group(1) in sel),
+    ] + COMMON

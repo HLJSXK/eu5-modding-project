@@ -230,8 +230,18 @@ class Engine:
         mn = self.size_prop(el, "minimumsize")
         mx = self.size_prop(el, "maximumsize")
         mnw = num(mn[0], -1) if mn else -1
+        # min_width / max_width on non-text elements act like minimumsize / maximumsize width
+        # (confirmed in game: ui_library vbox_component_entry "min_width = 800")
+        if el.kind not in TEXT and el.props.get("min_width") is not None:
+            mnw = max(mnw, num(el.props["min_width"]))
         mnh = num(mn[1], -1) if mn else -1
         mxw = num(mx[0], -1) if mx else -1
+        # text max_width caps the element width, so an expanding text_multi stops at max_width and the parent
+        # box centres it (confirmed in game: ui_library descriptions are 600px blocks centred in their card)
+        if el.kind in TEXT and el.props.get("max_width") is not None:
+            l, t, r, b = self.margins(el)
+            cap = num(el.props["max_width"]) + l + r
+            mxw = cap if mxw < 0 else min(mxw, cap)
         mxh = num(mx[1], -1) if mx else -1
         return mnw, mnh, mxw, mxh
 

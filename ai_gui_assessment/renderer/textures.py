@@ -55,7 +55,10 @@ def select_frame(img: Image.Image, spec: dict, frame_default=1) -> Image.Image:
         cols, rows = int(_f(fg[0], 1)), int(_f(fg[1], 1))
         fw, fh = img.width // max(cols, 1), img.height // max(rows, 1)
     elif fs and isinstance(fs, list) and len(fs) >= 2:
-        fw, fh = int(_f(fs[0])), int(_f(fs[1]))
+        # framesize is in GUI units like spriteborder: texture pixels = framesize * texture_density
+        # (confirmed in game: checkbox.dds 160x80, density 2, framesize {40 40} -> two 80px frames)
+        dens = _f(spec.get("texture_density"), 1.0) or 1.0
+        fw, fh = int(round(_f(fs[0]) * dens)), int(round(_f(fs[1]) * dens))
         cols = max(1, img.width // max(fw, 1))
     else:
         return img

@@ -50,8 +50,10 @@ provided by whichever mods are enabled.
    relative path;
 2. accepting the current Glorp UI 1.4 action-button and road-builder APIs,
    while migrating those APIs when an older reference snapshot is supplied;
-3. replacing the shared `zoom_to_button` type with the SOL-owned
-   `sol_zoom_to_button` type;
+3. shipping a SOL-owned copy of the shared `zoom_to_button` type in
+   `gui/SOL_glorp_location_support.gui` (same name as the Glorp UI and
+   Construction Manager copies; the name is not changed, and which duplicate
+   definition the engine keeps is unverified);
 4. replacing `Location.GetTotalIncome` with SOL's
    `local_sol_total_income`;
 5. inserting the SOL Living Standard tooltip button before the migration

@@ -50,7 +50,7 @@ def is_cjk(ch: str) -> bool:
     return o >= 0x2E80 or 0x2190 <= o <= 0x21FF or 0x2500 <= o <= 0x257F or 0x2010 <= o <= 0x206F
 
 
-TOKEN = re.compile(r"(#!|#[A-Za-z_][A-Za-z0-9_]*[ ]?|@[A-Za-z0-9_]+!|\n)")
+TOKEN = re.compile(r"(##|#!|#[A-Za-z_][A-Za-z0-9_]*[ ]?|@[A-Za-z0-9_]+!|\n)")
 
 
 def parse_runs(s: str):
@@ -62,6 +62,9 @@ def parse_runs(s: str):
             continue
         if part == "\n":
             out.append(("nl",))
+        elif part == "##":
+            # escaped literal '#' (confirmed in game: ui_library "default_format = ##high" shows "#high")
+            out.append(("text", "#", tuple(stack)))
         elif part.startswith("#!"):
             if stack:
                 stack.pop()

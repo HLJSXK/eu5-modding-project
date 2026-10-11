@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-06
+> Last updated: 2026-10-11
 
 ## Project Identity
 
@@ -120,11 +120,15 @@ eu5-modding-project/
 |   `-- sol_jtg_compatibility_submod/    late-loading SOL / Just Goods compatibility target
 |       |-- .metadata/                   SOL plus merged Just Goods dependency
 |       `-- in_game/                     generated demand, constants, effects, and 82-good GUI overrides
-|-- docs/                              project knowledge, guides, technical notes
+|-- docs/                              project knowledge, guides (incl. EU5_GUI_Modding_Guide.md), technical notes
 |-- scripts/                           Python codegen + validation
 |-- tools/                             support tooling
 |   |-- eu5_save_parser/               debug-save CSV exporter plus per-country/per-stratum demand-solution analyzer
 |   `-- sol_demand_simulator/          legacy interactive demand simulator
+|-- ai_gui_assessment/                 GUI renderer, in-game reference screenshots, and GUI research notes
+|   |-- renderer/                      Jomini GUI renderer: real .gui/textures/fonts/loc -> PNG + element tree
+|   |-- screenshots/                   1080p in-game ground truth (SOL screens, UI Library, vanilla screens)
+|   `-- images/                        renders of the same screens for comparison
 |-- data/                              calibration CSVs, generated indexes, and legacy simulator data
 |-- assets/                            images and media
 |-- reference_game_files/              vanilla EU5 references
@@ -160,6 +164,9 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 | Tool | When to run | Output |
 |---|---|---|
+| `ai_gui_assessment/renderer/run.py situation\|location\|tooltip` | Before launching the game after changing SOL GUI, or when checking how a `.gui` layout will look | Reads the installed game's `.gui` files with SOL `src/stable` overrides, DDS textures, Noto fonts and localization, and renders the SOL situation panel, location window and location tooltip at 1080p to `ai_gui_assessment/images/` with an element tree of computed rects. Uses mock data; verified within ~1px against in-game screenshots. Rules and limits: `docs/guides/EU5_GUI_Modding_Guide.md` |
+| `ai_gui_assessment/renderer/guidef.py <name>` | Before writing a `blockoverride` or using any vanilla `type`/`template` | Prints the full resolved definition from the game and SOL files |
+| `ai_gui_assessment/renderer/compare.py` / `lib_batch.py` | When verifying the renderer against new in-game screenshots | Side-by-side/zoom crops; batch render of all 26 UI Library pages |
 | `python -m tools.eu5_save_parser` | On an uncompressed text save produced with EU5 debug mode when calibrating or auditing the location-class compensation model | Memory-maps the save and extracts only metadata, country tags and solver caches, population records, location/population links, and decoded `sol_location_*` caches; writes analysis-ready location and country CSVs, a diagnostic manifest, and an optional population-group CSV under `data/save_analysis/` by default |
 | `python -m tools.eu5_save_parser.demand_analysis` | After exporting a debug save and when comparing the active location classifier with exact and gated approximate solves | Replays the current classifier or uses saved class ids, tries five total-constrained nonnegative approximation objectives plus `proportional_fast` as **offline comparison baselines** (the runtime itself ships only exact and the vertex sweep — these retired objectives are kept here solely to reproduce the measurements that justified retiring them), enforces the four-stratum gate by default (with explicit diagnostic bypasses for worsening and total-drift candidates), and writes country diagnostics including maximum worsening and total drift, one raw/approximate/exact error row per country and stratum, four-row stratum summaries, a strategy comparison, and metadata without collapsing nobles, clergy, burghers, and lower into one headline score |
 | `python -m tools.eu5_save_parser.cone_feasibility` | **First step** when a country reports `negative_factor` or a class-wide `-100%` `local_pop_demand` | Decides whether the exact solve can be feasible for *any* 4-way classification by testing whether the target lies in the cone of all owned-location spending vectors; also reports the minimum-norm ideal factor field, how many locations would need a negative factor, and which stratum subsets conflict. A residual above ~0.01 rules out every classifier-side fix |
