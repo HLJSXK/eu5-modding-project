@@ -1,0 +1,212 @@
+"""Texture loading and Jomini-style compositing (spriteType, modify_texture blend modes)."""
+from __future__ import annotations
+
+from functools import lru_cache
+
+import numpy as np
+from PIL import Image
+
+from gui import GAME, MOD
+
+SEARCH = [MOD / "main_menu", MOD / "in_game", GAME / "in_game", GAME / "main_menu", GAME / "loading_screen"]
+SEARCH += [p for p in (GAME / "dlc").glob("*/*") if p.is_dir()]
+
+
+class _Tex:
+    def __init__(self):
+        self.missing = set()
+
+    @lru_cache(maxsize=4096)
+    def load(self, path: str):
+        if not path or not isinstance(path, str) or path.startswith("["):
+            return None
+        rel = path.replace("\\", "/")
+        for root in SEARCH:
+            p = root / rel
+            if p.exists():
+                try:
+                    return Image.open(p).convert("RGBA")
+                except Exception:
+                    break
+        # SOL generated icon fallback (DDS written by the project generator)
+        self.missing.add(rel)
+        return None
+
+
+TEXTURES = _Tex()
+
+
+def _f(v, d=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return d
+
+
+def lower_spec(spec: dict) -> dict:
+    return {k.lower() if isinstance(k, str) else k: v for k, v in spec.items()}
+
+
+def select_frame(img: Image.Image, spec: dict, frame_default=1) -> Image.Image:
+    fg = spec.get("frame_grid")
+    fs = spec.get("framesize")
+    frame = int(_f(spec.get("frame", spec.get("upframe", frame_default)), frame_default))
+    if fg and isinstance(fg, list) and len(fg) >= 2:
+        cols, rows = int(_f(fg[0], 1)), int(_f(fg[1], 1))
+        fw, fh = img.width // max(cols, 1), img.height // max(rows, 1)
+    elif fs and isinstance(fs, list) and len(fs) >= 2:
+        fw, fh = int(_f(fs[0])), int(_f(fs[1]))
+        cols = max(1, img.width // max(fw, 1))
+    else:
+        return img
+    i = max(0, frame - 1)
+    cx, cy = (i % cols) * fw, (i // cols) * fh
+    return img.crop((cx, cy, cx + fw, cy + fh))
+
+
+def _tile(src: Image.Image, w: int, h: int) -> Image.Image:
+    if w <= 0 or h <= 0:
+        return Image.new("RGBA", (max(w, 1), max(h, 1)))
+    out = Image.new("RGBA", (w, h))
+    for yy in range(0, h, max(src.height, 1)):
+        for xx in range(0, w, max(src.width, 1)):
+            out.paste(src, (xx, yy))
+    return out
+
+
+def sprite(img: Image.Image, spec: dict, w: int, h: int, scale: float) -> Image.Image:
+    """Draw texture into w x h pixels according to spriteType/spriteborder/texture_density."""
+    w, h = max(1, int(round(w))), max(1, int(round(h))
+    )
+    st = str(spec.get("spritetype", "stretched")).strip('"').lower()
+    dens = _f(spec.get("texture_density"), 1.0) or 1.0
+    k = scale / dens  # texture px -> output px
+    if spec.get("mirror"):
+        m = str(spec.get("mirror"))
+        if "horizontal" in m:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if "vertical" in m:
+            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+    if st in ("corneredstretched", "corneredtiled"):
+        sb = spec.get("spriteborder") or [0, 0]
+        if not isinstance(sb, list):
+            sb = [sb, sb]
+        bl = br = int(_f(sb[0]))
+        bt = bb = int(_f(sb[1] if len(sb) > 1 else sb[0]))
+        bl = int(_f(spec.get("spriteborder_left", bl)))
+        br = int(_f(spec.get("spriteborder_right", br)))
+        bt = int(_f(spec.get("spriteborder_top", bt)))
+        bb = int(_f(spec.get("spriteborder_bottom", bb)))
+        tiled = st == "corneredtiled"
+        W, H = img.size
+        bl, br = min(bl, W // 2), min(br, W // 2)
+        bt, bb = min(bt, H // 2), min(bb, H // 2)
+        # output border sizes
+        obl, obr, obt, obb = [int(round(v * k)) for v in (bl, br, bt, bb)]
+        # avoid borders bigger than target
+        if obl + obr > w:
+            f = w / max(obl + obr, 1)
+            obl, obr = int(obl * f), w - int(obl * f)
+        if obt + obb > h:
+            f = h / max(obt + obb, 1)
+            obt, obb = int(obt * f), h - int(obt * f)
+        out = Image.new("RGBA", (w, h))
+        xs_src = [0, bl, W - br, W]
+        ys_src = [0, bt, H - bb, H]
+        xs_dst = [0, obl, w - obr, w]
+        ys_dst = [0, obt, h - obb, h]
+        for iy in range(3):
+            for ix in range(3):
+                sx0, sx1, sy0, sy1 = xs_src[ix], xs_src[ix + 1], ys_src[iy], ys_src[iy + 1]
+                dx0, dx1, dy0, dy1 = xs_dst[ix], xs_dst[ix + 1], ys_dst[iy], ys_dst[iy + 1]
+                if sx1 <= sx0 or sy1 <= sy0 or dx1 <= dx0 or dy1 <= dy0:
+                    continue
+                piece = img.crop((sx0, sy0, sx1, sy1))
+                if tiled and (ix == 1 or iy == 1):
+                    # tile at texture density
+                    pw = max(1, int(round(piece.width * k)))
+                    ph = max(1, int(round(piece.height * k)))
+                    piece = piece.resize((pw if ix == 1 else dx1 - dx0, ph if iy == 1 else dy1 - dy0), Image.BILINEAR)
+                    piece = _tile(piece, dx1 - dx0, dy1 - dy0)
+                else:
+                    piece = piece.resize((dx1 - dx0, dy1 - dy0), Image.BILINEAR)
+                out.paste(piece, (dx0, dy0))
+        return out
+    if st == "tiled":
+        pw = max(1, int(round(img.width * k)))
+        ph = max(1, int(round(img.height * k)))
+        return _tile(img.resize((pw, ph), Image.BILINEAR), w, h)
+    return img.resize((w, h), Image.BILINEAR)
+
+
+def to_np(img):
+    return np.asarray(img, dtype=np.float32) / 255.0
+
+
+def from_np(a):
+    return Image.fromarray(np.clip(a * 255.0 + 0.5, 0, 255).astype(np.uint8), "RGBA")
+
+
+def blend(base: np.ndarray, mod: np.ndarray, mode: str, alpha: float) -> np.ndarray:
+    b, m = base[..., :3], mod[..., :3]
+    ma = mod[..., 3:4] * alpha
+    mode = (mode or "normal").lower()
+    out = base.copy()
+    if mode == "alphamultiply":
+        out[..., 3:4] = base[..., 3:4] * (1 - alpha + alpha * mod[..., 3:4])
+        return out
+    if mode == "multiply":
+        c = b * m
+    elif mode == "overlay":
+        c = np.where(b < 0.5, 2 * b * m, 1 - 2 * (1 - b) * (1 - m))
+    elif mode == "add":
+        c = np.clip(b + m, 0, 1)
+    elif mode == "colordodge":
+        c = np.clip(b / np.maximum(1 - m, 1e-3), 0, 1)
+    elif mode == "lighten":
+        c = np.maximum(b, m)
+    elif mode == "darken":
+        c = np.minimum(b, m)
+    else:  # normal
+        c = m
+    out[..., :3] = b * (1 - ma) + c * ma
+    return out
+
+
+def parse_color(v):
+    if isinstance(v, list):
+        vals = [_f(x, 1.0) for x in v]
+        while len(vals) < 4:
+            vals.append(1.0)
+        return vals[:4]
+    return None
+
+
+def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Image | None:
+    """Render a background/icon texture spec to an RGBA image of w_px x h_px."""
+    spec = lower_spec(spec)
+    tex = resolve(spec.get("texture"))
+    img = TEXTURES.load(tex) if isinstance(tex, str) else None
+    if img is None:
+        return None
+    img = select_frame(img, spec)
+    out = to_np(sprite(img, spec, w_px, h_px, scale))
+    for ms in spec.get("modifies", []):
+        ms = lower_spec(ms)
+        mt = resolve(ms.get("texture"))
+        mimg = TEXTURES.load(mt) if isinstance(mt, str) else None
+        if mimg is None:
+            continue
+        mimg = select_frame(mimg, ms)
+        m = to_np(sprite(mimg, ms, out.shape[1], out.shape[0], scale))
+        col = parse_color(ms.get("color"))
+        if col:
+            m[..., :3] *= np.array(col[:3], dtype=np.float32)
+            m[..., 3] *= col[3]
+        out = blend(out, m, ms.get("blend_mode", "normal"), _f(ms.get("alpha"), 1.0))
+    col = parse_color(spec.get("color"))
+    if col:
+        out[..., :3] *= np.array(col[:3], dtype=np.float32)
+        out[..., 3] *= col[3]
+    out[..., 3] *= _f(spec.get("alpha"), 1.0)
+    return from_np(out)
