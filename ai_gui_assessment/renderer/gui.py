@@ -133,7 +133,7 @@ class Element:
 PRIMITIVE_ALIAS = {
     "uberwidget": "widget", "uberhbox": "hbox", "ubervbox": "vbox", "ubericon": "icon",
     "uberbutton": "button", "ubertextbox": "textbox", "uberscrollarea": "scrollarea",
-    "uberpieslice": "pieslice",
+    "uberpieslice": "pieslice", "dropDown": "dropdown",
 }
 
 
@@ -153,7 +153,7 @@ class Expander:
             "ecs_scene_viewer_widget", "window", "editbox", "checkbutton", "dropdown",
             "scrollbar", "scrollvbox", "barchart", "barslice", "spacer", "textbox",
             "scrollbar_vertical", "scrollbar_horizontal", "scrollwidget", "tooltip_widget",
-            "uberpieslice", "pieslice_no_highlight")
+            "uberpieslice", "pieslice_no_highlight", "ranged_slider")
 
     def splice_usings(self, body: list[Node], depth=0) -> list[Node]:
         out = []
@@ -251,6 +251,22 @@ class Expander:
                 sub = [c for c in self.expand_entries(n.value, ctx) if c.is_block() and self.is_element_key(c.key)]
                 if sub:
                     el.item = (sub[0].key, sub[0].value, ctx, sub[0].src, sub[0].line)
+            elif k == "active_item" and n.is_block():
+                # dropDown keeps its selected item as a regular child; the open list is
+                # an engine-owned popup and is intentionally not instantiated here.
+                sub = [c for c in self.expand_entries(n.value, ctx) if c.is_block() and self.is_element_key(c.key)]
+                if sub:
+                    active = self.build(sub[0].key, sub[0].value, ctx, sub[0].src, sub[0].line)
+                    # The vanilla control supplies a default label until a selection is made.
+                    # The UI Library deliberately leaves this block empty, so preserve that
+                    # visible engine fallback for the static reference render.
+                    def set_default_label(node):
+                        if node.kind in ("textbox", "editbox") and not ("text" in node.props or "raw_text" in node.props):
+                            node.props["raw_text"] = "默认"
+                            return True
+                        return any(set_default_label(c) for c in node.children)
+                    set_default_label(active)
+                    el.children.append(active)
             elif k in ("scrollwidget", "viewportwidget") and n.is_block():
                 # scrollarea content wrapper: children inside become our children (tagged)
                 for c in self.expand_entries(n.value, ctx):
@@ -263,8 +279,12 @@ class Expander:
                 for c in self.expand_entries(n.value, ctx):
                     if c.is_block() and self.is_element_key(c.key):
                         el.props["__buttontext__"] = (c.key, c.value, ctx, c.src, c.line)
-            elif k in ("scrollbar_vertical", "scrollbar_horizontal", "contextmenu_widget", "slider"):
+            elif k in ("scrollbar_vertical", "scrollbar_horizontal", "contextmenu_widget"):
                 el.props[k] = True
+            elif k in ("track", "track_range", "track_highlight", "slider", "slider_low",
+                       "dec_button", "inc_button", "dec_button_low", "inc_button_low") and n.is_block():
+                # Special ranged_slider parts are specs rather than normal children.
+                el.props[k] = self.widget_spec(n.value, ctx)
             elif n.is_block() and self.is_element_key(k):
                 el.children.append(self.build(k, n.value, ctx, n.src, n.line))
             elif n.is_block():
@@ -289,6 +309,28 @@ class Expander:
                 spec["modifies"].append(self.texture_spec(n.value, ctx))
             elif n.is_block():
                 spec[n.key] = scalars(n)
+            else:
+                spec[n.key] = n.value
+        return spec
+
+    def widget_spec(self, body: list[Node], ctx: dict) -> dict:
+        """Flatten a widget/template block into a renderable texture spec.
+
+        Slider parts use ``using = economy_slider_*`` templates whose first node is
+        a type instance. Build that instance once, retaining its background and
+        texture layers while ignoring layout-only child widgets.
+        """
+        spec = {"modifies": []}
+        for n in self.expand_entries(body, ctx):
+            if n.key == "modify_texture" and n.is_block():
+                spec["modifies"].append(self.texture_spec(n.value, ctx))
+            elif n.is_block() and self.is_element_key(n.key):
+                child = self.build(n.key, n.value, ctx, n.src, n.line)
+                spec.update(child.props)
+                spec["modifies"].extend(child.modifies)
+                spec.setdefault("backgrounds", []).extend(child.backgrounds)
+            elif n.is_block():
+                spec[n.key] = scalars(n) if all(not c.is_block() for c in n.value) else n.value
             else:
                 spec[n.key] = n.value
         return spec

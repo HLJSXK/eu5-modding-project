@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-11
+> Last updated: 2026-10-12
 
 ## Project Identity
 
@@ -164,7 +164,7 @@ The 1.3 SOL demand runtime no longer uses `gen_scarcity.py`, `gen_sol_ui.py`, `e
 
 | Tool | When to run | Output |
 |---|---|---|
-| `ai_gui_assessment/renderer/run.py situation\|location\|tooltip` | Before launching the game after changing SOL GUI, or when checking how a `.gui` layout will look | Reads the installed game's `.gui` files with SOL `src/stable` overrides, DDS textures, Noto fonts and localization, and renders the SOL situation panel, location window and location tooltip at 1080p to `ai_gui_assessment/images/` with an element tree of computed rects. Uses mock data; verified within ~1px against in-game screenshots. Rules and limits: `docs/guides/EU5_GUI_Modding_Guide.md` |
+| `ai_gui_assessment/renderer/run.py situation\|location\|tooltip\|event\|market\|government\|battle` | Before launching the game after changing SOL GUI, or when checking how a `.gui` layout will look | Reads the installed game's `.gui` files with SOL `src/stable` overrides, DDS textures, Noto fonts and localization, and renders a mock-data screen plus an element tree at 1080p. Parts of the SOL situation panel and location window match in-game screenshots; the SOL tooltip frame width matches its screenshot. Screen-wide pixel accuracy and real save data are not verified. Rules and limits: `docs/guides/EU5_GUI_Modding_Guide.md` |
 | `ai_gui_assessment/renderer/guidef.py <name>` | Before writing a `blockoverride` or using any vanilla `type`/`template` | Prints the full resolved definition from the game and SOL files |
 | `ai_gui_assessment/renderer/compare.py` / `lib_batch.py` | When verifying the renderer against new in-game screenshots | Side-by-side/zoom crops; batch render of all 26 UI Library pages |
 | `python -m tools.eu5_save_parser` | On an uncompressed text save produced with EU5 debug mode when calibrating or auditing the location-class compensation model | Memory-maps the save and extracts only metadata, country tags and solver caches, population records, location/population links, and decoded `sol_location_*` caches; writes analysis-ready location and country CSVs, a diagnostic manifest, and an optional population-group CSV under `data/save_analysis/` by default |

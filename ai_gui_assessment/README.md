@@ -27,15 +27,21 @@ $env:PYTHONUTF8='1'
 & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py situation      # images/r1_*
 & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py location       # images/r2_*
 & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py tooltip        # images/r3_*
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py market         # images/market.png
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py event          # images/event.png
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py government     # images/government.png
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py battle         # images/battle.png
 & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py ui_library cards ui_library_text_tabs=cards1
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py ui_library windows windows=tooltips
 & $env:EU5_PYTHON ai_gui_assessment/renderer/lib_batch.py          # UI Library 全部 26 页（约 2–3 分钟）
 & $env:EU5_PYTHON ai_gui_assessment/renderer/guidef.py situation_card_common   # 打印 type/template 的完整定义
 & $env:EU5_PYTHON ai_gui_assessment/renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
 ```
 
-每次运行会输出 `unknown expressions`，即没有示例数据的绑定表达式。新界面的示例数据写在
+每次运行会输出 `unknown expressions`，即没有示例数据的普通绑定表达式；`unresolved datacontexts`
+单列无法由静态 mock 还原的上下文绑定，前者为 0 不代表后者全部解析。新界面的示例数据写在
 `renderer/scenarios.py`（局势、UI Library）或 `renderer/scen_location.py`（地点窗口、tooltip）。
-`ui_library/` 的元素树可再生成，未保存。
+`lib_batch.py` 会把 UI Library 各页的 `*_tree.txt` 元素树保存在 `images/ui_library/`。
 
 | 模块 | 作用 |
 |---|---|
@@ -52,9 +58,10 @@ $env:PYTHONUTF8='1'
 
 ## 精度与局限
 
-已用实机截图验证：SOL 三个界面误差约 1 像素；UI Library 的文字格式、窗口、按钮、卡片各页基本一致。
-无法复现：3D 场景与插画、程序生成的国旗和纹章、人物肖像、动画与悬停状态、真实存档数据。
-尚未实现：`dropdown`、`slider`、引擎生成的 tooltip 表格（`TooltipBlockList` + `textcontext`）。
+已用实机截图对照 SOL 局势面板、地点窗口和地点 tooltip，以及 UI Library 的文字格式、窗口、按钮和卡片。
+局势面板与地点窗口的既有基线局部可达到像素一致；SOL 地点 tooltip 的外框宽度与实机截图同为约 550px，但不能把三个界面的整体误差概括为约 1 像素。
+无法复现：3D 场景、无可用贴图的插画、程序生成的国旗和纹章、人物肖像、动画与悬停状态、真实存档数据。已有贴图的事件插画可静态渲染。
+`dropdown`、`ranged_slider`、UI Library 的 `TooltipBlockList` 表格以及人物/成员卡片可用 mock 数据静态渲染；不解析任意 `textcontext`，也不模拟控件交互。
 已知差异见 `08_round2_results.md`。
 
 ## 后续工作方法

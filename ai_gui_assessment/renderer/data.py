@@ -355,6 +355,35 @@ class Evaluator:
     def fn_DataModelHasItems(self, a):
         return bool(a) if isinstance(a, list) else False
 
+    def fn_DataModelFirst(self, a, n):
+        """GUI list helpers used by fixed-grid sections."""
+        if not isinstance(a, list):
+            return []
+        return a[:max(0, int(_num(n)))]
+
+    def fn_DataModelSkipFirst(self, a, n):
+        if not isinstance(a, list):
+            return []
+        return a[max(0, int(_num(n))):]
+
+    def fn_DataModelRepeatedItem(self, n):
+        return [{} for _ in range(max(0, int(_num(n))))]
+
+    def fn_Select_int32(self, condition, a, b):
+        return int(_num(a) if condition else _num(b))
+
+    def fn_IsOdd_int32(self, a):
+        return int(_num(a)) % 2 == 1
+
+    def fn_IsEven_int32(self, a):
+        return int(_num(a)) % 2 == 0
+
+    def fn_IsStringViewNotEmptyOrNull(self, a):
+        return bool(a) and not isinstance(a, Unknown)
+
+    def fn_AddTextIf(self, condition, text):
+        return str(text) if condition else ""
+
     def fn_GetDataModelSize(self, a):
         return float(len(a)) if isinstance(a, list) else 0.0
 

@@ -14,7 +14,7 @@
 | 嵌套实例自己写的 blockoverride 优先于从外层继承的同名覆盖 | UI Library 在 `scrollbox_content` 里又嵌了一个 scrollbox；按“外层优先”会无限递归 | 渲染崩溃 |
 | 按钮上的 `text` / `raw_text` 由按钮内部的 `buttonText = { textbox }` 显示 | 所有页签按钮都有文字 | 二级页签全部为空 |
 
-全部修正后复核了第一轮的三张图，结果不变。
+当前复核中，SOL 局势面板两张输出与既有基线一致；SOL tooltip 的 550px 宽度恢复后也与既有输出一致。地点窗口相对既有输出仅在 `(263,48)-(305,77)` 范围内有变化，尚未据此宣称整图像素一致。
 
 ## 逐页结论
 
@@ -27,20 +27,31 @@
 | Portraits | 画框和缎带一致；人物肖像是 3D 渲染，无法复现 |
 | Buttons → Flags | 框体一致；国旗和家族纹章是程序生成，无法复现 |
 
-## 仍有差异、尚未修正
+## 第二轮遗留项的处理
 
-| 页面 | 差异 | 原因判断 |
-|---|---|---|
-| Buttons → Selectors | 下拉框和滑条不显示 | `dropdown`、`slider` 是引擎特殊控件，渲染器尚未实现 |
-| Windows → Tooltips | 实机的 tooltip 内是一张表格（`textcontext = "TOOLTIP_TABLE_TEST"`），渲染器显示空列表 | 表格内容由引擎从本地化生成（`TooltipBlockList`），需要实现这套表格格式 |
-| Cards → Cards 1 | DLC 卡片在实机中更窄、更高，文字自动换行；渲染器中的卡片过宽 | 很可能是 `max_width` / 多行文本的最小宽度规则，还要再查 |
-| Cards → Situations / IOs | 人物卡、成员列表里的数据为空 | 依赖存档里的人物和国家数据，需要另外编示例数据 |
-| Building blocks → Test | 实机按钮是圆角，渲染器是直角，两侧多出装饰 | 尚未分析 |
+更新（2026-10-12）：以下为静态渲染器的当前状态。数据仍来自示例，实际存档与交互状态须在游戏内验证。
+
+| 页面 | 当前状态 |
+|---|---|
+| Buttons → Selectors | `dropdown` 和 `ranged_slider` 的静态状态已渲染；滑条轨道的模板 `background` 边框已补齐 |
+| Windows → Tooltips | `TooltipBlockList` 表格已用 mock 数据渲染，不解析任意 `textcontext` |
+| Cards → Cards 1 | DLC 卡片宽度和文字换行已按实机截图调整 |
+| Cards → Situations / IOs | 人物字段与成员列表已补 mock 数据；IOs 的成员列表按 `flipdirection = yes`、`datamodel_wrap = 1` 分成三行；3D 肖像和程序化旗帜仍无法复现 |
+| Cards → Disasters | 空动作列表已补 mock 数据；静态卡片可渲染，实际动作仍需存档数据 |
+| Building blocks → Test | 圆角按钮及两侧装饰已按实机截图调整 |
+
+Selectors 底轨和 IOs 三行成员列表已分别与 `screenshots/ui_library/lib_buttons_selectors.png`、`lib_cards_ios.png` 对照。Selectors、IOs、Situations、Situationsios、Disasters 五页重渲染后均无普通未知表达式。SOL 局势面板两张基线图完全一致；tooltip 的外框恢复为实机截图中的约 550px，且未改变 UI Library 的 450px 紧凑 tooltip。
 
 ## 5 个原版界面
 
-事件、市场、地点 tooltip、政府、战斗这五张截图已经收好。它们依赖大量存档数据（人物、市场、战斗），每一个都要像地点窗口那样单独编写示例数据才能渲染，所以本轮还没有渲染。从截图中已经可以直接确认的规则：
+事件、市场、地点 tooltip、政府、战斗这五张截图已收好。渲染器使用对应的静态 mock 场景比对布局；真实存档数据和交互状态仍需游戏内验证。
 
-- **地点 tooltip**：顶部是一块紫色的 DEBUG INFO 区域，因为你的游戏开着 debug 模式；正式版不会显示。渲染时需要区分这两种情况。
-- **事件窗口**：正文是自动换行的多行文本，选项按钮宽度固定，选项 tooltip 出现在按钮右下方。
-- **市场 tooltip**：两列表格（最大盈余 / 最大短缺）宽度相等，数字右对齐，红绿色与 `|+` 格式规则一致。
+| 原版截图 | 当前渲染状态与边界 |
+|---|---|
+| 事件 `screenshots/round2/event.png` | 已选中普通事件窗口根节点，正文换行、插画和固定宽度选项可静态渲染；选项悬停 tooltip 与实际交互状态未复现。 |
+| 市场 `screenshots/round2/market.png` | 商品页搜索栏、筛选条件和排序控件可见，商品行使用 mock 数据；排序图标是示例，市场的 10 个 `datacontext` 仍缺少可解析的存档对象。截图中的两列表格 tooltip（最大盈余 / 最大短缺）数字右对齐，其红绿色遵循 `|+` 格式规则。 |
+| 地点 tooltip `screenshots/round2/location.png` | 这张是**原版地点 tooltip**，不是 SOL 的 `images/r3_location_sol_tooltip.png`。顶部紫色 DEBUG INFO 区域来自截图的 debug 模式；正式版没有此区。`run.py tooltip` 仅渲染 SOL tooltip，其 550px 外框宽度已对照 `screenshots/C_sol_tooltip.png` 复核。 |
+| 政府 `screenshots/round2/gov.png` | 阶层页签和三张阶层卡片已对位；阶层数据仍是 mock，16 个 `datacontext` 未解析，3D 人物场景和真实存档状态无法复现。 |
+| 战斗 `screenshots/round2/battle.png` | 攻守双方显示不同兵力，左右中侧翼分别绑定 mock 数值；3D 场景、地图背景和真实存档状态无法复现。 |
+
+四个已实现的原版窗口（事件、市场、政府、战斗）当前普通未知表达式均为 0；这不等于市场和政府的上下文已完整解析。地点窗口另有 20 个未解析 `datacontext`，其 mock 图像只能用于静态布局检查。

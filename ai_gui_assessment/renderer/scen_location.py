@@ -125,6 +125,7 @@ def location(tab="demography"):
         (r"Location\.GetPossibleTownRights", 2.0),
         (r"Location\.GetRomanFortLevel", "II"),
         (r"GetIntegrationLevelIcon\(.*\)", "gfx/interface/icons/integration_levels/core.dds"),
+        (r"CoatOfArmsWrapper\.GetTexture\(.*\)", "gfx/interface/icons/flat_icons/country.dds"),
     ]
     return mocks
 

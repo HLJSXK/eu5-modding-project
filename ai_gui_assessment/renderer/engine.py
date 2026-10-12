@@ -50,17 +50,28 @@ class Engine:
         self.ex, self.ev, self.loc, self.formats, self.icons = ex, ev, loc, formats, icons
         self.scale = scale
         self.missing_text = []
+        self.unresolved_contexts = set()
 
     # ------------------------------------------------------------ data helpers
     def push(self, el):
+        count = 0
         it = getattr(el, "ctx_item", None)
         if it is not None:
             self.ev.item_stack.append(it)
-            return True
-        return False
+            count += 1
+        for expr in el.props.get("datacontexts", []):
+            log_start = len(self.ev.log)
+            context = self.ev.eval_str(expr)
+            if isinstance(context, dict):
+                self.ev.item_stack.append(context)
+                count += 1
+            elif isinstance(context, Unknown):
+                self.unresolved_contexts.add(context.path)
+                del self.ev.log[log_start:]
+        return count
 
     def pop(self, pushed):
-        if pushed:
+        for _ in range(pushed):
             self.ev.item_stack.pop()
 
     def visible(self, el) -> bool:
@@ -167,10 +178,19 @@ class Engine:
             return
         el._realized = True
         dm = el.props.get("datamodel")
-        if dm and el.item is not None:
+        # A dropdown's open list is a popup owned by the engine.  Its static
+        # active item is already expanded by gui.Expander; realizing every
+        # option here would paint the closed list on top of the control.
+        if dm and el.item is not None and el.kind != "dropdown":
             items = self.ev.eval_str(dm)
             if isinstance(items, list):
-                for it in items:
+                for index, it in enumerate(items):
+                    if isinstance(it, dict):
+                        # Jomini exposes the current data-model index through
+                        # PdxGuiWidget while evaluating row backgrounds/layout.
+                        it = dict(it)
+                        it.setdefault("PdxGuiWidget.GetIndexInDataModel", index)
+                        it.setdefault("PdxGuiWidget.GetIndexInParent", index)
                     ch = self.ex.build_lazy(el.item)
                     ch.ctx_item = it
                     ch.props["__dm_item__"] = True
@@ -179,7 +199,7 @@ class Engine:
     def layout_children(self, el):
         """Children taking part in box layout. Hidden children take neither size nor spacing, with or without
         `ignoreinvisible` (confirmed in game: situation panel card sits directly under the tab bar)."""
-        return self.vis_children(el)
+        return [c for c in self.vis_children(el) if c.props.get("ignore_layout") != "yes"]
 
     def _shown(self, c):
         p = self.push(c)
@@ -266,12 +286,41 @@ class Engine:
         l, t, r, b = self.margins(el)
         hw = hh = 0.0
         kind = el.kind
+        multiline_expands = False
         if kind in BOX:
             kids = self.layout_children(el)
             sp = num(el.props.get("spacing"), 0)
             inner_avail = None if avail_w is None else max(0, avail_w - l - r)
-            ms = [self.measure(c, inner_avail if kind == "vbox" else None) if self._shown(c) else ZERO for c in kids]
+            # If no parent width is available, use the declared minimum as the
+            # wrapping width.  Once a parent supplies a wider box, its width
+            # is the actual text width; treating the minimum as a cap would
+            # wrap tooltip paragraphs one line too early.
+            declared_min = self.size_prop(el, "minimumsize")
+            if declared_min:
+                declared_w = num(declared_min[0], -1)
+                if declared_w >= 0 and inner_avail is None:
+                    min_content = max(0, declared_w - l - r)
+                    inner_avail = min_content
+            measured = []
+            for c in kids:
+                if not self._shown(c):
+                    measured.append(ZERO)
+                    continue
+                child_avail = inner_avail if kind == "vbox" else None
+                # Multiline text in a row needs the row's available width in
+                # order to wrap.  Other hbox children keep their intrinsic
+                # width so columns and spacer widgets still measure normally.
+                if (kind == "hbox" and inner_avail is not None and c.kind in TEXT
+                        and c.props.get("multiline") == "yes"):
+                    child_avail = inner_avail
+                measured.append(self.measure(c, child_avail))
+            ms = measured
             if kind == "hbox":
+                multiline_expands = any(
+                    c.kind in TEXT and c.props.get("multiline") == "yes"
+                    and m["hint"][1] > 30.01
+                    for c, m in zip(kids, ms)
+                )
                 hw = sum(m["hint"][0] for m in ms) + sp * max(0, len(ms) - 1)
                 hh = max([m["hint"][1] for m in ms] or [0])
                 mw = sum(m["min"][0] for m in ms) + sp * max(0, len(ms) - 1)
@@ -321,7 +370,12 @@ class Engine:
             vertical = el.props.get("direction") == "vertical" or kind == "dynamicgridbox"
             if el.props.get("flipdirection") == "yes" and kind == "dynamicgridbox":
                 vertical = False
-            if vertical:
+            wrap = int(num(el.props.get("datamodel_wrap"), 0)) if kind == "dynamicgridbox" and not vertical else 0
+            if wrap > 0:
+                rows = [ms[i:i + wrap] for i in range(0, len(ms), wrap)]
+                hh = sum(max(m["hint"][1] for m in row) for row in rows) + sp * max(0, len(rows) - 1)
+                hw = max((sum(m["hint"][0] for m in row) + sp * (len(row) - 1) for row in rows), default=0)
+            elif vertical:
                 hh = sum(m["hint"][1] for m in ms) + sp * max(0, len(ms) - 1)
                 hw = max([m["hint"][0] for m in ms] or [0])
             else:
@@ -339,11 +393,31 @@ class Engine:
         else:
             # widget-like: hint from size; or from children that resize parent
             kids = self.vis_children(el)
+            # Cap intrinsic tooltip text width, but retain a wider declared
+            # minimum when a tooltip contains fixed-width columns.
+            if kind == "tooltip_widget":
+                # Frontend tooltips reserve a 420px content budget. The
+                # contextual card uses the ordinary compact width, while the
+                # frontend DLC card gets the wider budget.
+                tooltip_avail = 450.0 if el.typename == "ContextualTooltipType" else 470.0
+            else:
+                tooltip_avail = avail_w
+            child_min_w = 0.0
             for c in kids:
                 if c.props.get("set_parent_size_to_minimum") == "yes" or c.props.get("resizeparent") == "yes":
-                    m = self.measure(c, avail_w)
+                    # A shrinking child reports its intrinsic size.  Passing the
+                    # free parent width into it makes expanding descendants
+                    # consume the whole slot, which is wrong for contextual
+                    # tooltips: their table content has a 400px minimum and the
+                    # outer widget must remain a compact, centered card.
+                    if kind == "tooltip_widget":
+                        child_avail = tooltip_avail
+                    else:
+                        child_avail = None if self.policy(c, 0) == "shrinking" else avail_w
+                    m = self.measure(c, child_avail)
                     hw = max(hw, m["hint"][0])
                     hh = max(hh, m["hint"][1])
+                    child_min_w = max(child_min_w, m["min"][0])
             if kind in ("icon", "button") and sw is None and sh is None and not size:
                 tex = self.resolve(el.props.get("texture"))
                 img = TEXTURES.load(tex) if isinstance(tex, str) else None
@@ -352,6 +426,8 @@ class Engine:
                     d = num(el.props.get("texture_density"), 1) or 1
                     hw, hh = img.width / d, img.height / d
             mw, mh = 0, 0
+            if kind == "tooltip_widget":
+                hw = max(min(hw, tooltip_avail), child_min_w)
         if sw is not None and not (kind in TEXT and el.props.get("autoresize") == "yes"):
             hw = sw
             mw = sw
@@ -376,7 +452,13 @@ class Engine:
             hw, mw = min(hw, mxw), min(mw, mxw)
         if mxh >= 0:
             maxh = mxh
-            hh, mh = min(hh, mxh), min(mh, mxh)
+            # TooltipTableField declares a 30px row for ordinary one-line
+            # values, but its text child is also a multiline autoresized
+            # textbox.  The game lets that child grow the row when wrapping
+            # produces more than one line; applying the hbox maximum here
+            # would paint the following rows over the paragraph.
+            if not (multiline_expands and hh > mxh + 0.01):
+                hh, mh = min(hh, mxh), min(mh, mxh)
         res = {"hint": (hw, hh), "min": (mw, mh), "max": (maxw, maxh)}
         cache[avail_w] = res
         return res
@@ -415,17 +497,32 @@ class Engine:
             vertical = el.props.get("direction") == "vertical" or kind == "dynamicgridbox"
             if el.props.get("flipdirection") == "yes" and kind == "dynamicgridbox":
                 vertical = False
+            wrap = int(num(el.props.get("datamodel_wrap"), 0)) if kind == "dynamicgridbox" and not vertical else 0
             cx, cy = x + l, y + t
-            for c in kids:
-                m = self.measure(c, w)
-                cw_, ch_ = m["hint"]
-                if self.policy(c, 0) in ("expanding", "growing", "preferred") and vertical:
-                    cw_ = w - l - r
-                self.place(c, cx, cy, cw_, ch_)
-                if vertical:
-                    cy += ch_ + sp
-                else:
-                    cx += cw_ + sp
+            if wrap > 0:
+                for start in range(0, len(kids), wrap):
+                    row = kids[start:start + wrap]
+                    heights = [self.measure(c, w)["hint"][1] for c in row]
+                    row_h = max(heights)
+                    cx = x + l
+                    cell_w = (w - l - r - sp * (wrap - 1)) / wrap
+                    for c in row:
+                        cw_, ch_ = self.measure(c, cell_w)["hint"]
+                        cell = cell_w if self.size_prop(c) and str(self.size_prop(c)[0]).endswith("%") else cw_
+                        self._place_free(c, cx, cy, cell, ch_)
+                        cx += cell + sp
+                    cy += row_h + sp
+            else:
+                for c in kids:
+                    m = self.measure(c, w)
+                    cw_, ch_ = m["hint"]
+                    if self.policy(c, 0) in ("expanding", "growing", "preferred") and vertical:
+                        cw_ = w - l - r
+                    self.place(c, cx, cy, cw_, ch_)
+                    if vertical:
+                        cy += ch_ + sp
+                    else:
+                        cx += cw_ + sp
         elif kind == "scrollarea":
             kids = self.vis_children(el)
             for c in kids:
@@ -481,6 +578,11 @@ class Engine:
             self.pop(pu)
 
     def _place_box(self, el, x, y, w, h, axis):
+        # Out-of-flow decorations use the whole box as their percent-size and
+        # anchor reference; they do not consume a layout slot or spacing.
+        for c in self.vis_children(el):
+            if c.props.get("ignore_layout") == "yes":
+                self._place_free(c, x, y, w, h)
         kids = self.layout_children(el)
         rev = el.props.get("righttoleft" if axis == 0 else "bottomtotop") == "yes"
         if rev:
@@ -493,7 +595,10 @@ class Engine:
         items = []
         for c in kids:
             pu = self.push(c)
-            m = self.measure(c, w if axis == 1 else None) if self._shown(c) else ZERO
+            measure_avail = w if axis == 1 else None
+            if (axis == 0 and c.kind in TEXT and c.props.get("multiline") == "yes"):
+                measure_avail = w
+            m = self.measure(c, measure_avail) if self._shown(c) else ZERO
             pol = self.policy(c, axis) if m is not ZERO else "fixed"
             cpol = self.policy(c, 1 - axis)
             hint = m["hint"][axis]
@@ -578,17 +683,17 @@ class Engine:
             pos += i["size"] + gap
 
     # ------------------------------------------------------------ rendering
-    def render(self, el, img, alpha=1.0, clip=None):
+    def render(self, el, img, alpha=1.0, clip=None, mask=None):
         p = self.push(el)
         try:
-            self._render(el, img, alpha, clip)
+            self._render(el, img, alpha, clip, mask)
         finally:
             self.pop(p)
 
     def px(self, v):
         return int(round(v * self.scale))
 
-    def _paste(self, img, layer, x, y, clip):
+    def _paste(self, img, layer, x, y, clip, mask=None):
         if layer is None:
             return
         X, Y = self.px(x), self.px(y)
@@ -601,6 +706,29 @@ class Engine:
                 return
             layer = layer.crop((lx0 - X, ly0 - Y, lx1 - X, ly1 - Y))
             X, Y = lx0, ly0
+        if mask is not None:
+            # ``mask`` is a global alpha image produced by a masked_button.
+            # Apply it after rectangle clipping so the layer coordinates stay
+            # aligned even when a scroll area has cropped the child.
+            mx, my, ma = mask
+            mx, my = self.px(mx), self.px(my)
+            arr = to_np(layer)
+            x0, y0 = max(X, mx), max(Y, my)
+            x1, y1 = min(X + layer.width, mx + ma.shape[1]), min(Y + layer.height, my + ma.shape[0])
+            if x1 <= x0 or y1 <= y0:
+                return
+            arr_y0, arr_y1 = y0 - Y, y1 - Y
+            arr_x0, arr_x1 = x0 - X, x1 - X
+            mask_y0, mask_y1 = y0 - my, y1 - my
+            mask_x0, mask_x1 = x0 - mx, x1 - mx
+            arr[arr_y0:arr_y1, arr_x0:arr_x1, 3] *= ma[mask_y0:mask_y1, mask_x0:mask_x1]
+            # The mask is a hard clipping shape.  Clear any layer pixels
+            # outside its bounds instead of letting them leak at the edges.
+            if X < mx or Y < my or X + layer.width > mx + ma.shape[1] or Y + layer.height > my + ma.shape[0]:
+                keep = np.zeros((layer.height, layer.width), dtype=np.float32)
+                keep[arr_y0:arr_y1, arr_x0:arr_x1] = 1.0
+                arr[..., 3] *= keep
+            layer = from_np(arr)
         if X >= img.width or Y >= img.height or X + layer.width <= 0 or Y + layer.height <= 0:
             return
         if X < 0 or Y < 0:
@@ -613,10 +741,25 @@ class Engine:
         r = self.resolve(v)
         return r if isinstance(r, (str, tuple, list)) else None
 
-    def _render(self, el, img, alpha, clip):
+    def _mask_for(self, el):
+        """Build the global alpha mask owned by a masked_button element."""
+        path = self.resolve(el.props.get("mask"))
+        if not isinstance(path, str) or el.w <= 0 or el.h <= 0:
+            return None
+        mimg = TEXTURES.load(path)
+        if mimg is None:
+            return None
+        spec = lower_spec(el.props)
+        mimg = select_frame(mimg, spec)
+        mimg = sprite(mimg, spec, self.px(el.w), self.px(el.h), self.scale)
+        return (el.x, el.y, to_np(mimg)[..., 3])
+
+    def _render(self, el, img, alpha, clip, inherited_mask=None):
         a = alpha * num(el.props.get("alpha"), 1.0)
         if a <= 0.001 or el.w < 0 or el.h < 0:
             return
+        own_mask = inherited_mask if str(el.props.get("inherit_mask", "")).lower() == "yes" else None
+        descendant_mask = self._mask_for(el) or inherited_mask
         # backgrounds
         for bg in el.backgrounds:
             bgl = lower_spec(bg)
@@ -639,7 +782,7 @@ class Engine:
                 arr = to_np(layer)
                 arr[..., 3] *= a
                 layer = from_np(arr)
-            self._paste(img, layer, el.x - l, el.y - t, clip)
+            self._paste(img, layer, el.x - l, el.y - t, clip, own_mask)
         # own content
         if el.kind in ("icon", "button") and el.props.get("texture") and el.w > 0 and el.h > 0:
             spec = dict(el.props)
@@ -650,18 +793,20 @@ class Engine:
             layer = compose(spec, self.px(el.w), self.px(el.h), self.scale, self._res_tex)
             if layer is not None:
                 if el.glows:
-                    self._glow(img, layer, el, clip, a)
+                    self._glow(img, layer, el, clip, a, own_mask)
                 if a < 1:
                     arr = to_np(layer)
                     arr[..., 3] *= a
                     layer = from_np(arr)
-                self._paste(img, layer, el.x, el.y, clip)
+                self._paste(img, layer, el.x, el.y, clip, own_mask)
+        if el.kind == "ranged_slider":
+            self._ranged_slider(el, img, a, clip, own_mask)
         if el.kind == "piechart":
-            self._pie(el, img, a, clip)
+            self._pie(el, img, a, clip, own_mask)
         if el.kind == "ecs_scene_viewer_widget":
-            self._scene(el, img, clip)
+            self._scene(el, img, clip, own_mask)
         if el.kind in TEXT:
-            self._text(el, img, a, clip)
+            self._text(el, img, a, clip, own_mask)
         kids = self.vis_children(el)
         cclip = clip
         if getattr(el, "clip", None):
@@ -669,11 +814,105 @@ class Engine:
         for c in kids:
             if c.kind == "pieslice":
                 continue
-            self.render(c, img, a, cclip)
+            self.render(c, img, a, cclip, descendant_mask)
         if el.kind == "scrollarea" and el.props.get("scrollbar_vertical") and kids:
-            self._scrollbar(el, img, max(k.h for k in kids), clip)
+            self._scrollbar(el, img, max(k.h for k in kids), clip, own_mask)
 
-    def _scrollbar(self, el, img, content_h, clip):
+    def _resolved_num(self, value, default):
+        value = self.resolve(value)
+        return num(value, default)
+
+    def _slider_part(self, spec, w, h, x, y, img, alpha, clip, mask=None):
+        if not isinstance(spec, dict) or w <= 0 or h <= 0:
+            return
+        for bg in spec.get("backgrounds", []):
+            bgl = lower_spec(bg)
+            if bgl.get("visible") is not None and not self.ev.truthy(bgl["visible"]):
+                continue
+            margin = bgl.get("margin")
+            l = r = num(margin[0]) if isinstance(margin, list) and margin else 0.0
+            t = b = num(margin[1] if len(margin) > 1 else margin[0]) if isinstance(margin, list) and margin else 0.0
+            l = num(bgl.get("margin_left"), l)
+            r = num(bgl.get("margin_right"), r)
+            t = num(bgl.get("margin_top"), t)
+            b = num(bgl.get("margin_bottom"), b)
+            layer = compose(bg, self.px(w + l + r), self.px(h + t + b), self.scale, self._res_tex)
+            if layer is not None and alpha * num(spec.get("alpha"), 1.0) < 1:
+                arr = to_np(layer)
+                arr[..., 3] *= alpha * num(spec.get("alpha"), 1.0)
+                layer = from_np(arr)
+            self._paste(img, layer, x - l, y - t, clip, mask)
+        layer = compose(spec, self.px(w), self.px(h), self.scale, self._res_tex)
+        if layer is None:
+            return
+        if alpha < 1:
+            arr = to_np(layer)
+            arr[..., 3] *= alpha
+            layer = from_np(arr)
+        self._paste(img, layer, x, y, clip, mask)
+
+    def _ranged_slider(self, el, img, alpha, clip, mask=None):
+        """Render the engine-owned ranged_slider parts from their GUI specs."""
+        if el.w <= 0 or el.h <= 0:
+            return
+        track = el.props.get("track")
+        track_range = el.props.get("track_range")
+        track_highlight = el.props.get("track_highlight")
+        slider = el.props.get("slider") or el.props.get("slider_low")
+        slider_low = el.props.get("slider_low")
+        dec = el.props.get("dec_button")
+        inc = el.props.get("inc_button")
+        dec_low = el.props.get("dec_button_low")
+        inc_low = el.props.get("inc_button_low")
+
+        # The vanilla layout reserves a 20px gap on either side of each 15px
+        # step button, leaving the centre segment for the track.
+        button_w = 15.0
+        track_x = 36.0
+        track_w = max(1.0, el.w - 2 * track_x)
+        track_y = el.y + (el.h - 15.0) / 2
+        self._slider_part(track, track_w, 15.0, el.x + track_x, track_y, img, alpha, clip, mask)
+        self._slider_part(track_range, track_w, 15.0, el.x + track_x, track_y, img, alpha, clip, mask)
+
+        lo = self._resolved_num(el.props.get("min"), 0.0)
+        hi = self._resolved_num(el.props.get("max"), 1.0)
+        span = max(hi - lo, 1e-6)
+        val = min(hi, max(lo, self._resolved_num(el.props.get("value"), lo)))
+        val_low = min(hi, max(lo, self._resolved_num(el.props.get("value_low"), val)))
+        px = lambda v: el.x + track_x + track_w * ((v - lo) / span)
+        x_low, x_high = px(val_low), px(val)
+        left, right = min(x_low, x_high), max(x_low, x_high)
+        self._slider_part(track_highlight, max(1.0, right - left), 15.0, left, track_y, img, alpha, clip, mask)
+
+        # Step buttons sit just outside the track.  A two-handle slider uses
+        # the low variants when present; these share the same visuals in the
+        # UI Library reference.
+        def step_button(spec, x, icon_name):
+            self._slider_part(spec, button_w, button_w, x, el.y, img, alpha, clip, mask)
+            if not isinstance(spec, dict):
+                return
+            icon = {
+                "texture": f"gfx/interface/buttons/flats/{icon_name}.dds",
+                "texture_density": 2,
+                "modifies": [
+                    {"texture": "gfx/interface/colors/gold.dds"},
+                    {"texture": "gfx/interface/component_overlay/overlay_window.dds",
+                     "texture_density": 2, "blend_mode": "overlay", "alpha": 0.9},
+                ],
+            }
+            self._slider_part(icon, 11, 11, x + 2, el.y + 2, img, alpha, clip, mask)
+
+        step_button(dec_low or dec, el.x, "minus")
+        step_button(inc_low or inc, el.x + button_w, "add")
+        step_button(dec, el.x + el.w - 2 * button_w, "minus")
+        step_button(inc, el.x + el.w - button_w, "add")
+
+        hs = 14.0
+        self._slider_part(slider_low or slider, hs, hs, x_low - hs / 2, el.y + (el.h - hs) / 2, img, alpha, clip, mask)
+        if slider is not None and abs(x_high - x_low) > 0.5:
+            self._slider_part(slider, hs, hs, x_high - hs / 2, el.y + (el.h - hs) / 2, img, alpha, clip, mask)
+
+    def _scrollbar(self, el, img, content_h, clip, mask=None):
         """ScrollbarVertical (loading_screen/gui/custom_loading_screen.gui:296), hard-coded track/slider specs."""
         if content_h <= el.h + 0.5:
             return
@@ -682,20 +921,20 @@ class Engine:
                                                  "blend_mode": "alphamultiply", "spriteType": "Corneredstretched", "spriteborder": ["0", "12"]}]}
         x = el.x + el.w - 12
         layer = compose(track, self.px(12), self.px(el.h), self.scale, self._res_tex)
-        self._paste(img, layer, x, el.y, clip)
+        self._paste(img, layer, x, el.y, clip, mask)
         sh = max(30, el.h * el.h / content_h)
         slider = {"texture": "gfx/interface/scrollbars/scrollbar_slider.dds", "texture_density": "2", "spritetype": "Corneredtiled",
                   "spriteborder": ["8", "8"], "framesize": ["8", "20"], "upframe": "1",
                   "modifies": [{"texture": "gfx/interface/component_overlay/overlay_stone.dds", "blend_mode": "overlay"}]}
         layer = compose(slider, self.px(8), self.px(sh), self.scale, self._res_tex)
-        self._paste(img, layer, x + 2, el.y, clip)
+        self._paste(img, layer, x + 2, el.y, clip, mask)
 
     def _intersect(self, a, b):
         x0, y0 = max(a[0], b[0]), max(a[1], b[1])
         x1, y1 = min(a[0] + a[2], b[0] + b[2]), min(a[1] + a[3], b[1] + b[3])
         return (x0, y0, max(0, x1 - x0), max(0, y1 - y0))
 
-    def _glow(self, img, layer, el, clip, a):
+    def _glow(self, img, layer, el, clip, a, mask=None):
         g = el.glows[0]
         rad = num(g.get("glow_radius"), 3)
         col = parse_color(g.get("color")) or [0, 0, 0, 1]
@@ -709,9 +948,9 @@ class Engine:
         out = np.zeros((big.height, big.width, 4), np.float32)
         out[..., :3] = col[:3]
         out[..., 3] = np.clip(arr * 1.5, 0, 1) * ga * col[3]
-        self._paste(img, from_np(out), el.x - pad / self.scale, el.y - pad / self.scale, clip)
+        self._paste(img, from_np(out), el.x - pad / self.scale, el.y - pad / self.scale, clip, mask)
 
-    def _text(self, el, img, a, clip):
+    def _text(self, el, img, a, clip, mask=None):
         l, t, r, b = self.margins(el)
         maxw = None
         if el.props.get("multiline") == "yes":
@@ -748,9 +987,9 @@ class Engine:
         layer = Image.new("RGBA", (max(1, self.px(el.w + 40)), max(1, self.px(el.h + 20))), (0, 0, 0, 0))
         rt.draw(layer, l + 20, t + oy + 10, self.scale, a, offs)
         # elide/clip horizontally to the box (+ small overflow allowance for glyph overhang)
-        self._paste(img, layer, el.x - 20, el.y - 10, clip if clip else None)
+        self._paste(img, layer, el.x - 20, el.y - 10, clip if clip else None, mask)
 
-    def _pie(self, el, img, a, clip):
+    def _pie(self, el, img, a, clip, mask=None):
         """Pie slices are drawn through each slice's texture (e.g. piechart_alpha.dds is a ring), tinted by its color."""
         slices = []
         for c in self.vis_children(el):
@@ -785,13 +1024,13 @@ class Engine:
             t = to_np(timg.resize((W, H), Image.BILINEAR)) if timg is not None else np.ones((H, W, 4), np.float32)
             out[m, :3] = t[m, :3] * np.array(col[:3], np.float32)
             out[m, 3] = t[m, 3] * col[3] * salpha * a
-        self._paste(img, from_np(out), el.x, el.y, clip)
+        self._paste(img, from_np(out), el.x, el.y, clip, mask)
 
-    def _scene(self, el, img, clip):
+    def _scene(self, el, img, clip, mask=None):
         W, H = self.px(el.w), self.px(el.h)
         if W <= 0 or H <= 0:
             return
         layer = Image.new("RGBA", (W, H), (58, 66, 60, 255))
         d = ImageDraw.Draw(layer)
         d.text((W / 2, H / 2), "3D scene (ecs_scene_viewer_widget)", fill=(200, 200, 200, 255), anchor="mm")
-        self._paste(img, layer, el.x, el.y, clip)
+        self._paste(img, layer, el.x, el.y, clip, mask)

@@ -1,6 +1,6 @@
 """Render a GUI screen from the real game/SOL .gui files.
 
-usage: run.py situation|location|tooltip
+usage: run.py situation|location|tooltip|event|market|government|battle
 """
 import os
 import sys
@@ -50,11 +50,13 @@ def walk(el):
         yield from walk(c)
 
 
-def find_root(db, suffix, key=None):
+def find_root(db, suffix, key=None, name=None):
     for path, nodes in db.roots.items():
         if path.replace("\\", "/").endswith(suffix):
             for n in nodes:
-                if key is None or n.key == key:
+                if (key is None or n.key == key) and (name is None or any(
+                    c.key == "name" and c.value == name for c in n.value if n.is_block()
+                )):
                     return path, n
     raise SystemExit(f"root not found {suffix} {key}")
 
@@ -64,6 +66,10 @@ def report(eng, log, el):
     print("unknown expressions:", len(c))
     for k, v in c.most_common(400):
         print(f"  {v:4d}  {k}")
+    if eng.unresolved_contexts:
+        print("unresolved datacontexts:", len(eng.unresolved_contexts))
+        for path in sorted(eng.unresolved_contexts):
+            print(f"  {path}")
     if TEXTURES.missing:
         print("missing textures:", sorted(TEXTURES.missing)[:30])
 
@@ -119,6 +125,7 @@ def tooltip():
     eng.place(el, pad, pad, w, h)
     img = Image.new("RGBA", (int((w + 2 * pad) * SCALE), int((h + 2 * pad) * SCALE)), (40, 52, 46, 255))
     eng.render(el, img)
+    OUT.mkdir(parents=True, exist_ok=True)
     img.save(OUT / "r3_location_sol_tooltip.png")
     report(eng, log, el)
     Path(OUT / "r3_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
@@ -140,13 +147,55 @@ def ui_library(tab="cards", *subs, w=1920, h=1080):
     report(eng, log, el)
     Path(OUT / f"{tag}_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
 
+
+def vanilla(which, w=1920, h=1080):
+    """Render one data-backed vanilla screen on a full-size canvas.
+
+    The map and 3D scenes are intentionally left as the neutral canvas; the
+    lateral/window itself uses the same GUI files and layout as the game.
+    """
+    configs = {
+        "event": (scenarios.event, "in_game/gui/eventwindow.gui", "window", 0, 0, w, h),
+        "market": (scenarios.market, "in_game/gui/selected_market_view.gui", "lateralview", 0, 130, 570, h - 130),
+        "government": (scenarios.government, "in_game/gui/government_lateralview.gui", "lateralview", 0, 130, 570, h - 130),
+        "battle": (scenarios.battle, "in_game/gui/battle_lateralview.gui", "lateralview", 0, 130, 570, h - 130),
+    }
+    make_scenario, suffix, key, x, y, pw, ph = configs[which]
+    db, ex, ev, eng, log = setup(make_scenario())
+    path, n = find_root(db, suffix, key, "event_window" if which == "event" else None)
+    el = ex.build(n.key, n.value, {}, path, n.line)
+    if which == "event":
+        mw, mh = eng.measure(el, None)["hint"]
+        x, y, pw, ph = (w - mw) / 2, max(130.0, (h - mh) / 2), mw, mh
+    eng.place(el, x, y, pw, ph)
+    img = Image.new("RGBA", (int(w * SCALE), int(h * SCALE)), (29, 35, 42, 255))
+    eng.render(el, img)
+    OUT.mkdir(parents=True, exist_ok=True)
+    img.save(OUT / f"{which}.png")
+    report(eng, log, el)
+    Path(OUT / f"{which}_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
+
 def _main():
     which = sys.argv[1] if len(sys.argv) > 1 else "situation"
-    globals()[which](*sys.argv[2:])
+    if which in ("event", "market", "government", "battle"):
+        vanilla(which, *sys.argv[2:])
+    else:
+        globals()[which](*sys.argv[2:])
 
 
 if __name__ == "__main__":
     # deep GUI trees (e.g. the 19k-line ui_library) need a big stack
-    t = threading.Thread(target=_main)
+    error = []
+
+    def run_main():
+        try:
+            _main()
+        except BaseException:
+            error.append(sys.exc_info())
+
+    t = threading.Thread(target=run_main)
     t.start()
     t.join()
+    if error:
+        _, exc, tb = error[0]
+        raise exc.with_traceback(tb)

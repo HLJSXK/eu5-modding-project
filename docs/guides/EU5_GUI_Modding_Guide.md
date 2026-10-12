@@ -27,11 +27,14 @@
    computed rect (game folder must exist at `C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V`):
 
    ```
-   & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py situation|location|tooltip
+   & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py situation
+   & $env:EU5_PYTHON ai_gui_assessment/renderer/run.py ui_library windows windows=tooltips
    & $env:EU5_PYTHON ai_gui_assessment/renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
    ```
 
-   It reproduces the three SOL screens to within ~1px of the game (see §6 for what it cannot do). For a new screen,
+   Replace `situation` with `location`, `tooltip`, `event`, `market`, `government`, or `battle` for those screens.
+   The SOL situation panel and location window have screenshot-matched regions, and the SOL location tooltip's
+   outer width matches the roughly 550px game screenshot. No screen-wide pixel-accuracy claim applies (see §6). For a new screen,
    add a mock-data scenario in `renderer/scenarios.py` / `scen_location.py`.
 
 4. **When the renderer and the game disagree, the game wins.** Record the corrected rule here and in
@@ -47,6 +50,7 @@
 | Overrides propagate into nested type instances, but **an instance's own `blockoverride` beats one inherited from outside** (otherwise nested scrollbox-in-scrollbox would recurse forever). | 实机 |
 | Text set on a button (`text` / `raw_text`) is drawn by the button type's `buttonText = { textbox }` child. | 实机 |
 | Hidden children in `hbox`/`vbox` take **neither size nor spacing**. | 实机 |
+| Nested widget `datacontext` expressions can refer to an ancestor's context: the battle view binds `Combat.GetDefender`, then a child binds `CombatSide.GetLeft`. A static renderer must retain the parent object while resolving the child. | 源 |
 
 ## 2. Layout
 
@@ -60,12 +64,14 @@
 | A vertical scrollbar overlays the content; it does not narrow it. | 实机 |
 | Fixed-width single-line text that does not fit **shrinks its font** down to `fontsize_min` (vanilla default 8). | 实机 |
 | `righttoleft = yes` / `bottomtotop = yes` reverse box order. | 源 |
+| A `dynamicgridbox` with `flipdirection = yes` lays items horizontally; `datamodel_wrap = 1` then starts a new row after each item. The IOs member list uses this to show three estate rows. This verified case does not establish vertical wrapping semantics. | 实机 |
 
 ## 3. Textures
 
 | Rule | Level |
 |---|---|
 | `spriteborder` and `framesize` are in **GUI units**, not texture pixels: texture pixels = value × `texture_density`. | 实机 |
+| A `ranged_slider` part instantiated through a template may have both its own `texture` and `background` layers. For example, `economy_slider_track` uses `bg_progress_bar_frame`; render the background before the track texture, including its margin and alpha. | 实机 |
 | `corneredtiled` tiles the middle; a border-only pattern (e.g. `pattern_bevel_vertical_bis`) shows only the edge strip. | 实机 |
 | A `modify_texture` with a `color` but no texture is a flat colour layer; the colour may be data-bound (`"[LocationPopItem.GetColor]"`). | 实机 |
 | `modify_texture` without `blend_mode` behaves as normal (mask textures with black RGB still tint correctly). | 推 |
@@ -96,9 +102,10 @@
 
 ## 6. What the renderer cannot do (verify in game)
 
-3D scenes and illustrations, procedural flags/coats of arms, character portraits, `dropdown` / `slider` controls,
-engine-generated tooltip tables (`TooltipBlockList` + `textcontext`), animations and hover states, and real
-save data (all values are mock data). Remaining known differences are listed in
+3D scenes, illustrations without accessible textures, procedural flags/coats of arms, character portraits, animations and hover states, and real
+save data (all values are mock data). Static `dropdown` and `ranged_slider` states and the UI Library's
+`TooltipBlockList` table are rendered with scenario data; the renderer does not execute engine actions or parse
+arbitrary `textcontext` strings into tooltip tables. Remaining known differences are listed in
 [`ai_gui_assessment/08_round2_results.md`](../../ai_gui_assessment/08_round2_results.md).
 
 ## 7. Further reading

@@ -20,7 +20,9 @@ class _Tex:
     def load(self, path: str):
         if not path or not isinstance(path, str) or path.startswith("["):
             return None
-        rel = path.replace("\\", "/")
+        # GUI texture paths are sometimes written with a leading slash; it is
+        # still relative to the selected game/mod content root.
+        rel = path.replace("\\", "/").lstrip("/")
         for root in SEARCH:
             p = root / rel
             if p.exists():
@@ -218,6 +220,15 @@ def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Im
             m[..., :3] *= np.array(col[:3], dtype=np.float32)
             m[..., 3] *= col[3]
         out = blend(out, m, ms.get("blend_mode", "normal"), _f(ms.get("alpha"), 1.0))
+    # masked_button uses the mask's alpha as a hard shape for the composed button.
+    # The mask follows the same frame/sprite sizing rules as the main texture.
+    mask = resolve(spec.get("mask")) if spec.get("mask") is not None else None
+    if isinstance(mask, str):
+        mimg = TEXTURES.load(mask)
+        if mimg is not None:
+            mimg = select_frame(mimg, spec)
+            ma = to_np(sprite(mimg, spec, out.shape[1], out.shape[0], scale))[..., 3:4]
+            out[..., 3:4] *= ma
     col = parse_color(spec.get("color"))
     if col:
         out[..., :3] *= np.array(col[:3], dtype=np.float32)
