@@ -805,3 +805,66 @@
   scope: any
   source: "reference_game_files/game/in_game/gui/battle_lateralview.gui:543,552; docs/guides/EU5_GUI_Modding_Guide.md section 1"
   notes: "Source-backed nested binding pattern; static renderer implementation checked on the battle mock (2026-10-12)."
+
+- id: gui_text_single_autoresize_beats_declared_size
+  pattern: null
+  bad: "Giving a fixed-width column cell a `size = { 46 26 }` and expecting the column to be 46px wide"
+  correction: "Set `autoresize = no` on every fixed-width text cell. `text_single` inherits `autoresize = yes` from `text_single_template`, and autoresize makes the declared size lose to the text's intrinsic width, so the cell collapses to its content and the columns run together. Keep the default only where shrink-to-fit is wanted."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/loading_screen/gui/textformatting.gui:636-642 (`text_single_template` sets `autoresize = yes`); renderer `engine.py` measures `hw = sw` only when autoresize is off"
+  notes: "Cost real debugging time on the SOL estate ledger: five declared columns (46/50/58/52/96) all rendered at content width and fused into one run of digits. The renderer reproduces the game's behaviour, so this was visible before launch. Rule also in the GUI guide section 2 (2026-10-13)."
+
+- id: gui_wrapping_text_without_max_width_inflates_frame
+  pattern: null
+  bad: "Placing a wrapping `text_multi`/`textbox` in a layout without a `max_width`, assuming the parent's width will constrain it"
+  correction: "Give every wrapping text an explicit `max_width`. An hbox measures its children with no width hint, so an uncapped multiline text reports its full *unwrapped* width as a **minimum**, and a minimum defeats the contextual-tooltip width cap: the whole tooltip is dragged wider than its frame. `max_width` caps that minimum as well as the hint."
+  category: gui
+  scope: any
+  source: "Symptom measured in the project renderer (an informational paragraph reported 663px as a minimum inside a 520px card); mechanism in `ai_gui_assessment/renderer/engine.py` `hw = max(min(hw, tooltip_avail), child_min_w)`"
+  notes: "Missed twice in the SOL tooltip rebuild - first as a bare `text_multi`, then again after rebuilding it on TooltipListBase, because the cap only applies once `max_width` is set. Rule also in the GUI guide section 2 (2026-10-13)."
+
+- id: gui_text_localizes_raw_text_is_literal
+  pattern: null
+  bad: "Putting a localization key in `raw_text`, or an expression/`#format#` markup string in `text`"
+  correction: "`text` resolves a localization key (and also evaluates an embedded `[expression]`); `raw_text` is printed verbatim. Labels use `text`; expressions, inline `@icon!` texticons and `#colour ... #!` markup go in `raw_text`."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/goods_details.gui:61-64 vs 159 (`raw_text = \"[Goods.GetNumSources]\"` beside `text = \"[Goods.GetDemandsInfo]\"`)"
+  notes: "Symptom is a raw key printed in the UI (e.g. `SOL_GUI_ROW_STRATUM_INCOME`), which reads as a styling bug rather than a property bug. Rule also in the GUI guide section 4 (2026-10-13)."
+
+- id: gui_blockoverride_cannot_parameterize_siblings
+  pattern: null
+  bad: "Declaring one block in a type and instantiating the type five times, expecting five different values - e.g. five table cells each with its own `blockoverride \"cell_value\"`"
+  correction: "A `blockoverride` replaces a block *entirely*, and an instance's own override beats one inherited from outside, so sibling instances of the same type each keep their own default. Expose ONE container block per row (`block \"sol_cells\" {}`) and let the caller fill it with its own child instances, each carrying its own override."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/main_menu_cooltip_types.gui:1601 (`type TooltipTableHeader`); confirmed by rendering in `ai_gui_assessment/renderer/`"
+  notes: "Design constraint behind the SOL kit's single-container-block-per-row shape. Getting it wrong silently duplicates elements rather than erroring: emitting five cells *alongside* a block that already held five defaults produced ten per row (2026-10-13)."
+
+- id: gui_tooltip_listbase_already_emits_a_table_header
+  pattern: null
+  bad: "Building a section caption on `TooltipListBase` and adding a body child for the title"
+  correction: "`TooltipListBase` already contains a `TooltipTableHeader`, so a caption needs only to override `tableheader_text`/`table_header_background`. Adding a body stacks a second header and makes the band roughly twice as tall as intended (measured ~60px instead of ~33px)."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/main_menu_cooltip_types.gui:1560-1578"
+  notes: "Found by measuring band height when replacing a TooltipTextBlock (43px) with a caption type: the naive version came out 60px, i.e. taller than what it replaced (2026-10-13)."
+
+- id: gui_pieslice_colour_is_rgb_and_values_are_raw_counts
+  pattern: null
+  bad: "Referencing a named colour in a `pieslice` colour field, or pre-dividing slice values into percentages"
+  correction: "A `pieslice` `color` takes a literal `{ r g b a }` list - a named colour cannot be used there. Slice `value`s may be expressions and are normalised by the engine, so pass raw counts and the same chart works at any scale."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/backgrounds.gui:3317 (`bg_circle_piechart`); existing SOL tooltip pieslices; pop colours in `main_menu/common/named_colors/02_map.txt`"
+  notes: "Consequence: pop colours must be transcribed as RGB literals (pop_nobles 224/59/80 -> 0.328 0.454 0.800, etc.). Slice drawing verified in the project renderer by pixel ratio on a 30/70 test (2026-10-13)."
+
+- id: gui_generated_block_shape_change_requires_rebuild_not_line_patch
+  pattern: null
+  bad: "Having a compatibility generator patch an earlier generator's output by inserting a line before a marker and compensating for a spacer count"
+  correction: "When the block's shape can change, rebuild the whole block from a shared renderer. Line insertion encodes the old layout (cell markup, row width, how many trailing spacers exist) and breaks the moment the shape changes - silently, if the compensating arithmetic still balances."
+  category: gui
+  scope: any
+  source: "scripts/sol_goods_ui.py (`render_goods_vbox`/`replace_goods_vbox`), consumed by scripts/gen_sol_ls_gui.py, gen_sol_pp_compat.py and gen_sol_jtg_compat.py"
+  notes: "Triggered by regrouping the SOL goods grid by demand group: PP's old `Expected one weaponry widget ... found 0` failed loudly, but JTG's version also had to drop an alphabetical sort that would have silently undone the group order (2026-10-13)."

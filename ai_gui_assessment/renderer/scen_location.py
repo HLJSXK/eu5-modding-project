@@ -1,4 +1,5 @@
 import colorsys
+import re
 
 from scenarios import COMMON
 
@@ -161,3 +162,31 @@ def tooltip():
         (r"GetVariableFromGlobalVariableMap\('sol_market_price_suppressed_(\w+)',.*\)\.GetValue",
          lambda m: 1 if m.group(1) in SUPPRESSED else 0),
     ]
+
+
+def goods_tooltip(good="wine"):
+    """The goods tooltip for one good, to check the SOL substitute-group section.
+
+    `Goods.GetKey` returns the good's own key, so the section's
+    Localize(Concatenate('SOL_GOOD_SUB_', Goods.GetKey)) resolves to that good's real
+    generated localization - the same string the game prints.
+    """
+    goods = {
+        "Goods.GetKey": good,
+        "Goods.GetName": good,
+        "Goods.GetNameWithNoTooltip": good,
+        "Goods.GetDefaultMarketPrice": 3.2,
+        "Goods.GetFlavorText": "GOODS_FLAVOR_TEXT",
+        "Goods.IsRawMaterial": good in {"wheat", "rice", "millet", "maize", "potato", "legumes"},
+        "Goods.GetNumSources": 4,
+        "Goods.GetNumDemands": 7,
+        "Goods.GetTransportWeight": 1.5,
+        "Goods.GetFoodOutput": 8.0,
+        "Goods.HasPopsDemandInfo": True,
+        "Goods.GetRawMaterialMethodInfo": "",
+        "Goods.GetPopsDemandInfo": "",
+        "Goods.GetDemandsInfo": "",
+        "Goods.GetDemandsForBuildings": "",
+    }
+    return location() + [(re.escape(key), value) for key, value in goods.items()]
+

@@ -132,6 +132,30 @@ def tooltip():
 
 
 
+def goods_tooltip(good="wine"):
+    """Render the goods tooltip with the SOL substitute-group section.
+
+    The section lives in the overridden main_menu/gui/shared/goods_details.gui, which
+    every goods tooltip splices with `using = goods_details`, so this checks the one
+    file that reaches Goods_tooltip, Goods_Cards_tooltip and SpecificGoodsMarket_tooltip.
+    """
+    db, ex, ev, eng, log = setup(scenarios.goods_tooltip(good))
+    body = db.templates["Goods_tooltip"]
+    tt = [n for n in body if n.is_block()][0]
+    el = ex.build(tt.key, tt.value, {}, "in_game/gui/shared/production_tooltips.gui", 0)
+    m = eng.measure(el, None)
+    w, h = m["hint"]
+    print("goods tooltip size", w, h)
+    pad = 20
+    eng.place(el, pad, pad, w, h)
+    img = Image.new("RGBA", (int((w + 2 * pad) * SCALE), int((h + 2 * pad) * SCALE)), (40, 52, 46, 255))
+    eng.render(el, img)
+    OUT.mkdir(parents=True, exist_ok=True)
+    img.save(OUT / "r4_goods_tooltip.png")
+    report(eng, log, el)
+    Path(OUT / "r4_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
+
+
 def ui_library(tab="cards", *subs, w=1920, h=1080):
     """run.py ui_library TAB [var=value ...]  e.g. ui_library cards ui_library_text_tabs=cards1"""
     sub = dict(x.split("=", 1) for x in subs) or None

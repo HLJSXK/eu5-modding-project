@@ -70,7 +70,7 @@ def situation():
     return mocks
 
 
-from scen_location import location, tooltip  # noqa: E402,F401
+from scen_location import goods_tooltip, location, tooltip  # noqa: E402,F401
 
 
 def ui_library(tab="cards", sub=None):

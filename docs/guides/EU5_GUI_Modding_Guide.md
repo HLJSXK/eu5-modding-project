@@ -59,7 +59,9 @@
 | Box children: `fixed` keeps its hint; `expanding` / `growing` take extra space. **`expanding` children get extra space first; `growing` only gets leftovers.** `expand = {}` is a `growing` widget, so it does *not* steal space from an expanding sibling. | 实机 |
 | If no child can grow, leftover space is **distributed evenly between the children** (first/last flush with the edges) — the box behaves like `justify-content: space-between`, not left-aligned. Use `expand = {}` to left/right align. Final-row spacer widgets in SOL goods grids exist for this reason. | 实机 |
 | `min_width` on a non-text element acts as a minimum width. | 实机 |
-| Text `max_width` also caps the element's width; an expanding `text_multi` stops at `max_width` and the parent centres it. | 实机 |
+| **`text_single` inherits `autoresize = yes`, and autoresize beats a declared `size`.** A fixed-width column cell that does not set `autoresize = no` collapses to its content width, so neighbouring columns run together. | 实机 |
+| **A wrapping text with no `max_width` reports its unwrapped width as a *minimum*.** An hbox measures its children with no width hint, so one uncapped paragraph (or `TooltipListBase` body) becomes the frame's minimum width and drags the whole tooltip past its 450px budget. Give every wrapping text an explicit `max_width`. | 实机 |
+| `max_width` also caps the element's width; an expanding `text_multi` stops at `max_width` and the parent centres it. | 实机 |
 | `widgetanchor` defaults to `parentanchor`. | 实机 |
 | A vertical scrollbar overlays the content; it does not narrow it. | 实机 |
 | Fixed-width single-line text that does not fit **shrinks its font** down to `fontsize_min` (vanilla default 8). | 实机 |
@@ -75,14 +77,17 @@
 | `corneredtiled` tiles the middle; a border-only pattern (e.g. `pattern_bevel_vertical_bis`) shows only the edge strip. | 实机 |
 | A `modify_texture` with a `color` but no texture is a flat colour layer; the colour may be data-bound (`"[LocationPopItem.GetColor]"`). | 实机 |
 | `modify_texture` without `blend_mode` behaves as normal (mask textures with black RGB still tint correctly). | 推 |
-| Pie slices are drawn through the slice texture; `piechart_alpha.dds` is a ring, so vanilla pies are rings with an icon in the centre. | 实机 |
+| Pie slices are drawn through the slice texture; `piechart_alpha.dds` is a ring, so vanilla pies are rings with an icon in the centre. A `pieslice` `color` must be a literal `{ r g b a }` - a named colour cannot be used there. Slice `value`s may be expressions and are normalised by the engine, so pass raw counts and one chart works at any scale. | 实机 |
 | Pop-type colours come from `main_menu/common/named_colors/02_map.txt` (`pop_nobles` …). | 源 |
+| **`TooltipListBase` already contains a `TooltipTableHeader`.** A section caption needs only to override `tableheader_text` / `table_header_background`; adding a body child stacks a second header and roughly doubles the band height (~60px vs ~33px). | 实机 |
+| **A `blockoverride` replaces a block entirely, and an instance's own override beats one inherited from outside.** One shared block name therefore cannot carry five different values into five sibling instances - each keeps its own default. Expose one container block per row (`block "sol_cells" {}`) and let the caller fill it with children that each carry their own override. Getting this wrong duplicates elements silently rather than erroring: emitting five cells *alongside* a block that already held five defaults produced ten per row. | 实机 |
 
 ## 4. Text, numbers and icons
 
 | Rule | Level |
 |---|---|
 | Fonts: body `StandardGameFont` (NotoSerif; Chinese falls back to NotoSansSC), headers `HeadersFont` (NotoSerif SemiBold; Chinese NotoSerifSC). Font sizes: Small 15, Medium 18, Big 23. | 源 |
+| **`text` resolves a localization key; `raw_text` is printed verbatim.** `text` also evaluates an embedded `[expression]` (`text = "[Goods.GetDemandsInfo]"`). Put keys in `text`, and expressions / `@icon!` texticons / `#colour ... #!` markup in `raw_text`. A key placed in `raw_text` prints literally in the UI. | 实机 |
 | Autoresized text is **21 px per line at font size 15** (single- and multi-line). The template's `size {0 23}` does not apply to autoresized text. | 实机 |
 | `#name ... #!` applies a format from `loading_screen/gui/textformatting.gui`. **`##` prints a literal `#`.** | 实机 |
 | Number suffix `\|+N`: colours by sign (positive green, negative red, zero plain) **without printing a `+`**. `\|=` / `\|+=`: also prints `+` on positive values. Digits = decimals, `%` multiplies by 100. | 实机 |
