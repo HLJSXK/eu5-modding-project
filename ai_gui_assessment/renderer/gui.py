@@ -362,6 +362,7 @@ def dump(el: Element, depth=0, out=None, maxdepth=99):
     txt = el.props.get("text") or el.props.get("raw_text") or ""
     out.append("  " * depth + f"{el.typename}<{el.kind}> {el.w:.0f}x{el.h:.0f}@{el.x:.0f},{el.y:.0f} "
                + (f"vis={vis[:60]} " if vis else "") + (f"txt={str(txt)[:50]}" if txt else ""))
+    out[-1] = out[-1].rstrip()
     if depth < maxdepth:
         for c in el.children:
             dump(c, depth + 1, out, maxdepth)

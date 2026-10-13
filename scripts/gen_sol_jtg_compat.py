@@ -436,6 +436,7 @@ def _country_count(good: str) -> str:
 
 
 def _render_effects(rows: List[Dict[str, object]]) -> str:
+    from sol_substitution import render_location_spending
     text = _read(STABLE_EFFECTS)
     combined_rows = _combined_good_rows(rows)
     refresh = _generate_refresh_block(combined_rows)
@@ -469,7 +470,7 @@ def _render_effects(rows: List[Dict[str, object]]) -> str:
             raise ValueError(f"Missing market effect coverage for JTG good: {good}")
         if f"gls_country_consumes_{good}" not in rendered:
             raise ValueError(f"Missing country effect coverage for JTG good: {good}")
-    return rendered
+    return rendered + render_location_spending(combined_rows, replace=True)
 
 
 def _render_gui(
@@ -488,10 +489,10 @@ def _render_gui(
         raise ValueError(f"Expected {EXPECTED_GUI_GOODS_COUNT} GUI goods, found {len(goods)}")
     rendered = replace_goods_vbox(text, section_marker, goods, variable_map, scope)
     for good in EXPECTED_DEMAND_GOODS:
-        if rendered.count(f'tooltip = "{good}"') != 1:
+        if rendered.count(f'tooltip = "@{good}!') != 1:
             raise ValueError(f"Rebuilt GUI does not contain exactly one {good} cell")
     for good in ("weaponry", "wheat"):
-        if rendered.count(f'tooltip = "{good}"') != 1:
+        if rendered.count(f'tooltip = "@{good}!') != 1:
             raise ValueError(f"Rebuilt GUI does not contain exactly one {good} cell")
     return GENERATED_HEADER + rendered
 

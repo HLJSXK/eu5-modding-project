@@ -135,8 +135,7 @@ def f_dashboard(base: int, scope: str, total_funds: str, total_need: str,
     """Render the F-route instrument dashboard.
 
     `estates` maps estate key to (funds script value, baseline script value).  The
-    data is deliberately read-only; substitute-group calculations stay in the
-    existing goods UI for the next backend task.
+    data is read-only; country substitution is computed before the demand solver.
     """
     i = T(base)
     total_frame = f_frame(f"{scope}.ScriptValue('{total_coef}')")
@@ -660,6 +659,9 @@ def render_panel(goods: list[str]) -> str:
                 ("SOL_GUI_ROW_BASE_SPENDING", sv("gls_country_base_spending_display", "+2")),
                 ("SOL_GUI_ROW_FINAL_COEFF", sv("gls_country_final_demand_scale_deviation_display", "+=1%")),
                 ("SOL_GUI_ROW_SAVINGS_PRESSURE", sv("gls_savings_pressure_adjustment_display", "+=1%")),
+                ("SOL_SUB_REFRESH_YEAR", sv("sol_substitute_year_display", "0")),
+                ("SOL_SUB_GOODS_COUNT", sv("sol_substitute_goods_count_display", "0")),
+                ("SOL_SUB_MAX_SIZE", sv("sol_substitute_max_size_display", "1%")),
             ],
         )
     )
@@ -705,6 +707,11 @@ UI_STRINGS = {
         "SOL_LEDGER_UPKEEP": "Upkeep",
         "SOL_LEDGER_SAVINGS": "Savings / target",
         "SOL_SUBGROUP_UNGROUPED": "#E Other#!",
+        "SOL_SUB_REFRESH_YEAR": "Substitution refresh year",
+        "SOL_SUB_GOODS_COUNT": "Eligible substitute goods",
+        "SOL_SUB_MAX_SIZE": "Largest substitution modifier",
+        "SOL_SUB_MULTIPLIER": "Country substitution multiplier",
+        "SOL_SUB_PRICE_WEIGHT": "Market price tier weight",
     },
     "simp_chinese": {
         "PERFORM_global_living_standard_recalculate_ACTION": "生活水平已重算",
@@ -733,6 +740,11 @@ UI_STRINGS = {
         "SOL_LEDGER_UPKEEP": "维护费",
         "SOL_LEDGER_SAVINGS": "存款 / 目标",
         "SOL_SUBGROUP_UNGROUPED": "#E 其他#!",
+        "SOL_SUB_REFRESH_YEAR": "替代刷新年份",
+        "SOL_SUB_GOODS_COUNT": "参与替代商品数",
+        "SOL_SUB_MAX_SIZE": "最大替代修正幅度",
+        "SOL_SUB_MULTIPLIER": "国家替代倍率",
+        "SOL_SUB_PRICE_WEIGHT": "市场价格档位权重",
     },
 }
 

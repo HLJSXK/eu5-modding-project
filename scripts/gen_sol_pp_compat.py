@@ -418,6 +418,7 @@ def _replace_once(text: str, old: str, new: str, label: str) -> str:
 
 
 def _render_effects(rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
+    from sol_substitution import render_country_runtime, render_location_spending
     text = _read(STABLE_EFFECTS)
     refresh = _generate_refresh_block(rows)
     save_scope = "\t\tsave_scope_as = sol_market_cache"
@@ -462,7 +463,8 @@ def _render_effects(rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
         block = _find_named_block_in_text(text, key, str(STABLE_EFFECTS))
         lines.extend(["", f"REPLACE:{key} = {{", block, "}"])
     lines.append("")
-    return "\n".join(lines)
+    runtime = render_country_runtime(rows).replace("\nsol_", "\nREPLACE:sol_")
+    return "\n".join(lines) + runtime + render_location_spending(rows, replace=True)
 
 
 def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str) -> str:
@@ -478,10 +480,10 @@ def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str
     if "victuals" not in goods:
         raise ValueError("PP goods rows are missing victuals")
     rendered = replace_goods_vbox(text, section_marker, goods, variable_map, scope)
-    if rendered.count('tooltip = "victuals"') != 1:
+    if rendered.count('tooltip = "@victuals!') != 1:
         raise ValueError(f"Rebuilt GUI does not contain exactly one victuals cell in {source}")
     for good in ("weaponry", "lumber"):
-        if rendered.count(f'tooltip = "{good}"') != 1:
+        if rendered.count(f'tooltip = "@{good}!') != 1:
             raise ValueError(f"Rebuilt GUI does not contain exactly one {good} cell in {source}")
     return GENERATED_HEADER + rendered
 
@@ -621,6 +623,10 @@ def _append_callback(lines: List[str], setting_id: str, alias: str, numeric: boo
             "\t\t\t\tgls_recalculate_global_living_standard = yes",
             "\t\t\t}",
         ])
+    if setting_id == "substitution":
+        lines.extend(["\t\tevery_country = { sol_clear_country_substitution = yes }", "\t\tif = { limit = { sol_sol_is_on = yes } gls_recalculate_global_living_standard = yes }"])
+    if setting_id == "sol_on":
+        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier } } }")
     lines.append("\t\t}")
 
 
@@ -634,6 +640,7 @@ def _render_cmm_effects() -> str:
         GENERATED_HEADER.rstrip(),
         "# Keep PP-compatible defaults while allowing explicit CMF opt-in for GDP-to-development.",
         "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_substitution_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
         "\tset_global_variable = { name = sol_as_enabled value = yes }",
@@ -655,6 +662,7 @@ def _render_cmm_effects() -> str:
     ]
     _append_bool_setting(lines, "sol_on", "feat", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "feat", "sol", "sol_sol_map_enabled")
+    _append_bool_setting(lines, "substitution", "feat", "sol", "sol_substitution_enabled", False)
     _append_bool_setting(lines, "as_on", "feat", "as", "sol_as_enabled", False)
     _append_slider_setting(lines, "bte", "sol_bte", "-15", "-30", "30", "1")
     _append_bool_setting(lines, "ae", "feat", "as", "sol_ae_enabled")
@@ -686,6 +694,7 @@ def _render_cmm_effects() -> str:
     lines.extend(["}", "", "REPLACE:sol_handle_cmf_callback = {", "\tswitch = {", "\t\ttrigger = var:cmf_callback"])
     for setting_id, alias, numeric in (
         ("sol_on", "sol_sol_on_enabled", False),
+        ("substitution", "sol_substitution_enabled", False),
         ("sol_map", "sol_sol_map_enabled", False),
         ("as_on", "sol_as_enabled", False),
         ("bte", "sol_bte", True),

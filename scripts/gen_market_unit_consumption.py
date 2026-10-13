@@ -22,6 +22,8 @@ from typing import Dict, List, Tuple
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from sol_substitution import market_details, map_write
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INPUT_CSV = REPO_ROOT / "data" / "demand_price_table.csv"
 TARGET_NAMES = ("stable", "sol_standalone")
@@ -186,6 +188,11 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
                 f"\t\tadd_to_global_variable_map = {{ name = sol_market_consumes_{good} key = scope:sol_market_cache value = local_var:sol_market_consumes_{good}_count }}",
                 f"\t\tremove_from_global_variable_map = {{ name = sol_market_price_suppressed_{good} key = scope:sol_market_cache }}",
                 f"\t\tadd_to_global_variable_map = {{ name = sol_market_price_suppressed_{good} key = scope:sol_market_cache value = local_var:sol_market_price_suppressed_{good} }}",
+            ]
+        )
+        lines.extend(market_details(good, pop_types))
+        lines.extend(
+            [
                 "\t\tif = {",
                 f"\t\t\tlimit = {{ local_var:sol_market_consumes_{good}_count > 0 }}",
             ]
@@ -212,6 +219,7 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
             ]
         )
     lines.append("")
+    lines.extend(map_write("sol_market_substitute_cache", "1"))
     lines.append("\t\t# Local variables persist beyond this recurring market pass; clear all scratch values.")
     for name in local_names:
         lines.append(f"\t\tremove_local_variable = {name}")
@@ -219,6 +227,7 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
         [
             "\t}",
             "\tset_global_variable = { name = sol_market_pop_demand_maps_initialized value = 1 }",
+            "\tset_global_variable = { name = sol_market_substitution_initialized value = 1 }",
             "}",
         ]
     )

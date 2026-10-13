@@ -81,13 +81,20 @@ def _consumed_expr(variable_map: str, good: str, scope: str) -> str:
     )
 
 
-def _good_cell(indent: str, good: str, consumed: str) -> list[str]:
+def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
     """One good: its icon, plus a dim copy shown when the surface does not consume it."""
     texture = f"{ICON_DIR}/icon_goods_{good}.dds"
+    country = "Location.GetOwner.MakeScope" if scope.startswith("Location.") else scope
+    from sol_substitution import CORE
+    multiplier = f"[{country}.ScriptValue('sol_substitute_{good}_display')|2]" if good in CORE else "1.00"
+    tooltip = f"@{good}! [Localize('{good}')]\\n[Localize('SOL_GOOD_SUB_{good}')]\\n[Localize('SOL_SUB_MULTIPLIER')]: {multiplier}"
+    if scope.startswith("Location."):
+        weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', {scope})"
+        tooltip += f"\\n[Localize('SOL_SUB_PRICE_WEIGHT')]: [Select_CFixedPoint({weight}.IsSet, {weight}.GetValue, '(CFixedPoint)1')|2]"
     return [
         f"{indent}widget = {{",
         f"{indent}\tsize = {{ {ICON_W} 24 }}",
-        f'{indent}\tblockoverride "sol_good_tooltip" {{ tooltip = "{good}" }}',
+        f'{indent}\ttooltip = "{tooltip}"',
         f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center texture = "{texture}" }}',
         f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center alpha = "{DIM_ALPHA}" '
         f'visible = "[Not({consumed})]" texture = "{texture}" }}',
@@ -103,7 +110,7 @@ def _group_row(indent: str, group: str | None, goods: list[str], variable_map: s
         f'{indent}\tblockoverride "sol_group_icons" {{',
     ]
     for good in goods:
-        out.extend(_good_cell(f"{indent}\t\t", good, _consumed_expr(variable_map, good, scope)))
+        out.extend(_good_cell(f"{indent}\t\t", good, _consumed_expr(variable_map, good, scope), scope))
     out.append(f"{indent}\t}}")
     out.append(f"{indent}}}")
     return out

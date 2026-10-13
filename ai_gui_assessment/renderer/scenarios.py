@@ -57,6 +57,9 @@ def situation():
         "gls_sol_commoners_liquid_display": 43.63, "gls_sol_commoners_base_display": 49.4,
         "gls_sol_tribesmen_liquid_display": 0, "gls_sol_tribesmen_base_display": 0,
         "gls_country_final_demand_scale_deviation_display": -0.112,
+        "sol_substitute_year_display": 1337,
+        "sol_substitute_goods_count_display": 42,
+        "sol_substitute_max_size_display": 0.33,
     }
     mocks = COMMON + [
         (r"Situation\.GetIcon", "gfx/interface/icons/situations/global_living_standard.dds"),

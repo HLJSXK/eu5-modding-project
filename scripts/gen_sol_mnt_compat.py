@@ -536,7 +536,9 @@ def _render_values_and_refresh(
         "REPLACE:sol_refresh_market_pop_demand_maps = {",
         1,
     )
-    return values, refresh
+    from sol_substitution import render_country_runtime, render_location_spending
+    runtime = render_country_runtime(rows).replace("\nsol_", "\nREPLACE:sol_")
+    return values, refresh + "\n" + runtime + render_location_spending(rows, replace=True)
 
 
 def _render_authority_objects(
@@ -962,6 +964,10 @@ def _append_callback(
                 "\t\t\t}",
             ]
         )
+    if setting_id == "substitution":
+        lines.extend(["\t\tevery_country = { sol_clear_country_substitution = yes }", "\t\tif = { limit = { sol_sol_is_on = yes } gls_recalculate_global_living_standard = yes }"])
+    if setting_id == "sol_on":
+        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier } } }")
     lines.append("\t\t}")
 
 
@@ -971,6 +977,7 @@ def _render_cmm() -> str:
         "# Keep M&T economic authority by default while allowing explicit CMF opt-in",
         "# to SOL's trigger-gated economic balance systems.",
         "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_substitution_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
         "\tremove_global_variable = sol_as_enabled",
@@ -992,6 +999,7 @@ def _render_cmm() -> str:
     ]
     _append_bool_setting(lines, "sol_on", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "sol", "sol_sol_map_enabled")
+    _append_bool_setting(lines, "substitution", "sol", "sol_substitution_enabled", False)
     _append_bool_setting(
         lines,
         "mnt_as_on",
@@ -1031,6 +1039,7 @@ def _render_cmm() -> str:
     )
     for setting_id, alias, numeric in (
         ("sol_on", "sol_sol_on_enabled", False),
+        ("substitution", "sol_substitution_enabled", False),
         ("sol_map", "sol_sol_map_enabled", False),
         ("mnt_as_on", "sol_as_enabled", False),
         ("bte", "sol_bte", True),
