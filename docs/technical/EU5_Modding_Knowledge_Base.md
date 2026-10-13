@@ -73,7 +73,7 @@ This file, located in the `.metadata` directory, is essential for the game to re
 | `supported_game_version` | String  | The compatible game version (e.g., "1.0.7" or "1.*.*").                   |
 | `short_description`      | String  | A brief description, which can include BBCode for formatting on Steam.    |
 | `tags`                   | Array   | A list of strings categorizing the mod (e.g., "Gameplay", "Graphics").    |
-| `relationships`          | Array   | A list of mod dependencies. Usually empty for standalone mods.            |
+| `relationships`          | Array   | Required, including for independent mods: use `[]` when there are no dependencies. Runtime metadata errors confirmed this on 2026-10-13. |
 | `game_custom_data`       | Object  | Contains game-specific flags, such as `"multiplayer_synchronized": true`. |
 | `picture` / `thumbnail`  | String  | The filename of the mod's preview image (e.g., "thumbnail.png").        |
 
@@ -316,6 +316,8 @@ Resolution AI scoring uses two script values: `ai_will_propose` for proposal fre
 ### 6.9. Localization
 
 All text displayed to the player is handled through the localization system. Localization files are in `.yml` format and must be encoded in **UTF-8-BOM**. Each language has its own subfolder and file naming convention (e.g., `_l_english.yml`). The system supports dynamic text, color formatting, and icons. [9]
+
+Each localization key needs one owner per language within a deploy target. Moving a caption into generated UI vocabulary requires removing its old handwritten definition; the runtime localizer reports duplicates across files. Check all files in each language and target, retaining the BOM when editing (SOL caption regression, 2026-10-13).
 
 ## 7. Advanced Modding Topics
 

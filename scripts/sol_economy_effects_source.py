@@ -2100,6 +2100,10 @@ def emit_section_50_panel_stats_stable(writer: ScriptWriter) -> None:
         "\tset_variable = { name = gls_building_maintenance_tribesmen value = 0 }",
         "\tset_variable = { name = gls_country_base_spending value = 0 }",
         "\tset_variable = { name = gls_country_liquid_funds value = 0 }",
+        # Display caches refresh independently of country-solver preparation.
+        *[f"\tset_variable = {{ name = gls_sol_{estate}_{metric} value = 0 }}"
+          for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+          for metric in ("liquid", "base")],
         "\tset_variable = { name = gls_country_sol_all value = 1 }",
         "\tsave_scope_as = gls_panel_country",
         "\tremove_from_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country }",
@@ -2813,6 +2817,9 @@ def emit_section_50_panel_stats_stable(writer: ScriptWriter) -> None:
         "\t\t\t\tchange_variable = { name = gls_building_maintenance_tribesmen add = scope:gls_cached_location.local_sol_tribesmen_building_maintenance }",
         "\t\t\t\tchange_variable = { name = gls_country_base_spending add = scope:gls_cached_location.local_sol_base_spending_display }",
         "\t\t\t\tchange_variable = { name = gls_country_liquid_funds add = scope:gls_cached_location.local_sol_liquid_funds_display }",
+        *[f"\t\t\t\tchange_variable = {{ name = gls_sol_{estate}_{metric} add = scope:gls_cached_location.local_sol_{estate}_{metric}_display }}"
+          for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+          for metric in ("liquid", "base")],
         "\t\t\t}",
         "\t\t}",
         "\t}",
@@ -2849,6 +2856,10 @@ def emit_section_50_panel_stats_standalone(writer: ScriptWriter) -> None:
         "\tset_variable = { name = gls_building_maintenance_tribesmen value = 0 }",
         "\tset_variable = { name = gls_country_base_spending value = 0 }",
         "\tset_variable = { name = gls_country_liquid_funds value = 0 }",
+        # Display caches refresh independently of country-solver preparation.
+        *[f"\tset_variable = {{ name = gls_sol_{estate}_{metric} value = 0 }}"
+          for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+          for metric in ("liquid", "base")],
         "\tset_variable = { name = gls_country_sol_all value = 1 }",
         "\tsave_scope_as = gls_panel_country",
         "\tremove_from_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country }",
@@ -3563,6 +3574,9 @@ def emit_section_50_panel_stats_standalone(writer: ScriptWriter) -> None:
         "\t\t\t\tchange_variable = { name = gls_building_maintenance_tribesmen add = scope:gls_cached_location.local_sol_tribesmen_building_maintenance }",
         "\t\t\t\tchange_variable = { name = gls_country_base_spending add = scope:gls_cached_location.local_sol_base_spending_display }",
         "\t\t\t\tchange_variable = { name = gls_country_liquid_funds add = scope:gls_cached_location.local_sol_liquid_funds_display }",
+        *[f"\t\t\t\tchange_variable = {{ name = gls_sol_{estate}_{metric} add = scope:gls_cached_location.local_sol_{estate}_{metric}_display }}"
+          for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+          for metric in ("liquid", "base")],
         "\t\t\t}",
         "\t\t}",
         "\t}",

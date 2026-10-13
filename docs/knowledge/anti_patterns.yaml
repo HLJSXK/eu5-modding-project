@@ -17,6 +17,123 @@
 # To add a new entry: append a YAML dict with all fields, then run:
 #   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
 
+- id: gui_format_tag_requires_separator_before_punctuation
+  pattern: '#(?:R-|E/)'
+  bad: "Writing #R-[expression] or #E/[expression] without separating the formatting tag from punctuation"
+  correction: "Separate the tag and its body with whitespace: #R -[expense|2]#! and #E /[target|0]#!. Use plain numeric formatting inside an explicitly coloured span."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/cooltip.gui:3479; docs/error_log/error.log (2026-10-13 17:03:35)"
+  notes: "Runtime tags included r- or e/ followed by internal numeric colour markers. The renderer previously accepted these malformed tags; Engine.process now reports the missing separator."
+
+- id: gui_numeric_property_cannot_use_text_formatting
+  pattern: '(?:value|min|max)\s*=\s*"\[[^\]\r\n]*\|[+0-9%=][^\]\r\n]*\]"'
+  bad: "Passing a formatted text expression such as ScriptValue(...)|+0 to a pieslice value or other numeric GUI property"
+  correction: "Use a numeric binding, e.g. FixedPointToFloat(Scope.ScriptValue(...)), for slice value. Keep |+0 or percent formatting in text/raw_text only."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/location_window.gui:1455; docs/error_log/error.log (2026-10-13 16:53)"
+  notes: "The engine reports Unexpected characters at end of Statement for all five location and five country slices. The renderer now rejects the suffix in data bindings while retaining formatted text and quoted pipe literals."
+
+- id: metadata_requires_empty_relationships_array
+  pattern: null
+  bad: "Omitting relationships from metadata because a standalone target has no dependencies"
+  correction: "Declare relationships as an empty JSON array for independent mods; keep actual dependencies in the array for dependent targets."
+  category: framework
+  scope: any
+  source: "reference_mods/3605677866/.metadata/metadata.json:12; docs/error_log/error.log (Expected member relationships)"
+  notes: "Runtime metadata reader requires the member even when it is empty. Updating workspace metadata does not repair a separate old installed copy."
+
+- id: localization_generated_caption_has_one_owner
+  pattern: null
+  bad: "Keeping a GUI caption in handwritten economy localization after adding the same key to generated UI localization"
+  correction: "Give each key one definition per language and target. Remove old caption definitions when generated UI vocabulary owns them; preserve UTF-8 BOM. Check the complete target, not one file."
+  category: localization
+  scope: any
+  source: "docs/error_log/error.log (duplicate SOL_GUI_SECTION_POP / SOL_GUI_SECTION_CONSUMPTION); scripts/gen_sol_ls_gui.py UI_STRINGS"
+  notes: "Both English and Chinese were duplicated although only the active Chinese language was reported. Stable and standalone need independent checks."
+
+- id: resolution_message_database_uses_fixed_path
+  pattern: null
+  bad: "Registering a resolution message type in an arbitrary main_menu/gui/SOL_economy_messages.txt file"
+  correction: "Generate main_menu/gui/messagetypes.txt from the current vanilla database plus SOL's additional types. Preserve every vanilla definition and combine files explicitly when another mod owns the same path."
+  category: gui
+  scope: any
+  source: "reference_official_defines/types/resolutions.txt:140; reference_game_files/game/main_menu/gui/messagetypes.txt:3338; installed eu5.exe message-handler path gui/messagetypes.txt"
+  notes: "Runtime lookup failed although the arbitrary file existed. show_message=no does not avoid registration-time lookup. Fixed-path correction still needs a fresh game run; messagetypes_custom.txt is not established as a Mod registration API."
+
+- id: gui_fixedpoint_conversion_requires_fixedpoint_arithmetic
+  pattern: 'FixedPointToInt\(\s*(?:Add|Subtract|Multiply|Divide|Min|Max)_float\('
+  bad: "Passing the result of float arithmetic to FixedPointToInt"
+  correction: "Keep frame arithmetic in CFixedPoint: ScriptValue -> *_CFixedPoint with typed constants -> FixedPointToInt -> Add_int32. Python coercion is not evidence of engine validity."
+  category: gui
+  scope: any
+  source: "reference_official_defines/docs/data_types_script.txt:3727; docs/data_types_common.txt:468/928/940; docs/error_log/error.log (2026-10-13)"
+  notes: "Runtime FetchData failures froze all six SOL dials at their first frame. The renderer now reports this type error."
+
+- id: gui_numeric_constant_is_not_a_binding
+  pattern: '(?:min|max)\s*=\s*"\[\s*[-+]?\d+(?:\.\d+)?\s*\]"'
+  bad: "Writing max = [1] as a data binding"
+  correction: "Use a numeric property literal such as max = 1. Constants inside function arguments use explicit typed literals."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/war_lateralview.gui:347-349; docs/error_log/error.log (No function for call '')"
+  notes: "The renderer previously accepted the invalid numeric binding; it now reports INVALID BINDING."
+
+- id: gui_progressbar_needs_an_empty_texture
+  pattern: null
+  bad: "Providing only progresstexture and expecting a parent background to supply the empty region"
+  correction: "Set noprogresstexture explicitly. The progressbar shader samples Texture0 for the filled region and Texture1 for the empty region. A separate background does not bind Texture1."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/main_menu/gui/shared/progressbars.gui:165-170; installed game clausewitz/loading_screen/gfx/FX/pdxgui_progressbar.shader"
+  notes: "The supplied screenshot showed solid lime bars while the renderer drew red/gold textures. Exact missing-sampler colour is engine-dependent. Evidence: screenshot symptom and source for the correction (2026-10-13)."
+
+- id: gui_weight_is_not_a_percentage
+  pattern: null
+  bad: "Formatting raw SOL tax/power weights as percentages or deriving irregular names by plural concatenation"
+  correction: "Map existing names explicitly and divide effective estate weights by local_total_tax_share before percent formatting. Nobles/commoners use effective weights after the transfer."
+  category: gui
+  scope: location
+  source: "src/stable/in_game/common/script_values/SOL_pop_values.txt:2-71; docs/error_log/error.log (missing local_commoners_tax_share)"
+  notes: "Screenshot displayed thousands of percent; weights are amounts, not fractions. The commoner key is singular. Mocks now carry raw weights and report missing script values (2026-10-13)."
+
+- id: gui_diagnostics_must_not_depend_on_optional_solver_caches
+  pattern: null
+  bad: "Reading estate diagnostics from solver-preparation caches"
+  correction: "Accumulate five estate funds/baselines in gls_accumulate_panel_stats alongside panel totals and expose gls_sol_*_display."
+  category: gui
+  scope: country
+  source: "scripts/sol_economy_effects_source.py emit_section_50_panel_stats_stable / emit_section_50_panel_stats_standalone"
+  notes: "Raw-only paths skip preparation for small countries and disabled solvers, leaving absent or stale caches. Reuse the panel traversal. Zero-baseline estates display No consumption, not -100%. Source evidence (2026-10-13)."
+
+- id: gui_fixed_group_row_overflows_with_compat_goods
+  pattern: null
+  bad: "Putting an arbitrarily large compatibility goods group inside one fixed-width hbox"
+  correction: "Budget labels, icons and every gap against the row width, then split members into explicit continuation rows in the shared generator. Check descendant positions, not only the parent's measured size. SOL's 216px row uses an 80px label, 20px icons and 2px gaps; six icons fit."
+  category: gui
+  scope: any
+  source: "src/stable/in_game/gui/SOL_living_standard_kit.gui:299; scripts/sol_goods_ui.py render_group_columns; tmp/check_sol_ui_runtime.py"
+  notes: "Static renderer check (2026-10-13): JTG's 26 ungrouped goods escaped the tooltip despite a nominal 216px row. Explicit chunks preserve all goods and grouping; no new in-game measurement."
+
+- id: gui_standalone_target_missing_shared_types
+  pattern: null
+  bad: "Generating standalone GUI instances while keeping their shared type definitions only in stable"
+  correction: "Include the shared kit in the standalone generator outputs and --check contract. Test target dependencies using the game and selected target only. A renderer loaded with stable can hide missing standalone types."
+  category: gui
+  scope: any
+  source: "build.bat deploy_target; scripts/gen_sol_ls_gui.py _outputs; src/sol_standalone/.metadata/metadata.json"
+  notes: "Source evidence (2026-10-13): build.bat mirrors each target's own directory, and standalone does not depend on stable. The generated standalone kit must match the stable source."
+
+- id: gui_prototype_mock_default_masks_missing_data
+  pattern: null
+  bad: "A catch-all prototype mock returning zero before the scenario's supplied script values"
+  correction: "Register only explicitly provided script-value/map keys before scenario mocks. Unspecified keys fall through to the scenario, and missing script values remain Unknown."
+  category: gui
+  scope: any
+  source: "ai_gui_assessment/renderer/run.py _proto_mocks; ai_gui_assessment/renderer/data.py Evaluator.lookup"
+  notes: "Tool regression (2026-10-13): explicit overrides, scenario fallback and missing-key reporting are checked separately. A zero unknown-expression count must not come from zero defaults."
+
 - id: sol_country_goods_modifier_accounting_parity
   pattern: null
   bad: "Writing size = M - 1 for a per-good country demand modifier when the same good already has other global_<good>_pop_demand sources, or changing SOL accounting for a good without changing its engine demand"
@@ -868,3 +985,48 @@
   scope: any
   source: "scripts/sol_goods_ui.py (`render_goods_vbox`/`replace_goods_vbox`), consumed by scripts/gen_sol_ls_gui.py, gen_sol_pp_compat.py and gen_sol_jtg_compat.py"
   notes: "Triggered by regrouping the SOL goods grid by demand group: PP's old `Expected one weaponry widget ... found 0` failed loudly, but JTG's version also had to drop an alphabetical sort that would have silently undone the group order (2026-10-13)."
+
+- id: gui_flowcontainer_does_not_wrap_by_width
+  pattern: null
+  bad: "Using `flowcontainer` with a `maximumsize` and expecting children to wrap onto a new line when the width runs out (CSS flex-wrap)"
+  correction: "No vanilla `flowcontainer` wraps by available width; the only wrapping seen is a fixed item count (`wrap_count = N`, e.g. agenda_view.gui:638). For width-dependent wrapping, split the content into explicit rows in the generator."
+  category: gui
+  scope: any
+  source: "grep over reference_game_files/game: 56 `flowcontainer` direction uses, wrapping only via `wrap_count` (agenda_view.gui:638, expeditions_lateralview.gui:170/299)"
+  notes: "Found while prototyping the SOL goods-group rows (2026-10-13). Not verified in game; treat as source-level evidence."
+
+- id: gui_stacked_bar_is_barchart_not_progressbar_arithmetic
+  pattern: null
+  bad: "Faking a stacked or offset bar by overlapping several progressbars, or sizing widgets from expressions"
+  correction: "Use `barchart` with `barslice` / `barslice_no_highlight` children: slice values are normalised like a pie, `direction = vertical` stacks bottom-up, `righttoleft = yes` reverses, and a transparent slice (`color = { 0 0 0 0 }`) offsets the next. Vanilla uses it inside tooltips (combat_tooltips.gui:2909) and as a horizontal bar (guelphs_and_ghibellines.gui:7)."
+  category: gui
+  scope: any
+  source: "reference_game_files/game/in_game/gui/shared/combat_tooltips.gui:2909; in_game/gui/panels/situation/guelphs_and_ghibellines.gui:7; in_game/gui/outliner_entries.gui:6533; loading_screen/gui/shared/defaults.gui:140 (`type barslice`)"
+  notes: "A transparent leading slice as an offset has no vanilla precedent - verify in game before relying on it. The project renderer draws barchart/progressbar since 2026-10-13 (run.py proto)."
+
+- id: gui_bare_widget_never_sizes_to_its_children
+  pattern: null
+  bad: "Wrapping content in a bare `widget = { background = {...} hbox = { ... } }` and expecting the widget to take its children's size, or trying to rescue it with `minimumsize` on the widget itself"
+  correction: "A widget-like element takes its hint from a declared `size`, or only from children that carry `set_parent_size_to_minimum = yes` (a child's `resizeparent = yes` is honoured the same way). A bare `widget` with neither measures 0, and `minimumsize` on the parent does not rescue it because the parent is measured before that. Either use a `vbox`/`hbox` (which do size to their children) as the framed container, or put `set_parent_size_to_minimum = yes` on the child."
+  category: gui
+  scope: any
+  source: "148 vanilla uses of `set_parent_size_to_minimum` in reference_game_files/game (e.g. alertmanager.gui:269, agenda_view.gui:220, alert_settings.gui:522); project renderer ai_gui_assessment/renderer/engine.py `_measure` widget branch and `_place` (`if c.kind in BOX ... and not size` / `set_parent_size_to_minimum`)"
+  notes: "Cost a full prototype round: the SOL tooltip hero rendered as `widget 400x0` with all its content scrolled over the section below, and probes isolated it (a sized child measures; the same child inside a bare widget measures 0). Same rule applies to art placed as a bare `background` on a childless element - emit it as a sized child widget instead (2026-10-13)."
+
+- id: gui_progressbar_using_is_a_type_not_a_texture
+  pattern: null
+  bad: "Writing `progressbar = { size = { W H } using = bar_gold min = 0 max = ... value = ... }` on the assumption that `using` names a texture"
+  correction: "`using = X` inlines the properties of a `type X`; it is not a texture reference. If no `X` exists the progressbar resolves no texture and draws nothing at all - silently, while still occupying its layout slot and reporting a normal size. A progressbar needs an explicit `progresstexture` (and optionally `noprogresstexture`), plus `texture_density` / `spriteType` / `spriteborder` on the element."
+  category: gui
+  scope: any
+  source: "Vanilla `type progressbar` in loading_screen/gui/shared/defaults.gui:225 (its own `using = tooltip_se` is a sound/behaviour type); main_menu/gui/shared/progressbars.gui:285 `template progress_bar_goldish_blue` names `progresstexture`/`noprogresstexture` directly; no `bar_*` type exists anywhere in reference_game_files"
+  notes: "Every bar in the SOL prototype tooltips measured correctly and drew nothing (2026-10-13). The failure is invisible to both the renderer's measure pass and a size check - only the pixels reveal it."
+
+- id: gui_expression_properties_need_brackets
+  pattern: null
+  bad: "Passing an expression to a numeric property without brackets, e.g. `layoutstretchfactor_horizontal = \"FixedPointToInt(Multiply_float(x, 1000))\"`"
+  correction: "Expression-valued properties must be wrapped as `\"[...]\"`. Unbracketed, the string does not evaluate: it resolves to the default (0 for stretch factors), which the engine then treats as a real value, so two such children split the space evenly instead of proportionally."
+  category: gui
+  scope: any
+  source: "Existing expression rules in docs/guides/EU5_GUI_Modding_Guide.md §4; reproduced in the project renderer (Evaluator.resolve vs. literal) with `run.py proto` - an unbracketed pair of stretch factors landed at 36/36 in a 72px hbox instead of 17/983"
+  notes: "Adjacent trap: the project renderer's evaluator functions are BINARY - `Max_float(a, b, c)` raises `TypeError`, so multi-argument folds must be nested pairwise (2026-10-13)."

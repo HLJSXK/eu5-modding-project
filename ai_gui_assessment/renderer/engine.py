@@ -118,6 +118,12 @@ class Engine:
         if s is None:
             return ""
         s = str(s)
+        # The engine consumes punctuation as part of the format name when a
+        # separator is missing (#R- / #E/). Our rich-text parser used to accept it.
+        for match in re.finditer(r"(?<!#)#([A-Za-z_][A-Za-z0-9_]*[-/])", s):
+            error = f"INVALID TEXT FORMAT: missing whitespace after #{match.group(1)[:-1]}"
+            if error not in self.ev.log:
+                self.ev.log.append(error)
         if not raw and re.fullmatch(r"[A-Za-z0-9_.\-]+", s):
             lv = self.loc.get(s)
             if lv is not None:
@@ -613,7 +619,7 @@ class Engine:
             else:  # expanding / preferred
                 lo, hi = mn, mx
             expansive = pol
-            stretch = num(c.props.get("layoutstretchfactor_horizontal" if axis == 0 else "layoutstretchfactor_vertical"), 0)
+            stretch = self._resolved_num(c.props.get("layoutstretchfactor_horizontal" if axis == 0 else "layoutstretchfactor_vertical"), 0)
             items.append(dict(c=c, m=m, hint=hint, lo=min(lo, hint), hi=max(hi, hint), exp=expansive, st=stretch,
                               cpol=cpol, size=hint))
             self.pop(pu)
@@ -737,9 +743,19 @@ class Engine:
         img.alpha_composite(layer, (X, Y))
 
     def _res_tex(self, v):
-        """Resolver handed to compose(): strings for textures, tuples/lists for data-bound colours."""
+        """Resolver handed to compose(): strings for textures, tuples/lists for data-bound colours,
+        numbers for data-bound frame indices."""
         r = self.resolve(v)
-        return r if isinstance(r, (str, tuple, list)) else None
+        return r if isinstance(r, (str, tuple, list, int, float)) else None
+
+    def _grayscale(self, layer, spec):
+        shader = str(spec.get("shaderfile", "")).lower()
+        if layer is None or "pdxgui_grayscale.shader" not in shader:
+            return layer
+        arr = to_np(layer)
+        gray = arr[..., 0] * 0.2126 + arr[..., 1] * 0.7152 + arr[..., 2] * 0.0722
+        arr[..., :3] = gray[..., None]
+        return from_np(arr)
 
     def _mask_for(self, el):
         """Build the global alpha mask owned by a masked_button element."""
@@ -755,7 +771,7 @@ class Engine:
         return (el.x, el.y, to_np(mimg)[..., 3])
 
     def _render(self, el, img, alpha, clip, inherited_mask=None):
-        a = alpha * num(el.props.get("alpha"), 1.0)
+        a = alpha * self._resolved_num(el.props.get("alpha"), 1.0)
         if a <= 0.001 or el.w < 0 or el.h < 0:
             return
         own_mask = inherited_mask if str(el.props.get("inherit_mask", "")).lower() == "yes" else None
@@ -778,6 +794,7 @@ class Engine:
             if w <= 0 or h <= 0:
                 continue
             layer = compose(bg, self.px(w), self.px(h), self.scale, self._res_tex)
+            layer = self._grayscale(layer, bgl)
             if layer is not None and a < 1:
                 arr = to_np(layer)
                 arr[..., 3] *= a
@@ -790,7 +807,9 @@ class Engine:
             if el.kind == "button":
                 down = el.props.get("down")
                 spec["frame"] = spec.get("downframe", 1) if (down and self.ev.truthy(down, False)) else spec.get("upframe", 1)
+            spec["alpha"] = 1
             layer = compose(spec, self.px(el.w), self.px(el.h), self.scale, self._res_tex)
+            layer = self._grayscale(layer, spec)
             if layer is not None:
                 if el.glows:
                     self._glow(img, layer, el, clip, a, own_mask)
@@ -803,6 +822,10 @@ class Engine:
             self._ranged_slider(el, img, a, clip, own_mask)
         if el.kind == "piechart":
             self._pie(el, img, a, clip, own_mask)
+        if el.kind == "progressbar":
+            self._progressbar(el, img, a, clip, own_mask)
+        if el.kind == "barchart":
+            self._barchart(el, img, a, clip, own_mask)
         if el.kind == "ecs_scene_viewer_widget":
             self._scene(el, img, clip, own_mask)
         if el.kind in TEXT:
@@ -812,7 +835,7 @@ class Engine:
         if getattr(el, "clip", None):
             cclip = el.clip if clip is None else self._intersect(clip, el.clip)
         for c in kids:
-            if c.kind == "pieslice":
+            if c.kind in ("pieslice", "barslice", "barslice_no_highlight"):
                 continue
             self.render(c, img, a, cclip, descendant_mask)
         if el.kind == "scrollarea" and el.props.get("scrollbar_vertical") and kids:
@@ -821,6 +844,118 @@ class Engine:
     def _resolved_num(self, value, default):
         value = self.resolve(value)
         return num(value, default)
+
+    def _texture_layer(self, el, texture, w, h, color=None):
+        if not texture or w <= 0 or h <= 0:
+            return None
+        spec = dict(el.props)
+        spec["texture"] = texture
+        spec["modifies"] = el.modifies
+        spec["alpha"] = 1
+        if color is not None:
+            spec["color"] = color
+        return compose(spec, self.px(w), self.px(h), self.scale, self._res_tex)
+
+    def _progressbar(self, el, img, alpha, clip, mask=None):
+        """Render a full-width texture, then crop it to the filled segment."""
+        if el.w <= 0 or el.h <= 0:
+            return
+        minimum = self._resolved_num(el.props.get("min"), 0.0)
+        maximum = self._resolved_num(el.props.get("max"), 1.0)
+        value = self._resolved_num(el.props.get("value"), minimum)
+        fraction = 0.0 if maximum == minimum else (value - minimum) / (maximum - minimum)
+        fraction = max(0.0, min(1.0, fraction))
+        direction = str(el.props.get("direction", "horizontal")).lower()
+        invert = str(el.props.get("invertprogress", "")).lower() == "yes"
+        empty = self._texture_layer(el, self.resolve(el.props.get("noprogresstexture")), el.w, el.h)
+        if empty is not None:
+            arr = to_np(empty)
+            arr[..., 3] *= alpha
+            self._paste(img, from_np(arr), el.x, el.y, clip, mask)
+        texture = self.resolve(el.props.get("progresstexture"))
+        if direction == "vertical":
+            filled_h = el.h * fraction
+            if filled_h <= 0:
+                return
+            full = self._texture_layer(el, texture, el.w, el.h)
+            if full is None:
+                return
+            full_h = full.height
+            segment_h = max(1, min(full_h, self.px(filled_h)))
+            if invert:
+                layer = full.crop((0, 0, full.width, segment_h))
+                y = el.y
+            else:
+                layer = full.crop((0, full_h - segment_h, full.width, full_h))
+                y = el.y + el.h - filled_h
+            if layer is not None and alpha < 1:
+                arr = to_np(layer)
+                arr[..., 3] *= alpha
+                layer = from_np(arr)
+            self._paste(img, layer, el.x, y, clip, mask)
+        else:
+            filled_w = el.w * fraction
+            if filled_w <= 0:
+                return
+            full = self._texture_layer(el, texture, el.w, el.h)
+            if full is None:
+                return
+            full_w = full.width
+            segment_w = max(1, min(full_w, self.px(filled_w)))
+            if invert:
+                layer = full.crop((full_w - segment_w, 0, full_w, full.height))
+                x = el.x + el.w - filled_w
+            else:
+                layer = full.crop((0, 0, segment_w, full.height))
+                x = el.x
+            if layer is not None and alpha < 1:
+                arr = to_np(layer)
+                arr[..., 3] *= alpha
+                layer = from_np(arr)
+            self._paste(img, layer, x, el.y, clip, mask)
+
+    def _barchart(self, el, img, alpha, clip, mask=None):
+        if el.w <= 0 or el.h <= 0:
+            return
+        slices = []
+        for child in self.vis_children(el):
+            if child.kind not in ("barslice", "barslice_no_highlight"):
+                continue
+            pushed = self.push(child)
+            value = max(0.0, self._resolved_num(child.props.get("value"), 0.0))
+            color = child.props.get("color")
+            color = self.resolve(color) if isinstance(color, str) else color
+            color = parse_color(color) if isinstance(color, list) else [1, 1, 1, 1]
+            texture = self.resolve(child.props.get("texture"))
+            slices.append((child, value, color, texture))
+            self.pop(pushed)
+        total = sum(item[1] for item in slices)
+        if total <= 0:
+            return
+        vertical = str(el.props.get("direction", "horizontal")).lower() == "vertical"
+        reverse = str(el.props.get("righttoleft", "")).lower() == "yes"
+        offset = 0.0
+        for child, value, color, texture in slices:
+            span = (el.h if vertical else el.w) * value / total
+            if span <= 0:
+                continue
+            if vertical:
+                y = el.y + (el.h - offset - span if not reverse else offset)
+                layer = self._texture_layer(child, texture, el.w, span, color)
+                if layer is not None and alpha < 1:
+                    arr = to_np(layer)
+                    arr[..., 3] *= alpha
+                    layer = from_np(arr)
+                self._paste(img, layer, el.x, y, clip, mask)
+            else:
+                x = el.x + (el.w - offset - span if reverse else offset)
+                layer = self._texture_layer(child, texture, span, el.h, color)
+                if layer is not None and alpha < 1:
+                    arr = to_np(layer)
+                    arr[..., 3] *= alpha
+                    layer = from_np(arr)
+                self._paste(img, layer, x, el.y, clip, mask)
+            offset += span
 
     def _slider_part(self, spec, w, h, x, y, img, alpha, clip, mask=None):
         if not isinstance(spec, dict) or w <= 0 or h <= 0:

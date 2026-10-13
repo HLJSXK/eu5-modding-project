@@ -1,8 +1,10 @@
 """Render a GUI screen from the real game/SOL .gui files.
 
-usage: run.py situation|location|tooltip|event|market|government|battle
+usage: run.py situation|location|tooltip|event|market|government|battle|proto
 """
 import os
+import json
+import re
 import sys
 import time
 from collections import Counter
@@ -19,8 +21,8 @@ from PIL import Image
 
 import scenarios
 from data import Evaluator, Formats, Loc, TextIcons
-from engine import Engine
-from gui import Expander, GuiDB, dump
+from engine import Engine, num
+from gui import Expander, GuiDB, collect_files, dump
 from textures import TEXTURES
 
 OUT = Path(__file__).resolve().parents[1] / "images"
@@ -32,9 +34,9 @@ PANEL_H = SCREEN_H - 130
 SCALE = float(os.environ.get("RENDER_SCALE", "1"))
 
 
-def setup(mocks):
+def setup(mocks, files=None):
     t = time.time()
-    db = GuiDB()
+    db = GuiDB(files)
     loc = Loc()
     log = []
     ev = Evaluator(mocks, loc, log)
@@ -198,6 +200,83 @@ def vanilla(which, w=1920, h=1080):
     img.save(OUT / f"{which}.png")
     report(eng, log, el)
     Path(OUT / f"{which}_tree.txt").write_text(chr(10).join(dump(el)), encoding="utf-8")
+
+
+def _proto_mocks(data, scenario_name):
+    scenario = []
+    if scenario_name and scenario_name.lower() != "none":
+        fn = getattr(scenarios, scenario_name, None)
+        if fn is None:
+            import scen_location
+            fn = getattr(scen_location, scenario_name, None)
+        if fn is None:
+            raise SystemExit(f"unknown proto scenario: {scenario_name}")
+        scenario = fn()
+
+    explicit = []
+    script_values = data.get("script_values", {})
+    for name, value in script_values.items():
+        explicit.append((r".*\.ScriptValue\('" + re.escape(name) + r"'\)", value))
+    gvm = data.get("gvm", {})
+    for name, value in gvm.items():
+        explicit.append((r"GetVariableFromGlobalVariableMap\('" + re.escape(name) + r"',.*\)\.GetValue", value))
+    for path, value in data.get("paths", {}).items():
+        explicit.append((re.escape(path), value))
+    return explicit + scenario
+
+
+def _proto_element(db, ex, name):
+    if name in db.templates:
+        body = db.templates[name]
+        for node in body:
+            if node.is_block() and ex.is_element_key(node.key):
+                return ex.build(node.key, node.value, {}, node.src, node.line), node.key
+        raise SystemExit(f"template has no root element: {name}")
+    if name in db.types:
+        return ex.build(name, [], {}, "<type>", 0), name
+    if ex.is_element_key(name):
+        return ex.build(name, [], {}, "<primitive>", 0), name
+    for path, nodes in db.roots.items():
+        for node in nodes:
+            if node.key == name and node.is_block():
+                return ex.build(node.key, node.value, {}, path, node.line), node.key
+            if node.is_block() and any(c.key == "name" and c.value == name for c in node.value):
+                return ex.build(node.key, node.value, {}, path, node.line), node.key
+    raise SystemExit(f"proto element not found: {name}")
+
+
+def proto(gui_path, name, mocks_path, out_name=None):
+    """Render a type, root widget, or template from an extra GUI file with JSON mocks."""
+    extra = Path(gui_path).resolve()
+    data = json.loads(Path(mocks_path).read_text(encoding="utf-8-sig"))
+    scenario_name = data.get("scenario")
+    db, ex, ev, eng, log = setup(
+        _proto_mocks(data, scenario_name),
+        collect_files() + [extra],
+    )
+    el, root_key = _proto_element(db, ex, name)
+    m = eng.measure(el, None)
+    w, h = m["hint"]
+    size = eng.size_prop(el)
+    if size and not str(size[0]).endswith("%") and num(size[0], -1) >= 0:
+        w = min(w, num(size[0])) if w > 0 else num(size[0])
+    is_tooltip = scenario_name == "tooltip" or root_key in (
+        "ContextualTooltipType", "SimpleContextualTooltipType"
+    ) or el.kind == "tooltip_widget"
+    pad = 20 if is_tooltip else 0
+    if not is_tooltip:
+        w, h = max(w, 1), max(h, 1)
+    print("proto root", root_key)
+    print("proto size", w, h)
+    eng.place(el, pad, pad, w, h)
+    image = Image.new("RGBA", (int((w + pad * 2) * SCALE), int((h + pad * 2) * SCALE)), (40, 52, 46, 255))
+    eng.render(el, image)
+    proto_out = Path(__file__).resolve().parents[1] / "images" / "proto"
+    proto_out.mkdir(parents=True, exist_ok=True)
+    tag = Path(out_name or name).stem
+    image.save(proto_out / f"{tag}.png")
+    report(eng, log, el)
+    Path(proto_out / f"{tag}_tree.txt").write_text("\n".join(dump(el)), encoding="utf-8")
 
 def _main():
     which = sys.argv[1] if len(sys.argv) > 1 else "situation"

@@ -35,6 +35,7 @@ COMMON = [
 
 
 def situation():
+    from data import Unknown
     pv = {
         "gls_pop_nobles_display": 12, "gls_pop_clergy_display": 18, "gls_pop_burghers_display": 95,
         "gls_pop_commoners_display": 1240, "gls_pop_tribesmen_display": 0,
@@ -50,6 +51,11 @@ def situation():
         "gls_tribesmen_savings_target_display": 0, "gls_total_savings_target_display": 2350,
         "gls_total_savings_display": 1967, "gls_savings_pressure_adjustment_display": -0.041,
         "gls_country_liquid_funds_display": 223.18, "gls_country_base_spending_display": 251.40,
+        "gls_sol_nobles_liquid_display": 78.4, "gls_sol_nobles_base_display": 90,
+        "gls_sol_clergy_liquid_display": 38.25, "gls_sol_clergy_base_display": 42,
+        "gls_sol_burghers_liquid_display": 62.9, "gls_sol_burghers_base_display": 70,
+        "gls_sol_commoners_liquid_display": 43.63, "gls_sol_commoners_base_display": 49.4,
+        "gls_sol_tribesmen_liquid_display": 0, "gls_sol_tribesmen_base_display": 0,
         "gls_country_final_demand_scale_deviation_display": -0.112,
     }
     mocks = COMMON + [
@@ -63,7 +69,7 @@ def situation():
         (r"SituationView\.Vars\..*", False),
         (r"SituationView\.GetActionGroups", []),
         (r"SituationView\.HasActiveResolution", False),
-        (r"Player\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: pv.get(m.group(1), 0)),
+        (r"Player\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: pv.get(m.group(1), Unknown(m.group(0)))),
         (r"GetVariableFromGlobalVariableMap\('gls_country_consumes_(\w+)',Player\.MakeScope\)\.GetValue",
          lambda m: 0 if m.group(1) in NOT_CONSUMED else 1),
     ]

@@ -88,6 +88,7 @@ def main() -> None:
         # the compatibility generators, which rebuild the goods block inside their output.
         _run(["scripts/gen_sol_ls_gui.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_sol_goods_tooltip.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_messages.py", "--target", target_arg, *mode_args])
 
     if "sol_standalone" in base_targets:
         location_args = ["--check"] if args.check else []

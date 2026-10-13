@@ -32,6 +32,13 @@
    & $env:EU5_PYTHON ai_gui_assessment/renderer/compare.py SHOT RENDER sx sy w h [rx ry] [zoom] OUT
    ```
 
+   To check a design before it exists in `src/`, write it as a throwaway `.gui` and render it with mock values:
+   `run.py proto <file.gui> <template_or_type> <mocks.json> [out]` (mocks: `script_values`, `gvm`, `paths`,
+   `scenario`; output in `ai_gui_assessment/images/proto/`). `progressbar` and `barchart` are drawn since 2026-10-13.
+   Explicit mock keys override the scenario; unspecified keys fall through to it. Missing script-value mocks are
+   reported rather than replaced with zero. For compatibility previews, supply their content roots in
+   `RENDER_EXTRA_ROOTS` (separated by `;` on Windows) so their actual DDS icons are loaded.
+
    Replace `situation` with `location`, `tooltip`, `event`, `market`, `government`, or `battle` for those screens.
    The SOL situation panel and location window have screenshot-matched regions, and the SOL location tooltip's
    outer width matches the roughly 550px game screenshot. No screen-wide pixel-accuracy claim applies (see §6). For a new screen,
@@ -46,7 +53,7 @@
 |---|---|
 | `.gui` files override **by whole relative path**; there is no INJECT/REPLACE for GUI. Owning one button in `location_window.gui` means owning the full file (hence SOL's generators). | 源 |
 | `type a = b { ... }` inherits `b`; `template x { }` + `using = x` pastes properties; `block "n" { default }` is a slot replaced **entirely** by `blockoverride "n" { }` (empty override deletes the default). | 源 |
-| Override content lands **where the block sits**, and is validated there: a block inside an `hbox`/`vbox` child cannot receive `parentanchor` or a `%` size (`pdx_gui_validation.cpp: Unsupported property ... child of a hbox/vbox`). | 源 |
+| Override content lands **where the block sits**, and is validated there: a layout child of an `hbox`/`vbox` cannot receive `parentanchor` or a `%` size (`pdx_gui_validation.cpp: Unsupported property ... child of a hbox/vbox`). This also applies to properties written directly in the shared type. Vanilla floating decorations set `ignore_layout = yes` (main_menu_cooltip_types.gui:254). The renderer checks resolved children after inheritance and overrides. | 实机错误日志 + 源 |
 | Overrides propagate into nested type instances, but **an instance's own `blockoverride` beats one inherited from outside** (otherwise nested scrollbox-in-scrollbox would recurse forever). | 实机 |
 | Text set on a button (`text` / `raw_text`) is drawn by the button type's `buttonText = { textbox }` child. | 实机 |
 | Hidden children in `hbox`/`vbox` take **neither size nor spacing**. | 实机 |
@@ -65,8 +72,11 @@
 | `widgetanchor` defaults to `parentanchor`. | 实机 |
 | A vertical scrollbar overlays the content; it does not narrow it. | 实机 |
 | Fixed-width single-line text that does not fit **shrinks its font** down to `fontsize_min` (vanilla default 8). | 实机 |
+| **Fixed-width rows can contain children outside their own measured rectangle.** Budget the label, icons and all gaps, and split large groups explicitly. SOL uses six icons per 216px group row; inspect descendant positions as well as total dimensions. Estate mini-card text uses fixed widths with `autoresize = no`; funds and baseline occupy separate lines to preserve large figures. | 源 + 渲染检查 |
 | `righttoleft = yes` / `bottomtotop = yes` reverse box order. | 源 |
 | A `dynamicgridbox` with `flipdirection = yes` lays items horizontally; `datamodel_wrap = 1` then starts a new row after each item. The IOs member list uses this to show three estate rows. This verified case does not establish vertical wrapping semantics. | 实机 |
+| **A bare `widget` never sizes to its children.** A widget-like element takes its hint from its own `size`, or only from children carrying `set_parent_size_to_minimum = yes` (a child's `resizeparent = yes` works the same). A bare `widget` holding an `hbox` measures **0** high, and `minimumsize` on the widget itself is measured too late to rescue it. Use a `vbox` as a framed container, and emit art as a **sized child widget**, never as a bare `background` on a childless element. | 源 |
+| **Expression-valued properties must be bracketed as `"[...]"`.** Unbracketed, a numeric property does not evaluate and silently takes its default - two `layoutstretchfactor_horizontal` children then split a row evenly (36/36 in a 72px box) instead of proportionally. | 源 |
 
 ## 3. Textures
 
@@ -79,10 +89,28 @@
 | `modify_texture` without `blend_mode` behaves as normal (mask textures with black RGB still tint correctly). | 推 |
 | Pie slices are drawn through the slice texture; `piechart_alpha.dds` is a ring, so vanilla pies are rings with an icon in the centre. A `pieslice` `color` must be a literal `{ r g b a }` - a named colour cannot be used there. Slice `value`s may be expressions and are normalised by the engine, so pass raw counts and one chart works at any scale. | 实机 |
 | Pop-type colours come from `main_menu/common/named_colors/02_map.txt` (`pop_nobles` …). | 源 |
+| **Stacked and offset bars are `barchart` + `barslice`/`barslice_no_highlight`.** Slice values are normalised (raw counts are fine), `direction = vertical` stacks bottom-up, `righttoleft = yes` reverses; vanilla uses it inside tooltips (`combat_tooltips.gui:2909`). A transparent leading slice used as an offset has no vanilla precedent. | 源 |
+| `flowcontainer` does not wrap by available width; vanilla wraps only with a fixed `wrap_count`. Split width-dependent rows in the generator. | 源 |
+| **`using = X` inlines a `type X`, it is not a texture reference.** A `progressbar` whose `using` names a non-existent type resolves no texture and draws **nothing while still occupying its layout slot and reporting a full size** - invisible to any measurement check. Name `progresstexture` / `noprogresstexture` outright (progressbars.gui:285) and carry `texture_density` / `spriteType` / `spriteborder` on the element. Verify bars by pixel. | 源 |
 | **`TooltipListBase` already contains a `TooltipTableHeader`.** A section caption needs only to override `tableheader_text` / `table_header_background`; adding a body child stacks a second header and roughly doubles the band height (~60px vs ~33px). | 实机 |
 | **A `blockoverride` replaces a block entirely, and an instance's own override beats one inherited from outside.** One shared block name therefore cannot carry five different values into five sibling instances - each keeps its own default. Expose one container block per row (`block "sol_cells" {}`) and let the caller fill it with children that each carry their own override. Getting this wrong duplicates elements silently rather than erroring: emitting five cells *alongside* a block that already held five defaults produced ten per row. | 实机 |
 
 ## 4. Text, numbers and icons
+
+2026-10-13 SOL dashboard corrections:
+
+- **[实机错误日志 + 源] GUI arithmetic is typed.** Scope.ScriptValue returns CFixedPoint; Multiply_float returns float. Feeding the latter to FixedPointToInt causes FetchData failures. Keep dial calculations in *_CFixedPoint until integer conversion. The renderer now reports this mismatch.
+- **[实机错误日志 + 源] A bare numeric binding such as max = "[1]" is invalid.** It produces an empty function call. Use max = 1; constants inside function arguments use explicit typed literals.
+- **[实机错误日志 + 源] Text formatting is not valid inside numeric properties.** Population slices using `ScriptValue(...)|+0` produced ten statement-parser errors in the 16:53 log. Use `[FixedPointToFloat(Scope.ScriptValue(...))]` for each slice value (vanilla location_window.gui:1455); keep `|+0` in legend text. The renderer now rejects unquoted format suffixes in numeric bindings.
+- **[实机错误日志 + 源] Separate a format tag from punctuation with whitespace.** `#R-[expense|+2]#!` and `#E/[target|+0]#!` produced unknown formatting tags when the ledger opened at 17:03. Use `#R -[expense|2]#!` (vanilla cooltip.gui:3479) and `#E /[target|0]#!`; plain number formats keep the enclosing colour. The renderer now flags these missing separators.
+- **[实机错误日志] Generated and handwritten vocabulary must not define the same key.** SOL_GUI_SECTION_POP and SOL_GUI_SECTION_CONSUMPTION now have one owner in SOL_ls_ui localization, for each language and target.
+- **[源 + 实机错误日志] Resolution message types use the fixed `main_menu/gui/messagetypes.txt` database.** An arbitrary SOL_economy_messages.txt file did not register the type. gen_sol_messages.py preserves every reference vanilla type and appends SOL's resolution type; another Mod owning this path needs an explicit merge. Registration happens even with show_message=no. A fresh runtime log remains required to confirm the filename correction.
+- **[截图症状 + 源] Supply noprogresstexture explicitly.** Vanilla supplies the empty texture; the installed progressbar shader samples Texture1 for the empty region. A parent background does not supply this sampler. Missing it accompanied solid lime bars; the exact fallback colour is not established as a general rule.
+- **[源] SOL tax/power weights are amounts.** Divide effective weights by local_total_tax_share before percent formatting; use the singular commoner key. A zero consumption baseline displays “无消费” with a neutral dial.
+- **[推，渲染检查] Budget the complete framed tooltip.** The F dashboard initially measured 1244px high. Compact repeated figures, use a two-column population legend and split oversized compatibility goods groups. Chinese/English previews at 100% measure 484×1003 (stable/standalone), 484×1028 (PP) and 484×1078 (JTG), including the frame. These are static previews, not new in-game measurements; larger UI scales need in-game checking.
+- **[源] Diagnostics refresh independently of optional solver preparation.** gls_accumulate_panel_stats aggregates estate display caches in its existing traversal, including small countries and disabled solvers.
+- **[工具检查] Missing SOL script-value mocks are reported, not defaulted to zero.** A zero unknown-expression count must not hide missing estate funds/baseline data.
+- **[源] Standalone must ship its shared GUI types.** The build mirrors only the selected target directory. `gen_sol_ls_gui.py` copies stable's shared kit into standalone and includes it in `--check`; loading stable types during preview does not prove standalone packaging.
 
 | Rule | Level |
 |---|---|

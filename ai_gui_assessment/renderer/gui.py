@@ -229,6 +229,20 @@ class Expander:
                     tb.props[k] = el.props.pop(k)
             tb.props.setdefault("size", ["100%", "100%"])
             el.children.insert(0, tb)
+        if el.kind in ("hbox", "vbox"):
+            for child in el.children:
+                if child.props.get("ignore_layout") == "yes":
+                    continue
+                invalid = []
+                if "parentanchor" in child.props:
+                    invalid.append("parentanchor")
+                if any("%" in str(v) for v in child.props.get("size", [])):
+                    invalid.append("size with a percentage")
+                for prop in invalid:
+                    self.log.append(
+                        f"INVALID BOX CHILD: {prop} on {child.typename} "
+                        f"inside {el.kind} at {child.src}:{child.line}"
+                    )
         return el
 
     def fill(self, el: Element, entries: list[Node], outer_ctx: dict):

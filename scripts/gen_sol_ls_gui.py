@@ -21,6 +21,8 @@ Outputs, for the stable and standalone targets:
 
 The goods block is rendered by scripts/sol_goods_ui.py, which the two compatibility
 generators also call - they rebuild the same block with their extra goods included.
+The handwritten shared kit in stable is also copied to standalone, whose build
+deploys its own directory without inheriting stable's GUI definitions.
 
 Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_ls_gui.py
@@ -69,6 +71,11 @@ ESTATES = (
 
 LEDGER_COLS = (126, 46, 50, 58, 52, 96)
 
+# F route: one shared dashboard language for the location tooltip and country panel.
+# The dial sheet is 7x3 (21 frames), mapping -50% .. +50% coefficient deviation.
+F_TEX = "gfx/interface/sol_proto"
+F_ESTATES = ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+
 
 def estate_stem(key: str) -> str:
     """The script-value stem for an estate key.
@@ -84,9 +91,128 @@ def T(n: int) -> str:
     return "\t" * n
 
 
+def f_sv(scope: str, name: str) -> str:
+    return f"FixedPointToFloat({scope}.ScriptValue('{name}'))"
+
+
+def f_coef(scope: str, funds: str, need: str) -> str:
+    return (
+        f"Subtract_CFixedPoint(Divide_CFixedPoint({scope}.ScriptValue('{funds}'), "
+        f"Max_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0.0001')), '(CFixedPoint)1.0')"
+    )
+
+
+def f_frame(coef: str) -> str:
+    # FixedPointToInt accepts CFixedPoint, never the result of *_float arithmetic.
+    clamped = f"Min_CFixedPoint(Max_CFixedPoint({coef}, '(CFixedPoint)-0.5'), '(CFixedPoint)0.5')"
+    return (
+        "Add_int32(FixedPointToInt(Multiply_CFixedPoint("
+        f"Add_CFixedPoint({clamped}, '(CFixedPoint)0.5'), '(CFixedPoint)20.0')), '(int32)1')"
+    )
+
+
+def f_meter(base: int, width: int, scope: str, funds: str, need: str) -> list[str]:
+    i = T(base)
+    fund = f_sv(scope, funds)
+    baseline = f_sv(scope, need)
+    scale = f"Max_float(Multiply_float({baseline}, '(float)1.6'), '(float)0.0001')"
+    value = f"Min_float(Max_float(Divide_float({fund}, {scale}), '(float)0'), '(float)1')"
+    enough = f"GreaterThanOrEqualTo_float({fund}, {baseline})"
+    short = f"LessThan_float({fund}, {baseline})"
+    return [
+        f"{i}widget = {{",
+        f"{i}\tsize = {{ {width} 12 }}",
+        f'{i}\tbackground = {{ texture = "{F_TEX}/bar_track.dds" texture_density = 2 spriteType = corneredstretched spriteborder = {{ 7 0 }} }}',
+        f'{i}\tprogressbar = {{ size = {{ {width} 12 }} progresstexture = "{F_TEX}/bar_gold.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 spriteType = corneredstretched spriteborder = {{ 7 0 }} min = 0 max = 1 value = "[{value}]" visible = "[{enough}]" }}',
+        f'{i}\tprogressbar = {{ size = {{ {width} 12 }} progresstexture = "{F_TEX}/bar_red.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 spriteType = corneredstretched spriteborder = {{ 7 0 }} min = 0 max = 1 value = "[{value}]" visible = "[{short}]" }}',
+        f'{i}\ticon = {{ size = {{ 2 12 }} position = {{ {int(width * 0.625)} 0 }} texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }}',
+        f"{i}}}",
+    ]
+
+
+def f_dashboard(base: int, scope: str, total_funds: str, total_need: str,
+                total_coef: str, estates: dict[str, tuple[str, str]]) -> list[str]:
+    """Render the F-route instrument dashboard.
+
+    `estates` maps estate key to (funds script value, baseline script value).  The
+    data is deliberately read-only; substitute-group calculations stay in the
+    existing goods UI for the next backend task.
+    """
+    i = T(base)
+    total_frame = f_frame(f"{scope}.ScriptValue('{total_coef}')")
+    compact = base == TOOLTIP_BASE
+    out: list[str] = [f"{i}vbox = {{", f"{i}\tlayoutpolicy_horizontal = expanding", f"{i}\tspacing = {3 if compact else 5}"]
+    out.append(f"{i}\tvbox = {{")
+    out.append(f"{i}\t\tlayoutpolicy_horizontal = expanding")
+    out.append(f'{i}\t\tbackground = {{ texture = "{F_TEX}/hero_frame.dds" texture_density = 2 spriteType = corneredstretched spriteborder = {{ 30 30 }} }}')
+    out.append(f"{i}\t\thbox = {{")
+    out.append(f"{i}\t\t\tlayoutpolicy_horizontal = expanding")
+    out.append(f"{i}\t\t\tspacing = 10")
+    out.append(f"{i}\t\t\tmargin = {{ 10 {4 if compact else 8} }}")
+    out.append(f"{i}\t\t\twidget = {{")
+    out.append(f"{i}\t\t\t\tsize = {{ 176 102 }}")
+    out.append(f'{i}\t\t\t\tbackground = {{ texture = "{F_TEX}/dial.dds" frame_grid = {{ 7 3 }} texture_density = 2 frame = "[{total_frame}]" }}')
+    out.append(f"{i}\t\t\t}}")
+    out.append(f"{i}\t\t\tvbox = {{")
+    out.append(f"{i}\t\t\t\tlayoutpolicy_horizontal = expanding")
+    out.append(f"{i}\t\t\t\tspacing = 2")
+    out.append(f'{i}\t\t\t\ttext_single = {{ autoresize = yes fontsize = 12 align = left|nobaseline text = "SOL_F_DASHBOARD_TITLE" }}')
+    out.append(f'{i}\t\t\t\ttext_single = {{ autoresize = yes fontsize = 28 align = left|nobaseline raw_text = "[{f_sv(scope, total_coef)}|+=1%]" }}')
+    for label, value in (("SOL_F_DASHBOARD_FUNDS", total_funds), ("SOL_F_DASHBOARD_BASELINE", total_need)):
+        out.append(f'{i}\t\t\t\thbox = {{ spacing = 6')
+        out.append(f'{i}\t\t\t\t\ttext_single = {{ autoresize = yes fontsize = 11 align = left|nobaseline text = "{label}" }}')
+        out.append(f'{i}\t\t\t\t\ttext_single = {{ autoresize = yes fontsize = 14 align = right|nobaseline raw_text = "[{f_sv(scope, value)}|+2]" }}')
+        out.append(f'{i}\t\t\t\t}}')
+    out.append(f"{i}\t\t\t}}")
+    out.append(f"{i}\t\t}}")
+    out.extend(f_meter(base + 2, 300, scope, total_funds, total_need))
+    out.append(f"{i}\t}}")
+    out.append("")
+    out.append(f"{i}\ttext_single = {{ autoresize = yes fontsize = 13 align = left|nobaseline text = \"SOL_F_DASHBOARD_ESTATE_HEADER\" }}")
+    out.append(f"{i}\thbox = {{")
+    out.append(f"{i}\t\tlayoutpolicy_horizontal = expanding")
+    out.append(f"{i}\t\tspacing = 4")
+    for key in F_ESTATES:
+        funds, need = estates[key]
+        coef = f_coef(scope, funds, need)
+        consumed = f"GreaterThan_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0')"
+        frame = f_frame(f"Select_CFixedPoint({consumed}, {coef}, '(CFixedPoint)0')")
+        out.append(f"{i}\t\tvbox = {{")
+        out.append(f"{i}\t\t\tminimumsize = {{ 82 -1 }}")
+        out.append(f"{i}\t\t\tmaximumsize = {{ 82 -1 }}")
+        out.append(f"{i}\t\t\tmargin = {{ 3 {2 if compact else 4} }}")
+        out.append(f'{i}\t\t\tbackground = {{ using = tooltip_table_field_texture }}')
+        out.append(f'{i}\t\t\ttext_single = {{ size = {{ 74 16 }} autoresize = no fontsize = 11 align = center|nobaseline text = "SOL_ESTATE_{key.upper()}" }}')
+        out.append(f"{i}\t\t\twidget = {{")
+        out.append(f"{i}\t\t\t\tsize = {{ 74 43 }}")
+        out.append(f'{i}\t\t\t\tbackground = {{ texture = "{F_TEX}/dial.dds" frame_grid = {{ 7 3 }} texture_density = 2 frame = "[{frame}]" }}')
+        out.append(f"{i}\t\t\t}}")
+        out.extend(f_meter(base + 3, 74, scope, funds, need))
+        # A 0/0 baseline means the estate consumes no goods, not a 100% shortfall.
+        out.append(f'{i}\t\t\twidget = {{ size = {{ 74 20 }}')
+        out.append(f'{i}\t\t\t\ttext_single = {{ size = {{ 74 20 }} autoresize = no fontsize = 14 align = center|nobaseline visible = "[{consumed}]" raw_text = "[{coef}|+=1%]" }}')
+        out.append(f'{i}\t\t\t\ttext_single = {{ size = {{ 74 20 }} autoresize = no fontsize = 11 align = center|nobaseline visible = "[Not({consumed})]" text = "SOL_F_DASHBOARD_NO_CONSUMPTION" }}')
+        out.append(f'{i}\t\t\t}}')
+        out.append(f'{i}\t\t\ttext_single = {{ size = {{ 74 12 }} autoresize = no fontsize = 9 align = center|nobaseline raw_text = "[{f_sv(scope, funds)}|1]" }}')
+        out.append(f'{i}\t\t\ttext_single = {{ size = {{ 74 12 }} autoresize = no fontsize = 9 align = center|nobaseline raw_text = "/ [{f_sv(scope, need)}|1]" }}')
+        out.append(f"{i}\t\t}}")
+    out.append(f"{i}\t\texpand = {{}}")
+    out.append(f"{i}\t}}")
+    out.append(f"{i}}}")
+    return out
+
+
 # ------------------------------------------------------------------ building blocks
 def caption(base: int, key: str) -> list[str]:
     i = T(base)
+    if base == TOOLTIP_BASE:
+        return [
+            f'{i}hbox = {{ layoutpolicy_horizontal = expanding margin = {{ 4 0 }}',
+            f'{i}\tbackground = {{ using = tooltip_table_field_texture }}',
+            f'{i}\ttext_single = {{ text = "{key}" }}',
+            f'{i}\texpand = {{}}',
+            f'{i}}}',
+        ]
     return [
         f"{i}sol_caption = {{",
         f'{i}\tblockoverride "sol_caption_text" {{ text = "{key}" }}',
@@ -111,6 +237,20 @@ def headline(base: int, rows: list[tuple[str, str, str]]) -> list[str]:
     parameterisation).
     """
     i = T(base)
+    if base == TOOLTIP_BASE:
+        # Funds and the final coefficient already appear in the dashboard. Keep
+        # income and savings here, on one compact row, within the screen budget.
+        out = [f'{i}hbox = {{ layoutpolicy_horizontal = expanding spacing = 8']
+        for concept, label, value in rows[:2]:
+            out.extend([
+                f'{i}\thbox = {{ spacing = 4',
+                f'{i}\t\ticon = {{ size = {{ 20 20 }} texture = "[GetConceptTexture(\'{concept}\')]" }}',
+                f'{i}\t\ttext_single = {{ fontsize = 13 text = "{label}" }}',
+                f'{i}\t\ttext_single = {{ raw_text = "{value}" }}',
+                f'{i}\t}}',
+            ])
+        out.extend([f'{i}\texpand = {{}}', f'{i}}}'])
+        return out
     out = [
         f"{i}hbox = {{",
         f"{i}\tlayoutpolicy_horizontal = expanding",
@@ -146,6 +286,20 @@ def composition(base: int, slices: list[str], legend: list[tuple[str, str]]) -> 
     out.append(f"{i}\tvbox = {{")
     out.append(f"{i}\t\tlayoutpolicy_horizontal = expanding")
     out.append(f"{i}\t\tspacing = 1")
+    if base == TOOLTIP_BASE + 1:
+        # Two legend entries per row: the same population values as the ring.
+        for start in range(0, len(legend), 2):
+            out.append(f'{i}\t\thbox = {{ layoutpolicy_horizontal = expanding spacing = 4')
+            for estate_label, share in legend[start:start + 2]:
+                out.extend([
+                    f'{i}\t\t\thbox = {{ size = {{ 176 22 }} spacing = 2',
+                    f'{i}\t\t\t\ttext_single = {{ size = {{ 104 22 }} autoresize = no fontsize = 13 align = left|nobaseline text = "{estate_label}" }}',
+                    f'{i}\t\t\t\ttext_single = {{ size = {{ 68 22 }} autoresize = no fontsize = 13 align = right|nobaseline raw_text = "{share}" }}',
+                    f'{i}\t\t\t}}',
+                ])
+            out.extend([f'{i}\t\t\texpand = {{}}', f'{i}\t\t}}'])
+        out.extend([f'{i}\t}}', f'{i}\texpand = {{}}', f'{i}}}'])
+        return out
     for estate_label, share in legend:
         out.append(f"{i}\t\tsol_legend_row = {{")
         out.append(f'{i}\t\t\tblockoverride "sol_legend_name" {{ text = "{estate_label}" }}')
@@ -189,6 +343,19 @@ def ledger(base: int, rows: list[tuple[str, list[str]]]) -> list[str]:
 
 def kv_rows(base: int, rows: list[tuple[str, str]]) -> list[str]:
     """Label + single right-aligned value, striped alternating."""
+    if base == TOOLTIP_BASE + 1:
+        # Baseline spending is in the hero; retain both raw and final coefficients.
+        i = T(base)
+        out = [f'{i}hbox = {{ layoutpolicy_horizontal = expanding spacing = 8']
+        for label, value in rows[1:]:
+            out.extend([
+                f'{i}\thbox = {{ spacing = 4',
+                f'{i}\t\ttext_single = {{ fontsize = 13 text = "{label}" }}',
+                f'{i}\t\ttext_single = {{ raw_text = "{value}" }}',
+                f'{i}\t}}',
+            ])
+        out.extend([f'{i}\texpand = {{}}', f'{i}}}'])
+        return out
     out: list[str] = []
     for index, (label, value) in enumerate(rows):
         kind = "sol_kv_row_alt" if index % 2 else "sol_kv_row"
@@ -229,7 +396,13 @@ LOC_POP = {
 }
 LOC_SAVINGS = {key: f"local_{estate_stem(key)}_savings" for key, _, _ in ESTATES}
 LOC_TARGET = {key: f"{LOC_SAVINGS[key]}_target" for key, _, _ in ESTATES}
-LOC_SHARE = {key: f"local_{key}_tax_share" for key, _, _ in ESTATES}
+LOC_SHARE = {
+    "nobles": "local_nobles_effective_tax_share",
+    "clergy": "local_clergy_tax_share",
+    "burghers": "local_burghers_tax_share",
+    "commoners": "local_commoner_effective_tax_share",
+    "tribesmen": "local_tribesmen_tax_share",
+}
 
 
 def render_tooltip(goods: list[str]) -> str:
@@ -249,9 +422,22 @@ def render_tooltip(goods: list[str]) -> str:
     out.append('\t\tblockoverride "tooltip_content" {')
     out.append("\t\t\tvbox = {")
     out.append("\t\t\t\tlayoutpolicy_horizontal = expanding")
-    out.append("\t\t\t\tspacing = 3")
+    out.append("\t\t\t\tspacing = 1")
     out.append("")
     out.append('\t\t\t\tTooltipTextBlock = { blockoverride "text" { text = "LOCATION_SOL_GUI_SUMMARY" } }')
+    out.extend(
+        f_dashboard(
+            TOOLTIP_BASE,
+            LOC,
+            "local_sol_liquid_funds_display",
+            "local_sol_base_spending_display",
+            "local_sol_pop_demand_modifier_size",
+            {
+                key: (f"local_sol_{key}_liquid_display", f"local_sol_{key}_base_display")
+                for key, _, _ in ESTATES
+            },
+        )
+    )
     out.extend(
         headline(
             TOOLTIP_BASE,
@@ -273,7 +459,7 @@ def render_tooltip(goods: list[str]) -> str:
     out.extend(
         composition(
             TOOLTIP_BASE + 1,
-            [sv(LOC_POP[key], "+0") for key, _, _ in ESTATES],
+            [f"[{f_sv(LOC, LOC_POP[key])}]" for key, _, _ in ESTATES],
             # Population, not tax share: the ring is drawn from populations, and a
             # legend reporting a different metric would contradict the graphic.
             [(f"SOL_ESTATE_{key.upper()}", sv(LOC_POP[key], "+0")) for key, _, _ in ESTATES],
@@ -296,10 +482,10 @@ def render_tooltip(goods: list[str]) -> str:
                     f"SOL_ESTATE_{key.upper()}",
                     [
                         sv(LOC_POP[key], "+0"),
-                        sv(LOC_SHARE[key], "+=1%"),
+                        f"[Divide_CFixedPoint({LOC}.ScriptValue('{LOC_SHARE[key]}'), {LOC}.ScriptValue('local_total_tax_share'))|1%]",
                         sv(f"local_sol_{key}_income_display", "+2"),
-                        f"#R-{sv(f'local_sol_{key}_building_maintenance_display', '+2')}#!",
-                        f"{sv(LOC_SAVINGS[key], '+0')} #E/{sv(LOC_TARGET[key], '+0')}#!",
+                        f"#R -{sv(f'local_sol_{key}_building_maintenance_display', '2')}#!",
+                        f"{sv(LOC_SAVINGS[key], '+0')} #E /{sv(LOC_TARGET[key], '0')}#!",
                     ],
                 )
                 for key, _, _ in ESTATES
@@ -392,6 +578,19 @@ def render_panel(goods: list[str]) -> str:
     out.append('\t\t\t\t\t\tblockoverride "sol_note_text" { text = "GLS_PANEL_INFO_BODY" }')
     out.append("\t\t\t\t\t}")
     out.extend(
+        f_dashboard(
+            PANEL_BASE,
+            COUNTRY,
+            "gls_country_liquid_funds_display",
+            "gls_country_base_spending_display",
+            "gls_country_final_demand_scale_deviation_display",
+            {
+                key: (f"gls_sol_{key}_liquid_display", f"gls_sol_{key}_base_display")
+                for key, _, _ in ESTATES
+            },
+        )
+    )
+    out.extend(
         headline(
             PANEL_BASE,
             [
@@ -411,7 +610,7 @@ def render_panel(goods: list[str]) -> str:
     out.extend(
         composition(
             PANEL_BASE + 1,
-            [sv(f"gls_pop_{key}_display", "+0") for key, _, _ in ESTATES],
+            [f"[{f_sv(COUNTRY, f'gls_pop_{key}_display')}]" for key, _, _ in ESTATES],
             # Population, matching the ring the same way the tooltip does.
             [(f"SOL_ESTATE_{key.upper()}", sv(f"gls_pop_{key}_display", "+0")) for key, _, _ in ESTATES],
         )
@@ -437,9 +636,9 @@ def render_panel(goods: list[str]) -> str:
                         # rather than filled with an invented figure.
                         "-",
                         sv(f"gls_income_{key}_display", "+2"),
-                        f"#R-{sv(f'gls_building_maintenance_{key}_display', '+2')}#!",
+                        f"#R -{sv(f'gls_building_maintenance_{key}_display', '2')}#!",
                         f"{sv(f'gls_{estate_stem(key)}_savings_display', '+0')} "
-                        f"#E/{sv(f'gls_{estate_stem(key)}_savings_target_display', '+0')}#!",
+                        f"#E /{sv(f'gls_{estate_stem(key)}_savings_target_display', '0')}#!",
                     ],
                 )
                 for key, _, _ in ESTATES
@@ -480,6 +679,22 @@ def render_panel(goods: list[str]) -> str:
 # ------------------------------------------------------------------ localization
 UI_STRINGS = {
     "english": {
+        "PERFORM_global_living_standard_recalculate_ACTION": "Living Standard recalculated",
+        "PERFORM_global_living_standard_recalculate_ACTION_TITLE": "Living Standard recalculated",
+        "PERFORM_global_living_standard_recalculate_ACTION_SETUP": "When a country refreshes the Living Standard caches.",
+        "PERFORM_global_living_standard_recalculate_ACTION_HEADER": "$MESSENGER$",
+        "PERFORM_global_living_standard_recalculate_ACTION_DESC": "The Living Standard caches have been refreshed.",
+        "PERFORM_global_living_standard_recalculate_ACTION_EFFECTS": "$EFFECT$",
+        "PERFORM_global_living_standard_recalculate_ACTION_LOG": "Living Standard caches refreshed.",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN1": "OK",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN2": "OK",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN3": "$common_string_go_to$",
+        "PERFORM_global_living_standard_recalculate_ACTION_MAP": "",
+        "SOL_F_DASHBOARD_TITLE": "Consumption balance",
+        "SOL_F_DASHBOARD_FUNDS": "Available funds",
+        "SOL_F_DASHBOARD_BASELINE": "Baseline consumption",
+        "SOL_F_DASHBOARD_ESTATE_HEADER": "Estate balances",
+        "SOL_F_DASHBOARD_NO_CONSUMPTION": "No consumption",
         "SOL_GUI_SECTION_POP": "#T Composition#!",
         "SOL_GUI_SECTION_LEDGER": "#T Estate ledger#!",
         "SOL_GUI_SECTION_CONSUMPTION": "#T Consumption coefficient#!",
@@ -492,6 +707,22 @@ UI_STRINGS = {
         "SOL_SUBGROUP_UNGROUPED": "#E Other#!",
     },
     "simp_chinese": {
+        "PERFORM_global_living_standard_recalculate_ACTION": "生活水平已重算",
+        "PERFORM_global_living_standard_recalculate_ACTION_TITLE": "生活水平已重算",
+        "PERFORM_global_living_standard_recalculate_ACTION_SETUP": "当国家刷新生活水平缓存时。",
+        "PERFORM_global_living_standard_recalculate_ACTION_HEADER": "$MESSENGER$",
+        "PERFORM_global_living_standard_recalculate_ACTION_DESC": "生活水平缓存已刷新。",
+        "PERFORM_global_living_standard_recalculate_ACTION_EFFECTS": "$EFFECT$",
+        "PERFORM_global_living_standard_recalculate_ACTION_LOG": "生活水平缓存已刷新。",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN1": "确定",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN2": "确定",
+        "PERFORM_global_living_standard_recalculate_ACTION_BTN3": "$common_string_go_to$",
+        "PERFORM_global_living_standard_recalculate_ACTION_MAP": "",
+        "SOL_F_DASHBOARD_TITLE": "消费平衡",
+        "SOL_F_DASHBOARD_FUNDS": "可支配资金",
+        "SOL_F_DASHBOARD_BASELINE": "基准消费",
+        "SOL_F_DASHBOARD_ESTATE_HEADER": "阶层平衡",
+        "SOL_F_DASHBOARD_NO_CONSUMPTION": "无消费",
         "SOL_GUI_SECTION_POP": "#T 阶层构成#!",
         "SOL_GUI_SECTION_LEDGER": "#T 阶层账本#!",
         "SOL_GUI_SECTION_CONSUMPTION": "#T 消费系数#!",
@@ -563,7 +794,11 @@ def _outputs(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
             f"Expected the {EXPECTED_GOODS} grouped SOL goods, found {len(goods)}"
         )
     result: dict[Path, str] = {}
+    kit_path = Path("in_game/gui/SOL_living_standard_kit.gui")
+    kit = (STABLE / kit_path).read_text(encoding="utf-8-sig")
     for root in roots:
+        if root != STABLE:
+            result[root / kit_path] = kit
         result[root / "in_game" / "gui" / "SOL_economy_local.gui"] = render_tooltip(goods)
         result[
             root / "in_game" / "gui" / "panels" / "situation" / "global_living_standard.gui"
@@ -604,7 +839,7 @@ def main() -> None:
         payload = content.encode("utf-8")
         if path.suffix == ".yml":
             payload = UTF8_BOM + payload
-        else:
+        elif path.name != "SOL_living_standard_kit.gui":
             _validate(content, str(relative))
         if args.check:
             current = path.read_bytes() if path.exists() else None

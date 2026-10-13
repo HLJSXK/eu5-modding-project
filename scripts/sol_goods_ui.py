@@ -44,9 +44,12 @@ DIM_ALPHA = "0.3"
 
 GROUPS_PER_LINE = 2
 ICON_W = 20
+# sol_group_row: 216px total, 80px label, 2px gaps, including the trailing expand.
+# Six icons fit; larger compatibility groups need explicit continuation rows.
+ICONS_PER_GROUP_ROW = 6
 
 # Player-facing group names, [english, simp_chinese]. Kept short: the label column is
-# 84px and a long name would shrink to fontsize_min and look broken.
+# 80px and a long name would shrink to fontsize_min and look broken.
 GROUP_LABELS: dict[str, tuple[str, str]] = {
     "basic_clothing": ("Clothing", "基本衣物"),
     "standard_clothing": ("Fine cloth", "标准衣物"),
@@ -107,8 +110,12 @@ def _group_row(indent: str, group: str | None, goods: list[str], variable_map: s
 
 
 def render_group_columns(goods: list[str], variable_map: str, scope: str, indent: str) -> list[str]:
-    """The grouped block: one labelled row per group, laid out GROUPS_PER_LINE to a line."""
-    rows = group_rows(ordered(goods))
+    """Labelled groups with bounded icon rows, GROUPS_PER_LINE columns per line."""
+    rows = [
+        (group, members[start : start + ICONS_PER_GROUP_ROW])
+        for group, members in group_rows(ordered(goods))
+        for start in range(0, len(members), ICONS_PER_GROUP_ROW)
+    ]
     out: list[str] = []
     for start in range(0, len(rows), GROUPS_PER_LINE):
         out.append(f"{indent}hbox = {{")

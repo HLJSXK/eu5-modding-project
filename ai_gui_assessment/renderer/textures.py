@@ -1,7 +1,9 @@
 """Texture loading and Jomini-style compositing (spriteType, modify_texture blend modes)."""
 from __future__ import annotations
 
+import os
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -9,6 +11,9 @@ from PIL import Image
 from gui import GAME, MOD
 
 SEARCH = [MOD / "main_menu", MOD / "in_game", GAME / "in_game", GAME / "main_menu", GAME / "loading_screen"]
+# Prototype assets that do not live in the mod yet (e.g. `run.py proto` designs): extra
+# content roots, searched first, separated by os.pathsep.
+SEARCH = [Path(p) for p in os.environ.get("RENDER_EXTRA_ROOTS", "").split(os.pathsep) if p] + SEARCH
 SEARCH += [p for p in (GAME / "dlc").glob("*/*") if p.is_dir()]
 
 
@@ -182,7 +187,7 @@ def blend(base: np.ndarray, mod: np.ndarray, mode: str, alpha: float) -> np.ndar
 
 
 def parse_color(v):
-    if isinstance(v, list):
+    if isinstance(v, (list, tuple)):
         vals = [_f(x, 1.0) for x in v]
         while len(vals) < 4:
             vals.append(1.0)
@@ -197,6 +202,9 @@ def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Im
     img = TEXTURES.load(tex) if isinstance(tex, str) else None
     if img is None:
         return None
+    if isinstance(spec.get("frame"), str) and spec["frame"].startswith("["):
+        # data-driven frame, e.g. alert_settings.gui:163 `frame = "[Select_int32(...)]"`
+        spec = dict(spec, frame=resolve(spec["frame"]))
     img = select_frame(img, spec)
     out = to_np(sprite(img, spec, w_px, h_px, scale))
     for ms in spec.get("modifies", []):
@@ -219,7 +227,7 @@ def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Im
         if col:
             m[..., :3] *= np.array(col[:3], dtype=np.float32)
             m[..., 3] *= col[3]
-        out = blend(out, m, ms.get("blend_mode", "normal"), _f(ms.get("alpha"), 1.0))
+        out = blend(out, m, ms.get("blend_mode", "normal"), _f(resolve(ms.get("alpha")), 1.0))
     # masked_button uses the mask's alpha as a hard shape for the composed button.
     # The mask follows the same frame/sprite sizing rules as the main texture.
     mask = resolve(spec.get("mask")) if spec.get("mask") is not None else None
@@ -233,5 +241,5 @@ def compose(spec: dict, w_px: int, h_px: int, scale: float, resolve) -> Image.Im
     if col:
         out[..., :3] *= np.array(col[:3], dtype=np.float32)
         out[..., 3] *= col[3]
-    out[..., 3] *= _f(spec.get("alpha"), 1.0)
+    out[..., 3] *= _f(resolve(spec.get("alpha")), 1.0)
     return from_np(out)

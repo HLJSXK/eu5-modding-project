@@ -1,6 +1,8 @@
 import colorsys
 import re
 
+from data import Unknown
+
 from scenarios import COMMON
 
 
@@ -137,8 +139,10 @@ def tooltip():
         "local_wealth_display": 18.40, "local_effective_control": 0.64, "local_tax_base_display": 11.78,
         "local_noble_pop_display": 2, "local_clergy_pop_display": 3, "local_burghers_pop_display": 14,
         "local_commoner_pop_display": 96, "local_tribesmen_pop_display": 0,
-        "local_nobles_tax_share": 0.38, "local_clergy_tax_share": 0.12, "local_burghers_tax_share": 0.21,
-        "local_commoner_tax_share": 0.29, "local_tribesmen_tax_share": 0,
+        "local_nobles_tax_share": 38, "local_clergy_tax_share": 12, "local_burghers_tax_share": 21,
+        "local_commoner_tax_share": 29, "local_tribesmen_tax_share": 0,
+        "local_nobles_effective_tax_share": 44, "local_commoner_effective_tax_share": 23,
+        "local_total_tax_share": 100,
         "local_commoner_share_transferred_to_nobles": 0.06, "local_commoner_share_lost_to_nobles": 0.06,
         "local_nobles_tax_rate": 0.18, "local_clergy_tax_rate": 0.10, "local_burghers_tax_rate": 0.22,
         "local_commoner_tax_rate": 0.08, "local_tribesmen_tax_rate": 0,
@@ -153,10 +157,15 @@ def tooltip():
         "local_burghers_savings_target": 28, "local_commoner_savings_target": 14, "local_tribesmen_savings_target": 0,
         "local_total_savings_target": 107, "local_total_savings": 95, "local_savings_pressure_adjustment": -0.028,
         "local_sol_liquid_funds_display": 7.51, "local_sol_base_spending_display": 8.40,
+        "local_sol_nobles_liquid_display": 3.4, "local_sol_nobles_base_display": 3.0,
+        "local_sol_clergy_liquid_display": 1.2, "local_sol_clergy_base_display": 1.2,
+        "local_sol_burghers_liquid_display": 1.9, "local_sol_burghers_base_display": 2.2,
+        "local_sol_commoners_liquid_display": 1.01, "local_sol_commoners_base_display": 2.0,
+        "local_sol_tribesmen_liquid_display": 0, "local_sol_tribesmen_base_display": 0,
         "local_sol_raw_demand_modifier_size": -0.106, "local_sol_pop_demand_modifier_size": -0.079,
     }
     return location() + [
-        (r"Location\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: v.get(m.group(1), 0)),
+        (r"Location\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: v.get(m.group(1), Unknown(m.group(0)))),
         (r"GetVariableFromGlobalVariableMap\('sol_market_consumes_(\w+)',.*\)\.GetValue",
          lambda m: 0 if m.group(1) in NOT_CONSUMED else 1),
         (r"GetVariableFromGlobalVariableMap\('sol_market_price_suppressed_(\w+)',.*\)\.GetValue",

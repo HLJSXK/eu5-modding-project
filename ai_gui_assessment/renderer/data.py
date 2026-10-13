@@ -273,6 +273,12 @@ class Evaluator:
                 if fn is None:
                     fn = self.generic_fn(name)
                 if fn is not None:
+                    # Python numbers erase Jomini's float/CFixedPoint distinction.
+                    # Reject the conversion that failed in the in-game SOL dial.
+                    if name == "FixedPointToInt" and args and self.expression_type(args[0]) == "float":
+                        error = "TYPE ERROR: FixedPointToInt requires CFixedPoint, got float: " + self.canon(node)
+                        self.log.append(error)
+                        return Unknown(error)
                     vals = [self.eval(a) for a in args]
                     return fn(*vals)
         path = self.canon(node)
@@ -281,11 +287,33 @@ class Evaluator:
             self.log.append(path)
         return v
 
+    def expression_type(self, node):
+        if node[0] == "lit":
+            match = re.match(r"^\(([^)]+)\)", str(node[1]))
+            return match.group(1) if match else None
+        name, args = node[1][-1]
+        if name in ("FixedPointToFloat", "IntToFloat") or name.endswith("_float"):
+            return "float"
+        if name in ("ScriptValue", "GetValue", "IntToFixedPoint") or name.endswith("_CFixedPoint"):
+            return "CFixedPoint"
+        return None
+
     def eval_str(self, s: str):
         s = s.strip()
         if s in ("yes", "no"):
             return s == "yes"
         if s.startswith("[") and s.endswith("]") and s.count("[") == 1:
+            # Formatting suffixes belong to text/raw_text, not numeric bindings.
+            # The expression parser otherwise silently ignores the trailing |+0.
+            unquoted = re.sub(r"'(?:[^'\\]|\\.)*'", "", s[1:-1])
+            if "|" in unquoted:
+                error = "INVALID BINDING: text formatting is not valid in a data property: " + s
+                self.log.append(error)
+                return Unknown(error)
+            if re.fullmatch(r"\[\s*[-+]?\d+(?:\.\d+)?\s*\]", s):
+                error = "INVALID BINDING: numeric constants must be literal or explicitly typed: " + s
+                self.log.append(error)
+                return Unknown(error)
             return self.eval(parse_expr(s[1:-1]))
         return s
 
@@ -334,8 +362,35 @@ class Evaluator:
     def fn_FixedPointToFloat(self, a):
         return _num(a)
 
+    def fn_FixedPointToInt(self, a):
+        return int(_num(a))
+
     def fn_IntToFloat(self, a):
         return _num(a)
+
+    def fn_IntToFixedPoint(self, a):
+        return _num(a)
+
+    def fn_Select_float(self, condition, a, b):
+        return a if condition else b
+
+    def fn_Select_CFixedPoint(self, condition, a, b):
+        return a if condition else b
+
+    def fn_Abs_float(self, a):
+        return abs(_num(a))
+
+    def fn_Abs_CFixedPoint(self, a):
+        return abs(_num(a))
+
+    def fn_Negate_float(self, a):
+        return -_num(a)
+
+    def fn_Negate_CFixedPoint(self, a):
+        return -_num(a)
+
+    def fn_Divide_int32(self, a, b):
+        return int(_num(a) / _num(b)) if _num(b) else 0
 
     def fn_Select_CString(self, c, a, b):
         return a if c else b
@@ -406,7 +461,15 @@ class Evaluator:
         return True
 
     def fn_GetVariableFromGlobalVariableMap(self, name, key):
-        return self.lookup(f"GVM:{name}")
+        value = self.lookup(f"GVM:{name}")
+        if not isinstance(value, Unknown):
+            return value
+        path = f"GetVariableFromGlobalVariableMap('{name}',{key}).GetValue"
+        for rx, mock in self.mocks:
+            match = rx.fullmatch(path)
+            if match:
+                return mock(match) if callable(mock) else mock
+        return Unknown(path)
 
 
 # ------------------------------------------------------------------ concept textures
