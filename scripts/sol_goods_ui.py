@@ -28,18 +28,14 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sol_goods_order import GROUP_ORDER, group_rows, ordered  # noqa: E402
+from sol_substitution import CORE  # noqa: E402
 
-# Every good - vanilla, SOL, PP's victuals and the JTG goods - has its icon at the
-# standard engine path, each submod shipping its own. An explicit texture is used
-# rather than the `@<good>!` inline texticon because the inline form needs the goods
-# database registration to carry the icon and the pre-existing SOL grid already
-# special-cased one good around that.
+# Goods support @good! through engine registration. These standalone widgets need
+# a fixed footprint and positioned substitution markers; use their standard DDS.
 ICON_DIR = "gfx/interface/icons/trade_goods"
 
-# An unconsumed good is dimmed, not struck through: a cross reads as "warning", which
-# is not what "your people simply do not buy this" means. The dim is a second icon on
-# top rather than an `alpha` expression, because a bracketed expression in `alpha` is
-# not dependable (the renderer degrades it to 1.0 and it is not a property-block field).
+# Full and dim icons are mutually exclusive. A translucent copy drawn over an
+# opaque original cannot dim it. Static alpha avoids an unverified numeric binding.
 DIM_ALPHA = "0.3"
 
 GROUPS_PER_LINE = 2
@@ -75,31 +71,47 @@ GROUP_LABELS: dict[str, tuple[str, str]] = {
 
 
 def _consumed_expr(variable_map: str, good: str, scope: str) -> str:
+    entry = f"GetVariableFromGlobalVariableMap('{variable_map}_{good}', {scope})"
     return (
-        "GreaterThan_CFixedPoint(GetVariableFromGlobalVariableMap("
-        f"'{variable_map}_{good}', {scope}).GetValue,'(CFixedPoint)0')"
+        f"GreaterThan_CFixedPoint(Select_CFixedPoint({entry}.IsSet, "
+        f"{entry}.GetValue, '(CFixedPoint)0'), '(CFixedPoint)0')"
     )
 
 
 def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
-    """One good: its icon, plus a dim copy shown when the surface does not consume it."""
+    """Supply state, country substitution direction and context-specific hover data."""
     texture = f"{ICON_DIR}/icon_goods_{good}.dds"
     country = "Location.GetOwner.MakeScope" if scope.startswith("Location.") else scope
-    from sol_substitution import CORE
     multiplier = f"[{country}.ScriptValue('sol_substitute_{good}_display')|2]" if good in CORE else "1.00"
     tooltip = f"@{good}! [Localize('{good}')]\\n[Localize('SOL_GOOD_SUB_{good}')]\\n[Localize('SOL_SUB_MULTIPLIER')]: {multiplier}"
+    tooltip += "\\n" + substitution_status(country)
     if scope.startswith("Location."):
         weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', {scope})"
-        tooltip += f"\\n[Localize('SOL_SUB_PRICE_WEIGHT')]: [Select_CFixedPoint({weight}.IsSet, {weight}.GetValue, '(CFixedPoint)1')|2]"
-    return [
+        tooltip += f"\\n[SelectLocalization({weight}.IsSet, 'SOL_SUB_PRICE_{good}', 'SOL_SUB_PRICE_PENDING')]"
+    tooltip += "\\n[Localize('SOL_SUB_SCOPE_NOTE')]\\n[Localize('SOL_SUB_LEGEND_TOOLTIP')]"
+    out = [
         f"{indent}widget = {{",
         f"{indent}\tsize = {{ {ICON_W} 24 }}",
         f'{indent}\ttooltip = "{tooltip}"',
-        f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center texture = "{texture}" }}',
+        f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center visible = "[{consumed}]" texture = "{texture}" }}',
         f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center alpha = "{DIM_ALPHA}" '
         f'visible = "[Not({consumed})]" texture = "{texture}" }}',
-        f"{indent}}}",
     ]
+    if good in CORE:
+        value = f"{country}.ScriptValue('sol_substitute_{good}_display')"
+        for op, marker in (("GreaterThan_CFixedPoint", "#G +#!"), ("LessThan_CFixedPoint", "#R -#!")):
+            out.append(f'{indent}\ttext_single = {{ size = {{ 10 12 }} autoresize = no fontsize = 12 '
+                       f'position = {{ 10 12 }} raw_text = "{marker}" '
+                       f'visible = "[And({consumed}, {op}({value}, \'(CFixedPoint)1\'))]" }}')
+    out.append(f"{indent}}}")
+    return out
+
+
+def substitution_status(country: str) -> str:
+    value = f"{country}.ScriptValue('sol_substitute_status_display')"
+    return (f"[SelectLocalization(GreaterThan_CFixedPoint({value}, '(CFixedPoint)1'), "
+            f"'SOL_SUB_ACTIVE', SelectLocalization(GreaterThan_CFixedPoint({value}, "
+            "'(CFixedPoint)0'), 'SOL_SUB_PENDING', 'SOL_SUB_DISABLED'))]")
 
 
 def _group_row(indent: str, group: str | None, goods: list[str], variable_map: str, scope: str) -> list[str]:
@@ -154,6 +166,15 @@ def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: s
         f"{indent}\tmargin = {{ 10 2 }}",
         f"{indent}\tspacing = 1",
     ]
+    if not scope.startswith("Location."):
+        status = f"{scope}.ScriptValue('sol_substitute_status_display')"
+        summary = (f"[SelectLocalization(GreaterThan_CFixedPoint({status}, '(CFixedPoint)1'), "
+                   f"'SOL_SUB_SUMMARY', SelectLocalization(GreaterThan_CFixedPoint({status}, "
+                   "'(CFixedPoint)0'), 'SOL_SUB_PENDING', 'SOL_SUB_DISABLED'))]")
+        lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 12 '
+                     f'raw_text = "{summary}" tooltip = "SOL_SUB_SUMMARY_TOOLTIP" }}')
+        lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 11 '
+                     f'text = "SOL_SUB_LEGEND" tooltip = "SOL_SUB_LEGEND_TOOLTIP" }}')
     lines.extend(render_group_columns(goods, variable_map, scope, f"{indent}\t"))
     lines.append(f"{indent}}}")
     return "\n".join(lines)

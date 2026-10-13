@@ -113,6 +113,24 @@
 - **[工具检查] Missing SOL script-value mocks are reported, not defaulted to zero.** A zero unknown-expression count must not hide missing estate funds/baseline data.
 - **[源] Standalone must ship its shared GUI types.** The build mirrors only the selected target directory. `gen_sol_ls_gui.py` copies stable's shared kit into standalone and includes it in `--check`; loading stable types during preview does not prove standalone packaging.
 
+2026-10-13 substitution integration:
+
+- **[源 + 渲染像素检查] Full and dim icons must be mutually exclusive.** Drawing an alpha-0.3 copy over an opaque icon leaves the original bright. Bind the full copy to the cached supply condition and the dim copy to its inverse; verify the pixels as well as the properties. SOL's `sol_market_consumes_*` maps record supply, so dimming means no cached supply, not a shortage or zero demand.
+- **[数据源 + 渲染检查] Labelled groups show every membership.** `goods_weights.csv` contains 56 unique goods and 67 memberships across 20 groups. `ordered()` uses the primary group to order a unique list; `group_rows()` shows an overlapping good in each of its groups. Repeated icons do not repeat spending. PP/JTG extras stay in the ungrouped tail.
+- **[官方 API + 原版源 + 离线检查] Missing market weights are pending data, not neutral prices.** Check `GetVariableFromGlobalVariableMap(...).IsSet` (data_types_script.txt:34,3427), then use `SelectLocalization` (goods_details.gui:135) to choose the location price snippet or pending text. Only the location hover has a market; country goods use `Player.MakeScope` for the multiplier and the generic goods tooltip keeps static memberships.
+- **[模组源 + 离线检查，实机悬停待验收] Show substitution lifecycle explicitly.** The guarded display value distinguishes disabled, enabled awaiting a snapshot, and initialized. Country goods show a compact refresh-year / eligible-count / largest-absolute-modifier summary; the last metric includes external demand offsets and differs from the substitution multiplier. The +/- corner markers indicate country multipliers above/below 1 only on supplied goods. Hover text explains the country scope and annual/full-refresh market cache.
+
+`scripts/test_sol_substitution_ui.py` reads the shipped templates and installed game assets. It checks
+all memberships, supply pixels, localized hover content, missing-cache text, lifecycle summaries, and
+Chinese/English framed tooltip bounds for stable, standalone, PP and JTG. M&T inherits the base goods UI.
+It uses mock values and does not execute engine hover or demand updates. To save review images:
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:SOL_UI_PREVIEW_OUT='ai_gui_assessment/images/substitution_integration'
+& $env:EU5_PYTHON scripts/test_sol_substitution_ui.py
+```
+
 | Rule | Level |
 |---|---|
 | Fonts: body `StandardGameFont` (NotoSerif; Chinese falls back to NotoSansSC), headers `HeadersFont` (NotoSerif SemiBold; Chinese NotoSerifSC). Font sizes: Small 15, Medium 18, Big 23. | 源 |

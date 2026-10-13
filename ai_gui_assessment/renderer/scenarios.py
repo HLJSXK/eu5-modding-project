@@ -10,6 +10,17 @@ GOODS = ["amber", "beer", "beeswax", "books", "camels", "chili", "cloth", "clove
 NOT_CONSUMED = {"camels", "chili", "cocoa", "coffee", "elephants", "ivory", "lacquerware", "maize", "potato",
                 "porcelain", "saffron", "tea", "tobacco", "cloves"}
 SUPPRESSED = {"wheat", "fish", "salt", "beer", "cloth", "legumes", "wine"}
+SUB_MULTIPLIERS = {"cloth": .88, "leather": 1.12, "wheat": .75, "rice": 1.25, "wine": .8, "beer": 1.2}
+
+
+def substitution_mocks(country, status=2):
+    """Invented country-specific substitutions, including neutral compatibility goods."""
+    import re
+    return [
+        (re.escape(country) + r"\.ScriptValue\('sol_substitute_status_display'\)", status),
+        (re.escape(country) + r"\.ScriptValue\('sol_substitute_(" + "|".join(GOODS) + r")_display'\)",
+         lambda m: SUB_MULTIPLIERS.get(m.group(1), 1) if status == 2 else 1),
+    ]
 
 COMMON = [
     (r"GetGraphicalCultureTexture\('(\w+)'\)", lambda m: GC.format(m.group(1))),
@@ -60,8 +71,9 @@ def situation():
         "sol_substitute_year_display": 1337,
         "sol_substitute_goods_count_display": 42,
         "sol_substitute_max_size_display": 0.33,
+        "sol_substitute_status_display": 2,
     }
-    mocks = COMMON + [
+    mocks = COMMON + substitution_mocks("Player.MakeScope") + [
         (r"Situation\.GetIcon", "gfx/interface/icons/situations/global_living_standard.dds"),
         (r"Situation\.GetName", "SOL-生活水平"),
         (r"Situation\.HasEnded", False),
@@ -75,6 +87,7 @@ def situation():
         (r"Player\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: pv.get(m.group(1), Unknown(m.group(0)))),
         (r"GetVariableFromGlobalVariableMap\('gls_country_consumes_(\w+)',Player\.MakeScope\)\.GetValue",
          lambda m: 0 if m.group(1) in NOT_CONSUMED else 1),
+        (r"GetVariableFromGlobalVariableMap\('gls_country_consumes_(\w+)',Player\.MakeScope\)\.IsSet", True),
     ]
     return mocks
 

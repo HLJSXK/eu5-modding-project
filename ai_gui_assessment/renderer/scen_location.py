@@ -134,7 +134,7 @@ def location(tab="demography"):
 
 
 def tooltip():
-    from scenarios import NOT_CONSUMED, SUPPRESSED
+    from scenarios import NOT_CONSUMED, SUPPRESSED, substitution_mocks
     v = {
         "local_wealth_display": 18.40, "local_effective_control": 0.64, "local_tax_base_display": 11.78,
         "local_noble_pop_display": 2, "local_clergy_pop_display": 3, "local_burghers_pop_display": 14,
@@ -164,12 +164,15 @@ def tooltip():
         "local_sol_tribesmen_liquid_display": 0, "local_sol_tribesmen_base_display": 0,
         "local_sol_raw_demand_modifier_size": -0.106, "local_sol_pop_demand_modifier_size": -0.079,
     }
-    return location() + [
+    return location() + substitution_mocks("Location.GetOwner.MakeScope") + [
         (r"Location\.MakeScope\.ScriptValue\('(\w+)'\)", lambda m: v.get(m.group(1), Unknown(m.group(0)))),
         (r"GetVariableFromGlobalVariableMap\('sol_market_consumes_(\w+)',.*\)\.GetValue",
          lambda m: 0 if m.group(1) in NOT_CONSUMED else 1),
         (r"GetVariableFromGlobalVariableMap\('sol_market_price_suppressed_(\w+)',.*\)\.GetValue",
          lambda m: 1 if m.group(1) in SUPPRESSED else 0),
+        (r"GetVariableFromGlobalVariableMap\('sol_market_substitute_weight_(\w+)',.*\)\.GetValue",
+         lambda m: .5 if m.group(1) in SUPPRESSED else 1),
+        (r"GetVariableFromGlobalVariableMap\('sol_market_(?:consumes|substitute_weight)_(\w+)',.*\)\.IsSet", True),
     ]
 
 

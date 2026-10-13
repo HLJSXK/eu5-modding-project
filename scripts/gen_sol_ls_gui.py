@@ -39,7 +39,7 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sol_goods_order import GROUP_ORDER, PRIMARY_GROUP  # noqa: E402
-from sol_goods_ui import GROUP_LABELS, render_group_columns  # noqa: E402
+from sol_goods_ui import GROUP_LABELS, render_goods_vbox  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STABLE = REPO_ROOT / "src" / "stable"
@@ -370,12 +370,7 @@ def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[
     """Caption plus the grouped rows. Kept adjacent: the JTG generator locates the
     caption and rebuilds the vbox that follows it."""
     out = caption(base, key)
-    out.append(f"{T(base)}vbox = {{")
-    out.append(f"{T(base)}\tlayoutpolicy_horizontal = expanding")
-    out.append(f"{T(base)}\tmargin = {{ 10 2 }}")
-    out.append(f"{T(base)}\tspacing = 1")
-    out.extend(render_group_columns(goods, variable_map, scope, f"{T(base)}\t"))
-    out.append(f"{T(base)}}}")
+    out.extend(render_goods_vbox(goods, variable_map, scope, T(base)).splitlines())
     return out
 
 
@@ -659,9 +654,6 @@ def render_panel(goods: list[str]) -> str:
                 ("SOL_GUI_ROW_BASE_SPENDING", sv("gls_country_base_spending_display", "+2")),
                 ("SOL_GUI_ROW_FINAL_COEFF", sv("gls_country_final_demand_scale_deviation_display", "+=1%")),
                 ("SOL_GUI_ROW_SAVINGS_PRESSURE", sv("gls_savings_pressure_adjustment_display", "+=1%")),
-                ("SOL_SUB_REFRESH_YEAR", sv("sol_substitute_year_display", "0")),
-                ("SOL_SUB_GOODS_COUNT", sv("sol_substitute_goods_count_display", "0")),
-                ("SOL_SUB_MAX_SIZE", sv("sol_substitute_max_size_display", "1%")),
             ],
         )
     )
@@ -712,6 +704,16 @@ UI_STRINGS = {
         "SOL_SUB_MAX_SIZE": "Largest substitution modifier",
         "SOL_SUB_MULTIPLIER": "Country substitution multiplier",
         "SOL_SUB_PRICE_WEIGHT": "Market price tier weight",
+        "SOL_SUB_PRICE_PENDING": "Market price data pending",
+        "SOL_SUB_STATUS": "Goods substitution",
+        "SOL_SUB_ACTIVE": "Active",
+        "SOL_SUB_PENDING": "Awaiting refresh",
+        "SOL_SUB_DISABLED": "Disabled",
+        "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] goods · max change [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
+        "SOL_SUB_SUMMARY_TOOLTIP": "Year of the last country substitution refresh, number of eligible goods and largest absolute SOL commodity modifier. This modifier includes the external demand offset; it differs from the substitution multiplier. Market weights refresh yearly and on full recalculation.",
+        "SOL_SUB_SCOPE_NOTE": "The multiplier applies country-wide; price weights come from the cached market basket.",
+        "SOL_SUB_LEGEND": "+/- substitution; dim: no supply; repeated: shared group",
+        "SOL_SUB_LEGEND_TOOLTIP": "Plus/minus marks a country substitution multiplier above/below 1. Dim icons indicate no cached supply. Goods in multiple groups appear in each group; this does not count their spending twice.",
     },
     "simp_chinese": {
         "PERFORM_global_living_standard_recalculate_ACTION": "生活水平已重算",
@@ -745,6 +747,16 @@ UI_STRINGS = {
         "SOL_SUB_MAX_SIZE": "最大替代修正幅度",
         "SOL_SUB_MULTIPLIER": "国家替代倍率",
         "SOL_SUB_PRICE_WEIGHT": "市场价格档位权重",
+        "SOL_SUB_PRICE_PENDING": "市场价格数据待刷新",
+        "SOL_SUB_STATUS": "商品替代",
+        "SOL_SUB_ACTIVE": "已启用",
+        "SOL_SUB_PENDING": "待刷新",
+        "SOL_SUB_DISABLED": "已关闭",
+        "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] 年 · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] 种商品 · 最大修正 [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
+        "SOL_SUB_SUMMARY_TOOLTIP": "最近一次国家替代刷新的年份、参与商品数与 SOL 商品修正的最大绝对幅度。修正计入外部需求影响，与替代倍率不同。市场权重按年或完整重算时更新。",
+        "SOL_SUB_SCOPE_NOTE": "倍率在全国统一生效；价格权重来自缓存的市场商品篮子。",
+        "SOL_SUB_LEGEND": "+/- 替代增减 · 灰：无供应 · 重复：跨组",
+        "SOL_SUB_LEGEND_TOOLTIP": "+/- 表示国家替代倍率高于/低于 1。灰色表示缓存中无供应。跨组商品会在每个所属组内显示，消费支出仍只计一次。",
     },
 }
 

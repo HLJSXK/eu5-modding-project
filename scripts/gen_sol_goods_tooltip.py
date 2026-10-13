@@ -254,6 +254,9 @@ def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
         ]
         for good in _all_goods():
             lines.append(f' SOL_GOOD_SUB_{good}: "{_good_line(good, by_good, by_group, language)}"')
+            # Selected only by the location hover when the market entry exists.
+            weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', Location.GetMarket.MakeScope)"
+            lines.append(f' SOL_SUB_PRICE_{good}: "$SOL_SUB_PRICE_WEIGHT$: [{weight}.GetValue|2]"')
         lines.append("")
         text = "\n".join(lines)
         for root in roots:

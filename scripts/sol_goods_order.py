@@ -5,11 +5,9 @@ Both SOL economy surfaces show every demand good as an icon cell. Ordering those
 cells by substitute group (instead of alphabetically) is what makes the grouping
 legible without any extra widgets: a cell is adjacent to its substitutes.
 
-The membership table is read from data/goods_weights.csv, which is the existing
-substitute-group data file (one row per membership, a good may appear in several
-groups). Every good's PRIMARY group is the first group it appears in, following
-GROUPS in the order the groups first appear in that file. Overlapping goods
-therefore appear once, under their primary group.
+The membership table is read from data/goods_weights.csv (one row per membership).
+Ordering a unique goods list uses its first group, while labelled group rows show
+every membership. An overlapping good therefore appears in each of its groups.
 
 JTG-only goods have no membership in that file and sort after every grouped good,
 keeping their existing relative order.
@@ -27,9 +25,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GOODS_WEIGHTS = REPO_ROOT / "data" / "goods_weights.csv"
 
 
-def _load() -> tuple[list[str], dict[str, str]]:
+def _load() -> tuple[list[str], dict[str, str], dict[str, list[str]]]:
     groups: list[str] = []
     primary: dict[str, str] = {}
+    members: dict[str, list[str]] = {}
     with GOODS_WEIGHTS.open(encoding="utf-8-sig", newline="") as handle:
         for row in csv.DictReader(handle):
             good = (row["good"] or "").strip()
@@ -39,14 +38,16 @@ def _load() -> tuple[list[str], dict[str, str]]:
             if group not in groups:
                 groups.append(group)
             primary.setdefault(good, group)
+            if good not in members.setdefault(group, []):
+                members[group].append(good)
     if len(primary) != 56:
         raise ValueError(
             f"Expected 56 grouped SOL goods in {GOODS_WEIGHTS}, found {len(primary)}"
         )
-    return groups, primary
+    return groups, primary, members
 
 
-GROUP_ORDER, PRIMARY_GROUP = _load()
+GROUP_ORDER, PRIMARY_GROUP, GROUP_MEMBERS = _load()
 
 
 def group_of(good: str) -> str | None:
@@ -78,7 +79,7 @@ def main() -> None:
     goods = list(PRIMARY_GROUP)
     lines = ["# Substitute groups (order = first appearance in data/goods_weights.csv)"]
     for group in GROUP_ORDER:
-        members = ordered([good for good in goods if PRIMARY_GROUP[good] == group])
+        members = GROUP_MEMBERS[group]
         lines.append(f"\n{group} ({len(members)}): " + ", ".join(members))
     lines.append("\n# UI cell order (10 per row)")
     cells = ordered(goods)
@@ -99,10 +100,11 @@ def group_rows(goods: list[str]) -> list[tuple[str | None, list[str]]]:
     ungrouped good (the compat submods' extras) gets its own trailing row rather
     than being silently mixed in.
     """
-    buckets: dict[str | None, list[str]] = {}
-    for good in goods:
-        buckets.setdefault(PRIMARY_GROUP.get(good), []).append(good)
-    rows = [(group, buckets[group]) for group in GROUP_ORDER if group in buckets]
-    if None in buckets:
-        rows.append((None, buckets[None]))
+    available = set(goods)
+    rows = [(group, [good for good in GROUP_MEMBERS[group] if good in available])
+            for group in GROUP_ORDER]
+    rows = [(group, members) for group, members in rows if members]
+    ungrouped = list(dict.fromkeys(good for good in goods if good not in PRIMARY_GROUP))
+    if ungrouped:
+        rows.append((None, ungrouped))
     return rows

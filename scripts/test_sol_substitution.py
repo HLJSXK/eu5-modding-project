@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'ai_gui_assessment/renderer'))
 from pdx import parse
 from gen_market_unit_consumption import _load_good_rows
-from sol_substitution import CORE, GROUPS, CONFIG, POPS, price_weight, response, aggregate, render_country_runtime, render_location_spending, market_details
+from sol_substitution import CORE, GROUPS, CONFIG, POPS, price_weight, response, aggregate, render_country_runtime, render_location_spending, render_values, market_details
 
 
 @dataclass(eq=False)
@@ -39,11 +39,17 @@ class Runtime:
         self.maps = {}
         self.saved = {}
         self.enabled = enabled
+        self.script_values = {n.key: n.value for n in parse(render_values())}
 
-    def value(self, node, scope):
+    def value(self, node, scope, initial=0.):
         if isinstance(node, list):
-            value = 0.
+            value = initial
             for op in node:
+                if op.key == 'if':
+                    limits = next((n.value for n in op.value if n.key == 'limit'), [])
+                    if self.condition(limits, scope):
+                        value = self.value([n for n in op.value if n.key != 'limit'], scope, value)
+                    continue
                 rhs = self.value(op.value, scope)
                 if op.key == 'value': value = rhs
                 elif op.key == 'add': value += rhs
@@ -73,6 +79,7 @@ class Runtime:
         if node == 'market': return scope.market
         if node == 'owner': return scope.owner
         if node in self.quantities: return self.quantities[node]
+        if node in self.script_values: return self.value(self.script_values[node], scope)
         return float(node)
 
     def condition(self, nodes, scope):
@@ -334,6 +341,20 @@ class SubstitutionTests(unittest.TestCase):
         self.assertIn("Player.MakeScope.ScriptValue('sol_substitute_cloth_display')", country)
         self.assertNotIn('sol_market_substitute_weight', country)
         self.assertNotIn('blockoverride \"sol_good_tooltip\"', location)
+
+    def test_substitution_display_lifecycle(self):
+        rt, country, loc = self.fixture({'cloth': .5, 'leather': 1})
+        self.assertEqual(rt.value('sol_substitute_status_display', country), 1)
+        self.assertEqual(rt.value('sol_substitute_cloth_display', country), 1)
+        rt.run('sol_refresh_country_substitution', country)
+        self.assertEqual(rt.value('sol_substitute_status_display', country), 2)
+        self.assertEqual(rt.value('sol_substitute_cloth_display', country), country.variables['sol_sub_multiplier_cloth'])
+        rt.enabled = False
+        rt.run('sol_refresh_country_substitution', country)
+        self.assertEqual(rt.value('sol_substitute_status_display', country), 0)
+        self.assertEqual(rt.value('sol_substitute_cloth_display', country), 1)
+        rt.enabled = True
+        self.assertEqual(rt.value('sol_substitute_status_display', country), 1)
 
     def test_algorithm_a_90_10(self):
         d = response({'a': .5, 'b': 1}, {'a', 'b'}, {'g': ['a', 'b']}, {'g': 2})

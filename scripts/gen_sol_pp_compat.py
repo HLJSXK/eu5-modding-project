@@ -36,6 +36,7 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
     load_vanilla_goods,
 )
 from sol_goods_ui import replace_goods_vbox  # noqa: E402
+from sol_goods_order import GROUP_MEMBERS  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_pp_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
@@ -483,8 +484,9 @@ def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str
     if rendered.count('tooltip = "@victuals!') != 1:
         raise ValueError(f"Rebuilt GUI does not contain exactly one victuals cell in {source}")
     for good in ("weaponry", "lumber"):
-        if rendered.count(f'tooltip = "@{good}!') != 1:
-            raise ValueError(f"Rebuilt GUI does not contain exactly one {good} cell in {source}")
+        expected = sum(good in members for members in GROUP_MEMBERS.values())
+        if rendered.count(f'tooltip = "@{good}!') != expected:
+            raise ValueError(f"Rebuilt GUI does not contain all {expected} {good} memberships in {source}")
     return GENERATED_HEADER + rendered
 
 

@@ -1,6 +1,23 @@
 # SOL Economy UI Redesign — Session Handoff (2026-10-13)
 
-Branch: `substitution` · Working tree: 42 changed/untracked paths, **nothing committed**
+Branch: `substitution`. Current integration update (2026-10-13):
+
+- The F-route dashboard is committed as `09ab11b1`; the existing substitution implementation and initial GUI integration are committed as `dfd3055f`. The GUI alignment described below is the follow-up implementation.
+- Base and compatibility generators share `sol_goods_ui.py`. Labelled rows preserve all 67 CSV memberships; unique-list ordering remains separate. Full/dim supply icons are mutually exclusive, and +/- marks the consuming country's substitution direction. Compatibility-only goods stay neutral.
+- Location hover uses the owner country and local market cache; missing weights say pending. Country hover uses Player without inventing a market. Both show disabled/pending/active states. Country goods begin with refresh year, eligible count and maximum absolute modifier; generic goods tooltips remain static.
+- Core tests pass 14/14; the new `scripts/test_sol_substitution_ui.py` passes 5/5 with installed assets and mock values. The five-target generation check and changed-file validation pass. Bilingual framed tooltips measure 484×1003 (base/standalone), 484×1028 (PP), and 484×1078 (JTG), without unknown expressions or horizontal overflow.
+- Review images and element trees: `ai_gui_assessment/images/substitution_integration/`. The country and location CLI renders report zero unknown expressions; the generic goods render retains ten known vanilla mock gaps. The CLI PNGs include outer margins.
+- Goods inline icons are engine-registered from goods data, including camels; absence from font_icons.gui does not make them unsupported. Fixed widgets are retained for the grid footprint and positioned markers. Supply dimming is not a shortage measurement.
+
+The sections below preserve the **initial redesign handoff**, including its old
+dimensions, uncommitted status and open questions. Those are historical, superseded
+by the update above and [the current implementation record](../technical/SOL_Substitution_Implementation_20261013.md).
+This integration has not been launched in game; hover, demand updates, fixed-point
+behavior and larger UI scales still need engine acceptance.
+
+## Initial redesign snapshot
+
+Original working tree: 42 changed/untracked paths, nothing committed at that point.
 
 This is a handoff for the SOL economy front-end redesign: the location tooltip, the
 country situation panel, and the goods tooltip. Read this before touching any of the

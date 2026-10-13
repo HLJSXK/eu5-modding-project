@@ -1,6 +1,6 @@
 # SOL 替代组实现与验收记录
 
-日期：2026-10-13。当前分支：`substitution`。原有工作区改动先提交为 `09ab11b1`（Complete SOL economy dashboard and GUI renderer updates）；替代组改动是此后的独立工作区改动。
+日期：2026-10-13。当前分支：`substitution`。近期 GUI 大改为 `09ab11b1`（Complete SOL economy dashboard and GUI renderer updates）；本轮先将已有替代组实现与初步界面接入提交为 `dfd3055f`（Implement country goods substitution and initial GUI integration），再完成以下 GUI 衔接。
 
 实现依据为 [实施规格](SOL_Substitute_Groups_Global_Modifier_Implementation.md) 和 [审计报告](SOL_Substitute_Groups_Global_Modifier_Audit.md)。本次完成生成代码与离线验证，没有部署、启动游戏或测量游戏性能。
 
@@ -24,7 +24,13 @@ CMF 新增默认开启的商品替代开关。关闭替代会移除专用修正�
 
 PP 以最终零 lumber 需求计算，victuals 因无已验证 global 接口保持中性且计入原有消费。M&T 使用最终校准数量和 M&T 默认价。JTG 的 26 个额外商品保持中性、无组且计入消费。各兼容生成器输出匹配的市场明细和地点支出 helper；PP/M&T 还覆盖国家聚合，以免错误使用基础数量。
 
-通用商品提示列出全部静态组关系。地点商品图标提示显示地点 owner 的国家替代倍率与该地点市场的缓存价格权重；国家面板提示使用其 Player 上下文，没有虚构市场。国家面板增加刷新年份、参与商品数、最大绝对 modifier。无效的 bare-widget `sol_good_tooltip` override 已改为直接 tooltip 属性。UI/hover 目前只有源码与离线证据。
+基础版、独立版、PP、JTG 共用 `sol_goods_ui.py` 的完整商品块；M&T 继承基础商品界面。每个标签组按 CSV 完整显示成员，保留全部 67 条关系；跨组重复图标不重复计费。兼容额外商品在尾部无组行显示且倍率保持中性。
+
+有供应与无供应图标的 `visible` 互斥，修复半透明副本叠在不透明图标上无法变暗的问题。核心商品有绿色 + / 红色 - 角标，表示消费国家的替代倍率高于/低于 1；无缓存供应时不显示角标。`sol_market_consumes_*` 实际记录供应，图例不把它写成短缺或需求。
+
+地点图标悬停显示地点 owner 的国家替代倍率、替代状态、全部所属组和当地市场缓存价格权重；权重缺失显示待刷新，不伪造 1.00。国家图标使用 Player 上下文，无市场权重。通用商品提示仍列静态组关系。国家商品区用一行摘要显示刷新年份、参与商品数、最大绝对 modifier，配一行图例；关闭与等待快照时显示对应状态。最大修正计入外部需求 offset，与替代倍率不同；市场权重正常按年或完整重算刷新。状态为 guarded script value，没有新增持久化标志。
+
+无效的 bare-widget `sol_good_tooltip` override 已改为直接 tooltip 属性。UI/hover 目前只有源码与离线证据。
 
 ## 离线验证与复现
 
@@ -34,16 +40,20 @@ PP 以最终零 lumber 需求计算，victuals 因无已验证 global 接口保�
 & $env:EU5_PYTHON scripts/gen_sol_chain.py
 & $env:EU5_PYTHON scripts/gen_sol_chain.py --check
 & $env:EU5_PYTHON scripts/test_sol_substitution.py
+$env:SOL_UI_PREVIEW_OUT='ai_gui_assessment/images/substitution_integration'
+& $env:EU5_PYTHON scripts/test_sol_substitution_ui.py
 & $env:EU5_PYTHON scripts/validate.py --changed
 npm --prefix substitution-lab test
 git diff --check
 ```
 
-本次结果：五目标生成一致性检查通过，Python 13/13、substitution-lab 13/13 测试通过，36 个变更 mod 文件校验无问题，`git diff --check` 通过。
+初始替代组验收记录：Python 13/13、substitution-lab 13/13 通过，36 个变更 mod 文件校验无问题。本次 GUI 衔接：五目标生成一致性检查通过，Python 核心测试 14/14、GUI 测试 5/5 通过，变更 mod 文件校验与 `git diff --check` 通过。substitution-lab 未修改，本次没有重复运行其历史测试。
 
-Python 测试解析并执行生成的 EU5 effects，覆盖严格档位、重叠组中性、两市场加权、重复刷新、外部 offset、共享市场下不同国家的支出、倍率只应用一次、缺市场/缺供应、空国家、控制模式切换、相同数量的领地交换、关闭清理和 PP fallback。它使用 Python float，不模拟 EU5 定点、实际 modifier 更新时机或需求刷新。
+Python 核心测试解析并执行生成的 EU5 effects，覆盖严格档位、重叠组中性、两市场加权、重复刷新、外部 offset、共享市场下不同国家的支出、倍率只应用一次、缺市场/缺供应、空国家、控制模式切换、相同数量的领地交换、关闭清理、PP fallback，以及关闭/待刷新/已启用/清理后的显示值。它使用 Python float，不模拟 EU5 定点、实际 modifier 更新时机或需求刷新。
 
-GUI 预览：`ai_gui_assessment/renderer/run.py situation` 和 `tooltip`；地点提示为 484×1003，两个页面均无未知表达式。预览不证明 hover 行为或游戏数据正确；地点预览保留 vanilla ExtraTooltipInfo.GetUIAction 的模拟上下文提示。
+新增 GUI 测试读取实际出货模板及已安装游戏的纹理/字体，在中英文下检查成员关系、悬停内容、缺缓存文案、状态摘要、图标变暗像素和布局边界。完整提示框在 100% 比例下：基础版/独立版 484×1003、PP 484×1028、JTG 484×1078，均无未知表达式或横向溢出。预览位于 `ai_gui_assessment/images/substitution_integration/`；测试保存的双语 PNG 不加外边距，CLI 的 `r3_location_sol_tooltip.png` 带 20px 外边距。
+
+Renderer CLI `situation` 和 `tooltip` 均无未知表达式；`goods_tooltip wine` 的内容框为 442×372，仍有 10 个已知原版 StringPairList/mapmode 等 mock 缺口，没有新增 SOL 表达式问题。地点预览保留 vanilla ExtraTooltipInfo.GetUIAction 的模拟上下文提示。所有数值为 mock；本轮没有启动游戏，预览不证明实机悬停或需求更新。
 
 ## 实机验收清单
 
@@ -54,5 +64,6 @@ GUI 预览：`ai_gui_assessment/renderer/run.py situation` 和 `tooltip`；地�
 5. 检查低频 AI 月度修正不失效，并测试所有权/市场切换、市场消失、国家形成、最后地点丢失、总开关与替代开关。
 6. 在 PP、M&T、JTG 的真实加载顺序下检查最终商品数量、价格和求解器记账，特别是 victuals 与 JTG 中性额外商品。
 7. 用代表性大国存档记录年度完整计算和月度重写耗时，评估新增的地点×商品×人口类型成本。本次未提供实机性能数值，也不把 Python 测试时间当游戏性能。
+8. 实机检查中英文商品悬停、状态切换、跨组重复、供应变暗及 +/- 角标；在 100% 和更大 UI 比例下检查提示框，特别是 JTG 的 1078px 静态预算。
 
 算法 A 不承诺实际组预算守恒；国家单一商品因子会损失市场与 POP 精度。旧 Engel、宗教/文化偏好、开发度抵消、时代缩放和 scarcity 总量补偿均未恢复。
