@@ -30,6 +30,8 @@ Mod-focused documentation for the EU5 Modding Project.
 
 ### Technical Reference (general EU5 knowledge, dated – not authoritative for syntax)
 
+- [SOL 1.4 Algorithm Atlas](analysis/sol_14_algorithm/index.html) — 六张中文算法与复杂度矢量图、交互工作量示意、当前源码与历史故障边界；[公式及源码索引](analysis/sol_14_algorithm/README.md)
+
 - [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) – file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
 - [EU5 Modding Knowledge Base](technical/EU5_Modding_Knowledge_Base.md) – Jomini engine overview, scripting, events, localization
 - [EU5 Mod Framework Guide](technical/EU5_Mod_Framework_Guide.md) – community mod patterns, file structure, GUI, complexity tiers

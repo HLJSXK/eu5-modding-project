@@ -28,12 +28,9 @@ sol_local_pop_demand_monthly_pulse = {
 			sol_update_estate_building_maintenance = yes
 			set_variable = { name = sol_estate_building_maintenance_initialized value = 1 }
 		}
-		# Check ownership, market, control mode and external-good offsets monthly.
-		if = { limit = { is_ai = yes sol_ai_reduced_freq_is_on = yes }
-			sol_check_substitution_snapshot = yes
-			if = { limit = { var:sol_substitute_dirty = 1 } sol_solve_country_pop_demand = yes }
-			remove_variable = sol_substitute_dirty
-		}
+		# Reduced-frequency AI deliberately keeps its last economic result until
+		# its yearly pulse. Do not scan territory, markets or goods for dirtiness.
+		# Start/load and explicit setting callbacks already own their refreshes.
 		# Humans, and AI on the normal cadence, re-solve then apply every month.
 		# AI under reduced frequency skips the solve and re-applies the coefficients
 		# cached by its own yearly pulse. The modifier is always written monthly so
@@ -51,9 +48,11 @@ sol_local_pop_demand_monthly_pulse = {
 			sol_update_local_pop_demand_modifiers = yes
 		}
 		else = {
-			# No cached coefficients yet (first month of a new game, a freshly
-			# formed country, or the setting was just switched on): solve once so
-			# the very first applied modifier is correct rather than a bare 1.0.
+			# No country solve yet (first month of a new game or a freshly
+			# formed country): solve once so
+			# the very first applied modifier is initialized. An acquired location
+			# missing its own coefficient gets a neutral fallback in the apply pass;
+			# it does not force a complete AI country solve before the anniversary.
 			if = {
 				limit = { NOT = { has_variable = sol_country_demand_solve_status } }
 				sol_solve_country_pop_demand = yes

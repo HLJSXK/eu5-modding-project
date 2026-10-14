@@ -30,7 +30,20 @@ sol_local_pop_demand_monthly_pulse = {
 			sol_update_estate_building_maintenance = yes
 			set_variable = { name = sol_estate_building_maintenance_initialized value = 1 }
 		}
-		sol_update_local_pop_demand_modifiers = yes
+		# Humans respond monthly; AI economics may remain stale until its anniversary.
+		if = {
+			limit = { is_human = yes }
+			sol_update_local_pop_demand_modifiers = yes
+		}
+		else = {
+			# New countries initialize once; individual missing location coefficients
+			# receive a neutral fallback inside the existing monthly apply pass.
+			if = {
+				limit = { NOT = { has_variable = sol_country_demand_solve_status } }
+				sol_solve_country_pop_demand = yes
+			}
+			sol_apply_local_pop_demand_modifiers = yes
+		}
 	}
 }
 
@@ -41,6 +54,18 @@ sol_local_pop_demand_monthly_pulse = {
 yearly_country_pulse = {
 	on_actions = {
 		sol_estate_building_maintenance_yearly_pulse
+		sol_ai_yearly_pop_demand_pulse
+	}
+}
+
+sol_ai_yearly_pop_demand_pulse = {
+	trigger = {
+		total_population > 0
+		num_locations > 0
+		is_ai = yes
+	}
+	effect = {
+		sol_update_local_pop_demand_modifiers = yes
 	}
 }
 
