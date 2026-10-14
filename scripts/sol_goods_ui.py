@@ -236,7 +236,12 @@ def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: s
         lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 11 '
                      f'text = "SOL_SUB_LEGEND" tooltip = "SOL_SUB_LEGEND_TOOLTIP" }}')
     lines.extend(render_group_columns(goods, variable_map, scope, f"{indent}\t"))
-    lines.append(f'{indent}\ttextbox = {{ using = tooltip_text_block_template max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
+    if scope.startswith("Location."):
+        lines.append(f'{indent}\ttextbox = {{ using = tooltip_text_block_template max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
+    else:
+        # Regular panels have no ExtraTooltipInfo; the tooltip template binds
+        # its font tint to that context even when the text itself is static.
+        lines.append(f'{indent}\ttext_multi = {{ layoutpolicy_horizontal = expanding autoresize = yes max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
     lines.append(f"{indent}}}")
     return "\n".join(lines)
 

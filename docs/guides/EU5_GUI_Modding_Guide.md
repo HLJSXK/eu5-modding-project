@@ -98,6 +98,16 @@
 
 ## 4. Text, numbers and icons
 
+**[Runtime log + vanilla source] Tooltip text templates need tooltip context.**
+`tooltip_text_block_template` inherits `fonttintcolor = "[ExtraTooltipInfo.GetTintColor]"`
+from `main_menu_cooltip_types.gui:336`. A regular situation panel has no
+`ExtraTooltipInfo`: even static localized text repeatedly reports No context supplied / FetchData failed.
+Use `text_multi` with `layoutpolicy_horizontal = expanding`, `autoresize = yes`
+and an explicit `max_width`, as in `council_of_trent.gui:219`. Keep the tooltip template
+inside actual contextual tooltips. Renderer now evaluates inherited text-tint bindings,
+and situation mocks exclude tooltip-only contexts; a regression reproduces the original failure.
+The fix preserves the supply explanation and wrapping. Fresh in-game confirmation remains pending.
+
 2026-10-13 SOL dashboard corrections:
 
 - **[实机错误日志 + 源] GUI arithmetic is typed.** Scope.ScriptValue returns CFixedPoint; Multiply_float returns float. Feeding the latter to FixedPointToInt causes FetchData failures. Keep dial calculations in *_CFixedPoint until integer conversion. The renderer now reports this mismatch.

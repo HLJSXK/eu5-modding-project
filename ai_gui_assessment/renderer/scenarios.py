@@ -73,7 +73,9 @@ def situation():
         "sol_substitute_max_size_display": 0.33,
         "sol_substitute_status_display": 2,
     }
-    mocks = COMMON + substitution_mocks("Player.MakeScope") + [
+    # A situation panel is not a contextual tooltip. Do not let global tooltip
+    # mocks mask accidental ExtraTooltipInfo bindings in its visible content.
+    mocks = [(key, value) for key, value in COMMON if not key.startswith("ExtraTooltipInfo")] + substitution_mocks("Player.MakeScope") + [
         (r"Situation\.GetIcon", "gfx/interface/icons/situations/global_living_standard.dds"),
         (r"Situation\.GetName", "SOL-生活水平"),
         (r"Situation\.HasEnded", False),

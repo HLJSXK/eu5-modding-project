@@ -163,6 +163,10 @@ class Engine:
         cache = el.__dict__.setdefault("_rt", {})
         if key in cache:
             return cache[key]
+        # Validate inherited text-colour bindings too. Previously the renderer
+        # skipped this property, hiding missing ExtraTooltipInfo in panel text.
+        if "fonttintcolor" in el.props:
+            self.resolve(el.props["fonttintcolor"])
         s = self.text_of(el) or ""
         font = el.props.get("font", "StandardGameFont")
         size = size_override or num(el.props.get("fontsize"), 15)

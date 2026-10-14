@@ -157,6 +157,40 @@ class SubstitutionUI(unittest.TestCase):
                 self.assertNotIn('1337', text)
             self.assertFalse(log)
 
+    def test_country_supply_note_has_no_tooltip_context(self):
+        for target in ('stable', 'sol_standalone', 'sol_pp_compatibility_submod', 'sol_jtg_compatibility_submod'):
+            path = ROOT / 'src' / target / 'in_game/gui/panels/situation/global_living_standard.gui'
+            nodes = parse(path.read_text(encoding='utf-8-sig'), str(path))
+            def find_note(items):
+                for node in items:
+                    if node.is_block():
+                        if any(n.key == 'text' and n.value == 'SOL_F_GOODS_SUPPLY_NOTE' for n in node.value):
+                            return node
+                        found = find_note(node.value)
+                        if found is not None:
+                            return found
+            note = find_note(nodes)
+            self.assertIsNotNone(note, target)
+            for language in ('english', 'simp_chinese'):
+                eng, log = self.engine(scenarios.situation(), language)
+                element = eng.ex.build(note.key, note.value, {}, str(path), 0)
+                self.assertNotIn('ExtraTooltipInfo', repr(element.props))
+                self.assertEqual(element.props.get('multiline'), 'yes')
+                self.assertEqual(int(element.props['max_width']), GOODS_CONTENT_W)
+                eng.measure(element, GOODS_CONTENT_W)
+                self.assertEqual(eng.text_of(element), eng.loc.get('SOL_F_GOODS_SUPPLY_NOTE'))
+                self.assertFalse(log, log)
+
+        # Prove that the original misuse is caught by the renderer, while a real
+        # location tooltip continues to supply the tint context.
+        bad = parse('textbox = { using = tooltip_text_block_template max_width = 500 text = "SOL_F_GOODS_SUPPLY_NOTE" }')[0]
+        eng, log = self.engine(scenarios.situation())
+        eng.measure(eng.ex.build(bad.key, bad.value, {}, '<bad panel note>', 0), 500)
+        self.assertIn('ExtraTooltipInfo.GetTintColor', log)
+        eng, log = self.engine(scenarios.tooltip())
+        eng.measure(eng.ex.build(bad.key, bad.value, {}, '<tooltip note>', 0), 500)
+        self.assertFalse(log, log)
+
     def test_shipped_tooltip_layouts(self):
         for target in ('stable', 'sol_standalone', 'sol_pp_compatibility_submod', 'sol_jtg_compatibility_submod'):
             compat = 'compatibility' in target

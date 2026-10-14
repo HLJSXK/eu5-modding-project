@@ -73,6 +73,17 @@ Selectors 底轨和 IOs 三行成员列表已分别与 `screenshots/ui_library/l
 Runtime showed elided group labels, stretched incomplete rows, coincident population/income markers, duplicate fallback estate icons and concatenated amounts. Renderer previously accepted float stretch weights; it now flags them and uses integer weights. Fixed card/header geometry, independent share tracks, inline estate icons and separated two-decimal amounts have static regression coverage. Funds balance and applied demand are separately labelled. Repaired previews are in `images/runtime_f_repair/`; these are mock renders, not new in-game evidence.
 
 
+## 2026-10-14 situation text context regression
+
+User runtime logs at 23:09:26 and 23:10:03 identify ExtraTooltipInfo.GetTintColor
+from main_menu_cooltip_types.gui:336, instantiated by the country goods supply note.
+The shared renderer now emits bounded text_multi for country panels and retains
+tooltip_text_block_template only for location tooltips. Local rendering previously
+ignored fonttintcolor and situation mocks supplied ExtraTooltipInfo; both gaps are
+corrected. Regression checks expand the shipped note for stable, standalone, PP and
+JTG in both languages, reproduce the invalid old template, and confirm it is valid
+in a real tooltip scenario. This is a source/offline fix pending a fresh runtime log.
+
 ## 2026-10-14 sheet C purchasing-power revision
 
 User replaced dials with a labelled bidirectional -50%..+50% bar, large raw value, and funds/baseline pair. All five estates use the same three values; population distribution charts and marker tracks are temporarily removed. F goods tiers persist. Previews in images/sheet_c_balances/ use mock data and are not new runtime evidence. Renderer already implements invertprogress; the regression now checks signed fill, endpoint cursor clamping and neutral zero baseline.

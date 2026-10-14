@@ -85,6 +85,7 @@ The following violations occurred and informed the Mandatory Reference Categorie
 
 | Date | Violation | Root cause | Correct behavior |
 |---|---|---|---|
+| 2026-10-14 | Situation supply note repeatedly failed ExtraTooltipInfo.GetTintColor | Tooltip text template inherited a context-specific tint; renderer skipped the binding and supplied a global tooltip mock | Use bounded text_multi in panels; evaluate font tint in renderer and remove tooltip context from situation mocks. |
 | 2026-10-14 | Estate markers coincide in runtime | Float shares used for integer stretch weights | Scale shares to int32, hide zero spacers; test boundary positions. |
 | 2026-10-14 | Group labels elide; incomplete card rows stretch | Header width unspecified; cards inherit expanding | Positive header/label/count widths, fixed cards; assert descendant bounds. |
 | 2026-10 | Unavailable goods stayed bright | A translucent icon was drawn over an always-visible opaque original | Make full and dim copies mutually exclusive and check pixels, not only alpha declarations. |
