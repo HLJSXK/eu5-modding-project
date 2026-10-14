@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-13
+> Last updated: 2026-10-14
 
 ## Project Identity
 
@@ -52,7 +52,7 @@ performance boundary.
 
 11. **Unified Glorp UI Location Window** - Full SOL uses the complete current Glorp UI location-window file as its merge base, preserves its 1.4 action-button and road-builder APIs (and migrates older snapshots when needed), preserves Glorp UI and optional Construction Manager references, and inserts one Living Standard tooltip button. SOL Standalone remains vanilla-based, and the M&T target migrates its own final window. Missing `cm_*` definitions with SOL alone are expected optional-dependency logs; enabling Construction Manager supplies them without changing the unified file.
 
-12. **Unified SOL Economy UI** - The location tooltip and country situation panel share `SOL_living_standard_kit.gui`, the generated F-route dashboard, estate ledger, population ring, and all 67 memberships in 20 labelled goods groups. Mutually exclusive full/dim icons indicate cached supply; +/- markers indicate the consuming country's substitution multiplier. Contextual tips show the location owner or panel country multiplier and disabled/pending/active state; location tips also show cached market weights or pending-data text. The country goods block summarizes refresh year, eligible goods count and largest absolute modifier. Generic goods tips keep static memberships; country power share remains absent because only locations provide that value.
+12. **Unified SOL Economy UI** - The location tooltip and country panel use sheet C purchasing-power rows: a labelled bidirectional -50%..+50% bar, a large unclamped raw alpha-minus-one number, and smaller available-funds/baseline values. The total and five estate rows have light gold dividers and shaded backgrounds; dials, population/income distribution charts, share tracks and ratios are temporarily removed by user decision. Solver beta is absent from SOL GUI; the location modifier retains the applied result. Goods retain F's required/daily/luxury tiers and all 67 memberships across 20 groups, with fixed cards, supplied/total counts, gold supply ratios, mutually exclusive full/dim icons and country substitution markers. PP/JTG regenerate the same shared layout with neutral extra goods; M&T inherits the base UI. Country and owner substitution lifecycle/price context remains in goods tips; generic goods tips remain static.
 
 13. **Country goods substitution** - Algorithm A with price-only preferences restores 20 groups, 56 core goods and 67 overlapping memberships. Strict price weights compare current and neutral eligible baskets, and country factors aggregate population × calibrated quantity × default price before the existing SOL solver. The default-on CMF switch cleans country modifiers and substitution caches when disabled; standalone enables substitution without CMF. PP keeps zero lumber and neutral victuals, M&T uses its final calibrated quantities, and the 26 JTG extras remain neutral. Source generation, offline scope tests and previews are implemented; EU5 demand refresh, fixed-point stability, slave effects and performance still require in-game acceptance.
 

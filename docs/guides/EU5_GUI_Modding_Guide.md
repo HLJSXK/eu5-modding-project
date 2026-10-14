@@ -173,3 +173,17 @@ arbitrary `textcontext` strings into tooltip tables. Remaining known differences
 
 > Note: `ai_gui_assessment/01`–`05` were written **before** the in-game screenshots. Where they disagree with
 > this guide (e.g. hbox alignment, number formats, goods icons), this guide is authoritative.
+
+### 2026-10-14 F runtime screenshot corrections
+
+- **[Runtime screenshot + official API]** Fractional float stretch weights made all estate markers coincide. Vanilla `SocietalValueItem.GetInertiaCapWeight` returns int32. Use scaled integer weights and hide zero-weight spacers; give population/income markers independent full tracks. Renderer rejects float weights; boundary positions are regression tested. New in-game confirmation is pending.
+- **[Runtime screenshot; cause inferred from layout/source]** A fixed label in an unconstrained `size = { -1 17 }` header collapsed to ellipsis. Set positive widths for header, label and count. Fixed card policy prevents a lone card expanding to full row width. Width/height checks alone do not prove visible labels or non-overlapping descendants.
+- **[Mod source]** Funds/baseline minus one is distinct from the final country-solver demand coefficient. By explicit user decision, all SOL GUI consumption balances use raw location alpha (displayed as alpha minus one); the country panel aggregates raw funds and baseline. Do not display country-solver beta or final/applied demand in panels or their tooltips. The location modifier retains the actual applied result. Goods count/gold line reflect cached supply, not consumption.
+
+
+### Current SOL layout decision: sheet C balances (2026-10-14)
+
+**User-directed design, source-backed bars, offline preview checked; new runtime confirmation pending.**
+SOL now shows only three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use two progressbar halves around 0, with the negative half invertprogress = yes (vanilla societal_values_lateralview.gui). Scale labels are -50%, -25%, 0, +25%, +50%; clamp only the bar/cursor, never the large numeric value. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
+
+All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Local previews are in ai_gui_assessment/images/sheet_c_balances/.

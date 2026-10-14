@@ -47,7 +47,24 @@ def _load() -> tuple[list[str], dict[str, str], dict[str, list[str]]]:
     return groups, primary, members
 
 
-GROUP_ORDER, PRIMARY_GROUP, GROUP_MEMBERS = _load()
+_CSV_GROUP_ORDER, PRIMARY_GROUP, GROUP_MEMBERS = _load()
+
+# F-route groups are presented as three demand tiers in sheet3_f.png.
+GROUP_ORDER = [
+    "staple", "protein", "basic_clothing", "heating", "crude_goods",
+    "condiments", "household", "standard_clothing", "intoxicants",
+    "medicine", "ritual", "knowledge",
+    "luxury_food", "luxury_drinks", "luxury_goods", "spices", "precious",
+    "treasures", "weapons", "mounts",
+]
+if set(GROUP_ORDER) != set(_CSV_GROUP_ORDER):
+    raise ValueError("F-route group order does not match data/goods_weights.csv")
+
+GROUP_TIERS = (
+    ("required", GROUP_ORDER[:5]),
+    ("daily", GROUP_ORDER[5:12]),
+    ("luxury", GROUP_ORDER[12:]),
+)
 
 
 def group_of(good: str) -> str | None:

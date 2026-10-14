@@ -67,3 +67,12 @@ Selectors 底轨和 IOs 三行成员列表已分别与 `screenshots/ui_library/l
 | 战斗 `screenshots/round2/battle.png` | 攻守双方显示不同兵力，左右中侧翼分别绑定 mock 数值；3D 场景、地图背景和真实存档状态无法复现。 |
 
 四个已实现的原版窗口（事件、市场、政府、战斗）当前普通未知表达式均为 0；这不等于市场和政府的上下文已完整解析。地点窗口另有 20 个未解析 `datacontext`，其 mock 图像只能用于静态布局检查。
+
+## 2026-10-14 user F runtime screenshot
+
+Runtime showed elided group labels, stretched incomplete rows, coincident population/income markers, duplicate fallback estate icons and concatenated amounts. Renderer previously accepted float stretch weights; it now flags them and uses integer weights. Fixed card/header geometry, independent share tracks, inline estate icons and separated two-decimal amounts have static regression coverage. Funds balance and applied demand are separately labelled. Repaired previews are in `images/runtime_f_repair/`; these are mock renders, not new in-game evidence.
+
+
+## 2026-10-14 sheet C purchasing-power revision
+
+User replaced dials with a labelled bidirectional -50%..+50% bar, large raw value, and funds/baseline pair. All five estates use the same three values; population distribution charts and marker tracks are temporarily removed. F goods tiers persist. Previews in images/sheet_c_balances/ use mock data and are not new runtime evidence. Renderer already implements invertprogress; the regression now checks signed fill, endpoint cursor clamping and neutral zero baseline.

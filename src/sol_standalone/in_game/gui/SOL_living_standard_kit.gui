@@ -3,48 +3,15 @@
 #   * the location tooltip           (SOL_economy_local.gui)
 #   * the country situation panel    (panels/situation/global_living_standard.gui)
 #
-# STRUCTURE
-# ---------
-# The surfaces are organised around the estate, not around the statistic. A player
-# asks "how are my nobles doing", not "show me column four of the power table", so
-# each estate owns one ledger row it can be read across, and the composition of the
-# population is a ring rather than a row of five percentages.
+# CURRENT SURFACES
+# scripts/gen_sol_ls_gui.py owns sheet C purchasing-power rows and the three
+# numeric values (raw balance, available funds, baseline). Population charts
+# and dials are temporarily removed by user decision. F goods tiers use
+# sol_group_row below. Older ring/ledger helpers remain defined for legacy
+# tooling but are not emitted into either current surface.
 #
-#   headline figures   four concept-icon figures across the top
-#   composition        a ring of estate population share with a texticon legend
-#   estate ledger      one row per estate: population, income, upkeep, savings/target
-#   consumption        the three-step spending coefficient as quiet key/value rows
-#   substitute groups  one labelled row per group, its member goods as icons
-#
-# Everything is built from vanilla components:
-#   tooltip_table_field_texture                 the turquoise tinted row stripe
-#   text_mask_container_texture + color_turquoise_texture   the caption band
-#   TooltipTextBlock / tooltip_text_block_template          wrapped body text
-#   piechart + piechart_angles + bg_circle_piechart         the composition ring
-#   Font_Size_Small / Font_Size_Medium / Font_Type_Headers  (loading_screen/gui/preload/fonts.gui)
-#   @nobles! @clergy! @burghers! @peasants! @tribesmen!     estate texticons
-#
-# BUDGETS
-# -------
-# The lateral situation card is 520px wide with a 486px content column; the location
-# tooltip is capped near 450px by the contextual-tooltip budget. Everything here is
-# sized to fit 470 so it reads identically on both.
-#
-# Two rules that cost real debugging time:
-#   1. `text` resolves a localization key; `raw_text` is printed verbatim. Labels use
-#      `text`, expressions use `raw_text`.
-#   2. A wrapping text with no `max_width` reports its full unwrapped width as a
-#      *minimum*, and an hbox measures its children with no width hint - so one
-#      uncapped paragraph drags the entire tooltip past its frame. Every sol_note
-#      body therefore carries an explicit max_width.
-#
-# PARAMETERISATION
-# ----------------
-# A blockoverride replaces a block *entirely*, and an instance's own override beats
-# one inherited from outside. A single shared block name therefore cannot carry five
-# different values into five sibling cells - each would keep its own default. So each
-# row exposes ONE container block ("sol_cells") the caller fills with its own
-# instances, each carrying its own override.
+# Every wrapping text must have a max_width. Fixed headers and card labels need
+# positive width budgets; blockoverride replaces an inherited block entirely.
 
 types SOLivingStandardKit {
 	# ---------------------------------------------------------------- headline figure
@@ -289,24 +256,41 @@ types SOLivingStandardKit {
 	}
 
 	# ---------------------------------------------------------------- substitute group
-	# One demand group: its name, then its member goods as icons. This is the whole
-	# point of grouping - a good is shown next to the goods it can replace. Icons
-	# show cached supply and country substitution direction; hover gives details.
-	# Fixed width, not content width: the block lays these out in two columns, and a
-	# row that sizes itself to its own icons starts each column at a different x.
-	type sol_group_row = hbox {
-		size = { 216 24 }
-		spacing = 2
+	# F-route card: one demand group with its goods shown in a compact icon grid.
+	# A 122px card fits six icons on one row. Both surfaces have four columns.
+	type sol_group_row = vbox {
+		size = { 122 48 }
+		minimumsize = { 122 48 }
+		layoutpolicy_horizontal = fixed
+		spacing = 1
+		margin = { 4 3 }
+		background = { using = tooltip_table_field_texture }
 
-		text_single = {
-			size = { 80 24 }
-			autoresize = no
-			align = left|nobaseline
-			block "sol_group_label" { text = "SOL_SUBGROUP_STAPLE" }
+		hbox = {
+			block "sol_group_header" { size = { 114 17 } layoutpolicy_horizontal = fixed }
+			text_single = {
+				layoutpolicy_horizontal = fixed
+				autoresize = no
+				fontsize = 11
+				align = left|nobaseline
+				block "sol_group_label" { text = "SOL_SUBGROUP_STAPLE" }
+			}
+			text_single = {
+				size = { 30 17 }
+				autoresize = no
+				fontsize = 10
+				align = right|nobaseline
+				block "sol_group_count" { raw_text = "0" }
+			}
 		}
 
 		block "sol_group_icons" {}
-
 		expand = {}
+		progressbar = {
+			block "sol_group_progress" { size = { 114 3 } max = 1 value = 0 }
+			min = 0
+			progresstexture = "gfx/interface/sol_proto/bar_gold.dds"
+			noprogresstexture = "gfx/interface/sol_proto/bar_track.dds"
+		}
 	}
 }

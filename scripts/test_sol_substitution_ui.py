@@ -25,7 +25,7 @@ from data import Evaluator, Formats, Loc, TextIcons
 from engine import Engine
 from gui import Expander, GuiDB
 from pdx import parse
-from sol_goods_ui import _consumed_expr, _good_cell, render_goods_vbox
+from sol_goods_ui import _consumed_expr, _good_cell, render_goods_vbox, GOODS_CONTENT_W, LOCATION_CARD_W
 from sol_substitution import CORE
 
 
@@ -81,7 +81,7 @@ class SubstitutionUI(unittest.TestCase):
                 current = group
                 if node.key == 'sol_group_row':
                     label = next(n for n in node.value if n.key == 'blockoverride:sol_group_label')
-                    current = label.value[0].value.removeprefix('SOL_SUBGROUP_').lower()
+                    current = next(n.value for n in label.value if n.key == 'text').removeprefix('SOL_SUBGROUP_').lower()
                 for child in node.value:
                     if child.key == 'tooltip' and isinstance(child.value, str) and child.value.startswith('@'):
                         actual.append((current, child.value[1:].split('!', 1)[0]))
@@ -169,17 +169,76 @@ class SubstitutionUI(unittest.TestCase):
                     element = eng.ex.build(node.key, node.value, {}, str(path), 0)
                     width, height = eng.measure(element, None)['hint']
                     eng.place(element, 0, 0, width, height)
-                    self.assertLessEqual(width, 500)
+                    self.assertAlmostEqual(width, GOODS_CONTENT_W + 20, delta=1)
                     self.assertLessEqual(height, 1080)
                     for child in walk(element):
                         if child.w > 0 and eng.visible(child):
                             self.assertGreaterEqual(child.x, -1, child.kind)
                             self.assertLessEqual(child.x + child.w, width + 1, child.kind)
+                    # Every supplied group, including compatibility tails, is one icon row.
+                    cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size') == ['122', '48']]
+                    self.assertGreaterEqual(len(cards), 20)
+                    for card in cards:
+                        cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
+                        self.assertLessEqual(len(cells), 6)
+                        self.assertEqual(len({round(c.y, 1) for c in cells}), 1)
                     image = Image.new('RGBA', (int(width), int(height)), (40, 52, 46, 255))
                     eng.render(element, image)
                     if self.out:
                         image.save(self.out / f'{target}_{language}.png')
                     self.assertFalse(log, log)
+
+    def test_balance_cursor_and_signed_bar(self):
+        from gen_sol_ls_gui import balance_cursor, bidirectional_bar, f_coef
+        for coef in (-1, -.5, -.25, 0, .25, .5, 5):
+            eng, log = self.engine([])
+            expr = f"'(CFixedPoint){coef}'"
+            source = '\\n'.join(balance_cursor(0, 220, expr))
+            node = parse(source)[0]
+            element = eng.ex.build(node.key, node.value, {}, '<balance cursor>', 0)
+            eng.measure(element, None)
+            eng.place(element, 0, 0, 220, 14)
+            marker = next(c for c in element.children if c.backgrounds)
+            share = max(0, min(1, coef + .5))
+            self.assertAlmostEqual(marker.x, share * 218, delta=.1)
+            source = '\\n'.join(bidirectional_bar(0, 220, expr))
+            node = parse(source)[0]
+            bar = eng.ex.build(node.key, node.value, {}, '<bidirectional bar>', 0)
+            progresses = [c for c in walk(bar) if c.kind == 'progressbar']
+            values = [float(eng.resolve(c.props['value'])) for c in progresses]
+            self.assertEqual(values, [min(.5, max(0, -coef)), min(.5, max(0, coef))])
+            self.assertEqual(progresses[0].props['invertprogress'], 'yes')
+            self.assertFalse(log, log)
+        # Raw alpha is neutral for a baseline-free estate.
+        eng, log = self.engine([(r"Test.ScriptValue\('funds'\)", 5), (r"Test.ScriptValue\('need'\)", 0)])
+        self.assertEqual(eng.resolve(f"[{f_coef('Test', 'funds', 'need')}]"), 0)
+        self.assertFalse(log, log)
+
+    def test_group_card_bounds_and_labels(self):
+        for language in ('simp_chinese', 'english'):
+            eng, log = self.engine(scenarios.tooltip(), language)
+            source = render_goods_vbox(CORE + ['victuals'], 'sol_market_consumes', 'Location.GetMarket.MakeScope', '')
+            node = parse(source)[0]
+            root = eng.ex.build(node.key, node.value, {}, '<goods>', 0)
+            width, height = eng.measure(root, GOODS_CONTENT_W)['hint']
+            eng.place(root, 0, 0, GOODS_CONTENT_W, height)
+            labels = [e for e in walk(root) if str(e.props.get('text', '')).startswith('SOL_SUBGROUP_')]
+            self.assertEqual(len(labels), 21)
+            for label in labels:
+                self.assertGreaterEqual(label.w, 84)
+                self.assertTrue(eng.text_of(label))
+            cards = [e for e in walk(root) if any(str(c.props.get('text', '')).startswith('SOL_SUBGROUP_') for c in walk(e)) and e.kind == 'vbox' and e is not root]
+            for card in cards:
+                self.assertAlmostEqual(card.w, LOCATION_CARD_W)
+                self.assertAlmostEqual(card.h, 48)
+                cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
+                self.assertLessEqual(len(cells), 6)
+                self.assertEqual(len({round(c.y, 1) for c in cells}), 1)
+                for child in walk(card):
+                    if child.w > 0 and eng.visible(child):
+                        self.assertLessEqual(child.x + child.w, card.x + card.w + 1)
+                        self.assertLessEqual(child.y + child.h, card.y + card.h + 1)
+            self.assertFalse(log, log)
 
 
 if __name__ == '__main__':

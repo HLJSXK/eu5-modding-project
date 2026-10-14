@@ -85,6 +85,8 @@ The following violations occurred and informed the Mandatory Reference Categorie
 
 | Date | Violation | Root cause | Correct behavior |
 |---|---|---|---|
+| 2026-10-14 | Estate markers coincide in runtime | Float shares used for integer stretch weights | Scale shares to int32, hide zero spacers; test boundary positions. |
+| 2026-10-14 | Group labels elide; incomplete card rows stretch | Header width unspecified; cards inherit expanding | Positive header/label/count widths, fixed cards; assert descendant bounds. |
 | 2026-10 | Unavailable goods stayed bright | A translucent icon was drawn over an always-visible opaque original | Make full and dim copies mutually exclusive and check pixels, not only alpha declarations. |
 | 2026-10 | Grouped goods omitted 11 overlapping memberships | Unique primary-group ordering was reused as the labelled group's membership list | Show all 67 memberships of the 56 goods; compatibility checks count memberships while spending remains deduplicated. |
 | 2026-10 | Missing market weights appeared neutral | A missing cache entry defaulted to 1.00 | Use Scope.IsSet plus pending-data localization; distinguish disabled, pending and initialized country substitution. |

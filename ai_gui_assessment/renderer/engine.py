@@ -619,7 +619,11 @@ class Engine:
             else:  # expanding / preferred
                 lo, hi = mn, mx
             expansive = pol
-            stretch = self._resolved_num(c.props.get("layoutstretchfactor_horizontal" if axis == 0 else "layoutstretchfactor_vertical"), 0)
+            stretch_prop = c.props.get("layoutstretchfactor_horizontal" if axis == 0 else "layoutstretchfactor_vertical")
+            if isinstance(stretch_prop, str) and stretch_prop.startswith("["):
+                if self.ev.expression_type(parse_expr(stretch_prop[1:-1])) == "float":
+                    self.ev.log.append("TYPE ERROR: layoutstretchfactor requires int32, got float: " + stretch_prop)
+            stretch = int(self._resolved_num(stretch_prop, 0))
             items.append(dict(c=c, m=m, hint=hint, lo=min(lo, hint), hi=max(hi, hint), exp=expansive, st=stretch,
                               cpol=cpol, size=hint))
             self.pop(pu)
