@@ -242,10 +242,19 @@ def price_template(market: bool = False) -> str:
     for index, (weight, label, interval, color) in enumerate(PRICE_TIERS):
         lines.append(f'\t\t\tvbox = {{ size = {{ 58 40 }} layoutpolicy_horizontal = fixed spacing = 2 using = bg_number_container_bckg tooltip = "SOL_GOOD_PRICE_TIER_{index}"')
         if market:
-            lines.append(
+            lines += [
                 f'\t\t\t\twidget = {{ name = "sol_price_tier_active_{index}" size = {{ 58 40 }} ignore_layout = yes '
-                f'visible = "[{price_tier_condition(interval)}]" using = bg_square_gold_tile }}'
-            )
+                f'visible = "[{price_tier_condition(interval)}]"',
+                '\t\t\t\t\tbackground = { using = color_gold_texture alpha = 0.07 }',
+            ]
+            # Four flat one-unit edges avoid the thick bevel of a framed tile.
+            for width, height, x, y in ((58, 1, 0, 0), (58, 1, 0, 39),
+                                       (1, 38, 0, 1), (1, 38, 57, 1)):
+                lines.append(
+                    f'\t\t\t\t\twidget = {{ size = {{ {width} {height} }} position = {{ {x} {y} }} '
+                    'background = { using = color_gold_texture alpha = 0.65 } }'
+                )
+            lines.append('\t\t\t\t}')
         lines += [
             f'\t\t\t\ttext_single = {{ size = {{ 58 19 }} autoresize = no align = center fontsize = 13 raw_text = "#{color} ×{weight}#!" }}',
             f'\t\t\t\ttext_single = {{ size = {{ 58 17 }} autoresize = no align = center fontsize = 11 raw_text = "{label}" }}',

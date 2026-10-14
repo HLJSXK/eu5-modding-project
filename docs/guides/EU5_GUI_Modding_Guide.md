@@ -238,8 +238,10 @@ and invalid markets. It is a live reference price, not the cached applied countr
 multiplier. Preference boundaries match sol_substitution.py:29, including strict
 comparisons at 0.40/0.65/0.85/1.30/1.70/2.30; column tooltips spell out full intervals.
 The market-only `SOL_goods_market_price_tiers` highlights exactly one current
-tier with `bg_square_gold_tile` (backgrounds.gui:3176), drawn as a sized
-`ignore_layout = yes` child before the text. Compare the live price directly
+tier with a 1 GUI-unit gold outline and a faint gold fill, drawn as a sized
+`ignore_layout = yes` child before the text. Four flat edge widgets use
+`color_gold_texture` (window_components.gui:26); the beveled `bg_square_gold_tile`
+was too heavy in the user's runtime screenshot. Compare the live price directly
 against `Multiply_CFixedPoint(base_price, threshold)`, matching the runtime;
 formatting or rounding the ratio first can select the wrong boundary tier.
 Generic/card legends have no active tier, and invalid markets, zero base prices
