@@ -37,7 +37,7 @@ class Node:
         return f"Node({self.key}{self.op}{v})"
 
 
-def tokenize(text: str):
+def tokenize(text: str, src: str = ""):
     pos, line = 0, 1
     n = len(text)
     while pos < n:
@@ -48,6 +48,14 @@ def tokenize(text: str):
             continue
         kind = m.lastgroup
         tok = m.group(kind)
+        if kind == "str":
+            for escape in re.finditer(r"\\(.)", tok, re.DOTALL):
+                if escape.group(1) not in ('"', "\\"):
+                    escape_line = line + tok[:escape.start()].count("\n")
+                    raise ValueError(
+                        f"{src or '<script>'}:{escape_line}: invalid quoted-string escape "
+                        f"{escape.group(0)!r}; only quote and backslash may be escaped"
+                    )
         if kind not in ("ws", "comment"):
             yield kind, tok, line
         line += tok.count("\n")
@@ -72,7 +80,7 @@ def _eval_const_expr(expr: str, consts: dict) -> str:
 
 def parse(text: str, src: str = "", consts: dict | None = None) -> list[Node]:
     consts = consts if consts is not None else {}
-    toks = list(tokenize(text))
+    toks = list(tokenize(text, src))
     i = 0
 
     def value_of(tok_kind, tok):

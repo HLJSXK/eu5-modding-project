@@ -98,12 +98,16 @@ def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
     texture = f"{ICON_DIR}/icon_goods_{good}.dds"
     country = "Location.GetOwner.MakeScope" if scope.startswith("Location.") else scope
     multiplier = f"[{country}.ScriptValue('sol_substitute_{good}_display')|2]" if good in CORE else "1.00"
-    tooltip = f"@{good}! [Localize('{good}')]\\n[Localize('SOL_GOOD_SUB_{good}')]\\n[Localize('SOL_SUB_MULTIPLIER')]: {multiplier}"
-    tooltip += "\\n" + substitution_status(country)
+    tooltip_lines = [f"@{good}! [Localize('{good}')]",
+                     f"[Localize('SOL_GOOD_SUB_{good}')]",
+                     f"[Localize('SOL_SUB_MULTIPLIER')]: {multiplier}",
+                     substitution_status(country)]
     if scope.startswith("Location."):
         weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', {scope})"
-        tooltip += f"\\n[SelectLocalization({weight}.IsSet, 'SOL_SUB_PRICE_{good}', 'SOL_SUB_PRICE_PENDING')]"
-    tooltip += "\\n[Localize('SOL_SUB_SCOPE_NOTE')]\\n[Localize('SOL_SUB_LEGEND_TOOLTIP')]"
+        tooltip_lines.append(f"[SelectLocalization({weight}.IsSet, 'SOL_SUB_PRICE_{good}', 'SOL_SUB_PRICE_PENDING')]")
+    tooltip_lines += ["[Localize('SOL_SUB_SCOPE_NOTE')]", "[Localize('SOL_SUB_LEGEND_TOOLTIP')]"]
+    # GUI quoted strings cannot escape newlines; the vanilla localization can.
+    tooltip = "[Localize('NEWLINE_BREAK')]".join(tooltip_lines)
     out = [
         f"{indent}widget = {{",
         f"{indent}\tsize = {{ {ICON_W} 18 }}",

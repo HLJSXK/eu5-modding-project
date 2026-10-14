@@ -17,6 +17,15 @@
 # To add a new entry: append a YAML dict with all fields, then run:
 #   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
 
+- id: substitution_performance_requires_actual_cadence
+  pattern: null
+  bad: "Attributing default monthly AI cost to the entire substitution aggregate, or assuming solver/substitution toggles skip every newly added runtime cost"
+  correction: "Trace monthly and yearly callers separately. Clean reduced-frequency AI only checks snapshots and applies modifiers; dirty AI enters the full solve. Country substitution refresh precedes size/solver gates, and substitution-off still computes per-good external spending. Count actual dirty solves and successful modifier writes before claiming engine-time attribution."
+  category: scope
+  scope: country
+  source: "src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:32; src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:5039,5438; docs/technical/SOL_Monthly_Performance_Audit_20261014.md"
+  notes: "Source and offline operation-count audit, 2026-10-14. A 7-to-215 map-read increase is confined to location recomputation, not every clean AI month. Existing logs are not an effect-time profiler."
+
 - id: gui_dim_copy_over_opaque_icon
   pattern: null
   bad: "Drawing a translucent goods icon over an always-visible opaque copy to indicate unavailable supply"
@@ -1101,3 +1110,58 @@
   scope: any
   source: "2026-10-14 user runtime screenshot; SOL_living_standard_kit.gui sol_group_row; EU5_GUI_Modding_Guide.md layout policies"
   notes: "Renderer preview did not reproduce the engine's negative-width header collapse; explicit geometry is checked by regression."
+
+- id: eu5_14_country_modifier_name_field
+  pattern: 'add_country_modifier\s*=\s*\{\s*name\s*='
+  bad: "Using name= to identify an add_country_modifier object in EU5 1.4"
+  correction: "Use modifier= as in the current vanilla source. The older effects.log example still says name= and is not authoritative when current runtime logs reject it."
+  category: modifier
+  scope: country
+  source: "reference_game_files/game/in_game/common/scripted_effects/country_effects.txt:846; user error.5.log:2575-2630 (2026-10-14 session)"
+  notes: "SOL's 56 name= substitutions failed parsing, followed by empty-object/PostValidate errors. New-game confirmation of the corrected modifier's demand effect remains required."
+
+- id: local_variables_are_not_market_storage
+  pattern: null
+  bad: "Treating local_var as independent per-market storage, or validating that assumption with a Scope.local dictionary in an offline fixture"
+  correction: "Local variables are event-context links visible across scope switches. Use market-keyed global_variable_map for per-market isolation; use local_var only for one calculation's scratch and explicitly remove it. Correct offline fixtures to share one local context across scope switches."
+  category: scope
+  scope: any
+  source: "reference_official_defines/docs/event_targets.log:822-830; reference_game_files/game/in_game/common/scripted_effects/location_effects.txt:145-168; effects.log:531-537"
+  notes: "Vanilla transfer_pop sets pops_to_add inside target scope and reads it after returning to root. Market scope also cannot hold persistent set_variable values. SOL market population and spending caches use maps, including a typed country owner map to prevent shared-market cross-country reuse."
+
+- id: country_substitution_repeated_monthly_replace
+  pattern: null
+  bad: "Repeating market/pop basket expansion for every location and replacing unchanged country goods modifiers every month"
+  correction: "Aggregate owned population by market/pop type, evaluate each basket once, and cache seven country-adjusted market spending totals. Apply permanent goods modifiers only on real size changes or missing modifiers; subtract the actually applied size when reading external offsets and retain an observed-total snapshot for clean-month checks. Keep the separate monthly location modifier lifetime policy."
+  category: scope
+  scope: country
+  source: "reference_official_defines/docs/effects.log:2824-2828; country_effects.txt:846-850; docs/technical/SOL_Monthly_Performance_Optimization_20261015.md"
+  notes: "Offline 180-location/3-market fixture cuts refresh variable operations from 571285 to 12023. This is not measured EU5 wall time; intermediate fixed-point rounding and engine cache invalidation require in-game acceptance."
+
+- id: gui_quoted_string_newline_escape
+  pattern: '(?:tooltip|raw_text|text(?:context)?)\s*=\s*"[^"\r\n]*?(?<!\\)\\[nt]'
+  only_in_paths: ["/gui/"]
+  bad: "Emitting literal backslash-n or backslash-t into a quoted GUI string"
+  correction: "GUI lexing allows only escaped quotes/backslashes. Insert [Localize('NEWLINE_BREAK')] for tooltip line breaks; newline escapes belong in localization YAML. Do not double the slash merely to suppress the lexer error."
+  category: gui
+  scope: any
+  source: "2026-10-15 user lexer.cpp:805 log; reference_game_files/game/in_game/gui/shared/character_tooltips.gui:1571; main_menu/localization/english/economy_l_english.yml:38"
+  notes: "SOL goods-cell generator emitted invalid escapes on every hover. The shared generator now uses vanilla NEWLINE_BREAK and renderer pdx tokenizer rejects invalid escapes; bilingual location/country hover regression checks real line breaks."
+
+- id: requested_modifier_size_is_not_live_strength
+  pattern: null
+  bad: "Subtracting a cached requested modifier size from a live aggregate getter and interpreting any difference as an external modifier change"
+  correction: "When the named modifier exists, read country_modifier_strength(<modifier key>) and subtract that actual strength. Keep the last requested size for change-only writes and a separate live-strength snapshot for own drift detection/repair. Account internal spending with the actual applied strength."
+  category: scope
+  scope: country
+  source: "reference_official_defines/docs/triggers.log:3517-3523; scripts/test_sol_substitution_performance.py"
+  notes: "Controlled offline tests cover corrupt request caches, actual own drift, real 0.00001 external changes and stale diagnostic payload. They do not prove engine precision/refresh timing or establish the cause of the user's tenfold performance regression. Ordinary clean guards do not add strength getter calls."
+
+- id: local_effect_min_is_not_value_floor
+  pattern: 'change_local_variable\s*=\s*\{[^{}]*\bmin\s*=\s*0(?:\s|\})'
+  bad: "Using change_local_variable min=0 as a nonnegative lower-bound clamp"
+  correction: "Use set_local_variable with value={ value=... min=0 } to express the lower bound. Do not copy value-block clamp semantics into the change-local effect or its offline interpreter."
+  category: scope
+  scope: any
+  source: "2026-10-15 HUN debug saves 1337.5.15/6.15/7.15: 4311 reason6 samples; country_effects.txt:1660-1665; docs/technical/SOL_Three_Save_Performance_Fix_20261015.md"
+  notes: "Every recorded sample has new_total=actual_own, hence external baseline must be1, but the old local-effect min produced0. The offline fixture incorrectly modeled this as max(value,0), concealing mass monthly AI re-solving. Only this local-effect behavior is established by saves; do not reverse persistent-variable or script-value clamp rules globally."

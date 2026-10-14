@@ -46,14 +46,15 @@ def main() -> None:
     parser.add_argument("--target", choices=[*TARGETS, "all"], default="all")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    payload = render().encode("utf-8")
+    payload = b"\xef\xbb\xbf" + render().encode("utf-8")
     targets = TARGETS if args.target == "all" else (args.target,)
     ok = True
     for target in targets:
         path = ROOT / "src" / target / "main_menu/gui/messagetypes.txt"
         relative = path.relative_to(ROOT)
         if args.check:
-            matches = path.exists() and path.read_bytes() == payload
+            # Preserve the shipped UTF-8 BOM and tolerate Git's CRLF checkout.
+            matches = path.exists() and path.read_bytes().replace(b"\r\n", b"\n") == payload
             ok &= matches
             print(f"[{'OK' if matches else 'FAIL'}] {relative}")
         else:

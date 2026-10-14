@@ -3,6 +3,7 @@ import math
 import re
 import sys
 import unittest
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +41,8 @@ class Runtime:
         self.saved = {}
         self.enabled = enabled
         self.script_values = {n.key: n.value for n in parse(render_values())}
+        self.operations = Counter()
+        self.local_context = {}
 
     def value(self, node, scope, initial=0.):
         if isinstance(node, list):
@@ -64,12 +67,14 @@ class Runtime:
             name, sep, tail = node[6:].partition('.')
             value = self.saved[name]
             return self.value(tail, value) if sep else value
-        if node.startswith('local_var:'): return scope.local[node[10:]]
+        if node.startswith('local_var:'): return self.local_context[node[10:]]
         if node.startswith('var:'): return scope.variables[node[4:]]
         if node.startswith('num_pop_type:'): return scope.pops.get(node[13:], 0.)
         if node.startswith('modifier:global_'):
             good = node[len('modifier:global_'):-len('_pop_demand')]
             return scope.external.get(good, 0.) + scope.modifiers.get('sol_substitute_' + good, 0.)
+        if node.startswith('country_modifier_strength('):
+            return scope.modifiers[node[len('country_modifier_strength('):-1]]
         if node.startswith('global_variable_map('):
             name, key = node[len('global_variable_map('):-1].split('|')
             return self.maps[(name, id(self.value(key, scope)))]
@@ -91,6 +96,7 @@ class Runtime:
         if key == 'AND': return self.condition(val, scope)
         if key == 'NOT': return not self.condition(val, scope)
         if key == 'has_variable': return val in scope.variables
+        if key == 'has_local_variable': return val in self.local_context
         if key == 'has_country_modifier': return val in scope.modifiers
         if key == 'has_global_variable': return True
         if key == 'has_global_variable_map': return any(k[0] == val for k in self.maps)
@@ -112,6 +118,9 @@ class Runtime:
         self.execute(self.effects[effect], scope)
 
     def execute(self, nodes, scope):
+        # Jomini local_var is a global event-target link in the script context,
+        # and remains visible after scope switches (vanilla transfer_pop).
+        scope.local = self.local_context
         taken = False
         for node in nodes:
             key, val = node.key, node.value
@@ -127,13 +136,14 @@ class Runtime:
                     taken = True
                 continue
             taken = False
+            self.operations[key] += 1
             if key in ('set_variable', 'set_local_variable', 'save_scope_value_as'):
                 fields = {n.key: n.value for n in val}
-                target = self.saved if key == 'save_scope_value_as' else scope.local if key == 'set_local_variable' else scope.variables
+                target = self.saved if key == 'save_scope_value_as' else self.local_context if key == 'set_local_variable' else scope.variables
                 target[fields['name']] = self.value(fields['value'], scope)
             elif key in ('change_variable', 'change_local_variable'):
                 name = next(n.value for n in val if n.key == 'name')
-                target = scope.local if key == 'change_local_variable' else scope.variables
+                target = self.local_context if key == 'change_local_variable' else scope.variables
                 ops = [n for n in val if n.key != 'name']
                 result = target[name]
                 for op in ops:
@@ -141,15 +151,20 @@ class Runtime:
                     if op.key == 'add': result += rhs
                     elif op.key == 'subtract': result -= rhs
                     elif op.key == 'multiply': result *= rhs
-                    elif op.key == 'min': result = max(result, rhs)
+                    elif op.key == 'min' and key == 'change_local_variable':
+                        # Runtime save evidence: local effect min=0 turns a
+                        # positive external baseline into zero. Do not reuse
+                        # value-block min's lower-bound semantics here.
+                        result = min(result, rhs)
                     else: raise AssertionError(op.key)
                 target[name] = result
             elif key in ('remove_variable', 'remove_local_variable'):
-                (scope.local if key == 'remove_local_variable' else scope.variables).pop(val, None)
+                (self.local_context if key == 'remove_local_variable' else scope.variables).pop(val, None)
             elif key == 'remove_country_modifier': scope.modifiers.pop(val, None)
             elif key == 'add_country_modifier':
                 fields = {n.key: n.value for n in val}
-                scope.modifiers[fields['name']] = self.value(fields['size'], scope)
+                # Match the current 1.4 source schema; the engine rejects name=.
+                scope.modifiers[fields['modifier']] = self.value(fields['size'], scope)
             elif key == 'save_scope_as': self.saved[val] = scope
             elif key in ('remove_from_global_variable_map', 'add_to_global_variable_map'):
                 fields = {n.key: n.value for n in val}
@@ -160,6 +175,11 @@ class Runtime:
                 limits = next((n.value for n in val if n.key == 'limit'), [])
                 for loc in scope.locations:
                     if self.condition(limits, loc): self.execute(val, loc)
+            elif key == 'every_market_present_in_country':
+                limits = next((n.value for n in val if n.key == 'limit'), [])
+                markets = dict.fromkeys(loc.market for loc in scope.locations if loc.market is not None)
+                for market in markets:
+                    if self.condition(limits, market): self.execute(val, market)
             elif key == 'market': self.execute(val, scope.market)
             elif key == 'owner':
                 if scope.owner is not None: self.execute(val, scope.owner)
@@ -256,10 +276,10 @@ class SubstitutionTests(unittest.TestCase):
         rt.effects['tier'] = parse('\n'.join(market_details('cloth', ['nobles'])))
         rt.saved['sol_market_cache'] = loc.market
         for ratio in (2.3, 1.7, 1.3, .85, .65, .4, 2.30001, 1.70001, 1.30001, .84999, .64999, .39999):
-            loc.market.local.update(sol_market_actual_price_cloth=ratio * rt.prices['cloth'], sol_market_effective_price_cloth=min(ratio, 1) * rt.prices['cloth'], sol_market_consumes_cloth_count=1)
+            rt.local_context.update(sol_market_actual_price_cloth=ratio * rt.prices['cloth'], sol_market_effective_price_cloth=min(ratio, 1) * rt.prices['cloth'], sol_market_consumes_cloth_count=1)
             rt.run('tier', loc.market)
             self.assertEqual(rt.maps[('sol_market_substitute_weight_cloth', id(loc.market))], price_weight(ratio))
-        loc.market.local['sol_market_consumes_cloth_count'] = 0
+        rt.local_context['sol_market_consumes_cloth_count'] = 0
         rt.run('tier', loc.market)
         self.assertEqual(rt.maps[('sol_market_good_spending_nobles_cloth', id(loc.market))], 0)
 

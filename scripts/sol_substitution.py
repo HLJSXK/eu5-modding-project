@@ -89,24 +89,40 @@ def market_details(good: str, pops: list[str]) -> list[str]:
 
 def render_location_spending(rows, replace: bool = False) -> str:
     lines = [f"{'REPLACE:' if replace else ''}sol_compute_substitute_unit_spending = {{",
-             "\t# Location scope; market details are raw, country effective factors applied once."]
+             "\t# Location scope; reuse country-adjusted unit spending within each market.",
+             "\t# Country/world market refresh invalidates the market-keyed owner map."]
     for pop in POPS:
         lines.append(f"\tset_variable = {{ name = sol_unit_spending_{pop} value = 0 }}")
     lines += ["\towner ?= { save_scope_as = sol_spending_country }",
               "\tif = { limit = { exists = market exists = owner }",
-              "\t\tmarket = { save_scope_as = sol_location_market }"]
+              "\t\tmarket = {",
+              "\t\t\tsave_scope_as = sol_location_market",
+              '\t\t\tif = { limit = { NOT = { AND = { has_global_variable_map = sol_country_market_spending_owner is_key_in_global_variable_map = { name = sol_country_market_spending_owner target = scope:sol_location_market } "global_variable_map(sol_country_market_spending_owner|scope:sol_location_market)" = scope:sol_spending_country } } }']
+    for pop in POPS:
+        lines.append(f"\t\t\t\tset_local_variable = {{ name = sol_spending_cache_{pop} value = 0 }}")
     for good, _, quantities in rows:
-        lines.append("\t\tset_local_variable = { name = sol_sub_effective value = 1 }")
+        lines.append("\t\t\t\tset_local_variable = { name = sol_sub_effective value = 1 }")
         if good in CORE:
-            lines.append(f"\t\tif = {{ limit = {{ scope:sol_spending_country = {{ has_variable = sol_good_effective_{good} }} }} set_local_variable = {{ name = sol_sub_effective value = scope:sol_spending_country.var:sol_good_effective_{good} }} }}")
+            lines.append(f"\t\t\t\tif = {{ limit = {{ scope:sol_spending_country = {{ has_variable = sol_good_effective_{good} }} }} set_local_variable = {{ name = sol_sub_effective value = scope:sol_spending_country.var:sol_good_effective_{good} }} }}")
         for pop in POPS:
             if round(quantities[pop], 5) <= 0:
                 continue
             name = f"sol_market_good_spending_{pop}_{good}"
-            lines += [f"\t\tif = {{ limit = {{ has_global_variable_map = {name} is_key_in_global_variable_map = {{ name = {name} target = scope:sol_location_market }} }}",
-                      f'\t\t\tchange_variable = {{ name = sol_unit_spending_{pop} add = {{ value = "global_variable_map({name}|scope:sol_location_market)" multiply = local_var:sol_sub_effective }} }}',
-                      "\t\t}"]
-    lines += ["\t}", "\tremove_local_variable = sol_sub_effective", "}"]
+            lines += [f"\t\t\t\tif = {{ limit = {{ has_global_variable_map = {name} is_key_in_global_variable_map = {{ name = {name} target = scope:sol_location_market }} }}",
+                      f'\t\t\t\t\tchange_local_variable = {{ name = sol_spending_cache_{pop} add = {{ value = "global_variable_map({name}|scope:sol_location_market)" multiply = local_var:sol_sub_effective }} }}',
+                      "\t\t\t\t}"]
+    lines.append("\t\t\t\tremove_local_variable = sol_sub_effective")
+    for pop in POPS:
+        name = f"sol_country_market_spending_{pop}"
+        lines += [f"\t\t\t\tremove_from_global_variable_map = {{ name = {name} key = scope:sol_location_market }}",
+                  f"\t\t\t\tadd_to_global_variable_map = {{ name = {name} key = scope:sol_location_market value = local_var:sol_spending_cache_{pop} }}",
+                  f"\t\t\t\tremove_local_variable = sol_spending_cache_{pop}"]
+    lines += ["\t\t\t\tremove_from_global_variable_map = { name = sol_country_market_spending_owner key = scope:sol_location_market }",
+              "\t\t\t\tadd_to_global_variable_map = { name = sol_country_market_spending_owner key = scope:sol_location_market value = scope:sol_spending_country }",
+              "\t\t\t}", "\t\t}"]
+    for pop in POPS:
+        lines.append(f'\t\tset_variable = {{ name = sol_unit_spending_{pop} value = "global_variable_map(sol_country_market_spending_{pop}|scope:sol_location_market)" }}')
+    lines += ["\t}", "}"]
     return "\n".join(lines) + "\n"
 
 
@@ -133,26 +149,43 @@ def render_values() -> str:
 
 def render_country_runtime(rows) -> str:
     quantities = {good: q for good, _, q in rows if good in CORE}
+    # Record the first invalidation, without logging every country every month.
+    def dirty(reason: int) -> str:
+        cleanup = " ".join(f"remove_variable = sol_sub_perf_{field}" for field in
+                           ("old_total", "new_total", "cached_own", "actual_own", "external_now"))
+        return ("if = { limit = { var:sol_substitute_dirty = 0 } "
+                "set_variable = { name = sol_substitute_dirty value = 1 } "
+                f"set_variable = {{ name = sol_sub_perf_dirty_reason value = {reason} }} "
+                "set_variable = { name = sol_sub_perf_dirty_good value = 0 } "
+                f"{cleanup} }}")
     lines = ["# Generated by gen_sol_substitution.py; algorithm A, V=1.",
-             "sol_clear_country_substitution = {"]
+             "sol_clear_country_substitution = {",
+             "\t# Empty/inactive countries without SOL state need no repeated cleanup.",
+             "\tif = { limit = { OR = { has_variable = sol_substitute_initialized has_variable = sol_demand_snapshot_initialized has_variable = sol_good_effective_amber } }"]
     for good in CORE:
         lines += [f"\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} remove_country_modifier = sol_substitute_{good} }}"]
-        for field in ("multiplier", "size", "effective", "external", "base", "target"):
+        for field in ("multiplier", "size", "effective", "external", "base", "target", "applied", "live"):
             lines.append(f"\tremove_variable = sol_sub_{field}_{good}")
         lines.append(f"\tremove_variable = sol_good_effective_{good}")
+        lines.append(f"\tremove_variable = sol_demand_observed_total_{good}")
     for name in ("initialized", "year", "goods_count", "max_size", "locations", "enabled", "human"):
         lines.append(f"\tremove_variable = sol_substitute_{name}")
+    for name in ("refresh_count", "dirty_count", "dirty_reason", "dirty_good", "old_total", "new_total", "cached_own", "actual_own", "external_now"):
+        lines.append(f"\tremove_variable = sol_sub_perf_{name}")
     lines += ["\tremove_variable = sol_substitute_dirty",
               "\tremove_variable = sol_demand_snapshot_initialized",
               "\tremove_variable = sol_demand_snapshot_locations",
               "\tremove_variable = sol_demand_snapshot_human",
+              "\tremove_variable = sol_demand_snapshot_enabled",
+              "\tremove_variable = sol_demand_snapshot_version",
               "\tevery_owned_location = { remove_variable = sol_sub_snapshot_country remove_variable = sol_sub_snapshot_market remove_variable = sol_demand_snapshot_country remove_variable = sol_demand_snapshot_market }",
-              "}", "", "sol_refresh_country_substitution = {",
-              "\t# Remove own old values before reading external additive offsets.",
+              "\tevery_market_present_in_country = { save_scope_as = sol_spending_clear_market " + " ".join(f"remove_from_global_variable_map = {{ name = sol_country_market_spending_{field} key = scope:sol_spending_clear_market }}" for field in ("owner", *POPS)) + " }",
+              "\t}", "}", "", "sol_refresh_country_substitution = {",
+              "\t# Read external offsets without deleting unchanged SOL modifiers.",
               "\tsave_scope_as = sol_sub_country",
               "\tif = { limit = { NOT = { has_global_variable = sol_market_substitution_initialized } } sol_refresh_market_pop_demand_maps = yes }",
               "\tset_local_variable = { name = sol_sub_market_missing value = 0 }",
-              "\tevery_owned_location = { limit = { is_land = yes exists = market } market = { save_scope_as = sol_sub_market_probe } if = { limit = { OR = { NOT = { has_global_variable_map = sol_market_substitute_cache } NOT = { is_key_in_global_variable_map = { name = sol_market_substitute_cache target = scope:sol_sub_market_probe } } } } scope:sol_sub_country = { set_local_variable = { name = sol_sub_market_missing value = 1 } } } }",
+              "\tevery_market_present_in_country = { save_scope_as = sol_sub_market_probe if = { limit = { OR = { NOT = { has_global_variable_map = sol_market_substitute_cache } NOT = { is_key_in_global_variable_map = { name = sol_market_substitute_cache target = scope:sol_sub_market_probe } } } } scope:sol_sub_country = { set_local_variable = { name = sol_sub_market_missing value = 1 } } } }",
               "\tif = { limit = { local_var:sol_sub_market_missing = 1 } sol_refresh_market_pop_demand_maps = yes }",
               "\tremove_local_variable = sol_sub_market_missing",
               "\tset_variable = { name = sol_substitute_goods_count value = 0 }",
@@ -160,17 +193,37 @@ def render_country_runtime(rows) -> str:
               "\tset_variable = { name = sol_substitute_enabled value = 0 }",
               "\tset_variable = { name = sol_substitute_human value = 0 }",
               "\tif = { limit = { is_human = yes } set_variable = { name = sol_substitute_human value = 1 } }",
-              "\tif = { limit = { sol_substitution_is_on = yes } set_variable = { name = sol_substitute_enabled value = 1 } }"]
+              "\tif = { limit = { sol_substitution_is_on = yes } set_variable = { name = sol_substitute_enabled value = 1 }",
+              "\t\tif = { limit = { NOT = { has_variable = sol_sub_perf_refresh_count } } set_variable = { name = sol_sub_perf_refresh_count value = 0 } }",
+              "\t\tchange_variable = { name = sol_sub_perf_refresh_count add = 1 }",
+              "\t}"]
     for good in CORE:
-        lines += [f"\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} remove_country_modifier = sol_substitute_{good} }}",
-                  f"\tset_variable = {{ name = sol_sub_external_{good} value = {{ value = 1 add = modifier:global_{good}_pop_demand min = 0 }} }}",
+        lines += [f"\tset_local_variable = {{ name = sol_sub_external_read value = {{ value = 1 add = modifier:global_{good}_pop_demand }} }}",
+                  f'\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} change_local_variable = {{ name = sol_sub_external_read subtract = "country_modifier_strength(sol_substitute_{good})" }} }}',
+                  f"\tset_variable = {{ name = sol_sub_external_{good} value = {{ value = local_var:sol_sub_external_read min = 0 }} }}",
                   f"\tset_variable = {{ name = sol_sub_multiplier_{good} value = 1 }}",
                   f"\tset_variable = {{ name = sol_sub_size_{good} value = 0 }}",
                   f"\tset_variable = {{ name = sol_sub_base_{good} value = 0 }}",
                   f"\tset_variable = {{ name = sol_sub_target_{good} value = 0 }}"]
-    lines += ["\tif = { limit = { sol_substitution_is_on = yes num_locations > 0 }",
-              "\t\tevery_owned_location = {", "\t\t\tlimit = { is_land = yes exists = market }",
-              "\t\t\tmarket = { save_scope_as = sol_sub_market }"]
+    lines += ["\tremove_local_variable = sol_sub_external_read",
+              "\tif = { limit = { sol_substitution_is_on = yes num_locations > 0 }",
+              "\t\t# Basket response is identical for all owned locations in one market.",
+              "\t\tevery_market_present_in_country = {",
+              "\t\t\tsave_scope_as = sol_sub_population_market"]
+    for pop in POPS:
+        lines += [f"\t\t\tremove_from_global_variable_map = {{ name = sol_sub_market_population_{pop} key = scope:sol_sub_population_market }}",
+                  f"\t\t\tadd_to_global_variable_map = {{ name = sol_sub_market_population_{pop} key = scope:sol_sub_population_market value = 0 }}"]
+    # The map key, rather than local_var scope, isolates each market's population.
+    lines += ["\t\t}", "\t\tevery_owned_location = { limit = { is_land = yes exists = market }",
+              "\t\t\tmarket = { save_scope_as = sol_sub_population_market }"]
+    for pop in POPS:
+        lines += [f'\t\t\tset_local_variable = {{ name = sol_sub_population_amount value = {{ value = "global_variable_map(sol_sub_market_population_{pop}|scope:sol_sub_population_market)" add = num_pop_type:{pop} }} }}',
+                  f"\t\t\tremove_from_global_variable_map = {{ name = sol_sub_market_population_{pop} key = scope:sol_sub_population_market }}",
+                  f"\t\t\tadd_to_global_variable_map = {{ name = sol_sub_market_population_{pop} key = scope:sol_sub_population_market value = local_var:sol_sub_population_amount }}"]
+    lines += ["\t\t}", "\t\tevery_market_present_in_country = {",
+              "\t\t\tsave_scope_as = sol_sub_market"]
+    for pop in POPS:
+        lines.append(f'\t\t\tset_local_variable = {{ name = sol_sub_population_{pop} value = "global_variable_map(sol_sub_market_population_{pop}|scope:sol_sub_market)" }}')
     for good in CORE:
         name = f"sol_market_substitute_weight_{good}"
         supply = f"sol_market_consumes_{good}"
@@ -180,7 +233,9 @@ def render_country_runtime(rows) -> str:
                   f'\t\t\t\tset_local_variable = {{ name = sol_sub_weight_{good} value = "global_variable_map({name}|scope:sol_sub_market)" }}', "\t\t\t}"]
     for pop in POPS:
         used = [good for good in CORE if round(quantities[good][pop], 5) > 0]
-        lines.append(f"\t\t\tif = {{ limit = {{ num_pop_type:{pop} > 0 }}")
+        if not used:
+            continue
+        lines.append(f"\t\t\tif = {{ limit = {{ local_var:sol_sub_population_{pop} > 0 }}")
         for good in used:
             lines += [f"\t\t\t\tset_local_variable = {{ name = sol_sub_current_{good} value = 0 }}",
                       f"\t\t\t\tset_local_variable = {{ name = sol_sub_neutral_{good} value = 0 }}"]
@@ -201,7 +256,7 @@ def render_country_runtime(rows) -> str:
             lines.append("\t\t\t\t}")
         for good in used:
             lines += [f"\t\t\t\tif = {{ limit = {{ local_var:sol_sub_neutral_{good} > 0 }}",
-                      f'\t\t\t\t\tset_local_variable = {{ name = sol_sub_amount value = {{ value = num_pop_type:{pop} multiply = sol_unit_consumption_{pop}_{good} multiply = "default_price(goods:{good})" }} }}',
+                      f'\t\t\t\t\tset_local_variable = {{ name = sol_sub_amount value = {{ value = local_var:sol_sub_population_{pop} multiply = sol_unit_consumption_{pop}_{good} multiply = "default_price(goods:{good})" }} }}',
                       f"\t\t\t\t\tset_local_variable = {{ name = sol_sub_response value = {{ value = local_var:sol_sub_current_{good} divide = local_var:sol_sub_neutral_{good} }} }}",
                       "\t\t\t\t\tsave_scope_value_as = { name = sol_sub_base_amount value = local_var:sol_sub_amount }",
                       "\t\t\t\t\tsave_scope_value_as = { name = sol_sub_target_amount value = { value = local_var:sol_sub_amount multiply = local_var:sol_sub_response } }",
@@ -214,7 +269,10 @@ def render_country_runtime(rows) -> str:
         lines.append(f"\t\t\tremove_local_variable = sol_sub_weight_{good}")
     for name in ("group_count", "group_weight", "amount", "response"):
         lines.append(f"\t\t\tremove_local_variable = sol_sub_{name}")
-    lines += ["\t\t}", "\t}"]
+    for pop in POPS:
+        lines.append(f"\t\t\tremove_local_variable = sol_sub_population_{pop}")
+        lines.append(f"\t\t\tremove_from_global_variable_map = {{ name = sol_sub_market_population_{pop} key = scope:sol_sub_market }}")
+    lines += ["\t\t}", "\t\tremove_local_variable = sol_sub_population_amount", "\t}"]
     for good in CORE:
         lines += [f"\tif = {{ limit = {{ var:sol_sub_base_{good} > 0 }}",
                   f"\t\tset_variable = {{ name = sol_sub_multiplier_{good} value = {{ value = var:sol_sub_target_{good} divide = var:sol_sub_base_{good} min = 0 }} }}",
@@ -234,42 +292,91 @@ def render_country_runtime(rows) -> str:
               "\t\tsol_clear_country_substitution = yes"]
     for good in CORE:
         lines.append(f"\t\tset_variable = {{ name = sol_good_effective_{good} value = {{ value = 1 add = modifier:global_{good}_pop_demand min = 0 }} }}")
-    lines += ["\t}",
+    lines.append("\t}")
+    lines.append("\tif = { limit = { sol_substitution_is_on = yes }")
+    for good in CORE:
+        lines += [f"\t\tset_variable = {{ name = sol_sub_live_{good} value = 0 }}",
+                  f'\t\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} set_variable = {{ name = sol_sub_live_{good} value = "country_modifier_strength(sol_substitute_{good})" }} }}',
+                  f"\t\tset_variable = {{ name = sol_good_effective_{good} value = {{ value = var:sol_sub_external_{good} add = var:sol_sub_live_{good} min = 0 }} }}"]
+    lines.append("\t}")
+    for good in CORE:
+        lines.append(f"\tset_variable = {{ name = sol_demand_observed_total_{good} value = modifier:global_{good}_pop_demand }}")
+    lines += [
               "\tevery_owned_location = { limit = { is_land = yes } set_variable = { name = sol_demand_snapshot_country value = scope:sol_sub_country } if = { limit = { exists = market } market = { save_scope_as = sol_demand_snapshot_market } set_variable = { name = sol_demand_snapshot_market value = scope:sol_demand_snapshot_market } } else = { remove_variable = sol_demand_snapshot_market } }",
               "\tset_variable = { name = sol_demand_snapshot_locations value = num_locations }",
               "\tset_variable = { name = sol_demand_snapshot_human value = 0 }",
               "\tif = { limit = { is_human = yes } set_variable = { name = sol_demand_snapshot_human value = 1 } }",
+              "\tset_variable = { name = sol_demand_snapshot_enabled value = 0 }",
+              "\tif = { limit = { sol_substitution_is_on = yes } set_variable = { name = sol_demand_snapshot_enabled value = 1 } }",
               "\tset_variable = { name = sol_demand_snapshot_initialized value = 1 }",
+              "\tset_variable = { name = sol_demand_snapshot_version value = 2 }",
+              "\t# Invalidate country-specific unit totals before the following location solve.",
+              "\tevery_market_present_in_country = { save_scope_as = sol_spending_clear_market remove_from_global_variable_map = { name = sol_country_market_spending_owner key = scope:sol_spending_clear_market } }",
               "}", "",
               "sol_apply_country_substitution = {"]
+    lines.append("\tif = { limit = { sol_substitution_is_on = yes }")
     for good in CORE:
-        lines += [f"\tif = {{ limit = {{ has_variable = sol_sub_size_{good} NOT = {{ var:sol_sub_size_{good} = 0 }} sol_substitution_is_on = yes }}",
-                  f"\t\tadd_country_modifier = {{ name = sol_substitute_{good} months = 2 mode = replace size = var:sol_sub_size_{good} }}",
-                  f"\t}} else = {{ if = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} remove_country_modifier = sol_substitute_{good} }} }}"]
-    lines += ["}", "", "sol_check_substitution_snapshot = {",
+        lines += [f"\t\tif = {{ limit = {{ has_variable = sol_sub_size_{good} NOT = {{ var:sol_sub_size_{good} = 0 }} }}",
+                  f'\t\t\tif = {{ limit = {{ OR = {{ NOT = {{ has_country_modifier = sol_substitute_{good} }} NOT = {{ has_variable = sol_sub_applied_{good} }} NOT = {{ var:sol_sub_applied_{good} = var:sol_sub_size_{good} }} AND = {{ has_variable = sol_sub_live_{good} NOT = {{ var:sol_sub_live_{good} = "country_modifier_strength(sol_substitute_{good})" }} }} }} }}',
+                  f"\t\t\t\tadd_country_modifier = {{ modifier = sol_substitute_{good} days = -1 mode = replace size = var:sol_sub_size_{good} }}",
+                  f"\t\t\t\tset_variable = {{ name = sol_sub_applied_{good} value = var:sol_sub_size_{good} }}",
+                  f"\t\t\t\tset_variable = {{ name = sol_demand_observed_total_{good} value = modifier:global_{good}_pop_demand }}",
+                  "\t\t\t}",
+                  f"\t\t}} else = {{ if = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} remove_country_modifier = sol_substitute_{good} }} remove_variable = sol_sub_applied_{good} }}"]
+    lines += ["\t}", "\telse = {"]
+    for good in CORE:
+        lines += [f"\t\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} remove_country_modifier = sol_substitute_{good} }}",
+                  f"\t\tremove_variable = sol_sub_applied_{good}"]
+    lines += ["\t}", "}", "", "sol_check_substitution_snapshot = {",
               "\tset_variable = { name = sol_substitute_dirty value = 0 }",
               "\tsave_scope_as = sol_sub_check_country",
-              "\tif = { limit = { NOT = { has_variable = sol_demand_snapshot_initialized } } set_variable = { name = sol_substitute_dirty value = 1 } }",
+              f"\tif = {{ limit = {{ NOT = {{ has_variable = sol_demand_snapshot_initialized }} }} {dirty(1)} }}",
               "\telse = {",
-              "\t\tif = { limit = { OR = { NOT = { var:sol_demand_snapshot_locations = num_locations } AND = { is_human = yes NOT = { var:sol_demand_snapshot_human = 1 } } AND = { is_ai = yes NOT = { var:sol_demand_snapshot_human = 0 } } } } set_variable = { name = sol_substitute_dirty value = 1 } }",
-              "\t\tevery_owned_location = { limit = { is_land = yes }",
-              "\t\t\tif = { limit = { NOT = { has_variable = sol_demand_snapshot_country } } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
-              "\t\t\telse_if = { limit = { NOT = { var:sol_demand_snapshot_country = scope:sol_sub_check_country } } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
+              f"\t\tif = {{ limit = {{ NOT = {{ var:sol_demand_snapshot_locations = num_locations }} }} {dirty(2)} }}",
+              "\t\tif = { limit = { OR = { AND = { is_human = yes NOT = { var:sol_demand_snapshot_human = 1 } } AND = { is_ai = yes NOT = { var:sol_demand_snapshot_human = 0 } } NOT = { has_variable = sol_demand_snapshot_enabled } AND = { sol_substitution_is_on = yes NOT = { var:sol_demand_snapshot_enabled = 1 } } AND = { sol_substitution_is_on = no NOT = { var:sol_demand_snapshot_enabled = 0 } } NOT = { has_variable = sol_demand_snapshot_version } NOT = { var:sol_demand_snapshot_version = 2 } } } " + dirty(1) + " }",
+              "\t\tevery_owned_location = { limit = { is_land = yes scope:sol_sub_check_country = { var:sol_substitute_dirty = 0 } }",
+              "\t\t\tif = { limit = { NOT = { has_variable = sol_demand_snapshot_country } } scope:sol_sub_check_country = { " + dirty(2) + " } }",
+              "\t\t\telse_if = { limit = { NOT = { var:sol_demand_snapshot_country = scope:sol_sub_check_country } } scope:sol_sub_check_country = { " + dirty(2) + " } }",
               "\t\t\tif = { limit = { exists = market }",
               "\t\t\t\tmarket = { save_scope_as = sol_sub_check_market }",
-              "\t\t\t\tif = { limit = { OR = { NOT = { has_global_variable_map = sol_market_substitute_cache } NOT = { is_key_in_global_variable_map = { name = sol_market_substitute_cache target = scope:sol_sub_check_market } } } } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
-              "\t\t\t\tif = { limit = { NOT = { has_variable = sol_demand_snapshot_market } } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
-              "\t\t\t\telse_if = { limit = { NOT = { var:sol_demand_snapshot_market = scope:sol_sub_check_market } } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
-              "\t\t\t} else_if = { limit = { has_variable = sol_demand_snapshot_market } scope:sol_sub_check_country = { set_variable = { name = sol_substitute_dirty value = 1 } } }",
+              "\t\t\t\tif = { limit = { OR = { NOT = { has_global_variable_map = sol_market_substitute_cache } NOT = { is_key_in_global_variable_map = { name = sol_market_substitute_cache target = scope:sol_sub_check_market } } } } scope:sol_sub_check_country = { " + dirty(4) + " } }",
+              "\t\t\t\tif = { limit = { NOT = { has_variable = sol_demand_snapshot_market } } scope:sol_sub_check_country = { " + dirty(3) + " } }",
+              "\t\t\t\telse_if = { limit = { NOT = { var:sol_demand_snapshot_market = scope:sol_sub_check_market } } scope:sol_sub_check_country = { " + dirty(3) + " } }",
+              "\t\t\t} else_if = { limit = { has_variable = sol_demand_snapshot_market } scope:sol_sub_check_country = { " + dirty(3) + " } }",
               "\t\t}", "\t}"]
-    for good in CORE:
-        lines += [f"\tif = {{ limit = {{ has_variable = sol_good_effective_{good} }}",
-                  f"\t\tset_local_variable = {{ name = sol_sub_check_external value = {{ value = 1 add = modifier:global_{good}_pop_demand }} }}",
-                  f"\t\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} has_variable = sol_sub_size_{good} }} change_local_variable = {{ name = sol_sub_check_external subtract = var:sol_sub_size_{good} }} }}",
-                  "\t\tchange_local_variable = { name = sol_sub_check_external min = 0 }",
+    for good_index, good in enumerate(CORE, 1):
+        lines += [f"\tif = {{ limit = {{ var:sol_substitute_dirty = 0 }}",
+                  f"\t\tif = {{ limit = {{ has_variable = sol_sub_applied_{good} NOT = {{ has_country_modifier = sol_substitute_{good} }} }} {dirty(5)} set_variable = {{ name = sol_sub_perf_dirty_good value = {good_index} }} }}",
+                  f"\t\tif = {{ limit = {{ var:sol_substitute_dirty = 0 OR = {{ NOT = {{ has_variable = sol_demand_observed_total_{good} }} NOT = {{ has_variable = sol_good_effective_{good} }} NOT = {{ var:sol_demand_observed_total_{good} = modifier:global_{good}_pop_demand }} }} }}",
+                  "\t\tremove_local_variable = sol_sub_check_external",
+                  "\t\tset_local_variable = { name = sol_sub_check_actual_own value = 0 }",
+                  f'\t\tif = {{ limit = {{ has_country_modifier = sol_substitute_{good} }} set_local_variable = {{ name = sol_sub_check_actual_own value = "country_modifier_strength(sol_substitute_{good})" }} }}',
+                  f"\t\tif = {{ limit = {{ sol_substitution_is_on = yes has_variable = sol_sub_live_{good} NOT = {{ var:sol_sub_live_{good} = local_var:sol_sub_check_actual_own }} }} {dirty(7)} }}",
+                  f"\t\tif = {{ limit = {{ has_variable = sol_good_effective_{good} }}",
+                  "\t\t# Clamp in script-value math; effect min is not this lower bound.",
+                  f"\t\tset_local_variable = {{ name = sol_sub_check_external value = {{ value = 1 add = modifier:global_{good}_pop_demand subtract = local_var:sol_sub_check_actual_own min = 0 }} }}",
                   f"\t\tif = {{ limit = {{ sol_substitution_is_on = yes has_variable = sol_sub_external_{good} }}",
-                  f"\t\t\tif = {{ limit = {{ NOT = {{ local_var:sol_sub_check_external = var:sol_sub_external_{good} }} }} set_variable = {{ name = sol_substitute_dirty value = 1 }} }}",
-                  f"\t\t}} else = {{ if = {{ limit = {{ NOT = {{ local_var:sol_sub_check_external = var:sol_good_effective_{good} }} }} set_variable = {{ name = sol_substitute_dirty value = 1 }} }} }}", "\t}",
-                  "\telse = { set_variable = { name = sol_substitute_dirty value = 1 } }"]
-    lines += ["\tremove_local_variable = sol_sub_check_external", "}"]
+                  f"\t\t\tif = {{ limit = {{ NOT = {{ local_var:sol_sub_check_external = var:sol_sub_external_{good} }} }} {dirty(6)} }}",
+                  f"\t\t}} else = {{ if = {{ limit = {{ NOT = {{ local_var:sol_sub_check_external = var:sol_good_effective_{good} }} }} {dirty(6)} }} }}", "\t}",
+                  "\t\telse = { " + dirty(1) + " }",
+                  "\t\tif = { limit = { var:sol_substitute_dirty = 1 }",
+                  f"\t\t\tset_variable = {{ name = sol_sub_perf_dirty_good value = {good_index} }}",
+                  f"\t\t\tif = {{ limit = {{ has_variable = sol_demand_observed_total_{good} }} set_variable = {{ name = sol_sub_perf_old_total value = var:sol_demand_observed_total_{good} }} }}",
+                  f"\t\t\tset_variable = {{ name = sol_sub_perf_new_total value = modifier:global_{good}_pop_demand }}",
+                  "\t\t\tset_variable = { name = sol_sub_perf_cached_own value = 0 }",
+                  f"\t\t\tif = {{ limit = {{ has_variable = sol_sub_applied_{good} }} set_variable = {{ name = sol_sub_perf_cached_own value = var:sol_sub_applied_{good} }} }}",
+                  "\t\t\tset_variable = { name = sol_sub_perf_actual_own value = local_var:sol_sub_check_actual_own }",
+                  "\t\t\tif = { limit = { has_local_variable = sol_sub_check_external } set_variable = { name = sol_sub_perf_external_now value = local_var:sol_sub_check_external } }",
+                  "\t\t}",
+                  f"\t\tif = {{ limit = {{ var:sol_substitute_dirty = 0 }} set_variable = {{ name = sol_demand_observed_total_{good} value = modifier:global_{good}_pop_demand }} }}",
+                  "\t\t}", "\t}"]
+    lines += ["\tremove_local_variable = sol_sub_check_external",
+              "\tremove_local_variable = sol_sub_check_actual_own",
+              "\tif = { limit = { var:sol_substitute_dirty = 1 }",
+              "\t\tif = { limit = { NOT = { has_variable = sol_sub_perf_dirty_count } } set_variable = { name = sol_sub_perf_dirty_count value = 0 } }",
+              "\t\tchange_variable = { name = sol_sub_perf_dirty_count add = 1 }",
+              "\t\t# Expose the recorded sample to script debug inspection too."]
+    for field in ("dirty_reason", "dirty_good", "old_total", "new_total", "cached_own", "actual_own", "external_now"):
+        lines.append(f"\t\tif = {{ limit = {{ has_variable = sol_sub_perf_{field} }} save_scope_value_as = {{ name = sol_sub_perf_trace_{field} value = var:sol_sub_perf_{field} }} }}")
+    lines += ["\t}", "}"]
     return "\n".join(lines) + "\n"

@@ -98,6 +98,19 @@
 
 ## 4. Text, numbers and icons
 
+**[Runtime lexer log + vanilla source] GUI strings do not accept backslash-n or backslash-t escapes.**
+The user 2026-10-15 log reports `Backslash followed by neither quote nor backslash`
+on every generated goods-cell tooltip. Use `[Localize('NEWLINE_BREAK')]` between
+tooltip sections, as `in_game/gui/shared/character_tooltips.gui:1571` does.
+Vanilla `main_menu/localization/english/economy_l_english.yml:38` and the Chinese
+equivalent define `NEWLINE_BREAK` as a localization newline; localization and GUI
+have different escaping rules. Escaping another backslash only makes the GUI
+string lexically valid and does not establish a displayed line break. Renderer
+`pdx.py` now rejects unsupported quoted-string escapes before expansion; bilingual
+hover tests verify seven location sections and six country sections, including
+additional lines for overlapping group memberships. Fresh in-game
+confirmation of the generated fix remains pending.
+
 **[Runtime log + vanilla source] Tooltip text templates need tooltip context.**
 `tooltip_text_block_template` inherits `fonttintcolor = "[ExtraTooltipInfo.GetTintColor]"`
 from `main_menu_cooltip_types.gui:336`. A regular situation panel has no

@@ -149,6 +149,8 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
         "\t# Also tracks which goods have suppressed demand (market_price > default_price).",
         "\tevery_market_in_world = {",
         "\t\tsave_scope_as = sol_market_cache",
+        "\t\t# Country-adjusted totals must not survive a price/supply map refresh.",
+        "\t\tremove_from_global_variable_map = { name = sol_country_market_spending_owner key = scope:sol_market_cache }",
     ]
 
     for pop_type in POP_TYPES:

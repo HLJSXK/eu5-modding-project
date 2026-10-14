@@ -87,3 +87,17 @@ in a real tooltip scenario. This is a source/offline fix pending a fresh runtime
 ## 2026-10-14 sheet C purchasing-power revision
 
 User replaced dials with a labelled bidirectional -50%..+50% bar, large raw value, and funds/baseline pair. All five estates use the same three values; population distribution charts and marker tracks are temporarily removed. F goods tiers persist. Previews in images/sheet_c_balances/ use mock data and are not new runtime evidence. Renderer already implements invertprogress; the regression now checks signed fill, endpoint cursor clamping and neutral zero baseline.
+
+## 2026-10-15 goods tooltip lexer regression
+
+The user runtime log reports lexer.cpp:805 on literal backslash-n escapes in
+SOL_economy_local.gui goods tooltips. The GUI generator now inserts vanilla
+`[Localize('NEWLINE_BREAK')]` (character_tooltips.gui:1571), preserving all hover
+sections and overlapping membership lines. The preview tokenizer previously
+accepted arbitrary escaped characters; it now rejects unsupported quoted-string
+escapes before parsing. Tests cover invalid escapes, valid quote/backslash escapes,
+comments, and real Chinese/English hover line breaks for country and location
+contexts. All 21 shipped GUI files pass the lexer scan; nine substitution UI and
+five layout tests pass. Eight bilingual panel previews are under
+`tmp/gui_escape_fix_20261015/`. This is runtime-error/source-backed repair with
+offline previews, not a new in-game screenshot or restart confirmation.

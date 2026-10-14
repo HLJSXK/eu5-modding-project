@@ -65,6 +65,14 @@ class SubstitutionUI(unittest.TestCase):
         node = parse(source)[0]
         return eng.ex.build(node.key, node.value, {}, '<goods cell>', 0)
 
+    def test_gui_lexer_rejects_invalid_escapes(self):
+        for escape in ('\\n', '\\t', '\\q'):
+            with self.subTest(escape=escape):
+                with self.assertRaisesRegex(ValueError, 'invalid quoted-string escape'):
+                    parse(f'widget = {{ tooltip = "first{escape}second" }}', 'bad.gui')
+        parse(r'widget = { tooltip = "escaped quote: \"; escaped slash: \\" }')
+        parse('# comment with "ignored\\n"\nwidget = { tooltip = "valid" }')
+
     def test_all_memberships_and_compat_extras(self):
         expected = []
         with (ROOT / 'data/goods_weights.csv').open(encoding='utf-8-sig', newline='') as handle:
@@ -95,12 +103,16 @@ class SubstitutionUI(unittest.TestCase):
             with self.subTest(language=language):
                 eng, log = self.engine(scenarios.tooltip(), language)
                 text = eng.process(self.cell(eng).props['tooltip'], raw=True)
+                membership_lines = len(eng.loc.get('SOL_GOOD_SUB_cloth').splitlines())
+                self.assertEqual(len(text.splitlines()), 6 + membership_lines)
+                self.assertNotIn('\\n', text)
                 self.assertIn('0.88', text)
                 self.assertIn('0.50', text)
                 self.assertIn(eng.loc.get('SOL_SUB_ACTIVE'), text)
                 self.assertNotIn('SOL_', text)
                 country, country_log = self.engine(scenarios.situation(), language)
                 text = country.process(self.cell(country, scope='Player.MakeScope').props['tooltip'], raw=True)
+                self.assertEqual(len(text.splitlines()), 5 + membership_lines)
                 self.assertNotIn(country.loc.get('SOL_SUB_PRICE_WEIGHT'), text)
                 self.assertIn('0.88', text)
                 # A missing market must not invent the neutral price weight 1.
@@ -227,7 +239,7 @@ class SubstitutionUI(unittest.TestCase):
         for coef in (-1, -.5, -.25, 0, .25, .5, 5):
             eng, log = self.engine([])
             expr = f"'(CFixedPoint){coef}'"
-            source = '\\n'.join(balance_cursor(0, 220, expr))
+            source = '\n'.join(balance_cursor(0, 220, expr))
             node = parse(source)[0]
             element = eng.ex.build(node.key, node.value, {}, '<balance cursor>', 0)
             eng.measure(element, None)
@@ -235,7 +247,7 @@ class SubstitutionUI(unittest.TestCase):
             marker = next(c for c in element.children if c.backgrounds)
             share = max(0, min(1, coef + .5))
             self.assertAlmostEqual(marker.x, share * 218, delta=.1)
-            source = '\\n'.join(bidirectional_bar(0, 220, expr))
+            source = '\n'.join(bidirectional_bar(0, 220, expr))
             node = parse(source)[0]
             bar = eng.ex.build(node.key, node.value, {}, '<bidirectional bar>', 0)
             progresses = [c for c in walk(bar) if c.kind == 'progressbar']

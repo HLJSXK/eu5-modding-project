@@ -1964,7 +1964,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
 def emit_section_40_country_update_and_map(writer: ScriptWriter) -> None:
     writer.extend([
         "sol_apply_local_pop_demand_modifiers = {",
-        "\tsol_apply_country_substitution = yes",
+        "\t# Country goods modifiers are permanent and updated only by substitution refresh.",
         "\t# root = country. Writes the one-month modifier from each location's already-cached",
         "\t# sol_location_pop_demand_modifier_size without re-solving. Split out of",
         "\t# sol_update_local_pop_demand_modifiers so AI countries under the reduced-frequency",
