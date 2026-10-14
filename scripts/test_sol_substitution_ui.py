@@ -5,6 +5,7 @@ This checks mock data, source scopes and layout; it does not simulate engine hov
 """
 import csv
 import os
+import operator
 import re
 import sys
 import unittest
@@ -27,6 +28,7 @@ from gui import Expander, GuiDB
 from pdx import parse
 from sol_goods_ui import _consumed_expr, _good_cell, render_goods_vbox, GOODS_CONTENT_W, LOCATION_CARD_W
 from sol_substitution import CORE
+from gen_sol_goods_tooltip import inject, inject_market, price_template, VANILLA_GUI, VANILLA_MARKET_GUI, PRICE_TIERS
 
 
 def walk(element):
@@ -35,11 +37,19 @@ def walk(element):
         yield from walk(child)
 
 
+def visible_walk(engine, element):
+    if engine.visible(element):
+        yield element
+        for child in element.children:
+            yield from visible_walk(engine, child)
+
+
 class SubstitutionUI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.db = GuiDB()
         cls.formats, cls.icons = Formats(), TextIcons()
+        cls.localizations = {}
         cls.old_language = binding.LANG
         cls.old_texture_search = list(textures.SEARCH)
         textures.SEARCH[:0] = [ROOT / 'reference_mods/3613232232/main_menu',
@@ -56,8 +66,14 @@ class SubstitutionUI(unittest.TestCase):
     def engine(self, mocks, language='simp_chinese'):
         binding.LANG = language
         log = []
-        ev = Evaluator(mocks, Loc(), log)
+        if language not in self.localizations:
+            self.localizations[language] = Loc()
+        ev = Evaluator(mocks, self.localizations[language], log)
         return Engine(Expander(self.db, log), ev, ev.loc, self.formats, self.icons, 1), log
+
+    def goods_engine(self, good='wine', ratio=None, language='simp_chinese', overrides=()):
+        eng, _ = self.engine([], language)
+        return self.engine(list(overrides) + scenarios.goods_tooltip(good, ratio, eng.loc), language)
 
     def cell(self, eng, good='cloth', scope='Location.GetMarket.MakeScope'):
         variable_map = 'sol_market_consumes' if scope.startswith('Location.') else 'gls_country_consumes'
@@ -259,6 +275,174 @@ class SubstitutionUI(unittest.TestCase):
         eng, log = self.engine([(r"Test.ScriptValue\('funds'\)", 5), (r"Test.ScriptValue\('need'\)", 0)])
         self.assertEqual(eng.resolve(f"[{f_coef('Test', 'funds', 'need')}]"), 0)
         self.assertFalse(log, log)
+
+    def test_goods_tooltip_preserves_vanilla_and_packages_both_targets(self):
+        vanilla = VANILLA_GUI.read_text(encoding='utf-8-sig')
+        market = VANILLA_MARKET_GUI.read_text(encoding='utf-8-sig')
+        for target in ('stable', 'sol_standalone'):
+            with self.subTest(target=target):
+                base = ROOT / 'src' / target
+                self.assertEqual((base / 'main_menu/gui/shared/goods_details.gui').read_text(encoding='utf-8'),
+                                 inject(vanilla) + price_template())
+                self.assertEqual((base / 'in_game/gui/shared/market_tooltips.gui').read_text(encoding='utf-8'),
+                                 inject_market(market) + price_template(market=True))
+                # A generic tooltip must be usable without any market/country data.
+                source = (base / 'main_menu/gui/shared/goods_details.gui').read_text(encoding='utf-8')
+                for scope in ('Market.', 'Player.', 'Location.'):
+                    self.assertNotIn(scope, source)
+
+    def test_goods_tooltip_all_memberships_and_unknown_good(self):
+        from sol_goods_order import GROUP_MEMBERS
+        for language in ('simp_chinese', 'english'):
+            for good in CORE + ['iron', 'third_party_good']:
+                with self.subTest(language=language, good=good):
+                    eng, log = self.goods_engine(good, language=language)
+                    node = parse('vbox = { using = goods_details }')[0]
+                    root = eng.ex.build(node.key, node.value, {}, '<goods details>', 0)
+                    width, height = eng.measure(root, None)['hint']
+                    eng.place(root, 0, 0, width, height)
+                    elements = list(visible_walk(eng, root))
+                    groups = [e.props['text'].removeprefix('SOL_GOOD_GROUP_') for e in elements
+                              if str(e.props.get('text', '')).startswith('SOL_GOOD_GROUP_')]
+                    expected = [group for group, members in GROUP_MEMBERS.items() if good in members]
+                    self.assertCountEqual(groups, expected)
+                    chips = [e.props['raw_text'][1:].split('!', 1)[0] for e in elements
+                             if str(e.props.get('raw_text', '')).startswith('@')]
+                    self.assertCountEqual(chips, [g for group in expected for g in GROUP_MEMBERS[group]])
+                    texts = [eng.text_of(e) for e in elements if e.kind == 'textbox']
+                    if not expected:
+                        self.assertNotIn(eng.loc.get('SOL_GOOD_SUB_NONE'), texts)
+                        self.assertNotIn(eng.loc.get('SOL_GOOD_SUBSTITUTES_HEADER'), texts)
+                        self.assertNotIn(eng.loc.get('SOL_GOOD_PRICE_TIERS'), texts)
+                    for element in elements:
+                        if element.w > 0:
+                            self.assertLessEqual(element.x + element.w, width + 1, element.typename)
+                    self.assertLessEqual(width, 422)
+                    self.assertFalse(log, log)
+
+    def test_ungrouped_goods_hide_entire_substitution_section(self):
+        for language in ('simp_chinese', 'english'):
+            for good in ('iron', 'third_party_good', 'default', ''):
+                for template in ('Goods_tooltip', 'Goods_Cards_tooltip', 'SpecificGoodsMarket_tooltip'):
+                    with self.subTest(language=language, good=good, template=template):
+                        market = template == 'SpecificGoodsMarket_tooltip'
+                        eng, log = self.goods_engine(good, 1.42 if market else None, language)
+                        if good != 'iron':
+                            # Unknown/default keys have no generated membership
+                            # localization. Their section must still disappear.
+                            self.assertIsNone(eng.loc.get('SOL_GOOD_SUB_' + good))
+                        node = next(n for n in self.db.templates[template] if n.is_block())
+                        root = eng.ex.build(node.key, node.value, {}, '<ungrouped goods tooltip>', 0)
+                        width, height = eng.measure(root, None)['hint']
+                        eng.place(root, 0, 0, width, height)
+                        elements = list(visible_walk(eng, root))
+                        self.assertFalse(any(e.typename == 'divider_center_gold' for e in elements))
+                        for element in elements:
+                            self.assertNotIn('SOL_GOOD_', str(element.props.get('text', '')))
+                            self.assertNotIn('SOL_GOOD_', str(element.props.get('raw_text', '')))
+                        self.assertTrue(any(e.typename == 'TooltipStatsBar' for e in elements))
+                        self.assertFalse(log, log)
+                        if self.out and good == 'iron':
+                            image = Image.new('RGBA', (int(width + 40), int(height + 40)), (40, 52, 46, 255))
+                            eng.place(root, 20, 20, width, height)
+                            eng.render(root, image)
+                            image.save(self.out / f'ungrouped_{template}_{language}.png')
+
+    def test_market_goods_tooltip_price_ratio_and_bilingual_bounds(self):
+        for language in ('simp_chinese', 'english'):
+            for template in ('Goods_tooltip', 'Goods_Cards_tooltip', 'SpecificGoodsMarket_tooltip'):
+                with self.subTest(language=language, template=template):
+                    market = template == 'SpecificGoodsMarket_tooltip'
+                    eng, log = self.goods_engine('wine', 1.42 if market else None, language)
+                    node = next(n for n in self.db.templates[template] if n.is_block())
+                    root = eng.ex.build(node.key, node.value, {}, '<goods tooltip>', 0)
+                    width, height = eng.measure(root, None)['hint']
+                    eng.place(root, 0, 0, width, height)
+                    texts = [eng.text_of(e) or '' for e in visible_walk(eng, root) if e.kind == 'textbox']
+                    self.assertEqual(sum('1.42' in text for text in texts), int(market))
+                    highlights = [e.props['name'] for e in visible_walk(eng, root)
+                                  if str(e.props.get('name', '')).startswith('sol_price_tier_active_')]
+                    self.assertEqual(highlights, ['sol_price_tier_active_4'] if market else [])
+                    if market:
+                        ratio_line = next(e for e in visible_walk(eng, root)
+                                          if 'SOL_GOOD_MARKET_RATIO_PREFIX' in str(e.props.get('raw_text', '')))
+                        self.assertGreaterEqual(ratio_line.w, 400)
+                        self.assertLessEqual(ratio_line.h, 50)
+                    weights = [text for text in texts if '×' in text]
+                    self.assertEqual(len(weights), 7)
+                    self.assertLessEqual(width, 444)
+                    self.assertLessEqual(height, 1080)
+                    self.assertFalse(log, log)
+                    self.assertFalse(eng.unresolved_contexts, eng.unresolved_contexts)
+                    if self.out:
+                        image = Image.new('RGBA', (int(width + 40), int(height + 40)), (40, 52, 46, 255))
+                        eng.place(root, 20, 20, width, height)
+                        eng.render(root, image)
+                        image.save(self.out / f'goods_{template}_{language}.png')
+        # Zero-base-price and invalid-market goods must never fabricate a ratio.
+        for mock in ((r'Goods.GetDefaultMarketPrice', 0), (r'Market.IsValid', False)):
+            eng, log = self.goods_engine('wine', 1.42, overrides=[mock])
+            node = next(n for n in self.db.templates['SpecificGoodsMarket_tooltip'] if n.is_block())
+            root = eng.ex.build(node.key, node.value, {}, '<invalid market tooltip>', 0)
+            eng.measure(root, None)
+            texts = [eng.text_of(e) or '' for e in visible_walk(eng, root) if e.kind == 'textbox']
+            self.assertFalse(any('1.42' in text for text in texts))
+            self.assertFalse(any(str(e.props.get('name', '')).startswith('sol_price_tier_active_')
+                                 for e in visible_walk(eng, root)))
+            self.assertFalse(log, log)
+
+    def test_current_price_tier_highlight_boundaries_and_pixels(self):
+        from sol_substitution import price_weight
+        ratios = [.2, .5, .75, 1, 1.42, 2, 3]
+        for boundary in (.4, .65, .85, 1.3, 1.7, 2.3):
+            ratios += [boundary - .0001, boundary, boundary + .0001]
+        for ratio in ratios:
+            with self.subTest(ratio=ratio):
+                eng, log = self.goods_engine('wine', ratio)
+                node = parse('vbox = { using = SOL_goods_market_price_tiers }')[0]
+                root = eng.ex.build(node.key, node.value, {}, '<current price tier>', 0)
+                width, height = eng.measure(root, None)['hint']
+                eng.place(root, 0, 0, width, height)
+                active = [e for e in visible_walk(eng, root)
+                          if str(e.props.get('name', '')).startswith('sol_price_tier_active_')]
+                expected = next(i for i, tier in enumerate(PRICE_TIERS) if float(tier[0]) == price_weight(ratio))
+                self.assertEqual([e.props['name'] for e in active], [f'sol_price_tier_active_{expected}'])
+                self.assertEqual((active[0].w, active[0].h), (58, 40))
+                self.assertFalse(log, log)
+        # Verify that selecting a tier really changes its pixels, while the
+        # unselected columns retain the generic legend's appearance.
+        images = []
+        for market in (False, True):
+            eng, log = self.goods_engine('wine', 1.42 if market else None)
+            template = 'SOL_goods_market_price_tiers' if market else 'SOL_goods_price_tiers'
+            node = parse(f'vbox = {{ using = {template} }}')[0]
+            root = eng.ex.build(node.key, node.value, {}, '<price tier pixels>', 0)
+            width, height = eng.measure(root, None)['hint']
+            eng.place(root, 0, 0, width, height)
+            image = Image.new('RGBA', (int(width), int(height)), (20, 20, 20, 255))
+            eng.render(root, image)
+            row = next(e for e in visible_walk(eng, root) if e.kind == 'hbox')
+            images.append((image, row.children))
+            self.assertFalse(log, log)
+        plain, columns = images[0]
+        selected = images[1][0]
+        for index, column in enumerate(columns):
+            rect = (int(column.x), int(column.y), int(column.x + column.w), int(column.y + column.h))
+            self.assertEqual(plain.crop(rect).tobytes() == selected.crop(rect).tobytes(), index != 4)
+
+    def test_goods_price_legend_intervals_match_runtime(self):
+        from sol_substitution import price_weight
+        comparisons = {'<': operator.lt, '<=': operator.le, '>': operator.gt}
+        for threshold in (.4, .65, .85, 1.3, 1.7, 2.3):
+            for ratio in (threshold - .0001, threshold, threshold + .0001):
+                matches = []
+                for weight, _, interval, _ in PRICE_TIERS:
+                    tokens = interval.split()
+                    values = [ratio if token == 'r' else float(token) for token in tokens[::2]]
+                    if all(comparisons[op](left, right) for op, left, right
+                           in zip(tokens[1::2], values, values[1:])):
+                        matches.append(float(weight))
+                self.assertEqual(matches, [price_weight(ratio)], ratio)
 
     def test_group_card_bounds_and_labels(self):
         for language in ('simp_chinese', 'english'):

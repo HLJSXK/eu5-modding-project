@@ -210,3 +210,41 @@ arbitrary `textcontext` strings into tooltip tables. Remaining known differences
 SOL now shows only three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use two progressbar halves around 0, with the negative half invertprogress = yes (vanilla societal_values_lateralview.gui). Scale labels are -50%, -25%, 0, +25%, +50%; clamp only the bar/cursor, never the large numeric value. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
 
 All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Local previews are in ai_gui_assessment/images/sheet_c_balances/.
+
+### Sheet C goods tooltips (2026-10-15)
+
+**[Vanilla/official source; offline bilingual previews; in-game confirmation pending.]**
+The actual goods tooltip is separate from the SOL basket cells' string hover.
+`goods_details` is shared by `Goods_tooltip`, `Goods_Cards_tooltip` and
+`SpecificGoodsMarket_tooltip` (production_tooltips.gui:458/495; market_tooltips.gui:1515).
+It shows tier/group labels and all member icon/name chips, including the hovered good,
+plus the seven static price preferences. Goods outside the membership table hide
+the complete substitution section: heading, dividers, membership rows, price
+preferences and the substitution market-price ratio. Gate on static membership,
+not a market's current supply or cached consumption, so grouped goods still show
+their alternatives when locally unavailable. The separate basket-cell hover keeps
+its ungrouped string for compatibility goods.
+Visibility uses an explicit allowlist from `goods_weights.csv`: extra goods from
+other mods and unknown/default/empty keys hide the section even when no
+`SOL_GOOD_SUB_<key>` localization exists. No fallback text or substitute data is
+evaluated for those goods. Bilingual regressions cover all three tooltip types.
+
+`block "sol_goods_price_context"` defaults to the static legend. Only the market
+use site supplies its override: vanilla already binds `Market.GetMarketEntry(Goods.Self)`.
+The generator owns that complete vanilla path and preserves every other block.
+The live ratio divides `Market.GetPrice(Goods.Self)` by `Goods.GetDefaultMarketPrice`
+(both CFixedPoint, official data_types_uncategorized.txt:98436/76572); guard zero base price
+and invalid markets. It is a live reference price, not the cached applied country
+multiplier. Preference boundaries match sol_substitution.py:29, including strict
+comparisons at 0.40/0.65/0.85/1.30/1.70/2.30; column tooltips spell out full intervals.
+The market-only `SOL_goods_market_price_tiers` highlights exactly one current
+tier with `bg_square_gold_tile` (backgrounds.gui:3176), drawn as a sized
+`ignore_layout = yes` child before the text. Compare the live price directly
+against `Multiply_CFixedPoint(base_price, threshold)`, matching the runtime;
+formatting or rounding the ratio first can select the wrong boundary tier.
+Generic/card legends have no active tier, and invalid markets, zero base prices
+and ungrouped goods have no highlight. Regression checks cover all seven tiers,
+every boundary and the actual selected-column pixels. In-game confirmation remains pending.
+Review images are in `ai_gui_assessment/images/sheet_c_goods/`. Generate them with
+`SOL_UI_PREVIEW_OUT` and `scripts/test_sol_substitution_ui.py`; the renderer CLI also
+accepts `run.py goods_tooltip wine 1.42` for a market preview.

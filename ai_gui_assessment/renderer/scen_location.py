@@ -176,29 +176,58 @@ def tooltip():
     ]
 
 
-def goods_tooltip(good="wine"):
-    """The goods tooltip for one good, to check the SOL substitute-group section.
-
-    `Goods.GetKey` returns the good's own key, so the section's
-    Localize(Concatenate('SOL_GOOD_SUB_', Goods.GetKey)) resolves to that good's real
-    generated localization - the same string the game prints.
-    """
+def goods_tooltip(good="wine", market_ratio=None, loc=None):
+    """One good, optionally in a market, for the shipped sheet C tooltip."""
+    from data import Loc
+    loc = loc or Loc()
+    name = loc.get(good) or good
+    icon = f"gfx/interface/icons/trade_goods/icon_goods_{good}.dds"
     goods = {
         "Goods.GetKey": good,
-        "Goods.GetName": good,
-        "Goods.GetNameWithNoTooltip": good,
+        "Goods.Self": good,
+        "Goods.GetName": name,
+        "Goods.GetNameWithNoTooltip": name,
         "Goods.GetDefaultMarketPrice": 3.2,
-        "Goods.GetFlavorText": "GOODS_FLAVOR_TEXT",
+        "Goods.GetFlavorText": loc.get(f"{good}_desc") or "",
         "Goods.IsRawMaterial": good in {"wheat", "rice", "millet", "maize", "potato", "legumes"},
         "Goods.GetNumSources": 4,
         "Goods.GetNumDemands": 7,
         "Goods.GetTransportWeight": 1.5,
         "Goods.GetFoodOutput": 8.0,
-        "Goods.HasPopsDemandInfo": True,
+        "Goods.HasPopsDemandInfo": False,
         "Goods.GetRawMaterialMethodInfo": "",
         "Goods.GetPopsDemandInfo": "",
         "Goods.GetDemandsInfo": "",
         "Goods.GetDemandsForBuildings": "",
     }
-    return location() + [(re.escape(key), value) for key, value in goods.items()]
+    extra = [
+        (r"GetGoodsIcon\(Goods.Self\)", icon),
+        (r"StringPairList.GetRows|StringPairList.GetFooter", []),
+        (r"StringPairList.GetTitle.IsStringViewNotEmptyOrNull", False),
+        (r"StringPairList.GetTitle.GetStringView", ""),
+        (r"ExtraTooltipInfo.IsDelayedInfoShowing|CanChangeMapMode|IsBuildDebug", False),
+        (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
+        (r"GetMapMode\('reactive_trade_good'\)", {"__type__": "MapMode"}),
+        (r"PdxGuiWidget.GetIndexInParent", 0),
+        (r"PdxGuiWidget.IsTextContextEmpty", True),
+        (r"UIAction.GetDescription", ""),
+    ]
+    if market_ratio is not None:
+        extra += [
+            (r"Market", {"__type__": "Market"}),
+            (r"Market.GetMarketEntry\(Goods.Self\)", {"__type__": "GoodsMarketEntry"}),
+            (r"GoodsMarketEntry.GetGoods", {"__type__": "Goods"}),
+            (r"Market.IsValid", True),
+            (r"Market.GetPrice\(Goods.Self\)", 3.2 * float(market_ratio)),
+            (r"Market.GetName", "Vienna"),
+            (r"Market.GetSupplyLabel\(.*\)", "24.00"),
+            (r"Market.GetDemandLabel\(.*\)", "20.00"),
+            (r"Market.GetSupplyFromTradesInfo\(.*\)|Market.GetDemandFromTradesInfo\(.*\)", ""),
+            (r"Market.GetSupply\(.*\)", 24),
+            (r"Market.GetDemand\(.*\)", 20),
+            (r"Market.GetPriceWithChange\(.*\)", 3.2 * float(market_ratio)),
+            (r"GoodsMarketEntry.GetStockpile", 68),
+            (r"Market.GetCenterLocation.GetModifierValueFixed\('maximum_stockpile_capacity'\)", 150),
+        ]
+    return extra + [(re.escape(key), value) for key, value in goods.items()] + location()
 

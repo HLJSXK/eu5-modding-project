@@ -134,15 +134,10 @@ def tooltip():
 
 
 
-def goods_tooltip(good="wine"):
-    """Render the goods tooltip with the SOL substitute-group section.
-
-    The section lives in the overridden main_menu/gui/shared/goods_details.gui, which
-    every goods tooltip splices with `using = goods_details`, so this checks the one
-    file that reaches Goods_tooltip, Goods_Cards_tooltip and SpecificGoodsMarket_tooltip.
-    """
-    db, ex, ev, eng, log = setup(scenarios.goods_tooltip(good))
-    body = db.templates["Goods_tooltip"]
+def goods_tooltip(good="wine", market_ratio=None):
+    """Render sheet C: goods_tooltip wine [1.42] adds actual market context."""
+    db, ex, ev, eng, log = setup(scenarios.goods_tooltip(good, market_ratio))
+    body = db.templates["SpecificGoodsMarket_tooltip" if market_ratio is not None else "Goods_tooltip"]
     tt = [n for n in body if n.is_block()][0]
     el = ex.build(tt.key, tt.value, {}, "in_game/gui/shared/production_tooltips.gui", 0)
     m = eng.measure(el, None)

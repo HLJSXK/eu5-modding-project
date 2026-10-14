@@ -1,39 +1,20 @@
 #!/usr/bin/env python3
-"""Generate the SOL goods tooltip override (substitute-group section).
+"""Generate sheet C goods tooltips for stable and standalone.
 
-Overrides main_menu/gui/shared/goods_details.gui for the stable and standalone
-targets. That one file is the right seam: its `goods_details` template is spliced
-with `using = goods_details` by every goods tooltip in the game - Goods_tooltip
-(production_tooltips.gui:406), Goods_Cards_tooltip and SpecificGoodsMarket_tooltip
-(market_tooltips.gui:1473) - so one override reaches all of them, and it is small
-(210 lines) rather than the 1440- or 4598-line files that also use it.
-
-WHAT IS SHOWN
--------------
-Only substitute-group membership, which is a static property of the good: which
-demand groups it belongs to and which goods substitute for it inside each. That is
-true in every context, so it needs no scope.
-
-Two things are deliberately NOT shown here:
-
-  * the country-level SOL substitute multiplier - the generic goods tooltip has no
-    single consuming country (a good is demanded by every country that trades it),
-    and showing one country's multiplier would be a fiction. It belongs on a surface
-    that owns a country: add a block at the SpecificGoodsMarket_tooltip use site
-    (market_tooltips.gui:1523 `block "good_details_extra_info" {}`) or read it from
-    a country-scoped panel.
-  * the market price tier - needs a market in scope, so it likewise belongs on the
-    market-context section, not on the generic tooltip.
-
-Both are static-free extension points; this generator does not fabricate them.
+The shared goods_details keeps vanilla statistics and adds tier/group labels,
+icon-and-name chips (including the current good), and the seven price preferences.
+Only SpecificGoodsMarket_tooltip overrides the price section with a live market
+ratio. Its vanilla file is preserved apart from that single insertion; generic
+and card tooltips never acquire a fabricated market or consuming country.
 
 LOCALIZATION
 ------------
 Every good that can exist gets a key `SOL_GOOD_SUB_<good>`, generated from
 data/goods_weights.csv plus the vanilla goods and the goods the compat submods add.
-A good that belongs to no group gets the explicit "no substitute group" text rather
-than a blank block. A good from an unrelated third-party mod has no key and would
-print its raw key text - the one documented gap.
+A good that belongs to no group keeps the explicit "no substitute group" string
+for basket-cell hover. Graphical goods tooltips hide the entire substitution
+section, including its heading, dividers and price preferences, for ungrouped goods.
+This also handles unrelated third-party goods without a generated key.
 
 Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_goods_tooltip.py
@@ -61,12 +42,29 @@ GOODS_WEIGHTS = REPO_ROOT / "data" / "goods_weights.csv"
 VANILLA_GUI = (
     REPO_ROOT / "reference_game_files" / "game" / "main_menu" / "gui" / "shared" / "goods_details.gui"
 )
+VANILLA_MARKET_GUI = (
+    REPO_ROOT / "reference_game_files/game/in_game/gui/shared/market_tooltips.gui"
+)
 GAME_GUI = Path(
     r"C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V"
     r"\game\main_menu\gui\shared\goods_details.gui"
 )
 
 UTF8_BOM = b"\xef\xbb\xbf"
+
+from sol_goods_order import GROUP_TIERS
+from sol_goods_ui import GROUP_LABELS as SHORT_GROUP_LABELS, TIER_LABELS
+
+CONTENT_W = 420
+PRICE_TIERS = (
+    ("2", "<0.40", "r < 0.40", "G"),
+    ("1.5", "<0.65", "0.40 <= r < 0.65", "G"),
+    ("1.25", "<0.85", "0.65 <= r < 0.85", "G"),
+    ("1", "0.85–1.30", "0.85 <= r <= 1.30", "E"),
+    ("0.75", ">1.30", "1.30 < r <= 1.70", "R"),
+    ("0.5", ">1.70", "1.70 < r <= 2.30", "R"),
+    ("0.25", ">2.30", "r > 2.30", "R"),
+)
 
 # The compat submods add goods through INJECT blocks in their generated goods files.
 MOD_GOODS_DIRS = [
@@ -135,7 +133,8 @@ def _vanilla_goods() -> set[str]:
     goods: set[str] = set()
     if not VANILLA_GOODS_DIR.exists():
         return goods
-    pattern = re.compile(r"^\s*([a-z][a-z_0-9]*)\s*=\s*\{")
+    # Only top-level objects are goods, not demand_add/custom_tags children.
+    pattern = re.compile(r"^([a-z][a-z_0-9]*)\s*=\s*\{")
     for path in sorted(VANILLA_GOODS_DIR.glob("*.txt")):
         for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
             line = line.split("#", 1)[0]
@@ -167,29 +166,131 @@ def _all_goods() -> list[str]:
 
 # ------------------------------------------------------------------------ gui text
 def goods_block() -> str:
-    """The section injected into `template goods_details`.
+    """Static memberships and price legend; safe with only Goods in context."""
+    by_good, by_group = _memberships()
+    lines = [
+        "\t# ---- SOL sheet C goods ---------------------------------------------------",
+        f'\tvbox = {{ visible = "[{_member_condition(sorted(by_good))}]" layoutpolicy_horizontal = expanding spacing = 4',
+        '\t\ttext_single = { size = { 420 23 } autoresize = no text = "SOL_GOOD_SUBSTITUTES_HEADER" fontsize = 15 align = left|nobaseline }',
+        "\t\tdivider_center_gold = {}",
+    ]
+    for _, groups in GROUP_TIERS:
+        for group in groups:
+            members = by_group[group]
+            lines += [
+                f'\t\thbox = {{ visible = "[{_member_condition(members)}]" layoutpolicy_horizontal = expanding spacing = 4',
+                f'\t\t\ttext_single = {{ size = {{ 108 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline text = "SOL_GOOD_GROUP_{group}" tooltip = "SOL_GOOD_GROUP_{group}" }}',
+                "\t\t\tvbox = { layoutpolicy_horizontal = expanding spacing = 2",
+            ]
+            # Explicit wrapping; a layout box does not wrap at its available width.
+            for start in range(0, len(members), 4):
+                lines.append("\t\t\t\thbox = { layoutpolicy_horizontal = expanding spacing = 2")
+                for good in members[start:start + 4]:
+                    lines.append(
+                        '\t\t\t\t\ttext_single = { size = { 75 27 } autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
+                        f'using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{good}\')]" tooltip = "{good}" }}'
+                    )
+                lines += ["\t\t\t\t\texpand = {}", "\t\t\t\t}"]
+            lines += ["\t\t\t}", "\t\t}"]
+    lines += [
+        "\t}",
+        '\tblock "sol_goods_price_context" { using = SOL_goods_price_tiers }',
+    ]
+    return "\n".join(lines) + "\n"
 
-    Both children are vanilla TooltipTextBlock. `text` is the property that resolves
-    an embedded expression here - the same shape the template already uses for
-    `text = "[Goods.GetDemandsInfo]"`.
+
+def _member_condition(goods: list[str]) -> str:
+    """Explicit member allowlist; unknown, default and empty keys do not match."""
+    condition = f"EqualTo_string(Goods.GetKey, '{goods[0]}')"
+    for good in goods[1:]:
+        condition = f"Or({condition}, EqualTo_string(Goods.GetKey, '{good}'))"
+    return condition
+
+
+def market_price_ratio() -> str:
+    positive = "GreaterThan_CFixedPoint(Goods.GetDefaultMarketPrice, '(CFixedPoint)0')"
+    return f"Divide_CFixedPoint(Market.GetPrice(Goods.Self), Select_CFixedPoint({positive}, Goods.GetDefaultMarketPrice, '(CFixedPoint)1'))"
+
+
+def price_tier_condition(interval: str) -> str:
+    """Compare actual prices to scaled base prices, as the runtime does.
+
+    Dividing or formatting the ratio first can round a price across a boundary.
+    The intervals also supply column tooltips, so the two stay consistent.
     """
+    tokens = interval.split()
+    operands = ["Market.GetPrice(Goods.Self)" if token == "r" else
+                f"Multiply_CFixedPoint(Goods.GetDefaultMarketPrice, '(CFixedPoint){token}')"
+                for token in tokens[::2]]
+    comparisons = {"<": "LessThan_CFixedPoint", "<=": "LessThanOrEqualTo_CFixedPoint",
+                   ">": "GreaterThan_CFixedPoint"}
+    parts = [f"{comparisons[op]}({left}, {right})"
+             for op, left, right in zip(tokens[1::2], operands, operands[1:])]
+    inside = parts[0] if len(parts) == 1 else f"And({parts[0]}, {parts[1]})"
+    return f"And(And(Market.IsValid, GreaterThan_CFixedPoint(Goods.GetDefaultMarketPrice, '(CFixedPoint)0')), {inside})"
+
+
+def price_template(market: bool = False) -> str:
+    grouped = sorted(_memberships()[0])
+    lines = [
+        f"\ntemplate {'SOL_goods_market_price_tiers' if market else 'SOL_goods_price_tiers'} {{",
+        f'\tvbox = {{ visible = "[{_member_condition(grouped)}]" layoutpolicy_horizontal = expanding spacing = 4',
+        '\t\ttext_single = { size = { 420 23 } autoresize = no text = "SOL_GOOD_PRICE_TIERS" fontsize = 15 align = left|nobaseline }',
+        "\t\tdivider_center_gold = {}",
+        "\t\thbox = { layoutpolicy_horizontal = expanding spacing = 2",
+    ]
+    for index, (weight, label, interval, color) in enumerate(PRICE_TIERS):
+        lines.append(f'\t\t\tvbox = {{ size = {{ 58 40 }} layoutpolicy_horizontal = fixed spacing = 2 using = bg_number_container_bckg tooltip = "SOL_GOOD_PRICE_TIER_{index}"')
+        if market:
+            lines.append(
+                f'\t\t\t\twidget = {{ name = "sol_price_tier_active_{index}" size = {{ 58 40 }} ignore_layout = yes '
+                f'visible = "[{price_tier_condition(interval)}]" using = bg_square_gold_tile }}'
+            )
+        lines += [
+            f'\t\t\t\ttext_single = {{ size = {{ 58 19 }} autoresize = no align = center fontsize = 13 raw_text = "#{color} ×{weight}#!" }}',
+            f'\t\t\t\ttext_single = {{ size = {{ 58 17 }} autoresize = no align = center fontsize = 11 raw_text = "{label}" }}',
+            "\t\t\t}",
+        ]
+    lines += ["\t\t}", "\t}", "}"]
+    return "\n".join(lines) + "\n"
+
+
+def market_price_block() -> str:
+    grouped = _member_condition(sorted(_memberships()[0]))
+    ratio = market_price_ratio()
     return (
-        "\t# ---- SOL substitute groups -------------------------------------------------\n"
-        "\t# Data: data/goods_weights.csv. Membership is static per good, so this reads\n"
-        "\t# nothing scoped and is correct in every goods tooltip.\n"
-        "\t# The country multiplier and the market price tier are NOT shown here: the\n"
-        "\t# generic tooltip owns neither a country nor a market. Add them at a use site\n"
-        "\t# that does (market_tooltips.gui:1523 `block \"good_details_extra_info\" {}`).\n"
-        "\tTooltipTextBlock = {\n"
-        '\t\tblockoverride "text" { text = "SOL_GOOD_SUBSTITUTES_HEADER" }\n'
-        "\t}\n"
-        "\n"
-        "\tTooltipTextBlock = {\n"
-        '\t\tblockoverride "text" {\n'
-        '\t\t\ttext = "[Localize(Concatenate(\'SOL_GOOD_SUB_\', Goods.GetKey))]"\n'
-        "\t\t}\n"
-        "\t}\n"
+        '\n\t\t\t# SOL: only this use site owns Market; generic goods stay static.\n'
+        '\t\t\tblockoverride "sol_goods_price_context" {\n'
+        '\t\t\t\tvbox = {\n'
+        f'\t\t\t\t\tvisible = "[And(Market.IsValid, {grouped})]"\n'
+        '\t\t\t\t\tlayoutpolicy_horizontal = expanding\n'
+        '\t\t\t\t\tspacing = 4\n'
+        '\t\t\t\t\tusing = SOL_goods_market_price_tiers\n'
+        '\t\t\t\t\ttext_multi = {\n'
+        '\t\t\t\t\t\tlayoutpolicy_horizontal = expanding\n'
+        '\t\t\t\t\t\tautoresize = yes\n'
+        '\t\t\t\t\t\talign = left|nobaseline\n'
+        '\t\t\t\t\t\tvisible = "[GreaterThan_CFixedPoint(Goods.GetDefaultMarketPrice, \'(CFixedPoint)0\')]"\n'
+        f'\t\t\t\t\t\tmax_width = {CONTENT_W}\n'
+        '\t\t\t\t\t\tfontsize = 13\n'
+        f'\t\t\t\t\t\traw_text = "[Localize(\'SOL_GOOD_MARKET_RATIO_PREFIX\')] #high [{ratio}|2]#! [Localize(\'SOL_GOOD_MARKET_RATIO_SUFFIX\')]"\n'
+        '\t\t\t\t\t}\n'
+        '\t\t\t\t}\n'
+        '\t\t\t}\n'
     )
+
+
+def inject_market(source: str) -> str:
+    """Change only SpecificGoodsMarket_tooltip, preserving every vanilla block."""
+    start = source.index("template SpecificGoodsMarket_tooltip {")
+    # Put the override on the actual instance, alongside title/tooltip_content
+    # overrides. An override nested in another override's raw contents is not
+    # an instance override and is discarded by the renderer's expansion stage.
+    needle = "\tContextualTooltipType = {\n"
+    position = source.index(needle, start) + len(needle)
+    block = "\n".join(line[1:] if line.startswith("\t") else line
+                      for line in market_price_block().split("\n"))
+    return source[:position] + block + source[position:]
 
 
 def inject(source: str) -> str:
@@ -219,9 +320,12 @@ def gui_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
     source = source_path.read_text(encoding="utf-8-sig", errors="replace")
     if "\ufeff" in source:
         source = source.replace("\ufeff", "")
-    patched = inject(source)
+    patched = inject(source) + price_template()
     relative = Path("main_menu") / "gui" / "shared" / "goods_details.gui"
-    return {root / relative: patched for root in roots}
+    market_source = VANILLA_MARKET_GUI.read_text(encoding="utf-8-sig")
+    market_relative = Path("in_game/gui/shared/market_tooltips.gui")
+    return {**{root / relative: patched for root in roots},
+            **{root / market_relative: inject_market(market_source) + price_template(market=True) for root in roots}}
 
 
 # ------------------------------------------------------------------ localization
@@ -252,6 +356,23 @@ def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
             f" {HEADER[language][0]}: \"{HEADER[language][1]}\"",
             f" {NONE_LABEL[language][0]}: \"{NONE_LABEL[language][1]}\"",
         ]
+        index = 0 if language == "english" else 1
+        strings = {
+            "SOL_GOOD_PRICE_TIERS": ("Price preference tiers", "价格偏好档位"),
+            "SOL_GOOD_MARKET_RATIO_PREFIX": ("This market's price is", "本市场价格为基础价的"),
+            "SOL_GOOD_MARKET_RATIO_SUFFIX": ("times the base price.", "倍。"),
+        }
+        for tier, groups in GROUP_TIERS:
+            for group in groups:
+                strings[f"SOL_GOOD_GROUP_{group}"] = tuple(
+                    f"#E {TIER_LABELS[tier][i]}#! {SHORT_GROUP_LABELS[group][i]}" for i in (0, 1)
+                )
+        for number, (weight, _, interval, _) in enumerate(PRICE_TIERS):
+            strings[f"SOL_GOOD_PRICE_TIER_{number}"] = (
+                f"Price / base price: {interval}. Preference weight: ×{weight}.",
+                f"价格/基础价：{interval}。价格偏好权重：×{weight}。",
+            )
+        lines += [f' {key}: "{value[index]}"' for key, value in strings.items()]
         for good in _all_goods():
             lines.append(f' SOL_GOOD_SUB_{good}: "{_good_line(good, by_good, by_group, language)}"')
             # Selected only by the location hover when the market entry exists.
