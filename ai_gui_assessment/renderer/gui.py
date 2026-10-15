@@ -221,6 +221,26 @@ class Expander:
         entries.extend(self.expand_entries(body, new_ctx))
         el = Element(kind=kind, typename=key, src=src, line=line)
         self.fill(el, entries, new_ctx)
+        # The engine merges named siblings; drawing both hides accidental row
+        # overrides. Diagnose duplicates rather than claiming to emulate merging.
+        explicit_names = {
+            prop.value for entry in entries
+            if entry.is_block() and self.is_element_key(entry.key)
+            for prop in entry.value
+            if prop.key == 'name' and isinstance(prop.value, str)
+        }
+        named_children = {}
+        for child in el.children:
+            name = child.props.get('name')
+            if not isinstance(name, str) or not name or name not in explicit_names:
+                continue
+            if name in named_children:
+                previous = named_children[name]
+                self.log.append(
+                    f"DUPLICATE NAMED CHILD: {name} at {child.src}:{child.line}; "
+                    f"previous at {previous.src}:{previous.line}"
+                )
+            named_children[name] = child
         bt = el.props.pop("__buttontext__", None)
         if bt and ("text" in el.props or "raw_text" in el.props):
             tb = self.build(*bt)

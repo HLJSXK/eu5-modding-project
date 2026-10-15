@@ -183,6 +183,10 @@ save data (all values are mock data). Static `dropdown` and `ranged_slider` stat
 arbitrary `textcontext` strings into tooltip tables. Remaining known differences are listed in
 [`ai_gui_assessment/08_round2_results.md`](../../ai_gui_assessment/08_round2_results.md).
 
+### Named sibling containers (2026-10-15)
+
+**[Runtime log; crash fix awaiting engine retest.]** The crash bundle Europa Universalis V20261015_055545 records pdx_gui_factory.cpp:535 warnings that duplicate named children override earlier widgets. Reusing sol_balance_estate_row made the clergy row override the nobles container and its named children. Give the five outer containers unique names; local child names may repeat under different parents. The renderer now diagnoses explicit sibling collisions; inherited defaults such as vanilla expand are outside this diagnostic. Repeated stack addresses do not identify parser functions without symbols. The earlier claim that a positioned hbox inside a plain widget is intrinsically invalid was incorrect: the box-child rule concerns its immediate parent.
+
 ## 7. Further reading
 
 | Document | Content |
@@ -204,12 +208,12 @@ arbitrary `textcontext` strings into tooltip tables. Remaining known differences
 - **[Mod source]** Funds/baseline minus one is distinct from the final country-solver demand coefficient. By explicit user decision, all SOL GUI consumption balances use raw location alpha (displayed as alpha minus one); the country panel aggregates raw funds and baseline. Do not display country-solver beta or final/applied demand in panels or their tooltips. The location modifier retains the actual applied result. Goods count/gold line reflect cached supply, not consumption.
 
 
-### Current SOL layout decision: sheet C balances (2026-10-14)
+### Current SOL layout decision: compact sheet C balances (2026-10-15)
 
 **User-directed design, source-backed bars, offline preview checked; new runtime confirmation pending.**
-SOL now shows only three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use two progressbar halves around 0, with the negative half invertprogress = yes (vanilla societal_values_lateralview.gui). Scale labels are -50%, -25%, 0, +25%, +50%; clamp only the bar/cursor, never the large numeric value. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
+SOL shows three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use centered signed nonlinear bars with one shared numeric ruler (-100%, -50%, 0%, +100%, +200%) above the estate rows. Every track keeps two short minor ticks and a fixed two-unit-wide zero line. Labels, tracks and right-aligned values share columns. Estate rows are 42 units high with 18-point percentages and an 11-point gray funds / baseline pair underneath; its bilingual tooltip explains the ordering. The 64-unit total row has a faint gold background and one-unit gold outline, a 12-unit bar (estate bars: 8), and a 24-point percentage. No numeric scale is repeated inside individual rows. The negative fill uses `1-q²` for funds/base `q` in 0..1, with cursor position `q²/2`; positive raw balance `c=q-1` uses `c(4-c)/4` in 0..2, with cursor position `1/2 + fill/2`. Zero funds reaches -100%, baseline reaches centered 0%, and three times baseline reaches +200%. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
 
-All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Local previews are in ai_gui_assessment/images/sheet_c_balances/.
+All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Current bilingual previews are in ai_gui_assessment/images/compact_balances_20261015/; these use mock data, and new in-game confirmation is pending.
 
 ### Sheet C goods tooltips (2026-10-15)
 

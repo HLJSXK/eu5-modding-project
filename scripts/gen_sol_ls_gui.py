@@ -2,8 +2,9 @@
 """Generate SOL economy surfaces: sheet C balances plus F goods tiers.
 
 The total and five estate rows show raw alpha minus one, available funds and
-baseline spending. A labelled bidirectional bar spans -50%..+50%; the large
-number is never clamped. Country rows summarize raw funds and baseline.
+baseline spending. The bar maps raw alpha-minus-one through a nonlinear
+-100%..+200% curve; the right-aligned raw number is never clamped.
+A single estate ruler, compact funds/base pairs and a gold total row reduce clutter.
 Population distributions and dials are temporarily excluded by user decision.
 Both base targets and PP/JTG compatibility share the goods renderer.
 """
@@ -57,74 +58,121 @@ def f_coef(scope: str, funds: str, need: str) -> str:
     return f"Select_CFixedPoint({consumed}, {ratio}, '(CFixedPoint)0')"
 
 
-def balance_cursor(base: int, width: int, coef: str) -> list[str]:
+def f_capacity_components(scope: str, funds: str, need: str) -> tuple[str, str, str]:
+    """Return negative fill, positive fill and cursor position for alpha - 1."""
+    consumed = f"GreaterThan_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0')"
+    ratio = (
+        f"Divide_CFixedPoint({scope}.ScriptValue('{funds}'), "
+        f"Max_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0.0001'))"
+    )
+    bounded_ratio = f"Min_CFixedPoint(Max_CFixedPoint({ratio}, '(CFixedPoint)0'), '(CFixedPoint)1')"
+    ratio_square = f"Multiply_CFixedPoint({bounded_ratio}, {bounded_ratio})"
+    negative = f"Select_CFixedPoint({consumed}, Subtract_CFixedPoint('(CFixedPoint)1', {ratio_square}), '(CFixedPoint)0')"
+
+    raw = f"Subtract_CFixedPoint({ratio}, '(CFixedPoint)1')"
+    positive_delta = f"Min_CFixedPoint(Max_CFixedPoint({raw}, '(CFixedPoint)0'), '(CFixedPoint)2')"
+    positive_remainder = f"Subtract_CFixedPoint('(CFixedPoint)4', {positive_delta})"
+    positive_curve = f"Divide_CFixedPoint(Multiply_CFixedPoint({positive_delta}, {positive_remainder}), '(CFixedPoint)4')"
+    positive = f"Select_CFixedPoint({consumed}, {positive_curve}, '(CFixedPoint)0')"
+    negative_position = f"Divide_CFixedPoint({ratio_square}, '(CFixedPoint)2')"
+    positive_position = f"Add_CFixedPoint('(CFixedPoint)0.5', Divide_CFixedPoint({positive}, '(CFixedPoint)2'))"
+    position = f"Select_CFixedPoint(GreaterThan_CFixedPoint({raw}, '(CFixedPoint)0'), {positive_position}, {negative_position})"
+    return negative, positive, position
+
+
+def balance_cursor(base: int, width: int, position: str, height: int = 14) -> list[str]:
     i = T(base)
-    clamped = f"Min_CFixedPoint(Max_CFixedPoint({coef}, '(CFixedPoint)-0.5'), '(CFixedPoint)0.5')"
-    weight = f"FixedPointToInt(Multiply_CFixedPoint(Add_CFixedPoint({clamped}, '(CFixedPoint)0.5'), '(CFixedPoint)10000'))"
+    clamped = f"Min_CFixedPoint(Max_CFixedPoint({position}, '(CFixedPoint)0'), '(CFixedPoint)1')"
+    weight = f"FixedPointToInt(Multiply_CFixedPoint({clamped}, '(CFixedPoint)10000'))"
     remainder = f"Subtract_int32('(int32)10000', {weight})"
     return [
-        f'{i}hbox = {{ size = {{ {width} 14 }}',
+        f'{i}hbox = {{ size = {{ {width} {height} }}',
         f'{i}\twidget = {{ layoutpolicy_horizontal = expanding visible = "[GreaterThan_int32({weight}, \'(int32)0\')]" layoutstretchfactor_horizontal = "[{weight}]" }}',
-        f'{i}\twidget = {{ size = {{ 2 14 }} background = {{ texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }} }}',
+        f'{i}\twidget = {{ size = {{ 2 {height} }} background = {{ texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }} }}',
         f'{i}\twidget = {{ layoutpolicy_horizontal = expanding visible = "[GreaterThan_int32({remainder}, \'(int32)0\')]" layoutstretchfactor_horizontal = "[{remainder}]" }}',
         f'{i}}}',
     ]
 
 
-def bidirectional_bar(base: int, width: int, coef: str) -> list[str]:
-    """Two explicit progressbars fill outwards from 0; cursor uses int32 weights."""
+def capacity_bar(base: int, width: int, negative: str, positive: str,
+                 position: str, height: int = 8) -> list[str]:
+    """Render ticks and centered signed fill; numeric labels live in one ruler."""
     i = T(base)
-    half = width // 2
-    negative = f"FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint(Subtract_CFixedPoint('(CFixedPoint)0', {coef}), '(CFixedPoint)0'), '(CFixedPoint)0.5'))"
-    positive = f"FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint({coef}, '(CFixedPoint)0'), '(CFixedPoint)0.5'))"
+    negative_value = f"FixedPointToFloat({negative})"
+    positive_value = f"FixedPointToFloat({positive})"
+    negative_width = width // 2
     out = [
-        f'{i}vbox = {{ size = {{ {width} 29 }} layoutpolicy_horizontal = fixed spacing = 1',
-        f'{i}\twidget = {{ size = {{ {width} 14 }}',
-        f'{i}\t\thbox = {{ size = {{ {width} 14 }} spacing = 0',
-        f'{i}\t\t\tprogressbar = {{ name = "sol_balance_negative" size = {{ {half} 10 }} min = 0 max = 0.5 value = "[{negative}]" invertprogress = yes progresstexture = "{F_TEX}/bar_red.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 }}',
-        f'{i}\t\t\tprogressbar = {{ name = "sol_balance_positive" size = {{ {width - half} 10 }} min = 0 max = 0.5 value = "[{positive}]" progresstexture = "{F_TEX}/bar_green.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 }}',
+        f'{i}widget = {{ name = "sol_balance_track" size = {{ {width} {height + 4} }}',
+        f'{i}\t\thbox = {{ size = {{ {width} {height} }} spacing = 0',
+        f'{i}\t\t\tprogressbar = {{ name = "sol_balance_negative" size = {{ {negative_width} {height} }} min = 0 max = 1 value = "[{negative_value}]" invertprogress = yes progresstexture = "{F_TEX}/bar_red.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 spriteType = Corneredstretched spriteborder = {{ 12 0 }} }}',
+        f'{i}\t\t\tprogressbar = {{ name = "sol_balance_positive" size = {{ {width - negative_width} {height} }} min = 0 max = 1 value = "[{positive_value}]" progresstexture = "{F_TEX}/bar_green.dds" noprogresstexture = "{F_TEX}/bar_track.dds" texture_density = 2 spriteType = Corneredstretched spriteborder = {{ 12 0 }} }}',
         f'{i}\t\t}}',
     ]
-    for tick in (0.25, 0.5, 0.75):
-        out.append(f'{i}\t\twidget = {{ size = {{ 1 6 }} position = {{ {int(width * tick)} 4 }} background = {{ texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }} }}')
-    out.extend(balance_cursor(base + 2, width, coef))
-    out.extend([f'{i}\t}}', f'{i}\twidget = {{ size = {{ {width} 14 }}'])
-    for fraction, label in ((0, "-50%"), (.25, "-25%"), (.5, "0"), (.75, "+25%"), (1, "+50%")):
-        x = round(fraction * (width - 32))
-        out.append(f'{i}\t\ttext_single = {{ size = {{ 32 14 }} position = {{ {x} 0 }} autoresize = no fontsize = 10 align = center|nobaseline raw_text = "{label}" }}')
-    out.extend([f'{i}\t}}', f'{i}}}'])
+    for tick_index, raw_balance in enumerate((-.5, 1)):
+        if raw_balance < 0:
+            mapped = .5 * (raw_balance + 1) * (raw_balance + 1)
+        else:
+            mapped = .5 + .5 * (raw_balance / 2) * (4 - raw_balance / 2) / 4
+        x = round(width * mapped)
+        out.append(f'{i}\twidget = {{ name = "sol_balance_minor_tick_{tick_index}" size = {{ 1 4 }} position = {{ {x} {height - 2} }} background = {{ texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }} }}')
+    out.extend(balance_cursor(base + 1, width, position, height + 4))
+    out.append(f'{i}\twidget = {{ name = "sol_balance_zero_tick" size = {{ 2 {height + 4} }} position = {{ {negative_width - 1} 0 }} background = {{ texture = "{F_TEX}/bar_tick.dds" texture_density = 2 }} }}')
+    out.append(f'{i}}}')
+    return out
+
+
+def balance_scale(base: int, width: int) -> list[str]:
+    """One shared ruler, aligned with the actual estate track coordinates."""
+    i = T(base)
+    out = [f'{i}widget = {{ name = "sol_balance_scale" size = {{ {width} 14 }}']
+    scale = ((-1, "-100%"), (-.5, "-50%"), (0, "0%"),
+             (1, "+100%"), (2, "+200%"))
+    for raw_balance, label in scale:
+        if raw_balance < 0:
+            q = raw_balance + 1
+            mapped = .5 * q
+        else:
+            mapped = .5 + .5 * (raw_balance / 2) * (4 - raw_balance / 2) / 4
+        x = min(width - 32, max(0, round(width * mapped - 16)))
+        out.append(f'{i}\ttext_single = {{ size = {{ 32 14 }} position = {{ {x} 0 }} autoresize = no fontsize = 10 align = center|nobaseline raw_text = "{label}" }}')
+    out.append(f'{i}}}')
     return out
 
 
 def balance_row(base: int, scope: str, funds: str, need: str, label: str,
                 width: int, hero: bool = False) -> list[str]:
-    """Exactly three data values, with light gold/striped decoration."""
+    """Align label, track and right-aligned values in a compact two-line row."""
     i = T(base)
-    margin = 8 if hero else 6
-    inner = width - margin * 2
-    values_w = 152 if width == 400 else 176
-    bar_w = inner - values_w - 12
+    margin, label_w, values_w, gap = 8, 110, 126, 10
+    bar_w = width - 2 * margin - label_w - values_w - 2 * gap
+    bar_x = margin + label_w + gap
+    values_x = width - margin - values_w
+    row_h = 64 if hero else 42
+    line_h = 28 if hero else 22
+    top = 8 if hero else 3
+    row_name = 'sol_balance_total_row' if hero else f'sol_balance_estate_row_{label.removeprefix("SOL_ESTATE_").lower()}'
     coef = f_coef(scope, funds, need)
+    negative, positive, position = f_capacity_components(scope, funds, need)
     consumed = f"GreaterThan_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0')"
     out = [
-        f'{i}hbox = {{ size = {{ {width} {76 if hero else 58} }} layoutpolicy_horizontal = fixed spacing = 12 margin = {{ {margin} 4 }}',
-        f'{i}\tbackground = {{ using = tooltip_table_field_texture }}',
-        f'{i}\tvbox = {{ size = {{ {bar_w} 47 }} layoutpolicy_horizontal = fixed spacing = 2',
-        f'{i}\t\ttext_single = {{ size = {{ {bar_w} 16 }} autoresize = no fontsize = 12 align = left|nobaseline text = "{label}" tooltip = "SOL_C_BALANCE_TOOLTIP" }}',
+        f'{i}widget = {{ name = "{row_name}" size = {{ {width} {row_h} }}',
+        f'{i}\tbackground = {{ using = tooltip_table_field_texture alpha = {0.3 if hero else 0.12} }}',
     ]
-    out.extend(bidirectional_bar(base + 2, bar_w, coef))
+    if hero:
+        out.append(f'{i}\tbackground = {{ using = color_gold_texture alpha = 0.06 }}')
+        for w, h, x, y in ((width, 1, 0, 0), (width, 1, 0, row_h - 1),
+                            (1, row_h - 2, 0, 1), (1, row_h - 2, width - 1, 1)):
+            out.append(f'{i}\twidget = {{ size = {{ {w} {h} }} position = {{ {x} {y} }} background = {{ using = color_gold_texture alpha = 0.6 }} }}')
+    out.extend([
+        f'{i}\ttext_single = {{ name = "sol_balance_label" size = {{ {label_w} {line_h} }} position = {{ {margin} {top} }} autoresize = no fontsize = {14 if hero else 12} align = left|nobaseline text = "{label}" tooltip = "SOL_C_BALANCE_TOOLTIP" alwaystransparent = no }}',
+        f'{i}\twidget = {{ size = {{ {bar_w} {16 if hero else 12} }} position = {{ {bar_x} {top + 6} }}',
+    ])
+    out.extend(capacity_bar(base + 2, bar_w, negative, positive, position, 12 if hero else 8))
     out.extend([
         f'{i}\t}}',
-        f'{i}\tvbox = {{ size = {{ {values_w} 50 }} layoutpolicy_horizontal = fixed spacing = 2',
-        f'{i}\t\twidget = {{ size = {{ {values_w} 32 }}',
-        f'{i}\t\t\ttext_single = {{ name = "sol_balance_value" size = {{ {values_w} 32 }} autoresize = no fontsize = {30 if hero else 24} align = center|nobaseline visible = "[{consumed}]" raw_text = "[{coef}|+=1%]" }}',
-        f'{i}\t\t\ttext_single = {{ size = {{ {values_w} 32 }} autoresize = no fontsize = 13 align = center|nobaseline visible = "[Not({consumed})]" text = "SOL_F_DASHBOARD_NO_CONSUMPTION" }}',
-        f'{i}\t\t}}',
-        f'{i}\t\thbox = {{ size = {{ {values_w} 16 }} spacing = 4',
-        f'{i}\t\t\ttext_single = {{ name = "sol_balance_funds" size = {{ {(values_w - 4) // 2} 16 }} autoresize = no fontsize = 11 align = left|nobaseline raw_text = "[Localize(\'SOL_C_FUNDS_SHORT\')] [{f_sv(scope, funds)}|2]" tooltip = "SOL_F_DASHBOARD_FUNDS" }}',
-        f'{i}\t\t\ttext_single = {{ name = "sol_balance_baseline" size = {{ {(values_w - 4) // 2} 16 }} autoresize = no fontsize = 11 align = right|nobaseline raw_text = "[Localize(\'SOL_C_BASELINE_SHORT\')] [{f_sv(scope, need)}|2]" tooltip = "SOL_F_DASHBOARD_BASELINE" }}',
-        f'{i}\t\t}}',
-        f'{i}\t}}',
+        f'{i}\ttext_single = {{ name = "sol_balance_value" size = {{ {values_w} {line_h} }} position = {{ {values_x} {top} }} autoresize = no fontsize = {24 if hero else 18} align = right|nobaseline visible = "[{consumed}]" raw_text = "[{coef}|+=1%]" }}',
+        f'{i}\ttext_single = {{ name = "sol_balance_no_consumption" size = {{ {values_w} {line_h} }} position = {{ {values_x} {top} }} autoresize = no fontsize = 12 align = right|nobaseline visible = "[Not({consumed})]" text = "SOL_F_DASHBOARD_NO_CONSUMPTION" }}',
+        f'{i}\ttext_single = {{ name = "sol_balance_funds_baseline" size = {{ {width - margin - bar_x} 14 }} position = {{ {bar_x} {top + line_h} }} autoresize = no fontsize = 11 align = right|nobaseline raw_text = "#color_gray [{f_sv(scope, funds)}|2] / [{f_sv(scope, need)}|2]#!" tooltip = "SOL_C_FUNDS_BASELINE_TOOLTIP" alwaystransparent = no }}',
         f'{i}}}',
     ])
     return out
@@ -133,13 +181,16 @@ def balance_row(base: int, scope: str, funds: str, need: str, label: str,
 def balance_sections(base: int, scope: str, prefix: str, width: int) -> list[str]:
     i = T(base)
     total_prefix = "local_sol" if prefix == "local_sol" else "gls_country"
-    out = [f'{i}# SOL_UI_SECTION overall_balance', f'{i}vbox = {{ layoutpolicy_horizontal = expanding spacing = 3',
-           f'{i}\tdivider_center_gold = {{ size = {{ -1 1 }} }}']
+    out = [f'{i}# SOL_UI_SECTION overall_balance', f'{i}vbox = {{ layoutpolicy_horizontal = expanding spacing = 3']
     out.extend(balance_row(base + 1, scope, total_prefix + "_liquid_funds_display",
                            total_prefix + "_base_spending_display", "SOL_C_BALANCE_TITLE", width, True))
-    out.extend([f'{i}\tdivider_center_gold = {{ size = {{ -1 1 }} }}',
-                f'{i}\t# SOL_UI_SECTION estate_balances',
+    out.extend([f'{i}\t# SOL_UI_SECTION estate_balances',
                 f'{i}\ttext_single = {{ autoresize = yes fontsize = 13 align = left|nobaseline text = "SOL_C_ESTATE_HEADER" }}'])
+    out.extend([f'{i}\thbox = {{ size = {{ {width} 14 }}',
+                f'{i}\t\twidget = {{ size = {{ 128 14 }} }}',
+                f'{i}\t\twidget = {{ size = {{ {width - 272} 14 }}'])
+    out.extend(balance_scale(base + 3, width - 272))
+    out.extend([f'{i}\t\t}}', f'{i}\t\twidget = {{ layoutpolicy_horizontal = expanding }}', f'{i}\t}}'])
     for estate in F_ESTATES:
         out.extend(balance_row(base + 1, scope, f"{prefix}_{estate}_liquid_display",
                                f"{prefix}_{estate}_base_display", f"SOL_ESTATE_{estate.upper()}", width))
@@ -201,7 +252,8 @@ UI_STRINGS = {
         "SOL_C_ESTATE_HEADER": "Estate purchasing power",
         "SOL_C_FUNDS_SHORT": "Funds",
         "SOL_C_BASELINE_SHORT": "Base",
-        "SOL_C_BALANCE_TOOLTIP": "Raw purchasing power = available funds / baseline consumption - 1. The bar spans -50% to +50%; the number shows the full value.",
+        "SOL_C_FUNDS_BASELINE_TOOLTIP": "Available funds / baseline consumption. The first number is money available for consumption; the second is the cost of the baseline basket.",
+        "SOL_C_BALANCE_TOOLTIP": "Raw purchasing power = available funds / baseline consumption - 1. The bar maps -100% to +200% nonlinearly; the number shows the full raw value.",
         "SOL_F_GOODS_SUPPLY_NOTE": "Count / gold line: supplied goods in group. Dim: no cached supply.",
         "SOL_F_DASHBOARD_FUNDS": "Available funds",
         "SOL_F_DASHBOARD_BASELINE": "Baseline consumption",
@@ -251,7 +303,8 @@ UI_STRINGS = {
         "SOL_C_ESTATE_HEADER": "各阶层购买力",
         "SOL_C_FUNDS_SHORT": "资金",
         "SOL_C_BASELINE_SHORT": "基准",
-        "SOL_C_BALANCE_TOOLTIP": "原始购买力＝可支配资金 / 基准消费 - 1。进度条范围为 -50% 至 +50%，数字保留完整值。",
+        "SOL_C_FUNDS_BASELINE_TOOLTIP": "可支配资金 / 基准消费。前一个数字为可用于消费的资金，后一个数字为基准消费篮子的支出。",
+        "SOL_C_BALANCE_TOOLTIP": "原始购买力＝可支配资金 / 基准消费 - 1。进度条以非线性比例显示 -100% 至 +200%；数字仍显示完整原值。",
         "SOL_F_GOODS_SUPPLY_NOTE": "计数与金线＝组内有供应商品比例；暗色＝缓存中无供应。",
         "SOL_F_DASHBOARD_FUNDS": "可支配资金",
         "SOL_F_DASHBOARD_BASELINE": "基准消费",

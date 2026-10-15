@@ -250,26 +250,140 @@ class SubstitutionUI(unittest.TestCase):
                         image.save(self.out / f'{target}_{language}.png')
                     self.assertFalse(log, log)
 
-    def test_balance_cursor_and_signed_bar(self):
-        from gen_sol_ls_gui import balance_cursor, bidirectional_bar, f_coef
-        for coef in (-1, -.5, -.25, 0, .25, .5, 5):
+    def test_duplicate_named_siblings_are_reported(self):
+        eng, log = self.engine([])
+        node = parse('vbox = { widget = { name = "row" } widget = { name = "row" } }')[0]
+        eng.ex.build(node.key, node.value, {}, '<duplicate rows>', 0)
+        self.assertTrue(any('DUPLICATE NAMED CHILD: row' in entry for entry in log))
+        eng, log = self.engine([])
+        node = parse('vbox = { widget = { name = "row_a" widget = { name = "value" } } widget = { name = "row_b" widget = { name = "value" } } }')[0]
+        eng.ex.build(node.key, node.value, {}, '<separate row scopes>', 0)
+        self.assertFalse(log, log)
+
+    def test_balance_sources_have_unique_sibling_names(self):
+        def check(nodes, path):
+            seen = set()
+            for node in nodes:
+                if not node.is_block():
+                    continue
+                names = [n.value for n in node.value if n.key == 'name' and isinstance(n.value, str)]
+                for name in names:
+                    self.assertNotIn(name, seen, f'{path}:{node.line}: duplicate sibling {name}')
+                    seen.add(name)
+                check(node.value, path)
+        for target in ('stable', 'sol_standalone', 'sol_pp_compatibility_submod', 'sol_jtg_compatibility_submod'):
+            for path in (ROOT / 'src' / target / 'in_game/gui').rglob('*.gui'):
+                if path.name in ('SOL_economy_local.gui', 'zz_SOL_economy_local.gui', 'global_living_standard.gui'):
+                    check(parse(path.read_text(encoding='utf-8-sig'), str(path)), path)
+
+    def test_compact_balance_rows_and_shared_scale(self):
+        from gen_sol_ls_gui import balance_sections, LOC, COUNTRY
+        for language in ('simp_chinese', 'english'):
+            for scope, prefix, scenario, surface in (
+                (LOC, 'local_sol', scenarios.tooltip, 'location'),
+                (COUNTRY, 'gls_sol', scenarios.situation, 'country'),
+            ):
+                with self.subTest(language=language, surface=surface):
+                    eng, log = self.engine(scenario(), language)
+                    source = '\n'.join(balance_sections(0, scope, prefix, 500))
+                    node = next(n for n in parse(source) if n.is_block())
+                    root = eng.ex.build(node.key, node.value, {}, '<compact balances>', 0)
+                    w, h = eng.measure(root, None)['hint']
+                    eng.place(root, 0, 0, w, h)
+                    elements = list(walk(root))
+                    ruler = [e for e in elements if e.props.get('name') == 'sol_balance_scale']
+                    self.assertEqual(len(ruler), 1)
+                    labels = ruler[0].children
+                    self.assertEqual([e.props['raw_text'] for e in labels],
+                                     ['-100%', '-50%', '0%', '+100%', '+200%'])
+                    for left, right in zip(labels, labels[1:]):
+                        self.assertLessEqual(left.x + left.w, right.x)
+                    rows = [e for e in elements if e.props.get('name') == 'sol_balance_total_row'
+                            or str(e.props.get('name', '')).startswith('sol_balance_estate_row_')]
+                    self.assertEqual(len(rows), 6)
+                    self.assertEqual([e.h for e in rows], [64, 42, 42, 42, 42, 42])
+                    right_edges = []
+                    for index, row in enumerate(rows):
+                        descendants = list(walk(row))
+                        named = {e.props.get('name'): e for e in descendants}
+                        value = named['sol_balance_value']
+                        pair = named['sol_balance_funds_baseline']
+                        track = named['sol_balance_track']
+                        zero = named['sol_balance_zero_tick']
+                        for element in (value, pair):
+                            self.assertEqual(element.props['align'], 'right|nobaseline')
+                            if element.w > 0:
+                                right_edges.append(element.x + element.w)
+                        self.assertEqual(pair.props['tooltip'], 'SOL_C_FUNDS_BASELINE_TOOLTIP')
+                        self.assertEqual(pair.props['alwaystransparent'], 'no')
+                        self.assertIn(' / ', eng.text_of(pair))
+                        self.assertIn('#color_gray ', pair.props['raw_text'])
+                        self.assertNotEqual(eng.loc.get(pair.props['tooltip']), pair.props['tooltip'])
+                        self.assertEqual(int(value.props['fontsize']), 24 if index == 0 else 18)
+                        self.assertAlmostEqual(zero.x + zero.w / 2, track.x + track.w / 2)
+                        self.assertEqual(zero.w, 2)
+                        minors = [e for e in descendants if str(e.props.get('name', '')).startswith('sol_balance_minor_tick_')]
+                        self.assertEqual(len(minors), 2)
+                        self.assertTrue(all(e.w == 1 for e in minors))
+                        self.assertAlmostEqual(track.x, ruler[0].x)
+                        self.assertAlmostEqual(track.w, ruler[0].w)
+                        self.assertAlmostEqual(labels[2].x + labels[2].w / 2, zero.x + zero.w / 2)
+                        self.assertTrue(all('raw_text' not in e.props or e.props['raw_text'] not in
+                                            ('-100%', '-50%', '0%', '+100%', '+200%') for e in descendants))
+                        bars = [e for e in descendants if e.kind == 'progressbar']
+                        self.assertEqual([e.h for e in bars], [12, 12] if index == 0 else [8, 8])
+                        for child in descendants:
+                            if eng.visible(child) and child.w > 0:
+                                self.assertGreaterEqual(child.x, row.x)
+                                self.assertLessEqual(child.x + child.w, row.x + row.w)
+                                self.assertGreaterEqual(child.y, row.y)
+                                self.assertLessEqual(child.y + child.h, row.y + row.h)
+                    self.assertEqual(len(set(right_edges)), 1)
+                    self.assertGreater(len(rows[0].backgrounds), len(rows[1].backgrounds))
+                    preview = Image.new('RGBA', (int(w), int(h)), (32, 40, 39, 255))
+                    eng.render(root, preview)
+                    if self.out:
+                        preview.save(self.out / f'balances_{surface}_{language}.png')
+                    self.assertFalse(log, log)
+
+    def test_nonlinear_capacity_bar_and_cursor(self):
+        from gen_sol_ls_gui import balance_cursor, capacity_bar, f_capacity_components, f_coef
+        for position in (0, .166667, .333333, .5, .666667, .833333, 1):
             eng, log = self.engine([])
-            expr = f"'(CFixedPoint){coef}'"
+            expr = f"'(CFixedPoint){position}'"
             source = '\n'.join(balance_cursor(0, 220, expr))
             node = parse(source)[0]
             element = eng.ex.build(node.key, node.value, {}, '<balance cursor>', 0)
             eng.measure(element, None)
             eng.place(element, 0, 0, 220, 14)
             marker = next(c for c in element.children if c.backgrounds)
-            share = max(0, min(1, coef + .5))
+            share = max(0, min(1, position))
             self.assertAlmostEqual(marker.x, share * 218, delta=.1)
-            source = '\n'.join(bidirectional_bar(0, 220, expr))
+            source = '\n'.join(capacity_bar(0, 220, expr, expr, expr))
             node = parse(source)[0]
             bar = eng.ex.build(node.key, node.value, {}, '<bidirectional bar>', 0)
             progresses = [c for c in walk(bar) if c.kind == 'progressbar']
             values = [float(eng.resolve(c.props['value'])) for c in progresses]
-            self.assertEqual(values, [min(.5, max(0, -coef)), min(.5, max(0, coef))])
-            self.assertEqual(progresses[0].props['invertprogress'], 'yes')
+            self.assertEqual(values, [min(1, max(0, position)), min(1, max(0, position))])
+            self.assertEqual(progresses[0].props['max'], '1')
+            self.assertFalse(log, log)
+        # The signed bar maps ratio q=funds/baseline through smooth curves:
+        # q=0 -> -100%, q=1 -> 0%, q=3 -> +200%.
+        eng, log = self.engine([
+            (r"Test.ScriptValue\('funds'\)", 0), (r"Test.ScriptValue\('need'\)", 1),
+        ])
+        negative, positive, position = f_capacity_components('Test', 'funds', 'need')
+        self.assertEqual(eng.resolve(f"[{negative}]"), 1)
+        self.assertEqual(eng.resolve(f"[{positive}]"), 0)
+        self.assertEqual(eng.resolve(f"[{position}]"), 0)
+        self.assertFalse(log, log)
+        for funds, expected in ((1, 0), (2, .75), (3, 1), (6, 1)):
+            eng, log = self.engine([
+                (r"Test.ScriptValue\('funds'\)", funds), (r"Test.ScriptValue\('need'\)", 1),
+            ])
+            negative, positive, position = f_capacity_components('Test', 'funds', 'need')
+            self.assertAlmostEqual(eng.resolve(f"[{negative}]"), 0)
+            self.assertAlmostEqual(eng.resolve(f"[{positive}]"), expected)
             self.assertFalse(log, log)
         # Raw alpha is neutral for a baseline-free estate.
         eng, log = self.engine([(r"Test.ScriptValue\('funds'\)", 5), (r"Test.ScriptValue\('need'\)", 0)])

@@ -135,12 +135,17 @@ class SOLFRoute(unittest.TestCase):
                     self.assertEqual(positions, sorted(positions))
                     for key in ("overall_row", "estate_row", "overall_bar", "estate_bar"):
                         self.assertTrue(node_size(text, config[key]), f"missing {key}")
-                    for name in ("sol_balance_value", "sol_balance_funds", "sol_balance_baseline",
+                    for name in ("sol_balance_value", "sol_balance_funds_baseline", "sol_balance_zero_tick",
                                  "sol_balance_negative", "sol_balance_positive"):
                         count = sum(1 for node in nodes if node_name(node) == "name" and node.value == name)
                         self.assertEqual(count, self.surface_spec["balance_rows"], name)
                     for label in self.surface_spec["scale_labels"]:
-                        self.assertEqual(text.count(f'raw_text = "{label}"'), self.surface_spec["balance_rows"])
+                        self.assertEqual(text.count(f'raw_text = "{label}"'), self.surface_spec["scale_repetitions"])
+                    self.assertEqual(text.count('name = "sol_balance_scale"'), 1)
+                    self.assertEqual(text.count('tooltip = "SOL_C_FUNDS_BASELINE_TOOLTIP"'), 6)
+                    for retired in ('name = "sol_balance_funds"', 'name = "sol_balance_baseline"',
+                                    'raw_text = "+50%"', 'raw_text = "+150%"'):
+                        self.assertNotIn(retired, text)
                     for estate in ("NOBLES","CLERGY","BURGHERS","COMMONERS","TRIBESMEN"):
                         self.assertEqual(text.count(f'text = "SOL_ESTATE_{estate}"'), 1)
 
