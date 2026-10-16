@@ -382,7 +382,7 @@ class SubstitutionTests(unittest.TestCase):
         self.assertAlmostEqual(10*d['b'], 40/3)
 
     def test_interface_coverage_and_packaging(self):
-        types = (ROOT / 'reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt').read_text(encoding='utf-8-sig')
+        types = (ROOT / '.eu5-base/reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt').read_text(encoding='utf-8-sig')
         for good in CORE: self.assertRegex(types, rf'(?m)^global_{good}_pop_demand\s*=')
         self.assertEqual(len(GROUPS), 20)
         self.assertEqual(sum(len(m) for m in GROUPS.values()), 67)

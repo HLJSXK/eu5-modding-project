@@ -109,9 +109,9 @@ If write permission is denied, run terminal as Administrator.
 
 - `src/` - Active mod source files
 - `docs/` - Modding documentation and design notes
-- `reference_official_defines/` - Official define/type references for EU5 syntax verification
-- `reference_game_files/` - Vanilla reference assets
-- `reference_mods/` - Community mod references
+- `.eu5-base/reference_official_defines/` - Official define/type references for EU5 syntax verification
+- `.eu5-base/reference_game_files/` - Vanilla reference assets
+- `.eu5-base/reference_mods/` - Community mod references
 - `assets/` - Images and media assets
 
 ## Documentation
@@ -126,3 +126,6 @@ If write permission is denied, run terminal as Administrator.
 ## License
 
 This project is for educational and modding purposes. European Universalis 5 is a trademark of Paradox Interactive.
+## Shared EU5 foundation
+
+Reusable EU5 references, official definitions, community-mod snapshots, game knowledge, GUI rendering, and shared AI rules live in the sibling `eu5-modding-base` project. Run `python scripts/bootstrap_base.py` after cloning to connect `.eu5-base/`, then read [the shared agent entry](.eu5-base/CLAUDE.md) and this project's `CLAUDE.md`. The project's own source, generated indexes, design notes, and workflow remain here.

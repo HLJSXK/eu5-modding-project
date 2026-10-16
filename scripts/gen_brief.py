@@ -8,6 +8,7 @@ Usage:
 """
 
 from datetime import date
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,6 +23,12 @@ except ImportError:
     raise SystemExit(1)
 
 REPO_ROOT = Path(__file__).parent.parent
+_BASE_DEFAULT = REPO_ROOT / ".eu5-base"
+if not _BASE_DEFAULT.exists():
+    _BASE_DEFAULT = REPO_ROOT.parent / "eu5-modding-base"
+BASE_ROOT = Path(os.environ.get("EU5_MODDING_BASE", str(_BASE_DEFAULT))).resolve()
+sys.path.insert(0, str(BASE_ROOT / "docs" / "knowledge"))
+from knowledge_loader import load_anti_patterns, load_valid_enums
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 OUTPUT = KNOWLEDGE_DIR / "BRIEF.md"
 OVERVIEW = KNOWLEDGE_DIR / "PROJECT_OVERVIEW.md"
@@ -125,8 +132,8 @@ def _run_gen_index() -> None:
 
 def main():
     _run_gen_index()
-    anti_patterns = load("anti_patterns.yaml") or []
-    enums = load("valid_enums.yaml") or {}
+    anti_patterns = load_anti_patterns(REPO_ROOT)
+    enums = load_valid_enums(REPO_ROOT)
 
     lines: list[str] = []
     lines.append("# EU5 Knowledge Brief")

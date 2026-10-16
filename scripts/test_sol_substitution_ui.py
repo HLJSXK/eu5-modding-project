@@ -52,8 +52,8 @@ class SubstitutionUI(unittest.TestCase):
         cls.localizations = {}
         cls.old_language = binding.LANG
         cls.old_texture_search = list(textures.SEARCH)
-        textures.SEARCH[:0] = [ROOT / 'reference_mods/3613232232/main_menu',
-                              ROOT / 'reference_mods/3785316314/main_menu']
+        textures.SEARCH[:0] = [ROOT / '.eu5-base/reference_mods/3613232232/main_menu',
+                              ROOT / '.eu5-base/reference_mods/3785316314/main_menu']
         cls.out = Path(os.environ['SOL_UI_PREVIEW_OUT']) if os.environ.get('SOL_UI_PREVIEW_OUT') else None
         if cls.out:
             cls.out.mkdir(parents=True, exist_ok=True)

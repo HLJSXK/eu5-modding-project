@@ -1,9 +1,11 @@
+> Shared cross-project reference: [EU5 modding base](../../.eu5-base/docs/technical/EU5_Modding_Knowledge_Base.md). This local document is preserved for its source project's examples and history.
+
 # European Universalis 5 Modding Knowledge Base
 
 **Author:** Manus AI
 **Date:** Jan 22, 2026
 
-> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `reference_official_defines/` and `reference_game_files/` to verify.
+> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `.eu5-base/reference_official_defines/` and `.eu5-base/reference_game_files/` to verify.
 
 ## 1. Introduction
 
@@ -262,7 +264,7 @@ For a development-independent calibration baseline, both layers must be disabled
 
 Goods can also declare regional demand modifiers such as `continent_demand_modifier = { ... }` and `sub_continent_demand_modifier = { ... }`. Vanilla uses both forms, and compatibility mods may add their own keys. These blocks are goods-level final-demand modifiers, not just documentation or map metadata.
 
-When a compatibility patch takes ownership of final pop demand for a good, audit these blocks alongside `wealth_impact_threshold` and `development_threshold`. If the intended baseline is region-independent, emit late `INJECT` entries whose negative per-region values exactly cancel the source values. The SOL-JTG compatibility generator records these keys in `data/jtg_pop_demand.csv` and audits them against `reference_mods/3785316314` so future Just Goods updates cannot silently add a regional gate.
+When a compatibility patch takes ownership of final pop demand for a good, audit these blocks alongside `wealth_impact_threshold` and `development_threshold`. If the intended baseline is region-independent, emit late `INJECT` entries whose negative per-region values exactly cancel the source values. The SOL-JTG compatibility generator records these keys in `data/jtg_pop_demand.csv` and audits them against `.eu5-base/reference_mods/3785316314` so future Just Goods updates cannot silently add a regional gate.
 
 ### 6.5. Pop-Needs Income Scale
 

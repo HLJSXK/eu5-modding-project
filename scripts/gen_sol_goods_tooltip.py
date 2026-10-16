@@ -37,13 +37,13 @@ TARGET_ROOTS = {"stable": STABLE, "sol_standalone": STANDALONE}
 ALL_TARGETS = (STABLE, STANDALONE)
 TARGETS = ALL_TARGETS
 
-VANILLA_GOODS_DIR = REPO_ROOT / "reference_game_files" / "game" / "in_game" / "common" / "goods"
+VANILLA_GOODS_DIR = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "in_game" / "common" / "goods"
 GOODS_WEIGHTS = REPO_ROOT / "data" / "goods_weights.csv"
 VANILLA_GUI = (
-    REPO_ROOT / "reference_game_files" / "game" / "main_menu" / "gui" / "shared" / "goods_details.gui"
+    REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "main_menu" / "gui" / "shared" / "goods_details.gui"
 )
 VANILLA_MARKET_GUI = (
-    REPO_ROOT / "reference_game_files/game/in_game/gui/shared/market_tooltips.gui"
+    REPO_ROOT / ".eu5-base/reference_game_files/game/in_game/gui/shared/market_tooltips.gui"
 )
 GAME_GUI = Path(
     r"C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V"

@@ -151,7 +151,7 @@ dirty 条件：没有初始快照、领土数量变化、AI/玩家身份变化�
 
 `error.5.log:3444` 附近及 `error.4.log` 开头合计 56 条 `add_country_modifier [Invalid database object '']`，每种商品一条，均发生在 **22:57:44 的 PostValidate 初始化阶段**。没有发现这些错误按每月洪泛。
 
-当前 `C_SOL_substitution.txt:5968` 使用 `name = sol_substitute_amber`；官方 `reference_official_defines/docs/effects.log:105` 也写 `name`，而当前 1.4 原版 `reference_game_files/game/in_game/common/scripted_effects/country_effects.txt:846` 使用 `modifier`。文档与当前 source 冲突。字段失效是需要复验的兼容性候选，本次未改字段并重启游戏，故不把它当作已验证修复。
+当前 `C_SOL_substitution.txt:5968` 使用 `name = sol_substitute_amber`；官方 `.eu5-base/reference_official_defines/docs/effects.log:105` 也写 `name`，而当前 1.4 原版 `.eu5-base/reference_game_files/game/in_game/common/scripted_effects/country_effects.txt:846` 使用 `modifier`。文档与当前 source 冲突。字段失效是需要复验的兼容性候选，本次未改字段并重启游戏，故不把它当作已验证修复。
 
 本地最新存档（20:37:44 写入、游戏版本 1.4.1、日期 1337.4.1）的只读扫描同时显示：
 

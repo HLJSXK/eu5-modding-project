@@ -15,11 +15,11 @@
 ## 检查对象
 
 - 本模组：`src/stable`，Standard of Living，简称 SOL。
-- 目标模组：`reference_mods/3613232232`，Prosper or Perish，简称 P&P。
+- 目标模组：`.eu5-base/reference_mods/3613232232`，Prosper or Perish，简称 P&P。
 - 本地参考副本信息：P&P 版本 `0.9.0`，标注支持游戏版本 `1.3.10`。
 - SOL 本地 metadata：版本 `1.3.11`，标注支持游戏版本 `1.3.11`。
 
-本报告基于仓库内 `reference_mods/3613232232` 的静态文件检查。没有进行游戏内联合加载测试，也没有读取联合运行后的 `error.log`。
+本报告基于仓库内 `.eu5-base/reference_mods/3613232232` 的静态文件检查。没有进行游戏内联合加载测试，也没有读取联合运行后的 `error.log`。
 
 ## 关键加载规则
 
@@ -85,7 +85,7 @@ SOL 当前通过 `TRY_INJECT:total_population` 注入相对 vanilla 的 delta：
 P&P 文件：
 
 ```text
-reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt
+.eu5-base/reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt
 ```
 
 P&P 对 `total_population` 的关键改动包括：
@@ -153,8 +153,8 @@ src/stable/in_game/common/prices/A_SOL_economy_prices.txt
 P&P 文件示例：
 
 ```text
-reference_mods/3613232232/in_game/common/prices/pp_institution_price_adjustments.txt
-reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt
+.eu5-base/reference_mods/3613232232/in_game/common/prices/pp_institution_price_adjustments.txt
+.eu5-base/reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt
 ```
 
 冲突项包括：
@@ -205,13 +205,13 @@ P&P 在 `pp_goods_adjustments.txt` 中对其中约 51 种商品也做了注入�
 P&P 新增商品：
 
 ```text
-reference_mods/3613232232/in_game/common/goods/pp_goods_victuals.txt
+.eu5-base/reference_mods/3613232232/in_game/common/goods/pp_goods_victuals.txt
 ```
 
 并通过：
 
 ```text
-reference_mods/3613232232/in_game/common/goods_demand/pp_new_goods_demands.txt
+.eu5-base/reference_mods/3613232232/in_game/common/goods_demand/pp_new_goods_demands.txt
 ```
 
 向 `pop_demand` 注入：

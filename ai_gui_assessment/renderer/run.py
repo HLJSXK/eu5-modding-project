@@ -12,7 +12,16 @@ from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_workspace = Path(__file__).resolve().parents[2]
+_base_root = _workspace / ".eu5-base"
+if not _base_root.is_dir():
+    _base_root = _workspace.parent / "eu5-modding-base"
+_base_renderer = _base_root / "ai_gui_assessment" / "renderer"
+os.environ.setdefault("EU5_RENDER_WORKSPACE", str(_workspace))
+os.environ.setdefault("EU5_RENDER_MOD_ROOT", str(_workspace / "src" / "stable"))
+os.environ.setdefault("EU5_RENDER_OUTPUT_ROOT", str(_workspace / "ai_gui_assessment" / "images"))
+sys.path.insert(0, str(_base_renderer))
+sys.path.insert(1, str(Path(__file__).resolve().parent))
 sys.setrecursionlimit(20000)
 import threading
 threading.stack_size(256 * 1024 * 1024 - 4096)
@@ -25,7 +34,7 @@ from engine import Engine, num
 from gui import Expander, GuiDB, collect_files, dump
 from textures import TEXTURES
 
-OUT = Path(__file__).resolve().parents[1] / "images"
+OUT = Path(os.environ["EU5_RENDER_OUTPUT_ROOT"])
 if os.environ.get("RENDER_OUT"):
     OUT = OUT / os.environ["RENDER_OUT"]
 # 1080p, UI scale 100%: 1 GUI unit = 1 screen pixel; lateral panel height = 1080 - topbar 40 - panel bar 90
@@ -266,7 +275,7 @@ def proto(gui_path, name, mocks_path, out_name=None):
     eng.place(el, pad, pad, w, h)
     image = Image.new("RGBA", (int((w + pad * 2) * SCALE), int((h + pad * 2) * SCALE)), (40, 52, 46, 255))
     eng.render(el, image)
-    proto_out = Path(__file__).resolve().parents[1] / "images" / "proto"
+    proto_out = OUT / "proto"
     proto_out.mkdir(parents=True, exist_ok=True)
     tag = Path(out_name or name).stem
     image.save(proto_out / f"{tag}.png")

@@ -130,7 +130,7 @@ Created `/reference_game_files/` directory containing:
 - README with usage guidelines
 
 ### 2. Documentation
-- `reference_game_files/README.md` - Comprehensive guide to using game files
+- `.eu5-base/reference_game_files/README.md` - Comprehensive guide to using game files
 - This task summary document
 
 ## Key Learnings
@@ -207,7 +207,7 @@ Created `/reference_game_files/` directory containing:
 
 - [EU5 Modding Knowledge Base](../technical/EU5_Modding_Knowledge_Base.md)
 - [Dynamic Missions Design](../design/Dynamic_Missions_Design.md)
-- [Reference Game Files](../../reference_game_files/README.md)
+- [Reference Game Files](../../.eu5-base/reference_game_files/README.md)
 - [Modifier Types Wiki](https://eu5.paradoxwikis.com/Modifier_types)
 
 ## Conclusion

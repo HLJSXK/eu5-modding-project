@@ -1,53 +1,15 @@
-"""Print the full definition of a GUI template/type by name from the game + SOL files.
-
-usage: guidef.py NAME [NAME ...]
-"""
-import re
-import sys
+"""SOL-compatible entry point; implementation lives in eu5-modding-base."""
+import os
+import runpy
 from pathlib import Path
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-ROOTS = [
-    Path(r"C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game"),
-    Path(__file__).resolve().parents[2] / "src" / "stable" / "in_game" / "gui",
-]
-DEF_RE = re.compile(r"^\s*(template|type)\s+([A-Za-z0-9_]+)\b")
-
-
-def blocks():
-    for root in ROOTS:
-        for p in root.rglob("*.gui"):
-            if "\\mod\\" in str(p):
-                continue
-            lines = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()
-            for i, line in enumerate(lines):
-                m = DEF_RE.match(line)
-                if m:
-                    yield m.group(2), p, i, lines
-
-
-def extract(lines, start):
-    depth, out, opened = 0, [], False
-    for line in lines[start:]:
-        code = line.split("#", 1)[0]
-        out.append(line)
-        depth += code.count("{") - code.count("}")
-        if "{" in code:
-            opened = True
-        if opened and depth <= 0:
-            break
-    return out
-
-
-def main():
-    want = set(sys.argv[1:])
-    for name, p, i, lines in blocks():
-        if name in want:
-            print(f"===== {name}  ({p}:{i + 1})")
-            print("\n".join(extract(lines, i)))
-
-
+_workspace = Path(__file__).resolve().parents[2]
+_base_root = _workspace / ".eu5-base"
+if not _base_root.is_dir():
+    _base_root = _workspace.parent / "eu5-modding-base"
+_base = _base_root / "ai_gui_assessment" / "renderer"
+os.environ.setdefault("EU5_RENDER_WORKSPACE", str(_workspace))
+os.environ.setdefault("EU5_RENDER_MOD_ROOT", str(_workspace / "src" / "stable"))
+os.environ.setdefault("EU5_RENDER_OUTPUT_ROOT", str(_workspace / "ai_gui_assessment" / "images"))
 if __name__ == "__main__":
-    main()
+    runpy.run_path(str(_base / "guidef.py"), run_name="__main__")

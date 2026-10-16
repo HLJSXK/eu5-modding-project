@@ -137,9 +137,9 @@ eu5-modding-project/
 |   `-- images/                        renders of the same screens for comparison
 |-- data/                              calibration CSVs, generated indexes, and legacy simulator data
 |-- assets/                            images and media
-|-- reference_game_files/              vanilla EU5 references
-|-- reference_mods/                    community mod examples
-`-- reference_official_defines/        official EU5 syntax/type definitions
+|-- .eu5-base/reference_game_files/              vanilla EU5 references
+|-- .eu5-base/reference_mods/                    community mod examples
+`-- .eu5-base/reference_official_defines/        official EU5 syntax/type definitions
 ```
 
 ## Script Reference

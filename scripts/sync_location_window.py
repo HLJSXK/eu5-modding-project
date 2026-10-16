@@ -17,7 +17,7 @@ from gui_14_migration import migrate_location_gui, migrate_location_types
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # 3812518640 is the current Glorp UI Workshop snapshot. The older
 # 3601047146 directory is retained as historical reference data.
-GLORP_ROOT = REPO_ROOT / "reference_mods" / "3812518640"
+GLORP_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3812518640"
 SOURCE_PATH = GLORP_ROOT / "in_game" / "gui" / "location_window.gui"
 SOURCE_METADATA_PATH = GLORP_ROOT / ".metadata" / "metadata.json"
 SOURCE_TYPES_PATH = (

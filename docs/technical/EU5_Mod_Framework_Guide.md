@@ -1,9 +1,11 @@
+> Shared cross-project reference: [EU5 modding base](../../.eu5-base/docs/technical/EU5_Mod_Framework_Guide.md). This local document is preserved for its source project's examples and history.
+
 # EU5 Mod Framework Guide
 
 **Author:** Manus AI
 **Date:** Jan 22, 2026
 
-> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `reference_official_defines/` and `reference_game_files/` to verify.
+> **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `.eu5-base/reference_official_defines/` and `.eu5-base/reference_game_files/` to verify.
 
 ## 1. Introduction
 

@@ -1,1 +1,0 @@
-﻿Folder to start uploading stuff to Git for EUV planning

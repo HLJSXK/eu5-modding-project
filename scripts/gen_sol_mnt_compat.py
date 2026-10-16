@@ -32,8 +32,8 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_mnt_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
-MNT_ROOT = REPO_ROOT / "reference_mods" / "3735059838"
-VANILLA_ROOT = REPO_ROOT / "reference_game_files" / "game"
+MNT_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3735059838"
+VANILLA_ROOT = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game"
 
 TARGET_DEMAND_CSV = REPO_ROOT / "data" / "target_demand.csv"
 STABLE_PRICES = STABLE_ROOT / "in_game" / "common" / "prices" / "A_SOL_economy_prices.txt"

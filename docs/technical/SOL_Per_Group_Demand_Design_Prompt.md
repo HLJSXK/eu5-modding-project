@@ -184,7 +184,7 @@ demand[good][pop_type] =
 ```
 
 来源：
-- vanilla demand_add / demand_multiply → `reference_game_files/…/common/goods/*.txt`
+- vanilla demand_add / demand_multiply → `.eu5-base/reference_game_files/…/common/goods/*.txt`
 - inject demand_add / demand_multiply → `src/stable/…/common/goods/z_SOL_pop_goods.txt`
 
 ---

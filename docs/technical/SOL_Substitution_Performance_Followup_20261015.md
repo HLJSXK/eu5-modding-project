@@ -12,7 +12,7 @@
 
 ## 本轮代码修正
 
-- 用官方 `country_modifier_strength(<modifier key>)` 扣除实际自身修正，代替从 live 总值中扣缓存的请求 size。接口来源：`reference_official_defines/docs/triggers.log:3517-3523`。
+- 用官方 `country_modifier_strength(<modifier key>)` 扣除实际自身修正，代替从 live 总值中扣缓存的请求 size。接口来源：`.eu5-base/reference_official_defines/docs/triggers.log:3517-3523`。
 - `sol_sub_applied_*` 继续记录上次请求值；新增 `sol_sub_live_*` 保存引擎实际强度，二者不再混为一谈。内部支出按 `max(external + live, 0)` 记账。
 - 真正的自身强度漂移与外部偏移分开处理：自身漂移触发重算并修复修正，稳定的请求值/实际值差异不反复 replace。
 - 原始总值没变的 clean 快路不新增 strength getter。没有改变 AI 年度频率或移除替代功能；快照版本 2 会在旧存档/首轮加载时成套刷新一次，应跳过该月份做性能对照。

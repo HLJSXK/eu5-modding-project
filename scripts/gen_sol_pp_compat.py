@@ -40,7 +40,7 @@ from sol_goods_order import GROUP_MEMBERS  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_pp_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
-PP_ROOT = REPO_ROOT / "reference_mods" / "3613232232"
+PP_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3613232232"
 
 PP_VICTUALS_FILE = PP_ROOT / "in_game" / "common" / "goods" / "pp_goods_victuals.txt"
 PP_LUMBER_FILE = PP_ROOT / "in_game" / "common" / "goods" / "pp_goods_adjustments.txt"

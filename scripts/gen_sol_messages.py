@@ -15,7 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "reference_game_files/game/main_menu/gui/messagetypes.txt"
+BASE = ROOT / ".eu5-base/reference_game_files/game/main_menu/gui/messagetypes.txt"
 TARGETS = ("stable", "sol_standalone")
 MESSAGE_KEY = "PERFORM_global_living_standard_recalculate_ACTION"
 SOL_MESSAGE = f"""{MESSAGE_KEY}={{

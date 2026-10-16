@@ -10,7 +10,17 @@ from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import os
+_workspace = Path(__file__).resolve().parents[2]
+_base_root = _workspace / ".eu5-base"
+if not _base_root.is_dir():
+    _base_root = _workspace.parent / "eu5-modding-base"
+_base_renderer = _base_root / "ai_gui_assessment" / "renderer"
+os.environ.setdefault("EU5_RENDER_WORKSPACE", str(_workspace))
+os.environ.setdefault("EU5_RENDER_MOD_ROOT", str(_workspace / "src" / "stable"))
+os.environ.setdefault("EU5_RENDER_OUTPUT_ROOT", str(_workspace / "ai_gui_assessment" / "images"))
+sys.path.insert(0, str(_base_renderer))
+sys.path.insert(1, str(Path(__file__).resolve().parent))
 sys.setrecursionlimit(20000)
 threading.stack_size(256 * 1024 * 1024 - 4096)
 
@@ -22,7 +32,7 @@ from engine import Engine
 from gui import Expander, GuiDB, dump
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "images" / "ui_library"
+OUT = Path(os.environ["EU5_RENDER_OUTPUT_ROOT"]) / "ui_library"
 INDEX = ROOT / "screenshots" / "ui_library" / "INDEX.txt"
 
 

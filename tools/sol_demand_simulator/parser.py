@@ -9,7 +9,7 @@ Correct EU5 demand formula:
         × sol_gdp_per_capita_scale[pop_type]
 
 Sources:
-  - vanilla demand_add / demand_multiply  →  reference_game_files/…/common/goods/*.txt
+  - vanilla demand_add / demand_multiply  →  .eu5-base/reference_game_files/…/common/goods/*.txt
   - inject demand_add / demand_multiply   →  src/stable/…/common/goods/z_SOL_pop_goods.txt
   - sol_gdp_per_capita_scale              →  handled by simulator.py (SOL_pop_values.txt)
 
@@ -24,7 +24,7 @@ from typing import Dict, List, Tuple
 
 MOD_ROOT = Path(__file__).resolve().parent.parent.parent
 
-VANILLA_GOODS_DIR = MOD_ROOT / "reference_game_files/game/in_game/common/goods"
+VANILLA_GOODS_DIR = MOD_ROOT / ".eu5-base/reference_game_files/game/in_game/common/goods"
 INJECT_FILE       = MOD_ROOT / "src/stable/in_game/common/goods/z_SOL_pop_goods.txt"
 
 # EU5 pop types the tool tracks (slaves excluded — no scaling formula)

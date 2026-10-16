@@ -13,6 +13,7 @@ import json
 import re
 import sys
 import subprocess
+import os
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -27,9 +28,15 @@ except ImportError:
 REPO_ROOT = Path(__file__).parent.parent
 MOD_SOURCE_DIR = REPO_ROOT / "src"
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
+_BASE_DEFAULT = REPO_ROOT / ".eu5-base"
+if not _BASE_DEFAULT.exists():
+    _BASE_DEFAULT = REPO_ROOT.parent / "eu5-modding-base"
+BASE_ROOT = Path(os.environ.get("EU5_MODDING_BASE", str(_BASE_DEFAULT))).resolve()
+sys.path.insert(0, str(BASE_ROOT / "docs" / "knowledge"))
+from knowledge_loader import load_anti_patterns, load_valid_enums
 MODIFIER_TYPES_FILE = (
     REPO_ROOT
-    / "reference_game_files"
+    / ".eu5-base" / "reference_game_files"
     / "game"
     / "main_menu"
     / "common"
@@ -365,8 +372,8 @@ def _parse_issue_structured(raw: str) -> dict:
 
 
 def main():
-    anti_patterns = load_yaml(KNOWLEDGE_DIR / "anti_patterns.yaml") or []
-    enum_data = load_yaml(KNOWLEDGE_DIR / "valid_enums.yaml") or {}
+    anti_patterns = load_anti_patterns(REPO_ROOT)
+    enum_data = load_valid_enums(REPO_ROOT)
     modifier_whitelist = load_modifier_whitelist()
 
     use_changed = "--changed" in sys.argv

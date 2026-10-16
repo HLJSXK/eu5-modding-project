@@ -8,7 +8,7 @@
 ## 审计范围
 
 - SOL：`src/stable/in_game/common/goods/z_SOL_pop_goods.txt` 形成的 55 个商品最终人口需求。
-- M&T：`reference_mods/3735059838/in_game/common/goods/` 中完整 `REPLACE` 后的同一批 55 个商品。
+- M&T：`.eu5-base/reference_mods/3735059838/in_game/common/goods/` 中完整 `REPLACE` 后的同一批 55 个商品。
 - Pop 类型：`nobles`、`clergy`、`burghers`、`laborers`、`peasants`、`soldiers`、`tribesmen`。
 - 比较的是 `demand_add` 与 `demand_multiply` 解析后的单位人口基础需求。开发度、财富、气候、冬季、市场可用性等运行时 gate 另行比较。
 

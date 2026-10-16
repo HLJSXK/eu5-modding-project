@@ -17,7 +17,7 @@
 
 ## 2. 已核实的引擎接口
 
-`reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt` 定义了：
+`.eu5-base/reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt` 定义了：
 
 ```text
 global_pop_demand = { percent = yes game_data = { category = country } }
@@ -30,7 +30,7 @@ global_fine_cloth_pop_demand = {
 
 同一文件列出了商品级 `global_<good>_pop_demand`。当前参考快照中，核心 `data/goods_weights.csv` 的 56 种商品全部有对应定义（含 `camels`，不含 `victuals`）；原版和当前 PP 参考目录未找到 `global_victuals_pop_demand`。Just Goods 参考目录则自行声明了其 26 种有直接人口需求商品的全部对应类型。因此应审计最终加载的原版和兼容模组定义，不能仅凭原版缺项判定自定义商品永远不可支持；反过来，声明了名字也不等于证明引擎把它接到了商品需求计算，仍需实测。
 
-官方 `reference_official_defines/docs/effects.log` 记录的国家修正器调用为：
+官方 `.eu5-base/reference_official_defines/docs/effects.log` 记录的国家修正器调用为：
 
 ```text
 add_country_modifier = {
@@ -44,7 +44,7 @@ remove_country_modifier = name
 
 当前 SOL 的地点修正器使用同样的生命周期模式：`months = 1`、`mode = replace`，每月重写；年度低频计算只延后求解，不能让一个一年期修正器自行维持。国家商品修正器应采用相同原则，每次刷新都显式写入全部商品，关闭功能或商品失去接口时显式移除。
 
-`reference_game_files/game/in_game/common/age/00_default.txt` 的 `goods_demand` 块直接写入 `global_<good>_pop_demand`，例如时代一的 liquor=-0.75、tobacco=-0.75、coffee=-0.5。时代、思潮和其他模组可能写入同类修正。实测结果见 4.3：同类来源相加，不同类型相乘。测试中时代 1 的 `goods_demand` 修正未出现在人口需求明细里，其实际生效方式仍待查明。
+`.eu5-base/reference_game_files/game/in_game/common/age/00_default.txt` 的 `goods_demand` 块直接写入 `global_<good>_pop_demand`，例如时代一的 liquor=-0.75、tobacco=-0.75、coffee=-0.5。时代、思潮和其他模组可能写入同类修正。实测结果见 4.3：同类来源相加，不同类型相乘。测试中时代 1 的 `goods_demand` 修正未出现在人口需求明细里，其实际生效方式仍待查明。
 
 ## 3. v1.1 历史机制
 
