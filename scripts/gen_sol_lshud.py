@@ -19,6 +19,7 @@ UTF8_BOM = b"\xef\xbb\xbf"
 ESTATES = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 W = 440                 # tooltip body width
 PANEL_W = 570
+PENDING_BODY_W = PANEL_W - 20  # contextual tooltip's 10px content margins
 ROW_Y = 130
 ROW_H = 36
 GLORP_ROOT = ROOT / ".eu5-base/reference_mods/3601047146/in_game/gui/glorp.gui"
@@ -42,6 +43,7 @@ def fp(x):
 
 
 READY = IS("sol_ls_pci")
+YOY_READY = IS("sol_ls_pci_yoy")
 TIER_READY = f"And({READY}, {IS('sol_ls_tier')})"
 RANK_READY = f"And({READY}, And({IS('sol_ls_rank')}, GetGlobalVariable('sol_ls_rank_count').IsSet))"
 
@@ -130,8 +132,8 @@ BAR = ('progresstexture = "gfx/interface/sol_proto/bar_{c}.dds" noprogresstextur
 # ------------------------------------------------------------------ GUI
 def diverging(var, w=150):
     half = w // 2
-    neg = f"[FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint(Multiply_CFixedPoint({V(var)}, {fp(-10)}), {fp(0)}), {fp(1)}))]"
-    pos = f"[FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint(Multiply_CFixedPoint({V(var)}, {fp(10)}), {fp(0)}), {fp(1)}))]"
+    neg = f"[FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint(Multiply_CFixedPoint({V(var)}, {fp(-5)}), {fp(0)}), {fp(1)}))]"
+    pos = f"[FixedPointToFloat(Min_CFixedPoint(Max_CFixedPoint(Multiply_CFixedPoint({V(var)}, {fp(5)}), {fp(0)}), {fp(1)}))]"
     return f"""widget = {{ size = {{ {w} 14 }}
 						hbox = {{ size = {{ {w} 10 }} position = {{ 0 2 }} spacing = 0
 							progressbar = {{ size = {{ {half} 10 }} min = 0 max = 1 invertprogress = yes value = "{neg}" {BAR.format(c='red')} }}
@@ -144,13 +146,17 @@ def diverging(var, w=150):
 def estate_row(e):
     return f"""
 				hbox = {{ name = "sol_lshud_estate_{e}" size = {{ {W} 26 }} visible = "[GreaterThan_CFixedPoint({V('sol_ls_pop_' + e)}, {fp(0)})]" spacing = 6
-					{text('SOL_ESTATE_' + e.upper(), 104, 26)}
-					{text(f'[{V("sol_ls_pci_" + e)}|2]', 62, 26, align='right|nobaseline', fmt='#high', raw=True)}
+					{text('SOL_ESTATE_' + e.upper(), 84, 26)}
+					{text(f'[{V("sol_ls_pci_" + e)}|2] @gold!', 82, 26, align='right|nobaseline', fmt='#high', raw=True)}
 					widget = {{ size = {{ 8 1 }} }}
-					{diverging('sol_ls_pci_yoy_' + e)}
-					expand = {{}}
-					{text(f'[{V("sol_ls_pci_yoy_" + e)}|+=1%]', 58, 26, align='right|nobaseline', raw=True)}
-					{text(trend_select('SOL_LSHUD_TREND_ICON', 'sol_ls_pci_yoy_class_' + e), 26, 26, align='right|nobaseline')}
+					widget = {{ size = {{ 248 26 }}
+						hbox = {{ name = "sol_lshud_estate_yoy_{e}" size = {{ 248 26 }} spacing = 6 visible = "[{YOY_READY}]"
+							{diverging('sol_ls_pci_yoy_' + e)}
+							{text(f'[{V("sol_ls_pci_yoy_" + e)}|+=1%]', 58, 26, align='right|nobaseline', raw=True)}
+							{text(trend_select('SOL_LSHUD_TREND_ICON', 'sol_ls_pci_yoy_class_' + e), 26, 26, align='right|nobaseline')}
+						}}
+						{text('SOL_LSHUD_YOY_PENDING', 248, 26, fs=12, fmt='#weak', align='right|nobaseline', extra=f'visible = "[Not({YOY_READY})]"')}
+					}}
 				}}"""
 
 
@@ -220,8 +226,13 @@ widget = {{
 \t\t\t{text(f"[{V('sol_ls_pci')}|2] @gold!", 76, 24, fs=17, font='Font_Type_Headers', fmt='#high', raw=True)}
 \t\t\t{_row_divider()}
 \t\t\t{text('SOL_LSHUD_ROW_YOY_LABEL', 28, 22, fs=12, fmt='#weak')}
-\t\t\t{text(trend_select('SOL_LSHUD_TREND_ICON'), 18, 22, fs=14, align='center|nobaseline')}
-\t\t\t{text(f"[{V('sol_ls_pci_yoy')}|+=1%]", 56, 22, fs=15, raw=True)}
+\t\t\twidget = {{ size = {{ 82 22 }}
+\t\t\t\thbox = {{ name = "sol_lshud_row_yoy" size = {{ 82 22 }} spacing = 8 visible = "[{YOY_READY}]"
+\t\t\t\t\t{text(trend_select('SOL_LSHUD_TREND_ICON'), 18, 22, fs=14, align='center|nobaseline')}
+\t\t\t\t\t{text(f"[{V('sol_ls_pci_yoy')}|+=1%]", 56, 22, fs=15, raw=True)}
+\t\t\t\t}}
+\t\t\t\t{text('SOL_LSHUD_YOY_PENDING', 82, 22, fs=12, fmt='#weak', extra=f'name = "sol_lshud_row_yoy_pending" visible = "[Not({YOY_READY})]"')}
+\t\t\t}}
 \t\t\t{_row_divider()}
 \t\t\t{text('SOL_LSHUD_ROW_RANK', 120, 22, fs=14, extra=f'visible = "[{RANK_READY}]"')}
 \t\t\t{text('SOL_LSHUD_ROW_RANK_PENDING', 120, 22, fs=13, fmt='#weak', extra=f'visible = "[Not({RANK_READY})]"')}
@@ -327,6 +338,7 @@ def _legacy_tooltip_source():
 			hbox = {{
 				name = "sol_lshud_hero"
 				size = {{ {W + 20} 104 }}
+				layoutpolicy_horizontal = expanding
 				margin = {{ 14 10 }}
 				spacing = 14
 				using = bg_contextual_tooltip_header
@@ -344,7 +356,7 @@ def _legacy_tooltip_source():
 					expand = {{}}
 				}}
 				expand = {{}}
-				widget = {{ name = "sol_lshud_pill" size = {{ 116 76 }} visible = "[{READY}]"
+				widget = {{ name = "sol_lshud_pill" size = {{ 116 76 }} visible = "[{YOY_READY}]"
 					widget = {{ size = {{ 116 76 }} visible = "{up}" background = {{ using = color_mid_green_texture alpha = 0.28 }} }}
 					widget = {{ size = {{ 116 76 }} visible = "{down}" background = {{ using = color_mid_red_texture alpha = 0.28 }} }}
 					vbox = {{ size = {{ 116 76 }} margin = {{ 6 6 }}
@@ -353,13 +365,19 @@ def _legacy_tooltip_source():
 						{text('SOL_LSHUD_PREV_SHORT', 104, 18, fs=12, align='center|nobaseline', fmt='#weak')}
 					}}
 				}}
+				vbox = {{ name = "sol_lshud_yoy_pending" visible = "[And({READY}, Not({YOY_READY}))]"
+					{text('SOL_LSHUD_ROW_YOY_LABEL', 116, 24, fs=15, align='center|nobaseline')}
+					{text('SOL_LSHUD_YOY_PENDING', 116, 24, fs=12, align='center|nobaseline', fmt='#weak')}
+				}}
 			}}
 		}}
 		blockoverride "tooltip_content" {{
 			vbox = {{
 				name = "sol_lshud_pending_body"
 				visible = "[Not({READY})]"
-				text_multi = {{ max_width = {W} autoresize = yes text = "SOL_LSHUD_PENDING_BODY" }}
+				minimumsize = {{ {PENDING_BODY_W} -1 }}
+				layoutpolicy_horizontal = expanding
+				text_multi = {{ name = "sol_lshud_pending_text" layoutpolicy_horizontal = expanding max_width = {PENDING_BODY_W} autoresize = yes text = "SOL_LSHUD_PENDING_BODY" }}
 			}}
 			vbox = {{
 				name = "sol_lshud_body"
@@ -368,7 +386,7 @@ def _legacy_tooltip_source():
 				hbox = {{ size = {{ {W} 22 }}
 					{text('SOL_LSHUD_SECTION_ESTATES_YOY', 260, 22, fmt='#S', font='Font_Type_Headers')}
 					expand = {{}}
-					{text('SOL_LSHUD_SCALE_10', 160, 22, align='right|nobaseline', fs=12, fmt='#weak')}
+					{text('SOL_LSHUD_SCALE_20', 160, 22, align='right|nobaseline', fs=12, fmt='#weak')}
 				}}
 				{gold_rule(W)}
 {''.join(estate_row(e) for e in ESTATES)}
@@ -410,7 +428,8 @@ LOC = {
     "SOL_LSHUD_ROW_YOY_LABEL": "同比",
     "SOL_LSHUD_ROW_RANK": f"世界 #high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0]",
     "SOL_LSHUD_ROW_RANK_PENDING": "排行待更新",
-    "SOL_LSHUD_ROW_PENDING": "待年度结算",
+    "SOL_LSHUD_ROW_PENDING": "等待首次计算",
+    "SOL_LSHUD_YOY_PENDING": "暂无去年数据",
     "SOL_LSHUD_LABEL": "生活水平",
     "SOL_LSHUD_TITLE_LOW": "生活水平：#N 低#!",
     "SOL_LSHUD_TITLE_MID": "生活水平：#Y 中#!",
@@ -426,17 +445,17 @@ LOC = {
     "SOL_LSHUD_TREND_ICON_BIG_DOWN": "@arrow_malus_tier_2!",
     "SOL_LSHUD_PREV_SHORT": f"一年前 [{P}('sol_ls_pci_prev').GetValue|2]",
     "SOL_LSHUD_SECTION_ESTATES_YOY": "各阶层人均收入与同比",
-    "SOL_LSHUD_SCALE_10": "条形满格 = ±10%",
+    "SOL_LSHUD_SCALE_20": "条形满格 = ±20%",
     "SOL_LSHUD_SECTION_WORLD": "全球位置",
     "SOL_LSHUD_PERCENTILE": f"第 #high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0] · 高于 [{P}('sol_ls_percentile').GetValue|0%] 的国家",
     "SOL_LSHUD_ELLIPSIS": "⋯",
-    "SOL_LSHUD_PENDING_SHORT": "待年度结算",
-    "SOL_LSHUD_PENDING_BODY": "本国生活水平将在积累至少一整年的同月收入样本后显示；全球排行每年 1 月 1 日刷新。",
+    "SOL_LSHUD_PENDING_SHORT": "等待首次计算",
+    "SOL_LSHUD_PENDING_BODY": "人均收入在首次计算后即可显示；同比需要去年同月数据。全球排行每年 1 月 1 日刷新，首次初始化或手动全局重算时也会更新。",
     "SOL_LSHUD_RANK_PENDING": "全球排行与等级将在下一次 1 月 1 日刷新后显示。",
     "SOL_LSHUD_FOOTNOTE": ("人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。等级以世界人口加权平均 "
                            "[GetGlobalVariable('sol_ls_world_pci').GetValue|2] 为基准：低于其 75% 为低，高于其 133% 为高。"
-                           "同比：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低。玩家按月、AI 按计算频率设置刷新（默认周年），与去年同月比较。排行每年 1 月 1 日更新。"),
-    "SOL_LSHUD_FOOTNOTE_PENDING": "人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。玩家按月、AI 按计算频率设置刷新（默认周年），与去年同月比较。",
+                           "同比：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低；暂无去年同月数据时不显示。玩家按月、AI 按计算频率设置刷新（默认周年）。排行每年 1 月 1 日更新。"),
+    "SOL_LSHUD_FOOTNOTE_PENDING": "人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。玩家按月、AI 按计算频率设置刷新（默认周年）；同比需要去年同月数据。",
 }
 
 LOC_ENGLISH = {
@@ -449,7 +468,8 @@ LOC_ENGLISH = {
     "SOL_LSHUD_ROW_YOY_LABEL": "YoY",
     "SOL_LSHUD_ROW_RANK": f"World #high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0]",
     "SOL_LSHUD_ROW_RANK_PENDING": "Ranking pending",
-    "SOL_LSHUD_ROW_PENDING": "Awaiting annual data",
+    "SOL_LSHUD_ROW_PENDING": "Awaiting first calculation",
+    "SOL_LSHUD_YOY_PENDING": "No prior-year data",
     "SOL_LSHUD_LABEL": "Living Standard",
     "SOL_LSHUD_TITLE_LOW": "Living Standard: #N Low#!",
     "SOL_LSHUD_TITLE_MID": "Living Standard: #Y Medium#!",
@@ -462,22 +482,22 @@ LOC_ENGLISH = {
     **{key: value for key, value in LOC.items() if key.startswith("SOL_LSHUD_TREND_ICON_")},
     "SOL_LSHUD_PREV_SHORT": f"Year ago [{P}('sol_ls_pci_prev').GetValue|2]",
     "SOL_LSHUD_SECTION_ESTATES_YOY": "Estate income and annual change",
-    "SOL_LSHUD_SCALE_10": "Full bar = ±10%",
+    "SOL_LSHUD_SCALE_20": "Full bar = ±20%",
     "SOL_LSHUD_SECTION_WORLD": "World position",
     "SOL_LSHUD_PERCENTILE": f"#high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0] · Above [{P}('sol_ls_percentile').GetValue|0%] of countries",
     "SOL_LSHUD_ELLIPSIS": "⋯",
-    "SOL_LSHUD_PENDING_SHORT": "Awaiting annual data",
-    "SOL_LSHUD_PENDING_BODY": "Living-standard figures appear after at least a full year of same-month income samples has accumulated. World rankings refresh on 1 January.",
+    "SOL_LSHUD_PENDING_SHORT": "Awaiting first calculation",
+    "SOL_LSHUD_PENDING_BODY": "Income appears after the first calculation. Annual change needs data from the same month last year. World rankings refresh on 1 January, at initialization and on manual global recalculation.",
     "SOL_LSHUD_RANK_PENDING": "World rankings and tiers will appear after the next 1 January refresh.",
     "SOL_LSHUD_FOOTNOTE": (
         "Income per person = monthly net estate income ÷ population (thousands) × 12, after building maintenance. "
         "Tiers use the population-weighted world average [GetGlobalVariable('sol_ls_world_pci').GetValue|2]: "
         "low below 75%, high above 133%. Annual change: ≥ +5% strong rise; 0 to +5% rise; −5% to 0 fall; ≤ −5% strong fall. "
-        "Player figures refresh monthly; AI follows the calculation frequency setting (annual by default). Changes compare the same month last year. Rankings refresh on 1 January."
+        "Annual change is unavailable without data from the same month last year. Player figures refresh monthly; AI follows the calculation frequency setting (annual by default). Rankings refresh on 1 January."
     ),
     "SOL_LSHUD_FOOTNOTE_PENDING": (
         "Income per person = monthly net estate income ÷ population (thousands) × 12, after building maintenance. "
-        "Player figures refresh monthly; AI follows the calculation frequency setting (annual by default). Changes compare the same month last year."
+        "Player figures refresh monthly; AI follows the calculation frequency setting (annual by default). Annual change needs data from the same month last year."
     ),
 }
 
@@ -493,7 +513,7 @@ def outputs(targets: tuple[str, ...] = tuple(TARGET_ROOTS)) -> dict[Path, bytes]
         root = TARGET_ROOTS[target]
         result[root / "in_game/gui/SOL_lshud.gui"] = gui_source().encode("utf-8")
         result[root / "in_game/gui/SOL_lshud_glorp_compat.gui"] = glorp_compat_source().encode("utf-8")
-        result[root / "in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt"] = (
+        result[root / "in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt"] = UTF8_BOM + (
             "# Generated by scripts/gen_sol_lshud.py - do not edit.\n"
             "gui/SOL_lshud.gui = sol_lshud_leftrow_root\n"
         ).encode("utf-8")

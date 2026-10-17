@@ -192,6 +192,37 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(rt.globals["sol_ls_top_pci"], 25)
         self.assertEqual(rt.globals["sol_ls_world_pci"], 25)
 
+    def test_first_january_ranks_current_income_without_prior_year_samples(self):
+        from test_sol_lshud_income import IncomeRuntime, country_fixture, scale_income
+
+        for target in ("stable", "sol_standalone"):
+            with self.subTest(target=target):
+                income = IncomeRuntime()
+                player, ai = country_fixture(), country_fixture()
+                scale_income(ai, 2)
+                # Startup samples exist, but no country has a full-year baseline.
+                for item in (player, ai):
+                    income.sample(item, year=1337, month=4, day=1)
+                    item.population = 10
+                # Player keeps sampling monthly; reduced-frequency AI can still
+                # rank using its last solve. January has no prior-year baseline.
+                scale_income(player, 3)
+                income.sample(player, year=1338, month=1)
+                for item in (player, ai):
+                    self.assertNotIn("sol_ls_pci_yoy", item.variables)
+                    self.assertNotIn("sol_ls_pci_prev", item.variables)
+                rt = RankingRuntime([player, ai])
+                original_value = rt.value
+                rt.value = lambda node, scope, initial=0.: 1 if node == "current_month" else original_value(node, scope, initial)
+                path = ROOT / "src" / target / "in_game/common/situations/SOL_economy_situation.txt"
+                _, ancestors = next(effect_calls(parse(path.read_text(encoding="utf-8-sig"))))
+                # Execute the shipped January gate rather than bypassing it.
+                rt.execute([ancestors[-1]], Scope("global"))
+                self.assert_ladder(rt, [player, ai])
+                self.assertAlmostEqual(rt.globals["sol_ls_world_pci"], 48)
+                self.assertEqual(player.variables["sol_ls_rank"], 1)
+                self.assertEqual(ai.variables["sol_ls_rank"], 2)
+
     def test_full_ranking_past_top_ten_and_two_neighbours_each_side(self):
         countries = [country(i, population=i * 10) for i in (4, 12, 2, 7, 1, 11, 6, 9, 3, 13, 5, 10, 8)]
         rt = RankingRuntime(countries)

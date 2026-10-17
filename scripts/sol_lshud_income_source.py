@@ -69,12 +69,19 @@ def render_income_effects() -> str:
         ])
     lines.extend(["\t}", "}", "", "sol_ls_finalize_country_income = {"])
     for metric in METRICS:
+        pci, previous, yoy, trend = _public_names(metric)
         lines.extend([
             f"\tset_variable = {{ name = sol_ls_current_pci_{metric} value = 0 }}",
             "\tif = {",
             f"\t\tlimit = {{ var:sol_ls_pop_{metric} > 0 }}",
             f"\t\tset_variable = {{ name = sol_ls_current_pci_{metric} value = {{ value = var:sol_ls_income_{metric} divide = var:sol_ls_pop_{metric} multiply = sol_ls_annualization_factor }} }}",
             "\t}",
+            # Current income is useful immediately, including for world rankings.
+            f"\tset_variable = {{ name = {pci} value = var:sol_ls_current_pci_{metric} }}",
+            # Availability is per sample: never reuse a stale month's comparison.
+            f"\tremove_variable = {previous}",
+            f"\tremove_variable = {yoy}",
+            f"\tremove_variable = {trend}",
         ])
     lines.extend([
         "\tset_variable = { name = sol_ls_previous_year value = { value = current_year subtract = 1 } }",
@@ -115,12 +122,11 @@ def render_income_effects() -> str:
             pci, previous, yoy, trend = _public_names(metric)
             lines.extend([
                 f"\t\t\tset_variable = {{ name = {previous} value = var:{prefix}_previous_{metric} }}",
-                f"\t\t\tset_variable = {{ name = {pci} value = var:sol_ls_current_pci_{metric} }}",
             ])
         lines.extend([
             "\t\t\tsol_ls_compute_income_yoy = yes",
             "\t\t}",
-            "\t\t# An incomplete new month retains the last complete public annual sample.",
+            "\t\t# No matching baseline leaves current income available and only YoY unset.",
         ])
         for metric in METRICS:
             lines.append(f"\t\tset_variable = {{ name = {prefix}_{metric} value = var:sol_ls_current_pci_{metric} }}")

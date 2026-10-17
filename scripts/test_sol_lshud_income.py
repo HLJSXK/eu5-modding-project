@@ -8,7 +8,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from gen_market_unit_consumption import _load_good_rows
-from sol_lshud_income_source import ESTATES, render_income_effects, render_income_values
+from sol_lshud_income_source import ESTATES, METRICS, _public_names, render_income_effects, render_income_values
 from test_sol_substitution import Runtime, Scope, parse
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,14 +74,21 @@ def scale_income(country, factor):
 
 
 class IncomeTests(unittest.TestCase):
-    def test_weighted_net_income_annual_units_and_first_sample_pending(self):
+    def assert_yoy_unavailable(self, country):
+        for metric in METRICS:
+            for name in _public_names(metric)[1:]:
+                self.assertNotIn(name, country.variables)
+
+    def test_weighted_net_income_published_immediately_with_yoy_pending(self):
         runtime, country = IncomeRuntime(), country_fixture()
         runtime.sample(country)
         self.assertEqual(country.variables["sol_ls_pop_all"], 10)
         self.assertAlmostEqual(country.variables["sol_ls_current_pci_all"], 19.2)
         self.assertEqual(country.variables["sol_ls_pop_commoners"], 10)
         self.assertEqual(country.variables["sol_ls_pop_nobles"], 0)
-        self.assertNotIn("sol_ls_pci", country.variables)
+        self.assertAlmostEqual(country.variables["sol_ls_pci"], 19.2)
+        self.assertAlmostEqual(country.variables["sol_ls_pci_commoners"], 19.2)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, year=1338)
         self.assertAlmostEqual(country.variables["sol_ls_pci"], 19.2)
         self.assertAlmostEqual(country.variables["sol_ls_pci_commoners"], 19.2)
@@ -92,11 +99,11 @@ class IncomeTests(unittest.TestCase):
         runtime, country = IncomeRuntime(), country_fixture()
         runtime.sample(country)
         runtime.sample(country, year=1338, month=1)
-        self.assertNotIn("sol_ls_pci", country.variables)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, month=5, day=16)
-        self.assertNotIn("sol_ls_pci", country.variables)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, day=17)
-        self.assertIn("sol_ls_pci", country.variables)
+        self.assertIn("sol_ls_pci_yoy", country.variables)
 
     def test_repeated_refresh_preserves_prior_year_and_rotates_next_year(self):
         runtime, country = IncomeRuntime(), country_fixture()
@@ -130,11 +137,11 @@ class IncomeTests(unittest.TestCase):
         runtime, country = IncomeRuntime(), country_fixture()
         runtime.sample(country)
         runtime.sample(country, year=1340)
-        self.assertNotIn("sol_ls_pci", country.variables)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, year=1341, month=6)
-        self.assertNotIn("sol_ls_pci", country.variables)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, year=1342)
-        self.assertIn("sol_ls_pci", country.variables)
+        self.assertIn("sol_ls_pci_yoy", country.variables)
 
     def test_zero_prior_income_is_defined_without_division(self):
         runtime, country = IncomeRuntime(), country_fixture()
@@ -158,21 +165,37 @@ class IncomeTests(unittest.TestCase):
             for estate in ("", *(f"_{item}" for item in ESTATES)):
                 self.assertEqual(country.variables[f"sol_ls_pci_yoy_class{estate}"], expected)
 
-    def test_mature_public_sample_survives_missing_month_and_earlier_sample_day(self):
+    def test_current_income_updates_and_stale_yoy_clears_without_matching_baseline(self):
         runtime, country = IncomeRuntime(), country_fixture()
         runtime.sample(country)
         runtime.sample(country, year=1338)
-        public = {key: value for key, value in country.variables.items()
-                  if key.startswith("sol_ls_pci")}
+        self.assertEqual(country.variables["sol_ls_pci_yoy"], 0)
         scale_income(country, 2)
         runtime.sample(country, month=6)
-        self.assertEqual(public, {key: value for key, value in country.variables.items()
-                                 if key.startswith("sol_ls_pci")})
+        self.assertAlmostEqual(country.variables["sol_ls_pci"], 38.4)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, year=1339, month=5, day=16)
-        self.assertEqual(public, {key: value for key, value in country.variables.items()
-                                 if key.startswith("sol_ls_pci")})
+        self.assertAlmostEqual(country.variables["sol_ls_pci"], 38.4)
+        self.assert_yoy_unavailable(country)
         runtime.sample(country, day=17)
         self.assertAlmostEqual(country.variables["sol_ls_pci_yoy"], 1)
+
+    def test_first_year_income_keeps_updating_without_fabricating_yoy(self):
+        runtime, country = IncomeRuntime(), country_fixture()
+        runtime.sample(country, year=1337, month=4, day=1)
+        scale_income(country, 2)
+        runtime.sample(country, month=5)
+        self.assertAlmostEqual(country.variables["sol_ls_pci"], 38.4)
+        self.assert_yoy_unavailable(country)
+        runtime.sample(country, year=1338, month=1)
+        self.assertAlmostEqual(country.variables["sol_ls_pci"], 38.4)
+        self.assert_yoy_unavailable(country)
+        runtime.sample(country, month=4)
+        self.assertAlmostEqual(country.variables["sol_ls_pci_prev"], 19.2)
+        self.assertAlmostEqual(country.variables["sol_ls_pci_yoy"], 1)
+        runtime.sample(country, month=5)
+        self.assertAlmostEqual(country.variables["sol_ls_pci_prev"], 38.4)
+        self.assertAlmostEqual(country.variables["sol_ls_pci_yoy"], 0)
 
     def test_maintenance_deficits_use_real_solver_clamps_and_add_up(self):
         for target in ("stable", "sol_standalone"):

@@ -1,8 +1,18 @@
 # 生活水平行 · 左面板按钮下方（兼容 GlorpUI）—— 新版设计
 
 2026-10-18。**设计已进入正式生成链并写入 stable/standalone；离线渲染通过，实机验收待完成。**
-本版只替换常驻入口的位置（topbar 悬挂徽章 → 左侧 9 个按钮下方的一整行）；tooltip 原样复用已实现的
+本版替换常驻入口的位置（topbar 悬挂徽章 → 左侧 9 个按钮下方的一整行）；tooltip 复用已实现的
 `SOL_LSHUD_tooltip`（`src/stable/in_game/gui/SOL_lshud.gui`），变量契约不变。
+
+2026-10-18 宽度修正：等待首次计算的 tooltip 外框为 570px，与生活水平行等宽；正文最小宽度 550px，
+两侧各留 10px，标题背景横向扩展。已有收入的 tooltip 维持 460px。正式生成器拥有此修正，
+`scripts/test_sol_lshud_ui.py` 检查两目标、中英文的外框、标题和正文边界；离线预览见
+`ai_gui_assessment/images/living_standard_pending_width/`，实际游戏悬停定位仍需实机验收。
+
+同日数据可用性修正：首次计算即显示当前收入并取得排名资格；仅同比等待去年同月样本。
+缺少基线时，行、标题与阶层同比区域显示“暂无去年数据”，隐藏箭头、百分比及变化条；排名独立显示。
+正式生成器与测试已覆盖“收入和排行可用、同比未出”及“收入可用、排行和同比未出”，新预览在
+`ai_gui_assessment/images/living_standard_immediate_income/`。下面的原型脚本保留布局研究用 fixtures，正式实现以生成器为准。
 
 ```powershell
 $env:PYTHONUTF8='1'
@@ -19,9 +29,10 @@ $env:PYTHONUTF8='1'
 | 位置 / 尺寸 | 屏幕 `{0 130}`，`570 × 36` | 左面板 `position = { @panel_x @topbar_height }` = `{0 40}`，面板条 90 高（`ingame_topbar.gui:9-17,216-219`）；宽 = `@left_panel_width` 570 |
 | 背景 | `bg_panel_bar` + 底部 1px 金线（alpha 0.55） | 与 GlorpUI 统计栏同一底纹（`glorp.gui:39`），两者叠放时是一个家族 |
 | 内容（左→右） | 30px 小徽章（底盘 + 文化金环 + 等级图标）· `生活水平` · `低/中/高` ┃ `人均收入` **1.86** @gold! ┃ `同比` 箭头 `+4.5%` ┃ `世界 12 / 87` | 等级图标与箭头沿用 B（`sol_proto/tier_*`、`@arrow_bonus/malus_tier_1/2!`） |
-| 未结算 | SOL 徽记（0.6 alpha）+ `生活水平 ┃ 待年度结算` | 同 B 的 `sol_ls_pci` 未设置分支 |
+| 首次计算前 | SOL 徽记（0.6 alpha）+ `生活水平 ┃ 等待首次计算` | `sol_ls_pci` 未设置分支 |
+| 同比未出 | 收入和排行照常显示，同比区域为 `暂无去年数据` | `sol_ls_pci_yoy` 未设置分支 |
 | 排行未出 | 等级位显示 `—`，排名位显示 `排行待更新` | 同 B 的 rank/tier `.IsSet` 守卫 |
-| 悬停 | 整行一个热区，`tooltipwidget = { using = SOL_LSHUD_tooltip }` | 已实现的 tooltip，不改 |
+| 悬停 | 整行一个热区，`tooltipwidget = { using = SOL_LSHUD_tooltip }` | 已实现的 tooltip；首次计算前宽 570，有收入后宽 460 |
 | 显示条件 | 玩家有效、`sol_ls_hud_enabled > 0`、左侧面板**未打开**（`Not(Or(LeftView.IsShown, LeftView.IsSideAttached))`） | 面板打开时侧栏从 y=130 起覆盖这一区域 |
 | 隐藏 UI | `using = Animation_Show_Hide_UI`，`on_hide_ui` 左移 570 + 透明，与原版左面板同参数 | `ingame_topbar.gui:221-228` |
 | 层 | `layer = bottom`（与 `left_panel` 相同），侧栏 / tooltip / 顶栏自然压在上面 | GlorpUI `left_panel` 的 `layer = bottom` |

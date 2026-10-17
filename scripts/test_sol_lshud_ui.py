@@ -22,7 +22,7 @@ import textures
 from data import Evaluator, Formats, Loc, TextIcons
 from engine import Engine
 from gui import Expander, GuiDB, collect_files
-from gen_sol_lshud import LOC, LOC_ENGLISH, PANEL_W, ROW_H, ROW_Y, TIER_TEX, outputs
+from gen_sol_lshud import LOC, LOC_ENGLISH, PANEL_W, PENDING_BODY_W, ROW_H, ROW_Y, TIER_TEX, W, outputs
 
 # Reuse the adopted prototype's invented country/estate fixtures, never its GUI.
 spec = importlib.util.spec_from_file_location(
@@ -81,14 +81,23 @@ class LivingStandardHUD(unittest.TestCase):
                 match = Loc.LINE_RE.match(line)
                 if match:
                     loc.d[match[1]] = match[2]
-        rank_pending = state == "_rank_pending"
+        rank_pending = state in ("_rank_pending", "_rank_yoy_pending")
         overrides, rank, ready = fixtures.STATES.get(state, fixtures.STATES[""])
+        yoy_ready = ready and state not in ("_yoy_pending", "_rank_yoy_pending")
+
+        def annual_value(match):
+            if not yoy_ready:
+                raise AssertionError("Unavailable annual comparison was read: " + match[0])
+            return dict(fixtures.PLAYER_VARS, **overrides)[match[1]]
+
         mocks = [
             (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", enabled),
             (r"LeftView\.IsShown", left_shown),
             (r"LeftView\.IsSideAttached", left_attached),
             (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
             (r"Player\.MakeScope\.GetVariable\('sol_ls_(rank|tier)'\)\.IsSet", ready and not rank_pending),
+            (r"Player\.MakeScope\.GetVariable\('sol_ls_pci_yoy'\)\.IsSet", yoy_ready),
+            (r"Player\.MakeScope\.GetVariable\('(sol_ls_pci_(?:prev|yoy)\w*)'\)\.GetValue", annual_value),
             (r"GetGlobalVariable\('sol_ls_rank_count'\)\.IsSet", not rank_pending),
         ] + fixtures.state_mocks(overrides, rank, ready) + hud.mocks()
         log = []
@@ -127,11 +136,11 @@ class LivingStandardHUD(unittest.TestCase):
     def test_adopted_leftrow_and_all_tooltip_states(self):
         for target in self.databases:
             for language in ("simp_chinese", "english"):
-                for state in (*fixtures.STATES, "_rank_pending"):
+                for state in (*fixtures.STATES, "_rank_pending", "_yoy_pending", "_rank_yoy_pending"):
                     with self.subTest(target=target, language=language, state=state):
                         eng, root, row, tip, (width, height), log = self.context(target, language, state)
                         self.assertEqual((row.x, row.y, row.w, row.h), (0, ROW_Y, PANEL_W, ROW_H))
-                        self.assertLessEqual(width, 460)
+                        self.assertEqual(width, PANEL_W if state == "_pending" else W + 20)
                         self.assertLessEqual(height, 760)
                         elements = []
                         texts = []
@@ -140,11 +149,30 @@ class LivingStandardHUD(unittest.TestCase):
                             if element.kind == "textbox":
                                 texts.append(eng.text_of(element) or "")
                         names = {e.props.get("name") for e in elements}
+                        row_names = {e.props.get("name") for e in visible_walk(eng, row)}
+                        if state in ("_yoy_pending", "_rank_yoy_pending"):
+                            self.assertIn("sol_lshud_yoy_pending", names)
+                            self.assertNotIn("sol_lshud_pill", names)
+                            self.assertNotIn("sol_lshud_estate_yoy_commoners", names)
+                            self.assertIn("sol_lshud_row_yoy_pending", row_names)
+                            self.assertNotIn("sol_lshud_row_yoy", row_names)
+                            self.assertTrue(any("1.86" in text for text in texts))
+                        elif state != "_pending":
+                            self.assertIn("sol_lshud_pill", names)
+                            self.assertIn("sol_lshud_estate_yoy_commoners", names)
+                            self.assertNotIn("sol_lshud_yoy_pending", names)
                         self.assertNotIn("sol_lshud_estate_tribesmen", names)
                         if state == "_pending":
                             self.assertIn("sol_lshud_pending_body", names)
                             self.assertNotIn("sol_lshud_body", names)
-                        elif state == "_rank_pending":
+                            by_name = {e.props.get("name"): e for e in elements}
+                            hero = by_name["sol_lshud_hero"]
+                            body = by_name["sol_lshud_pending_body"]
+                            paragraph = by_name["sol_lshud_pending_text"]
+                            self.assertEqual((hero.x, hero.w), (tip.x, PANEL_W))
+                            self.assertEqual((body.x, body.w), (tip.x + 10, PENDING_BODY_W))
+                            self.assertEqual((paragraph.x, paragraph.w), (body.x, body.w))
+                        elif state in ("_rank_pending", "_rank_yoy_pending"):
                             self.assertIn("sol_lshud_body", names)
                             self.assertIn("sol_lshud_rank_pending", names)
                             self.assertNotIn("sol_lshud_ranking", names)
@@ -154,7 +182,7 @@ class LivingStandardHUD(unittest.TestCase):
                             self.assertIn("sol_lshud_ranking", names)
                             self.assertNotIn("sol_lshud_rank_pending", names)
                             self.assertEqual("sol_lshud_top_1" in names, state != "_rank2")
-                        expected_tier = {"": 1, "_high_bigup": 2, "_low_bigdown": 0, "_rank2": 2}.get(state)
+                        expected_tier = {"": 1, "_high_bigup": 2, "_low_bigdown": 0, "_rank2": 2, "_yoy_pending": 1}.get(state)
                         active_icons = [e.props.get("texture") for e in visible_walk(eng, row)
                                         if e.props.get("texture") in TIER_TEX.values()]
                         self.assertEqual(active_icons, [] if expected_tier is None else [TIER_TEX[expected_tier]])
