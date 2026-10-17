@@ -15,6 +15,8 @@ from typing import Callable, List, Sequence
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from sol_lshud_income_source import render_income_effects
+
 
 @dataclass
 class ScriptWriter:
@@ -1530,6 +1532,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tlimit = { is_land = yes }",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
+        "\t\t\tsol_ls_accumulate_country_income = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }",
@@ -1562,6 +1565,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "}",
         "",
         "sol_solve_country_pop_demand = {",
+        "\tsol_ls_reset_country_income = yes",
         "\tsol_refresh_country_substitution = yes",
         "\tgls_compute_savings_pressure = yes",
         "\t# Size prefilter, checked before anything else because num_locations is",
@@ -1603,6 +1607,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_census_outcome = yes",
         "\t}",
         "\telse = { sol_solve_country_pop_demand_raw_only = yes }",
+        "\tsol_ls_finalize_country_income = yes",
         "}",
         "",
         "# Global census counters. Incremented per country during the monthly pass",
@@ -1798,6 +1803,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tlimit = { is_land = yes }",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
+        "\t\t\tsol_ls_accumulate_country_income = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }",
@@ -3539,6 +3545,7 @@ def emit_section_60_full_refresh(writer: ScriptWriter) -> None:
         "\t# World scope: refresh market maps once, then refresh all countries.",
         "\tsol_refresh_market_pop_demand_maps = yes",
         "\tevery_country = { if = { limit = { total_population > 0 num_locations > 0 } gls_full_refresh_country = yes } else = { sol_clear_country_substitution = yes } }",
+        "\tsol_ls_recalculate_world_ranking = yes",
         "}",
     ])
 
@@ -3580,4 +3587,5 @@ def render_static_sections(
         sections.append(section_writer.render().rstrip())
         if name == "10_standard_of_living_prelude":
             sections.append(refresh_block.strip())
+    sections.append(render_income_effects().strip())
     return "\n\n".join(sections).rstrip() + "\n"

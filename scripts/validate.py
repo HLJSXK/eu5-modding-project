@@ -126,6 +126,10 @@ def check_anti_patterns(path: Path, content: str, patterns: list[dict]):
         regex = entry.get("pattern", "")
         if not regex:
             continue
+        # This rule describes generic-action selection slots. Resolutions use
+        # the separate native recipient/vote contract (benedictus_deus.txt).
+        if entry.get("id") == "select_trigger_custom_target_flag" and "/generic_actions/" not in path_str:
+            continue
         # Restrict to specific path substrings if specified
         only_in = entry.get("only_in_paths", [])
         if only_in and not any(sub in path_str for sub in only_in):

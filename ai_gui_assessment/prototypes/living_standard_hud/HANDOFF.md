@@ -1,6 +1,8 @@
 # 交接：HUD「生活水平」徽章（方案 B，靠左）
 
-状态（2026-10-17）：**前端原型已定稿并离线验收；未进入 `src/`，未实机验证，后端未实现。**
+状态（2026-10-18）：**B 方案原来的 topbar 悬挂位置已由新版左面板行设计替换；新版已接入 stable/standalone，实机验收待完成。**
+新版位置、Glorp UI 顺延兼容和渲染验收见 [`living_standard_leftrow/DESIGN.md`](../living_standard_leftrow/DESIGN.md) 与 [`EU5_GUI_SOL_Notes.md`](../../../docs/guides/EU5_GUI_SOL_Notes.md)。正式生成入口仍为 `scripts/gen_sol_lshud.py` 与 `scripts/gen_sol_chain.py`；以下第 3–5 节保留为原始数据/tooltip 合同，实现细节见 [`SOL_Topbar_HUD_Implementation_20261017.md`](../../../docs/technical/SOL_Topbar_HUD_Implementation_20261017.md)。
+实际单位为“每千人每年净收入”（月收入 ×12）；总计取求解器五阶层各自扣维护后非负净收入之和。同比使用去年同月的完整样本，首次满一年之前保持待结算；不将不足一年的周年间隔视为同比。排序采用具名 script value 与显式总数，无需未经核实的 `position` 循环索引。
 用户已确认采用 B、删除 A/C、徽章从左往右靠左放置。
 
 - 原始设计对比记录不再保留；A（顶栏内嵌指标）与 C（国家横幅侧签）已按用户要求删除，相关生成物与渲染图已清除。

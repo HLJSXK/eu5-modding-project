@@ -5007,6 +5007,7 @@ sol_solve_country_pop_demand_raw_only = {
 			limit = { is_land = yes }
 			sol_compute_location_pop_demand = yes
 			save_scope_as = sol_demand_cached_location
+			sol_ls_accumulate_country_income = yes
 			owner = {
 				change_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }
 				change_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }
@@ -5039,6 +5040,7 @@ sol_solve_country_pop_demand_raw_only = {
 }
 
 sol_solve_country_pop_demand = {
+	sol_ls_reset_country_income = yes
 	sol_refresh_country_substitution = yes
 	gls_compute_savings_pressure = yes
 	# Size prefilter, checked before anything else because num_locations is
@@ -5080,6 +5082,7 @@ sol_solve_country_pop_demand = {
 		sol_country_demand_census_outcome = yes
 	}
 	else = { sol_solve_country_pop_demand_raw_only = yes }
+	sol_ls_finalize_country_income = yes
 }
 
 # Global census counters. Incremented per country during the monthly pass
@@ -5275,6 +5278,7 @@ sol_solve_country_pop_demand_solver = {
 			limit = { is_land = yes }
 			sol_compute_location_pop_demand = yes
 			save_scope_as = sol_demand_cached_location
+			sol_ls_accumulate_country_income = yes
 			owner = {
 				change_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }
 				change_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }
@@ -6263,4 +6267,747 @@ gls_recalculate_global_living_standard = {
 	# World scope: refresh market maps once, then refresh all countries.
 	sol_refresh_market_pop_demand_maps = yes
 	every_country = { if = { limit = { total_population > 0 num_locations > 0 } gls_full_refresh_country = yes } else = { sol_clear_country_substitution = yes } }
+	sol_ls_recalculate_world_ranking = yes
+}
+
+# HUD income piggybacks on the existing country solver preparation pass.
+sol_ls_reset_country_income = {
+	set_variable = { name = sol_ls_income_all value = 0 }
+	set_variable = { name = sol_ls_pop_all value = 0 }
+	set_variable = { name = sol_ls_income_nobles value = 0 }
+	set_variable = { name = sol_ls_pop_nobles value = 0 }
+	set_variable = { name = sol_ls_income_clergy value = 0 }
+	set_variable = { name = sol_ls_pop_clergy value = 0 }
+	set_variable = { name = sol_ls_income_burghers value = 0 }
+	set_variable = { name = sol_ls_pop_burghers value = 0 }
+	set_variable = { name = sol_ls_income_commoners value = 0 }
+	set_variable = { name = sol_ls_pop_commoners value = 0 }
+	set_variable = { name = sol_ls_income_tribesmen value = 0 }
+	set_variable = { name = sol_ls_pop_tribesmen value = 0 }
+}
+
+sol_ls_accumulate_country_income = {
+	# Location scope, called immediately after sol_compute_location_pop_demand.
+	save_scope_as = sol_ls_income_location
+	owner = {
+		# The solver clamps net income per estate before summing. Reuse that exact total
+		# so one estate's maintenance deficit cannot consume another estate's income.
+		change_variable = { name = sol_ls_income_all add = scope:sol_ls_income_location.var:sol_location_total_income }
+		change_variable = { name = sol_ls_pop_all add = scope:sol_ls_income_location.local_sol_population_sum }
+		change_variable = { name = sol_ls_pop_nobles add = scope:sol_ls_income_location.num_pop_type:nobles }
+		change_variable = { name = sol_ls_income_nobles add = scope:sol_ls_income_location.var:sol_location_nobles_net_income }
+		change_variable = { name = sol_ls_pop_clergy add = scope:sol_ls_income_location.num_pop_type:clergy }
+		change_variable = { name = sol_ls_income_clergy add = scope:sol_ls_income_location.var:sol_location_clergy_net_income }
+		change_variable = { name = sol_ls_pop_burghers add = scope:sol_ls_income_location.num_pop_type:burghers }
+		change_variable = { name = sol_ls_income_burghers add = scope:sol_ls_income_location.var:sol_location_burghers_net_income }
+		change_variable = { name = sol_ls_pop_commoners add = scope:sol_ls_income_location.local_commoner_population }
+		change_variable = { name = sol_ls_income_commoners add = scope:sol_ls_income_location.var:sol_location_commoners_net_income }
+		change_variable = { name = sol_ls_pop_tribesmen add = scope:sol_ls_income_location.num_pop_type:tribesmen }
+		change_variable = { name = sol_ls_income_tribesmen add = scope:sol_ls_income_location.var:sol_location_tribesmen_net_income }
+	}
+}
+
+sol_ls_finalize_country_income = {
+	set_variable = { name = sol_ls_current_pci_all value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_all > 0 }
+		set_variable = { name = sol_ls_current_pci_all value = { value = var:sol_ls_income_all divide = var:sol_ls_pop_all multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_current_pci_nobles value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_nobles > 0 }
+		set_variable = { name = sol_ls_current_pci_nobles value = { value = var:sol_ls_income_nobles divide = var:sol_ls_pop_nobles multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_current_pci_clergy value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_clergy > 0 }
+		set_variable = { name = sol_ls_current_pci_clergy value = { value = var:sol_ls_income_clergy divide = var:sol_ls_pop_clergy multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_current_pci_burghers value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_burghers > 0 }
+		set_variable = { name = sol_ls_current_pci_burghers value = { value = var:sol_ls_income_burghers divide = var:sol_ls_pop_burghers multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_current_pci_commoners value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_commoners > 0 }
+		set_variable = { name = sol_ls_current_pci_commoners value = { value = var:sol_ls_income_commoners divide = var:sol_ls_pop_commoners multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_current_pci_tribesmen value = 0 }
+	if = {
+		limit = { var:sol_ls_pop_tribesmen > 0 }
+		set_variable = { name = sol_ls_current_pci_tribesmen value = { value = var:sol_ls_income_tribesmen divide = var:sol_ls_pop_tribesmen multiply = sol_ls_annualization_factor } }
+	}
+	set_variable = { name = sol_ls_previous_year value = { value = current_year subtract = 1 } }
+	# Save/load and repeated refreshes cannot turn a partial year into YoY.
+	# Keep both this year's last sample and the previous year's sample for each month.
+	if = {
+		limit = { current_month = 1 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_1_year } }
+			set_variable = { name = sol_ls_sample_1_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_1_year < current_year }
+			remove_variable = sol_ls_sample_1_previous_year
+			if = {
+				limit = { var:sol_ls_sample_1_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_1_previous_year value = var:sol_ls_sample_1_year }
+				set_variable = { name = sol_ls_sample_1_previous_day value = var:sol_ls_sample_1_day }
+				set_variable = { name = sol_ls_sample_1_previous_all value = var:sol_ls_sample_1_all }
+				set_variable = { name = sol_ls_sample_1_previous_nobles value = var:sol_ls_sample_1_nobles }
+				set_variable = { name = sol_ls_sample_1_previous_clergy value = var:sol_ls_sample_1_clergy }
+				set_variable = { name = sol_ls_sample_1_previous_burghers value = var:sol_ls_sample_1_burghers }
+				set_variable = { name = sol_ls_sample_1_previous_commoners value = var:sol_ls_sample_1_commoners }
+				set_variable = { name = sol_ls_sample_1_previous_tribesmen value = var:sol_ls_sample_1_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_1_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_1_previous_year
+				var:sol_ls_sample_1_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_1_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_1_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_1_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_1_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_1_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_1_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_1_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_1_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_1_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_1_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_1_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_1_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_1_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_1_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 2 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_2_year } }
+			set_variable = { name = sol_ls_sample_2_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_2_year < current_year }
+			remove_variable = sol_ls_sample_2_previous_year
+			if = {
+				limit = { var:sol_ls_sample_2_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_2_previous_year value = var:sol_ls_sample_2_year }
+				set_variable = { name = sol_ls_sample_2_previous_day value = var:sol_ls_sample_2_day }
+				set_variable = { name = sol_ls_sample_2_previous_all value = var:sol_ls_sample_2_all }
+				set_variable = { name = sol_ls_sample_2_previous_nobles value = var:sol_ls_sample_2_nobles }
+				set_variable = { name = sol_ls_sample_2_previous_clergy value = var:sol_ls_sample_2_clergy }
+				set_variable = { name = sol_ls_sample_2_previous_burghers value = var:sol_ls_sample_2_burghers }
+				set_variable = { name = sol_ls_sample_2_previous_commoners value = var:sol_ls_sample_2_commoners }
+				set_variable = { name = sol_ls_sample_2_previous_tribesmen value = var:sol_ls_sample_2_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_2_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_2_previous_year
+				var:sol_ls_sample_2_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_2_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_2_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_2_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_2_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_2_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_2_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_2_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_2_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_2_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_2_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_2_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_2_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_2_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_2_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 3 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_3_year } }
+			set_variable = { name = sol_ls_sample_3_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_3_year < current_year }
+			remove_variable = sol_ls_sample_3_previous_year
+			if = {
+				limit = { var:sol_ls_sample_3_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_3_previous_year value = var:sol_ls_sample_3_year }
+				set_variable = { name = sol_ls_sample_3_previous_day value = var:sol_ls_sample_3_day }
+				set_variable = { name = sol_ls_sample_3_previous_all value = var:sol_ls_sample_3_all }
+				set_variable = { name = sol_ls_sample_3_previous_nobles value = var:sol_ls_sample_3_nobles }
+				set_variable = { name = sol_ls_sample_3_previous_clergy value = var:sol_ls_sample_3_clergy }
+				set_variable = { name = sol_ls_sample_3_previous_burghers value = var:sol_ls_sample_3_burghers }
+				set_variable = { name = sol_ls_sample_3_previous_commoners value = var:sol_ls_sample_3_commoners }
+				set_variable = { name = sol_ls_sample_3_previous_tribesmen value = var:sol_ls_sample_3_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_3_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_3_previous_year
+				var:sol_ls_sample_3_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_3_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_3_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_3_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_3_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_3_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_3_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_3_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_3_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_3_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_3_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_3_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_3_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_3_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_3_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 4 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_4_year } }
+			set_variable = { name = sol_ls_sample_4_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_4_year < current_year }
+			remove_variable = sol_ls_sample_4_previous_year
+			if = {
+				limit = { var:sol_ls_sample_4_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_4_previous_year value = var:sol_ls_sample_4_year }
+				set_variable = { name = sol_ls_sample_4_previous_day value = var:sol_ls_sample_4_day }
+				set_variable = { name = sol_ls_sample_4_previous_all value = var:sol_ls_sample_4_all }
+				set_variable = { name = sol_ls_sample_4_previous_nobles value = var:sol_ls_sample_4_nobles }
+				set_variable = { name = sol_ls_sample_4_previous_clergy value = var:sol_ls_sample_4_clergy }
+				set_variable = { name = sol_ls_sample_4_previous_burghers value = var:sol_ls_sample_4_burghers }
+				set_variable = { name = sol_ls_sample_4_previous_commoners value = var:sol_ls_sample_4_commoners }
+				set_variable = { name = sol_ls_sample_4_previous_tribesmen value = var:sol_ls_sample_4_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_4_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_4_previous_year
+				var:sol_ls_sample_4_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_4_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_4_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_4_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_4_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_4_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_4_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_4_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_4_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_4_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_4_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_4_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_4_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_4_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_4_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 5 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_5_year } }
+			set_variable = { name = sol_ls_sample_5_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_5_year < current_year }
+			remove_variable = sol_ls_sample_5_previous_year
+			if = {
+				limit = { var:sol_ls_sample_5_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_5_previous_year value = var:sol_ls_sample_5_year }
+				set_variable = { name = sol_ls_sample_5_previous_day value = var:sol_ls_sample_5_day }
+				set_variable = { name = sol_ls_sample_5_previous_all value = var:sol_ls_sample_5_all }
+				set_variable = { name = sol_ls_sample_5_previous_nobles value = var:sol_ls_sample_5_nobles }
+				set_variable = { name = sol_ls_sample_5_previous_clergy value = var:sol_ls_sample_5_clergy }
+				set_variable = { name = sol_ls_sample_5_previous_burghers value = var:sol_ls_sample_5_burghers }
+				set_variable = { name = sol_ls_sample_5_previous_commoners value = var:sol_ls_sample_5_commoners }
+				set_variable = { name = sol_ls_sample_5_previous_tribesmen value = var:sol_ls_sample_5_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_5_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_5_previous_year
+				var:sol_ls_sample_5_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_5_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_5_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_5_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_5_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_5_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_5_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_5_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_5_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_5_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_5_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_5_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_5_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_5_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_5_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 6 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_6_year } }
+			set_variable = { name = sol_ls_sample_6_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_6_year < current_year }
+			remove_variable = sol_ls_sample_6_previous_year
+			if = {
+				limit = { var:sol_ls_sample_6_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_6_previous_year value = var:sol_ls_sample_6_year }
+				set_variable = { name = sol_ls_sample_6_previous_day value = var:sol_ls_sample_6_day }
+				set_variable = { name = sol_ls_sample_6_previous_all value = var:sol_ls_sample_6_all }
+				set_variable = { name = sol_ls_sample_6_previous_nobles value = var:sol_ls_sample_6_nobles }
+				set_variable = { name = sol_ls_sample_6_previous_clergy value = var:sol_ls_sample_6_clergy }
+				set_variable = { name = sol_ls_sample_6_previous_burghers value = var:sol_ls_sample_6_burghers }
+				set_variable = { name = sol_ls_sample_6_previous_commoners value = var:sol_ls_sample_6_commoners }
+				set_variable = { name = sol_ls_sample_6_previous_tribesmen value = var:sol_ls_sample_6_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_6_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_6_previous_year
+				var:sol_ls_sample_6_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_6_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_6_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_6_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_6_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_6_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_6_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_6_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_6_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_6_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_6_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_6_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_6_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_6_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_6_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 7 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_7_year } }
+			set_variable = { name = sol_ls_sample_7_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_7_year < current_year }
+			remove_variable = sol_ls_sample_7_previous_year
+			if = {
+				limit = { var:sol_ls_sample_7_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_7_previous_year value = var:sol_ls_sample_7_year }
+				set_variable = { name = sol_ls_sample_7_previous_day value = var:sol_ls_sample_7_day }
+				set_variable = { name = sol_ls_sample_7_previous_all value = var:sol_ls_sample_7_all }
+				set_variable = { name = sol_ls_sample_7_previous_nobles value = var:sol_ls_sample_7_nobles }
+				set_variable = { name = sol_ls_sample_7_previous_clergy value = var:sol_ls_sample_7_clergy }
+				set_variable = { name = sol_ls_sample_7_previous_burghers value = var:sol_ls_sample_7_burghers }
+				set_variable = { name = sol_ls_sample_7_previous_commoners value = var:sol_ls_sample_7_commoners }
+				set_variable = { name = sol_ls_sample_7_previous_tribesmen value = var:sol_ls_sample_7_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_7_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_7_previous_year
+				var:sol_ls_sample_7_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_7_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_7_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_7_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_7_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_7_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_7_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_7_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_7_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_7_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_7_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_7_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_7_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_7_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_7_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 8 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_8_year } }
+			set_variable = { name = sol_ls_sample_8_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_8_year < current_year }
+			remove_variable = sol_ls_sample_8_previous_year
+			if = {
+				limit = { var:sol_ls_sample_8_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_8_previous_year value = var:sol_ls_sample_8_year }
+				set_variable = { name = sol_ls_sample_8_previous_day value = var:sol_ls_sample_8_day }
+				set_variable = { name = sol_ls_sample_8_previous_all value = var:sol_ls_sample_8_all }
+				set_variable = { name = sol_ls_sample_8_previous_nobles value = var:sol_ls_sample_8_nobles }
+				set_variable = { name = sol_ls_sample_8_previous_clergy value = var:sol_ls_sample_8_clergy }
+				set_variable = { name = sol_ls_sample_8_previous_burghers value = var:sol_ls_sample_8_burghers }
+				set_variable = { name = sol_ls_sample_8_previous_commoners value = var:sol_ls_sample_8_commoners }
+				set_variable = { name = sol_ls_sample_8_previous_tribesmen value = var:sol_ls_sample_8_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_8_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_8_previous_year
+				var:sol_ls_sample_8_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_8_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_8_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_8_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_8_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_8_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_8_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_8_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_8_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_8_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_8_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_8_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_8_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_8_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_8_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 9 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_9_year } }
+			set_variable = { name = sol_ls_sample_9_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_9_year < current_year }
+			remove_variable = sol_ls_sample_9_previous_year
+			if = {
+				limit = { var:sol_ls_sample_9_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_9_previous_year value = var:sol_ls_sample_9_year }
+				set_variable = { name = sol_ls_sample_9_previous_day value = var:sol_ls_sample_9_day }
+				set_variable = { name = sol_ls_sample_9_previous_all value = var:sol_ls_sample_9_all }
+				set_variable = { name = sol_ls_sample_9_previous_nobles value = var:sol_ls_sample_9_nobles }
+				set_variable = { name = sol_ls_sample_9_previous_clergy value = var:sol_ls_sample_9_clergy }
+				set_variable = { name = sol_ls_sample_9_previous_burghers value = var:sol_ls_sample_9_burghers }
+				set_variable = { name = sol_ls_sample_9_previous_commoners value = var:sol_ls_sample_9_commoners }
+				set_variable = { name = sol_ls_sample_9_previous_tribesmen value = var:sol_ls_sample_9_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_9_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_9_previous_year
+				var:sol_ls_sample_9_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_9_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_9_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_9_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_9_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_9_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_9_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_9_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_9_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_9_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_9_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_9_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_9_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_9_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_9_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 10 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_10_year } }
+			set_variable = { name = sol_ls_sample_10_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_10_year < current_year }
+			remove_variable = sol_ls_sample_10_previous_year
+			if = {
+				limit = { var:sol_ls_sample_10_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_10_previous_year value = var:sol_ls_sample_10_year }
+				set_variable = { name = sol_ls_sample_10_previous_day value = var:sol_ls_sample_10_day }
+				set_variable = { name = sol_ls_sample_10_previous_all value = var:sol_ls_sample_10_all }
+				set_variable = { name = sol_ls_sample_10_previous_nobles value = var:sol_ls_sample_10_nobles }
+				set_variable = { name = sol_ls_sample_10_previous_clergy value = var:sol_ls_sample_10_clergy }
+				set_variable = { name = sol_ls_sample_10_previous_burghers value = var:sol_ls_sample_10_burghers }
+				set_variable = { name = sol_ls_sample_10_previous_commoners value = var:sol_ls_sample_10_commoners }
+				set_variable = { name = sol_ls_sample_10_previous_tribesmen value = var:sol_ls_sample_10_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_10_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_10_previous_year
+				var:sol_ls_sample_10_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_10_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_10_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_10_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_10_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_10_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_10_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_10_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_10_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_10_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_10_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_10_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_10_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_10_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_10_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 11 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_11_year } }
+			set_variable = { name = sol_ls_sample_11_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_11_year < current_year }
+			remove_variable = sol_ls_sample_11_previous_year
+			if = {
+				limit = { var:sol_ls_sample_11_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_11_previous_year value = var:sol_ls_sample_11_year }
+				set_variable = { name = sol_ls_sample_11_previous_day value = var:sol_ls_sample_11_day }
+				set_variable = { name = sol_ls_sample_11_previous_all value = var:sol_ls_sample_11_all }
+				set_variable = { name = sol_ls_sample_11_previous_nobles value = var:sol_ls_sample_11_nobles }
+				set_variable = { name = sol_ls_sample_11_previous_clergy value = var:sol_ls_sample_11_clergy }
+				set_variable = { name = sol_ls_sample_11_previous_burghers value = var:sol_ls_sample_11_burghers }
+				set_variable = { name = sol_ls_sample_11_previous_commoners value = var:sol_ls_sample_11_commoners }
+				set_variable = { name = sol_ls_sample_11_previous_tribesmen value = var:sol_ls_sample_11_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_11_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_11_previous_year
+				var:sol_ls_sample_11_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_11_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_11_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_11_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_11_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_11_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_11_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_11_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_11_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_11_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_11_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_11_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_11_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_11_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_11_day value = current_day }
+	}
+	if = {
+		limit = { current_month = 12 }
+		if = {
+			limit = { NOT = { has_variable = sol_ls_sample_12_year } }
+			set_variable = { name = sol_ls_sample_12_year value = current_year }
+		}
+		else_if = {
+			limit = { var:sol_ls_sample_12_year < current_year }
+			remove_variable = sol_ls_sample_12_previous_year
+			if = {
+				limit = { var:sol_ls_sample_12_year = var:sol_ls_previous_year }
+				set_variable = { name = sol_ls_sample_12_previous_year value = var:sol_ls_sample_12_year }
+				set_variable = { name = sol_ls_sample_12_previous_day value = var:sol_ls_sample_12_day }
+				set_variable = { name = sol_ls_sample_12_previous_all value = var:sol_ls_sample_12_all }
+				set_variable = { name = sol_ls_sample_12_previous_nobles value = var:sol_ls_sample_12_nobles }
+				set_variable = { name = sol_ls_sample_12_previous_clergy value = var:sol_ls_sample_12_clergy }
+				set_variable = { name = sol_ls_sample_12_previous_burghers value = var:sol_ls_sample_12_burghers }
+				set_variable = { name = sol_ls_sample_12_previous_commoners value = var:sol_ls_sample_12_commoners }
+				set_variable = { name = sol_ls_sample_12_previous_tribesmen value = var:sol_ls_sample_12_tribesmen }
+			}
+			set_variable = { name = sol_ls_sample_12_year value = current_year }
+		}
+		if = {
+			limit = {
+				has_variable = sol_ls_sample_12_previous_year
+				var:sol_ls_sample_12_previous_year = var:sol_ls_previous_year
+				current_day >= var:sol_ls_sample_12_previous_day
+			}
+			set_variable = { name = sol_ls_pci_prev value = var:sol_ls_sample_12_previous_all }
+			set_variable = { name = sol_ls_pci value = var:sol_ls_current_pci_all }
+			set_variable = { name = sol_ls_pci_prev_nobles value = var:sol_ls_sample_12_previous_nobles }
+			set_variable = { name = sol_ls_pci_nobles value = var:sol_ls_current_pci_nobles }
+			set_variable = { name = sol_ls_pci_prev_clergy value = var:sol_ls_sample_12_previous_clergy }
+			set_variable = { name = sol_ls_pci_clergy value = var:sol_ls_current_pci_clergy }
+			set_variable = { name = sol_ls_pci_prev_burghers value = var:sol_ls_sample_12_previous_burghers }
+			set_variable = { name = sol_ls_pci_burghers value = var:sol_ls_current_pci_burghers }
+			set_variable = { name = sol_ls_pci_prev_commoners value = var:sol_ls_sample_12_previous_commoners }
+			set_variable = { name = sol_ls_pci_commoners value = var:sol_ls_current_pci_commoners }
+			set_variable = { name = sol_ls_pci_prev_tribesmen value = var:sol_ls_sample_12_previous_tribesmen }
+			set_variable = { name = sol_ls_pci_tribesmen value = var:sol_ls_current_pci_tribesmen }
+			sol_ls_compute_income_yoy = yes
+		}
+		# An incomplete new month retains the last complete public annual sample.
+		set_variable = { name = sol_ls_sample_12_all value = var:sol_ls_current_pci_all }
+		set_variable = { name = sol_ls_sample_12_nobles value = var:sol_ls_current_pci_nobles }
+		set_variable = { name = sol_ls_sample_12_clergy value = var:sol_ls_current_pci_clergy }
+		set_variable = { name = sol_ls_sample_12_burghers value = var:sol_ls_current_pci_burghers }
+		set_variable = { name = sol_ls_sample_12_commoners value = var:sol_ls_current_pci_commoners }
+		set_variable = { name = sol_ls_sample_12_tribesmen value = var:sol_ls_current_pci_tribesmen }
+		set_variable = { name = sol_ls_sample_12_day value = current_day }
+	}
+}
+
+sol_ls_compute_income_yoy = {
+	set_variable = { name = sol_ls_pci_yoy value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev > 0 }
+		set_variable = { name = sol_ls_pci_yoy value = { value = var:sol_ls_pci divide = var:sol_ls_pci_prev subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy > 0 } set_variable = { name = sol_ls_pci_yoy_class value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class value = -2 } }
+	set_variable = { name = sol_ls_pci_yoy_nobles value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev_nobles > 0 }
+		set_variable = { name = sol_ls_pci_yoy_nobles value = { value = var:sol_ls_pci_nobles divide = var:sol_ls_pci_prev_nobles subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class_nobles value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy_nobles >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class_nobles value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_nobles > 0 } set_variable = { name = sol_ls_pci_yoy_class_nobles value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_nobles <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_nobles value = -2 } }
+	set_variable = { name = sol_ls_pci_yoy_clergy value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev_clergy > 0 }
+		set_variable = { name = sol_ls_pci_yoy_clergy value = { value = var:sol_ls_pci_clergy divide = var:sol_ls_pci_prev_clergy subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class_clergy value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy_clergy >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class_clergy value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_clergy > 0 } set_variable = { name = sol_ls_pci_yoy_class_clergy value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_clergy <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_clergy value = -2 } }
+	set_variable = { name = sol_ls_pci_yoy_burghers value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev_burghers > 0 }
+		set_variable = { name = sol_ls_pci_yoy_burghers value = { value = var:sol_ls_pci_burghers divide = var:sol_ls_pci_prev_burghers subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class_burghers value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy_burghers >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class_burghers value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_burghers > 0 } set_variable = { name = sol_ls_pci_yoy_class_burghers value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_burghers <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_burghers value = -2 } }
+	set_variable = { name = sol_ls_pci_yoy_commoners value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev_commoners > 0 }
+		set_variable = { name = sol_ls_pci_yoy_commoners value = { value = var:sol_ls_pci_commoners divide = var:sol_ls_pci_prev_commoners subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class_commoners value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy_commoners >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class_commoners value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_commoners > 0 } set_variable = { name = sol_ls_pci_yoy_class_commoners value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_commoners <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_commoners value = -2 } }
+	set_variable = { name = sol_ls_pci_yoy_tribesmen value = 0 }
+	if = {
+		limit = { var:sol_ls_pci_prev_tribesmen > 0 }
+		set_variable = { name = sol_ls_pci_yoy_tribesmen value = { value = var:sol_ls_pci_tribesmen divide = var:sol_ls_pci_prev_tribesmen subtract = 1 } }
+	}
+	set_variable = { name = sol_ls_pci_yoy_class_tribesmen value = -1 }
+	if = { limit = { var:sol_ls_pci_yoy_tribesmen >= sol_ls_yoy_big_increase_threshold } set_variable = { name = sol_ls_pci_yoy_class_tribesmen value = 2 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_tribesmen > 0 } set_variable = { name = sol_ls_pci_yoy_class_tribesmen value = 1 } }
+	else_if = { limit = { var:sol_ls_pci_yoy_tribesmen <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_tribesmen value = -2 } }
 }

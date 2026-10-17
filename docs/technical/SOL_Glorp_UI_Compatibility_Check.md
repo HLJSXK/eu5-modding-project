@@ -73,13 +73,20 @@ Workshop `3812518640` nor `3736668860` is declared as a SOL metadata
 dependency. Their definitions remain optional runtime inputs to the unified
 location window.
 
+The Living Standard row below the left-panel buttons adds one GUI type-load
+condition: when Glorp UI is enabled, load SOL after Glorp UI so the generated
+`SOL_lshud_glorp_compat.gui` definitions of `left_panel_info_bar` and
+`left_panel_info_toggle` take effect. The generator preserves both Glorp type
+bodies and adds a 36px offset. These definitions are unused without Glorp UI;
+the compatibility shim does not replace a vanilla or Glorp GUI file path.
+
 The effective combinations are:
 
 | Enabled mods | Winning `location_window.gui` | Expected result |
 |---|---|---|
 | SOL only | SOL's generated Glorp-based file | SOL + Glorp UI layout and button. `cm_*` references report missing definitions, but those errors do not prevent the SOL/Glorp layout from displaying. |
-| SOL + Glorp UI | SOL's generated file (configure load order so SOL wins this exact path) | Same location window as SOL only. Other Glorp UI files also load, but Glorp UI cannot replace the SOL file when SOL wins the path. |
-| SOL + Glorp UI + Construction Manager | SOL's generated Glorp-based file, with CM definitions loaded | SOL + Glorp UI + Construction Manager controls, with no missing `cm_*` definitions. Keep Construction Manager above Glorp UI so its definitions load while Glorp's integrated GUI remains the selected UI file. |
+| SOL + Glorp UI | SOL's generated file (configure load order so SOL wins this exact path) | Same location window as SOL only; the living-standard row appears below the left-panel buttons and Glorp's stats bar/toggle move below the row. |
+| SOL + Glorp UI + Construction Manager | SOL's generated Glorp-based file, with CM definitions loaded | SOL + Glorp UI + Construction Manager controls, with no missing `cm_*` definitions. Keep Construction Manager above Glorp UI and SOL after Glorp UI so its definitions load and SOL's window/type overrides are selected. |
 
 For Glorp UI + Construction Manager without SOL, keep Construction Manager
 above Glorp UI so Glorp's integrated `location_window.gui` wins while

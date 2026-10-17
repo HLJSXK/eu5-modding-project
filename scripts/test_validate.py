@@ -33,7 +33,8 @@ class ValidationExitTests(unittest.TestCase):
             try:
                 with patch.object(validate, 'REPO_ROOT', root), \
                      patch.object(validate, 'get_changed_files', return_value=[source]), \
-                     patch.object(validate, 'load_yaml', side_effect=lambda p: patterns if p.name == 'anti_patterns.yaml' else {}), \
+                     patch.object(validate, 'load_anti_patterns', return_value=patterns), \
+                     patch.object(validate, 'load_valid_enums', return_value={}), \
                      patch.object(validate, 'load_modifier_whitelist', return_value=set()), \
                      patch.object(validate.subprocess, 'run', return_value=result), \
                      patch.object(sys, 'argv', arguments), \
@@ -76,6 +77,26 @@ class ValidationExitTests(unittest.TestCase):
         code, text = self.run_validator('valid_effect = { value = 1 }\n', staged=False)
         self.assertEqual(code, 0)
         self.assertNotIn('[WARN]', text)
+
+    def test_generic_action_slot_rule_preserves_native_resolution_vote(self):
+        patterns = [entry for entry in validate.load_anti_patterns(validate.REPO_ROOT)
+                    if entry['id'] == 'select_trigger_custom_target_flag']
+        self.assertEqual(len(patterns), 1)
+        cases = (
+            ('resolutions/native.txt', 'recipient', False),
+            ('resolutions/native.txt', 'vote', False),
+            ('generic_actions/selection.txt', 'target_1', False),
+            ('generic_actions/selection.txt', 'selected_artist', True),
+        )
+        try:
+            for relative, flag, expected_error in cases:
+                with self.subTest(relative=relative, flag=flag):
+                    validate.issues.clear()
+                    path = validate.REPO_ROOT / 'src/stable/in_game/common' / relative
+                    validate.check_anti_patterns(path, f'target_flag = {flag}', patterns)
+                    self.assertEqual(bool(validate.issues), expected_error)
+        finally:
+            validate.issues.clear()
 
 
 if __name__ == '__main__':

@@ -4,6 +4,14 @@ Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guid
 
 ## SOL scenario adapter
 
+### Living Standard left-panel row (2026-10-18)
+
+**[Source and offline rendering; in-game acceptance pending.]** The latest design moves the persistent summary into a 570×36 row at `{ 0 130 }`, below the left panel's nine navigation buttons, and keeps the adopted contextual tooltip unchanged. Stable and standalone register a separate `layer = bottom` scripted widget. It hides while `LeftView.IsShown` or `LeftView.IsSideAttached`, follows `Animation_Show_Hide_UI`, and stable's SOL master switch still disables it. `scripts/gen_sol_lshud.py` owns both target GUIs, bilingual localization, ranking outputs and the Glorp UI compatibility shim.
+
+Income remains yearly net gold per thousand people, read from the solver's individually nonnegative estate-income caches. Same-month histories prevent partial-year changes being labelled annual; initial figures remain pending until a full baseline exists. The annual ranking still uses a named `order_by` value and one country-cache-only pass.
+
+When Glorp UI is installed, the generated `SOL_lshud_glorp_compat.gui` wraps its current `left_panel_info_bar` and `left_panel_info_toggle` source type bodies and shifts them down 36px. SOL must load after Glorp UI so its duplicate type names win; no vanilla or Glorp path is replaced, and the shim is unused without Glorp. The offline UI regression renders the row with the actual Glorp composition and checks the shifted bar and its collapse toggle. Native hover, UI scaling, scripted-widget hit testing, hide/show animation, and actual Workshop load order still require in-game confirmation.
+
 `ai_gui_assessment/renderer/run.py` retains the SOL presets `situation`, `location`, `tooltip`, `goods_tooltip`, `event`, `market`, `government`, `battle`, `ui_library`, and `proto`. It loads the reusable renderer from `.eu5-base`, reads the installed game's textures, fonts, and localization, and overlays `src/stable` GUI files. Render output and element trees go to `ai_gui_assessment/images/` by default; set `EU5_RENDER_OUTPUT_ROOT` to choose another directory. Set `RENDER_EXTRA_ROOTS` for compatibility DDS assets outside the selected mod root. At 1080p and UI scale 100%, some SOL situation-panel and location-window regions match in-game screenshots, and the SOL location tooltip frame is approximately 550px wide; no screen-wide pixel-accuracy claim applies. For new SOL screens, add mock data to `renderer/scenarios.py` or `renderer/scen_location.py`.
 
 ```powershell

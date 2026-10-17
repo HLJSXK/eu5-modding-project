@@ -88,6 +88,7 @@ def main() -> None:
         # SOL_living_standard_kit.gui and data/goods_weights.csv, and must run before
         # the compatibility generators, which rebuild the goods block inside their output.
         _run(["scripts/gen_sol_ls_gui.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_lshud.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_sol_goods_tooltip.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_sol_messages.py", "--target", target_arg, *mode_args])
 

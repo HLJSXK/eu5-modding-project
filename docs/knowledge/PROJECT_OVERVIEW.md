@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-15
+> Last updated: 2026-10-18
 
 ## Project Identity
 
@@ -56,6 +56,8 @@ performance boundary.
 
 13. **Country goods substitution** - Algorithm A with price-only preferences retains 20 groups, 56 core goods and 67 overlapping memberships. Baskets evaluate once per country market/pop type after aggregating owned population; seven country-adjusted market spending totals feed each location and the existing SOL solver. Country goods modifiers are permanent and written only when changed or missing, with applied-size and observed-total snapshots. The default-on CMF switch cleans modifiers and caches when disabled; standalone enables substitution without CMF. PP keeps zero lumber and neutral victuals, M&T uses its final calibrated quantities, and the 26 JTG extras remain neutral. Source generation, multi-market/shared-context offline tests and previews are implemented; EU5 demand refresh, fixed-point rounding, slave effects and actual month timing still require in-game acceptance.
 
+14. **Living Standard left-panel row** - Stable and standalone ship a 570×36 row below the nine left-panel buttons, with a small tier medallion, annual net income per thousand people, same-month YoY change and world rank. It reuses the detailed B tooltip and hides while the left lateral view is open or stable's SOL master switch is off. An independent Glorp UI shim shifts its own stats bar and collapse toggle down one row; it preserves the source type bodies and requires SOL to load after Glorp UI. Income snapshots, annual country-cache rankings and all prior economic cadences remain unchanged; offline rendering covers both languages, six data states and Glorp UI, while in-game visibility, click pass-through, native tooltip and actual mod type-load order remain to be confirmed.
+
 ## Directory Structure
 
 ```text
@@ -89,6 +91,8 @@ eu5-modding-project/
 |       |       |-- SOL_glorp_location_support.gui sanitized SOL-owned Glorp zoom-button type required by the window
 |       |       |-- vanilla/             generated vanilla type support extracted by Glorp UI
 |       |       |-- SOL_economy_local.gui location SOL tooltip/panel content
+|       |       |-- SOL_lshud.gui        generated left-panel Living Standard row and contextual tooltip
+|       |       |-- SOL_lshud_glorp_compat.gui generated shifted Glorp UI stats-bar and toggle types
 |       |       |-- SOL_living_standard_kit.gui shared UI kit for both SOL economy surfaces (headline figures, caption band, composition ring, estate ledger, substitute-group rows)
 |       |       |-- SOL_migration_caller.gui after-lobby migration/cache callers
 |       |       |-- panels/             situation panels
@@ -155,6 +159,9 @@ eu5-modding-project/
 | `sync_location_window.py` | After updating the Glorp UI reference; called by `gen_sol_chain.py` for `stable`/`all` | Unified Glorp UI-based stable location window with optional Construction Manager references, 1.4 button/road-builder migration, one SOL tooltip button, and migrated extracted vanilla type support |
 | `gen_sol_economy_effects.py` | After changing SOL economy emitters, the country solver, or demand data; called by `gen_sol_chain.py` for `stable`/`sol_standalone`/`all` | Emits the location aggregation/runtime `A_SOL_economy_effects.txt` and the separate fixed-dimensional `B_SOL_country_demand_solver.txt` for stable and standalone |
 | `gen_sol_ls_gui.py` | After changing the SOL economy UI design, the shared kit, the estate/goods vocabulary, or `data/goods_weights.csv`; called by `gen_sol_chain.py` | Rebuilds the location tooltip and country situation panel for stable/standalone, plus `SOL_ls_ui_l_*.yml`; copies stable's `SOL_living_standard_kit.gui` to standalone and includes that copy in its generated-output check |
+| `gen_sol_lshud.py` | After changing the adopted left-row design, translations, ranking source, or vendored Glorp UI type source; called by `gen_sol_chain.py` | Stable/standalone row GUI, Glorp type shim, scripted-widget registration, bilingual localization, ranking effects and shared unit/threshold values; `--check` verifies all outputs |
+| `sol_lshud_income_source.py` / `sol_lshud_ranking_source.py` | Imported by the economy and HUD generators | Fused income accumulation, same-month annual histories and trend classes; annual country-only population-weighted ranking, tiers, top-ten and neighbour slots |
+| `test_sol_lshud_income.py` / `test_sol_lshud_ranking.py` / `test_sol_lshud_ui.py` | After changing HUD data, sorting or presentation | Executes generated income/ranking effects and renders the row/tooltip in both languages/targets plus Glorp UI bar/toggle composition; `SOL_LSHUD_PREVIEW_OUT` saves review images |
 | `gen_sol_goods_tooltip.py` | After changing `data/goods_weights.csv` or vanilla goods_details/market_tooltips; called by `gen_sol_chain.py` | Generates sheet C group icon/name rows and seven static price preferences in goods_details, plus a full preserved market_tooltips override supplying the live market/base-price ratio and gold current-tier highlight only for SpecificGoodsMarket_tooltip. Emits bilingual membership/group/price localization and location-market snippets |
 | `sol_goods_order.py` | Imported by the two scripts above and by both compatibility generators; not run directly | `ordered()` orders unique goods by primary group; `group_rows()` preserves every CSV membership in labelled rows, with neutral ungrouped compatibility goods last |
 | `sol_goods_ui.py` | Imported by the three GUI generators; not run directly | Shared goods-block renderer (`render_goods_vbox` / `replace_goods_vbox`), group labels, mutually exclusive supply icons, country +/- markers, contextual hover and lifecycle summary. Base and compatibility generators rebuild the same block through it |
