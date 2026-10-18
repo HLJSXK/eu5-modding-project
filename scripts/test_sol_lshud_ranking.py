@@ -373,6 +373,10 @@ class RankingTests(unittest.TestCase):
             self.assertTrue(path.read_bytes().startswith(b"\xef\xbb\xbf"), str(path))
             source = path.read_text(encoding="utf-8-sig")
             self.assertEqual(source, render_world_ranking(), str(path))
+            for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen"):
+                self.assertIn(f"sol_ls_rank_{estate}", source)
+                self.assertIn(f"sol_ls_percentile_{estate}", source)
+                self.assertIn(f"sol_ls_top_1_{estate}", source)
             sources.append(source)
             rt = RankingRuntime([country(3), country(7), country(1)], source)
             rt.refresh()

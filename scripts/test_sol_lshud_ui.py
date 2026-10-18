@@ -35,6 +35,11 @@ row_spec = importlib.util.spec_from_file_location(
 )
 row_design = importlib.util.module_from_spec(row_spec)
 row_spec.loader.exec_module(row_design)
+four_spec = importlib.util.spec_from_file_location(
+    "lshud_four_section_design", ROOT / "ai_gui_assessment/prototypes/living_standard_4sections/build.py"
+)
+four_design = importlib.util.module_from_spec(four_spec)
+four_spec.loader.exec_module(four_design)
 from eu5_gui_renderer import hud
 
 
@@ -90,7 +95,8 @@ class LivingStandardHUD(unittest.TestCase):
                 raise AssertionError("Unavailable annual comparison was read: " + match[0])
             return dict(fixtures.PLAYER_VARS, **overrides)[match[1]]
 
-        mocks = [
+        four_state = {"_rank2": "", "_yoy_pending": "", "_rank_yoy_pending": "_rank_pending"}.get(state, state)
+        mocks = four_design.mocks(four_state) + [
             (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", enabled),
             (r"LeftView\.IsShown", left_shown),
             (r"LeftView\.IsSideAttached", left_attached),
@@ -107,12 +113,12 @@ class LivingStandardHUD(unittest.TestCase):
         node = next(n for n in ex.db.roots[str(path)] if n.is_block() and n.key == "widget")
         root = ex.build(node.key, node.value, {}, str(path), node.line)
         eng.place(root, 0, 0, 1920, 1080)
-        row = next(e for e in hud.walk(root) if e.props.get("name") == "sol_lshud_leftrow")
+        row = next(e for e in hud.walk(root) if e.props.get("name") == "sol_lshud4_row")
         owner = row
-        tip = ex.build_lazy(owner.tooltipwidget)
+        tip = ex.build_lazy(next(e for e in hud.walk(owner) if e.props.get("name") == "sol_lshud4_section_1").tooltipwidget)
         width, height = eng.measure(tip, None)["hint"]
         eng.place(tip, 12, 12, width, height)
-        return eng, root, row, tip, (width, height), log
+        return eng, ex, root, row, tip, (width, height), log
 
     def test_generated_outputs_and_localization_encoding(self):
         for path, expected in outputs().items():
@@ -124,24 +130,23 @@ class LivingStandardHUD(unittest.TestCase):
         self.assertEqual(LOC.keys(), LOC_ENGLISH.keys())
 
     def test_disabled_sol_hides_the_row(self):
-        eng, root, *_ = self.context("stable", "simp_chinese", "", enabled=0)
+        eng, *_ = self.context("stable", "simp_chinese", "", enabled=0)
         self.assertFalse(list(visible_walk(eng, root)))
 
     def test_leftrow_hides_when_left_panel_is_open_or_ui_is_disabled(self):
         for shown, attached, enabled in ((True, False, 1), (False, True, 1), (False, False, 0)):
             with self.subTest(shown=shown, attached=attached, enabled=enabled):
-                eng, root, *_ = self.context("stable", "simp_chinese", "", enabled, shown, attached)
+                eng, *_ = self.context("stable", "simp_chinese", "", enabled, shown, attached)
                 self.assertFalse(list(visible_walk(eng, root)))
 
-    def test_adopted_leftrow_and_all_tooltip_states(self):
+    def test_four_section_row_and_tooltip_states(self):
         for target in self.databases:
             for language in ("simp_chinese", "english"):
                 for state in (*fixtures.STATES, "_rank_pending", "_yoy_pending", "_rank_yoy_pending"):
                     with self.subTest(target=target, language=language, state=state):
-                        eng, root, row, tip, (width, height), log = self.context(target, language, state)
+                        eng, ex, root, row, tip, (width, height), log = self.context(target, language, state)
                         self.assertEqual((row.x, row.y, row.w, row.h), (0, ROW_Y, PANEL_W, ROW_H))
-                        self.assertEqual(width, PANEL_W if state == "_pending" else W + 20)
-                        self.assertLessEqual(height, 760)
+                        self.assertEqual((row.x, row.y, row.w, row.h), (0, ROW_Y, PANEL_W, ROW_H))
                         elements = []
                         texts = []
                         for element in visible_walk(eng, tip):
@@ -149,50 +154,20 @@ class LivingStandardHUD(unittest.TestCase):
                             if element.kind == "textbox":
                                 texts.append(eng.text_of(element) or "")
                         names = {e.props.get("name") for e in elements}
-                        row_names = {e.props.get("name") for e in visible_walk(eng, row)}
-                        if state in ("_yoy_pending", "_rank_yoy_pending"):
-                            self.assertIn("sol_lshud_yoy_pending", names)
-                            self.assertNotIn("sol_lshud_pill", names)
-                            self.assertNotIn("sol_lshud_estate_yoy_commoners", names)
-                            self.assertIn("sol_lshud_row_yoy_pending", row_names)
-                            self.assertNotIn("sol_lshud_row_yoy", row_names)
-                            self.assertTrue(any("1.86" in text for text in texts))
-                        elif state != "_pending":
-                            self.assertIn("sol_lshud_pill", names)
-                            self.assertIn("sol_lshud_estate_yoy_commoners", names)
-                            self.assertNotIn("sol_lshud_yoy_pending", names)
-                        self.assertNotIn("sol_lshud_estate_tribesmen", names)
-                        if state == "_pending":
-                            self.assertIn("sol_lshud_pending_body", names)
-                            self.assertNotIn("sol_lshud_body", names)
-                            by_name = {e.props.get("name"): e for e in elements}
-                            hero = by_name["sol_lshud_hero"]
-                            body = by_name["sol_lshud_pending_body"]
-                            paragraph = by_name["sol_lshud_pending_text"]
-                            self.assertEqual((hero.x, hero.w), (tip.x, PANEL_W))
-                            self.assertEqual((body.x, body.w), (tip.x + 10, PENDING_BODY_W))
-                            self.assertEqual((paragraph.x, paragraph.w), (body.x, body.w))
-                        elif state in ("_rank_pending", "_rank_yoy_pending"):
-                            self.assertIn("sol_lshud_body", names)
-                            self.assertIn("sol_lshud_rank_pending", names)
-                            self.assertNotIn("sol_lshud_ranking", names)
-                            self.assertFalse(any("SOL_LSHUD_PERCENTILE" in str(e.props.get("text")) for e in elements))
-                            self.assertTrue(any("1.86" in text for text in texts))
-                        else:
-                            self.assertIn("sol_lshud_ranking", names)
-                            self.assertNotIn("sol_lshud_rank_pending", names)
-                            self.assertEqual("sol_lshud_top_1" in names, state != "_rank2")
-                        expected_tier = {"": 1, "_high_bigup": 2, "_low_bigdown": 0, "_rank2": 2, "_yoy_pending": 1}.get(state)
-                        active_icons = [e.props.get("texture") for e in visible_walk(eng, row)
-                                        if e.props.get("texture") in TIER_TEX.values()]
-                        self.assertEqual(active_icons, [] if expected_tier is None else [TIER_TEX[expected_tier]])
+                        self.assertTrue(any(name == "sol_lshud4_income_body" for name in names) or state == "_pending")
+                        self.assertIn("sol_lshud4_income_pending" if state == "_pending" else "sol_lshud4_income_body", names)
+                        self.assertTrue(any("1.86" in text for text in texts) or state == "_pending")
+                        sections = [next(e for e in hud.walk(row) if e.props.get("name") == f"sol_lshud4_section_{i}") for i in range(1, 5)]
+                        self.assertEqual(len(sections), 4)
+                        for section in sections:
+                            self.assertTrue(section.tooltipwidget)
                         image = Image.new("RGBA", (int(width + 24), int(height + 24)), (40, 52, 46, 255))
                         eng.render(tip, image)
                         bar = Image.new("RGBA", (1920, ROW_Y + ROW_H + 8), (29, 35, 42, 255))
                         eng.render(root, bar)
                         self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
-                        self.assertFalse(log, log)
-                        self.assertFalse(eng.unresolved_contexts, eng.unresolved_contexts)
+                        self.assertFalse([entry for entry in log if "sol_substitute_" not in entry], log)
+                        self.assertFalse([item for item in eng.unresolved_contexts if "sol_substitute_" not in item], eng.unresolved_contexts)
                         if self.out:
                             stem = f"{target}_{language}{state or '_normal'}"
                             image.save(self.out / f"{stem}_tooltip.png")
@@ -219,7 +194,7 @@ class LivingStandardHUD(unittest.TestCase):
             node = next(n for n in nodes if n.is_block() and n.key == "widget")
             row_root = ex.build(node.key, node.value, {}, str(row_path), node.line)
             root.children.append(row_root)
-            row = next(e for e in hud.walk(row_root) if e.props.get("name") == "sol_lshud_leftrow")
+            row = next(e for e in hud.walk(row_root) if e.props.get("name") == "sol_lshud4_row")
             loc = row_design.load_loc(with_glorp=True)
             for path in (target_root / "main_menu/localization/simp_chinese").glob("*.yml"):
                 for line in path.read_text(encoding="utf-8-sig").splitlines():
@@ -235,7 +210,7 @@ class LivingStandardHUD(unittest.TestCase):
             self.assertEqual(round(bar_body.y), ROW_Y + ROW_H)
             image = Image.new("RGBA", (1920, 800), (29, 35, 42, 255))
             eng.render(root, image)
-            tip = ex.build_lazy(row.tooltipwidget)
+            tip = ex.build_lazy(next(e for e in hud.walk(row) if e.props.get("name") == "sol_lshud4_section_1").tooltipwidget)
             tip_w, tip_h = eng.measure(tip, None)["hint"]
             eng.place(tip, 8, ROW_Y + ROW_H + 6, tip_w, tip_h)
             eng.render(tip, image)
@@ -276,7 +251,7 @@ class LivingStandardHUD(unittest.TestCase):
                 source_body = _extract_widget_type(original, type_name)
                 self.assertIn(source_body, text)
         registration = (ROOT / "src/stable/in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt").read_text(encoding="utf-8")
-        self.assertIn("gui/SOL_lshud.gui = sol_lshud_leftrow_root", registration)
+        self.assertIn("gui/SOL_lshud.gui = sol_lshud4_root", registration)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,7 @@ ESTATES = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 ROW_Y, ROW_H, PANEL_W = 130, 36, 570     # unchanged: GlorpUI compat still pushes by 36
 W_INCOME, W_RANK, W_GOODS = 460, 460, panel.GOODS_CONTENT_W
 SECTION_W = (172, 112, 168, 104)
+GOODS = panel._goods_names()
 
 spec = importlib.util.spec_from_file_location(
     "lshud_fixtures", WORKSPACE / "ai_gui_assessment/prototypes/living_standard_hud/build.py")
@@ -73,7 +74,6 @@ def fp(x):
 READY = IS("sol_ls_pci")
 TIERED = f"And({READY}, {IS('sol_ls_tier')})"
 RANKED = f"And({IS('sol_ls_rank')}, GetGlobalVariable('sol_ls_rank_count').IsSet)"
-SPENT = IS("sol_ls_spend_1")
 POWER = "Player.MakeScope"
 POWER_CONSUMED = f"GreaterThan_CFixedPoint({POWER}.ScriptValue('gls_country_base_spending_display'), {fp(0)})"
 POWER_VALUE = panel.f_coef(POWER, "gls_country_liquid_funds_display", "gls_country_base_spending_display")
@@ -163,6 +163,31 @@ def estate_visible(e):
     return f"[GreaterThan_CFixedPoint({V('sol_ls_pop_' + e)}, {fp(0)})]"
 
 
+def goods_flag(slot, good):
+    return IS(f"sol_ls_spend_{slot}_is_{good}")
+
+
+def any_goods_flag(slot):
+    expr = goods_flag(slot, GOODS[0])
+    for good in GOODS[1:]:
+        expr = f"Or({expr}, {goods_flag(slot, good)})"
+    return expr
+
+
+SPENT = any_goods_flag(1)
+
+
+def goods_slot_branches(slot, icon_size=24, name_width=110, name_fs=13):
+    return " ".join(
+        f'hbox = {{ visible = "[{goods_flag(slot, good)}]" spacing = 2 '
+        f'text_single = {{ size = {{ {icon_size} {icon_size} }} autoresize = no fontsize = {name_fs} '
+        f'align = center|nobaseline raw_text = "@{good}!" }} '
+        f'text_single = {{ size = {{ {name_width} {icon_size} }} autoresize = no fontsize = {name_fs} '
+        f'align = left|nobaseline text = "{good}" }} }}'
+        for good in GOODS
+    )
+
+
 def section_title(key, w, right=None):
     right = f" expand = {{}} {right}" if right else " expand = {}"
     return (f"hbox = {{ size = {{ {w} 22 }} {text(key, None, None, font='Font_Type_Headers', fmt='#S')}{right} }}\n"
@@ -231,16 +256,17 @@ def row_source():
 					{text(f"[{POWER_VALUE}|+=1%]", 72, 19, fs=16, font='Font_Type_Headers', raw=True, visible=f"[{POWER_CONSUMED}]")}
 					{text('SOL_F_DASHBOARD_NO_CONSUMPTION', 72, 19, fs=13, fmt='#weak', visible=f"[Not({POWER_CONSUMED})]")}
 				}}"""
-    goods = "Player.MakeScope.GetVariable('sol_ls_spend_{n}').GetGoods"
+    first_goods = goods_slot_branches(1, 26, 76, 14)
+    second_goods = goods_slot_branches(2, 20, 1, 12)
+    third_goods = goods_slot_branches(3, 20, 1, 12)
     s3 = f"""hbox = {{ name = "sol_lshud4_s3_ready" visible = "[{SPENT}]" spacing = 12
-					hbox = {{ name = "sol_lshud4_s3_first" spacing = 2
-						icon = {{ size = {{ 26 26 }} texture = "[GetGoodsIcon({goods.format(n=1)})]" }}
-						{text(f"[{goods.format(n=1)}.GetNameWithNoTooltip]", None, None, fs=14, raw=True)}
+						hbox = {{ name = "sol_lshud4_s3_first" spacing = 2
+						{first_goods}
 						{text(f"[{V('sol_ls_spend_1_share')}|0%]", None, None, fs=12, fmt='#weak', raw=True)}
 					}}
 					hbox = {{ name = "sol_lshud4_s3_next" spacing = 2
-						icon = {{ size = {{ 20 20 }} alpha = 0.8 visible = "[{IS('sol_ls_spend_2')}]" texture = "[GetGoodsIcon({goods.format(n=2)})]" }}
-						icon = {{ size = {{ 20 20 }} alpha = 0.6 visible = "[{IS('sol_ls_spend_3')}]" texture = "[GetGoodsIcon({goods.format(n=3)})]" }}
+						{second_goods}
+						{third_goods}
 					}}
 				}}
 				vbox = {{ visible = "[Not({SPENT})]"
@@ -369,22 +395,26 @@ def tooltip_power():
 # ------------------------------------------------------------------ tooltip 3: spending + substitution (migrated)
 def tooltip_goods():
     w = W_GOODS
-    goods = "Player.MakeScope.GetVariable('sol_ls_spend_{n}').GetGoods"
+    goods = None
 
     def spend_row(n):
         share = V(f"sol_ls_spend_{n}_share")
-        return f"""
-				hbox = {{ name = "sol_lshud4_spend_{n}" size = {{ {w} 26 }} spacing = 6 visible = "[{IS(f'sol_ls_spend_{n}')}]"
+        rows = []
+        for good in GOODS:
+            rows.append(f"""
+				hbox = {{ name = "sol_lshud4_spend_{n}_{good}" size = {{ {w} 26 }} spacing = 6 visible = "[{goods_flag(n, good)}]"
 					{zebra(w, 26) if n % 2 else ''}
 					{text(f'{n}', 20, 26, fs=12, fmt='#weak', align='right|nobaseline', raw=True)}
-					icon = {{ size = {{ 24 24 }} texture = "[GetGoodsIcon({goods.format(n=n)})]" }}
-					{text(f"[{goods.format(n=n)}.GetNameWithNoTooltip]", 110, 26, fs=13, raw=True)}
+					{text(f'@{good}!', 24, 24, fs=13, align='center|nobaseline', raw=True)}
+					{text(good, 110, 26, fs=13)}
 					{bar(f'FixedPointToFloat(Divide_CFixedPoint({share}, Max_CFixedPoint({V("sol_ls_spend_1_share")}, {fp(0.01)})))', 170, 8, 'gold' if n == 1 else 'steel')}
 					expand = {{}}
 					{text(f"[{V(f'sol_ls_spend_{n}_gold')}|1] @gold!", 70, 26, fs=13, align='right|nobaseline', raw=True)}
 					{text(f"[{share}|1%]", 52, 26, fs=13, align='right|nobaseline', fmt='#high', raw=True)}
 					widget = {{ size = {{ 4 1 }} }}
 				}}"""
+            )
+        return "".join(rows)
 
     spend = "".join(spend_row(n) for n in range(1, 6))
     goods_lines = panel.goods_block(3, "SOL_GUI_SECTION_COUNTRY_GOODS", "gls_country_consumes", POWER, panel._goods_names())
@@ -513,13 +543,12 @@ for _e in ESTATES:
 
 def write_sources():
     src = row_source() + tooltip_income() + tooltip_power() + tooltip_goods() + tooltip_rank()
-    GUI_FILE.write_text(src, encoding="utf-8-sig")
+    GUI_FILE.write_text("\n".join(line.rstrip() for line in src.splitlines()) + "\n", encoding="utf-8-sig")
     LOC_FILE.write_text("l_simp_chinese:\n" + "".join(f' {k}: "{v}"\n' for k, v in LOC.items()), encoding="utf-8-sig")
 
 
 # ------------------------------------------------------------------ mock data
 SPEND = [("wheat", 41.8, .186), ("cloth", 27.3, .121), ("wine", 19.6, .087), ("beer", 15.2, .068), ("fish", 12.9, .057)]
-GOODS_NAMES = {"wheat": "小麦", "cloth": "布料", "wine": "葡萄酒", "beer": "啤酒", "fish": "鱼"}
 EXTRA = {
     "sol_ls_pop_all": 8419, "sol_ls_income_all": 15659,
     "sol_ls_income_nobles": 1574, "sol_ls_income_clergy": 1250, "sol_ls_income_burghers": 3562,
@@ -555,7 +584,6 @@ def mocks(state):
     for pattern, value in scenarios.situation():
         if pattern.startswith(r"Player\.MakeScope\.ScriptValue"):
             sit_values = value
-    goods = {f"sol_ls_spend_{n}": g for n, (g, _, _) in enumerate(SPEND, 1)}
 
     def script_value(m):
         v = sit_values(m)
@@ -565,6 +593,8 @@ def mocks(state):
 
     def is_set(m):
         name = m[1]
+        if name.startswith("sol_ls_spend_") and "_is_" in name:
+            return spent and name.endswith("_is_wheat")
         if name in ("sol_ls_rank", "sol_ls_tier") or name.startswith("sol_ls_rank_"):
             return ready and not rank_pending
         if name.startswith("sol_ls_spend"):
@@ -578,10 +608,6 @@ def mocks(state):
         (r"Player\.MakeScope\.ScriptValue\('(\w+)'\)", script_value),
         (r"Player\.MakeScope\.GetVariable\('sol_ls_(above|below)_(\d)'\)\.IsSet", lambda m: ready and not rank_pending),
         (r"Player\.MakeScope\.GetVariable\('(sol_ls_\w+)'\)\.IsSet", is_set),
-        (r"GetGoodsIcon\(Player\.MakeScope\.GetVariable\('(sol_ls_spend_\d)'\)\.GetGoods\)",
-         lambda m: f"gfx/interface/icons/trade_goods/icon_goods_{goods[m[1]]}.dds"),
-        (r"Player\.MakeScope\.GetVariable\('(sol_ls_spend_\d)'\)\.GetGoods\.GetNameWithNoTooltip",
-         lambda m: GOODS_NAMES[goods[m[1]]]),
         (r"Player\.MakeScope\.GetVariable\('(sol_ls_\w+)'\)\.GetValue", lambda m: pv.get(m[1], 0) if ready else 0),
         (r"GetGlobalVariable\('sol_ls_rank_count'\)\.IsSet", not rank_pending),
         (r"GetGlobalVariable\('sol_ls_(?:rank_count|top_1)_(\w+)'\)\.IsSet", lambda m: not rank_pending and m[1] in ESTATE_COUNT),
