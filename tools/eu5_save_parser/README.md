@@ -104,3 +104,40 @@ three soft total-penalty candidates to test whether a small total drift buys
 additional four-stratum improvements.
 The reports evaluate all four strata independently so an improvement in one
 cannot hide a worsening in another.
+
+## Decade autosave archiver
+
+EU5 keeps only a few rotating autosaves, so a long observer game loses its
+history. Run this watcher next to the game (stdlib only, no mod changes):
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON -m tools.eu5_save_parser.autosave_archiver
+```
+
+It polls `Documents\Paradox Interactive\Europa Universalis V\save games`
+every 5 seconds, ignores `.tmp` files (the game writes `.tmp` and renames when
+done) and waits until a `.eu5` file's size and mtime stop changing. It reads
+the in-game date from the save metadata (falling back to a zip text member,
+then the `..._YYYY_MM_DD_...` file name) and copies the **first save in every
+10-year bucket** (1330s, 1340s, ...) to
+`data/saves/observer_archive/<playthrough_id>/<YYYY.MM.DD>_<original name>`.
+Copies go through a `.part` file and are discarded if the source changed
+during the copy. `archive_state.json` records what was kept, so a restart
+resumes. Saves of different playthroughs are kept apart.
+
+```text
+--interval 25 --anchor 1337   other bucket sizes/alignment
+--out D:\eu5_archive           another drive (a 1.4 debug save is ~0.4 GB)
+--min-free-gb 5                refuse to copy below this free space (retries)
+--playthrough <id>             only one game
+--save-dir <folder>            non-default/Steam Cloud save folder (repeatable)
+--once / --dry-run             scan current files once / only report
+```
+
+Game settings: launch with `-debug_mode` so saves stay plaintext for the
+parser (non-text saves are still archived, with a warning). Autosave interval
+and the number of kept autosaves can only be changed from the main menu;
+yearly autosaves with more than 3 kept give the watcher minutes per save. The
+copy holds the file open for a few seconds; on Windows the game cannot delete
+it during that time, which only matters if autosaves rotate faster than that.
