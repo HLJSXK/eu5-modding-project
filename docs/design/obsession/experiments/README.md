@@ -13,6 +13,7 @@
 | `queue_pointer_scheduler.py` / `_results.json` | 方案A的小图规格：15 项断言（q 只在排队期间存在、待处理目标不重复入队、δ 内不写回、预算暂停等） | 02 第 4 节、10 第 3 节 |
 | `immunity_lock_viz.html` | 浏览器可视化：现行基准、对比项与早期实验的逐行 JS 移植，13 个情景自动与 Python 核对；可载入 `tools/obsession_sim` 导出的回放文件（任意坐标的真实地图） | 本目录 |
 | `first_batch_transport_results.json` | `python -m tools.obsession_sim.study` 生成：冻结咖啡/茶/烟草城市目标，静态稀疏贸易/走廊、共享预算前沿、组件对照与30组输入敏感性；明确不是完整L2或引擎耗时验收 | 16 首批贸易验证 |
+| `observer_archive_survey/` | `survey.py extract` 把观察者十年存档压成摘要 JSON（`tmp/`，不提交），`survey.py report` 生成 `survey_results.json`：所有权/市场/贸易网/道路逐档变化、三商品游戏内流向、制度扩散、所有权历史 | 18 观察者存档用途 |
 
 ## 仍有价值的对比项（说明为什么没选）
 
