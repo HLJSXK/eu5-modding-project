@@ -7,6 +7,7 @@ selection_log.json before invoking `matrix`; the runner checks this boundary.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -71,6 +72,11 @@ def selected(exp):
         assert json.loads(committed) == json.loads((ROOT/name).read_text(encoding='utf-8')), 'Commit parameter selection before holdout validation'
     log = json.loads((ROOT/paths[1]).read_text(encoding='utf-8'))
     assert log['runtime_hash'] == exp.runtime_hash and log['frozen_hash'] == exp.frozen_hash
+    manifests=log.get('observer_manifests',[])
+    if manifests:
+        assert {str(Path(m['path']).resolve()) for m in manifests} == set(exp.observer_paths)
+        for manifest in manifests:
+            assert hashlib.sha256(Path(manifest['path']).read_bytes()).hexdigest()==manifest['sha256']
     return json.loads((ROOT/paths[0]).read_text(encoding='utf-8'))
 
 
@@ -129,8 +135,13 @@ if __name__ == '__main__':
     ap.add_argument('--workers', type=int, default=6)
     ap.add_argument('--protocol', type=Path, default=Path(__file__).with_name('structural_fit_protocol.json'))
     ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_structural')
+    ap.add_argument('--observer', type=Path, action='append')
     args = ap.parse_args()
-    exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', sorted((ROOT/'tmp/obsession_worlds').glob('*/timeline.json')),
+    observers=args.observer
+    log_path=ROOT/'tools/obsession_sim/selection_log.json'
+    if not observers and args.action in ('matrix','checks','replays') and log_path.exists():
+        observers=[Path(m['path']) for m in json.loads(log_path.read_text(encoding='utf-8')).get('observer_manifests',[])]
+    exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', observers or sorted((ROOT/'tmp/obsession_worlds').glob('*/timeline.json')),
                      ROOT/'.eu5-base/reference_game_files/game', args.out)
     if args.action == 'fit':
         fit(exp, args.workers, args.protocol)
