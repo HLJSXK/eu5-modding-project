@@ -643,7 +643,13 @@ def test_cache_binds_the_actual_graph_even_when_the_world_state_is_identical(tmp
         experiment.targets=[];experiment.facts=[]  # This integration fixture has no historical regions.
         return experiment.one('R','S',0,end_year=1337.1)
     first=run()
+    archive=next((tmp_path/'results/inputs/code').glob('*.json'))
+    archived_mtime=archive.stat().st_mtime_ns
     g.incoming=[(),(),()];g.outgoing=[(),(),()];save_json(g,graph_path)
     second=run()
+    assert archive.stat().st_mtime_ns==archived_mtime  # Workers must not replace an immutable shared archive.
     assert first['world_hash']==second['world_hash']
     assert first['graph_hash']!=second['graph_hash'] and first['cache_file']!=second['cache_file']
+    archive.write_text('{}')
+    with pytest.raises(ValueError,match='source archive'):
+        run()

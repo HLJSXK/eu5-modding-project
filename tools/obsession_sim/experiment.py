@@ -98,7 +98,13 @@ class Experiment:
         self.frozen_valid, self.frozen_hash, self.actual_hashes = freeze_status()
         bundle=code_bundle();self.runtime_hash=bundle['runtime_hash']
         self.code_snapshot=self.out/'inputs'/'code'/(self.runtime_hash+'.json')
-        atomic_json(self.code_snapshot,bundle)
+        # The parent creates this immutable archive before starting workers.
+        # Replacing the same file in every Windows worker races with readers.
+        if self.code_snapshot.exists():
+            if read_json(self.code_snapshot) != bundle:
+                raise ValueError("runtime source archive does not match its hash")
+        else:
+            atomic_json(self.code_snapshot,bundle)
         signature = canonical_hash({"initial": self.observers[0][1][0]["_snapshot_sha256"],
                                     "builder":{name:bundle['files']['tools/obsession_sim/'+name]['sha256'] for name in ('worlds.py','eu5_map.py')},
                                     "graph":self.graph_hash,
