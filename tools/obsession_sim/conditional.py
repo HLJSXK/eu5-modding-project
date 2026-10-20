@@ -19,7 +19,7 @@ class ConditionalEvaluator:
         self.cases = []
         self.seen = {key: set() for key in self.definitions}
         self.first = True
-        self.origin_countries = set()
+        self.origin_countries = {}
         self.initial_raw = {}
 
     def add(self, kid, key, month, country=None, **extra):
@@ -36,7 +36,8 @@ class ConditionalEvaluator:
                 market_population=None, market_faith=None):
         if self.first:
             self.initial_raw = {g: set(cs) for g, cs in raw_countries.items()}
-            self.origin_countries = {int(c) for x in country_x.values() for c in np.flatnonzero(x >= 20)}
+            for good,x in country_x.items():
+                self.origin_countries.setdefault(good,set()).update(int(c) for c in np.flatnonzero(x>=20))
         nonlocal_by_good = {(i["good"], i["country"]) for i in inputs if i["type"] != "adjacency"}
         first_inputs={}
         for row in inputs:
@@ -65,7 +66,7 @@ class ConditionalEvaluator:
                 key = (good, c)
                 if key in self.seen["K4"]:
                     continue
-                if c in self.initial_raw.get(good, set()) or c in self.origin_countries or country_x[good][c] >= 1:
+                if c in self.initial_raw.get(good, set()) or c in self.origin_countries.get(good,set()) or country_x[good][c] >= 1:
                     self.seen["K4"].add(key)
                 else:
                     self.add("K4", key, month, c, good=good, capital=state.capitals.get(c))
@@ -81,7 +82,7 @@ class ConditionalEvaluator:
             initial=ban.get("initial",float(country_x["tobacco"][c]))
             if ban["good"] == "tobacco" and initial >= 20:
                 self.add("K6", (c, month), month, c, capital=state.capitals.get(c),
-                         initial=initial, minimum=initial)
+                         initial=initial, minimum=initial, source=ban.get('event','action'))
         if origin_market is not None and market_x.get("coffee", [0])[origin_market] >= 20:
             if origin_market not in self.seen["K7"]:
                 source = state.markets[origin_market]["merchants"].keys()
@@ -99,6 +100,9 @@ class ConditionalEvaluator:
             if case["status"] != "pending":
                 continue
             kid, c, t0 = case["id"], case.get("country"), case["t0"]
+            if kid=='K4' and c in self.origin_countries.get(case['good'],set()):
+                case.update(status='untriggered',reason='origin country for this good')
+                continue
             if c is not None and (case.get("capital") is None or state.capitals.get(c) != case["capital"]):
                 case.update(status="untriggered", reason="country or original capital lost")
                 continue

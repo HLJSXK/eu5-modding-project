@@ -19,6 +19,11 @@ def canonical_hash(value):
                                      separators=(",", ":")).encode()).hexdigest()
 
 
+def snapshot_hash(entry):
+    return (canonical_hash({'world':entry['sha256'],'relations':entry['relations_sha256']})
+            if entry.get('relations_sha256') else entry['sha256'])
+
+
 def month_of(date, start=1337):
     y, m, *_ = map(int, date.split("."))
     if not 1 <= m <= 12:
@@ -75,7 +80,30 @@ class SnapshotSequence:
             raise ValueError("world snapshot metadata mismatch")
         if snap["metadata"].get("playthrough_id") != self.manifest["id"]:
             raise ValueError("mixed playthroughs in one world")
-        snap["_snapshot_sha256"] = entry["sha256"]
+        if bool(entry.get('relations_file'))!=bool(entry.get('relations_sha256')):
+            raise ValueError('incomplete relationship supplement reference')
+        if entry.get('relations_file'):
+            relation_path=(self.path.parent/entry['relations_file']).resolve()
+            if not relation_path.is_relative_to(self.path.parent.resolve()):
+                raise ValueError('relationship supplement escapes timeline directory')
+            relation_raw=relation_path.read_bytes()
+            if hashlib.sha256(relation_raw).hexdigest()!=entry['relations_sha256']:
+                raise ValueError('relationship supplement hash mismatch')
+            relations=json.loads(relation_raw)
+            if (relations.get('format')!='obsession.world-relations/1' or relations.get('date')!=entry['date']
+                    or relations.get('playthrough_id')!=self.manifest['id'] or relations.get('world_snapshot_sha256')!=entry['sha256']
+                    or relations.get('source_sha256')!=snap.get('source',{}).get('sha256')):
+                raise ValueError('relationship source/world/date mismatch')
+            links=list(snap.get('links',[]))
+            for relation in relations['relations']:
+                a,b=relation['first'],relation['second'];kind=relation['kind']
+                if kind not in ('marriage','diplomacy') or a not in snap['countries'] or b not in snap['countries']:
+                    raise ValueError('invalid relationship endpoints/kind')
+                for actor,other in ((a,b),(b,a)):
+                    links.append({'kind':kind,'actor':actor,'other':other,'good':None,
+                                  'fact_id':f'O:{kind}:{a}:{b}'})
+            snap['links']=links
+        snap["_snapshot_sha256"] = snapshot_hash(entry)
         self.cache[index]=snap
         while len(self.cache)>2:
             del self.cache[next(iter(self.cache))]
@@ -220,7 +248,7 @@ class Timeline:
         self.country_index = {name: i for i, name in enumerate(self.country_names)}
         self.market_names = market_names if sequence else sorted({m for s in snapshots for m in s["markets"]})
         self.market_index = {name: i for i, name in enumerate(self.market_names)}
-        self.hash = canonical_hash({"snapshots": ([e['sha256'] for e in snapshots.manifest['snapshots']] if sequence else
+        self.hash = canonical_hash({"snapshots": ([snapshot_hash(e) for e in snapshots.manifest['snapshots']] if sequence else
                                                 [s.get("_snapshot_sha256") or canonical_hash(s) for s in snapshots]),
                                    "facts": list(facts), "faiths": self.faith_groups,"residency_power":residency_power})
         self.cursor = -1
@@ -247,12 +275,14 @@ class Timeline:
         market = np.array([self.market_index.get(locs[n].get("market"), -1) for n in self.graph.names], dtype=int)
         capitals = {self.country_index[c]: self.names[rec["capital"]] for c, rec in snap["countries"].items()
                     if rec.get("capital") in self.names and c in self.country_index}
-        markets = [{"merchants": {}, "center": -1} for _ in self.market_names]
+        markets = [{"merchants": {}, "center": -1,'present':False} for _ in self.market_names]
         for m, rec in snap["markets"].items():
-            markets[self.market_index[m]] = {"center": self.names.get(rec["center"], -1),
+            markets[self.market_index[m]] = {"center": self.names.get(rec["center"], -1),'present':True,
                 "merchants": {self.country_index[c]: float(s) for c, s in rec["merchants"].items()
                               if c in self.country_index and s > 0}}
-        links = []
+        links=[{'kind':r['kind'],'actor':self.country_index[str(r['actor'])],
+                'other':self.country_index.get(str(r.get('other'))),'fact_id':r['fact_id'],'good':r.get('good')}
+               for r in snap.get('links',[]) if str(r.get('actor')) in self.country_index]
         for fact in sorted(active,key=lambda f:f["start_month"]):
             if fact["kind"] not in ("ownership","ownership_region"):
                 continue
@@ -325,4 +355,12 @@ def weighted_means(values, groups, population, size):
     valid = groups >= 0
     weights = np.bincount(groups[valid], weights=population[valid], minlength=size)
     sums = np.bincount(groups[valid], weights=population[valid] * values[valid], minlength=size)
-    return np.divide(sums, weights, out=np.zeros(size), where=weights > 0), weights
+    means=np.divide(sums,weights,out=np.zeros(size),where=weights>0)
+    positive=valid & (population>0)
+    lower,upper=np.full(size,np.inf),np.full(size,-np.inf)
+    np.minimum.at(lower,groups[positive],values[positive])
+    np.maximum.at(upper,groups[positive],values[positive])
+    # A weighted mean is in its contributors' convex hull. In particular,
+    # constant 45 must remain exactly 45, not 44.99999999999998.
+    means=np.where(weights>0,np.clip(means,lower,upper),0.)
+    return means, weights

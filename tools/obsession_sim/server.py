@@ -117,7 +117,8 @@ class RunnerServer(ThreadingHTTPServer):
         selected=HERE/'selected_params.json'
         if selected.exists():
             from .structural import validate_params
-            params={**params,**validate_params(read_json(selected)['params'])}
+            values=read_json(selected)
+            params={**params,**validate_params(values.get('params',values))}
         return {"params":params, "worlds": worlds,
                 "frozen_valid": valid, "frozen_hash": digest}
 

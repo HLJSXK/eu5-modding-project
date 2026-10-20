@@ -173,6 +173,9 @@ def archive_worlds(archive, out, progress=print):
         if not folder.is_dir():
             continue
         entries = []
+        manifest=Path(out)/folder.name/'timeline.json'
+        previous=json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else {}
+        old_entries={e['file']:e for e in previous.get('snapshots',[])}
         for save in sorted(folder.glob("*.eu5")):
             target = Path(out) / folder.name / (save.stem + ".json")
             existing = json.loads(target.read_text(encoding="utf-8")) if target.exists() else None
@@ -184,13 +187,20 @@ def archive_worlds(archive, out, progress=print):
             elif not same or existing.get("format") != FORMAT:
                 existing = export_world(save, target)
                 progress(f"Extracted {save.name}: {len(existing['locations'])} locations", flush=True)
-            entries.append({"date": existing["metadata"]["date"], "file": target.name, "sha256": digest(target)})
+            entry={"date": existing["metadata"]["date"], "file": target.name, "sha256": digest(target)}
+            old=old_entries.get(target.name,{})
+            if old.get('sha256')==entry['sha256']:
+                entry.update({k:old[k] for k in ('relations_file','relations_sha256','relations_complete') if k in old})
+            entries.append(entry)
         if entries:
             entries.sort(key=lambda e: tuple(map(int, e["date"].split("."))))
             manifest = Path(out) / folder.name / "timeline.json"
-            atomic_json(manifest, {"format": "obsession.world-timeline/1", "kind": "O", "id": folder.name,
-                                   "resolution_years": 10, "snapshots": entries})
+            atomic_json(manifest, {**previous,"format": "obsession.world-timeline/1", "kind": "O", "id": folder.name,
+                                   "resolution_years": 10, "snapshots": entries,
+                                   'relations_complete':all(e.get('relations_complete') is True for e in entries)})
             manifests.append(str(manifest))
+    from .relationships_export import archive_relationships
+    archive_relationships(archive,out,progress)
     return manifests
 
 

@@ -80,6 +80,18 @@ assert.equal(elements['pb-milestones'].hidden,false);
 assert.equal(elements['pb-milestone-rows'].children.length,1);
 run('pbZoom(2);pbZoom(.5)');assert.equal(run('pbView.zoom'),1);
 run('pbSeekMonth(11)');assert.equal(run('pbIdx'),1);
+const dynamic=structuredClone(real);
+dynamic.arrival_kind=['opening','contact'];
+dynamic.clock.join=[-110,12];dynamic.clock.joined=[true,true];
+dynamic.world_frames=[{month:0,owner:[0,1],market:[0,1],group_labels:['POR','ENG']},
+                      {month:12,owner:[1,1],market:[2,2],group_labels:['POR','ENG']}];
+sandbox.payload=dynamic;run('pbLoad(payload)');
+assert.equal(run('pbOwner(0)'),'POR');
+run('pbHover=0;pbDetails()');assert.match(elements['pb-detail'].textContent,/时钟基准 1590 年 11 月/);
+run('pbSeekMonth(12);pbHover=1;pbDetails()');
+assert.equal(run('pbOwner(0)'),'ENG');assert.equal(run('PB.attrs.market[0]'),2);
+assert.match(elements['pb-detail'].textContent,/父来源：商人常驻接触/);
+run('pbSeekMonth(0)');assert.equal(run('pbOwner(0)'),'POR');
 const regrouped=structuredClone(real);
 Object.assign(regrouped,{group_names:['area_a','area_b'],attrs:{...real.attrs,owner_tag:['POR','POR']}});
 Object.assign(regrouped.graph_meta,{kind:'eu5_map',clock_group:'area',source_date:'1337.1.1',owner_source:'1337 setup own_* lists'});

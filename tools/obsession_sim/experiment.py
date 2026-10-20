@@ -30,6 +30,7 @@ from tools.eu5_save_parser.world_export import atomic_json, json_scalar
 HERE = Path(__file__).resolve().parent
 FROZEN = ("acceptance_spec.json", "regional_targets.json", "world_facts.json", "structural_config.json", "world_priors.json")
 MODES = {"S":"none", "H":"historical", "G":"generic", "F":"mixed"}
+RUNTIME_NAMES=("__init__.py","acceptance.py","conditional.py","core.py","eu5_map.py","experiment.py","export.py","graph.py","metrics.py","presets.py","structural.py","worlds.py")
 _WORKER = None
 _WORKER_CANCEL = None
 
@@ -57,21 +58,37 @@ def freeze_status():
 
 
 def code_hash():
-    names = ("acceptance.py","conditional.py","core.py","experiment.py","export.py","graph.py","structural.py","worlds.py")
-    return canonical_hash({name: hashlib.sha256((HERE/name).read_bytes()).hexdigest() for name in names})
+    return code_bundle()['runtime_hash']
+
+
+def code_bundle():
+    files={}
+    paths={f'tools/obsession_sim/{name}':HERE/name for name in RUNTIME_NAMES}
+    paths.update({f'tools/eu5_save_parser/{name}':HERE.parent/'eu5_save_parser'/name
+                  for name in ('__init__.py','parser.py','world_export.py','relationships_export.py')})
+    for name,path in paths.items():
+        raw=path.read_bytes()
+        files[name]={'sha256':hashlib.sha256(raw).hexdigest(),'source':raw.decode('utf-8')}
+    return {'format':'obsession.runtime-source/1','files':files,
+            'runtime_hash':canonical_hash({name:r['sha256'] for name,r in files.items()})}
+
+
+def environment_info():
+    return {'python':sys.version.split()[0],'numpy':getattr(sys.modules.get('numpy'),'__version__',None),'platform':sys.platform}
 
 
 class Experiment:
     def __init__(self, graph_path, observer_paths, reference, out):
-        self.graph_path = Path(graph_path)
+        self.graph_path = Path(graph_path).resolve()
+        self.graph_hash=hashlib.sha256(self.graph_path.read_bytes()).hexdigest()
         self.graph = load_json(graph_path)
         self.observers = [read_timeline(p,lazy=True) for p in observer_paths]
-        self.observer_paths = list(map(str,observer_paths))
+        self.observer_paths = [str(Path(p).resolve()) for p in observer_paths]
         if not self.observers:
             raise ValueError("the initial engine world requires an exported near-start snapshot")
-        self.reference = Path(reference)
+        self.reference = Path(reference).resolve()
         self.faiths = religion_groups(self.reference)
-        self.out = Path(out)
+        self.out = Path(out).resolve()
         self.out.mkdir(parents=True, exist_ok=True)
         self.spec = read_json(HERE/"acceptance_spec.json")
         self.targets = read_json(HERE/"regional_targets.json")["targets"]
@@ -79,9 +96,12 @@ class Experiment:
         self.facts = read_json(HERE/"world_facts.json")["facts"]
         self.priors = read_json(HERE/"world_priors.json")
         self.frozen_valid, self.frozen_hash, self.actual_hashes = freeze_status()
+        bundle=code_bundle();self.runtime_hash=bundle['runtime_hash']
+        self.code_snapshot=self.out/'inputs'/'code'/(self.runtime_hash+'.json')
+        atomic_json(self.code_snapshot,bundle)
         signature = canonical_hash({"initial": self.observers[0][1][0]["_snapshot_sha256"],
-                                    "builder":hashlib.sha256((HERE/"worlds.py").read_bytes()).hexdigest(),
-                                    "graph": hashlib.sha256(self.graph_path.read_bytes()).hexdigest(),
+                                    "builder":{name:bundle['files']['tools/obsession_sim/'+name]['sha256'] for name in ('worlds.py','eu5_map.py')},
+                                    "graph":self.graph_hash,
                                     "setup": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in
                                               list((self.reference/"main_menu/setup/1337").glob("*.txt"))+
                                               list((self.reference/"in_game/setup/countries").glob("*.txt"))}})
@@ -91,7 +111,6 @@ class Experiment:
         else:
             self.base = historical_base(self.graph, self.observers[0][1][0], self.reference)
             atomic_json(cached, {"build_signature":signature, "snapshot":self.base})
-        self.runtime_hash = code_hash()
 
     def timeline(self, world, seed, omit_wc=False):
         if world == "R":
@@ -118,7 +137,7 @@ class Experiment:
             raise ValueError("seed must be a fixed ID 0–29")
         spec = deepcopy(self.spec)
         spec["targets"] = [r for r in self.targets if not fit_only or r["split"] == "fit"]
-        identity = {"frozen":self.frozen_hash, "world":timeline.hash, "mode":mode, "seed":seed,
+        identity = {"frozen":self.frozen_hash, "world":timeline.hash,'graph':self.graph_hash,'environment':environment_info(), "mode":mode, "seed":seed,
                     "params":config["params"], "disabled":list(disabled_events), "omit_wc":omit_wc,
                     "fit_only":fit_only, "end_year":end_year, "code":self.runtime_hash,"disabled_rules":list(disabled_rules)}
         key = canonical_hash(identity)
@@ -135,18 +154,26 @@ class Experiment:
                       elapsed_seconds=time.perf_counter()-start, end_month=run.end, world_hash=timeline.hash,
                       world_dates=[s["metadata"]["date"] for s in timeline.snapshots],
                       params=config["params"], frozen_hash=self.frozen_hash, cache_file=str(cache))
+        result.update(graph_hash=self.graph_hash,code_snapshot=str(self.code_snapshot),environment=environment_info())
+        result['country_labels']=[run.state.countries.get(c,{}).get('tag') or c for c in timeline.country_names]
         result = json.loads(json.dumps(result,allow_nan=False,default=json_scalar))
         atomic_json(cache,result)
         if frames:
             result["replays"] = {}
             for good,sim in run.sims.items():
-                path = self.out/"replays"/f"{timeline.id}_{mode}_{seed}_{good}.json"
+                path = self.out/"replays"/f"{timeline.id}_{mode}_{seed}_{key[:12]}_{good}.json"
                 payload = playback_payload(sim, title=f"{mode}×{timeline.kind} · {good} · seed {seed}", start_year=1337,
                                            milestone_results=[r for r in result["milestones"] if r["good"] == good])
                 payload.update(world_frames=run.world_log, arrival_kind=sim.arrival_kind,
                                structural={"events":run.event_log, "K":result["K"], "world_hash":timeline.hash,
                                            "world_kind":timeline.kind,"world_id":timeline.id,"mode":mode,
                                            "sources":sim.nonlocal_log,"waves":sim.waves})
+                initial=run.world_log[0]
+                payload['group']=initial['owner']
+                payload['attrs']={**payload['attrs'],'owner_tag':[initial['group_labels'][c] if c>=0 else None for c in initial['owner']],
+                                  'market':initial['market']}
+                payload['graph_meta']={**payload['graph_meta'],'source_date':initial['date'],
+                    'owner_source':('1337 setup plus sourced political facts' if timeline.kind=='R' else 'Observed /2 world snapshots: '+timeline.id)}
                 payload = json.loads(json.dumps(payload,allow_nan=False,default=json_scalar))
                 atomic_json(path,payload)
                 # Existing map viewer remains the renderer for this new engine.
@@ -219,16 +246,21 @@ class Experiment:
                 if mode == "H" and kind == "R":
                     ablations = []
                     for event in [e for e in self.config["events"] if e["pool"] == "historical"]:
-                        counts, moved_rows = [], []
+                        counts, moved_rows, shifts = [], [], []
+                        affected=[seed for seed,baseline in zip(seeds,runs) if any(e['id']==event['id'] for e in baseline['events'])]
+                        requests=[dict(world=world,mode='H',seed=seed,params=params,disabled_events=[event['id']],omit_wc=True)
+                                  for seed in affected]
+                        ablated=dict(zip(affected,self.many(requests,workers,progress,cancel))) if requests else {}
                         for seed, baseline in zip(seeds,runs):
-                            if any(e["id"] == event["id"] for e in baseline["events"]):
-                                without = self.one(world,"H",seed,params=params,disabled_events=[event["id"]],cancel=cancel,omit_wc=True)
-                            else:
-                                without = baseline  # keyed RNG, no activation => provably identical
+                            without=ablated.get(seed,baseline)  # no activation => provably identical
                             changed = [a["id"] for a,b in zip(baseline["milestones"],without["milestones"])
                                        if a["grade"] in ("A","B") and moved(a["simulated_month"],b["simulated_month"],a["tolerance_months"])]
                             counts.append(len(changed)); moved_rows.append(changed)
-                        ablations.append({"event":event["id"],"median_moved":q(counts),"moved":moved_rows})
+                            shifts.append({'seed':seed,'milestones':[{'id':a['id'],'baseline_year':a['simulated_year'],
+                                'without_year':b['simulated_year'],'delta_years':(b['simulated_month']-a['simulated_month'])/12
+                                if a['simulated_month'] is not None and b['simulated_month'] is not None else None}
+                                for a,b in zip(baseline['milestones'],without['milestones']) if a['id'] in changed]})
+                        ablations.append({"event":event["id"],"median_moved":q(counts),"moved":moved_rows,'shifts':shifts})
                     cell["A_max"] = max((r["median_moved"] for r in ablations),default=0)
                     cell["ablation"] = ablations
                 world_cells[f"{mode}×{kind}:{world}"] = cell
@@ -241,6 +273,11 @@ class Experiment:
         gate_result = gates(cells,self.spec,frozen_valid=valid,world_count=len(self.observers),
                             independent_worlds=sum(m.get("role")=="independent_validation" for m,_ in self.observers),
                             complete_protocol=protocol)
+        incomplete=[m['id'] for m,_ in self.observers if not m.get('relations_complete')]
+        for level in ('L2','L3'):
+            if incomplete:
+                gate_result[level]['missing'].append('observer marriage/alliance inputs incomplete: '+', '.join(incomplete))
+                gate_result[level]['status']='无法判定'
         primary_gate=deepcopy(gate_result)
         independent=[m for m,_ in self.observers if m.get('role')=='independent_validation' and m['id']!=self.observers[0][0]['id']]
         if independent:
@@ -264,13 +301,21 @@ class Experiment:
                 current["failures"].extend(f"{manifest['id']}: {f}" for f in check["failures"])
                 current["missing"].extend(f"{manifest['id']}: {f}" for f in check["missing"])
                 current["status"]="无法判定" if current["missing"] else "未达"
+        if incomplete:
+            message='observer marriage/alliance inputs incomplete: '+', '.join(incomplete)
+            if message not in gate_result['L3']['missing']:gate_result['L3']['missing'].append(message)
         gate_result['L3']['status']='无法判定' if gate_result['L3']['missing'] else '未达' if gate_result['L3']['failures'] else '达到'
         effective_params={**self.config["params"],**(params or {})}
         report = {"format":"obsession.acceptance/1", "frozen_hash":self.frozen_hash,"frozen_valid":valid,
                   "input_hashes":self.actual_hashes,"runtime_hash":self.runtime_hash,"params":effective_params,
+                  'graph_hash':self.graph_hash,'code_snapshot':str(self.code_snapshot),'environment':environment_info(),
                   "fixed":self.config["fixed"],"profiles":self.config["profiles"],"seeds":seeds,
-                  "adjustable_numbers":len(self.config["params"]),"cells":cells,"world_cells":world_cells,"gates":gate_result,
-                  "worlds":[{"id":m["id"],"dates":[e["date"] for e in m["snapshots"]]} for m,_ in self.observers],
+                  "adjustable_numbers":len(self.config["params"]),"cells":cells,
+                  "world_cells":{key:({**{k:v for k,v in cell.items() if k!='runs'},'runs_from_cell':key.split(':')[0]}
+                                      if cell is cells.get(key.split(':')[0]) else cell) for key,cell in world_cells.items()},
+                  "gates":gate_result,
+                  "worlds":[{"id":m["id"],"dates":[e["date"] for e in m["snapshots"]],
+                             'relations_complete':bool(m.get('relations_complete'))} for m,_ in self.observers],
                   "limits":["R uses 1337 populations/owners but near-start observed market boundaries.",
                             "World facts with W-C evidence require removal sensitivity; wine custom magnitude is a prior.",
                             "K3 is intentionally untriggered pending a designed supply/tax rule.",

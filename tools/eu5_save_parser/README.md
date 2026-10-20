@@ -8,7 +8,7 @@ reads completed archived text saves without changing them. It resumes existing e
 population, owner/capital, market boundaries and normalized resident merchant power, roads,
 proximity, market access, institutions, and resolved culture/religion keys. Numeric runtime
 identity references are joined through the save's definition managers; country official faith
-is kept separately from the capital's local faith. Original save size, mtime and SHA-256 are
+is kept separately from the capital's local faith. Active marriages and alliances are exported as separate hash-bound `obsession.world-relations/1` supplements. `world_export` includes them automatically; use `python -m tools.eu5_save_parser.relationships_export` to add/resume them for existing worlds without reparsing populations. Peace offers, opinion lists and inferred friendships are excluded. Original save size, mtime and SHA-256 are
 retained. Version 1 exports upgrade without rereading all population objects. Commodity trade
 quantities and guessed routes are deliberately excluded. This is separate from SOL solver analysis.
 

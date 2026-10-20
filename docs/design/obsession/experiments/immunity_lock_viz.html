@@ -1053,11 +1053,11 @@ function pbAppliedInputs(){
 }
 function pbPayloadMap(payload=PB){return payload?.inputs?.map||payload?.graph_meta?.simulation_map||(payload?.graph_meta?.kind==='hex_grid'?'hex':'real');}
 function pbMapLabel(map){return map==='hex'?'合成六角网格':'真实 EU5 地图';}
-function pbDate(month) {
-  if (month == null || month < 0) return "未达到";
+function pbDate(month,allowNegative=false) {
+  if (month == null || (month < 0&&!allowNegative)) return "未达到";
   if (PB && PB.start_year != null && Number.isFinite(+PB.start_year)) {
     const total = Math.round(+PB.start_year * 12 + month);
-    return `${Math.floor(total / 12)} 年 ${total % 12 + 1} 月`;
+    return `${Math.floor(total / 12)} 年 ${(total%12+12)%12+1} 月`;
   }
   return `第 ${fmt(month)} 月`;
 }
@@ -1189,6 +1189,7 @@ function pbDetails() {
   const region=pbAttr("region",v),area=pbAttr("area",v), group=PB.group&&PB.group[v];
   const clockName=group==null||group<0?"无组":PB.group_names&&PB.group_names[group]||String(group);
   const join=PB.clock&&PB.clock.join&&PB.clock.join[group],decay=PB.clock&&PB.clock.decay_start&&PB.clock.decay_start[group];
+  const joined=PB.clock?.joined?.[group]??(join!=null&&join>=0);
   const arrivalText=time=>time==null?"无记录":time<0?"本轮尚未达到":`${pbDate(time)}（第 ${time} 月${time>month?"，当前尚未到达":""}）`;
   const arrival=arrivalText(t),thresholds=PB.threshold_arrival||{};
   const reached=[['首次非零 x>0',PB.first_positive&&PB.first_positive[v]],['首次 x≥20',thresholds['20']&&thresholds['20'][v]],['首次 x≥45',thresholds['45']&&thresholds['45'][v]],['首次 x≥70',thresholds['70']&&thresholds['70'][v]]];
@@ -1196,7 +1197,7 @@ function pbDetails() {
   const parent=PB.arrival_kind?.[v];
   $("pb-detail").textContent=`${pbName(v)}${PB.names&&PB.names[v]&&PB.names[v]!==pbName(v)?" · "+PB.names[v]:""}\n国家：${pbOwner(v)}　Area：${area}　Region：${region}\n时钟组：${clockName}\n当前：${STAGES[code%7][2]}${code>=7?" · 退潮中":""}\n首次 x≥1：${arrival}\n`+reached.map(([label,time])=>`${label}：${arrivalText(time)}`).join("\n")+
     (parent?`\n首次成为成员的父来源：${kinds[parent]||parent}`:"")+
-    (join!=null&&join>=0?`\n最后一波时钟记录：入场 ${pbDate(join)}；退潮起点 ${decay!=null&&decay>=0?pbDate(decay):"未触发"}`:"")+pbRefDetail(v);
+    (joined?`\n最后一波时钟记录：时钟基准 ${pbDate(join,true)}（政策可前移）；退潮起点 ${decay!=null&&decay>=0?pbDate(decay):"未触发"}`:"")+pbRefDetail(v);
 }
 function pbLegend() {
   const box=$("pb-legend");box.replaceChildren();

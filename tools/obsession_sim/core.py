@@ -379,7 +379,7 @@ class Simulation:
         if P.stop_when_calm and self.event_cursor == len(self.events) and not self.sources:
             if self.clock:
                 if t > 0 and self.length == 0 and not self.pending and all(
-                        self.finished[c] or self.join[c] < 0 for c in range(self.ng)):
+                        self.finished[c] or not self.clock_joined(c) for c in range(self.ng)):
                     self.calm_month = t
                     self.done = True
             elif self.length == 0 and not self.pending and self.phase != "lazy" and not (
@@ -399,7 +399,7 @@ class Simulation:
         d = len(inc)
         old = self.x[v]
         p = self.pp[v]
-        p, retention, shared_input = self.local_terms(v, p, self.rho[v])
+        p, retention, shared_input = self.local_terms(v, p, self.rho[v],old)
         y = retention * old + shared_input
         if self.sources:
             y += self.sources.get(v, 0.0)
@@ -432,7 +432,7 @@ class Simulation:
             self._note(v, y, t)
         # A seeded member can be stationary (delta suppresses its write). It
         # still joins, dated by first adoption rather than delayed queue service.
-        if self.clock and c >= 0 and self.join[c] < 0 and self.x[v] >= 1:
+        if self.clock and c >= 0 and not self.clock_joined(c) and self.x[v] >= 1:
             # Runtime never reads offline arrival history. An explicit member
             # seed already supplied its month in the shared event definition;
             # new propagation and reawakened customs join when actually served.
@@ -443,14 +443,14 @@ class Simulation:
             self.join[c] = min([t] + configured)
             self.U += pr["join_write"]
 
-    def local_terms(self, v, p, retention):
+    def local_terms(self, v, p, retention, old=None):
         """Optional structural rules; default preserves the reference experiments."""
         return p, retention, 0.0
 
     def _clocks(self, t):
         pr = self.price
         for c in range(self.ng):
-            if self.finished[c] or self.join[c] < 0:
+            if self.finished[c] or not self.clock_joined(c):
                 continue
             self.U += pr["clock_active"]
             if not self.decaying[c] and t >= self.join[c] + self.P.hold_T:
@@ -494,6 +494,9 @@ class Simulation:
 
     def clock_decay_multiplier(self, country):
         return 1
+
+    def clock_joined(self, country):
+        return self.join[country] >= 0
 
     def _enter_global_decay(self):
         P = self.P
@@ -591,7 +594,7 @@ class Simulation:
                 "calm_month": self.calm_month, "ever_member": ever,
                 "final_members": final["members"], "final_saturated": final["saturated"],
                 "final_positive": final["positive"],
-                "groups_joined": sum(1 for j in self.join if j >= 0),
+                "groups_joined": sum(self.clock_joined(c) for c in range(self.ng)),
                 "groups_finished": sum(self.finished),
                 "peak_round_delay_months": self.peak_round_delay,
                 "input_events_processed": self.event_cursor}

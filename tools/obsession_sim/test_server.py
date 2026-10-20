@@ -21,7 +21,7 @@ from .server import build_server
 
 class ServerTests(unittest.TestCase):
     def test_structural_api_validates_and_dispatches_shared_parameters(self):
-        invalid=[{"params":{"p":True}},{"params":{"lambda_contact":11}},{"params":{"hold_T":1.2}},
+        invalid=[{"params":{"p":True}},{"params":{"lambda_contact":301}},{"params":{"hold_T":1.2}},
                  {"world":"O:missing"},{"seed":30},{"mode":"bad"},{"fit_only":1},{"command":"bad"}]
         with patch.object(self.server,"structural_config",return_value={"worlds":[]}):
             for value in invalid:

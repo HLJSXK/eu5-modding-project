@@ -23,7 +23,9 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 - `worlds.py`：R = 1337 引擎人口/所有权/道路/官方文化宗教，加有来源的跨商品世界事实；市场边界使用近开局观察快照，属于公开的近似。O = 真实存档序列，取前一档，运行只到最后观察月。
 - `structural.py`：读取世界状态的商人常驻、所有权、同市场、道路、先占和条件事件。商品贸易数量不进入动力学。开局习俗先保持静止，新增结构联系开启最长百年波次；各商品共享 480,000 U 月额度。
 - `conditional.py` / `acceptance.py`：K1–K7、删失、人口加权区域中位数、反作弊指标、逐项闸门。K3 未设计；缺少独立第二局时 L3 不能宣称通过。
-- `experiment.py`：版本化输入、代码/世界/参数哈希、可续算检查点、拟合集扫描、30 种子矩阵和逐历史事件消融。正式 R 排除 W-C；`run --disable-rules wine` 支持移除酒习俗先占的敏感性检查。
+- `experiment.py`：版本化输入、代码/图/环境/世界/参数哈希及运行源码快照、可续算检查点、拟合集扫描、30 种子矩阵和逐历史事件消融。正式 R 排除 W-C；正式选参后使用可直接传给 `--params` 的 `tools/obsession_sim/selected_params.json`，选参日志另存。`run --disable-rules wine` 支持移除酒习俗先占的敏感性检查。
+
+`lambda_contact` 是每单位商人份额的年风险率，通过 Poisson 公式转换为月概率；数值大于 1 不表示概率超过 100%。同市场支持仅限当前成员，区域入口审计记录达标人口的来源构成。
 
 冻结输入在本目录的 `acceptance_spec.json`、`regional_targets.json`、`world_facts.json`、`world_priors.json`、`structural_config.json`；`frozen_manifest.json` 保存逐版修改原因。结果和大体积世界/回放在 `tmp/obsession_structural/` 与 `tmp/obsession_worlds/`，不会写入原始存档。实现与验收记录见设计 [21](../../docs/design/obsession/21_Structural_Implementation_Results.md)。以下第 1–11 节主要描述原始核心和旧静态研究接口。
 

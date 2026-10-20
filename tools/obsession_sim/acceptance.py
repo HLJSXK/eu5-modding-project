@@ -64,6 +64,7 @@ class RunMetrics:
             raise ValueError("regional milestone has an empty selector")
         self.arrivals = {}
         self.arrival_unseeded = {}
+        self.arrival_unseeded_evidence = {}
         self.arrival_evidence = {}
         self.violations = {}
         self.europe = [i for i, c in enumerate(graph.attrs["continent"]) if c == "europe"]
@@ -71,8 +72,11 @@ class RunMetrics:
         self.europe_set=set(self.europe)
         self.east_asia_set=set(self.east_asia)
         self.outside_america=[i for i,c in enumerate(graph.attrs["continent"]) if c != "america"]
-        self.tea_capped = [i for i, r in enumerate(graph.attrs["region"]) if r in ("anatolia_region", "france_region", "italy_region")]
+        self.tea_regions={region:[i for i,r in enumerate(graph.attrs['region']) if r==region]
+                          for region in ('anatolia_region','france_region','italy_region')}
+        self.tea_local_hotspots={}
         self.external_first = {}
+        self.contact_evidence={}
         self.yearly = []
 
     def observe(self, month, run, diagnostics):
@@ -91,12 +95,15 @@ class RunMetrics:
                 entries = {v for v,t in sim.entries.items() if t <= month}
                 near = entries | {u for v in entries for u in sim.g.outgoing[v]}
                 downstream = np.array([v not in near for v in vs])
-                self.arrival_unseeded[row["id"]] = bool(w[met & downstream].sum() >= .5*w.sum())
+                attained=float(w[met].sum());away=float(w[met & downstream].sum())
+                self.arrival_unseeded[row["id"]] = bool(away >= .5*attained)
+                self.arrival_unseeded_evidence[row['id']]={'attained_population':attained,'downstream_population':away,
+                    'downstream_share':away/attained,'region_population':float(w.sum()),
+                    'old_all_population_test':bool(away>=.5*w.sum())}
                 facts=set().union(*(sim.fact_ancestry.get(int(v),()) for v in np.asarray(vs)[met]))
                 self.arrival_evidence[row['id']]=sorted(facts)
         if self.kind != "R":
             return
-        checks = []
         if month < (1500-1337)*12:
             bad=[c for c,v in state.capitals.items() if v in self.europe_set and country_x["coffee"][c] >= 1]
             if bad:
@@ -105,16 +112,34 @@ class RunMetrics:
             bad=[c for c,v in state.capitals.items() if v in self.east_asia_set and country_x["coffee"][c] >= 20]
             if bad:
                 self.violations.setdefault("coffee_east_asia_before_1650", {"month":month,"countries":bad})
-        if month < (1800-1337)*12:
-            checks.append(("tea_capped_regions", "tea", self.tea_capped, 45))
-        for name, good, vs, threshold in checks:
-            bad = [v for v in vs if values[good][v] >= threshold]
-            if bad:
-                self.violations.setdefault(name, {"month": month, "locations": bad[:50], "count": len(bad)})
+        for region,vs in self.tea_regions.items():
+            if region=='anatolia_region' and month>=(1800-1337)*12:
+                continue
+            x,w=values['tea'][vs],state.population[vs]
+            high=x>=45
+            if np.any(high):
+                self.tea_local_hotspots.setdefault(region,{'month':month,'locations':np.asarray(vs)[high].tolist()[:50]})
+            if w.sum()>0 and w[high].sum()>=.5*w.sum():
+                self.violations.setdefault('tea_stage3_'+region,{'month':month,'region':region,
+                    'population_share':float(w[high].sum()/w.sum()),'locations':np.asarray(vs)[high].tolist()[:50]})
         for row in run.inputs_this_month:
             if row["good"] in ("tea", "tobacco") and row.get("node") is not None:
                 if row["node"] in self.europe_set:
                     self.external_first.setdefault(row["good"], month)
+                    self.contact_evidence.setdefault(row['good'],{'month':month,'type':row['type'],'node':row['node']})
+        tea=run.sims['tea']
+        if 'tea' not in self.external_first and tea.spreading:
+            for v in self.europe:
+                c=int(state.owner[v])
+                if values['tea'][v]<=0 or tea.pp[v]<=0 or (c>=0 and tea.decaying[c]):
+                    continue
+                for k,u in enumerate(tea.g.incoming[v]):
+                    weight=tea.w[v][k] if tea.w else 1.
+                    if u not in self.europe_set and weight>0 and values['tea'][u]>0:
+                        self.external_first['tea']=month
+                        self.contact_evidence['tea']={'month':month,'type':'adjacency','node':v,'source_node':u}
+                        break
+                if 'tea' in self.external_first:break
         if "tea" not in self.external_first and np.any(values["tea"][self.europe] > 0):
             self.violations.setdefault("european_tea_without_contact", {"month": month})
         continent=run.timeline.graph.attrs["continent"]
@@ -151,10 +176,12 @@ class RunMetrics:
                          "within_tolerance": error is not None and abs(error) <= target["tolerance_months"],
                          "within_2tol": error is not None and abs(error) <= 2*target["tolerance_months"],
                          "unseeded": self.arrival_unseeded.get(target["id"], False),
+                         'unseeded_evidence':self.arrival_unseeded_evidence.get(target['id']),
                          "world_evidence":{"facts":evidence,"counts":{g:grades[g] for g in ('W-A','W-B','W-C')},
                                            "trace":"first-membership parent ancestry; not a counterfactual necessity claim"},
                          "scored": not (grades['W-C'] and not (grades['W-A'] or grades['W-B']))})
-        result = {"milestones": rows, "violations": list(self.violations.items()), "violation_count": len(self.violations)}
+        result = {"milestones": rows, "violations": list(self.violations.items()), "violation_count": len(self.violations),
+                  'contact_evidence':self.contact_evidence,'tea_local_hotspots':self.tea_local_hotspots}
         for split, prefix in ((None, ""), ("fit", "fit_"), ("holdout", "holdout_")):
             eligible = [r for r in rows if r["grade"] in ("A", "B") and r['scored'] and (split is None or r["split"] == split)]
             pairs = [(a,b) for a in eligible for b in eligible if a["good"] == b["good"] and a["target_month"] < b["target_month"]]
@@ -179,6 +206,13 @@ class RunMetrics:
         result["ban_trials"]={"observed":len(decided_bans),"censored":len(ban_cases)-len(decided_bans),
             "failure_rate":sum(c["status"]=="pass" for c in decided_bans)/len(decided_bans) if decided_bans else None,
             "interpretation":"ban failed when intensity remained at least half over the specified observation window"}
+        result['ban_trials']['by_scenario']={}
+        for source in sorted({c.get('source','action') for c in ban_cases}):
+            cases=[c for c in ban_cases if c.get('source','action')==source]
+            decided=[c for c in cases if c['status'] in ('pass','fail')]
+            rate=sum(c['status']=='pass' for c in decided)/len(decided) if decided else None
+            result['ban_trials']['by_scenario'][source]={'observed':len(decided),'censored':len(cases)-len(decided),
+                'failure_rate':rate,'diagnostic_target':.7,'target_met':rate>=.7 if rate is not None else None}
         result.update(event_diagnostics(run.event_log, run.eligible_months))
         sanity = {}
         for good, sim in run.sims.items():
@@ -217,6 +251,14 @@ def aggregate_runs(runs, kind="R"):
     for key in ("B_max", "peak_U", "wave_years"):
         out[key] = max((r.get(key, 0) for r in runs), default=0)
     out["M_mis"] = sum(r.get("M_mis", 0) for r in runs)
+    out['ban_scenarios']={}
+    sources={source for r in runs for source in r.get('ban_trials',{}).get('by_scenario',{})}
+    for source in sorted(sources):
+        cases=[c for r in runs for k in r.get('K',[]) if k['id']=='K6' for c in k.get('cases',[]) if c.get('source','action')==source]
+        decided=[c for c in cases if c['status'] in ('pass','fail')]
+        rate=sum(c['status']=='pass' for c in decided)/len(decided) if decided else None
+        out['ban_scenarios'][source]={'observed':len(decided),'censored':len(cases)-len(decided),
+            'failure_rate':rate,'diagnostic_target':.7,'target_met':rate>=.7 if rate is not None else None}
     out["triggered_K_median"] = q([r.get("triggered_K") for r in runs])
     for prefix in ("","fit_","holdout_"):
         out[prefix+"loss_infinite_runs"] = sum(r.get(prefix+"loss_infinite",False) for r in runs)
