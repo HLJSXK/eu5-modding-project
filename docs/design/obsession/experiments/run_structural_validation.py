@@ -39,8 +39,8 @@ def record(exp, params, runs):
                 runtime_hash=exp.runtime_hash, frozen_hash=exp.frozen_hash)
 
 
-def fit(exp, workers):
-    protocol = json.loads((Path(__file__).with_name('structural_fit_protocol.json')).read_text(encoding='utf-8'))
+def fit(exp, workers, protocol_path):
+    protocol = json.loads(protocol_path.read_text(encoding='utf-8'))
     assert protocol['runtime_hash'] == exp.runtime_hash and protocol['frozen_hash'] == exp.frozen_hash
     grid = protocol['grid']
     phase_a = exp.many([dict(world='R', mode='S', seed=0, params=p, fit_only=True, omit_wc=True)
@@ -57,7 +57,7 @@ def fit(exp, workers):
     ranked = sorted((rows[i] for i in finalists), key=rank)
     valid, frozen, _ = freeze_status()
     assert valid and frozen == exp.frozen_hash and code_hash() == exp.runtime_hash
-    result = dict(format='obsession.fit-selection/1', protocol=str(Path(__file__).with_name('structural_fit_protocol.json')),
+    result = dict(format='obsession.fit-selection/1', protocol=str(protocol_path),
                   policy=protocol['ranking'], frozen_hash=frozen, runtime_hash=exp.runtime_hash,
                   candidates=rows, finalists=ranked, recommended=ranked[0])
     atomic_json(exp.out/'bounded_fit_comparison.json', result)
@@ -95,11 +95,13 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('action', choices=['fit', 'matrix', 'checks', 'replays'])
     ap.add_argument('--workers', type=int, default=6)
+    ap.add_argument('--protocol', type=Path, default=Path(__file__).with_name('structural_fit_protocol.json'))
+    ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_structural')
     args = ap.parse_args()
     exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', sorted((ROOT/'tmp/obsession_worlds').glob('*/timeline.json')),
-                     ROOT/'.eu5-base/reference_game_files/game', ROOT/'tmp/obsession_structural')
+                     ROOT/'.eu5-base/reference_game_files/game', args.out)
     if args.action == 'fit':
-        fit(exp, args.workers)
+        fit(exp, args.workers, args.protocol)
     else:
         params = selected(exp)
         if args.action == 'matrix':
