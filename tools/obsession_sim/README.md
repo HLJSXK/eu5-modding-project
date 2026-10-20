@@ -31,6 +31,8 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 
 本轮冻结流程可用 `docs/design/obsession/experiments/run_structural_validation.py` 复跑：`fit` 执行 49 候选及前六组的三种子确认；提交选参文件后，`matrix` 执行八格各 30 种子与历史事件消融，`checks` 执行分层及 W-C/酒习俗对照，`replays` 导出两份三商品地图回放。默认 6 个进程；参数选择提交、冻结哈希或代码哈希不匹配时停止。
 
+本轮校准源码可在提交 `3fe7bcb3` 或运行时源码归档中复现。当前源码随后修复了仅在酒习俗移除对照中执行的空种子分支；选参日志分别记录校准与正式运行时，参数没有重选，正式矩阵在修复后的代码下全部重算。`matrix/checks/replays` 默认使用日志绑定的冻结观察者副本，也可显式传入 `--observer`。
+
 ## 1. 它模拟什么
 
 每个商品独立运行一份。每月按以下顺序执行：
