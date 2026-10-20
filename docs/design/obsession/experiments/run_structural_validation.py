@@ -1,4 +1,4 @@
-"""Reproduce the frozen fit protocol, then the selected-parameter validation.
+"""Default to short engineering checks; full acceptance is a milestone action.
 
 Run from the repository root with the project's eu5 Python environment.
 `fit` never reads holdout outcomes. Commit selected_params.json and its
@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.obsession_sim.acceptance import aggregate_runs
 from tools.obsession_sim.experiment import Experiment, code_hash, freeze_status
+from tools.obsession_sim.validation import bound_observers, cache_screen, quick_check
 from tools.eu5_save_parser.world_export import atomic_json
 
 
@@ -131,7 +132,10 @@ def checks(exp, params, workers):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('action', choices=['fit', 'jointfit', 'matrix', 'checks', 'replays'])
+    ap.add_argument('action', nargs='?', default='quick',
+                    choices=['quick', 'screen', 'fit', 'jointfit', 'matrix', 'checks', 'replays'])
+    ap.add_argument('--force-full', action='store_true',
+                    help='Run the entire matrix even when exact cached cells already prove a necessary threshold failed')
     ap.add_argument('--workers', type=int, default=6)
     ap.add_argument('--protocol', type=Path, default=Path(__file__).with_name('structural_fit_protocol.json'))
     ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_structural')
@@ -139,17 +143,29 @@ if __name__ == '__main__':
     args = ap.parse_args()
     observers=args.observer
     log_path=ROOT/'tools/obsession_sim/selection_log.json'
-    if not observers and args.action in ('matrix','checks','replays') and log_path.exists():
-        observers=[Path(m['path']) for m in json.loads(log_path.read_text(encoding='utf-8')).get('observer_manifests',[])]
+    if not observers and args.action in ('quick','screen','matrix','checks','replays') and log_path.exists():
+        observers=bound_observers(log_path)
     exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', observers or sorted((ROOT/'tmp/obsession_worlds').glob('*/timeline.json')),
                      ROOT/'.eu5-base/reference_game_files/game', args.out)
-    if args.action == 'fit':
+    if args.action in ('quick', 'screen'):
+        params=json.loads((ROOT/'tools/obsession_sim/selected_params.json').read_text(encoding='utf-8'))
+        result=(quick_check if args.action=='quick' else cache_screen)(exp, params=params, progress=print)
+        print(json.dumps({k:v for k,v in result.items() if k not in ('identity','cells')}, ensure_ascii=False),flush=True)
+        if result.get('decision')=='early_reject':
+            sys.exit(2)
+    elif args.action == 'fit':
         fit(exp, args.workers, args.protocol)
     elif args.action == 'jointfit':
         jointfit(exp, args.workers)
     else:
         params = selected(exp)
         if args.action == 'matrix':
+            screen=cache_screen(exp, params=params, progress=print)
+            if screen['decision']=='early_reject' and not args.force_full:
+                print(json.dumps(dict(skipped_full=True,reason='Complete cached cells already disprove necessary thresholds',
+                                      gates=screen['gates'],report=str(exp.out/'cache_screen.json'),
+                                      override='--force-full'),ensure_ascii=False),flush=True)
+                sys.exit(2)
             print(json.dumps(exp.matrix(params=params, workers=args.workers)['gates'], ensure_ascii=False), flush=True)
         elif args.action == 'checks':
             checks(exp, params, args.workers)

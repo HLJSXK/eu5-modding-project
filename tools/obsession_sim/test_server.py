@@ -53,6 +53,42 @@ class ServerTests(unittest.TestCase):
                 self.assertIn('id="obsession-playback-data"', body)
                 connection.close()
 
+    def test_fast_structural_actions_and_failed_screen_skip_full_matrix(self):
+        from . import validation
+        quick = {"format": "obsession.quick-check/1", "passed": True}
+        rejected = {"format": "obsession.cache-screen/1", "decision": "early_reject", "cells": {}}
+        with patch.object(self.server, "structural_config", return_value={"worlds": []}), \
+                patch.object(experiment_runner, "Experiment") as cls, \
+                patch.object(validation, "quick_check", return_value=quick) as short, \
+                patch.object(validation, "cache_screen", return_value=rejected) as screen, \
+                patch.object(validation, "bound_observers", return_value=[]):
+            for action in ("quick", "screen", "matrix"):
+                status, result = self.request("POST", "/api/structural", {"action": action})
+                self.assertEqual(202, status)
+                job = self.wait_job(result["id"])
+                self.assertEqual("complete", job["status"])
+                self.assertEqual(quick if action=="quick" else rejected, job["result"])
+            self.assertEqual(1, short.call_count)
+            self.assertEqual(2, screen.call_count)
+            cls.return_value.matrix.assert_not_called()
+            cls.return_value.one.assert_not_called()
+            cls.return_value.matrix.return_value = {"cells": {}, "gates": {}}
+            _, result = self.request("POST", "/api/structural", {"action": "matrix", "force_full": True})
+            self.assertEqual("complete", self.wait_job(result["id"])["status"])
+            cls.return_value.matrix.assert_called_once()
+            self.assertEqual(400, self.request("POST", "/api/structural", {"action": "matrix", "force_full": 1})[0])
+
+    def test_acceptance_endpoint_labels_partial_report_when_matrix_is_absent(self):
+        with patch.object(runner_server, "WORKSPACE", Path(self.temp.name)):
+            folder = Path(self.temp.name) / "tmp/obsession_structural"
+            folder.mkdir(parents=True)
+            partial = {"format": "obsession.cache-screen/1", "cells": {}, "complete_protocol": False}
+            (folder / "cache_screen.json").write_text(json.dumps(partial))
+            self.assertEqual((200, partial), self.request("GET", "/api/acceptance"))
+            complete = {"format": "obsession.acceptance/1", "cells": {}, "complete_protocol": True}
+            (folder / "matrix.json").write_text(json.dumps(complete))
+            self.assertEqual((200, complete), self.request("GET", "/api/acceptance"))
+
     def test_explicit_empty_seed_list_and_historical_defaults_survive_prepare(self):
         scenario = {"seeds": [], "parameters": {"p": .004, "hold_T": 600, "coefficient_cost": 10},
                     "initial": [{"names": ["a"], "value": 30}]}

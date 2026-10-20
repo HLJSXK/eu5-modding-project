@@ -124,12 +124,15 @@ class RunnerServer(ThreadingHTTPServer):
 
     def start_structural(self, request):
         from .experiment import Experiment, HERE, read_json
-        if not isinstance(request, dict) or set(request) - {"action", "world", "mode", "seed", "params", "fit_only"}:
+        if not isinstance(request, dict) or set(request) - {"action", "world", "mode", "seed", "params", "fit_only", "force_full"}:
             raise ValueError("unknown structural request fields")
         _finite_json(request)
         action = request.get("action", "run")
-        if action not in ("run", "matrix", "refresh"):
-            raise ValueError("action must be run, matrix or refresh")
+        if action not in ("quick", "screen", "run", "matrix", "refresh"):
+            raise ValueError("action must be quick, screen, run, matrix or refresh")
+        force_full = request.get("force_full", False)
+        if not isinstance(force_full, bool):
+            raise ValueError("force_full must be boolean")
         mode = request.get("mode", "S")
         if mode not in ("S", "H", "G", "F"):
             raise ValueError("invalid structural mode")
@@ -164,6 +167,9 @@ class RunnerServer(ThreadingHTTPServer):
                         job.update(status="complete", progress="新增存档已导入；刷新页面即可选择。")
                     return
                 observers = sorted((WORKSPACE / "tmp/obsession_worlds").glob("*/timeline.json"))
+                if action in ("quick", "screen", "matrix") and (HERE / "selection_log.json").exists():
+                    from .validation import bound_observers
+                    observers = bound_observers(HERE / "selection_log.json") or observers
                 experiment = Experiment(self.graph_path, observers, WORKSPACE / ".eu5-base/reference_game_files/game",
                                         WORKSPACE / "tmp/obsession_structural")
                 def progress(value, run=None, **_):
@@ -172,13 +178,20 @@ class RunnerServer(ThreadingHTTPServer):
                             job["progress"] = str(value)
                         else:
                             job.update(month=value, progress=f"{mode}×{world.split(':')[0]} · {1337+value/12:.0f} 年")
-                if action == "matrix":
-                    result = experiment.matrix(params=clean,progress=progress,cancel=job["cancel"])
+                if action in ("quick", "screen", "matrix"):
+                    from .validation import cache_screen, quick_check
+                    result = (quick_check if action=="quick" else cache_screen)(
+                        experiment, params=clean, progress=progress, cancel=job["cancel"])
+                    if action=="matrix" and (force_full or result["decision"]!="early_reject"):
+                        result = experiment.matrix(params=clean,progress=progress,cancel=job["cancel"])
                 else:
                     result = experiment.one(world,mode,seed,params=clean,fit_only=fit_only,frames=12,
                                             progress=progress,cancel=job["cancel"])
                 with self.job_lock:
-                    job.update(status="complete", result=result, progress="计算完成；诊断与闸门结论已更新。")
+                    message = ("快速检查通过；不代表历史验收通过。" if action=="quick" else
+                               "缓存已证明必要门槛未达；完整矩阵已跳过。" if action=="matrix" and result.get("decision")=="early_reject" else
+                               "缓存筛查完成；未启动新模拟。" if action=="screen" else "计算完成；诊断与闸门结论已更新。")
+                    job.update(status="complete", result=result, progress=message)
             except InterruptedError:
                 with self.job_lock:
                     job.update(status="cancelled", progress="已取消")
@@ -405,8 +418,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.json_response(200, self.server.structural_config())
         elif path == "/api/acceptance":
             report = WORKSPACE / "tmp/obsession_structural/matrix.json"
+            if not report.exists():
+                report = WORKSPACE / "tmp/obsession_structural/cache_screen.json"
             self.json_response(200 if report.exists() else 404,
-                               json.loads(report.read_text(encoding="utf-8")) if report.exists() else {"error":"尚无完整验收矩阵"})
+                               json.loads(report.read_text(encoding="utf-8")) if report.exists() else {"error":"尚无验收或缓存筛查报告"})
         elif path == "/api/preview":
             choices = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("map", ["real"])
             if len(choices) != 1 or choices[0] not in self.server.previews:

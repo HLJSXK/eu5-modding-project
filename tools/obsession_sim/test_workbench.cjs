@@ -33,5 +33,18 @@ run('render(data)');assert.equal(elements['detail-seed'].children.length,2);
 elements['detail-seed'].value='1';elements['detail-seed'].onchange();
 assert.match(elements.summary.textContent,/seed 1/);assert.match(elements.summary.textContent,/75.0%/);
 assert.equal(elements['case-details'].hidden,true);
+const previous=run('report');
+box.data={format:'obsession.quick-check/1',passed:true,cached:true,elapsed_seconds:.2,rows:[{world:'R',mode:'S',disabled_rules:[]}],transitions:[],limitation:'工程检查，不判定验收'};
+run('render(data)');
+assert.equal(run('report'),previous,'quick probes must preserve the last acceptance report');
+assert.match(elements['check-summary'].textContent,/快速检查通过.*复用缓存/);
+assert.match(elements['check-details'].children[0].textContent,/不判定验收/);
+box.data={format:'obsession.cache-screen/1',decision:'early_reject',cells:{},coverage:{'S×R':{completed:30,required:30}},elapsed_seconds:1,
+ gates:{L1:{status:'未达',failures:['S×R: p_order=.54 < .60'],missing:['H×R']}},limitation:'只读缓存'};
+run('render(data)');
+assert.match(elements['check-summary'].textContent,/缓存已证实验收差项/);
+assert.match(elements.gates.children[0].children[0].textContent,/未达/);
+run('busy(true)');for(const id of ['quick','screen','run','matrix'])assert.equal(elements[id].disabled,true);
+run('busy(false)');
 assert.throws(()=>run('render({unexpected:true})'),/不是痴迷传播验收报告/);
 console.log('Acceptance workbench checks passed: actual DOM ids, single/matrix render, K details, W ancestry and seed switching.');

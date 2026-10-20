@@ -10,13 +10,15 @@
 <label for="mode">事件配置</label><select id="mode"><option value="S">S · 关闭事件</option><option value="H">H · 历史事件</option><option value="G">G · 通用事件</option><option value="F">F · 混合事件</option></select>
 <div class="row"><div><label for="seed">固定种子</label><input id="seed" type="number" min="0" max="29" value="0"></div></div>
 <label><input id="fit-only" type="checkbox" checked> 参数探索只显示拟合集</label>
-<details open><summary>三个商品共用参数</summary><div id="params" class="params"></div></details>
-<div class="row"><button id="run" class="primary">运行单次诊断</button><button id="matrix">完整 30 种子验收</button><button id="cancel" hidden>取消</button></div>
+<details><summary>三个商品共用参数</summary><div id="params" class="params"></div></details>
+<div class="row"><button id="quick" class="primary">快速检查</button><button id="screen">缓存筛查</button><button id="run">单次全时段诊断</button><button id="cancel" hidden>取消</button></div>
+<details><summary>阶段性完整验收</summary><p class="muted">稳定版本或发布候选再执行八格 × 30 种子及逐事件消融，可能耗时数小时。先筛查缓存；已有完整格证明必要门槛失败时自动停止。</p><label><input id="force-full" type="checkbox"> 即使已有差项，仍补齐完整矩阵</label><button id="matrix">运行完整 30 种子验收</button></details>
 <progress id="progress" hidden></progress><p id="status" class="status">连接本地模拟服务…</p><p id="errors"></p>
 <div class="row"><button id="refresh">导入新增存档</button><button id="reload">读取验收报告</button></div>
-<p class="muted">完整验收会开启留出集，执行六格矩阵、逐事件消融和混合配置检查。观察者世界只计算到最后一档。</p></section>
+<p class="muted">日常默认只跑两个月工程检查，复用同版本结果；缓存筛查不启动模拟。完整验收会开启留出集。观察者世界只计算到最后一档。</p></section>
 <section class="card"><h2>世界输入</h2><div id="worlds" class="muted">尚未加载</div><details><summary>证据与冻结</summary><p id="frozen" class="mono"></p><a href="../20_Acceptance_Matrix_Spec.md">验收规格</a> · <a href="../19_Next_Round_Mechanisms.md">机制计划</a></details></section>
 </aside><main>
+<section class="card"><div class="row"><h2>日常验证</h2><button id="download-check">导出检查结果</button></div><div id="check-summary" class="status">快速检查覆盖初始化与开关；缓存筛查只证明差项，不证明闸门通过。</div><div id="check-details"></div></section>
 <section class="card"><h2>验收闸门</h2><div class="gates" id="gates"><div class="empty">载入矩阵后逐项判定；缺项保持“无法判定”。</div></div><div id="gate-details"></div></section>
 <section class="card"><h2>配置 × 世界</h2><table class="matrix"><thead><tr><th>配置</th><th>R · 史实时间线</th><th>O · 观察者世界</th></tr></thead><tbody id="cells"></tbody></table><p class="muted">R 同时报年份与 K 条；O 仅报条件规律、传播健全性和事件落点。数字取固定 30 次中位数，O 的 K 条少于 3 条时保持无法判定。</p></section>
 <section class="card"><div class="row"><h2>运行详情</h2><select id="detail-cell" aria-label="配置与世界" style="width:auto"></select><select id="detail-seed" aria-label="查看种子" style="width:auto"></select><select id="good" style="width:auto"><option value="coffee">咖啡</option><option value="tea">茶</option><option value="tobacco">烟草</option></select><button id="download">导出 JSON</button><button id="import">载入报告</button><input id="report-file" type="file" accept=".json" hidden></div><div id="replays" class="row"></div>
@@ -27,11 +29,11 @@
 <script>
 'use strict';
 const $=id=>document.getElementById(id), percent=v=>v==null?'无法判定':(v*100).toFixed(1)+'%', num=v=>v==null?'无法判定':Number(v).toFixed(2), label={coffee:'咖啡',tea:'茶',tobacco:'烟草'};
-let report=null,job=null,config=null;
+let report=null,checkReport=null,job=null,config=null;
 const paramNames={rho:'保留率 ρ',p:'邻接传播 p',delta:'写回容差 δ',hold_T:'保持期 T（月）',decay_factor:'月退潮因子',habit_floor:'习俗保留 κ',theta:'来源门槛 θ',lambda_contact:'接触风险率 λ',lambda_ownership:'所有权回流率',affinity_strength:'亲和档案强度',contact_amount:'入口强度 a',preemption:'先占强度',internal_rate:'市场内通道',road_scale:'道路倍率'};
 function node(tag,text,cls){const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const data=await r.json();if(!r.ok)throw Error(data.error||r.status);return data;}
-function busy(on){for(const id of ['run','matrix','refresh'])$(id).disabled=on;$('cancel').hidden=!on;$('progress').hidden=!on;}
+function busy(on){for(const id of ['quick','screen','run','matrix','refresh'])$(id).disabled=on;$('cancel').hidden=!on;$('progress').hidden=!on;}
 function fillParams(values){$('params').replaceChildren();for(const [k,v] of Object.entries(values||{})){const box=node('div'),l=node('label',paramNames[k]||k),input=node('input');input.type='number';input.step='any';input.value=v;input.dataset.key=k;l.htmlFor='param-'+k;input.id=l.htmlFor;box.append(l,input);$('params').append(box);}}
 function params(){return Object.fromEntries([...$('params').querySelectorAll('input')].map(n=>[n.dataset.key,Number(n.value)]));}
 function currentRuns(){if(!report)return [];if(report.cells){const c=report.cells[$('detail-cell').value];return c?.runs||[];}return [report];}
@@ -45,7 +47,15 @@ function showCases(k){const r=currentRuns()[Number($('detail-seed')?.value||0)]|
  const table=node('table',null,'details'),header=node('tr');for(const text of ['国家索引','t₀','t₁','结果','原因'])header.append(node('th',text));table.append(header);
  for(const c of (k.cases||[]).slice(0,200)){const tr=node('tr');for(const value of [c.country==null?'市场':(r.country_labels?.[c.country]||c.country)+' · #'+c.country,c.t0==null?'—':(1337+c.t0/12).toFixed(1),c.t1==null?'尚未到达':(1337+c.t1/12).toFixed(1),c.status,c.reason||''])tr.append(node('td',String(value)));table.append(tr);}$('cases').replaceChildren(table);
 }
+function renderCheck(data){checkReport=data;$('check-details').replaceChildren();
+ const quick=data.format==='obsession.quick-check/1';
+ $('check-summary').textContent=(quick?(data.passed?'快速检查通过':'快速检查失败'):(data.decision==='early_reject'?'缓存已证实验收差项':'缓存尚不足以判定'))+' · '+Number(data.elapsed_seconds||0).toFixed(2)+' 秒'+(data.cached?' · 复用缓存':'');
+ $('check-details').append(node('p',data.limitation,'muted'));
+ if(quick){$('check-details').append(node('p',`${data.rows.length} 项短程检查 · ${data.transitions.length} 项世界更新 · 不执行历史年份计分`));for(const row of data.rows)$('check-details').append(node('span',`${row.world.split(':')[0]} / ${row.mode} / ${row.disabled_rules.join(',')||'基础'} ✓ `,'badge'));}
+ else{for(const [name,c] of Object.entries(data.coverage||{}))$('check-details').append(node('span',`${name} ${c.completed}/${c.required} `,'badge'));for(const g of Object.values(data.gates||{}))for(const failure of g.failures||[])$('check-details').append(node('p',failure,'bad'));}}
 function render(data){
+ if(data?.format==='obsession.quick-check/1'){renderCheck(data);return;}
+ if(data?.format==='obsession.cache-screen/1')renderCheck(data);
  if(!data||(!data.cells&&!Array.isArray(data.K)))throw Error('不是痴迷传播验收报告');
  report=data;if(data.params)fillParams(data.params);$('detail-cell').replaceChildren();if(data.worlds){$('worlds').replaceChildren();for(const w of data.worlds)$('worlds').append(node('p',w.id.slice(0,8)+' · '+w.dates.length+' 档 · '+w.dates[0]+' → '+w.dates.at(-1)));$('frozen').textContent='冻结 '+(data.frozen_valid?'有效':'已变化')+'\n'+data.frozen_hash;}
  for(const key of Object.keys(data.cells||{'单次诊断':data}))$('detail-cell').append(new Option(key,key));
@@ -58,15 +68,16 @@ function render(data){
 }
 function seedOptions(){const options=currentRuns();$('detail-seed').replaceChildren();options.forEach((r,i)=>$('detail-seed').append(new Option('seed '+(r.seed??i),String(i))));}
 async function poll(){if(!job)return;try{const r=await api('/api/jobs/'+job);$('status').textContent=r.progress||`${r.status} · ${r.month? (1337+r.month/12).toFixed(0)+' 年':''}`;if(r.status==='running'){setTimeout(poll,1200);return;}busy(false);job=null;if(r.status==='failed')throw Error(r.error);if(r.result)render(r.result);else if(r.status==='cancelled')$('status').textContent='已取消；已完成的验收运行保留为可续算检查点。';else await loadReport();}catch(e){busy(false);$('errors').textContent=e.message;job=null;}}
-async function start(action){$('errors').textContent='';try{busy(true);const r=await api('/api/structural',{action,world:$('world').value,mode:$('mode').value,seed:Number($('seed').value),params:params(),fit_only:$('fit-only').checked});job=r.id;poll();}catch(e){busy(false);$('errors').textContent=e.message;}}
-async function loadReport(){try{render(await api('/api/acceptance'));$('status').textContent='已载入最近完整矩阵。';}catch(e){$('errors').textContent=e.message;}}
+async function start(action){$('errors').textContent='';try{busy(true);const r=await api('/api/structural',{action,world:$('world').value,mode:$('mode').value,seed:Number($('seed').value),params:params(),fit_only:$('fit-only').checked,force_full:$('force-full').checked});job=r.id;poll();}catch(e){busy(false);$('errors').textContent=e.message;}}
+async function loadReport(){try{const data=await api('/api/acceptance');render(data);$('status').textContent=data.complete_protocol===false?'已载入部分缓存筛查；缺失项目尚未执行。':'已载入最近矩阵。';}catch(e){$('errors').textContent=e.message;}}
 async function init(){
  const embedded=document.getElementById('obsession-acceptance-data');
- if(embedded){try{render(JSON.parse(embedded.textContent));$('status').textContent='离线验收报告；可切换商品与案例并导出数据。';for(const id of ['run','matrix','refresh','reload'])$(id).disabled=true;return;}catch(e){$('errors').textContent=e.message;return;}}
+ if(embedded){try{render(JSON.parse(embedded.textContent));$('status').textContent='离线报告；可查看已有结果并导出数据。';for(const id of ['quick','screen','run','matrix','refresh','reload'])$(id).disabled=true;return;}catch(e){$('errors').textContent=e.message;return;}}
  try{config=await api('/api/structural-config');fillParams(config.params);
  $('worlds').replaceChildren();for(const w of config.worlds){$('world').append(new Option('O · '+w.id.slice(0,8)+' · 至 '+w.last_date,'O:'+w.id));$('worlds').append(node('p',w.id.slice(0,8)+' · '+w.snapshots+' 档 · '+w.first_date+' → '+w.last_date));}if(!config.worlds.length)$('worlds').textContent='尚无正式导出快照。点“导入新增存档”。';$('frozen').textContent='冻结 '+(config.frozen_valid?'有效':'已变化')+'\n'+config.frozen_hash;$('status').textContent='本地服务已连接。单次诊断不代表闸门通过。';$('coverage').textContent='O 世界按上一档阶梯保持；R 的市场边界使用近开局观察值。';try{render(await api('/api/acceptance'));}catch{}}
  catch(e){$('status').textContent='请从本地模拟服务打开此页。';$('errors').textContent=e.message;}}
-$('run').onclick=()=>start('run');$('matrix').onclick=()=>start('matrix');$('refresh').onclick=()=>start('refresh');$('reload').onclick=loadReport;$('cancel').onclick=()=>job&&api('/api/jobs/'+job+'/cancel',{});$('detail-cell').onchange=()=>{seedOptions();details();};$('detail-seed').onchange=details;$('good').onchange=details;
+$('quick').onclick=()=>start('quick');$('screen').onclick=()=>start('screen');$('run').onclick=()=>start('run');$('matrix').onclick=()=>start('matrix');$('refresh').onclick=()=>start('refresh');$('reload').onclick=loadReport;$('cancel').onclick=()=>job&&api('/api/jobs/'+job+'/cancel',{});$('detail-cell').onchange=()=>{seedOptions();details();};$('detail-seed').onchange=details;$('good').onchange=details;
+$('download-check').onclick=()=>{if(!checkReport)return;const url=URL.createObjectURL(new Blob([JSON.stringify(checkReport,null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='obsession-check.json';a.click();URL.revokeObjectURL(url);};
 $('download').onclick=()=>{if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='obsession-acceptance.json';a.click();URL.revokeObjectURL(url);};
 $('import').onclick=()=>$('report-file').click();
 $('report-file').onchange=async()=>{try{const file=$('report-file').files[0];if(file)render(JSON.parse(await file.text()));}catch(e){$('errors').textContent=e.message;}};

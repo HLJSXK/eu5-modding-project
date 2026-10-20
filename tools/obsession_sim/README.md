@@ -4,21 +4,28 @@
 
 ## 三层模型与正式验收
 
-先导出存档，再运行拟合集扫描、分层对照与完整矩阵：
+日常修改默认跑快速检查。完整矩阵仅在机制稳定或发布候选时运行一次，不在每次修复、文档或可视化调整后重跑：
 
 ```powershell
 $env:PYTHONUTF8='1'
 $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 & $env:EU5_PYTHON -m tools.eu5_save_parser.world_export --archive data/saves/observer_archive --out tmp/obsession_worlds
 & $env:EU5_PYTHON -m tools.obsession_sim.experiment freeze-check
-& $env:EU5_PYTHON -m tools.obsession_sim.experiment scan --seeds 0 --params <shared-params.json> --workers 3
-& $env:EU5_PYTHON -m tools.obsession_sim.experiment stages --seeds 0 --params <shared-params.json> --omit-wc
-& $env:EU5_PYTHON -m tools.obsession_sim.experiment matrix --params <shared-params.json> --workers 3
+& $env:EU5_PYTHON docs/design/obsession/experiments/run_structural_validation.py
+& $env:EU5_PYTHON docs/design/obsession/experiments/run_structural_validation.py screen
+# 阶段性验收；已知必要门槛失败时自动停止，返回码 2
+& $env:EU5_PYTHON docs/design/obsession/experiments/run_structural_validation.py matrix --workers 6
 & $env:EU5_PYTHON -m tools.obsession_sim.experiment run --world R --mode H --seeds 0 --params <shared-params.json> --omit-wc --frames 12
 & $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8766
 ```
 
-打开 `/docs/design/obsession/experiments/structural_workbench.html`。工作台可编辑三个商品的共同参数、选择世界与 S/H/G/F、运行或取消、导入新增存档、查看 K 案例和区域结果、导入导出报告，并打开真实地图回放。单次诊断默认只显示拟合集；完整矩阵固定种子 0–29。地图随存档阶梯更新归属与市场，详情标注首次成员的父来源类型。
+打开 `/docs/design/obsession/experiments/structural_workbench.html`。首要操作为“快速检查”和“缓存筛查”；完整验收移到折叠的阶段性操作中。工作台保留共同参数、世界与 S/H/G/F、单次诊断/取消、新增存档导入、K 案例/区域结果及地图回放。快速结果独立显示，不覆盖先前验收数据。单次诊断默认只显示拟合集；完整矩阵固定种子 0–29。
+
+`quick`（无参数默认）：在真实图上跑八种 R/O×S/H/G/F 初始化、六个 R 结构开关，每项仅两个月，再检查首个 O 快照更新。只读取 O 前两档，免去短程检查原先仍遍历全部 67 档的开销；不做历史目标计分、不导出地图。实测首次约 12.4 秒，同图/参数/冻结输入/运行时/检查器版本复用检查缓存。它不是历史验收。
+
+`screen`：只读取精确身份匹配的 R 缓存，不启动新模拟；每格必须齐全 30 个种子，旧运行时、短程、拟合集或消融结果均不混用。实测约 0.82 秒（含 Python 启动和输入准备约 2.7 秒）。必要门槛已失败时返回 2；缓存不足时明确无法判定，永不报告通过。当前 S×R 的 30 个种子顺序中位数 0.5376 < L1 的 0.6，所以默认 `matrix` 直接保留差项并停止。确需补齐研究数据时用 `matrix --force-full`；网页有对应复选框。
+
+数值逻辑修改仍需运行 `python -m pytest tools/obsession_sim -q`，前端修改运行相应 Node 检查。本次 Python 共 121 项及 33 个子测试，用时约 22 秒；两组 Node 检查通过。这个工程回归层与数小时的全时段历史验收分开执行。
 
 - `worlds.py`：R = 1337 引擎人口/所有权/道路/官方文化宗教，加有来源的跨商品世界事实；市场边界使用近开局观察快照，属于公开的近似。O = 真实存档序列，取前一档，运行只到最后观察月。
 - `structural.py`：读取世界状态的商人常驻、所有权、同市场、道路、先占和条件事件。商品贸易数量不进入动力学。开局习俗先保持静止，新增结构联系开启最长百年波次；各商品共享 480,000 U 月额度。
@@ -29,9 +36,9 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 
 冻结输入在本目录的 `acceptance_spec.json`、`regional_targets.json`、`world_facts.json`、`world_priors.json`、`structural_config.json`；`frozen_manifest.json` 保存逐版修改原因。结果和大体积世界/回放在 `tmp/obsession_structural/` 与 `tmp/obsession_worlds/`，不会写入原始存档。实现与验收记录见设计 [21](../../docs/design/obsession/21_Structural_Implementation_Results.md)。以下第 1–11 节主要描述原始核心和旧静态研究接口。
 
-本轮冻结流程可用 `docs/design/obsession/experiments/run_structural_validation.py` 复跑：`fit` 执行 49 候选及前六组的三种子确认；提交选参文件后，`matrix` 执行八格各 30 种子与历史事件消融，`checks` 执行分层及 W-C/酒习俗对照，`replays` 导出两份三商品地图回放。默认 6 个进程；参数选择提交、冻结哈希或代码哈希不匹配时停止。
+本轮冻结流程用 `docs/design/obsession/experiments/run_structural_validation.py` 复跑：默认 `quick`，`screen` 只看已有检查点。`fit` 执行 49 候选及前六组的三种子确认；当前选参已经完成，不再重选。`matrix` 先筛查已完成格，必要时才继续八格各 30 种子与历史事件消融；`checks` 的全时段分层及 W-C/酒对照、`replays` 的两份三商品地图回放也只在阶段性节点显式执行。完整计算默认 6 个进程；正式矩阵的选参提交、冻结哈希或代码哈希不匹配时停止。
 
-本轮校准源码可在提交 `3fe7bcb3` 或运行时源码归档中复现。当前源码随后修复了仅在酒习俗移除对照中执行的空种子分支；选参日志分别记录校准与正式运行时，参数没有重选，正式矩阵在修复后的代码下全部重算。`matrix/checks/replays` 默认使用日志绑定的冻结观察者副本，也可显式传入 `--observer`。
+本轮校准源码可在提交 `3fe7bcb3` 或运行时源码归档中复现。当前源码随后修复了酒习俗移除对照的空种子分支；参数没有重选。纠错后的完整矩阵按用户要求停止在 S×R 30 次、H×R 6 次，不宣称全部完成。快速流程和网页改动不改变数值运行时哈希，因此已完成的正式缓存继续有效。默认验证使用选参日志绑定的冻结观察者副本，也可显式传入 `--observer`。
 
 ## 1. 它模拟什么
 
