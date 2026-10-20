@@ -158,6 +158,21 @@ def chain_world(n=9):
     return g,s
 
 
+def test_wine_removal_uses_an_empty_seed_collection_and_removes_preemption():
+    g,s=tiny_world();cfg=deepcopy(CONFIG)
+    cfg['initial_customs']['wine']=[dict(where={'continent':'europe'},value=30)]
+    baseline=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=2)
+    assert baseline.context_goods['wine'].eff(1)==30
+    assert baseline.preemption_load('coffee',1)>0
+    cfg['disabled_rules']=['wine']
+    removed=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=2)
+    assert removed.context_goods['wine'].P.initial_values==[]
+    assert not any(removed.context_goods['wine'].x)
+    assert removed.preemption_load('coffee',1)==0
+    removed.run()
+    assert not any(removed.context_goods['wine'].x)
+
+
 def test_constant_weighted_sources_remain_exactly_on_their_threshold():
     x=np.array([45.,45.,45.]);population=np.array([.1,.2,.3]);groups=np.array([0,0,0])
     mean,_=weighted_means(x,groups,population,1)

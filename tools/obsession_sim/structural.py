@@ -422,7 +422,7 @@ class StructuralRun:
         # An unqueued 1337 wine custom is still the single x of another good,
         # rather than an additional resistance variable attached to coffee.
         # Its uncertain magnitude is exposed and removed in the prior ablation.
-        wine = opening_values("wine",graph,self.state,config) if "wine" not in self.disabled_rules else [0.]*graph.n
+        wine = opening_values("wine",graph,self.state,config) if "wine" not in self.disabled_rules else []
         wine_graph = simulation_graph(graph)
         wine_graph.owner = self.state.owner.tolist()
         wine_graph.group_names = list(timeline.country_names)
