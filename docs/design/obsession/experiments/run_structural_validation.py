@@ -74,6 +74,38 @@ def selected(exp):
     return json.loads((ROOT/paths[0]).read_text(encoding='utf-8'))
 
 
+def jointfit(exp, workers):
+    protocol = json.loads(Path(__file__).with_name('structural_joint_fit_protocol.json').read_text(encoding='utf-8'))
+    assert protocol['runtime_hash'] == exp.runtime_hash and protocol['frozen_hash'] == exp.frozen_hash
+    candidates = {}
+    for name in protocol['studies']:
+        study = json.loads((ROOT/name).read_text(encoding='utf-8'))
+        assert study['runtime_hash'] == exp.runtime_hash and study['frozen_hash'] == exp.frozen_hash
+        for row in study['finalists']:
+            candidates[json.dumps(row['params'], sort_keys=True)] = row
+    finalists = sorted(candidates.values(), key=rank)[:protocol['finalist_count']]
+    runs = exp.many([dict(world='R', mode='H', seed=s, params=row['params'], fit_only=True, omit_wc=True)
+                     for row in finalists for s in protocol['seeds']], workers=workers)
+    rows = []
+    n = len(protocol['seeds'])
+    for i, candidate in enumerate(finalists):
+        historical = record(exp, candidate['params'], runs[i*n:(i+1)*n])
+        s, h = candidate['metrics'], historical['metrics']
+        ratios = [s['fit_p_order']/.6, h['fit_within_2tol']/.5, h['fit_p_order']/.7,
+                  (h['p_K'] or 0)/.6, (h['p_unseeded'] or 0)/.5, (h['p_conn'] or 0)/.95]
+        rows.append(dict(params=candidate['params'], structural=candidate, historical=historical,
+                         violations=s['violation_count']+h['violation_count'],
+                         budget_over=max(s['peak_U'],h['peak_U'])>480000, minimum_ratio=min(ratios)))
+    rows.sort(key=lambda r:(r['violations'],r['budget_over'],-r['minimum_ratio'],
+                           -r['historical']['metrics']['fit_within_2tol']))
+    assert code_hash() == exp.runtime_hash
+    result = dict(format='obsession.joint-fit-selection/1', runtime_hash=exp.runtime_hash,
+                  frozen_hash=exp.frozen_hash, protocol=protocol, candidates=rows, recommended=rows[0],
+                  limitation='Fit-only search diagnostics; no L1 claim and no holdout outcomes read.')
+    atomic_json(exp.out/'joint_fit_comparison.json',result)
+    print(json.dumps(result['recommended'], ensure_ascii=False), flush=True)
+
+
 def checks(exp, params, workers):
     stages = [('inherent', ['contact', 'preemption', 'ownership', 'roads', 'market']),
               ('contact', ['preemption', 'ownership', 'roads']),
@@ -93,7 +125,7 @@ def checks(exp, params, workers):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('action', choices=['fit', 'matrix', 'checks', 'replays'])
+    ap.add_argument('action', choices=['fit', 'jointfit', 'matrix', 'checks', 'replays'])
     ap.add_argument('--workers', type=int, default=6)
     ap.add_argument('--protocol', type=Path, default=Path(__file__).with_name('structural_fit_protocol.json'))
     ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_structural')
@@ -102,6 +134,8 @@ if __name__ == '__main__':
                      ROOT/'.eu5-base/reference_game_files/game', args.out)
     if args.action == 'fit':
         fit(exp, args.workers, args.protocol)
+    elif args.action == 'jointfit':
+        jointfit(exp, args.workers)
     else:
         params = selected(exp)
         if args.action == 'matrix':
