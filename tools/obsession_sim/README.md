@@ -1,6 +1,31 @@
 # obsession_sim：痴迷扩散离线模拟核心
 
-更新：2026-10-19。这是「痴迷」系统现行方案的 Python 参考实现，用来在真实地图上校准扩散速度、检查历史落点和估算每月计算量。设计规格见 `docs/design/obsession/02`、`10`；本工具与设计不一致时，以设计为准并修工具。
+更新：2026-10-20。这是「痴迷」系统的 Python 离线参考实现。现行三层实验按设计 19/20 运行；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+
+## 三层模型与正式验收
+
+先导出存档，再运行拟合集扫描、分层对照与完整矩阵：
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
+& $env:EU5_PYTHON -m tools.eu5_save_parser.world_export --archive data/saves/observer_archive --out tmp/obsession_worlds
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment freeze-check
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment scan --seeds 0 --params <shared-params.json> --workers 3
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment stages --seeds 0 --params <shared-params.json> --omit-wc
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment matrix --params <shared-params.json> --workers 3
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment run --world R --mode H --seeds 0 --params <shared-params.json> --omit-wc --frames 12
+& $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8766
+```
+
+打开 `/docs/design/obsession/experiments/structural_workbench.html`。工作台可编辑三个商品的共同参数、选择世界与 S/H/G/F、运行或取消、导入新增存档、查看 K 案例和区域结果、导入导出报告，并打开真实地图回放。单次诊断默认只显示拟合集；完整矩阵固定种子 0–29。地图随存档阶梯更新归属与市场，详情标注首次成员的父来源类型。
+
+- `worlds.py`：R = 1337 引擎人口/所有权/道路/官方文化宗教，加有来源的跨商品世界事实；市场边界使用近开局观察快照，属于公开的近似。O = 真实存档序列，取前一档，运行只到最后观察月。
+- `structural.py`：读取世界状态的商人常驻、所有权、同市场、道路、先占和条件事件。商品贸易数量不进入动力学。开局习俗先保持静止，新增结构联系开启最长百年波次；各商品共享 480,000 U 月额度。
+- `conditional.py` / `acceptance.py`：K1–K7、删失、人口加权区域中位数、反作弊指标、逐项闸门。K3 未设计；缺少独立第二局时 L3 不能宣称通过。
+- `experiment.py`：版本化输入、代码/世界/参数哈希、可续算检查点、拟合集扫描、30 种子矩阵和逐历史事件消融。正式 R 排除 W-C；`run --disable-rules wine` 支持移除酒习俗先占的敏感性检查。
+
+冻结输入在本目录的 `acceptance_spec.json`、`regional_targets.json`、`world_facts.json`、`world_priors.json`、`structural_config.json`；`frozen_manifest.json` 保存逐版修改原因。结果和大体积世界/回放在 `tmp/obsession_structural/` 与 `tmp/obsession_worlds/`，不会写入原始存档。实现与验收记录见设计 [21](../../docs/design/obsession/21_Structural_Implementation_Results.md)。以下第 1–11 节主要描述原始核心和旧静态研究接口。
 
 ## 1. 它模拟什么
 

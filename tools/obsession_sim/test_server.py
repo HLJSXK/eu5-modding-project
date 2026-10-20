@@ -15,10 +15,30 @@ from .graph import from_adjacency, hex_grid, save_json, voronoi_groups
 from .presets import make_params
 from .scenario import apply_scenario
 from . import server as runner_server
+from . import experiment as experiment_runner
 from .server import build_server
 
 
 class ServerTests(unittest.TestCase):
+    def test_structural_api_validates_and_dispatches_shared_parameters(self):
+        invalid=[{"params":{"p":True}},{"params":{"lambda_contact":11}},{"params":{"hold_T":1.2}},
+                 {"world":"O:missing"},{"seed":30},{"mode":"bad"},{"fit_only":1},{"command":"bad"}]
+        with patch.object(self.server,"structural_config",return_value={"worlds":[]}):
+            for value in invalid:
+                with self.subTest(value=value):
+                    self.assertEqual(400,self.request("POST","/api/structural",value)[0])
+            with patch.object(experiment_runner,"Experiment") as cls:
+                cls.return_value.one.return_value={"K":[],"world_kind":"R","mode":"S"}
+                status,result=self.request("POST","/api/structural",{"params":{"p":.012,"hold_T":600}})
+                self.assertEqual(202,status)
+                job=self.wait_job(result['id'])
+                self.assertEqual('complete',job['status'])
+                call=cls.return_value.one.call_args
+                self.assertEqual(('R','S',0),call.args)
+                self.assertEqual({'p':.012,'hold_T':600},call.kwargs['params'])
+                self.assertTrue(call.kwargs['fit_only'])
+                self.assertEqual(12,call.kwargs['frames'])
+
     def test_reloading_root_reads_current_frontend_without_restart(self):
         template = Path(self.temp.name) / "viewer.html"
         with patch.object(runner_server, "VIEWER_TEMPLATE", template):

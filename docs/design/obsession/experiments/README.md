@@ -6,6 +6,8 @@
 
 ## 现行基准
 
+三层模型验收使用 [structural_workbench.html](structural_workbench.html)，由本地 Python 服务提供世界导入、参数、运行、取消、完整矩阵与案例查看；正式实现/结果见 [21](../21_Structural_Implementation_Results.md)。`immunity_lock_viz.html` 同时兼容旧静态回放与含动态 `world_frames` 的新回放。
+
 | 文件 | 内容 | 被谁引用 |
 |---|---|---|
 | `ripple_country_clock_study.py` / `_results.json` | 国家级时钟涟漪（T = 240 与 T = 120），1,600 个图 Voronoi 国家。x ≥ 45 的环带由内向外推进，第 1,760 月全图归零；单商品平均 2.75 万 U/月、峰值 12.2 万 | 02 第 8 节、10 第 9 节；`test_core.py` 回归；可视化默认情景 |

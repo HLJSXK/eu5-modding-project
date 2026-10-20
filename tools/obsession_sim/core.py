@@ -99,6 +99,9 @@ class Simulation:
         self.decay_start = [-1] * ng
         self.finished_month = [-1] * ng
         self.S = [1.0] * ng
+        # Shared clock-group parameter. It equals the good's kappa except when
+        # rebasing a lazy scale to preserve one bounded x during ownership IO.
+        self.habit = [params.habit_floor] * ng
         self.decaying = [False] * ng
         self.finished = [False] * ng
         self.members_of = [[] for _ in range(ng)]
@@ -186,7 +189,7 @@ class Simulation:
             return self.x[v] * self.gS
         c = self.owner[v]
         if self.clock and c >= 0 and self.decaying[c]:
-            h = self.P.habit_floor
+            h = self.habit[c]
             if h <= 0:
                 return self.x[v] * self.S[c]
             return self.x[v] * (h + (1 - h) * self.S[c])
@@ -275,6 +278,7 @@ class Simulation:
                             self.U += 4
                     self.join[c] = -1
                     self.S[c] = 1.0
+                    self.habit[c] = self.P.habit_floor
                     self.decaying[c] = self.finished[c] = False
                     self.U += 5
                 for v in row["nodes"]:
@@ -395,7 +399,8 @@ class Simulation:
         d = len(inc)
         old = self.x[v]
         p = self.pp[v]
-        y = self.rho[v] * old
+        p, retention, shared_input = self.local_terms(v, p, self.rho[v])
+        y = retention * old + shared_input
         if self.sources:
             y += self.sources.get(v, 0.0)
             self.U += 2
@@ -438,6 +443,10 @@ class Simulation:
             self.join[c] = min([t] + configured)
             self.U += pr["join_write"]
 
+    def local_terms(self, v, p, retention):
+        """Optional structural rules; default preserves the reference experiments."""
+        return p, retention, 0.0
+
     def _clocks(self, t):
         pr = self.price
         for c in range(self.ng):
@@ -449,11 +458,18 @@ class Simulation:
                 self.decay_start[c] = t
                 self.S[c] = 1.0
             if self.decaying[c]:
-                self.S[c] *= self.P.decay_factor
+                multiplier = self.clock_decay_multiplier(c)
+                self.S[c] *= self.P.decay_factor if multiplier == 1 else self.P.decay_factor ** multiplier
                 self.U += pr["clock_tick"]
-                h = self.P.habit_floor
+                h = self.habit[c]
                 if h > 0:
-                    if self.S[c] < self.P.habit_finish_S:      # settle: keep the custom share, stop ticking
+                    cut = self.P.habit_finish_S
+                    original = self.P.habit_floor
+                    if h != original and 0 < original < 1 and h < 1:
+                        # Convert the original cutoff to the rebased S axis.
+                        cut /= original*(1-h)/(h*(1-original))
+                        self.U += 6
+                    if self.S[c] < cut:      # settle: keep the custom share, stop ticking
                         k = h + (1 - h) * self.S[c]
                         for v in self.members_of[c]:
                             self.U += pr["renorm_per_node"]
@@ -462,6 +478,7 @@ class Simulation:
                         self.S[c] = 1.0
                         self.finished[c] = True
                         self.finished_month[c] = t
+
                 elif self.S[c] < 0.1:
                     alive = False
                     Sc = self.S[c]
@@ -474,6 +491,9 @@ class Simulation:
                     if not alive:
                         self.finished[c] = True
                         self.finished_month[c] = t
+
+    def clock_decay_multiplier(self, country):
+        return 1
 
     def _enter_global_decay(self):
         P = self.P

@@ -208,6 +208,7 @@ figure .cap i.dash{background:repeating-linear-gradient(90deg,#6B3F2A 0 4px,tran
 <body>
 <div class="wrap">
   <h1>痴迷扩散实验可视化</h1>
+  <p><a href="/docs/design/obsession/experiments/structural_workbench.html">三层模型 · 动态世界 · 验收矩阵 ↗</a></p>
   <p class="sub">真实 EU5 地图与合成六角网格在同一模拟区域切换，共用参数、播放控制与结果统计。连接本机服务后调整参数并用 Python 核心重算；导出结果可断网回放。历史浏览器实验与自动回归对照保留在折叠区。U 是离线抽象计数，系数是测试值。</p>
 
   <div class="grid">
@@ -972,6 +973,7 @@ let PB = null, pbIdx = 0, pbPlaying = false, pbRaf = 0;
 let pbRaster = null, pbImage = null, pbBorderImage = null, pbGeo = null, pbHover = -1;
 let pbMissingNodes = [];
 let pbOwnerIds = [];
+let pbWorldIndex = -1;
 let pbView = {zoom:1, dx:0, dy:0}, pbTransform = null, pbDrag = null, pbImageKey = "";
 const PBCOL = (() => { const out = [];
   for (let code = 0; code < 14; code++) { const st = code % 7; let c = SRGB[st];
@@ -1018,7 +1020,7 @@ function pbLoad(obj) {
   }
   clearTimeout(pbRaf); pbPlaying = false; $("pb-play").textContent = "播放";
   const previous = PB;
-  PB = obj; pbIdx = 0;
+  PB = obj; pbIdx = 0; pbWorldIndex = -1;
   const intro=document.querySelector?.('.sub');
   if(intro)intro.textContent=`${PB.title||'扩散模拟'}。${PB.preview?'当前为起点预览，尚未完整计算。':'当前显示此地图已计算的回放。'}真实地图与合成六角网格共用参数、播放与统计；历史实验保留在折叠区。`;
   pbGeo = geo || null; pbRaster = raster; pbImage = null; pbImageKey = ""; pbHover = -1; pbView = {zoom:1, dx:0, dy:0};
@@ -1033,7 +1035,7 @@ function pbLoad(obj) {
   const meta=PB.graph_meta||{},unowned=pbOwnerIds.filter(id=>id<0).length;
   const sourceYear=meta.source_year??(meta.source_date&&String(meta.source_date).match(/^\d{1,4}/)||[])[0];
   $("pb-meta").textContent = (pbPayloadMap()==='hex'?`合成六角网格 · ${PB.graph_meta?.width??117} × ${PB.graph_meta?.height??116}，${fmt(PB.nodes)} 个节点；用于在相同 Python 核心下对照传播系数。`:pbGeo ? `EU5 地点轮廓 · ${pbGeo.width} × ${pbGeo.height} 显示采样；传播使用导入的地点邻接图，显示分辨率不改变图拓扑。细小地点以中心点补充。` : "坐标点图（此回放没有真实地图轮廓）。")+
-    (meta.kind==="eu5_map"||meta.owner_source?`\n地图快照：${meta.source_date||"日期未声明"}；来源年份：${sourceYear??"未声明"}；归属来源：${meta.owner_source||"未声明"}。${fmt(PB.nodes)} 个地点，${fmt(unowned)} 个无主地点。归属是静态快照，不随模拟年份更新。`:"")+
+    (meta.kind==="eu5_map"||meta.owner_source?`\n地图快照：${meta.source_date||"日期未声明"}；来源年份：${sourceYear??"未声明"}；归属来源：${meta.owner_source||"未声明"}。${fmt(PB.nodes)} 个地点，${fmt(unowned)} 个无主地点。${PB.world_frames?.length?"归属与市场随世界快照阶梯更新。":"归属是静态快照，不随模拟年份更新。"}`:"")+
     `\n时钟分组：${meta.clock_group||"owner（国家）"}；模拟起年：${PB.start_year??"未声明"}。`;
   pbMilestones();
   $("pb-msg").textContent = "";
@@ -1125,8 +1127,23 @@ function pbRasterImage() {
   }
   g.putImageData(im,0,0);pbImage=c;
 }
+function pbApplyWorld() {
+  if (!Array.isArray(PB.world_frames) || !PB.world_frames.length) return;
+  const month = pbFrame().month;
+  let index = 0;
+  for (let i=1;i<PB.world_frames.length && PB.world_frames[i].month<=month;i++) index=i;
+  if(index===pbWorldIndex) return;
+  const state=PB.world_frames[index];
+  if(!Array.isArray(state.owner)||state.owner.length!==PB.nodes) throw new Error("动态世界归属列无效");
+  pbWorldIndex=index; PB.group=state.owner;
+  PB.attrs=PB.attrs||{};
+  PB.attrs.owner_tag=state.owner.map(c=>c<0?null:(state.group_labels?.[c]||PB.group_names?.[c]||String(c)));
+  PB.attrs.market=state.market;
+  pbOwnerIds=state.owner;pbImage=null;pbImageKey="";pbBuildBorders();
+}
 function pbDraw() {
   if (!PB) return;
+  pbApplyWorld();
   const c = $("pb-map"), W = c.clientWidth || 600;
   const [x0, y0, x1, y1] = pbGeo ? pbGeo.bounds : PB.bounds, bw = Math.max(1e-9, x1 - x0), bh = Math.max(1e-9, y1 - y0);
   const H = Math.round(Math.max(280,Math.min(660,W * bh / bw))), dpr = devicePixelRatio || 1;
@@ -1175,8 +1192,11 @@ function pbDetails() {
   const arrivalText=time=>time==null?"无记录":time<0?"本轮尚未达到":`${pbDate(time)}（第 ${time} 月${time>month?"，当前尚未到达":""}）`;
   const arrival=arrivalText(t),thresholds=PB.threshold_arrival||{};
   const reached=[['首次非零 x>0',PB.first_positive&&PB.first_positive[v]],['首次 x≥20',thresholds['20']&&thresholds['20'][v]],['首次 x≥45',thresholds['45']&&thresholds['45'][v]],['首次 x≥70',thresholds['70']&&thresholds['70'][v]]];
+  const kinds={opening:'开局习俗',adjacency:'邻接',contact:'商人常驻接触',ownership:'所有权回流',event:'条件事件',origin:'发源输入',market:'同市场输入',seed:'种子'};
+  const parent=PB.arrival_kind?.[v];
   $("pb-detail").textContent=`${pbName(v)}${PB.names&&PB.names[v]&&PB.names[v]!==pbName(v)?" · "+PB.names[v]:""}\n国家：${pbOwner(v)}　Area：${area}　Region：${region}\n时钟组：${clockName}\n当前：${STAGES[code%7][2]}${code>=7?" · 退潮中":""}\n首次 x≥1：${arrival}\n`+reached.map(([label,time])=>`${label}：${arrivalText(time)}`).join("\n")+
-    (join!=null&&join>=0?`\n时钟组入场：${pbDate(join)}；退潮起点：${decay!=null&&decay>=0?pbDate(decay):"未触发"}`:"")+pbRefDetail(v);
+    (parent?`\n首次成为成员的父来源：${kinds[parent]||parent}`:"")+
+    (join!=null&&join>=0?`\n最后一波时钟记录：入场 ${pbDate(join)}；退潮起点 ${decay!=null&&decay>=0?pbDate(decay):"未触发"}`:"")+pbRefDetail(v);
 }
 function pbLegend() {
   const box=$("pb-legend");box.replaceChildren();
@@ -1186,7 +1206,7 @@ function pbLegend() {
     for(const [color,text] of labels){const span=document.createElement("span"),swatch=document.createElement("i");swatch.style.background=color;span.append(swatch,document.createTextNode(text));box.append(span);}
     if(ref){const span=document.createElement("span");span.append(document.createTextNode(`比较首次 x≥1 月份：本次 #${pbCurrentRun||"?"} 对基准 #${pbRefId}`));box.append(span);}
     return;}
-  const labels=mode==="intensity"?STAGES.map((s,i)=>[PBCOL[i],s[2]]).concat([[PBCOL[11],"退潮偏灰"]]):mode==="arrival"?[["hsl(220 55% 48%)",`早 · ${pbDate(0)}`],["hsl(10 55% 48%)",`晚 · ${pbDate(PB.frames.at(-1).month)}`],["#e1e5e4","当前尚未抵达"]]:[["#a6b19e","颜色区分归属国家；国界按导入快照"],["#c5cec9","无主地点"]];
+  const labels=mode==="intensity"?STAGES.map((s,i)=>[PBCOL[i],s[2]]).concat([[PBCOL[11],"退潮偏灰"]]):mode==="arrival"?[["hsl(220 55% 48%)",`早 · ${pbDate(0)}`],["hsl(10 55% 48%)",`晚 · ${pbDate(PB.frames.at(-1).month)}`],["#e1e5e4","当前尚未抵达"]]:[["#a6b19e","颜色区分归属国家；国界按当前世界快照"],["#c5cec9","无主地点"]];
   for(const [color,text] of labels){const span=document.createElement("span"),swatch=document.createElement("i");swatch.style.background=color;span.append(swatch,document.createTextNode(text));box.append(span);}
 }
 function pbMilestones() {

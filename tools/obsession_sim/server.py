@@ -103,6 +103,90 @@ class RunnerServer(ThreadingHTTPServer):
                     job["cancel"].set()
         super().server_close()
 
+    def structural_config(self):
+        from .experiment import HERE, freeze_status, read_json
+        valid, digest, _ = freeze_status()
+        worlds = []
+        for path in sorted((WORKSPACE / "tmp/obsession_worlds").glob("*/timeline.json")):
+            manifest = read_json(path)
+            snaps = manifest.get("snapshots", [])
+            if snaps:
+                worlds.append({"id": manifest["id"], "snapshots": len(snaps),
+                               "first_date": snaps[0]["date"], "last_date": snaps[-1]["date"]})
+        params=read_json(HERE / "structural_config.json")["params"]
+        selected=HERE/'selected_params.json'
+        if selected.exists():
+            from .structural import validate_params
+            params={**params,**validate_params(read_json(selected)['params'])}
+        return {"params":params, "worlds": worlds,
+                "frozen_valid": valid, "frozen_hash": digest}
+
+    def start_structural(self, request):
+        from .experiment import Experiment, HERE, read_json
+        if not isinstance(request, dict) or set(request) - {"action", "world", "mode", "seed", "params", "fit_only"}:
+            raise ValueError("unknown structural request fields")
+        _finite_json(request)
+        action = request.get("action", "run")
+        if action not in ("run", "matrix", "refresh"):
+            raise ValueError("action must be run, matrix or refresh")
+        mode = request.get("mode", "S")
+        if mode not in ("S", "H", "G", "F"):
+            raise ValueError("invalid structural mode")
+        seed = _number(request.get("seed", 0), "seed", 0, 29, integer=True)
+        world = request.get("world", "R")
+        choices = {"R"} | {"O:"+w["id"] for w in self.structural_config()["worlds"]}
+        if world not in choices:
+            raise ValueError("unknown structural world")
+        params = request.get("params", {})
+        if not isinstance(params, dict):
+            raise ValueError("structural params must be an object")
+        from .structural import validate_params
+        clean = validate_params(params)
+        fit_only = request.get("fit_only", True)
+        if not isinstance(fit_only, bool):
+            raise ValueError("fit_only must be boolean")
+        job = {"id":uuid.uuid4().hex, "kind":"structural", "status":"running", "progress":"准备世界输入…",
+               "cancel":threading.Event()}
+        if not self._claim_slot(job):
+            return None
+        def work():
+            try:
+                if action == "refresh":
+                    from tools.eu5_save_parser.world_export import archive_worlds
+                    def log(message, **_):
+                        if job["cancel"].is_set():
+                            raise InterruptedError("refresh cancelled")
+                        with self.job_lock:
+                            job["progress"] = message
+                    archive_worlds(WORKSPACE / "data/saves/observer_archive", WORKSPACE / "tmp/obsession_worlds", log)
+                    with self.job_lock:
+                        job.update(status="complete", progress="新增存档已导入；刷新页面即可选择。")
+                    return
+                observers = sorted((WORKSPACE / "tmp/obsession_worlds").glob("*/timeline.json"))
+                experiment = Experiment(self.graph_path, observers, WORKSPACE / ".eu5-base/reference_game_files/game",
+                                        WORKSPACE / "tmp/obsession_structural")
+                def progress(value, run=None, **_):
+                    with self.job_lock:
+                        if run is None:
+                            job["progress"] = str(value)
+                        else:
+                            job.update(month=value, progress=f"{mode}×{world.split(':')[0]} · {1337+value/12:.0f} 年")
+                if action == "matrix":
+                    result = experiment.matrix(params=clean,progress=progress,cancel=job["cancel"])
+                else:
+                    result = experiment.one(world,mode,seed,params=clean,fit_only=fit_only,frames=12,
+                                            progress=progress,cancel=job["cancel"])
+                with self.job_lock:
+                    job.update(status="complete", result=result, progress="计算完成；诊断与闸门结论已更新。")
+            except InterruptedError:
+                with self.job_lock:
+                    job.update(status="cancelled", progress="已取消")
+            except Exception as exc:
+                with self.job_lock:
+                    job.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+        threading.Thread(target=work,daemon=True).start()
+        return job["id"]
+
     def prepare(self, request, graph=None):
         """Validate a run request. `graph` lets a sweep reuse one copy: scenario routes are idempotent."""
         if not isinstance(request, dict):
@@ -316,6 +400,12 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == "/api/config":
             self.json_response(200, self.server.config)
+        elif path == "/api/structural-config":
+            self.json_response(200, self.server.structural_config())
+        elif path == "/api/acceptance":
+            report = WORKSPACE / "tmp/obsession_structural/matrix.json"
+            self.json_response(200 if report.exists() else 404,
+                               json.loads(report.read_text(encoding="utf-8")) if report.exists() else {"error":"尚无完整验收矩阵"})
         elif path == "/api/preview":
             choices = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("map", ["real"])
             if len(choices) != 1 or choices[0] not in self.server.previews:
@@ -341,7 +431,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(raw)
                 return
             resolved = (WORKSPACE / unquote(path).lstrip("/")).resolve()
-            allowed = (WORKSPACE / "tmp/obsession_real", WORKSPACE / "docs/design/obsession")
+            allowed = (WORKSPACE / "tmp/obsession_real", WORKSPACE / "tmp/obsession_structural", WORKSPACE / "docs/design/obsession")
             if resolved.suffix.lower() not in (".html", ".css", ".js", ".json") or not any(resolved.is_relative_to(p.resolve()) for p in allowed):
                 self.json_response(403, {"error": "Only obsession viewer artifacts are served"})
                 return
@@ -359,13 +449,15 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError("request body must be 1 to 262144 bytes")
             request = json.loads(self.rfile.read(size).decode("utf-8"))
             path = urlsplit(self.path).path
-            if path in ("/api/run", "/api/sweep"):
+            if path in ("/api/run", "/api/sweep", "/api/structural"):
                 with self.server.job_lock:
                     busy = any(job["status"] == "running" for job in self.server.jobs.values())
                 if busy:
                     self.json_response(409, {"error": "a run is already active; cancel it before starting another"})
                     return
-                if path == "/api/run":
+                if path == "/api/structural":
+                    job_id = self.server.start_structural(request)
+                elif path == "/api/run":
                     job_id = self.server.start_job(self.server.prepare(request))
                 else:
                     job_id = self.server.start_sweep(self.server.prepare_sweep(request))
@@ -406,6 +498,7 @@ def build_server(graph_path, host="127.0.0.1", port=8765, scenario=None, preset=
                 "params": {k: getattr(make_params(preset, **dict(scenario_params, frames_every=12, series_every=12)), k) for k in PUBLIC_PARAMS}}
     server = RunnerServer((host, port), Handler)
     server.graph = graph
+    server.graph_path = Path(graph_path).resolve()
     server.node_index = {name: i for i, name in enumerate(graph.names)}
     server.scenario = deepcopy(scenario)
     hex_graph = hex_grid(117, 116)

@@ -1,5 +1,17 @@
 # EU5 debug-save population parser
 
+## Versioned obsession world exports
+
+`python -m tools.eu5_save_parser.world_export --archive data/saves/observer_archive --out tmp/obsession_worlds`
+reads completed archived text saves without changing them. It resumes existing exports and writes
+`obsession.world-snapshot/2` JSON plus a SHA-256 timeline per playthrough. Outputs include actual
+population, owner/capital, market boundaries and normalized resident merchant power, roads,
+proximity, market access, institutions, and resolved culture/religion keys. Numeric runtime
+identity references are joined through the save's definition managers; country official faith
+is kept separately from the capital's local faith. Original save size, mtime and SHA-256 are
+retained. Version 1 exports upgrade without rereading all population objects. Commodity trade
+quantities and guessed routes are deliberately excluded. This is separate from SOL solver analysis.
+
 This tool extracts only the data needed to study SOL's location-class
 compensation model. It supports **uncompressed text saves produced with debug
 mode enabled**; normal compressed/binary saves are rejected.
