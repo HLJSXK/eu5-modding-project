@@ -29,6 +29,8 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 
 冻结输入在本目录的 `acceptance_spec.json`、`regional_targets.json`、`world_facts.json`、`world_priors.json`、`structural_config.json`；`frozen_manifest.json` 保存逐版修改原因。结果和大体积世界/回放在 `tmp/obsession_structural/` 与 `tmp/obsession_worlds/`，不会写入原始存档。实现与验收记录见设计 [21](../../docs/design/obsession/21_Structural_Implementation_Results.md)。以下第 1–11 节主要描述原始核心和旧静态研究接口。
 
+本轮冻结流程可用 `docs/design/obsession/experiments/run_structural_validation.py` 复跑：`fit` 执行 49 候选及前六组的三种子确认；提交选参文件后，`matrix` 执行八格各 30 种子与历史事件消融，`checks` 执行分层及 W-C/酒习俗对照，`replays` 导出两份三商品地图回放。默认 6 个进程；参数选择提交、冻结哈希或代码哈希不匹配时停止。
+
 ## 1. 它模拟什么
 
 每个商品独立运行一份。每月按以下顺序执行：
