@@ -71,6 +71,7 @@ def test_zone_no_adjacency_export():
     r=custom_run(end_month=600);sim=r.sims['tea'];sim.open_wave();r.run()
     assert sim.x==[45,0,0]
     assert all(0 not in inc for inc in sim.g.incoming)
+    assert sim.g.outgoing[0]==()
     assert sim.zone_adjacency_arrivals==0
 
 
@@ -108,6 +109,7 @@ def test_zone_exempt_from_decay():
     for t in range(400):sim.t=t;sim._clocks(t)
     assert sim.finished[0] and sim.eff(0)==45 and sim.x[0]==45
     assert sim.eff(1)<20
+    assert sim.stage_string()[0]=='e'  # x=45, never painted as retreating.
 
 
 def test_zone_does_not_start_clock():
@@ -160,6 +162,21 @@ def test_r_share_quantile():
     exp.out=HERE/'nonexistent-test-output';exp.priors=read_json(HERE/'world_priors.json')
     assert exp.timeline('R',0).residency_power==.01605427509424987
     assert Timeline(g,[s]).at(0)[0].markets[0]['merchants']=={0:1.}
+
+
+@pytest.mark.parametrize('custom_receiver',[False,True])
+def test_fact_contacts_separate_triggered_and_accepted(custom_receiver):
+    g,s=tiny_world();cfg=deepcopy(CONFIG)
+    cfg['initial_customs']={'tea':[dict(where={'region':'x'},value=45)]}
+    if custom_receiver:cfg['initial_customs']['tea'].append(dict(where={'region':'y'},value=35))
+    fact=dict(id='re_test',kind='residency',actor_tag='B',location='a',start=1337,end=1400,
+              goods='all',fact='Synthetic residency',grade='W-A',source='synthetic')
+    r=StructuralRun(g,Timeline(g,[s],kind='R',facts=[fact]),cfg,SPEC)
+    sim=r.sims['tea'];sim.seen_pairs.clear();sim.contact_rng=SimpleNamespace(random=lambda:0.)
+    r.prepare_good(sim)
+    assert r.fact_contacts['re_test']==1
+    assert r.fact_contact_inputs['re_test']==(0 if custom_receiver else 1)
+    assert r.fact_contact_by_good['tea']['re_test']==(0 if custom_receiver else 1)
 
 
 def test_k2_vacuous_untriggered():

@@ -1,37 +1,41 @@
 # obsession_sim：痴迷扩散离线模拟核心
 
-更新：2026-10-22。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 23 为准，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+更新：2026-10-22。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 26 为准，未覆盖项沿用 23，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
 
-## 当前流程：23 交接规格
+## 当前流程：26 第三轮交接规格
 
-只拟合六个共同参数：`p、rho、lambda_contact、lambda_ownership、preemption、internal_rate`。领地回流按首都市场之外的流行人口占比计算；商人常驻排除该市场的有领土国家，保留实际份额而不重新归一化。道路与海峡均为单位权重，亲和表全开，酒恒定为 x=30；δ、来源门槛、入口剂量与退潮值按固定设计执行。
+只拟合六个共同参数：`p、rho、lambda_contact、lambda_ownership、preemption、internal_rate`。领地回流按首都市场之外的流行人口占比计算；商人常驻排除该市场的有领土国家，保留实际份额而不重新归一化。道路与海峡均为单位权重，亲和表全开，酒仅在意大利/法国/伊比利亚的当月基督教地点提供30背景（无酒模拟器）；δ、来源门槛、入口剂量与退潮值按固定设计执行。
 
-两局观察者档案在 `tmp/obsession_worlds_round2/`，各有 52 档，覆盖 1338.4.1–1840.4.1。SOL 局提供 R 的近开局市场边界和 31 档商人先验；原版局作为独立非史实世界，不参与这两项估计。世界事实、73 项修订与地图映射限制见 `world_facts.json`、`world_facts_amendments.json` 及 [第二轮报告](../../docs/design/obsession/24_Round2_Implementation_Results.md)。
+两局观察者档案在 `tmp/obsession_worlds_round2/`，各有 52 档，覆盖 1338.4.1–1840.4.1。SOL 局提供 R 的近开局市场边界和 31 档商人先验；原版局作为独立非史实世界，不参与这两项估计。世界事实、73 项修订与地图映射限制见 `world_facts.json`、`world_facts_amendments.json` 及 [第三轮计划](../../docs/design/obsession/26_Round3_Handoff.md)；新增48条审计方事实逐字保留。R常驻共同份额改取冻结样本0.9分位0.01605427509424987。
 
 ```powershell
 $env:PYTHONUTF8='1'
 $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 & $env:EU5_PYTHON -m tools.obsession_sim.experiment freeze-check
 & $env:EU5_PYTHON docs/design/obsession/experiments/run_structural_validation.py quick
-& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow fit
-& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow select
+& $env:EU5_PYTHON -m tools.obsession_sim.round3_workflow fit
+& $env:EU5_PYTHON -m tools.obsession_sim.round3_workflow select
 # 先提交 selected_params.json 与 selection_log.json，再通知审计方。
-& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow diagnostics
-& $env:EU5_PYTHON docs/design/obsession/experiments/build_round2_report.py
+& $env:EU5_PYTHON -m tools.obsession_sim.round3_workflow diagnostics
+& $env:EU5_PYTHON docs/design/obsession/experiments/build_round3_report.py
 & $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8767
 ```
 
-`fit` 要求新排序协议已提交；`diagnostics` 要求选参文件与日志已提交，且运行时和冻结哈希匹配。选参只读拟合集，正式诊断包含双局 K 条、通道消融、去酒与双倍预算。超过三分之一拟合 A/B 里程碑在双倍预算下移动超过容差，将阻止 L2 宣称。
+习俗区按静态地图一次构造并定格，拒收全部输入，不向区外邻接输出；同市场输入使用排除习俗区的开放聚合。商人/领地来源与先占继续读取全量值。国家时钟存截止月D：首次非习俗接触后1440月封顶，开放全国流行后缩到240月；未退潮国家开新波不重置D。`tea_1`保留为不计分输入。
 
-年度入口量按用户确认解释为年风险率，可大于 1，每月用 `1-exp(-r/12)` 抽样；退潮期间拒收。报告构建器校验完整 30 种子及当前冻结身份，输出 `tmp/round2_results_sections.md`，并为 JSON/离线 HTML 报告补充已知拟合集必要条件差项。正式闸门仍交审计方。离线 HTML 无损压缩内嵌完整报告，原始 JSON 另行保留；载入后移除一次性 DOM 数据块，支持两局与全部种子查看。
+`round3_workflow mechanics`完全不载入目标表、不构造判分器，只用第二轮参数体检；`protocol`在体检后生成64候选Latin协议（种子2026102201），前6名补五种子后选一。协议发布前必须完成30种子世界输入审计。不要重跑`round2 world/config/prior`覆盖冻结输入。
 
-工作台位于 `/docs/design/obsession/experiments/structural_workbench.html`：只显示六个可调参数，固定值另列，支持两局结果切换，以及队列延迟、放弃事件与逐商品 E_gap。R 地图回放在导出前屏蔽留出地点及其到达列，相关统计也去掉留出地点。实现者接口不运行或加载留出结果；正式全集矩阵留给审计方用显式 `--auditor-holdout` 运行。
+`fit` 要求新排序协议已提交；`diagnostics` 要求选参文件与日志已提交，且运行时和冻结哈希匹配。选参只读拟合集，正式诊断包含 S/H×R 各30种子、双局 S/G×O 各10种子、五通道消融、四项单因素回退与双倍预算（均10种子）。超过三分之一拟合 A/B 里程碑在双倍预算下移动超过容差，将阻止 L2 宣称。
+
+年度入口量按用户确认解释为年风险率，可大于 1，每月用 `1-exp(-r/12)` 抽样；退潮期间拒收。报告构建器校验R30种子/O10种子及当前冻结身份，输出 `docs/design/obsession/27_Round3_Results.md`，并为 JSON/离线 HTML 报告补充已知拟合集必要条件差项。正式闸门仍交审计方。离线 HTML 无损压缩内嵌完整报告，原始 JSON 另行保留；载入后移除一次性 DOM 数据块，支持两局与全部种子查看。
+
+工作台位于 `/docs/design/obsession/experiments/structural_workbench.html`：只显示六个可调参数，固定值另列，支持两局结果切换、习俗区拒收与恒定性、国家截止时钟及全国流行/退潮日志、p_order可达上限、K2对手从未出现，以及队列延迟、放弃事件与逐商品 E_gap。R 地图回放在导出前屏蔽留出地点及其到达列，相关统计也去掉留出地点。实现者接口不运行或加载留出结果；正式全集矩阵留给审计方用显式 `--auditor-holdout` 运行。
 
 观察者汇总选择器可切换 SOL/原版局的矩阵指标，运行详情另可逐种子检查 K 案例。通道消融和双倍预算在独立对照表中显示；阶段性报告标明实际完成次数。O 世界仅作条件规律检查，不展示历史年份对比。
 
 `round2 {config,world,prior,audit,audit-batch,observers}` 是输入准备与一致性检查工具；输入准备只在选参前进行。`config` 不覆盖已经选出的六参数文件。世界输入修订后需重新检查、冻结并发布协议。
 
-旧轮次的接口和验收汇总已从本页移除，避免实现者误读全集结果。当前操作以本页顶部和设计 23 为准。
+旧轮次的接口和验收汇总已从本页移除，避免实现者误读全集结果。当前操作以本页顶部和设计 26 为准。
 
 ## 1. 它模拟什么
 
@@ -42,6 +46,8 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 3. **节点服务**：方案A侵入式队列，每月最多一个逻辑轮（轮长 = 轮开始时的队列长度）。服务地点 v：
    `y = ρ_v·x_v + Σ_u p_v·w_uv·x_eff(u)`，夹到 [0, 100]，小于 ε 归零；只有 `|y − x_v| > δ` 或归零时才写回，并把自己和出边邻居入队，已在排队的不重复入队。
 4. **预算**（可选 `budget`）：预扣下一次节点服务会超出当月额度时停止出队，本轮留到下月继续，传播按日历变慢。国家时钟、整组重标定、外部播种先执行，可能已超过额度；它不是全部工作的硬上限。
+
+下述 core 参考模式仍用原加入月语义；新截止月语义只在 structural 层生效。
 
 游戏里允许持久化的只有：地点×商品的 x、排队期间的指针 q、时钟组×商品的加入月份/衰退标志/结束标志/S_c、商品级队列计数。工具里另外记录的到达月份、峰值、帧和时间序列都是**校准用诊断数据，不是游戏状态**。
 

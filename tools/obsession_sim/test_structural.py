@@ -234,11 +234,9 @@ def test_tea_regional_cap_allows_a_local_hotspot_and_preserves_frances_late_cap(
 
 def test_actual_cross_boundary_land_contact_is_not_a_spontaneous_european_tea_seed():
     g,s=tiny_world();cfg=deepcopy(CONFIG)
-    cfg['initial_customs']['tea']=[{'where':{'region':'x'},'value':25}]
+    cfg['initial_customs']['tea']=[]
     r=StructuralRun(g,Timeline(g,[s],kind='R',faith_groups={'sunni':'muslim'}),cfg,SPEC,end_month=1)
-    r.sims['tea'].zones.clear();r.sims['tea'].zone_mask[:]=False
-    r.sims['tea'].g.incoming=list(g.incoming)  # J13/C2: test a non-custom adjacency source
-    r.sims['tea'].open_wave();r.run()
+    r.sims['tea'].open_wave();r.sims['tea'].inject(0,25,'event');r.run()
     assert r.sims['tea'].x[1]>0
     assert 'european_tea_without_contact' not in r.metrics.violations
     assert r.metrics.contact_evidence['tea']['type']=='adjacency'

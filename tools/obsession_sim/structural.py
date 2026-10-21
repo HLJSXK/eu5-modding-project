@@ -88,6 +88,7 @@ class RuleSimulation(Simulation):
         self.zone_mask = np.array([v in self.zones for v in range(graph.n)])
         if self.zones:
             graph.incoming = [tuple(u for u in incoming if u not in self.zones) for incoming in graph.incoming]
+            graph.outgoing = [() if v in self.zones else out for v,out in enumerate(graph.outgoing)]
         self.zone_rejected_inputs = 0
         self.zone_adjacency_arrivals = 0
         self.zone_values_constant = True
@@ -187,6 +188,13 @@ class RuleSimulation(Simulation):
 
     def _push(self, v):
         return self.price["push_rejected"] if v in self.zones else super()._push(v)
+
+    def stage_string(self):
+        stages = list(super().stage_string())
+        for v in self.zones:
+            if ord(stages[v]) >= ord('a') + 7:
+                stages[v] = chr(ord(stages[v]) - 7)
+        return ''.join(stages)
 
     def _clocks(self, t):
         for c in range(self.ng):
@@ -520,6 +528,8 @@ class StructuralRun:
         self.mechanics_only = mechanics_only
         self.wave_log = {g: [] for g in GOODS}
         self.fact_contacts = defaultdict(int)
+        self.fact_contact_inputs = defaultdict(int)
+        self.fact_contact_by_good = {g:defaultdict(int) for g in GOODS}
         self.event_rng = {}
         self.eligible_months = []
         self.candidate_bursts = []
@@ -839,8 +849,12 @@ class StructuralRun:
                     evidence+=self.ownership_evidence(resident,center)
                 for fact_id in evidence:
                     self.fact_contacts[fact_id] += 1
-                sim.inject(cap, cfg["contact_amount"], "contact", {"market":m,"facts":evidence,"resident":int(resident),
+                accepted = sim.inject(cap, cfg["contact_amount"], "contact", {"market":m,"facts":evidence,"resident":int(resident),
                            "reverse":bool(sim.shared_market[m]<cfg['theta'])})
+                if accepted:
+                    for fact_id in evidence:
+                        self.fact_contact_inputs[fact_id] += 1
+                        self.fact_contact_by_good[sim.good][fact_id] += 1
         # Ownership is an actual-intensity channel, never raw-material => habit.
         for c,cap,source,fraction in ownership:
             profile = self.config["profiles"][sim.good]
@@ -1162,7 +1176,8 @@ class StructuralRun:
             zone_adjacency_arrivals={g:s.zone_adjacency_arrivals for g,s in self.sims.items()},
             zone_sizes={g:len(s.zones) for g,s in self.sims.items()},
             clocks={g:dict(history=s.clock_history,final_deadlines=s.deadline) for g,s in self.sims.items()},
-            waves=self.wave_log, fact_contacts=dict(self.fact_contacts),
+            waves=self.wave_log, fact_contacts=dict(self.fact_contacts), fact_contact_inputs=dict(self.fact_contact_inputs),
+            fact_contact_by_good={g:dict(rows) for g,rows in self.fact_contact_by_good.items()},
             ever_member={g:sum(t>=0 for t in s.arrival) for g,s in self.sims.items()},
             peak_U=max(self.ledger,default=0), peak_round_delay_months=max(s.peak_round_delay for s in self.sims.values()),
             events_abandoned_budget=self.events_abandoned_budget,

@@ -119,10 +119,10 @@ def build_report():
             rows.append([key,m['id'],m['name'],m['target_year'],m['tolerance_months']/12,'未到达' if got is None else f'{got:.1f}',sum(a['simulated_month'] is not None for a in samples),pct(sum(a['within_tolerance'] for a in samples)/30),pct(sum(a['within_2tol'] for a in samples)/30)])
     table(['配置','目标','地区','目标年','容差/年','含未到达中位年','到达/30','tol','2tol'],rows)
     text("## 新事实接触次数（S×R 30次）")
-    text("触发指月风险抽样成功且对应当前有效常驻事实；按事实逐条计数，含因习俗区/退潮拒收的尝试。该口径与成功注入的通道统计区分。零次照常报告。")
+    text("触发次数取实际成功注入，另列月风险抽样成功的尝试次数（可因习俗区/退潮拒收）。两列按当前有效常驻事实逐条计数，零次照常报告。")
     new_facts=[f for f in additions['facts'] if f['id'].startswith('re_')]
     assert len(new_facts)==43
-    table(['常驻事实','触发次数中位','最小','最大'],[[f['id'],q([x['fact_contacts'].get(f['id'],0) for x in base]),min(x['fact_contacts'].get(f['id'],0) for x in base),max(x['fact_contacts'].get(f['id'],0) for x in base)] for f in new_facts])
+    table(['常驻事实','成功注入次数中位','最小','最大','抽样触发尝试中位','咖啡/茶/烟草成功注入中位'],[[f['id'],q([x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base]),min(x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base),max(x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base),q([x['fact_contacts'].get(f['id'],0) for x in base]),[q([x.get('fact_contact_by_good',{}).get(g,{}).get(f['id'],0) for x in base]) for g in ('coffee','tea','tobacco')]] for f in new_facts])
     text("## K 规则与案例")
     rows=[];cases=[]
     for key,c in cells.items():
@@ -170,7 +170,7 @@ def build_report():
         text(f"未达 {level}，差在"+'；'.join(gaps if gaps else ['全集与留出待审计方；本轮 O 仅10次诊断，不作L2判断'])+'。')
         r['gates'][level]['failures']=gaps
     text("## 计划冲突处理与待决问题")
-    text("没有改变四项机制、判分口径、参数范围、固定值、世界事实或目标定义。可用观察者档案与用户所述1930年存在范围差异，采用可验证的两份52档清单（见输入节），没有延长世界终点。协议交叉引用 §6.2 实际排序位于 §6.3，按后者的完整列表执行；tea_0 在既有文件中已删除，tea_1 保留定义并 scored=false。上述为执行细节，未据成绩调整规则。")
+    text("扫描前体检重复原因：首次时钟计数把波次当国家，修正后复核；随后将新事实接触分成成功注入与抽样尝试，增加按商品分列，并使诊断路径和回放颜色遵守习俗区不外溢、不退潮，再用相同参数复核。全部体检均不读取成绩，次数如实预登记。新增事实副本没有 known_gaps 字段，编纂局限实际位于 world_facts.json，按原文引用，未改输入。没有改变四项机制、判分口径、参数范围、固定值、世界事实或目标定义。可用观察者档案与用户所述1930年存在范围差异，采用可验证的两份52档清单（见输入节），没有延长世界终点。协议交叉引用 §6.2 实际排序位于 §6.3，按后者的完整列表执行；tea_0 在既有文件中已删除，tea_1 保留定义并 scored=false。上述为执行细节，未据成绩调整规则。")
     text("待决问题：观察者原版局1840年之后的原始归档/完整导出在当前工作区不可用；不阻塞本轮按真实终点执行的10种子诊断。模型与事实的进一步修改由审计方决定。")
     text("## 交付物与复现")
     text("`tools/obsession_sim/round3_workflow.py` 依次提供 mechanics、protocol、fit、select、diagnostics。输入审计用 round2 audit-batch。报告构建器校验完整种子和冻结身份。所有大文件留 tmp/obsession_round3，不进 Git；fit_report.html 可离线双击打开，工作台支持习俗区、截止时钟、K2未触发、四项回退与双局切换。通知审计方的可审阅交付为本报告及已提交的选参日志；未自动向其他聊天发送消息。")
