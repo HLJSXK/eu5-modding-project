@@ -51,6 +51,7 @@ def test_j6_observer_nonoccurrence_window_is_shortened(kid, period):
     f = KFixture(kind="O")
     if kid == "K2":
         f.cx["coffee"][1] = 30
+        f.cx["tea"][1] = 1  # J14: rival must actually appear.
         f.obs(1)
     else:
         f.cx["tobacco"][1] = 30
@@ -133,11 +134,12 @@ def test_no_roads_or_straits_have_additional_weight_and_wine_is_constant():
     s["roads"] = [["a", "b", "railroad"]]
     g.meta["special_edges"] = [dict(a=1, b=2, type="strait")]
     cfg = deepcopy(CONFIG)
-    cfg["initial_customs"]["wine"] = [dict(where={"region":"x"}, value=30)]
-    r = StructuralRun(g, Timeline(g, [s]), cfg, SPEC, end_month=500).run()
+    g.attrs["region"][0]="italy_region"
+    s["locations"]["a"]["religion"]="catholic"
+    r = StructuralRun(g, Timeline(g, [s], faith_groups={"catholic":"christian"}), cfg, SPEC, end_month=500).run()
     assert all(sim.w is None for sim in r.sims.values())
-    wine = r.context_goods["wine"]
-    assert wine.x == [30, 0, 0] and not wine.clock and wine.join == [-1]*wine.ng
+    assert [r.wine_background(v) for v in range(3)] == [30, 0, 0]
+    assert not hasattr(r,"context_goods")
 
 
 def test_only_six_historical_parameters_are_exposed():
@@ -166,7 +168,7 @@ def test_j12_budget_rejected_event_is_counted():
     r = StructuralRun(g, Timeline(g, [s]), CONFIG, SPEC, end_month=1)
     sim = r.sims["tobacco"]
     sim.x[0] = 70
-    r.month_base_U = {g:s.U for g,s in {**r.sims, **r.context_goods}.items()}
+    r.month_base_U = {g:s.U for g,s in r.sims.items()}
     sim.U += CONFIG["fixed"]["budget"]
     event = next(e for e in CONFIG["events"] if e["id"] == "historical_ban")
     assert not r.live_event_probe(event, "tobacco", 0)

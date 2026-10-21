@@ -71,7 +71,7 @@ def coverage_50(arrivals, n):
 class RunMetrics:
     def __init__(self, graph, targets, kind="R"):
         self.kind = kind
-        self.targets = targets if kind == "R" else []
+        self.targets = [r for r in targets if r.get("scored", True)] if kind == "R" else []
         self.nodes = {r["id"]: resolve_nodes(graph, r) for r in self.targets}
         if any(not vs for vs in self.nodes.values()):
             raise ValueError("regional milestone has an empty selector")
@@ -161,13 +161,9 @@ class RunMetrics:
         run.tobacco_possession_seen |= transatlantic  # Diagnostic history, never a propagation gate.
         if not run.tobacco_possession_seen and not transatlantic and np.any(values["tobacco"][self.outside_america] > 0):
             self.violations.setdefault("tobacco_outside_america_before_possession", {"month":month})
-        # Wine is an explicitly modelled, dormant opening custom, with one x.
-        wine = run.context_goods["wine"]
-        scales=np.array([wine.habit[c]+(1-wine.habit[c])*wine.S[c]
-                         if wine.decaying[c] else 1. for c in range(wine.ng)]+[1.])
-        wine_values=np.asarray(wine.x)*scales[state.owner]
+        wine_values=np.fromiter((run.wine_background(v) for v in range(run.timeline.graph.n)), dtype=float)
         from .worlds import weighted_means
-        wine_country,_=weighted_means(wine_values,state.owner,state.population,wine.ng)
+        wine_country,_=weighted_means(wine_values,state.owner,state.population,len(run.timeline.country_names))
         for c in np.flatnonzero((country_x["coffee"] >= 45)&(wine_country >= 45)):
             if run.country_faith.get(int(c)) == "muslim":
                 self.violations.setdefault("muslim_wine_and_coffee", {"month": month, "country":int(c)})
@@ -203,6 +199,7 @@ class RunMetrics:
             result[prefix+"within_2tol"] = sum(r["within_2tol"] for r in eligible)/len(eligible) if eligible else None
             result[prefix+"p_order"] = sum(order_correct(a["simulated_month"], b["simulated_month"])
                                           for a,b in pairs)/len(pairs) if pairs else None
+            result[prefix+"p_order_upper"] = sum(a["simulated_month"] is not None for a,b in pairs)/len(pairs) if pairs else None
             missing = sum(r["simulated_month"] is None for r in eligible)
             result[prefix+"loss_missing"] = missing
             result[prefix+"loss_infinite"] = bool(missing)
@@ -251,6 +248,7 @@ class RunMetrics:
                       events_abandoned_budget=run.events_abandoned_budget,
                       overruns=run.overruns, wave_years=max((b-a)/12 for s in run.sims.values() for a,b in s.waves) if any(s.waves for s in run.sims.values()) else 0,
                       events=run.event_log, summaries={g:s.summary() for g,s in run.sims.items()})
+        result.update(run.mechanics_report())
         result["channel_audit"] = {}
         for good, sim in run.sims.items():
             result["channel_audit"][good] = {}
@@ -277,7 +275,7 @@ class RunMetrics:
 
 def aggregate_runs(runs, kind="R"):
     out = {"run_count": len(runs), "runs": runs}
-    metrics = ("within_tol", "within_2tol", "p_order", "fit_within_tol", "fit_within_2tol", "fit_p_order",
+    metrics = ("within_tol", "within_2tol", "p_order", "p_order_upper", "fit_p_order_upper", "triggered_K", "fit_within_tol", "fit_within_2tol", "fit_p_order",
                "holdout_within_tol", "holdout_within_2tol", "p_unseeded", "p_conn", "p_K", "p_link", "E_gap", "D_event")
     for key in metrics:
         out[key] = q([r.get(key) for r in runs])

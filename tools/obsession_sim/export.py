@@ -30,7 +30,7 @@ def playback_payload(sim, title="", note="", start_year=None, milestone_results=
         "arrival": sim.arrival,
         "first_positive": sim.first_positive,
         "threshold_arrival": {str(k): v for k, v in sim.threshold_arrival.items()},
-        "clock": {"join": sim.join,"joined":[sim.clock_joined(c) for c in range(sim.ng)],
+        "clock": {**({"deadline": sim.deadline, "history": sim.clock_history} if hasattr(sim,"deadline") else {"join": sim.join}),"joined":[sim.clock_joined(c) for c in range(sim.ng)],
                   "decay_start": sim.decay_start, "finished_month": sim.finished_month},
         "inputs": {"seeds": sim.P.seeds, "scenario": g.meta.get("scenario", {}),
                    "note": "Replay is precomputed; use the local parameter editor to rerun the Python core."},

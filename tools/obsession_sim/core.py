@@ -95,7 +95,7 @@ class Simulation:
         self.owner = graph.owner if graph.owner is not None else [-1] * n
         ng = graph.n_groups if graph.owner is not None else 0
         self.ng = ng
-        self.join = [-1] * ng
+        self.init_country_clocks(ng)
         self.decay_start = [-1] * ng
         self.finished_month = [-1] * ng
         self.S = [1.0] * ng
@@ -440,12 +440,24 @@ class Simulation:
                           if self.P.spread_windows is not None else 0)
             configured = [max(0, month) for node, month, value in self.P.seeds
                           if node == v and value >= 1 and wave_start <= max(0, month) <= t]
-            self.join[c] = min([t] + configured)
+            self.clock_first_touch(c, min([t] + configured))
             self.U += pr["join_write"]
 
     def local_terms(self, v, p, retention, old=None):
         """Optional structural rules; default preserves the reference experiments."""
         return p, retention, 0.0
+
+    def init_country_clocks(self, count):
+        self.join = [-1] * count
+
+    def clock_first_touch(self, country, month):
+        self.join[country] = month
+
+    def clock_due(self, country, month):
+        return month >= self.join[country] + self.P.hold_T
+
+    def materialize_node(self, node):
+        return True
 
     def _clocks(self, t):
         pr = self.price
@@ -453,7 +465,7 @@ class Simulation:
             if self.finished[c] or not self.clock_joined(c):
                 continue
             self.U += pr["clock_active"]
-            if not self.decaying[c] and t >= self.join[c] + self.P.hold_T:
+            if not self.decaying[c] and self.clock_due(c, t):
                 self.decaying[c] = True
                 self.decay_start[c] = t
                 self.S[c] = 1.0
@@ -472,6 +484,8 @@ class Simulation:
                     if self.S[c] < cut:      # settle: keep the custom share, stop ticking
                         k = h + (1 - h) * self.S[c]
                         for v in self.members_of[c]:
+                            if not self.materialize_node(v):
+                                continue
                             self.U += pr["renorm_per_node"]
                             y = self.x[v] * k
                             self.x[v] = y if y >= self.P.eps else 0.0
@@ -483,6 +497,8 @@ class Simulation:
                     alive = False
                     Sc = self.S[c]
                     for v in self.members_of[c]:
+                        if not self.materialize_node(v):
+                            continue
                         self.U += pr["renorm_per_node"]
                         y = self.x[v] * Sc
                         self.x[v] = y if y >= self.P.eps else 0.0

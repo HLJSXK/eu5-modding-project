@@ -25,6 +25,7 @@ class KFixture:
         self.state = SimpleNamespace(capitals={i:i for i in range(n)}, market=np.arange(n),
                                      owner=np.arange(n), population=np.ones(n),
                                      markets=[{"center":i,"merchants":{0:1.,1:1.}} for i in range(n)])
+        self.state.population[1] = 2.  # J15: the existing K1/K5 fixture is a large country.
         self.cx = {g:np.zeros(n) for g in ("coffee","tea","tobacco")}
         self.mx = deepcopy(self.cx)
         self.cap = deepcopy(self.cx)
@@ -160,18 +161,17 @@ def chain_world(n=9):
 
 
 def test_wine_removal_uses_an_empty_seed_collection_and_removes_preemption():
-    g,s=tiny_world();cfg=deepcopy(CONFIG)
-    cfg['initial_customs']['wine']=[dict(where={'continent':'europe'},value=30)]
-    baseline=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=2)
-    assert baseline.context_goods['wine'].eff(1)==30
+    g,s=tiny_world();g.attrs['region'][1]='france_region'
+    s['locations']['b']['religion']='catholic'
+    baseline=StructuralRun(g,Timeline(g,[s],faith_groups={'catholic':'christian'}),CONFIG,SPEC,end_month=2)
+    assert baseline.wine_background(1)==30
     assert baseline.preemption_load('coffee',1)>0
-    cfg['disabled_rules']=['wine']
-    removed=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=2)
-    assert removed.context_goods['wine'].P.initial_values==[]
-    assert not any(removed.context_goods['wine'].x)
+    cfg=deepcopy(CONFIG);cfg['disabled_rules']=['wine']
+    removed=StructuralRun(g,Timeline(g,[s],faith_groups={'catholic':'christian'}),cfg,SPEC,end_month=2)
+    assert all(removed.wine_background(v)==0 for v in range(g.n))
     assert removed.preemption_load('coffee',1)==0
     removed.run()
-    assert not any(removed.context_goods['wine'].x)
+    assert all(removed.wine_background(v)==0 for v in range(g.n))
 
 
 def test_constant_weighted_sources_remain_exactly_on_their_threshold():
@@ -217,7 +217,7 @@ def test_each_historical_negative_constraint_can_detect_a_violation(name,good,no
     g,s=tiny_world();g.attrs['subcontinent'][0]='east_asia';g.attrs['region'][1]='france_region'
     r=StructuralRun(g,Timeline(g,[s],kind='R',faith_groups={'sunni':'muslim'}),CONFIG,SPEC,end_month=1)
     r.sims[good].x[node]=value
-    if name=='muslim_wine_and_coffee':r.context_goods['wine'].x[0]=60
+    if name=='muslim_wine_and_coffee':r.wine_background=lambda v: 60. if v==0 else 0.  # synthetic invariant breach
     r.metrics.observe(0,r,r.diagnostics())
     assert name in r.metrics.violations
 
@@ -236,6 +236,8 @@ def test_actual_cross_boundary_land_contact_is_not_a_spontaneous_european_tea_se
     g,s=tiny_world();cfg=deepcopy(CONFIG)
     cfg['initial_customs']['tea']=[{'where':{'region':'x'},'value':25}]
     r=StructuralRun(g,Timeline(g,[s],kind='R',faith_groups={'sunni':'muslim'}),cfg,SPEC,end_month=1)
+    r.sims['tea'].zones.clear();r.sims['tea'].zone_mask[:]=False
+    r.sims['tea'].g.incoming=list(g.incoming)  # J13/C2: test a non-custom adjacency source
     r.sims['tea'].open_wave();r.run()
     assert r.sims['tea'].x[1]>0
     assert 'european_tea_without_contact' not in r.metrics.violations
@@ -283,7 +285,7 @@ def test_positive_habit_rebase_preserves_the_entire_future_curve():
     g,s=tiny_world();t=Timeline(g,[s],faith_groups={"sunni":"muslim"})
     config=deepcopy(CONFIG);config['profiles']['coffee']['habit_floor']=.5
     r=StructuralRun(g,t,config,SPEC,end_month=1);sim=r.sims['coffee']
-    sim.x[:]=[80.,100.,0.];sim.S[1]=.02;sim.decaying[1]=True;sim.join[1]=0
+    sim.x[:]=[80.,100.,0.];sim.S[1]=.02;sim.decaying[1]=True;sim.deadline[1]=240
     r.state.owner[0]=1;r.apply_state()
     assert sim.habit[1]==pytest.approx(.5/.51)
     stop=next(k for k in range(1,100) if .02*.98**k<.01)
@@ -349,11 +351,11 @@ def test_p3_creates_a_ban_shortens_hold_and_does_not_stack():
     cfg['fixed']['event_rate']=1
     r=StructuralRun(g,Timeline(g,[s],faith_groups={'sunni':'muslim'}),cfg,SPEC,events='historical',end_month=1)
     sim=r.sims['tobacco'];sim.x[:]=[70,0,0];sim.shared_country[0]=70
-    sim.spreading=True;sim.wave_start=0;sim.join[0]=0;sim.finished[0]=False
+    sim.spreading=True;sim.wave_start=0;sim.deadline[0]=240;sim.finished[0]=False
     r.process_events(20)
-    assert sim.join[0]==-110 and sim.clock_joined(0)
+    assert sim.deadline[0]==130 and sim.clock_joined(0)
     assert len(r.bans_this_month)==1 and r.event_log[0]['condition_valid']
-    sim.t=21;sim._push(0);sim._serve(21);assert sim.join[0]==-110
+    sim.t=21;sim._push(0);sim._serve(21);assert sim.deadline[0]==130
     r.effects[('tobacco',0)].append(dict(r.effects[('tobacco',0)][0]))
     assert r.multiplier('tobacco',0,21)==pytest.approx(.2)
     sim.t=130;sim._clocks(130)
@@ -366,7 +368,7 @@ def test_effect_activation_rejects_stale_aggregate_and_respects_budget():
     sim=r.sims['tobacco'];sim.shared_country[0]=70;sim.x[:]=[0,0,0]
     assert not r.live_event_probe(event,'tobacco',0)
     sim.x[0]=70
-    r.month_base_U={g:s.U for g,s in {**r.sims,**r.context_goods}.items()}
+    r.month_base_U={g:s.U for g,s in r.sims.items()}
     sim.U+=CONFIG['fixed']['budget']
     assert not r.live_event_probe(event,'tobacco',0)
 
@@ -592,9 +594,9 @@ def test_budget_admits_country_renewal_and_slices_queue_cleanup():
 def test_entry_clock_starts_before_queue_service_and_survives_wave_renewal():
     g,s=tiny_world();r=StructuralRun(g,Timeline(g,[s]),CONFIG,SPEC,end_month=1);sim=r.sims['coffee']
     sim.t=20;sim.open_wave();sim.inject(0,7,'event',{'event':'fixture'})
-    assert sim.join[0]==20
+    assert sim.deadline[0]==1460
     sim.t=21;sim.serve_shared_tasks(1000)
-    assert sim.join[0]==20
+    assert sim.deadline[0]==1460
 
 
 def test_t_alive_uses_first_wave_and_missing_losses_remain_infinite():

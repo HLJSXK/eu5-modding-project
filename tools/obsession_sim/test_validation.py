@@ -34,7 +34,7 @@ def experiment(tmp_path):
     exp.graph, exp.base, exp.observers = graph, snapshot, [({"id": "test"}, PrefixOnly())]
     exp.graph_hash = "graph"
     exp.config, exp.spec, exp.faiths, exp.facts = deepcopy(CONFIG), deepcopy(SPEC), {}, []
-    exp.priors = {"foreign_share_quantiles": {"0.5": .003}}
+    exp.priors = {"foreign_share_quantiles": {"0.9": .003}, "r_common_share_quantile":"0.9"}
     exp.frozen_valid, exp.frozen_hash, _ = freeze_status()
     exp.runtime_hash, exp.out = code_hash(), tmp_path
     for name in ("one", "many", "matrix"):
@@ -63,7 +63,7 @@ def seed_cache(exp, seeds=range(30), **changes):
         identity = dict(frozen=exp.frozen_hash, world=timeline.hash, graph=exp.graph_hash,
                         environment=environment_info(), mode="S", seed=seed, params=exp.config["params"],
                         disabled=[], omit_wc=True, fit_only=True, end_year=None,
-                        code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1)
+                        code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1, rollbacks=[], mechanics_only=False)
         path = exp.out / "runs" / (canonical_hash(identity) + ".json")
         row = dict(deepcopy(sample), identity=identity, mode="S", world_kind="R", world_id="R", seed=seed,
                    end_month=timeline.end, world_hash=timeline.hash, p_order=.5, fit_p_order=.5, violation_count=0,

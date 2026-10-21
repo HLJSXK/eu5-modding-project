@@ -119,7 +119,8 @@ def audit_world(facts_path, timeline_path, out, *, seed=0, omit_wc=False):
     reference = ROOT / ".eu5-base/reference_game_files/game"
     base = historical_base(graph, sequence[0], reference)
     facts = json.loads(Path(facts_path).read_text(encoding="utf-8"))["facts"]
-    share = json.loads((HERE / "world_priors.json").read_text(encoding="utf-8"))["foreign_share_quantiles"]["0.5"]
+    priors = json.loads((HERE / "world_priors.json").read_text(encoding="utf-8"))
+    share = priors["foreign_share_quantiles"][priors["r_common_share_quantile"]]
     timeline = Timeline(graph, [base], kind="R", facts=facts, seed=seed, omit_wc=omit_wc,
                         faith_groups=religion_groups(reference), residency_power=share)
     months = sorted({0, 5999} | {max(0, f[k]) for f in timeline.facts for k in ("start_month", "end_month")

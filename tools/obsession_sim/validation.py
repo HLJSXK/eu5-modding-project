@@ -94,9 +94,9 @@ def quick_check(exp, params=None, progress=lambda *a, **k: None, cancel=None):
             if not run.ledger or len(run.ledger) > 2:
                 raise ValueError("short probe exceeded its two-month scope")
             if any(not math.isfinite(float(x)) or not 0 <= x <= 100
-                   for sim in (*run.sims.values(), *run.context_goods.values()) for x in sim.x):
+                   for sim in run.sims.values() for x in sim.x):
                 raise ValueError("invalid x in short probe")
-            if "wine" in disabled and any(run.context_goods["wine"].x):
+            if "wine" in disabled and any(run.wine_background(v) for v in range(run.timeline.graph.n)):
                 raise ValueError("wine removal left initial customs")
             rows.append(dict(world=world, mode=mode, disabled_rules=disabled, months=len(run.ledger),
                              peak_U=max(run.ledger), passed=True))
@@ -143,7 +143,7 @@ def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None, *
             identity = dict(frozen=exp.frozen_hash, world=timeline.hash, graph=exp.graph_hash,
                             environment=environment_info(), mode=mode, seed=seed, params=params,
                             disabled=[], omit_wc=True, fit_only=fit_only, end_year=None,
-                            code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1)
+                            code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1, rollbacks=[], mechanics_only=False)
             path = exp.out / "runs" / (canonical_hash(identity) + ".json")
             if not path.exists():
                 missing.append(seed)

@@ -41,6 +41,10 @@ class ConditionalEvaluator:
             for good,x in country_x.items():
                 self.origin_countries.setdefault(good,set()).update(int(c) for c in np.flatnonzero(x>=20))
         nonlocal_by_good = {(i["good"], i["country"]) for i in inputs if i["type"] != "adjacency"}
+        population = np.bincount(state.owner[state.owner >= 0], weights=state.population[state.owner >= 0])
+        existing = [c for c in range(len(population)) if population[c] > 0]
+        existing.sort(key=lambda c: (-population[c], c))
+        large = set(existing[:math.ceil(.2 * len(existing))])
         first_inputs={}
         for row in inputs:
             if row["type"] in ("contact", "ownership", "event"):
@@ -51,7 +55,7 @@ class ConditionalEvaluator:
                 for c in foreign_merchants(state, int(m)):
                     cap = state.capitals.get(c)
                     if cap is not None:
-                        if capital_x["coffee"][c] >= 20 or state.market[cap] == m:
+                        if c not in large or capital_x["coffee"][c] >= 20 or state.market[cap] == m:
                             self.seen["K1"].add(c)
                         else:
                             self.add("K1", c, month, c, capital=cap, source_market=int(m))
@@ -74,7 +78,7 @@ class ConditionalEvaluator:
         for good, c in first_inputs:
             if good == "tobacco":
                 before=first_inputs[(good,c)].get("country_x_before",country_x[good][c])
-                if before >= 20:
+                if c not in large or before >= 20:
                     self.seen["K5"].add(c)
                 else:
                     self.add("K5", c, month, c, good=good, capital=state.capitals.get(c))
@@ -132,7 +136,8 @@ class ConditionalEvaluator:
                 elif case["maximum"] >= 45:
                     case.update(status="fail", t1=month, reason="rival reached stage3")
                 elif elapsed >= upper:
-                    case.update(status="pass", t1=month)
+                    case.update(status="pass", t1=month) if case["maximum"] >= 1 else case.update(
+                        status="untriggered", t1=month, reason="rival never present")
             elif kid == "K4":
                 if (case["good"], c) in nonlocal_by_good:
                     case.update(status="untriggered", reason="nonlocal input confounds raw possession")

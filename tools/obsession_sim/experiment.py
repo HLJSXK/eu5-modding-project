@@ -49,10 +49,10 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
-def freeze_status():
+def freeze_status(skip_targets=False):
     frozen = read_json(HERE / "frozen_manifest.json")
     canonical = frozen.get("hash_mode") == "canonical-json"
-    actual = {name: canonical_hash(read_json(HERE/name)) if canonical else hashlib.sha256((HERE/name).read_bytes()).hexdigest()
+    actual = {name: frozen['files'][name] if skip_targets and name == 'regional_targets.json' else canonical_hash(read_json(HERE/name)) if canonical else hashlib.sha256((HERE/name).read_bytes()).hexdigest()
               for name in FROZEN}
     return actual == frozen["files"], canonical_hash(frozen), actual
 
@@ -78,7 +78,7 @@ def environment_info():
 
 
 class Experiment:
-    def __init__(self, graph_path, observer_paths, reference, out):
+    def __init__(self, graph_path, observer_paths, reference, out, mechanics_only=False):
         self.graph_path = Path(graph_path).resolve()
         self.graph_hash=hashlib.sha256(self.graph_path.read_bytes()).hexdigest()
         self.graph = load_json(graph_path)
@@ -91,13 +91,14 @@ class Experiment:
         self.faiths = religion_groups(self.reference)
         self.out = Path(out).resolve()
         self.out.mkdir(parents=True, exist_ok=True)
-        self.spec = read_json(HERE/"acceptance_spec.json")
-        self.targets = read_json(HERE/"regional_targets.json")["targets"]
+        self.mechanics_only = mechanics_only
+        self.spec = dict(seeds=list(range(30))) if mechanics_only else read_json(HERE/"acceptance_spec.json")
+        self.targets = [] if mechanics_only else read_json(HERE/"regional_targets.json")["targets"]
         self.config = read_json(HERE/"structural_config.json")
         self.facts = read_json(HERE/"world_facts.json")["facts"]
         self.priors = read_json(HERE/"world_priors.json")
         self._timeline_cache = {}
-        self.frozen_valid, self.frozen_hash, self.actual_hashes = freeze_status()
+        self.frozen_valid, self.frozen_hash, self.actual_hashes = freeze_status(skip_targets=mechanics_only)
         bundle=code_bundle();self.runtime_hash=bundle['runtime_hash']
         self.code_snapshot=self.out/'inputs'/'code'/(self.runtime_hash+'.json')
         # The parent creates this immutable archive before starting workers.
@@ -123,13 +124,13 @@ class Experiment:
             self.base = historical_base(self.graph, initial, self.reference)
             atomic_json(cached, {"build_signature":signature, "snapshot":self.base})
 
-    def timeline(self, world, seed, omit_wc=False):
+    def timeline(self, world, seed, omit_wc=False, share_quantile=None):
         cache = getattr(self, "_timeline_cache", None)
-        key = (world, seed if world == "R" else 0, omit_wc)
+        key = (world, seed if world == "R" else 0, omit_wc, share_quantile)
         if cache is not None and key in cache:
             return cache[key]
         if world == "R":
-            share = self.priors["foreign_share_quantiles"]["0.5"]
+            share = self.priors["foreign_share_quantiles"][share_quantile or self.priors["r_common_share_quantile"]]
             timeline = Timeline(self.graph, [self.base], kind="R", facts=self.facts, seed=seed,
                                 faith_groups=self.faiths, omit_wc=omit_wc,residency_power=share)
             path = self.out / "inputs/world_bindings" / (bindings_key(timeline, seed, omit_wc) + ".json")
@@ -151,13 +152,17 @@ class Experiment:
         return timeline
 
     def one(self, world, mode, seed, *, params=None, disabled_events=(), omit_wc=False, fit_only=True,
-            frames=0, end_year=None, progress=None, cancel=None, disabled_rules=(), budget_multiplier=1):
-        timeline = self.timeline(world, seed, omit_wc)
+            frames=0, end_year=None, progress=None, cancel=None, disabled_rules=(), budget_multiplier=1, rollbacks=(), mechanics_only=False):
+        mechanics_only = mechanics_only or self.mechanics_only
+        if set(rollbacks) - {"R1", "R2", "R3", "R4"} or len(rollbacks) > 1:
+            raise ValueError("each rollback diagnosis changes exactly one mechanism")
+        timeline = self.timeline(world, seed, omit_wc, "0.5" if "R4" in rollbacks else None)
         config = deepcopy(self.config)
         allowed_rules = {"contact","preemption","ownership","market","wine"}
         if set(disabled_rules) - allowed_rules:
             raise ValueError("unknown structural rule")
         config["disabled_rules"] = list(disabled_rules)
+        config["rollbacks"] = list(rollbacks)
         for name,value in validate_fit_params(params or {}).items():
             config["params"][name] = value
         if budget_multiplier not in (1, 2):
@@ -166,11 +171,12 @@ class Experiment:
         if seed not in self.spec["seeds"] or isinstance(seed,bool):
             raise ValueError("seed must be a fixed ID 0–29")
         spec = deepcopy(self.spec)
-        spec["targets"] = [r for r in self.targets if not fit_only or r["split"] == "fit"]
+        if not mechanics_only:
+            spec["targets"] = [r for r in self.targets if r.get("scored", True) and (not fit_only or r["split"] == "fit")]
         identity = {"frozen":self.frozen_hash, "world":timeline.hash,'graph':self.graph_hash,'environment':environment_info(), "mode":mode, "seed":seed,
                     "params":config["params"], "disabled":list(disabled_events), "omit_wc":omit_wc,
                     "fit_only":fit_only, "end_year":end_year, "code":self.runtime_hash,"disabled_rules":list(disabled_rules),
-                    "budget_multiplier":budget_multiplier}
+                    "budget_multiplier":budget_multiplier, "rollbacks":list(rollbacks), "mechanics_only":mechanics_only}
         key = canonical_hash(identity)
         cache = self.out/"runs"/(key+".json")
         if cache.exists() and not frames:
@@ -178,9 +184,9 @@ class Experiment:
         start = time.perf_counter()
         run = StructuralRun(self.graph, timeline, config, spec, events=MODES.get(mode,mode), seed=seed,
                             disabled_events=disabled_events, frames_every=frames,
-                            end_month=round((end_year-1337)*12) if end_year else None, cancel=cancel)
+                            end_month=round((end_year-1337)*12) if end_year else None, cancel=cancel, mechanics_only=mechanics_only)
         run.run(progress)
-        result = run.metrics.report(run)
+        result = run.mechanics_report() if mechanics_only else run.metrics.report(run)
         result.update(identity=identity, world_id=timeline.id, world_kind=timeline.kind, mode=mode, seed=seed,
                       elapsed_seconds=time.perf_counter()-start, end_month=run.end, world_hash=timeline.hash,
                       world_dates=[s["metadata"]["date"] for s in timeline.snapshots],

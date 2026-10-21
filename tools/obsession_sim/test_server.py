@@ -82,7 +82,7 @@ class ServerTests(unittest.TestCase):
 
     def test_acceptance_endpoint_labels_partial_report_when_matrix_is_absent(self):
         with patch.object(runner_server, "WORKSPACE", Path(self.temp.name)):
-            folder = Path(self.temp.name) / "tmp/obsession_round2"
+            folder = Path(self.temp.name) / "tmp/obsession_round3"
             folder.mkdir(parents=True)
             partial = {"format": "obsession.cache-screen/1", "cells": {}, "complete_protocol": False}
             (folder / "cache_screen.json").write_text(json.dumps(partial))
