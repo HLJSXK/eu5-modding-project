@@ -52,3 +52,11 @@ console.log('Acceptance workbench checks passed: actual DOM ids, single/matrix r
 box.data={K:[],milestones:[{split:'holdout'}]};assert.throws(()=>run('render(data)'),/留出/);
 run('fillParams({p:.01,rho:.99,hold_T:999,road_scale:3,affinity_strength:0})');assert.equal(elements.params.children.length,2);
 run('busy(false)');assert.equal(elements.matrix.disabled,true);
+
+box.data={cells:{'S×O':{runs:[{...sample,world_kind:'O'}],run_count:1}},
+ worlds:[{id:'fixture',label:'SOL 观察者',dates:['1338.4.1','1840.4.1']}],frozen_hash:'fixture-hash'};
+run('render(data)');
+assert.match(elements.milestones.children[0].children[0].textContent,/非史实.*不比较历史年份/);
+assert.match(elements.worlds.children[0].textContent,/SOL 观察者/);
+assert.match(elements.frozen.textContent,/冻结哈希/);
+assert.doesNotMatch(elements.frozen.textContent,/已变化/);
