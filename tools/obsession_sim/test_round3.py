@@ -227,3 +227,21 @@ def test_round3_protocol_exact_ranges_and_one_latin_batch(tmp_path, monkeypatch)
         values=np.array([r[k] for r in p['grid']])
         positions=(np.log(values/lo)/np.log(hi/lo) if scale=='log' else (values-lo)/(hi-lo))
         assert sorted(np.floor(positions*64).astype(int))==list(range(64))
+
+
+def test_order_upper_is_reachability_ceiling_and_tea1_is_unscored():
+    from .acceptance import RunMetrics
+    r=custom_run(end_month=1).run()
+    targets=[dict(id=str(i),good='coffee',where={'region':'chain'},threshold=20,
+                  target_year=1400+i,tolerance_months=120,grade='B',split='fit') for i in range(3)]
+    metrics=RunMetrics(r.timeline.graph,targets)
+    metrics.arrivals={'0':300,'1':200}
+    result=metrics.report(r)
+    assert result['fit_p_order']==2/3 and result['fit_p_order_upper']==1
+    metrics.arrivals={};assert metrics.report(r)['fit_p_order_upper']==0
+    targets=read_json(HERE/'regional_targets.json')['targets']
+    tea1=next(t for t in targets if t['id']=='tea_1')
+    assert tea1['scored'] is False
+    fit=[t for t in targets if t['split']=='fit' and t['grade'] in ('A','B') and t.get('scored',True)]
+    assert len(fit)==24
+    assert sum(a['good']==b['good'] and a['target_year']<b['target_year'] for a in fit for b in fit)==84

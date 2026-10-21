@@ -96,7 +96,7 @@ def make_protocol(exp):
                  'least peak round delay, least budget-abandoned events, canonical parameter hash'],
         prior_round_candidate_lower_bound=129,
         earlier_round2_batches=[dict(candidate_count=49,status='completed'),dict(candidate_count=147,status='invalidated_or_aborted')],
-        mechanics_run_count=1,
+        mechanics_run_count=len(read_json(exp.out/'mechanics_runs.json')) if (exp.out/'mechanics_runs.json').exists() else 1,
         mechanics_sha256=canonical_hash(read_json(exp.out/'mechanics_only.json')),
         aggregation='Five-seed medians for every ranked scalar; K comparisons skipped if either candidate has <3 decidable rules. Deterministic canonical-hash input order resolves sparse-K ties.',
         validation_seeds=list(range(30)), ablation_seeds=list(range(10)),
@@ -246,6 +246,11 @@ def main():
         params=read_json(exp.out/'round2_params.json')
         result=exp.one('R','S',0,params=params,omit_wc=True,mechanics_only=True,progress=lambda m,r:print(f'mechanics month={m}',flush=True))
         atomic_json(exp.out/'mechanics_only.json',result)
+        ledger=read_json(exp.out/'mechanics_runs.json') if (exp.out/'mechanics_runs.json').exists() else []
+        filename=f'mechanics_only_{len(ledger)+1}.json'
+        atomic_json(exp.out/filename,result)
+        ledger.append(dict(file=filename,code=result['identity']['code'],sha256=canonical_hash(result)))
+        atomic_json(exp.out/'mechanics_runs.json',ledger)
         print(json.dumps({k:result[k] for k in ('zone_values_constant','zone_adjacency_arrivals','peak_U','clock_counts','ever_member')},ensure_ascii=False),flush=True)
     elif args.action=='protocol':make_protocol(exp)
     else:

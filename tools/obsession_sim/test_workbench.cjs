@@ -24,6 +24,13 @@ const sample={mode:'S',world_kind:'R',seed:0,params:{p:.006,lambda_ownership:.1}
               tolerance_months:180,within_tolerance:true,world_evidence:{counts:{'W-A':1,'W-B':2,'W-C':0}}}],events:[]};
 box.data=sample;run('render(data)');
 assert.equal(elements.krows.children.length,1);assert.equal(elements.milestones.children.length,1);
+box.data={...sample,zone_sizes:{coffee:0,tea:2,tobacco:1},zone_values_constant:{coffee:true,tea:true,tobacco:true},
+ zone_rejected_inputs:{coffee:0,tea:5,tobacco:1},zone_adjacency_arrivals:{coffee:0,tea:0,tobacco:0},
+ clocks:{coffee:{history:[{country:0,first_touch_month:10,national_month:20,deadline:260}]}},
+ waves:{coffee:[{reason:'origin'}]},fit_p_order_upper:.75,triggered_K:3};run('render(data)');
+assert.equal(elements.mechanics.children[0].children.length,4);
+assert.match(elements.mechanics.children[1].textContent,/75.0%.*3/);
+assert.match(elements.mechanics.children[2].children[1].children[1].children[0].textContent,/MAM/);
 assert.match(elements.milestones.children[0].children.at(-1).textContent,/1 \/ 2 \/ 0/);
 assert.match(elements.milestones.children[0].children[0].children[0].textContent,/balkan_region/);
 assert.equal(elements.milestones.children[0].children[2].textContent,'x≥20');

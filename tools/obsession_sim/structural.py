@@ -1166,8 +1166,10 @@ class StructuralRun:
             ever_member={g:sum(t>=0 for t in s.arrival) for g,s in self.sims.items()},
             peak_U=max(self.ledger,default=0), peak_round_delay_months=max(s.peak_round_delay for s in self.sims.values()),
             events_abandoned_budget=self.events_abandoned_budget,
-            clock_counts={g:dict(national=sum(r['national_month'] is not None for r in s.clock_history),
-                cap=sum(r['national_month'] is None and r['decay_start_month'] is not None for r in s.clock_history)) for g,s in self.sims.items()})
+            clock_counts={g:dict(national=len({r['country'] for r in s.clock_history if r['national_month'] is not None}),
+                cap=len({r['country'] for r in s.clock_history if r['national_month'] is None and r['decay_start_month'] is not None}),
+                national_episodes=sum(r['national_month'] is not None for r in s.clock_history),
+                cap_episodes=sum(r['national_month'] is None and r['decay_start_month'] is not None for r in s.clock_history)) for g,s in self.sims.items()})
 
     def run(self, progress=None):
         for month in range(self.timeline.start, self.end):
