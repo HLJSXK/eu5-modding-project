@@ -50,7 +50,10 @@ def test_no_wine_simulator():
 
 
 def test_wine_ablation_zero():
-    r=custom_run();r.disabled_rules.add('wine');r.state.religion_group[:]=['christian']*3
+    r=custom_run();r.timeline.graph.attrs['region'][1]='france_region'
+    r.state.religion_group[:]=['christian']*3
+    assert r.wine_background(1)==30
+    r.disabled_rules.add('wine')
     assert all(r.wine_background(v)==0 for v in range(3))
 
 
@@ -148,12 +151,13 @@ def test_deadline_renewal():
     assert sim.deadline[0]==1641
 
 
-@pytest.mark.parametrize('month,adoption,scale',[(20,0,.5),(100,80,.5),(230,10,.5)])
+@pytest.mark.parametrize('month,adoption,scale',[(20,0,.5),(100,80,.5),(230,10,.5),(21,0,.5),(230,11,.5)])
 def test_deadline_ban_equivalence(month,adoption,scale):
     r=custom_run();sim=r.sims['coffee'];sim.deadline[0]=adoption+240
     sim.apply_ban(0,month,scale)
     old=month+scale*max(0,adoption+240-month)-240
-    assert sim.deadline[0]==round(old+240)
+    import math
+    assert sim.deadline[0]==math.ceil(old+240)
 
 
 def test_r_share_quantile():

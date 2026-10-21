@@ -175,7 +175,7 @@ class RuleSimulation(Simulation):
         return month >= self.deadline[country]
 
     def apply_ban(self, country, month, scale):
-        deadline = round(month + scale * max(0, self.deadline[country] - month))
+        deadline = math.ceil(month + scale * max(0, self.deadline[country] - month))
         self.deadline[country] = -2 if deadline == -1 else deadline
         if country in self.clock_current:
             self.clock_current[country]["deadline"] = self.deadline[country]
@@ -474,7 +474,8 @@ class RuleSimulation(Simulation):
             if c not in self.controller.current_countries:
                 self.renew_cursor+=1
                 continue
-            materialise=self.decaying[c] or self.finished[c]
+            materialise=(self.decaying[c] and not self.finished[c] if "R2" in self.controller.rollbacks else
+                         self.decaying[c] or self.finished[c])
             nodes = [v for v in self.members_of[c] if v not in self.zones] if materialise else ()
             cost=7+4*len(nodes)
             if self.U-start+cost > budget:
