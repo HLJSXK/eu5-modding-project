@@ -69,17 +69,19 @@ def make_protocol(exp):
     assert len(FIT_PARAMS)*3 <= len(targets)
     ranges = dict(p=[.003,.024,'log'], rho=[.985,.9995,'linear'], lambda_contact=[20,300,'log'],
                   lambda_ownership=[.1,100,'log'], preemption=[0,.12,'linear'], internal_rate=[.0001,.005,'log'])
-    rng = np.random.default_rng(20261021)
-    n = 48
+    # V3 replaces every vector after the documented accidental exposure to an
+    # old full-set aggregate in the legacy README. Bounds/ranking are unchanged.
+    generation_seed = 2026102103
+    rng = np.random.default_rng(generation_seed)
+    n = 49
     columns = {}
     for key,(lo,hi,scale) in ranges.items():
         positions = (rng.permutation(n)+rng.random(n))/n
         columns[key] = np.exp(np.log(lo)+positions*np.log(hi/lo)) if scale=='log' else lo+positions*(hi-lo)
-    grid = [dict(exp.config['params'])]
-    grid += [{key:round(float(columns[key][i]),8) for key in FIT_PARAMS} for i in range(n)]
+    grid = [{key:round(float(columns[key][i]),8) for key in FIT_PARAMS} for i in range(n)]
     result = dict(format='obsession.round2-fit-protocol/1', runtime_hash=exp.runtime_hash, frozen_hash=exp.frozen_hash,
         graph_hash=exp.graph_hash, workflow_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        parameter_names=list(FIT_PARAMS), fit_AB_targets=len(targets), generation_seed=20261021, ranges=ranges,
+        parameter_names=list(FIT_PARAMS), fit_AB_targets=len(targets), generation_seed=generation_seed, ranges=ranges,
         grid=grid, candidate_count=len(grid), seeds_phase_a=[0], finalist_count=4, seeds_finalists=list(range(5)),
         ranking=['fewest negative constraints', 'monthly budget within 480000',
                  'maximize min(fit_within_2tol/.5, fit_p_order/.7, p_K/.6)',
