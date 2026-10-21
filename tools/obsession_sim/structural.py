@@ -136,13 +136,13 @@ class RuleSimulation(Simulation):
         self._aggregate_upper=[np.full(self.ng,-np.inf),np.full(len(self.shared_market),-np.inf)]
         self.shared_country_source = [-1]*self.ng
         self.shared_front = [False]*self.ng
-        self._front_work = [False]*self.ng
-        self._source_work = [-1]*self.ng
-        self._max_work = [0.]*self.ng
+        self._front_work = np.zeros(self.ng,dtype=bool)
+        self._source_work = np.full(self.ng,-1,dtype=int)
+        self._max_work = np.zeros(self.ng)
         self.owned_hot_population = np.zeros(self.ng)
         self.ownership_source = [-1]*self.ng
         self._owned_hot_work = np.zeros(self.ng)
-        self._ownership_source_work = [-1]*self.ng
+        self._ownership_source_work = np.full(self.ng,-1,dtype=int)
         self.country_wake_until = [-1]*self.ng
         self.market_wake_until = [-1]*len(self.shared_market)
         self.aggregate_cursor = 0
@@ -274,12 +274,22 @@ class RuleSimulation(Simulation):
         values=np.fromiter((self.eff(v) for v in vs),dtype=float,count=len(vs))
         return float(values@weights/total) if total else 0.
 
+    def effective_values(self, a, b):
+        if self.phase == 'lazy':
+            return np.fromiter((self.eff(v) for v in range(a,b)),dtype=float,count=b-a)
+        values = np.asarray(self.x[a:b],dtype=float)
+        if self.clock:
+            habit,S = np.asarray(self.habit),np.asarray(self.S)
+            scales = np.r_[np.where(self.decaying,habit+(1-habit)*S,1.),1.]
+            values = values*scales[np.asarray(self.owner[a:b],dtype=int)]
+        return values
+
     def refresh_aggregates(self):
         """A sliced, charged world traversal; no per-location contribution cache."""
         state, parts = self.controller.state, self.controller.config["fixed"]["aggregate_slices"]
         width = max(1, math.ceil(self.n / parts))
         a, b = self.aggregate_cursor, min(self.n, self.aggregate_cursor + width)
-        values = np.fromiter((self.eff(v) for v in range(a, b)), dtype=float, count=b-a)
+        values = self.effective_values(a,b)
         for k, groups in enumerate((state.owner[a:b], state.market[a:b])):
             valid = groups >= 0
             self._aggregate_sums[k] += np.bincount(groups[valid], weights=state.population[a:b][valid] * values[valid],
@@ -289,18 +299,25 @@ class RuleSimulation(Simulation):
             positive=valid & (state.population[a:b]>0)
             np.minimum.at(self._aggregate_lower[k],groups[positive],values[positive])
             np.maximum.at(self._aggregate_upper[k],groups[positive],values[positive])
-        for v,c,m,value in zip(range(a,b),state.owner[a:b].tolist(),state.market[a:b].tolist(),values.tolist()):
-            cap = state.capitals.get(c)
-            if cap is not None and m != state.market[cap] and value >= 20:
-                self._owned_hot_work[c] += state.population[v]
-                self._ownership_source_work[c] = v
-            if c >= 0 and 0 < value < 1:
-                self._front_work[c] = True
-            if c >= 0 and value > self._max_work[c]:
-                self._max_work[c],self._source_work[c] = value,v
-            dirty_country = c >= 0 and self.country_wake_until[c] >= self.t
-            if dirty_country or (value>=1 and m >= 0 and self.market_wake_until[m] >= self.t):
-                self.U += self._push(v)
+        owners,markets,vertices = state.owner[a:b],state.market[a:b],np.arange(a,b)
+        valid = owners>=0
+        if np.any(valid):
+            hot = valid & (values>=20) & (state.population[a:b]>0)
+            hot &= (self.controller.capital_market[owners] != -2) & (markets != self.controller.capital_market[owners])
+            np.add.at(self._owned_hot_work,owners[hot],state.population[a:b][hot])
+            np.maximum.at(self._ownership_source_work,owners[hot],vertices[hot])
+            self._front_work[owners[valid & (values>0) & (values<1)]] = True
+            previous = self._max_work.copy()
+            np.maximum.at(self._max_work,owners[valid],values[valid])
+            better = valid & (values>previous[owners]) & (values==self._max_work[owners])
+            first = np.full(self.ng,self.n,dtype=int)
+            np.minimum.at(first,owners[better],vertices[better])
+            improved = self._max_work>previous
+            self._source_work[improved] = first[improved]
+        country_dirty = np.r_[np.asarray(self.country_wake_until)>=self.t,False]
+        market_dirty = np.r_[np.asarray(self.market_wake_until)>=self.t,False]
+        dirty = country_dirty[owners] | ((values>=1) & market_dirty[markets])
+        for v in vertices[dirty].tolist():self.U += self._push(v)
         self.U += self.controller.config['fixed']['aggregate_node_cost'] * (b-a)
         self.aggregate_cursor = b
         if b == self.n:
@@ -314,10 +331,10 @@ class RuleSimulation(Simulation):
                     for c in np.flatnonzero(np.abs(country-self.shared_country)>1e-9):
                         other.country_wake_until[int(c)] = self.t+parts
             self.shared_country,self.shared_market = country,market
-            self.shared_country_source = self._source_work.copy()
+            self.shared_country_source = self._source_work.tolist()
             self.owned_hot_population = self._owned_hot_work.copy()
-            self.ownership_source = self._ownership_source_work.copy()
-            self.shared_front = self._front_work.copy()
+            self.ownership_source = self._ownership_source_work.tolist()
+            self.shared_front = self._front_work.tolist()
             self.U += 4*(len(self.controller.current_countries)+len(self.controller.current_markets))
             self.reset_aggregation()
 
@@ -327,11 +344,11 @@ class RuleSimulation(Simulation):
             array.fill(0.)
         for array in self._aggregate_lower:array.fill(np.inf)
         for array in self._aggregate_upper:array.fill(-np.inf)
-        self._max_work = [0.]*self.ng
-        self._source_work = [-1]*self.ng
-        self._front_work = [False]*self.ng
+        self._max_work.fill(0.)
+        self._source_work.fill(-1)
+        self._front_work.fill(False)
         self._owned_hot_work.fill(0.)
-        self._ownership_source_work = [-1]*self.ng
+        self._ownership_source_work.fill(-1)
 
     def begin_month(self):
         if self.done or self.t >= self.P.max_months:
@@ -558,6 +575,17 @@ class StructuralRun:
 
     def apply_state(self, first=False):
         state = self.state
+        previous_sim = next(iter(self.sims.values()))
+        old = previous_sim.g.attrs
+        physical = (first or not np.array_equal(state.owner, previous_sim.owner)
+                    or not np.array_equal(state.population, old.get('population'))
+                    or not np.array_equal(state.market, old.get('market'))
+                    or state.culture != old.get('culture') or state.religion != old.get('religion')
+                    or state.religion_group != old.get('religion_group')
+                    or state.capitals != getattr(self, 'applied_capitals', None))
+        market_demography = (first or not np.array_equal(state.population,old.get('population'))
+                             or not np.array_equal(state.market,old.get('market'))
+                             or state.religion_group != old.get('religion_group'))
         previous_countries,previous_markets=self.current_countries,self.current_markets
         self.current_countries={self.timeline.country_index[name] for name in state.countries}
         self.current_markets={m for m,rec in enumerate(state.markets) if rec.get('present',rec['center']>=0)}
@@ -566,40 +594,54 @@ class StructuralRun:
         valid = state.owner >= 0
         self.country_population = np.bincount(state.owner[valid], weights=state.population[valid],
                                                minlength=len(self.timeline.country_names))
-        self.country_neighbors = {c: set() for c in state.capitals}
+        self.capital_market = np.full(len(self.timeline.country_names)+1,-2,dtype=int)
+        for c,v in state.capitals.items():self.capital_market[c] = state.market[v]
         self.country_faith = {}
         for c, v in state.capitals.items():
             rec = state.countries.get(self.timeline.country_names[c], {})
             self.country_faith[c] = (None if rec.get('no_state_religion') else
                 rec.get('religion_group') or self.timeline.faith_groups.get(rec.get('religion')) or state.religion_group[v])
+        self.country_markets = {c: [] for c in state.capitals}
+        self.country_links=defaultdict(list)
+        for link in state.links:self.country_links[link['actor']].append(link)
+        for m, rec in enumerate(state.markets):
+            for c in rec["merchants"]:
+                if c in self.country_markets:
+                    self.country_markets[c].append(m)
+        if not physical:
+            # Marriage/residency/official-faith metadata cannot discard a
+            # partially completed physical population/x aggregation.
+            for sim in (*self.sims.values(), *self.context_goods.values()):
+                sim.U += 2*reset_groups
+            self.record_world_state()
+            return
+        self.country_neighbors = {c: set() for c in state.capitals}
         for v, neighbors in enumerate(self.timeline.graph.incoming):
             c = int(state.owner[v])
             if c in self.country_neighbors:
                 self.country_neighbors[c].update(int(state.owner[u]) for u in neighbors
                                                  if state.owner[u] >= 0 and state.owner[u] != c)
-        self.country_markets = {c: [] for c in state.capitals}
-        self.country_links=defaultdict(list)
-        for link in state.links:self.country_links[link['actor']].append(link)
         self.market_members=[[] for _ in state.markets]
         for v,m in enumerate(state.market):
             if m>=0:
                 self.market_members[int(m)].append(v)
-        for m, rec in enumerate(state.markets):
-            for c in rec["merchants"]:
-                if c in self.country_markets:
-                    self.country_markets[c].append(m)
-        self.foreign_members = {c: [] for c in state.capitals}
+        new_owner = state.owner.tolist()
+        moved = np.flatnonzero(state.owner != np.asarray(previous_sim.owner,dtype=int)).tolist()
+        members = [[] for _ in range(previous_sim.ng)]
+        for v,c in enumerate(new_owner):
+            if c>=0:members[c].append(v)
         continent = self.timeline.graph.attrs["continent"]
-        faith = [defaultdict(float) for _ in state.markets]
-        for v, c in enumerate(state.owner):
-            if c in state.capitals and continent[v] != continent[state.capitals[c]]:
-                self.foreign_members[c].append(v)
-            m = state.market[v]
-            if m >= 0 and state.religion_group[v] is not None:
-                faith[m][state.religion_group[v]] += state.population[v]
-        self.market_faith = [max(row, key=row.get) if row else None for row in faith]
+        self.foreign_members = {c:[v for v in members[c] if continent[v] != continent[cap]]
+                                for c,cap in state.capitals.items()}
+        if market_demography:
+            faith = [defaultdict(float) for _ in state.markets]
+            for v,m in enumerate(state.market):
+                if m>=0 and state.religion_group[v] is not None:
+                    faith[m][state.religion_group[v]] += state.population[v]
+            self.market_faith = [max(row,key=row.get) if row else None for row in faith]
+        population_list,market_list = state.population.tolist(),state.market.tolist()
         for sim in list(self.sims.values()) + list(self.context_goods.values()):
-            changed = [v for v in range(sim.n) if int(state.owner[v]) != sim.owner[v]]
+            changed = moved
             # Materialise incoming land before changing the owner. Rebase a new
             # country's lazy scale if division would overflow the one-x range.
             incoming_values = {v: sim.eff(v) for v in changed}
@@ -616,19 +658,16 @@ class StructuralRun:
                 sim.habit[c] = min(1.,sim.habit[c]/factor) if factor > 0 else 0.
                 sim.S[c] = 1.
                 sim.U += 3
-            sim.owner = state.owner.tolist()
+            sim.owner = new_owner
             sim.g.owner = sim.owner
-            sim.members_of = [[] for _ in range(sim.ng)]
-            for v, c in enumerate(sim.owner):
-                if c >= 0:
-                    sim.members_of[c].append(v)
+            sim.members_of = [vs.copy() for vs in members]
             for v, value in incoming_values.items():
                 c = sim.owner[v]
                 scale = (sim.habit[c] + (1-sim.habit[c])*sim.S[c]) if c >= 0 and sim.decaying[c] else 1.
                 sim.x[v] = value / scale
                 sim.U += 7 + sim._push(v)
-            sim.g.attrs.update(population=state.population.tolist(), market=state.market.tolist(),
-                               culture=state.culture, religion=state.religion)
+            sim.g.attrs.update(population=population_list, market=market_list,
+                               culture=state.culture, religion=state.religion, religion_group=state.religion_group)
             sim.g.in_weight = sim.w = None  # Every adjacency, including straits, has weight one.
             if hasattr(sim,"reset_aggregation"):
                 sim.reset_aggregation()
@@ -637,6 +676,13 @@ class StructuralRun:
             # are simulated work; copying a Python snapshot is not an EU5 scan.
             if not first:
                 sim.U += 2*reset_groups
+        self.applied_capitals = dict(state.capitals)
+        self.record_world_state()
+
+    def record_world_state(self):
+        if not any(sim.P.frames_every for sim in self.sims.values()):
+            return
+        state = self.state
         self.world_log.append({"month": next(iter(self.sims.values())).t, "date": state.snapshot_date,
                                "owner": state.owner.tolist(), "market": state.market.tolist(),
                                "group_labels": [state.countries.get(c,{}).get("tag") or c for c in self.timeline.country_names],
@@ -693,7 +739,7 @@ class StructuralRun:
             source=sim.ownership_source[c]
             if ("ownership" not in self.disabled_rules and source >= 0 and state.owner[source] == c and
                     state.market[source] != state.market[cap] and sim.eff(cap) < 20 and sim.eff(source) >= 20
-                    and self.country_population[c] > 0):
+                    and self.country_population[c] > 0 and sim.owned_hot_population[c] > 0):
                 ownership.append((c,cap,source,sim.owned_hot_population[c]/self.country_population[c]))
         new_pairs = {(m,c,target,resident) for m,c,_,target,resident in pairs} - sim.seen_pairs
         new_ownership = {(c,int(state.market[source])) for c,_,source,_ in ownership} - sim.seen_ownership
@@ -702,8 +748,6 @@ class StructuralRun:
         sim.seen_pairs.update((m,c,target,resident) for m,c,_,target,resident in pairs)
         sim.seen_ownership.update((c,int(state.market[source])) for c,_,source,_ in ownership)
         if opening:
-            return
-        if not sim.spreading and not sim.contact_started:
             return
         for m, c, share, cap,resident in pairs:
             profile = self.config["profiles"][sim.good]

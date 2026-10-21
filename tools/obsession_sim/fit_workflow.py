@@ -85,7 +85,9 @@ def make_protocol(exp):
                  'maximize min(fit_within_2tol/.5, fit_p_order/.7, p_K/.6)',
                  'maximize fit_within_2tol, fit_p_order, p_K in that order',
                  'least peak round delay, least budget-abandoned events, canonical parameter hash'],
-        prior_round_candidate_lower_bound=129, earlier_round2_batches=[],
+        prior_round_candidate_lower_bound=129,
+        earlier_round2_batches=(read_json(PROTOCOL.with_name('round2_aborted_batches.json'))['batches']
+                               if PROTOCOL.with_name('round2_aborted_batches.json').exists() else []),
         validation_seeds=list(range(30)), ablation_seeds=list(range(10)),
         diagnostics=dict(R_modes=['S','H'], O_modes=['S','G'],
                          rule_ablations=['contact','ownership','market','preemption','wine'], budget_multiplier=2),
@@ -136,6 +138,7 @@ def select(exp, protocol):
     log=dict(format='obsession.round2-selection-log/1',runtime_hash=exp.runtime_hash,frozen_hash=exp.frozen_hash,
         graph_hash=exp.graph_hash,protocol=str(PROTOCOL.relative_to(ROOT)),protocol_sha256=canonical_hash(protocol),
         candidate_count=result['candidate_count'],selection_run_count=result['selection_run_count'],
+        total_scheduled_candidates=result['candidate_count']+sum(b['candidate_count'] for b in protocol['earlier_round2_batches']),
         earlier_round2_batches=protocol['earlier_round2_batches'],prior_round_candidate_lower_bound=129,
         selected=result['recommended'],all_candidates=result['candidates'],fit_only=True,
         observer_manifests=[dict(path=p,sha256=hashlib.sha256(Path(p).read_bytes()).hexdigest()) for p in exp.observer_paths],

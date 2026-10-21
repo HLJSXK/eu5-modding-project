@@ -158,6 +158,7 @@ class RunMetrics:
         continent=run.timeline.graph.attrs["continent"]
         transatlantic=any(state.owner[v] in state.capitals and continent[v] == "america" and
                          continent[state.capitals[int(state.owner[v])]] != "america" for v in run.raw_nodes["tobacco"])
+        run.tobacco_possession_seen |= transatlantic  # Diagnostic history, never a propagation gate.
         if not run.tobacco_possession_seen and not transatlantic and np.any(values["tobacco"][self.outside_america] > 0):
             self.violations.setdefault("tobacco_outside_america_before_possession", {"month":month})
         # Wine is an explicitly modelled, dormant opening custom, with one x.

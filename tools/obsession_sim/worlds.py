@@ -333,6 +333,7 @@ class Timeline:
         self.cursor = -1
         self.signature = None
         self.state = None
+        self._column_cache = {}
 
     def resolve_actor(self, record, owner, countries, prefix="actor"):
         location = record.get(prefix + "_location")
@@ -344,6 +345,49 @@ class Timeline:
             return int(owner[self.names[record["location"]]])
         return self.country_index.get(name, -1) if name in countries else -1
 
+    def snapshot_columns(self, cursor):
+        """Decode immutable external columns once per snapshot, not per fact."""
+        if cursor in self._column_cache:
+            return self._column_cache[cursor]
+        snap = self.snapshots[cursor]
+        locs = snap['locations']
+        missing = set(self.names) - locs.keys()
+        if missing:
+            raise ValueError(f"world snapshot misses {len(missing)} graph locations")
+        owner = np.array([self.country_index.get(locs[n].get('owner'), -1) for n in self.graph.names], dtype=int)
+        pop = np.array([locs[n]['population'] for n in self.graph.names], dtype=float)
+        if np.any(~np.isfinite(pop)) or np.any(pop < 0):
+            raise ValueError('invalid world population')
+        market = np.array([self.market_index.get(locs[n].get('market'), -1) for n in self.graph.names], dtype=int)
+        capitals = {self.country_index[c]:self.names[rec['capital']] for c,rec in snap['countries'].items()
+                    if rec.get('capital') in self.names and c in self.country_index}
+        markets = [dict(merchants={}, center=-1, present=False) for _ in self.market_names]
+        for m, rec in snap['markets'].items():
+            markets[self.market_index[m]] = dict(center=self.names.get(rec['center'], -1), present=True,
+                merchants={self.country_index[c]:float(s) for c,s in rec['merchants'].items()
+                           if c in self.country_index and s>0})
+        links = [dict(kind=r['kind'], actor=self.country_index[str(r['actor'])],
+                      other=self.country_index.get(str(r.get('other'))), fact_id=r['fact_id'], good=r.get('good'))
+                 for r in snap.get('links',[]) if str(r.get('actor')) in self.country_index]
+        roads = {}
+        for a,b,kind in snap['roads']:
+            if a in self.names and b in self.names:
+                u,v = self.names[a],self.names[b]
+                if u in self.graph.incoming[v]:roads[min(u,v),max(u,v)] = kind
+        culture = [locs[n].get('culture') for n in self.graph.names]
+        religion = [locs[n].get('religion') for n in self.graph.names]
+        if any(pop[v]>0 and isinstance(r,str) and r.isdecimal() for v,r in enumerate(religion)):
+            raise ValueError('Unresolved runtime religion ids; refresh formal world exports before simulating')
+        base_raw = self.graph.attrs.get('raw_material') or [None]*self.graph.n
+        result = dict(owner=owner, population=pop, market=market, capitals=capitals, markets=markets,
+            countries=snap['countries'], links=links, roads=roads, culture=culture, religion=religion,
+            religion_group=[self.faith_groups.get(r) for r in religion],
+            raw_material=[locs[n].get('raw_material',base_raw[v]) for v,n in enumerate(self.graph.names)],
+            date=snap['metadata']['date'])
+        self._column_cache[cursor] = result
+        while len(self._column_cache)>2:del self._column_cache[next(iter(self._column_cache))]
+        return result
+
     def at(self, month):
         cursor = max((i for i, t in enumerate(self.dates) if t <= month), default=-1)
         if cursor < 0:
@@ -352,27 +396,13 @@ class Timeline:
         signature = (cursor, tuple(f["id"] for f in active))
         if signature == self.signature:
             return self.state, False
-        snap = self.snapshots[cursor]
-        locs = snap["locations"]
-        missing = set(self.names) - locs.keys()
-        if missing:
-            raise ValueError(f"world snapshot misses {len(missing)} graph locations")
-        owner = np.array([self.country_index.get(locs[n].get("owner"), -1) for n in self.graph.names], dtype=int)
-        pop = np.array([locs[n]["population"] for n in self.graph.names], dtype=float)
-        if np.any(~np.isfinite(pop)) or np.any(pop < 0):
-            raise ValueError("invalid world population")
-        market = np.array([self.market_index.get(locs[n].get("market"), -1) for n in self.graph.names], dtype=int)
-        capitals = {self.country_index[c]: self.names[rec["capital"]] for c, rec in snap["countries"].items()
-                    if rec.get("capital") in self.names and c in self.country_index}
-        markets = [{"merchants": {}, "center": -1,'present':False} for _ in self.market_names]
-        for m, rec in snap["markets"].items():
-            markets[self.market_index[m]] = {"center": self.names.get(rec["center"], -1),'present':True,
-                "merchants": {self.country_index[c]: float(s) for c, s in rec["merchants"].items()
-                              if c in self.country_index and s > 0}}
-        links=[{'kind':r['kind'],'actor':self.country_index[str(r['actor'])],
-                'other':self.country_index.get(str(r.get('other'))),'fact_id':r['fact_id'],'good':r.get('good')}
-               for r in snap.get('links',[]) if str(r.get('actor')) in self.country_index]
-        countries = deepcopy(snap["countries"])
+        columns = self.snapshot_columns(cursor)
+        owner,pop,market = (columns[k].copy() for k in ('owner','population','market'))
+        capitals = dict(columns['capitals'])
+        markets = [dict(rec, merchants=dict(rec['merchants'])) for rec in columns['markets']]
+        links = [dict(r) for r in columns['links']]
+        countries = {c:{k:(deepcopy(v) if isinstance(v,(list,dict)) else v) for k,v in rec.items()}
+                     for c,rec in columns['countries'].items()}
         resolved = {}
         effects = {}
         # Country identity exists for the entire active month, including when
@@ -408,8 +438,7 @@ class Timeline:
                             before, _ = self.at(fact["start_month"] - 1)
                             prior_owner = before.owner
                         else:
-                            prior_owner = np.array([self.country_index.get(locs[n].get("owner"), -1)
-                                                    for n in self.graph.names], dtype=int)
+                            prior_owner = columns['owner']
                         previous = previous if isinstance(previous, list) else [previous]
                         indices = [self.country_index[t] for t in previous if t in self.country_index]
                         self.bound_fact_nodes[fact["id"]] = targets[np.isin(prior_owner[targets], indices)]
@@ -457,26 +486,16 @@ class Timeline:
         # O exports already contain real shares; R has a common measured share.
         # Neither is renormalized after removing territorial residents.
         capitals = {c: v for c, v in capitals.items() if owner[v] == c}
-        roads = {}
-        for a, b, kind in snap["roads"]:
-            if a in self.names and b in self.names:
-                u, v = self.names[a], self.names[b]
-                if u in self.graph.incoming[v]:
-                    roads[(min(u, v), max(u, v))] = kind
-        culture = [locs[n].get("culture") for n in self.graph.names]
-        religion = [locs[n].get("religion") for n in self.graph.names]
-        if any(pop[v]>0 and isinstance(religion[v],str) and religion[v].isdecimal() for v in range(self.graph.n)):
-            raise ValueError('Unresolved runtime religion ids; refresh formal world exports before simulating')
-        base_raw = self.graph.attrs.get("raw_material") or [None]*self.graph.n
         territories = [set() for _ in markets]
-        for c, m, weight in zip(owner, market, pop):
-            if c >= 0 and m >= 0 and weight > 0:
-                territories[int(m)].add(int(c))
-        self.state = WorldState(owner, pop, market, capitals, countries, markets, roads, culture,
-                                religion, [self.faith_groups.get(r) for r in religion],
-                                [locs[n].get("raw_material",base_raw[v])
-                                 for v,n in enumerate(self.graph.names)], links,
-                                [f["id"] for f in active], snap["metadata"]["date"], territories, effects)
+        valid = (owner>=0)&(market>=0)&(pop>0)
+        if np.any(valid):
+            count = len(self.country_names)
+            for value in np.unique(market[valid]*count+owner[valid]).tolist():
+                m,c = divmod(value,count)
+                territories[m].add(c)
+        self.state = WorldState(owner, pop, market, capitals, countries, markets, dict(columns['roads']),
+                                columns['culture'].copy(), columns['religion'].copy(), columns['religion_group'].copy(),
+                                columns['raw_material'].copy(), links, [f['id'] for f in active], columns['date'], territories, effects)
         self.signature, self.cursor = signature, cursor
         return self.state, True
 

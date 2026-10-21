@@ -301,3 +301,84 @@ def test_j12_budget_diagnostics_are_preserved_in_aggregation():
     result = aggregate_runs([r.metrics.report(r), r.metrics.report(r)])
     assert result['peak_round_delay_months'] == 8
     assert result['events_abandoned_budget'] == 8
+
+
+def test_past_possession_is_remembered_by_diagnostics_after_a_colony_is_lost():
+    g, s = tiny_world()
+    s['locations']['c']['owner'] = 'A'
+    r = StructuralRun(g, Timeline(g, [s], kind='R'), CONFIG, SPEC, end_month=1).run()
+    assert r.tobacco_possession_seen
+    r.state.owner[2] = 2
+    r.sims['tobacco'].x[1] = 2
+    r.metrics.observe(100, r, r.diagnostics())
+    assert 'tobacco_outside_america_before_possession' not in r.metrics.violations
+
+
+def test_metadata_updates_preserve_aggregate_progress_and_nonvisual_runs_omit_world_frames():
+    g, s = tiny_world()
+    r = StructuralRun(g, Timeline(g, [s]), CONFIG, SPEC, end_month=1)
+    sim = r.sims['coffee']
+    sim.x[0] = 30
+    sim.refresh_aggregates()
+    cursor, weights = sim.aggregate_cursor, sim._aggregate_weights[0].copy()
+    r.state.links = [dict(kind='marriage',actor=0,other=1,fact_id='synthetic',good=None)]
+    r.apply_state()
+    assert sim.aggregate_cursor == cursor
+    assert np.array_equal(sim._aggregate_weights[0],weights)
+    assert r.country_links[0][0]['kind'] == 'marriage'
+    assert r.world_log == []
+    replay = StructuralRun(g, Timeline(g, [s]), CONFIG, SPEC, end_month=1, frames_every=1)
+    assert len(replay.world_log) == 1
+
+
+@pytest.mark.parametrize('channel',['contact','ownership'])
+def test_initial_eligible_channels_receive_their_annual_trials(channel):
+    g,s = tiny_world()
+    cfg=deepcopy(CONFIG)
+    cfg['initial_customs']['tea']=[dict(where=dict(region='x'),value=25)]
+    if channel=='contact':
+        s['markets']['0']['merchants']={'B':.1}
+    else:
+        s['locations']['a']['owner']='B'
+    r=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=1)
+    sim=r.sims['tea']
+    assert sim.wave_start is None and not sim.contact_started
+    sim.contact_rng=sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    sim.t=1
+    r.prepare_good(sim)
+    assert sim.x[1]==7 and any(row['type']==channel for row in sim.nonlocal_log)
+
+
+def test_zero_population_hot_territory_cannot_activate_ownership_return():
+    g,s=tiny_world()
+    s['locations']['a'].update(owner='B',population=0)
+    r=StructuralRun(g,Timeline(g,[s]),CONFIG,SPEC,end_month=1)
+    sim=r.sims['coffee'];sim.x[0]=30
+    for _ in range(sim.n):sim.refresh_aggregates()
+    sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    r.disabled_rules={'contact'}
+    r.prepare_good(sim)
+    assert sim.owned_hot_population[1]==0 and not sim.spreading and not sim.nonlocal_log
+
+
+def test_vector_aggregation_matches_effective_population_and_first_maximum_definitions():
+    from .test_structural import chain_world
+    from .worlds import weighted_means
+    g,s=chain_world(9)
+    for i,name in enumerate(g.names):
+        s['locations'][name]['market']='m' if i<2 else 'other'
+        s['locations'][name]['population']=i/10
+    s['markets']['other']=dict(center='n2',merchants={'A':1})
+    r=StructuralRun(g,Timeline(g,[s]),CONFIG,SPEC,end_month=1)
+    sim=r.sims['coffee'];sim.x[:]=[1,.5,40,40,50,20,10,0,2]
+    sim.decaying[0]=True;sim.S[0]=.8
+    values=np.array([sim.eff(v) for v in range(sim.n)])
+    assert sim.effective_values(0,sim.n)==pytest.approx(values)
+    sim.reset_aggregation()
+    for _ in range(sim.n):sim.refresh_aggregates()
+    expected,_=weighted_means(values,r.state.owner,r.state.population,sim.ng)
+    assert sim.shared_country==pytest.approx(expected)
+    assert sim.shared_country_source[0]==int(np.argmax(values))
+    assert sim.shared_front[0] == bool(np.any((values>0)&(values<1)))
+    mask=(r.state.market!=r.state.market[0])&(values>=20)&(r.state.population>0)
+    assert sim.owned_hot_population[0]==pytest.approx(r.state.population[mask].sum())
