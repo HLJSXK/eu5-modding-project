@@ -1,6 +1,6 @@
 # obsession_sim：痴迷扩散离线模拟核心
 
-更新：2026-10-21。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 23 为准，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+更新：2026-10-22。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 23 为准，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
 
 ## 当前流程：23 交接规格
 
@@ -17,12 +17,17 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 & $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow select
 # 先提交 selected_params.json 与 selection_log.json，再通知审计方。
 & $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow diagnostics
+& $env:EU5_PYTHON docs/design/obsession/experiments/build_round2_report.py
 & $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8767
 ```
 
 `fit` 要求新排序协议已提交；`diagnostics` 要求选参文件与日志已提交，且运行时和冻结哈希匹配。选参只读拟合集，正式诊断包含双局 K 条、通道消融、去酒与双倍预算。超过三分之一拟合 A/B 里程碑在双倍预算下移动超过容差，将阻止 L2 宣称。
 
+年度入口量按用户确认解释为年风险率，可大于 1，每月用 `1-exp(-r/12)` 抽样；退潮期间拒收。报告构建器校验完整 30 种子及当前冻结身份，输出 `tmp/round2_results_sections.md`，并为 JSON/离线 HTML 报告补充已知拟合集必要条件差项。正式闸门仍交审计方。离线 HTML 无损压缩内嵌完整报告，原始 JSON 另行保留；载入后移除一次性 DOM 数据块，支持两局与全部种子查看。
+
 工作台位于 `/docs/design/obsession/experiments/structural_workbench.html`：只显示六个可调参数，固定值另列，支持两局结果切换，以及队列延迟、放弃事件与逐商品 E_gap。R 地图回放在导出前屏蔽留出地点及其到达列，相关统计也去掉留出地点。实现者接口不运行或加载留出结果；正式全集矩阵留给审计方用显式 `--auditor-holdout` 运行。
+
+观察者汇总选择器可切换 SOL/原版局的矩阵指标，运行详情另可逐种子检查 K 案例。通道消融和双倍预算在独立对照表中显示；阶段性报告标明实际完成次数。O 世界仅作条件规律检查，不展示历史年份对比。
 
 `round2 {config,world,prior,audit,audit-batch,observers}` 是输入准备与一致性检查工具；输入准备只在选参前进行。`config` 不覆盖已经选出的六参数文件。世界输入修订后需重新检查、冻结并发布协议。
 

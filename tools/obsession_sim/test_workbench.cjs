@@ -1,6 +1,7 @@
 /* Exercise the real acceptance UI, including DOM-id and seed selection errors. */
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../../docs/design/obsession/experiments/structural_workbench.html'),'utf8');
+assert.equal((html.match(/<\/body>/g)||[]).length,1,'standalone report injection needs one explicit body end');
 function element(tag='div'){
  return {tag,children:[],dataset:{},style:{},value:'',textContent:'',hidden:false,disabled:false,
   append(...xs){this.children.push(...xs);if(this.tag==='select'&&!this.value&&xs[0])this.value=xs[0].value;},
@@ -19,11 +20,13 @@ assert.equal(elements.cells.children.length,4);
 const run=code=>vm.runInContext(code,box);
 const sample={mode:'S',world_kind:'R',seed:0,params:{p:.006,lambda_ownership:.1},p_K:.5,peak_U:123,violation_count:0,
  country_labels:['MAM'],K:[{id:'K1',level:'B',status:'fail',cases:[{country:0,t0:1200,t1:1300,status:'fail'}]}],
- milestones:[{good:'coffee',name:'Region',split:'fit',target_year:1500,simulated_year:1510,error_months:120,
+ milestones:[{good:'coffee',name:'Region',where:{region:'balkan_region'},threshold:20,split:'fit',target_year:1500,simulated_year:1510,error_months:120,
               tolerance_months:180,within_tolerance:true,world_evidence:{counts:{'W-A':1,'W-B':2,'W-C':0}}}],events:[]};
 box.data=sample;run('render(data)');
 assert.equal(elements.krows.children.length,1);assert.equal(elements.milestones.children.length,1);
 assert.match(elements.milestones.children[0].children.at(-1).textContent,/1 \/ 2 \/ 0/);
+assert.match(elements.milestones.children[0].children[0].children[0].textContent,/balkan_region/);
+assert.equal(elements.milestones.children[0].children[2].textContent,'x≥20');
 elements.krows.children[0].children[0].children[0].click();
 assert.equal(elements['case-details'].hidden,false);
 assert.match(elements.cases.children[0].children[1].children[0].textContent,/MAM/);
@@ -60,3 +63,31 @@ assert.match(elements.milestones.children[0].children[0].textContent,/非史实.
 assert.match(elements.worlds.children[0].textContent,/SOL 观察者/);
 assert.match(elements.frozen.textContent,/冻结哈希/);
 assert.doesNotMatch(elements.frozen.textContent,/已变化/);
+
+const contrastMetrics={fit_within_2tol:.2,fit_p_order:.6,p_K:.5,violation_count:0,peak_round_delay_months:3,events_abandoned_budget:2};
+box.data={...box.data,baseline_10:{metrics:contrastMetrics},ablations:{contact:{metrics:contrastMetrics}},
+ budget_sensitivity:{eligible_milestones:25,moved_fraction:.4,blocks_L2:true,double_budget:{metrics:contrastMetrics}}};
+run('render(data)');
+assert.equal(elements.ablations.children.length,3);
+assert.equal(elements.ablations.children[1].children[0].textContent,'关闭商人常驻');
+assert.match(elements['budget-summary'].textContent,/40.0%.*阻止 L2 宣称/);
+box.data={...box.data,budget_sensitivity:undefined,ablations:undefined,baseline_10:undefined};
+run('render(data)');
+assert.equal(elements.ablations.children.length,0);
+assert.match(elements['budget-summary'].textContent,/尚未完成/);
+
+box.data={...box.data,world_cells:{
+ 'S×O · SOL 观察者':{run_count:30,runs:[{...sample,world_kind:'O'}],p_K:.6},
+ 'S×O · 原版观察者':{run_count:30,runs:[{...sample,world_kind:'O'}],p_K:.4}}};
+run('render(data)');
+assert.equal(elements['observer-cell'].children.length,2);
+elements['observer-cell'].value='原版观察者';elements['observer-cell'].onchange();
+const observerCell=elements.cells.children[0].children[2];
+assert.match(observerCell.children[0].textContent,/原版观察者/);
+assert.equal(observerCell.querySelectorAll('b')[0].textContent,'40.0%');
+
+box.atob=atob;box.Blob=Blob;box.Response=Response;box.DecompressionStream=DecompressionStream;
+box.packed=require('node:zlib').gzipSync(JSON.stringify({fit_only:true,marker:'离线数据完整'})).toString('base64');
+run('unpackReport(packed)').then(data=>{
+ assert.equal(data.fit_only,true);assert.equal(data.marker,'离线数据完整');
+}).catch(error=>{console.error(error);process.exitCode=1;});
