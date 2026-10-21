@@ -21,10 +21,10 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from .acceptance import aggregate_runs, event_dependence, gates, moved, q
-from .export import export_html, playback_payload
+from .export import export_html, playback_payload, mask_holdout_playback
 from .graph import load_json
-from .structural import StructuralRun, validate_params
-from .worlds import Timeline, canonical_hash, historical_base, read_timeline, religion_groups
+from .structural import StructuralRun, validate_params, validate_fit_params
+from .worlds import Timeline, canonical_hash, historical_base, read_timeline, religion_groups, bindings_key
 from tools.eu5_save_parser.world_export import atomic_json, json_scalar
 
 HERE = Path(__file__).resolve().parent
@@ -83,6 +83,7 @@ class Experiment:
         self.graph_hash=hashlib.sha256(self.graph_path.read_bytes()).hexdigest()
         self.graph = load_json(graph_path)
         self.observers = [read_timeline(p,lazy=True) for p in observer_paths]
+        self.observers.sort(key=lambda item: item[0].get('role') == 'independent_validation')
         self.observer_paths = [str(Path(p).resolve()) for p in observer_paths]
         if not self.observers:
             raise ValueError("the initial engine world requires an exported near-start snapshot")
@@ -95,6 +96,7 @@ class Experiment:
         self.config = read_json(HERE/"structural_config.json")
         self.facts = read_json(HERE/"world_facts.json")["facts"]
         self.priors = read_json(HERE/"world_priors.json")
+        self._timeline_cache = {}
         self.frozen_valid, self.frozen_hash, self.actual_hashes = freeze_status()
         bundle=code_bundle();self.runtime_hash=bundle['runtime_hash']
         self.code_snapshot=self.out/'inputs'/'code'/(self.runtime_hash+'.json')
@@ -105,7 +107,10 @@ class Experiment:
                 raise ValueError("runtime source archive does not match its hash")
         else:
             atomic_json(self.code_snapshot,bundle)
-        signature = canonical_hash({"initial": self.observers[0][1][0]["_snapshot_sha256"],
+        initial_sequence = next((snaps for manifest, snaps in self.observers
+                                 if manifest['id'] == self.priors.get('source_world')), self.observers[0][1])
+        initial = initial_sequence[0]
+        signature = canonical_hash({"initial": initial["_snapshot_sha256"],
                                     "builder":{name:bundle['files']['tools/obsession_sim/'+name]['sha256'] for name in ('worlds.py','eu5_map.py')},
                                     "graph":self.graph_hash,
                                     "setup": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in
@@ -115,37 +120,57 @@ class Experiment:
         if cached.exists() and read_json(cached).get("build_signature") == signature:
             self.base = read_json(cached)["snapshot"]
         else:
-            self.base = historical_base(self.graph, self.observers[0][1][0], self.reference)
+            self.base = historical_base(self.graph, initial, self.reference)
             atomic_json(cached, {"build_signature":signature, "snapshot":self.base})
 
     def timeline(self, world, seed, omit_wc=False):
+        cache = getattr(self, "_timeline_cache", None)
+        key = (world, seed if world == "R" else 0, omit_wc)
+        if cache is not None and key in cache:
+            return cache[key]
         if world == "R":
             share = self.priors["foreign_share_quantiles"]["0.5"]
-            return Timeline(self.graph, [self.base], kind="R", facts=self.facts, seed=seed,
-                            faith_groups=self.faiths, omit_wc=omit_wc,residency_power=share/(1-share))
+            timeline = Timeline(self.graph, [self.base], kind="R", facts=self.facts, seed=seed,
+                                faith_groups=self.faiths, omit_wc=omit_wc,residency_power=share)
+            path = self.out / "inputs/world_bindings" / (bindings_key(timeline, seed, omit_wc) + ".json")
+            if path.exists():
+                import numpy as np
+                bound = read_json(path)
+                if bound['key'] != path.stem:
+                    raise ValueError('world binding cache key mismatch')
+                timeline.bound_fact_nodes = {k:np.array(v, dtype=int) for k,v in bound['bound_nodes'].items()}
+                timeline.fact_effect_counts = bound['affected_locations']
+            if cache is not None: cache[key] = timeline
+            return timeline
         match = next(((m,s) for m,s in self.observers if world in ("O", "O:"+m["id"])), None)
         if match is None:
             raise ValueError("unknown observer world")
         manifest, snapshots = match
-        return Timeline(self.graph, snapshots, kind="O", world_id=manifest["id"], seed=seed, faith_groups=self.faiths)
+        timeline = Timeline(self.graph, snapshots, kind="O", world_id=manifest["id"], seed=seed, faith_groups=self.faiths)
+        if cache is not None: cache[key] = timeline
+        return timeline
 
-    def one(self, world, mode, seed, *, params=None, disabled_events=(), omit_wc=False, fit_only=False,
-            frames=0, end_year=None, progress=None, cancel=None, disabled_rules=()):
+    def one(self, world, mode, seed, *, params=None, disabled_events=(), omit_wc=False, fit_only=True,
+            frames=0, end_year=None, progress=None, cancel=None, disabled_rules=(), budget_multiplier=1):
         timeline = self.timeline(world, seed, omit_wc)
         config = deepcopy(self.config)
-        allowed_rules = {"contact","preemption","ownership","roads","market","wine"}
+        allowed_rules = {"contact","preemption","ownership","market","wine"}
         if set(disabled_rules) - allowed_rules:
             raise ValueError("unknown structural rule")
         config["disabled_rules"] = list(disabled_rules)
-        for name,value in validate_params(params or {}).items():
+        for name,value in validate_fit_params(params or {}).items():
             config["params"][name] = value
+        if budget_multiplier not in (1, 2):
+            raise ValueError("budget sensitivity permits only 1× or 2×")
+        config["fixed"]["budget"] *= budget_multiplier
         if seed not in self.spec["seeds"] or isinstance(seed,bool):
             raise ValueError("seed must be a fixed ID 0–29")
         spec = deepcopy(self.spec)
         spec["targets"] = [r for r in self.targets if not fit_only or r["split"] == "fit"]
         identity = {"frozen":self.frozen_hash, "world":timeline.hash,'graph':self.graph_hash,'environment':environment_info(), "mode":mode, "seed":seed,
                     "params":config["params"], "disabled":list(disabled_events), "omit_wc":omit_wc,
-                    "fit_only":fit_only, "end_year":end_year, "code":self.runtime_hash,"disabled_rules":list(disabled_rules)}
+                    "fit_only":fit_only, "end_year":end_year, "code":self.runtime_hash,"disabled_rules":list(disabled_rules),
+                    "budget_multiplier":budget_multiplier}
         key = canonical_hash(identity)
         cache = self.out/"runs"/(key+".json")
         if cache.exists() and not frames:
@@ -161,6 +186,8 @@ class Experiment:
                       world_dates=[s["metadata"]["date"] for s in timeline.snapshots],
                       params=config["params"], frozen_hash=self.frozen_hash, cache_file=str(cache))
         result.update(graph_hash=self.graph_hash,code_snapshot=str(self.code_snapshot),environment=environment_info())
+        result["fit_only"] = fit_only
+        result["fact_effect_counts"] = timeline.fact_effect_counts
         result['country_labels']=[run.state.countries.get(c,{}).get('tag') or c for c in timeline.country_names]
         result = json.loads(json.dumps(result,allow_nan=False,default=json_scalar))
         atomic_json(cache,result)
@@ -180,6 +207,11 @@ class Experiment:
                                   'market':initial['market']}
                 payload['graph_meta']={**payload['graph_meta'],'source_date':initial['date'],
                     'owner_source':('1337 setup plus sourced political facts' if timeline.kind=='R' else 'Observed /2 world snapshots: '+timeline.id)}
+                if fit_only and timeline.kind == "R":
+                    from .metrics import resolve_nodes
+                    hidden = set().union(*(set(resolve_nodes(self.graph, row)) for row in self.targets
+                                           if row["split"] == "holdout" and row["good"] == good))
+                    mask_holdout_playback(payload, hidden)
                 payload = json.loads(json.dumps(payload,allow_nan=False,default=json_scalar))
                 atomic_json(path,payload)
                 # Existing map viewer remains the renderer for this new engine.
@@ -223,7 +255,7 @@ class Experiment:
         cells, world_cells = {}, {}
         completed = {}
         if workers > 1:
-            requests = [{"world":world,"mode":mode,"seed":seed,"params":params,"omit_wc":world=="R"}
+            requests = [{"world":world,"mode":mode,"seed":seed,"params":params,"omit_wc":world=="R", "fit_only":False}
                         for world in worlds for mode in (list(MODES) if mixed else ["S","H","G"]) for seed in seeds]
             results = self.many(requests,workers,progress,cancel)
             completed = {(request["world"],request["mode"],request["seed"]):result for request,result in zip(requests,results)}
@@ -236,7 +268,7 @@ class Experiment:
                 for seed in seeds:
                     if cancel and cancel.is_set():
                         raise InterruptedError("matrix cancelled")
-                    r = completed.get((world,mode,seed)) or self.one(world, mode, seed, params=params, cancel=cancel,omit_wc=world=="R")
+                    r = completed.get((world,mode,seed)) or self.one(world, mode, seed, params=params, cancel=cancel,omit_wc=world=="R",fit_only=False)
                     runs.append(r)
                     progress(f"{mode}×{kind} {r['world_id']} seed={seed} {r['elapsed_seconds']:.1f}s",flush=True)
                 local[mode] = runs
@@ -311,6 +343,20 @@ class Experiment:
             message='observer marriage/alliance inputs incomplete: '+', '.join(incomplete)
             if message not in gate_result['L3']['missing']:gate_result['L3']['missing'].append(message)
         gate_result['L3']['status']='无法判定' if gate_result['L3']['missing'] else '未达' if gate_result['L3']['failures'] else '达到'
+        sensitivity_path = self.out / "budget_sensitivity.json"
+        sensitivity = read_json(sensitivity_path) if sensitivity_path.exists() else None
+        expected_params = {**self.config["params"], **(params or {})}
+        sensitivity_valid = (sensitivity is not None and sensitivity.get("runtime_hash") == self.runtime_hash
+                             and sensitivity.get("frozen_hash") == self.frozen_hash
+                             and sensitivity.get("graph_hash") == self.graph_hash
+                             and sensitivity.get("params") == expected_params
+                             and sensitivity.get("seeds") == list(range(10)))
+        for level in ("L2", "L3"):
+            if not sensitivity_valid:
+                gate_result[level]["missing"].append("requires matching fit-only S×R seeds 0–9 at twice the budget")
+            elif sensitivity["blocks_L2"]:
+                gate_result[level]["failures"].append("more than one third of fit milestones move beyond tolerance at twice the budget")
+            gate_result[level]["status"] = "无法判定" if gate_result[level]["missing"] else "未达" if gate_result[level]["failures"] else "达到"
         effective_params={**self.config["params"],**(params or {})}
         report = {"format":"obsession.acceptance/1", "frozen_hash":self.frozen_hash,"frozen_valid":valid,
                   "input_hashes":self.actual_hashes,"runtime_hash":self.runtime_hash,"params":effective_params,
@@ -340,7 +386,7 @@ def main(argv=None):
     ap.add_argument("--graph",type=Path,default=Path("tmp/obsession_real/eu5_1337.json"))
     ap.add_argument("--observer",type=Path,action="append")
     ap.add_argument("--reference",type=Path,default=Path(".eu5-base/reference_game_files/game"))
-    ap.add_argument("--out",type=Path,default=Path("tmp/obsession_structural"))
+    ap.add_argument("--out",type=Path,default=Path("tmp/obsession_round2"))
     ap.add_argument("--world",default="R")
     ap.add_argument("--mode",choices=tuple(MODES),default="S")
     ap.add_argument("--seeds",default="0:30",help="half-open range, or comma-separated fixed seed IDs")
@@ -349,14 +395,17 @@ def main(argv=None):
     ap.add_argument("--end-year",type=float)
     ap.add_argument("--omit-wc",action="store_true")
     ap.add_argument("--fit-only",action="store_true")
+    ap.add_argument("--auditor-holdout",action="store_true",help="Auditor-only explicit access to full/holdout scoring")
     ap.add_argument("--disable-rules",default="")
     ap.add_argument("--workers",type=int,choices=range(1,5),default=2)
-    ap.add_argument("--theta",default="1,10,20,45")
+    ap.add_argument("--ownership-rates",default="0.1,1,10")
     ap.add_argument("--contact-rates",default="0.08,0.3,1")
     args = ap.parse_args(argv)
+    if args.action == "matrix" and not args.auditor_holdout:
+        ap.error("full/holdout matrix is reserved for the auditor; implementation uses fit-only runs")
     if args.action == "freeze-check":
         valid,hash,_ = freeze_status();print(json.dumps({"valid":valid,"hash":hash}));return 0 if valid else 1
-    observers = args.observer or sorted(Path("tmp/obsession_worlds").glob("*/timeline.json"))
+    observers = args.observer or sorted(Path("tmp/obsession_worlds_round2").glob("*/timeline.json"))
     exp = Experiment(args.graph,observers,args.reference,args.out)
     seeds = list(range(*map(int,args.seeds.split(":")))) if ":" in args.seeds else list(map(int,args.seeds.split(",")))
     if not seeds or len(set(seeds)) != len(seeds) or any(s not in range(30) for s in seeds):
@@ -368,7 +417,7 @@ def main(argv=None):
     elif args.action == "run":
         for seed in seeds:
             r=exp.one(args.world,args.mode,seed,params=params,frames=args.frames,end_year=args.end_year,
-                      omit_wc=args.omit_wc,fit_only=args.fit_only,
+                      omit_wc=args.omit_wc,fit_only=not args.auditor_holdout,
                       disabled_rules=[r for r in args.disable_rules.split(',') if r],
                       progress=lambda m,r:print(f"year={1337+m/12:.0f}",flush=True))
             atomic_json(args.out/f"latest_{args.mode}_{args.world.split(':')[0]}.json",r)
@@ -376,8 +425,8 @@ def main(argv=None):
             print(json.dumps({k:r[k] for k in keys},ensure_ascii=False),flush=True)
     elif args.action == "stages":
         results=[]
-        stages=[("inherent",["contact","preemption","ownership","roads","market"]),
-                ("contact",["preemption","ownership","roads"]),("preemption",["ownership","roads"]),("ownership_roads",[])]
+        stages=[("inherent",["contact","preemption","ownership","market"]),
+                ("contact",["preemption","ownership"]),("preemption",["ownership"]),("ownership",[])]
         for name,disabled in stages:
             runs=[exp.one("R","S",seed,params=params,fit_only=True,disabled_rules=disabled,omit_wc=args.omit_wc) for seed in seeds]
             agg=aggregate_runs(runs)
@@ -386,12 +435,12 @@ def main(argv=None):
             atomic_json(args.out/"mechanism_stages_fit_only.json",results)
     else:
         results=[]
-        grid = list(itertools.product(map(float,args.theta.split(",")),map(float,args.contact_rates.split(","))))
-        requests=[dict(world="R",mode="S",seed=seed,params={**params,"theta":theta,"lambda_contact":rate},
-                       fit_only=True,end_year=args.end_year,omit_wc=True) for theta,rate in grid for seed in seeds]
+        grid = list(itertools.product(map(float,args.ownership_rates.split(",")),map(float,args.contact_rates.split(","))))
+        requests=[dict(world="R",mode="S",seed=seed,params={**params,"lambda_ownership":ownership,"lambda_contact":rate},
+                       fit_only=True,end_year=args.end_year,omit_wc=True) for ownership,rate in grid for seed in seeds]
         all_runs = exp.many(requests,args.workers)
-        for i,(theta,rate) in enumerate(grid):
-            config={**params,"theta":theta,"lambda_contact":rate}
+        for i,(ownership,rate) in enumerate(grid):
+            config={**params,"lambda_ownership":ownership,"lambda_contact":rate}
             rows=all_runs[i*len(seeds):(i+1)*len(seeds)]
             agg=aggregate_runs(rows)
             record={"params":config,**{k:agg[k] for k in ("fit_within_2tol","fit_p_order","p_K","violation_count")}}

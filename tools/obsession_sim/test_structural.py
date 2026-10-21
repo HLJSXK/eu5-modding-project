@@ -23,7 +23,8 @@ class KFixture:
     def __init__(self, n=4, kind="R"):
         self.e = ConditionalEvaluator(SPEC["K"], kind)
         self.state = SimpleNamespace(capitals={i:i for i in range(n)}, market=np.arange(n),
-                                     markets=[{"merchants":{0:1.,1:1.}} for _ in range(n)])
+                                     owner=np.arange(n), population=np.ones(n),
+                                     markets=[{"center":i,"merchants":{0:1.,1:1.}} for i in range(n)])
         self.cx = {g:np.zeros(n) for g in ("coffee","tea","tobacco")}
         self.mx = deepcopy(self.cx)
         self.cap = deepcopy(self.cx)
@@ -280,7 +281,7 @@ def test_ownership_preserves_effective_x_and_bounds():
 
 def test_positive_habit_rebase_preserves_the_entire_future_curve():
     g,s=tiny_world();t=Timeline(g,[s],faith_groups={"sunni":"muslim"})
-    config=deepcopy(CONFIG);config['params']['habit_floor']=.5
+    config=deepcopy(CONFIG);config['profiles']['coffee']['habit_floor']=.5
     r=StructuralRun(g,t,config,SPEC,end_month=1);sim=r.sims['coffee']
     sim.x[:]=[80.,100.,0.];sim.S[1]=.02;sim.decaying[1]=True;sim.join[1]=0
     r.state.owner[0]=1;r.apply_state()
@@ -301,7 +302,8 @@ def test_ownership_channel_also_connects_distant_land_on_one_continent():
     t=Timeline(g,[s],kind='R',faith_groups={'sunni':'muslim'})
     r=StructuralRun(g,t,CONFIG,SPEC,end_month=1);sim=r.sims['coffee']
     r.disabled_rules={'contact'};sim.x[0]=30;sim.shared_country_source[0]=0
-    sim.contact_rng=SimpleNamespace(random=lambda:0.)
+    sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    for _ in range(sim.n):sim.refresh_aggregates()
     sim.t=20;r.prepare_good(sim)
     assert sim.wave_start==20 and sim.x[1]>0
     assert any(e['type']=='ownership' for e in sim.nonlocal_log)
@@ -312,7 +314,8 @@ def test_merchant_source_theta_does_not_disable_an_existing_owned_habit():
     cfg=deepcopy(CONFIG);cfg['params']['theta']=45
     r=StructuralRun(g,Timeline(g,[s],kind='R'),cfg,SPEC,end_month=1);sim=r.sims['coffee']
     r.disabled_rules={'contact'};sim.x[0]=30;sim.shared_country_source[0]=0
-    sim.contact_rng=SimpleNamespace(random=lambda:0.)
+    sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    for _ in range(sim.n):sim.refresh_aggregates()
     r.prepare_good(sim)
     assert sim.spreading and sim.x[1]>0  # Actual stage2 ownership source, not the raw-material attribute.
 
@@ -332,7 +335,8 @@ def test_a_late_contact_can_open_a_new_wave_without_extending_the_old_one():
     g,s=tiny_world();s['locations']['b']['owner']='A';s['countries']['A']['capital']='b'
     r=StructuralRun(g,Timeline(g,[s],kind='R'),CONFIG,SPEC,end_month=1);sim=r.sims['coffee']
     r.disabled_rules={'contact'};sim.x[0]=30;sim.shared_country_source[0]=0
-    sim.contact_rng=SimpleNamespace(random=lambda:0.)
+    sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    for _ in range(sim.n):sim.refresh_aggregates()
     sim.t=20;r.prepare_good(sim);end=sim.wave_end
     sim.t=21;r.prepare_good(sim);assert sim.wave_end==end
     sim.t=end;r.prepare_good(sim)
@@ -367,20 +371,20 @@ def test_effect_activation_rejects_stale_aggregate_and_respects_budget():
     assert not r.live_event_probe(event,'tobacco',0)
 
 
-def test_common_prior_strength_and_preemption_affect_retention_and_contact():
+def test_fixed_affinity_and_preemption_affect_retention_and_contact():
     g,s=tiny_world();cfg=deepcopy(CONFIG)
-    cfg['params'].update(p=.003,rho=.995,affinity_strength=0,lambda_contact=3,contact_amount=7)
+    cfg['params'].update(p=.003,rho=.995,lambda_contact=3,preemption=.08)
     s['markets']['0']['merchants']={'B':1.}
     r=StructuralRun(g,Timeline(g,[s],faith_groups={'sunni':'muslim'}),cfg,SPEC,end_month=1)
     sim=r.sims['coffee'];r.sims['tea'].shared_country[1]=50
     p,retention,_=sim.local_terms(1,.003,.995)
-    assert p==pytest.approx(.003/3.4) and retention==pytest.approx(.995*.976)
+    assert p==pytest.approx(.006/3.4) and retention==pytest.approx(.995*.976)
     sim.x[0]=30;sim.shared_market[0]=20
-    sim.contact_rng=SimpleNamespace(random=lambda:.1)
+    sim.contact_rng=SimpleNamespace(random=lambda:.15)
     r.prepare_good(sim);assert sim.x[1]==0
     r.disabled_rules={'preemption'}
     p,retention,_=sim.local_terms(1,.003,.995)
-    assert p==pytest.approx(.003) and retention==pytest.approx(.995)
+    assert p==pytest.approx(.006) and retention==pytest.approx(.995)
     r.prepare_good(sim);assert sim.x[1]==7
 
 
@@ -389,9 +393,9 @@ def test_event_gap_excludes_templates_that_already_fired():
     cfg['events']=[e for e in cfg['events'] if e['id']=='envoy_gift'];cfg['fixed']['event_rate']=0
     r=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,events='generic',end_month=1)
     sim=r.sims['coffee'];sim.x[0]=5;sim.shared_country[0]=5;sim.spreading=True;sim.wave_start=0
-    r.process_events(1);assert r.eligible_months[-1]==(1,True)
+    r.process_events(1);assert r.eligible_months[-1][1]['coffee'] is True
     r.event_done.add(('envoy_gift','coffee',0))
-    r.process_events(2);assert r.eligible_months[-1]==(2,False)
+    r.process_events(2);assert r.eligible_months[-1][1]['coffee'] is False
 
 
 def test_custom_flavor_uses_the_event_budget_without_waking_propagation():
@@ -405,7 +409,7 @@ def test_custom_flavor_uses_the_event_budget_without_waking_propagation():
 
 
 def test_market_support_cannot_broadcast_new_members_into_cold_locations():
-    g,s=tiny_world();cfg=deepcopy(CONFIG);cfg['params']['delta']=.001
+    g,s=tiny_world();cfg=deepcopy(CONFIG);cfg['params'].update(delta=.001,p=.02,rho=.99,internal_rate=.002)
     r=StructuralRun(g,Timeline(g,[s]),cfg,SPEC,end_month=1)
     sim=r.sims['coffee'];sim.shared_market[:]=100;sim.spreading=True
     sim._push(0);sim._serve(0);assert sim.x[0]==0
@@ -479,8 +483,8 @@ def test_mixed_pool_ratio_does_not_depend_on_template_count():
         r.event_done.clear();r.process_events(month)
     historical=sum(e['pool']=='historical' for e in r.event_log)
     assert len(r.event_log)==1000 and .55<historical/1000<.65
-    assert event_weight({'kind':'spread'},20,front=True)==2.25
-    assert event_weight({'kind':'impact'},45,blocked=True)==3.6
+    assert event_weight({'kind':'spread'},20,front=True,weights=CONFIG['event_weights'])==2.25
+    assert event_weight({'kind':'impact'},45,blocked=True,weights=CONFIG['event_weights'])==3.6
 
 
 @pytest.mark.parametrize('values',[{'p':True},{'p':float('nan')},{'theta':0},{'hold_T':1.5},
@@ -568,7 +572,8 @@ def test_ownership_return_keeps_the_world_fact_source_label():
     r=StructuralRun(g,Timeline(g,[s],kind='R',facts=[fact]),CONFIG,SPEC,end_month=1)
     r.state,_=r.timeline.at(36);r.apply_state();r.disabled_rules={'contact'}
     sim=r.sims['coffee'];c=int(r.state.owner[0]);sim.x[0]=30;sim.shared_country_source[c]=0;sim.t=36
-    sim.contact_rng=SimpleNamespace(random=lambda:0.)
+    sim.ownership_rng=SimpleNamespace(random=lambda:0.)
+    for _ in range(sim.n):sim.refresh_aggregates()
     r.prepare_good(sim)
     # Default dose .5 is below membership, but the input audit still names it.
     assert sim.nonlocal_log[-1]['source']['facts']==['conquest']

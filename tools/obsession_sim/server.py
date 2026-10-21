@@ -107,19 +107,22 @@ class RunnerServer(ThreadingHTTPServer):
         from .experiment import HERE, freeze_status, read_json
         valid, digest, _ = freeze_status()
         worlds = []
-        for path in sorted((WORKSPACE / "tmp/obsession_worlds").glob("*/timeline.json")):
+        for path in sorted((WORKSPACE / "tmp/obsession_worlds_round2").glob("*/timeline.json")):
             manifest = read_json(path)
             snaps = manifest.get("snapshots", [])
             if snaps:
                 worlds.append({"id": manifest["id"], "snapshots": len(snaps),
+                               "label":manifest.get('label',manifest['id'][:8]), "sol_enabled":manifest.get('sol_enabled'),
                                "first_date": snaps[0]["date"], "last_date": snaps[-1]["date"]})
         params=read_json(HERE / "structural_config.json")["params"]
         selected=HERE/'selected_params.json'
         if selected.exists():
-            from .structural import validate_params
+            from .structural import validate_fit_params
             values=read_json(selected)
-            params={**params,**validate_params(values.get('params',values))}
+            params={**params,**validate_fit_params(values.get('params',values))}
         return {"params":params, "worlds": worlds,
+                "fit_only":True, "fixed":read_json(HERE / "structural_config.json")["fixed"],
+                "manual_constant_count":read_json(HERE / "structural_config.json").get("manual_constant_count"),
                 "frozen_valid": valid, "frozen_hash": digest}
 
     def start_structural(self, request):
@@ -130,6 +133,8 @@ class RunnerServer(ThreadingHTTPServer):
         action = request.get("action", "run")
         if action not in ("quick", "screen", "run", "matrix", "refresh"):
             raise ValueError("action must be quick, screen, run, matrix or refresh")
+        if action == "matrix" or request.get("fit_only") is False:
+            raise ValueError("本轮实现者仅可运行拟合集；留出与全集矩阵由审计方独立执行")
         force_full = request.get("force_full", False)
         if not isinstance(force_full, bool):
             raise ValueError("force_full must be boolean")
@@ -144,8 +149,8 @@ class RunnerServer(ThreadingHTTPServer):
         params = request.get("params", {})
         if not isinstance(params, dict):
             raise ValueError("structural params must be an object")
-        from .structural import validate_params
-        clean = validate_params(params)
+        from .structural import validate_fit_params
+        clean = validate_fit_params(params)
         fit_only = request.get("fit_only", True)
         if not isinstance(fit_only, bool):
             raise ValueError("fit_only must be boolean")
@@ -162,16 +167,18 @@ class RunnerServer(ThreadingHTTPServer):
                             raise InterruptedError("refresh cancelled")
                         with self.job_lock:
                             job["progress"] = message
-                    archive_worlds(WORKSPACE / "data/saves/observer_archive", WORKSPACE / "tmp/obsession_worlds", log)
+                    archive_worlds(WORKSPACE / "data/saves/observer_archive", WORKSPACE / "tmp/obsession_worlds_round2", log)
                     with self.job_lock:
                         job.update(status="complete", progress="新增存档已导入；刷新页面即可选择。")
                     return
-                observers = sorted((WORKSPACE / "tmp/obsession_worlds").glob("*/timeline.json"))
+                observers = sorted((WORKSPACE / "tmp/obsession_worlds_round2").glob("*/timeline.json"))
                 if action in ("quick", "screen", "matrix") and (HERE / "selection_log.json").exists():
                     from .validation import bound_observers
-                    observers = bound_observers(HERE / "selection_log.json") or observers
+                    from .experiment import code_hash
+                    if read_json(HERE / "selection_log.json").get('runtime_hash') == code_hash():
+                        observers = bound_observers(HERE / "selection_log.json") or observers
                 experiment = Experiment(self.graph_path, observers, WORKSPACE / ".eu5-base/reference_game_files/game",
-                                        WORKSPACE / "tmp/obsession_structural")
+                                        WORKSPACE / "tmp/obsession_round2")
                 def progress(value, run=None, **_):
                     with self.job_lock:
                         if run is None:
@@ -185,7 +192,7 @@ class RunnerServer(ThreadingHTTPServer):
                     if action=="matrix" and (force_full or result["decision"]!="early_reject"):
                         result = experiment.matrix(params=clean,progress=progress,cancel=job["cancel"])
                 else:
-                    result = experiment.one(world,mode,seed,params=clean,fit_only=fit_only,frames=12,
+                    result = experiment.one(world,mode,seed,params=clean,fit_only=fit_only,omit_wc=world=='R',frames=12,
                                             progress=progress,cancel=job["cancel"])
                 with self.job_lock:
                     message = ("快速检查通过；不代表历史验收通过。" if action=="quick" else
@@ -417,9 +424,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif path == "/api/structural-config":
             self.json_response(200, self.server.structural_config())
         elif path == "/api/acceptance":
-            report = WORKSPACE / "tmp/obsession_structural/matrix.json"
+            report = WORKSPACE / "tmp/obsession_round2/fit_report.json"
             if not report.exists():
-                report = WORKSPACE / "tmp/obsession_structural/cache_screen.json"
+                report = WORKSPACE / "tmp/obsession_round2/cache_screen.json"
             self.json_response(200 if report.exists() else 404,
                                json.loads(report.read_text(encoding="utf-8")) if report.exists() else {"error":"尚无验收或缓存筛查报告"})
         elif path == "/api/preview":
@@ -447,7 +454,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(raw)
                 return
             resolved = (WORKSPACE / unquote(path).lstrip("/")).resolve()
-            allowed = (WORKSPACE / "tmp/obsession_real", WORKSPACE / "tmp/obsession_structural", WORKSPACE / "docs/design/obsession")
+            allowed = (WORKSPACE / "tmp/obsession_real", WORKSPACE / "tmp/obsession_round2", WORKSPACE / "docs/design/obsession")
             if resolved.suffix.lower() not in (".html", ".css", ".js", ".json") or not any(resolved.is_relative_to(p.resolve()) for p in allowed):
                 self.json_response(403, {"error": "Only obsession viewer artifacts are served"})
                 return

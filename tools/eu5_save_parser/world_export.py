@@ -22,6 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from . import parser as P
 
 FORMAT = "obsession.world-snapshot/2"
+WORLD_FIELDS_VERSION = 3
 
 
 def digest(path):
@@ -78,6 +79,17 @@ def extra_world(view, location_names, country_tags, tables=None):
                               "culture_instance":culture,"religion_instance":religion,
                               "culture":cultures.get(culture,culture),"religion":religions.get(religion,religion),
                               "religion_group":groups.get(religions.get(religion,religion))}
+    by_tag = {rec["tag"]: cid for cid, rec in countries.items()}
+    try:
+        religious_records = list(records(view, "religion_manager"))
+    except P.SaveFormatError:
+        religious_records = []  # Legacy inputs lack this status; never infer it from a country tag.
+    for _, body in religious_records:
+        if scalar(body, "has_religious_head") == "yes":
+            leader = by_tag.get(scalar(body, "important_country"))
+            faith = scalar(body, "definition")
+            if leader is not None and faith is not None:
+                countries[leader].setdefault("religious_leader_for", []).append(faith)
     for mid, body in records(view, "market_manager"):
         center = scalar(body, "center")
         if center is None:
@@ -123,7 +135,7 @@ def export_world(save, out):
     source_hash = digest(save)
     if before != (save.stat().st_size, save.stat().st_mtime_ns):
         raise P.SaveFormatError("Save changed while extracting; retry after archive completes")
-    result = {"format": FORMAT, "metadata": dict(parsed.metadata),
+    result = {"format": FORMAT, "world_fields_version": WORLD_FIELDS_VERSION, "metadata": dict(parsed.metadata),
               "source": {"name": save.name, "size": before[0], "mtime_ns": before[1], "sha256": source_hash},
               "locations": locations, "countries": countries, "markets": markets, "roads": roads,
               "identity_tables":{"culture":dict(tables[0]),"religion":dict(tables[1])},"religion_groups":dict(tables[2]),
@@ -158,10 +170,10 @@ def upgrade_world(save,existing,out):
     if digest(save)!=existing['source']['sha256'] or before!=(save.stat().st_size,save.stat().st_mtime_ns):
         raise P.SaveFormatError('Source save changed; cannot reuse v1 population extraction')
     for loc in existing['locations'].values():
-        culture,religion=loc.get('culture'),loc.get('religion')
+        culture,religion=loc.get('culture_instance',loc.get('culture')),loc.get('religion_instance',loc.get('religion'))
         loc.update(culture_instance=culture,religion_instance=religion,
                    culture=tables[0].get(culture,culture),religion=tables[1].get(religion,religion))
-    existing.update(format=FORMAT,metadata=metadata,countries=countries,markets=markets,roads=roads,
+    existing.update(format=FORMAT,world_fields_version=WORLD_FIELDS_VERSION,metadata=metadata,countries=countries,markets=markets,roads=roads,
                     identity_tables={'culture':dict(tables[0]),'religion':dict(tables[1])},religion_groups=dict(tables[2]))
     write_world(out,existing)
     return existing
@@ -181,7 +193,8 @@ def archive_worlds(archive, out, progress=print):
             existing = json.loads(target.read_text(encoding="utf-8")) if target.exists() else None
             signature = {"name": save.name, "size": save.stat().st_size, "mtime_ns": save.stat().st_mtime_ns}
             same=existing is not None and all(existing.get('source',{}).get(k)==v for k,v in signature.items())
-            if same and existing.get('format')=='obsession.world-snapshot/1':
+            if same and (existing.get('format')=='obsession.world-snapshot/1' or
+                         existing.get('world_fields_version') != WORLD_FIELDS_VERSION):
                 existing=upgrade_world(save,existing,target)
                 progress(f"Upgraded identity keys {save.name}",flush=True)
             elif not same or existing.get("format") != FORMAT:

@@ -15,15 +15,16 @@ import numpy as np
 
 from .core import Params, Simulation
 from .graph import MapGraph
-from .worlds import canonical_hash, weighted_means
+from .worlds import canonical_hash, weighted_means, foreign_merchants
 from .conditional import ConditionalEvaluator
 from .acceptance import RunMetrics
 
 GOODS = ("coffee", "tea", "tobacco")
+FIT_PARAMS = ("p", "rho", "lambda_contact", "lambda_ownership", "preemption", "internal_rate")
 PARAM_LIMITS = {"rho":(0,1),"p":(0,1),"delta":(0,100),"hold_T":(0,12000),
                 "decay_factor":(0,1),"habit_floor":(0,1),"theta":(.001,100),
-                "lambda_contact":(0,300),"lambda_ownership":(0,10),"affinity_strength":(0,3),"contact_amount":(0,100),"preemption":(0,10),
-                "internal_rate":(0,1),"road_scale":(0,10)}
+                "lambda_contact":(0,300),"lambda_ownership":(0,300),"contact_amount":(0,100),"preemption":(0,10),
+                "internal_rate":(0,1)}
 
 
 def validate_params(values):
@@ -35,12 +36,22 @@ def validate_params(values):
     return {k:int(v) if k=="hold_T" else v for k,v in values.items()}
 
 
-def event_weight(event, intensity, front=False, blocked=False):
+def validate_fit_params(values):
+    if set(values) - set(FIT_PARAMS):
+        raise ValueError("only six historical fit parameters may vary: " + ", ".join(FIT_PARAMS))
+    return validate_params(values)
+
+
+def model_params(config):
+    return {**{k:v for k,v in config.get("fixed", {}).items() if k in PARAM_LIMITS}, **config["params"]}
+
+
+def event_weight(event, intensity, front=False, blocked=False, *, weights):
     """Stage/kind weights depend only on current state, never geography/date."""
     if event["kind"] == "spread":
-        return (1.5 if front else 1.)*(1.5 if intensity < 45 else .7)
+        return (weights["spread_front"] if front else 1.)*(weights["spread_low"] if intensity < 45 else weights["spread_high"])
     if event["kind"] == "impact":
-        return (1.8 if intensity >= 45 else .5)*(2. if blocked else 1.)
+        return (weights["impact_high"] if intensity >= 45 else weights["impact_low"])*(weights["impact_blocked"] if blocked else 1.)
     return 1.
 
 
@@ -112,9 +123,11 @@ class RuleSimulation(Simulation):
         self.origin_node = None
         self.origin_month = round((controller.origin_year - 1337) * 12)
         self.contact_rng = random.Random(canonical_hash([controller.seed, good, "contact"]))
+        self.ownership_rng = random.Random(canonical_hash([controller.seed, good, "ownership"]))
         self.origin_rng = random.Random(canonical_hash([controller.seed, good, "origin"]))
         self.origin_groups = None
         self.external_stage2 = None
+        self.capital_stage2 = {}  # Diagnostic observations only; never read by propagation.
         self.shared_country = np.zeros(self.ng)
         self.shared_market = np.zeros(len(controller.timeline.market_names))
         self._aggregate_sums = [np.zeros(self.ng), np.zeros(len(self.shared_market))]
@@ -126,6 +139,10 @@ class RuleSimulation(Simulation):
         self._front_work = [False]*self.ng
         self._source_work = [-1]*self.ng
         self._max_work = [0.]*self.ng
+        self.owned_hot_population = np.zeros(self.ng)
+        self.ownership_source = [-1]*self.ng
+        self._owned_hot_work = np.zeros(self.ng)
+        self._ownership_source_work = [-1]*self.ng
         self.country_wake_until = [-1]*self.ng
         self.market_wake_until = [-1]*len(self.shared_market)
         self.aggregate_cursor = 0
@@ -163,7 +180,6 @@ class RuleSimulation(Simulation):
         c, m = int(state.owner[v]), int(state.market[v])
         affinity = profile.get("affinity", 1.) * profile.get("religion_group", {}).get(state.religion_group[v], 1.)
         affinity *= profile.get("culture", {}).get(state.culture[v], 1.)
-        affinity **= cfg['affinity_strength']
         barrier=ctl.preemption_load(self.good,v)
         multiplier = ctl.multiplier(self.good, int(c), self.t)
         self.U += 2 * len(ctl.effects.get((self.good,int(c)),()))
@@ -179,8 +195,6 @@ class RuleSimulation(Simulation):
         internal *= affinity * multiplier / (1. + barrier)
         if internal > 0 and c >= 0 and c not in self.internal_logged:
             row={"good": self.good, "country": int(c), "month": self.t,"type": "market", "node": v}
-            if self.good == "tobacco" and c not in ctl.evaluator.seen["K5"]:
-                row["country_x_before"] = self.country_value(c)
             ctl.inputs_this_month.append(row)
             self.internal_logged.add(int(c))
         self.task_terms = (v,p,internal)
@@ -275,16 +289,19 @@ class RuleSimulation(Simulation):
             positive=valid & (state.population[a:b]>0)
             np.minimum.at(self._aggregate_lower[k],groups[positive],values[positive])
             np.maximum.at(self._aggregate_upper[k],groups[positive],values[positive])
-        wine=self.controller.context_goods["wine"]
         for v,c,m,value in zip(range(a,b),state.owner[a:b].tolist(),state.market[a:b].tolist(),values.tolist()):
+            cap = state.capitals.get(c)
+            if cap is not None and m != state.market[cap] and value >= 20:
+                self._owned_hot_work[c] += state.population[v]
+                self._ownership_source_work[c] = v
             if c >= 0 and 0 < value < 1:
                 self._front_work[c] = True
             if c >= 0 and value > self._max_work[c]:
                 self._max_work[c],self._source_work[c] = value,v
-            dirty_country = c >= 0 and (self.country_wake_until[c] >= self.t or (wine.decaying[c] and not wine.finished[c]))
+            dirty_country = c >= 0 and self.country_wake_until[c] >= self.t
             if dirty_country or (value>=1 and m >= 0 and self.market_wake_until[m] >= self.t):
                 self.U += self._push(v)
-        self.U += 20 * (b-a)
+        self.U += self.controller.config['fixed']['aggregate_node_cost'] * (b-a)
         self.aggregate_cursor = b
         if b == self.n:
             country,market = [np.where(w>0,np.clip(np.divide(s,w,out=np.zeros_like(s),where=w>0),lo,hi),0.)
@@ -298,6 +315,8 @@ class RuleSimulation(Simulation):
                         other.country_wake_until[int(c)] = self.t+parts
             self.shared_country,self.shared_market = country,market
             self.shared_country_source = self._source_work.copy()
+            self.owned_hot_population = self._owned_hot_work.copy()
+            self.ownership_source = self._ownership_source_work.copy()
             self.shared_front = self._front_work.copy()
             self.U += 4*(len(self.controller.current_countries)+len(self.controller.current_markets))
             self.reset_aggregation()
@@ -311,6 +330,8 @@ class RuleSimulation(Simulation):
         self._max_work = [0.]*self.ng
         self._source_work = [-1]*self.ng
         self._front_work = [False]*self.ng
+        self._owned_hot_work.fill(0.)
+        self._ownership_source_work = [-1]*self.ng
 
     def begin_month(self):
         if self.done or self.t >= self.P.max_months:
@@ -393,8 +414,10 @@ class StructuralRun:
                  frames_every=0, end_month=None, cancel=None):
         if events not in ("none", "historical", "generic", "mixed"):
             raise ValueError("events must be none, historical, generic or mixed")
+        config = deepcopy(config)
+        config["params"] = model_params(config)
         validate_params(config["params"])
-        self.timeline, self.config, self.spec, self.seed = timeline, deepcopy(config), spec, seed
+        self.timeline, self.config, self.spec, self.seed = timeline, config, spec, seed
         self.state, _ = timeline.at(timeline.start)
         self.events_mode, self.disabled_events = events, set(disabled_events)
         self.end = min(timeline.end, end_month) if end_month is not None else timeline.end
@@ -404,6 +427,8 @@ class StructuralRun:
         self.disabled_rules = set(config.get("disabled_rules",()))
         self.event_rng = {}
         self.eligible_months = []
+        self.candidate_bursts = []
+        self.events_abandoned_budget = 0
         self.world_log = []
         self.country_neighbors = {}
         self.country_markets = {}
@@ -412,16 +437,12 @@ class StructuralRun:
         self.market_members = []
         self.country_faith = {}
         self.foreign_members = {}
-        self.last_roads = {}
-        self.straits = {tuple(sorted((e["a"],e["b"]))) for e in graph.meta.get("special_edges",[]) if e["type"] == "strait"}
         self.market_faith = []
         self.tobacco_possession_seen = False
         self.ledger = []
         self.overruns = []
         self.sims = {}
-        # An unqueued 1337 wine custom is still the single x of another good,
-        # rather than an additional resistance variable attached to coffee.
-        # Its uncertain magnitude is exposed and removed in the prior ablation.
+        # Wine is constant opening context: no clock, wave or decay.
         wine = opening_values("wine",graph,self.state,config) if "wine" not in self.disabled_rules else []
         wine_graph = simulation_graph(graph)
         wine_graph.owner = self.state.owner.tolist()
@@ -437,6 +458,7 @@ class StructuralRun:
         context.members_of.extend([[] for _ in range(extra)])
         context.ng += extra
         context.spreading = False
+        context.clock = False
         context.t = timeline.start
         self.origin_year = random.Random(canonical_hash([seed, "recipe"])).uniform(*config["fixed"]["origin_start"])
         self.evaluator = ConditionalEvaluator(spec["K"], timeline.kind, timeline.start)
@@ -450,9 +472,11 @@ class StructuralRun:
             g.owner = self.state.owner.tolist()
             initial = opening_values(good,g,self.state,config)
             p = config["params"]
-            params = Params(**{k: p[k] for k in ("rho", "p", "delta", "hold_T", "decay_factor", "habit_floor")},
+            effective = {k: p[k] for k in ("rho", "p", "delta", "hold_T", "decay_factor")}
+            effective["habit_floor"] = config["profiles"][good].get("habit_floor", p["habit_floor"])
+            params = Params(**effective,
                             initial_values=initial, max_months=self.end, stop_when_calm=False, series_every=12 if frames_every else 0,
-                            frames_every=frames_every, coefficient_cost=12)
+                            frames_every=frames_every, coefficient_cost=config['fixed']['coefficient_cost'])
             sim = RuleSimulation(g, params, good, self)
             sim.t = timeline.start
             for col in sim.threshold_arrival.values():
@@ -518,7 +542,7 @@ class StructuralRun:
         for fact in self.timeline.facts:
             if fact['id'] not in self.state.facts_active or fact['kind'] not in ('ownership','ownership_region'):
                 continue
-            if self.state.owner[self.timeline.names[fact['actor_location']]]!=c:
+            if self.timeline.resolve_actor(fact, self.state.owner, self.state.countries)!=c:
                 continue
             if fact['kind']=='ownership':
                 matches=fact['location']==name
@@ -539,12 +563,15 @@ class StructuralRun:
         self.current_markets={m for m,rec in enumerate(state.markets) if rec.get('present',rec['center']>=0)}
         reset_groups=len(previous_countries|self.current_countries)+len(previous_markets|self.current_markets)
         self.raw_nodes = {good:[v for v,r in enumerate(state.raw_material) if r == good] for good in GOODS}
-        changed_roads = {edge for edge in self.last_roads.keys() | state.roads.keys()
-                         if self.last_roads.get(edge) != state.roads.get(edge)}
+        valid = state.owner >= 0
+        self.country_population = np.bincount(state.owner[valid], weights=state.population[valid],
+                                               minlength=len(self.timeline.country_names))
         self.country_neighbors = {c: set() for c in state.capitals}
-        self.country_faith = {c:state.countries.get(self.timeline.country_names[c],{}).get('religion_group') or self.timeline.faith_groups.get(
-            state.countries.get(self.timeline.country_names[c],{}).get("religion")) or state.religion_group[v]
-            for c,v in state.capitals.items()}
+        self.country_faith = {}
+        for c, v in state.capitals.items():
+            rec = state.countries.get(self.timeline.country_names[c], {})
+            self.country_faith[c] = (None if rec.get('no_state_religion') else
+                rec.get('religion_group') or self.timeline.faith_groups.get(rec.get('religion')) or state.religion_group[v])
         for v, neighbors in enumerate(self.timeline.graph.incoming):
             c = int(state.owner[v])
             if c in self.country_neighbors:
@@ -602,18 +629,7 @@ class StructuralRun:
                 sim.U += 7 + sim._push(v)
             sim.g.attrs.update(population=state.population.tolist(), market=state.market.tolist(),
                                culture=state.culture, religion=state.religion)
-            weights = []
-            for v in range(sim.n):
-                ws = []
-                for u in sim.g.incoming[v]:
-                    kind = state.roads.get((min(u, v), max(u, v)))
-                    enabled = "roads" not in self.disabled_rules
-                    scale = self.config["params"]["road_scale"] if kind and enabled else 1.5 if (min(u,v),max(u,v)) in self.straits else 1.
-                    if enabled and kind in ("paved_road", "modern_road", "railroad"):
-                        scale *= self.config["params"]["road_scale"]
-                    ws.append(scale)
-                weights.append(tuple(ws))
-            sim.g.in_weight = sim.w = weights
+            sim.g.in_weight = sim.w = None  # Every adjacency, including straits, has weight one.
             if hasattr(sim,"reset_aggregation"):
                 sim.reset_aggregation()
             # These are imported engine relationships, not simulated state.
@@ -621,9 +637,6 @@ class StructuralRun:
             # are simulated work; copying a Python snapshot is not an EU5 scan.
             if not first:
                 sim.U += 2*reset_groups
-                for a,b in changed_roads:
-                    sim.U += 4 + sim._push(a) + sim._push(b)
-        self.last_roads = dict(state.roads)
         self.world_log.append({"month": next(iter(self.sims.values())).t, "date": state.snapshot_date,
                                "owner": state.owner.tolist(), "market": state.market.tolist(),
                                "group_labels": [state.countries.get(c,{}).get("tag") or c for c in self.timeline.country_names],
@@ -643,7 +656,7 @@ class StructuralRun:
                           and all(sim.g.attrs[k][v] in (val if isinstance(val,list) else [val]) for k,val in where.items())]
             sim.U += len(self.raw_nodes["coffee"]) * 4
             if candidates:
-                sim.origin_node = sim.origin_rng.choices(candidates, weights=[max(.001, state.population[v]) for v in candidates])[0]
+                sim.origin_node = sim.origin_rng.choices(candidates, weights=[max(fixed['minimum_origin_population'], state.population[v]) for v in candidates])[0]
                 sim.origin_month=t  # The finite source lasts from actual activation, including delayed conditions in O.
                 sim.source_market = int(state.market[sim.origin_node]) if state.market[sim.origin_node] >= 0 else None
                 sim.open_wave()
@@ -659,42 +672,35 @@ class StructuralRun:
             c=int(state.owner[sim.origin_node])
             self.evaluator.origin_countries['coffee']={c} if c>=0 else set()
         pairs = [(m, c, share, state.capitals[c],c) for m, rec in enumerate(state.markets) if sim.shared_market[m] >= cfg["theta"]
-                 for c, share in rec["merchants"].items() if c in state.capitals
+                 for c, share in foreign_merchants(state, m).items() if c in state.capitals
                  and rec["center"] >= 0 and state.owner[rec["center"]] != c
                  and state.market[state.capitals[c]] != m]
         # Reverse residency: the owner of an obsessed market has residents abroad.
         source_countries = {int(state.owner[rec["center"]]) for m,rec in enumerate(state.markets)
                             if sim.shared_market[m] >= cfg["theta"] and rec["center"] >= 0 and state.owner[rec["center"]] >= 0}
         for m, rec in enumerate(state.markets):
-            for c, share in rec["merchants"].items():
+            for c, share in foreign_merchants(state, m).items():
                 if c in source_countries and rec["center"] >= 0 and sim.shared_market[m] < cfg["theta"]:
                     center_owner = int(state.owner[rec["center"]])
-                    if center_owner >= 0:
+                    if center_owner >= 0 and center_owner != c:
                         pairs.append((m, center_owner, share, rec["center"],c))
-        if sim.good == "tobacco":
-            continent = sim.g.attrs["continent"]
-            transatlantic = any(state.owner[v] in state.capitals and continent[v] == "america" and
-                continent[state.capitals[int(state.owner[v])]] != "america" for v in self.raw_nodes["tobacco"])
-            sim.U += 4*len(self.raw_nodes["tobacco"])
-            self.tobacco_possession_seen |= transatlantic
-            if not self.tobacco_possession_seen:
-                pairs = [row for row in pairs if continent[row[3]] == "america"]
         sim.U += 3*len(self.current_markets)+4*sum(len(m["merchants"]) for m in state.markets)
         if "contact" in self.disabled_rules:
             pairs = []
         ownership = []
         for c, cap in state.capitals.items():
             sim.U += 5
-            source=sim.shared_country_source[c]
+            source=sim.ownership_source[c]
             if ("ownership" not in self.disabled_rules and source >= 0 and state.owner[source] == c and
-                    sim.eff(cap) < 20 and sim.eff(source) >= 20):
-                ownership.append((c,cap,source))
+                    state.market[source] != state.market[cap] and sim.eff(cap) < 20 and sim.eff(source) >= 20
+                    and self.country_population[c] > 0):
+                ownership.append((c,cap,source,sim.owned_hot_population[c]/self.country_population[c]))
         new_pairs = {(m,c,target,resident) for m,c,_,target,resident in pairs} - sim.seen_pairs
-        new_ownership = {(c,int(state.market[source])) for c,_,source in ownership} - sim.seen_ownership
+        new_ownership = {(c,int(state.market[source])) for c,_,source,_ in ownership} - sim.seen_ownership
         if not opening and (new_pairs or new_ownership):
             sim.open_wave()
         sim.seen_pairs.update((m,c,target,resident) for m,c,_,target,resident in pairs)
-        sim.seen_ownership.update((c,int(state.market[source])) for c,_,source in ownership)
+        sim.seen_ownership.update((c,int(state.market[source])) for c,_,source,_ in ownership)
         if opening:
             return
         if not sim.spreading and not sim.contact_started:
@@ -704,14 +710,13 @@ class StructuralRun:
             affinity = profile.get("affinity",1.) * profile.get("religion_group", {}).get(self.country_faith.get(c), 1.)
             culture = state.countries.get(self.timeline.country_names[c],{}).get("culture") or state.culture[cap]
             affinity *= profile.get("culture",{}).get(culture,1.)
-            affinity **= cfg['affinity_strength']
             barrier=self.preemption_load(sim.good,cap)
             sim.U += 8
             if sim.contact_rng.random() < -math.expm1(-cfg["lambda_contact"] * share * affinity / (12*(1+barrier))):
                 if not sim.spreading and sim.eff(cap) < cfg['theta']:
                     sim.open_wave()
                 evidence=[f['id'] for f in self.timeline.facts if f['id'] in state.facts_active and f['kind']=='residency'
-                          and state.owner[self.timeline.names[f['actor_location']]]==resident
+                          and self.timeline.resolve_actor(f, state.owner, state.countries)==resident
                           and state.market[self.timeline.names[f['location']]]==m]
                 center=state.markets[m]['center']
                 if center>=0 and state.owner[center]==resident:
@@ -719,12 +724,17 @@ class StructuralRun:
                 sim.inject(cap, cfg["contact_amount"], "contact", {"market":m,"facts":evidence,"resident":int(resident),
                            "reverse":bool(sim.shared_market[m]<cfg['theta'])})
         # Ownership is an actual-intensity channel, never raw-material => habit.
-        for c,cap,source in ownership:
-            sim.U+=3
-            if sim.contact_rng.random() < -math.expm1(-cfg["lambda_ownership"] / (12*(1+self.preemption_load(sim.good,cap)))):
+        for c,cap,source,fraction in ownership:
+            profile = self.config["profiles"][sim.good]
+            affinity = profile.get("affinity", 1.) * profile.get("religion_group", {}).get(self.country_faith.get(c), 1.)
+            culture = state.countries.get(self.timeline.country_names[c], {}).get("culture") or state.culture[cap]
+            affinity *= profile.get("culture", {}).get(culture, 1.)
+            sim.U+=8
+            if sim.ownership_rng.random() < -math.expm1(-cfg["lambda_ownership"] * fraction * affinity / (12*(1+self.preemption_load(sim.good,cap)))):
                 if not sim.spreading:
                     sim.open_wave()
-                sim.inject(cap, cfg["contact_amount"], "ownership", {"node":int(source),'facts':self.ownership_evidence(c,source)})
+                sim.inject(cap, cfg["contact_amount"], "ownership", {"node":int(source), "population_share":float(fraction),
+                           'facts':self.ownership_evidence(c,source)})
 
     def diagnostics(self):
         state, country_x, market_x, capital_x, values = self.state, {}, {}, {}, {}
@@ -763,6 +773,8 @@ class StructuralRun:
             cap_x = np.zeros(ng)
             for c, v in state.capitals.items():
                 cap_x[c] = x[v]
+                if x[v] >= 20:
+                    sim.capital_stage2.setdefault(int(c), dict(month=sim.t-1, node=int(v)))
             capital_x[good] = cap_x
         market_faith = self.market_faith
         raw_countries = {g: {int(state.owner[v]) for v in vs if state.owner[v] >= 0} for g, vs in self.raw_nodes.items()}
@@ -771,7 +783,7 @@ class StructuralRun:
                                self.inputs_this_month, self.bans_this_month, self.sims["coffee"].source_market,
                                market_population, market_faith)
         for good, sim in self.sims.items():
-            if sim.origin_groups is None and sim.wave_start is not None:
+            if sim.origin_groups is None and sim.wave_start is not None and np.any(country_x[good] >= 20):
                 sim.origin_groups = set(np.flatnonzero(country_x[good] >= 20))
             if sim.origin_groups is not None and sim.external_stage2 is None:
                 if any(c not in sim.origin_groups for c in np.flatnonzero(country_x[good] >= 20)):
@@ -803,7 +815,7 @@ class StructuralRun:
                 ok = any(r["kind"] == kind and r["other"] is not None and cx[r["other"]] >= 20 for r in links)
             elif condition == "religious_capital_with_contact":
                 rec = state.countries.get(self.timeline.country_names[c], {})
-                ok = rec.get('tag')=='PAP' and rec.get('religion')=='catholic' and any(cx[n]>=event['min_intensity']
+                ok = 'catholic' in rec.get('religious_leader_for', ()) and rec.get('religion')=='catholic' and any(cx[n]>=event['min_intensity']
                     for n in state.capitals if state.countries.get(self.timeline.country_names[n],{}).get('religion')=='catholic')
             elif condition == "declared_ban_at_stage2":
                 ok = any(r["kind"] == "ban" for r in links) and cx[c] >= 20
@@ -852,6 +864,7 @@ class StructuralRun:
         reserve=(20+3+sim.price['push_new']*(1+len(sim.g.outgoing[cap]))+len(sim.g.outgoing[cap])+sim.price.get('join_write',0)
                  if event['effect']=='boost' else 20+5*(len(countries) if event.get('religion_scope') else 1))
         if spent+cost+reserve>self.config['fixed']['budget']:
+            self.events_abandoned_budget += 1
             return False
         sim.U+=cost
         cx={n:sim.country_value(n) for n in countries}
@@ -868,7 +881,7 @@ class StructuralRun:
             return any(r['kind']==kind and r.get('other') in cx and cx[r['other']]>=20 for r in links)
         if condition=='religious_capital_with_contact':
             rec=state.countries.get(self.timeline.country_names[c],{})
-            return rec.get('tag')=='PAP' and rec.get('religion')=='catholic' and any(cx[n]>=event['min_intensity'] for n in countries)
+            return 'catholic' in rec.get('religious_leader_for', ()) and rec.get('religion')=='catholic' and any(cx[n]>=event['min_intensity'] for n in countries)
         if condition in ('declared_ban_at_stage2','declared_ceremony_at_stage2'):
             kind='ban' if condition.startswith('declared_ban') else 'ceremony'
             return cx[c]>=20 and any(r['kind']==kind for r in links)
@@ -891,7 +904,7 @@ class StructuralRun:
         if self.events_mode == "none":
             return
         pools = {"historical", "generic"} if self.events_mode == "mixed" else {self.events_mode}
-        qualified = False
+        qualified = {good: False for good in GOODS}
         audit = {}
         for good,sim in self.sims.items():
             # This full observation is diagnostic only. It does not supply the
@@ -905,7 +918,7 @@ class StructuralRun:
             audit[good] = (cx,mx,members)
         countries = sorted(self.state.capitals)
         country_order={c:i for i,c in enumerate(countries)}
-        width = 16
+        width = self.config['fixed']['event_country_slice']
         selected = {countries[(month * width + k) % len(countries)] for k in range(min(width, len(countries)))} if countries else set()
         per_event = defaultdict(int)
         candidates_by_row, eligible = {}, defaultdict(list)
@@ -932,21 +945,27 @@ class StructuralRun:
             sim = self.sims[good]
             rng = random.Random(canonical_hash([self.seed,good,self.timeline.country_names[c],month,"event"]))
             x = sim.shared_country[c]
-            stage_scale = .4 if sim.finished[c] else .6 if x<20 else 1. if x<45 else 1.3 if x<70 else 1.5
-            phase_scale = .6 if sim.finished[c] or sim.decaying[c] else 1.3 if x<20 else 1. if x<45 else 1.1
+            weights = self.config['event_weights']
+            stage_scale = weights['stage_finished'] if sim.finished[c] else weights['stage_cold'] if x<20 else weights['stage_member'] if x<45 else weights['stage_fashion'] if x<70 else weights['stage_high']
+            phase_scale = weights['phase_finished'] if sim.finished[c] or sim.decaying[c] else weights['phase_cold'] if x<20 else weights['phase_member'] if x<45 else weights['phase_high']
             blocked = any(e.get("multiplier",1)<1 for e in self.effects.get((good,c),()))
-            policy_scale = 1.5 if blocked else 1.
+            policy_scale = weights['policy_blocked'] if blocked else 1.
             sim.U += 10
             if rng.random() >= min(1.,self.config["fixed"]["event_rate"]*stage_scale*phase_scale*policy_scale):
                 chosen[good,c] = None
                 continue
             available = [p for p in ("historical","generic") if eligible.get((good,c,p))]
-            pool = ("historical" if rng.random()<.6 else "generic") if len(available)==2 else available[0]
+            pool = ("historical" if rng.random()<self.config['fixed']['historical_pool_share'] else "generic") if len(available)==2 else available[0]
             rows = eligible[good,c,pool]
             kinds = sorted({e["kind"] for e in rows})
-            kind_weights = [event_weight({"kind":kind},x,sim.shared_front[c],blocked) for kind in kinds]
+            kind_weights = [event_weight({"kind":kind},x,sim.shared_front[c],blocked,weights=weights) for kind in kinds]
             kind = rng.choices(kinds,weights=kind_weights)[0]
             chosen[good,c] = rng.choice([e for e in rows if e["kind"]==kind])["id"]
+        pre_cap = defaultdict(set)
+        for (good, c), event_id in chosen.items():
+            if event_id is not None:
+                pre_cap[event_id].add(c)
+        self.candidate_bursts.extend(len(cs) for cs in pre_cap.values())
         for event in self.config["events"]:
             if event["pool"] not in pools:
                 continue
@@ -969,9 +988,9 @@ class StructuralRun:
                                and (event['id'],good,c) not in self.event_done
                                and self.cooldowns.get((good,c),-1)<=month and self.global_cooldown.get(c,-1)<=month}
                     if event["condition"] == "linked_stage2_source":
-                        qualified |= any(acx[c] < 30 for c in available)
+                        qualified[good] |= any(acx[c] < 30 for c in available)
                     elif event["condition"] == "linked_source_and_local_contact":
-                        qualified |= any(0 < acx[c] < 20 for c in available)
+                        qualified[good] |= any(0 < acx[c] < 20 for c in available)
                 # Fair cyclic service; at most three countries per event/month.
                 candidates.sort(key=lambda row: (country_order[row[0]]-month)%max(1,len(countries)))
                 for c, cap, linked in candidates:
@@ -984,27 +1003,26 @@ class StructuralRun:
                     if per_event[event["id"]] >= self.config["fixed"]["event_cap_per_month"]:
                         continue
                     proof={}
-                    if not self.live_event_probe(event,good,c,proof):
+                    condition_valid = self.live_event_probe(event,good,c,proof)
+                    if not condition_valid:
                         continue
                     if event["id"] in self.disabled_events:
                         # Effect-only ablation retains discovery/admission U.
                         # A never-activated event is then exactly identical.
                         continue
-                    # Eligibility is re-evaluated at the effect boundary.
-                    if c not in {r[0] for r in self.event_candidates(event, good, {c})}:
-                        continue
                     row = {"id": event["id"], "good": good, "month": month, "country": c, "node": cap,
-                           "kind": event["kind"], "pool": event["pool"], "linked": linked, "condition_valid": True,
+                           "kind": event["kind"], "pool": event["pool"], "linked": linked, "condition_valid": condition_valid,
                            "condition": event["condition"],'phase':'active' if sim.spreading else 'customs'}
                     row['linked']=proof['linked']
                     if event["effect"] == "boost":
                         evidence=[r['fact_id'] for r in self.country_links.get(c,())]
                         sim.inject(cap, self.config["fixed"]["event_amount"], "event", {"event":event['id'],"facts":evidence})
                     elif event["effect"] in ("multiplier", "ban"):
-                        scale = .2 if event["effect"] == "ban" else self.config["fixed"]["event_multiplier"]
+                        fixed = self.config['fixed']
+                        scale = fixed['ban_multiplier'] if event["effect"] == "ban" else fixed["event_multiplier"]
                         if event['effect']=='ban' and not sim.decaying[c] and sim.clock_joined(c) and not any(e.get('policy')=='P3' for e in self.effects.get((good,c),())):
                             remaining=max(0.,sim.join[c]+sim.P.hold_T-month)
-                            sim.join[c]=month+.5*remaining-sim.P.hold_T
+                            sim.join[c]=month+fixed['ban_hold_scale']*remaining-sim.P.hold_T
                             if sim.join[c]==-1:
                                 sim.join[c]=math.nextafter(-1.,-math.inf)
                             sim.U+=5
@@ -1013,9 +1031,9 @@ class StructuralRun:
                         for target in targets:
                             sim.U+=5
                             self.effects.setdefault((good,target),[]).append({"good": good, "country": target, "multiplier": scale,
-                                             "decay_scale": 1.5 if event["effect"] == "ban" else 1.,
+                                             "decay_scale": fixed['ban_decay_scale'] if event["effect"] == "ban" else 1.,
                                              "policy":'P3' if event['effect']=='ban' else None,
-                                             "until": month + self.config["fixed"]["event_duration"] * (4 if event["effect"] == "ban" else 1)})
+                                             "until": month + fixed["event_duration"] * (fixed['ban_duration_scale'] if event["effect"] == "ban" else 1)})
                             sim.country_wake_until[target] = month+self.config["fixed"]["aggregate_slices"]
                         if event["effect"] == "ban":
                             self.bans_this_month.append({"good":good,"country":c,"initial":sim.country_value(c),"event":event['id']})
@@ -1043,24 +1061,7 @@ class StructuralRun:
             if changed:
                 self.apply_state()
             wine = self.context_goods["wine"]
-            wine.begin_month()
-            wine.month_start_U = before["wine"]
-            # A competing drink reopens attention to a dormant wine custom.
-            # Its subsequent retreat uses wine's ordinary country clock/x.
-            for c in self.state.capitals:
-                wine.U += 3
-                rival_member=False
-                for good in ('coffee','tea'):
-                    sim=self.sims[good];source=sim.shared_country_source[c]
-                    rival_member |= source >= 0 and sim.eff(source) >= 1
-                    wine.U += 3
-                if wine.join[c] < 0 and rival_member:
-                    members = wine.members_of[c]
-                    wine.U += len(members)
-                    if any(wine.eff(v) >= 1 for v in members):
-                        wine.join[c] = month
-                        wine.U += 2
-            wine.serve_month()
+            wine.t = month + 1
             prepared = []
             for sim in self.sims.values():
                 sim.begin_month()

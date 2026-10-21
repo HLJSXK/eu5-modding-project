@@ -114,16 +114,16 @@ def jointfit(exp, workers):
 
 
 def checks(exp, params, workers):
-    stages = [('inherent', ['contact', 'preemption', 'ownership', 'roads', 'market']),
-              ('contact', ['preemption', 'ownership', 'roads']),
-              ('preemption', ['ownership', 'roads']), ('ownership_roads', [])]
+    stages = [('inherent', ['contact', 'preemption', 'ownership', 'market']),
+              ('contact', ['preemption', 'ownership']),
+              ('preemption', ['ownership']), ('ownership', [])]
     rows = exp.many([dict(world='R', mode='S', seed=s, params=params, fit_only=True, omit_wc=True, disabled_rules=disabled)
                      for _, disabled in stages for s in range(3)], workers=workers)
     atomic_json(exp.out/'mechanism_stages_fit_only.json',
                 [dict(stage=name, disabled_rules=disabled, **record(exp, params, rows[i*3:(i+1)*3]))
                  for i, (name, disabled) in enumerate(stages)])
     comparisons = [('formal', True, []), ('with_wc', False, []), ('without_wine', True, ['wine'])]
-    rows = exp.many([dict(world='R', mode='H', seed=s, params=params, omit_wc=wc, disabled_rules=disabled)
+    rows = exp.many([dict(world='R', mode='H', seed=s, params=params, fit_only=True, omit_wc=wc, disabled_rules=disabled)
                      for _, wc, disabled in comparisons for s in range(3)], workers=workers)
     atomic_json(exp.out/'prior_sensitivity.json',
                 [dict(variant=name, seeds=list(range(3)), diagnostic_only=True,
@@ -136,16 +136,20 @@ if __name__ == '__main__':
                     choices=['quick', 'screen', 'fit', 'jointfit', 'matrix', 'checks', 'replays'])
     ap.add_argument('--force-full', action='store_true',
                     help='Run the entire matrix even when exact cached cells already prove a necessary threshold failed')
+    ap.add_argument('--auditor-holdout',action='store_true',help='Explicit auditor access to full/holdout scoring')
     ap.add_argument('--workers', type=int, default=6)
     ap.add_argument('--protocol', type=Path, default=Path(__file__).with_name('structural_fit_protocol.json'))
-    ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_structural')
+    ap.add_argument('--out', type=Path, default=ROOT/'tmp/obsession_round2')
     ap.add_argument('--observer', type=Path, action='append')
     args = ap.parse_args()
+    if args.action=='matrix' and not args.auditor_holdout:
+        ap.error('本轮实现者不得执行全集/留出矩阵；由审计方使用 --auditor-holdout 独立运行')
     observers=args.observer
     log_path=ROOT/'tools/obsession_sim/selection_log.json'
     if not observers and args.action in ('quick','screen','matrix','checks','replays') and log_path.exists():
-        observers=bound_observers(log_path)
-    exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', observers or sorted((ROOT/'tmp/obsession_worlds').glob('*/timeline.json')),
+        log=json.loads(log_path.read_text(encoding='utf-8'))
+        if log.get('runtime_hash')==code_hash():observers=bound_observers(log_path)
+    exp = Experiment(ROOT/'tmp/obsession_real/eu5_1337.json', observers or sorted((ROOT/'tmp/obsession_worlds_round2').glob('*/timeline.json')),
                      ROOT/'.eu5-base/reference_game_files/game', args.out)
     if args.action in ('quick', 'screen'):
         params=json.loads((ROOT/'tools/obsession_sim/selected_params.json').read_text(encoding='utf-8'))
@@ -160,7 +164,7 @@ if __name__ == '__main__':
     else:
         params = selected(exp)
         if args.action == 'matrix':
-            screen=cache_screen(exp, params=params, progress=print)
+            screen=cache_screen(exp, params=params, progress=print,fit_only=False)
             if screen['decision']=='early_reject' and not args.force_full:
                 print(json.dumps(dict(skipped_full=True,reason='Complete cached cells already disprove necessary thresholds',
                                       gates=screen['gates'],report=str(exp.out/'cache_screen.json'),
@@ -170,5 +174,5 @@ if __name__ == '__main__':
         elif args.action == 'checks':
             checks(exp, params, args.workers)
         else:
-            exp.many([dict(world=w, mode=m, seed=0, params=params, omit_wc=w=='R', frames=12)
+            exp.many([dict(world=w, mode=m, seed=0, params=params, fit_only=True,omit_wc=w=='R', frames=12)
                       for w, m in [('R', 'H'), ('O', 'G')]], workers=2)

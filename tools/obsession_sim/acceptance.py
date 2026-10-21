@@ -25,23 +25,36 @@ def event_dependence(historical, structural):
     return sum(moved(a["simulated_month"], b["simulated_month"], a["tolerance_months"]) for a, b in rows) / len(rows) if rows else None
 
 
-def event_diagnostics(events, eligible_months):
+def order_correct(earlier, later):
+    return earlier is not None and (later is None or earlier <= later)
+
+
+def event_diagnostics(events, eligible_months, candidate_bursts=()):
     generic = [e for e in events if e["pool"] == "generic" and e["kind"] == "spread"]
     bursts = {}
     for e in events:
         bursts.setdefault((e["id"], e["month"]), set()).add(e["country"])
-    hit = {e["month"] for e in generic}
-    gap = longest = 0
-    previous = None
-    for month, eligible in eligible_months:
-        if not eligible or month in hit:
-            gap = 0
-        else:
-            gap = gap+1 if previous == month-1 else 1
-            longest = max(longest, gap)
-        previous = month
+    gaps = {}
+    goods = {e.get("good", "all") for e in generic}
+    goods.update(g for _, row in eligible_months for g in (row if isinstance(row, dict) else ["all"]))
+    for good in sorted(goods):
+        hit = {e["month"] for e in generic if e.get("good", "all") == good}
+        gap = longest = qualified = 0
+        previous = None
+        for month, row in eligible_months:
+            eligible = row.get(good, False) if isinstance(row, dict) else row
+            qualified += bool(eligible)
+            if not eligible or month in hit:
+                gap = 0
+            else:
+                gap = gap+1 if previous == month-1 else 1
+                longest = max(longest, gap)
+            previous = month
+        gaps[good] = longest/12 if qualified else None
+    determined = [v for v in gaps.values() if v is not None]
     return {"p_link": sum(e["linked"] for e in generic)/len(generic) if generic else None,
-            "B_max": max(map(len, bursts.values()), default=0), "E_gap": longest/12,
+            "B_max": max(candidate_bursts, default=max(map(len, bursts.values()), default=0)),
+            "E_gap": max(determined) if determined else None, "E_gap_by_good": gaps,
             "M_mis": sum(not e["condition_valid"] for e in events if e["pool"] == "historical")}
 
 
@@ -179,7 +192,7 @@ class RunMetrics:
                          'unseeded_evidence':self.arrival_unseeded_evidence.get(target['id']),
                          "world_evidence":{"facts":evidence,"counts":{g:grades[g] for g in ('W-A','W-B','W-C')},
                                            "trace":"first-membership parent ancestry; not a counterfactual necessity claim"},
-                         "scored": not (grades['W-C'] and not (grades['W-A'] or grades['W-B']))})
+                         "scored": True})
         result = {"milestones": rows, "violations": list(self.violations.items()), "violation_count": len(self.violations),
                   'contact_evidence':self.contact_evidence,'tea_local_hotspots':self.tea_local_hotspots}
         for split, prefix in ((None, ""), ("fit", "fit_"), ("holdout", "holdout_")):
@@ -187,8 +200,8 @@ class RunMetrics:
             pairs = [(a,b) for a in eligible for b in eligible if a["good"] == b["good"] and a["target_month"] < b["target_month"]]
             result[prefix+"within_tol"] = sum(r["within_tolerance"] for r in eligible)/len(eligible) if eligible else None
             result[prefix+"within_2tol"] = sum(r["within_2tol"] for r in eligible)/len(eligible) if eligible else None
-            result[prefix+"p_order"] = sum(a["simulated_month"] is not None and b["simulated_month"] is not None
-                                          and a["simulated_month"] <= b["simulated_month"] for a,b in pairs)/len(pairs) if pairs else None
+            result[prefix+"p_order"] = sum(order_correct(a["simulated_month"], b["simulated_month"])
+                                          for a,b in pairs)/len(pairs) if pairs else None
             missing = sum(r["simulated_month"] is None for r in eligible)
             result[prefix+"loss_missing"] = missing
             result[prefix+"loss_infinite"] = bool(missing)
@@ -213,7 +226,7 @@ class RunMetrics:
             rate=sum(c['status']=='pass' for c in decided)/len(decided) if decided else None
             result['ban_trials']['by_scenario'][source]={'observed':len(decided),'censored':len(cases)-len(decided),
                 'failure_rate':rate,'diagnostic_target':.7,'target_met':rate>=.7 if rate is not None else None}
-        result.update(event_diagnostics(run.event_log, run.eligible_months))
+        result.update(event_diagnostics(run.event_log, run.eligible_months, run.candidate_bursts))
         sanity = {}
         for good, sim in run.sims.items():
             if sim.external_stage2 is not None:
@@ -233,8 +246,31 @@ class RunMetrics:
                                   not r["T_alive_failed"] and (r["T_alive"] is None or r["T_alive"] <= 100)
                                   for r in sanity.values()) if meaningful else None)
         result.update(sanity=sanity, peak_U=max(run.ledger, default=0), total_U=sum(run.ledger),
+                      peak_round_delay_months=max((s.peak_round_delay for s in run.sims.values()), default=0),
+                      events_abandoned_budget=run.events_abandoned_budget,
                       overruns=run.overruns, wave_years=max((b-a)/12 for s in run.sims.values() for a,b in s.waves) if any(s.waves for s in run.sims.values()) else 0,
                       events=run.event_log, summaries={g:s.summary() for g,s in run.sims.items()})
+        result["channel_audit"] = {}
+        for good, sim in run.sims.items():
+            result["channel_audit"][good] = {}
+            for kind in ("contact", "ownership", "event"):
+                inputs = [r for r in sim.nonlocal_log if r["type"] == kind]
+                shares = [r["source"]["population_share"] for r in inputs if (r.get("source") or {}).get("population_share") is not None]
+                result["channel_audit"][good][kind] = dict(inputs=len(inputs), receiving_countries=len({r['country'] for r in inputs}),
+                    ownership_population_share_median=q(shares), ownership_population_share_max=max(shares, default=None))
+        result["ownership_case_studies"] = []
+        if run.timeline.kind == "R":
+            for tag, good, fact_id, historical_lag in (("TUR", "coffee", "me_ott_yemen_1539", 17),
+                                                       ("CAS", "tobacco", "spanish_hispaniola", [40,50])):
+                c = run.timeline.country_index.get(tag)
+                fact = next((f for f in run.timeline.facts if f['id'] == fact_id), None)
+                if c is not None and fact is not None:
+                    got = run.sims[good].capital_stage2.get(c)
+                    result["ownership_case_studies"].append(dict(country=tag, good=good, fact=fact_id,
+                        exposure_month=fact['start_month'], capital_stage2=got,
+                        lag_years=(got['month']-fact['start_month'])/12 if got else None,
+                        historical_context_lag_years=historical_lag,
+                        interpretation="Report-only contextual comparison, not a fit target or attribution; other owned routes may act concurrently."))
         return result
 
 
@@ -248,8 +284,11 @@ def aggregate_runs(runs, kind="R"):
         out[key+"_p90"] = q([r.get(key) for r in runs], .9)
     out["violation_count"] = max((r["violation_count"] for r in runs), default=0)
     out["healthy_rate"] = sum(r["healthy"] is True for r in runs)/len(runs) if runs and any(r["healthy"] is not None for r in runs) else None
-    for key in ("B_max", "peak_U", "wave_years"):
+    for key in ("B_max", "peak_U", "wave_years", "peak_round_delay_months"):
         out[key] = max((r.get(key, 0) for r in runs), default=0)
+    out["events_abandoned_budget"] = sum(r.get("events_abandoned_budget", 0) for r in runs)
+    out["E_gap_by_good"] = {good: q([r.get("E_gap_by_good", {}).get(good) for r in runs])
+                            for good in ("coffee", "tea", "tobacco")}
     out["M_mis"] = sum(r.get("M_mis", 0) for r in runs)
     out['ban_scenarios']={}
     sources={source for r in runs for source in r.get('ban_trials',{}).get('by_scenario',{})}

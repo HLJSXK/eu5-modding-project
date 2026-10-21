@@ -15,7 +15,7 @@ const box={document:{getElementById:id=>elements[id]||null,createElement:element
  addEventListener:()=>{},setTimeout:()=>{},URL:{},Blob:class{},console};
 vm.createContext(box);
 for(const m of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))vm.runInContext(m[1],box);
-assert.equal(elements.cells.children.length,3);
+assert.equal(elements.cells.children.length,4);
 const run=code=>vm.runInContext(code,box);
 const sample={mode:'S',world_kind:'R',seed:0,params:{p:.006,lambda_ownership:.1},p_K:.5,peak_U:123,violation_count:0,
  country_labels:['MAM'],K:[{id:'K1',level:'B',status:'fail',cases:[{country:0,t0:1200,t1:1300,status:'fail'}]}],
@@ -48,3 +48,7 @@ run('busy(true)');for(const id of ['quick','screen','run','matrix'])assert.equal
 run('busy(false)');
 assert.throws(()=>run('render({unexpected:true})'),/不是痴迷传播验收报告/);
 console.log('Acceptance workbench checks passed: actual DOM ids, single/matrix render, K details, W ancestry and seed switching.');
+
+box.data={K:[],milestones:[{split:'holdout'}]};assert.throws(()=>run('render(data)'),/留出/);
+run('fillParams({p:.01,rho:.99,hold_T:999,road_scale:3,affinity_strength:0})');assert.equal(elements.params.children.length,2);
+run('busy(false)');assert.equal(elements.matrix.disabled,true);

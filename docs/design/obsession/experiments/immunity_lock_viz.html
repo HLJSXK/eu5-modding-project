@@ -1068,8 +1068,11 @@ function pbOwner(v) {
   return PB.group_names&&PB.group?PB.group_names[PB.group[v]]||"—":"—";
 }
 function pbName(v) { const display=pbAttr("display_name",v), name=pbAttr("name",v); return display!=="—"?display:PB.names&&PB.names[v]|| (name!=="—"?name:`地点 ${v}`); }
+const pbMasks=new WeakMap();
+function pbMasked(v){if(!PB?.masked_nodes)return false;let mask=pbMasks.get(PB);if(!mask){mask=new Set(PB.masked_nodes);pbMasks.set(PB,mask);}return mask.has(v);}
 function pbColor(v) {
   const mode = $("pb-mode").value;
+  if(mode!=="owner"&&pbMasked(v))return "#b8bec6";
   if (mode === "owner") { const owner = pbOwnerIds[v]; return owner<0?"#c5cec9":`hsl(${(owner * 137.508) % 360} 35% 63%)`; }
   if (mode === "arrival") {
     const t = PB.arrival && PB.arrival[v];
@@ -1186,6 +1189,7 @@ function pbDetails() {
   const shown=pbHover>=0?pbHover:pbSelected;
   if(!PB || shown<0 || shown>=PB.nodes){$("pb-detail").textContent="悬浮查看地点，点击选中（可设种子、选观察范围、存为里程碑）；查找框输入地点名后回车定位。地图中拖拽平移，滚轮缩放；键盘方向键 / ＋− / Home 也可操作。";return;}
   const v=shown,frame=pbFrame(),code=frame.stages.charCodeAt(v)-97,t=PB.arrival&&PB.arrival[v],month=frame.month;
+  if(pbMasked(v)){$("pb-detail").textContent=`${pbName(v)}\n留出范围：传播强度、到达时间与时钟已在导出前屏蔽；世界归属仍可查看。`;return;}
   const region=pbAttr("region",v),area=pbAttr("area",v), group=PB.group&&PB.group[v];
   const clockName=group==null||group<0?"无组":PB.group_names&&PB.group_names[group]||String(group);
   const join=PB.clock&&PB.clock.join&&PB.clock.join[group],decay=PB.clock&&PB.clock.decay_start&&PB.clock.decay_start[group];
@@ -1344,6 +1348,7 @@ function pbSelectRender(){
 function pbSelectStat(){
   const el=document.getElementById?.("pb-scope-stat");if(!el||!PB)return;
   if(!pbScope){el.textContent="";return;}
+  if(PB.masked_nodes?.some(v=>pbScope.mask[v])){el.textContent=`${pbScope.label} 含留出地点；只显示地理轮廓，不计算采纳比例或到达时间。`;return;}
   const s=pbFrame().stages;let m=0,f=0;
   for(let v=0;v<PB.nodes;v++)if(pbScope.mask[v]){const st=(s.charCodeAt(v)-97)%7;if(st>=2){m++;if(st>=3)f++;}}
   el.textContent=`${pbScope.label}：${fmt(pbScope.count)} 个地点；此刻成员 ${(100*m/Math.max(1,pbScope.count)).toFixed(1)}%，风尚 ${(100*f/Math.max(1,pbScope.count)).toFixed(1)}%。`;
@@ -1430,12 +1435,14 @@ function pbScopeCurve(payload,mask){
   return out;
 }
 function pbScopeArrival(payload,mask,column,frac){
+  if(payload.masked_nodes?.some(v=>mask[v]))return undefined;
   const col=column==="positive"?payload.first_positive:column==="20"?payload.threshold_arrival&&payload.threshold_arrival["20"]:payload.arrival;
   if(!Array.isArray(col))return undefined;
   const got=[];let n=0;for(let v=0;v<mask.length;v++)if(mask[v]){n++;if(col[v]!=null&&col[v]>=0)got.push(col[v]);}
   got.sort((a,b)=>a-b);const need=Math.max(1,Math.ceil(frac*n));return got.length>=need?got[need-1]:null;
 }
 function pbScopeChart(cursor){
+  if(pbScope&&PB.masked_nodes?.some(v=>pbScope.mask[v])){$("pb-scope-fig").hidden=true;return;}
   const fig=$("pb-scope-fig");fig.hidden=!pbScope;if(!pbScope)return;
   const ref=pbRefPayload(),key=`${pbScope.key}=${pbScope.value}/${pbCurrentRun}/${PB.frames.length}/${ref?pbRefId:0}`;
   if(!pbScopeCache||pbScopeCache.key!==key)pbScopeCache={key,cur:pbScopeCurve(PB,pbScope.mask),ref:ref?pbScopeCurve(ref,pbScope.mask):null};

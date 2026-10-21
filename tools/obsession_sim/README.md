@@ -1,6 +1,32 @@
 # obsession_sim：痴迷扩散离线模拟核心
 
-更新：2026-10-20。这是「痴迷」系统的 Python 离线参考实现。现行三层实验按设计 19/20 运行；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+更新：2026-10-21。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 23 为准，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+
+## 当前流程：23 交接规格
+
+只拟合六个共同参数：`p、rho、lambda_contact、lambda_ownership、preemption、internal_rate`。领地回流按首都市场之外的流行人口占比计算；商人常驻排除该市场的有领土国家，保留实际份额而不重新归一化。道路与海峡均为单位权重，亲和表全开，酒恒定为 x=30；δ、来源门槛、入口剂量与退潮值按固定设计执行。
+
+两局观察者档案在 `tmp/obsession_worlds_round2/`，各有 52 档，覆盖 1338.4.1–1840.4.1。SOL 局提供 R 的近开局市场边界和 31 档商人先验；原版局作为独立非史实世界，不参与这两项估计。世界事实、73 项修订与地图映射限制见 `world_facts.json`、`world_facts_amendments.json` 及 [第二轮报告](../../docs/design/obsession/24_Round2_Implementation_Results.md)。
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
+& $env:EU5_PYTHON -m tools.obsession_sim.experiment freeze-check
+& $env:EU5_PYTHON docs/design/obsession/experiments/run_structural_validation.py quick
+& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow fit
+& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow select
+# 先提交 selected_params.json 与 selection_log.json，再通知审计方。
+& $env:EU5_PYTHON -m tools.obsession_sim.fit_workflow diagnostics
+& $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8767
+```
+
+`fit` 要求新排序协议已提交；`diagnostics` 要求选参文件与日志已提交，且运行时和冻结哈希匹配。选参只读拟合集，正式诊断包含双局 K 条、通道消融、去酒与双倍预算。超过三分之一拟合 A/B 里程碑在双倍预算下移动超过容差，将阻止 L2 宣称。
+
+工作台位于 `/docs/design/obsession/experiments/structural_workbench.html`：只显示六个可调参数，固定值另列，支持两局结果切换，以及队列延迟、放弃事件与逐商品 E_gap。R 地图回放在导出前屏蔽留出地点及其到达列，相关统计也去掉留出地点。实现者接口不运行或加载留出结果；正式全集矩阵留给审计方用显式 `--auditor-holdout` 运行。
+
+`round2 {config,world,prior,audit,audit-batch,observers}` 是输入准备与一致性检查工具；输入准备只在选参前进行。`config` 不覆盖已经选出的六参数文件。世界输入修订后需重新检查、冻结并发布协议。
+
+<details><summary>上一轮三层接口记录（以当前流程为准）</summary>
 
 ## 三层模型与正式验收
 
@@ -39,6 +65,8 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 本轮冻结流程用 `docs/design/obsession/experiments/run_structural_validation.py` 复跑：默认 `quick`，`screen` 只看已有检查点。`fit` 执行 49 候选及前六组的三种子确认；当前选参已经完成，不再重选。`matrix` 先筛查已完成格，必要时才继续八格各 30 种子与历史事件消融；`checks` 的全时段分层及 W-C/酒对照、`replays` 的两份三商品地图回放也只在阶段性节点显式执行。完整计算默认 6 个进程；正式矩阵的选参提交、冻结哈希或代码哈希不匹配时停止。
 
 本轮校准源码可在提交 `3fe7bcb3` 或运行时源码归档中复现。当前源码随后修复了酒习俗移除对照的空种子分支；参数没有重选。纠错后的完整矩阵按用户要求停止在 S×R 30 次、H×R 6 次，不宣称全部完成。快速流程和网页改动不改变数值运行时哈希，因此已完成的正式缓存继续有效。默认验证使用选参日志绑定的冻结观察者副本，也可显式传入 `--observer`。
+
+</details>
 
 ## 1. 它模拟什么
 

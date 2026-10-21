@@ -29,13 +29,13 @@ class ServerTests(unittest.TestCase):
                     self.assertEqual(400,self.request("POST","/api/structural",value)[0])
             with patch.object(experiment_runner,"Experiment") as cls:
                 cls.return_value.one.return_value={"K":[],"world_kind":"R","mode":"S"}
-                status,result=self.request("POST","/api/structural",{"params":{"p":.012,"hold_T":600}})
+                status,result=self.request("POST","/api/structural",{"params":{"p":.012,"lambda_ownership":.2}})
                 self.assertEqual(202,status)
                 job=self.wait_job(result['id'])
                 self.assertEqual('complete',job['status'])
                 call=cls.return_value.one.call_args
                 self.assertEqual(('R','S',0),call.args)
-                self.assertEqual({'p':.012,'hold_T':600},call.kwargs['params'])
+                self.assertEqual({'p':.012,'lambda_ownership':.2},call.kwargs['params'])
                 self.assertTrue(call.kwargs['fit_only'])
                 self.assertEqual(12,call.kwargs['frames'])
 
@@ -62,32 +62,36 @@ class ServerTests(unittest.TestCase):
                 patch.object(validation, "quick_check", return_value=quick) as short, \
                 patch.object(validation, "cache_screen", return_value=rejected) as screen, \
                 patch.object(validation, "bound_observers", return_value=[]):
-            for action in ("quick", "screen", "matrix"):
+            for action in ("quick", "screen"):
                 status, result = self.request("POST", "/api/structural", {"action": action})
                 self.assertEqual(202, status)
                 job = self.wait_job(result["id"])
                 self.assertEqual("complete", job["status"])
                 self.assertEqual(quick if action=="quick" else rejected, job["result"])
             self.assertEqual(1, short.call_count)
-            self.assertEqual(2, screen.call_count)
+            self.assertEqual(1, screen.call_count)
             cls.return_value.matrix.assert_not_called()
             cls.return_value.one.assert_not_called()
             cls.return_value.matrix.return_value = {"cells": {}, "gates": {}}
-            _, result = self.request("POST", "/api/structural", {"action": "matrix", "force_full": True})
-            self.assertEqual("complete", self.wait_job(result["id"])["status"])
-            cls.return_value.matrix.assert_called_once()
+            status, result = self.request("POST", "/api/structural", {"action": "matrix", "force_full": True})
+            self.assertEqual(400, status)
+            self.assertIn('审计',result['error'])
+            cls.return_value.matrix.assert_not_called()
+            self.assertEqual(400,self.request('POST','/api/structural',{'fit_only':False})[0])
             self.assertEqual(400, self.request("POST", "/api/structural", {"action": "matrix", "force_full": 1})[0])
 
     def test_acceptance_endpoint_labels_partial_report_when_matrix_is_absent(self):
         with patch.object(runner_server, "WORKSPACE", Path(self.temp.name)):
-            folder = Path(self.temp.name) / "tmp/obsession_structural"
+            folder = Path(self.temp.name) / "tmp/obsession_round2"
             folder.mkdir(parents=True)
             partial = {"format": "obsession.cache-screen/1", "cells": {}, "complete_protocol": False}
             (folder / "cache_screen.json").write_text(json.dumps(partial))
             self.assertEqual((200, partial), self.request("GET", "/api/acceptance"))
             complete = {"format": "obsession.acceptance/1", "cells": {}, "complete_protocol": True}
             (folder / "matrix.json").write_text(json.dumps(complete))
-            self.assertEqual((200, complete), self.request("GET", "/api/acceptance"))
+            self.assertEqual((200, partial), self.request("GET", "/api/acceptance"))
+            (folder/'fit_report.json').write_text(json.dumps(dict(complete,fit_only=True)))
+            self.assertEqual(200,self.request('GET','/api/acceptance')[0])
 
     def test_explicit_empty_seed_list_and_historical_defaults_survive_prepare(self):
         scenario = {"seeds": [], "parameters": {"p": .004, "hold_T": 600, "coefficient_cost": 10},

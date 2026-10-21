@@ -53,3 +53,37 @@ def export_html(sim, path, title="", note="", **kwargs):
     # Escaping '<' prevents data from terminating the script element or injecting markup.
     tag = '<script type="application/json" id="obsession-playback-data">' + payload.replace("<", "\\u003c") + '</script>'
     Path(path).write_text(template.read_text(encoding="utf-8").replace("</body>", tag + "\n</body>"), encoding="utf-8")
+
+
+def mask_holdout_playback(payload, hidden_nodes):
+    """Remove held-out geography's outcomes before any playback is written."""
+    hidden = set(hidden_nodes)
+    payload["masked_nodes"] = sorted(hidden)
+    payload["note"] = "拟合集回放；留出范围的强度与到达时间已在导出前屏蔽，节点统计仅含非留出地点。"
+    for key in ("arrival", "first_positive", "arrival_kind"):
+        if key in payload:
+            payload[key] = [(None if key == "arrival_kind" else -1) if i in hidden else v
+                            for i, v in enumerate(payload[key])]
+    for key, values in payload.get("threshold_arrival", {}).items():
+        payload["threshold_arrival"][key] = [-1 if i in hidden else v for i, v in enumerate(values)]
+    for frame in payload.get("frames", ()):
+        frame["stages"] = "".join("a" if i in hidden else v for i, v in enumerate(frame["stages"]))
+    def counts(frame):
+        stages = [(ord(c)-97)%7 for i,c in enumerate(frame['stages']) if i not in hidden]
+        return dict(members=sum(s>=2 for s in stages), positive=sum(s>=1 for s in stages),
+                    x_ge_45=sum(s>=4 for s in stages), saturated=sum(s==6 for s in stages))
+    frames = payload.get('frames', [])
+    for row in payload.get('series', ()):
+        frame = next((f for f in reversed(frames) if f['month']<=row['month']), frames[0] if frames else None)
+        if frame is not None:row.update(counts(frame))
+    summary = payload.get('summary', {})
+    if frames:
+        final = counts(frames[-1])
+        summary.update(ever_member=sum(t>=0 for t in payload.get('arrival',[]) if t is not None),
+                       final_members=final['members'], final_positive=final['positive'], final_saturated=final['saturated'])
+    for key in ('groups_joined','groups_finished','calm_month'):summary.pop(key, None)
+    payload.pop("clock", None)
+    structural = payload.get("structural", {})
+    structural["sources"] = [r for r in structural.get("sources", ()) if r.get("node") not in hidden]
+    structural["events"] = [r for r in structural.get("events", ()) if r.get("node") not in hidden]
+    return payload

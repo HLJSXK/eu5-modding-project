@@ -45,7 +45,7 @@ def experiment(tmp_path):
 def test_quick_bounds_real_runs_reuses_cache_and_invalidates_params(experiment):
     result = quick_check(experiment)
     assert result["passed"] and not result["cached"] and not result["complete_protocol"]
-    assert len(result["rows"]) == 14 and all(r["months"] <= 2 for r in result["rows"])
+    assert len(result["rows"]) == 13 and all(r["months"] <= 2 for r in result["rows"])
     assert len(result["transitions"]) == 1
     assert result["transitions"][0]["date"] == "1340.1.1"
     assert not (experiment.out / "runs").exists()
@@ -62,11 +62,11 @@ def seed_cache(exp, seeds=range(30), **changes):
         timeline = exp.timeline("R", seed, omit_wc=True)
         identity = dict(frozen=exp.frozen_hash, world=timeline.hash, graph=exp.graph_hash,
                         environment=environment_info(), mode="S", seed=seed, params=exp.config["params"],
-                        disabled=[], omit_wc=True, fit_only=False, end_year=None,
-                        code=exp.runtime_hash, disabled_rules=[])
+                        disabled=[], omit_wc=True, fit_only=True, end_year=None,
+                        code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1)
         path = exp.out / "runs" / (canonical_hash(identity) + ".json")
         row = dict(deepcopy(sample), identity=identity, mode="S", world_kind="R", world_id="R", seed=seed,
-                   end_month=timeline.end, world_hash=timeline.hash, p_order=.5, violation_count=0,
+                   end_month=timeline.end, world_hash=timeline.hash, p_order=.5, fit_p_order=.5, violation_count=0,
                    cache_file=str(path), **changes)
         atomic_json(path, row)
 
@@ -80,8 +80,8 @@ def test_only_complete_exact_cell_can_prove_failure(experiment):
     complete = cache_screen(experiment)
     assert complete["simulations_started"] == 0 and not complete["complete_protocol"]
     assert complete["decision"] == "early_reject"
-    assert complete["gates"]["L1"]["status"] == "未达"
-    assert any("p_order=0.5" in s for s in complete["gates"]["L1"]["failures"])
+    assert complete["gates"]["L1"]["status"] == "无法判定"
+    assert any("p_order=0.5" in s for s in complete["gates"]["L2"]["failures"])
     assert complete["coverage"]["H×R"]["completed"] == 0
     assert all(g["status"] != "达到" for g in complete["gates"].values())
     assert cache_screen(experiment, params={"p": .01})["cells"] == {}

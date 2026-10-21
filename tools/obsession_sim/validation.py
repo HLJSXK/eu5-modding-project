@@ -80,7 +80,7 @@ def quick_check(exp, params=None, progress=lambda *a, **k: None, cancel=None):
     for world, factory in factories:
         cases = [(mode, []) for mode in MODES]
         if world == "R":
-            cases += [("S", [rule]) for rule in ("wine", "contact", "ownership", "market", "roads", "preemption")]
+            cases += [("S", [rule]) for rule in ("wine", "contact", "ownership", "market", "preemption")]
         for mode, disabled in cases:
             if cancel and cancel.is_set():
                 raise InterruptedError("quick check cancelled")
@@ -123,7 +123,7 @@ def quick_check(exp, params=None, progress=lambda *a, **k: None, cancel=None):
     return result
 
 
-def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None):
+def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None, *, fit_only=True):
     """Read exact-identity R checkpoints only. A missing seed cannot prove failure.
 
     Whole-cell medians need all 30 seeds. Partial cells, old runtimes, fit-only
@@ -142,8 +142,8 @@ def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None):
             timeline = timelines[seed]
             identity = dict(frozen=exp.frozen_hash, world=timeline.hash, graph=exp.graph_hash,
                             environment=environment_info(), mode=mode, seed=seed, params=params,
-                            disabled=[], omit_wc=True, fit_only=False, end_year=None,
-                            code=exp.runtime_hash, disabled_rules=[])
+                            disabled=[], omit_wc=True, fit_only=fit_only, end_year=None,
+                            code=exp.runtime_hash, disabled_rules=[], budget_multiplier=1)
             path = exp.out / "runs" / (canonical_hash(identity) + ".json")
             if not path.exists():
                 missing.append(seed)
@@ -167,6 +167,8 @@ def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None):
     result_gates = gates(cells, exp.spec, frozen_valid=True, world_count=len(exp.observers),
                          independent_worlds=sum(m.get("role")=="independent_validation" for m, _ in exp.observers),
                          complete_protocol=False)
+    if fit_only:
+        result_gates["L1"] = dict(status="无法判定", failures=[], missing=["全集及留出由审计方判定"], cells={})
     for gate in result_gates.values():
         # A necessary threshold can disprove a level with other cells missing.
         # No partial report can prove any level passed.
@@ -174,9 +176,9 @@ def cache_screen(exp, params=None, progress=lambda *a, **k: None, cancel=None):
     result = dict(format="obsession.cache-screen/1", cells=cells, coverage=coverage, errors=errors,
                   gates=result_gates, params=params, frozen_valid=True, frozen_hash=exp.frozen_hash,
                   runtime_hash=exp.runtime_hash, graph_hash=exp.graph_hash,
-                  complete_protocol=False, simulations_started=0,
+                  complete_protocol=False, fit_only=fit_only, simulations_started=0,
                   decision="early_reject" if any(g["failures"] for g in result_gates.values()) else "incomplete",
                   elapsed_seconds=time.perf_counter()-start,
-                  limitation="只读 R 的完整 30 种子基准缓存。可证实必要门槛失败，不能证明通过；O、消融及缺失格未执行。")
+                  limitation="只读本轮拟合集的完整 30 种子缓存；不读取留出或判定 L1，不替代审计。")
     atomic_json(exp.out / "cache_screen.json", result)
     return result

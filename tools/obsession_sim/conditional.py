@@ -10,6 +10,8 @@ import math
 
 import numpy as np
 
+from .worlds import foreign_merchants
+
 
 class ConditionalEvaluator:
     def __init__(self, definitions, world_kind="R", start_month=0):
@@ -41,13 +43,12 @@ class ConditionalEvaluator:
         nonlocal_by_good = {(i["good"], i["country"]) for i in inputs if i["type"] != "adjacency"}
         first_inputs={}
         for row in inputs:
-            if row["type"] != "adjacency":
+            if row["type"] in ("contact", "ownership", "event"):
                 first_inputs.setdefault((row["good"],row["country"]),row)
-        nonlocal_any = {c for _, c in nonlocal_by_good}
         # K1: only the first eligible residency for a country, irrespective of later moves.
         if "coffee" in market_x:
             for m in np.flatnonzero(market_x["coffee"] >= 20):
-                for c in state.markets[m]["merchants"]:
+                for c in foreign_merchants(state, int(m)):
                     cap = state.capitals.get(c)
                     if cap is not None:
                         if capital_x["coffee"][c] >= 20 or state.market[cap] == m:
@@ -70,7 +71,7 @@ class ConditionalEvaluator:
                     self.seen["K4"].add(key)
                 else:
                     self.add("K4", key, month, c, good=good, capital=state.capitals.get(c))
-        for good, c in nonlocal_by_good:
+        for good, c in first_inputs:
             if good == "tobacco":
                 before=first_inputs[(good,c)].get("country_x_before",country_x[good][c])
                 if before >= 20:
@@ -109,6 +110,8 @@ class ConditionalEvaluator:
             elapsed = month - t0
             lo, hi = (v * 12 for v in self.definitions[kid]["interval_years"])
             lower, upper = max(0, lo - self.padding), hi + self.padding
+            if kid in ("K2", "K6"):
+                upper = max(0, hi - self.padding)
             outcome = False
             if kid == "K1":
                 outcome = capital_x["coffee"][c] >= 20
@@ -131,7 +134,7 @@ class ConditionalEvaluator:
                 elif elapsed >= upper:
                     case.update(status="pass", t1=month)
             elif kid == "K4":
-                if c in nonlocal_any:
+                if (case["good"], c) in nonlocal_by_good:
                     case.update(status="untriggered", reason="nonlocal input confounds raw possession")
                 elif country_x[case["good"]][c] >= 20 and elapsed < max(0, hi - self.padding):
                     case.update(status="fail", t1=month, reason="raw possession reached stage2 without contact")
