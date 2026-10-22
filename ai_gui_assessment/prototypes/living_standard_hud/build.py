@@ -365,6 +365,8 @@ def country(tag, name, rank, pci, yoy, tier):
     return {"__type__": "Country", "Self": tag, "GetNameWithNoTooltip": name, "GetName": name,
             "MakeScope.GetVariable('sol_ls_rank').GetValue": rank,
             "MakeScope.GetVariable('sol_ls_pci').GetValue": pci,
+            # Living-standard ratio used by the four-section ranking ladder.
+            "MakeScope.GetVariable('sol_ls_sol').GetValue": pci,
             "MakeScope.GetVariable('sol_ls_pci_yoy').GetValue": yoy,
             "MakeScope.GetVariable('sol_ls_tier').GetValue": tier}
 
@@ -381,7 +383,8 @@ PLAYER_VARS = {
     "sol_ls_pci_yoy_class_nobles": 2, "sol_ls_pci_yoy_class_clergy": 1, "sol_ls_pci_yoy_class_burghers": -1,
     "sol_ls_pci_yoy_class_commoners": 1, "sol_ls_pci_yoy_class_tribesmen": 1,
 }
-GLOBAL_VARS = {"sol_ls_rank_count": 87, "sol_ls_world_pci": 1.62, "sol_ls_top_pci": 4.92}
+GLOBAL_VARS = {"sol_ls_rank_count": 87, "sol_ls_world_pci": 1.62, "sol_ls_top_pci": 4.92,
+               "sol_ls_world_sol": 1.62, "sol_ls_top_sol": 4.92}
 
 STATES = {
     # suffix: (player variable overrides, player rank, data ready)

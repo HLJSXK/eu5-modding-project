@@ -1,4 +1,7 @@
-"""Execute the generated SOL world ranking with offline country scopes."""
+"""Execute the generated SOL world ranking with offline country scopes.
+
+Countries are ranked by living standard (sol_ls_sol ratio), not by income.
+"""
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,8 +38,8 @@ class Country(Scope):
     population: float = 100
 
 
-def country(pci, population=100, locations=1):
-    return Country("country", variables={"sol_ls_pci": pci, "sol_ls_pop_all": population},
+def country(sol, population=100, locations=1):
+    return Country("country", variables={"sol_ls_sol": sol, "sol_ls_pop_all": population},
                    locations=LocationCount(locations), population=population)
 
 
@@ -147,7 +150,7 @@ class RankingRuntime(Runtime):
 
 class RankingTests(unittest.TestCase):
     def assert_clean_scratch(self, runtime):
-        for name in ("rank_population", "rank_income", "rank_cursor", "rank_previous_1", "rank_previous_2"):
+        for name in ("rank_population", "rank_sol_weighted", "rank_cursor", "rank_previous_1", "rank_previous_2"):
             self.assertNotIn("sol_ls_" + name, runtime.globals)
 
     def assert_ladder(self, runtime, expected):
@@ -175,12 +178,12 @@ class RankingTests(unittest.TestCase):
     def test_empty_world_clears_previous_global_leaders(self):
         rt = RankingRuntime([])
         rt.globals.update({"sol_ls_top_" + str(i): country(i) for i in range(1, 11)})
-        rt.globals.update(sol_ls_rank_count=99, sol_ls_top_pci=99, sol_ls_world_pci=99,
+        rt.globals.update(sol_ls_rank_count=99, sol_ls_top_sol=99, sol_ls_world_sol=99,
                           sol_ls_tier_count_0=4, sol_ls_tier_count_1=5, sol_ls_tier_count_2=6)
         rt.refresh()
         self.assert_ladder(rt, [])
-        self.assertEqual(rt.globals["sol_ls_top_pci"], 0)
-        self.assertEqual(rt.globals["sol_ls_world_pci"], 0)
+        self.assertEqual(rt.globals["sol_ls_top_sol"], 0)
+        self.assertEqual(rt.globals["sol_ls_world_sol"], 0)
         self.assertEqual(rt.operations["ordered_country"], 0)
 
     def test_single_country_has_zero_percentile_and_no_neighbours(self):
@@ -189,11 +192,22 @@ class RankingTests(unittest.TestCase):
         rt.refresh()
         self.assert_ladder(rt, [target])
         self.assertEqual(target.variables["sol_ls_tier"], 1)
-        self.assertEqual(rt.globals["sol_ls_top_pci"], 25)
-        self.assertEqual(rt.globals["sol_ls_world_pci"], 25)
+        self.assertEqual(rt.globals["sol_ls_top_sol"], 25)
+        self.assertEqual(rt.globals["sol_ls_world_sol"], 25)
 
-    def test_first_january_ranks_current_income_without_prior_year_samples(self):
+    def test_first_january_ranks_current_living_standard_without_prior_year_samples(self):
         from test_sol_lshud_income import IncomeRuntime, country_fixture, scale_income
+        from test_sol_living_standard import LivingStandardRuntime, solve
+
+        def solve_living_standard(item):
+            # Purchasing-power caches written by the same solver pass: funds = net income,
+            # four gold of baseline spending per location.
+            for place in item.locations:
+                for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen"):
+                    place.variables[f"sol_location_{estate}_liquid_funds"] = place.variables[f"sol_location_{estate}_net_income"]
+                    place.variables[f"sol_location_{estate}_base_spending"] = 4 if estate == "commoners" else 0
+                place.variables["sol_location_base_total_spending"] = 4
+            solve(LivingStandardRuntime(), item)
 
         for target in ("stable", "sol_standalone"):
             with self.subTest(target=target):
@@ -203,11 +217,13 @@ class RankingTests(unittest.TestCase):
                 # Startup samples exist, but no country has a full-year baseline.
                 for item in (player, ai):
                     income.sample(item, year=1337, month=4, day=1)
+                    solve_living_standard(item)
                     item.population = 10
                 # Player keeps sampling monthly; reduced-frequency AI can still
                 # rank using its last solve. January has no prior-year baseline.
                 scale_income(player, 3)
                 income.sample(player, year=1338, month=1)
+                solve_living_standard(player)
                 for item in (player, ai):
                     self.assertNotIn("sol_ls_pci_yoy", item.variables)
                     self.assertNotIn("sol_ls_pci_prev", item.variables)
@@ -219,7 +235,8 @@ class RankingTests(unittest.TestCase):
                 # Execute the shipped January gate rather than bypassing it.
                 rt.execute([ancestors[-1]], Scope("global"))
                 self.assert_ladder(rt, [player, ai])
-                self.assertAlmostEqual(rt.globals["sol_ls_world_pci"], 48)
+                # Player 3 x 16 / 8 = 6, AI 2 x 16 / 8 = 4, equal cached populations.
+                self.assertAlmostEqual(rt.globals["sol_ls_world_sol"], 5)
                 self.assertEqual(player.variables["sol_ls_rank"], 1)
                 self.assertEqual(ai.variables["sol_ls_rank"], 2)
 
@@ -227,7 +244,7 @@ class RankingTests(unittest.TestCase):
         countries = [country(i, population=i * 10) for i in (4, 12, 2, 7, 1, 11, 6, 9, 3, 13, 5, 10, 8)]
         rt = RankingRuntime(countries)
         rt.refresh()
-        expected = sorted(countries, key=lambda c: c.variables["sol_ls_pci"], reverse=True)
+        expected = sorted(countries, key=lambda c: c.variables["sol_ls_sol"], reverse=True)
         self.assert_ladder(rt, expected)
         self.assertEqual(rt.visits["every_country"], 13)
         self.assertEqual(rt.visits["ordered_country"], 13)
@@ -235,21 +252,21 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(rt.operations["ordered_country"], 1)
         self.assertEqual(expected[-1].variables["sol_ls_rank"], 13)
 
-    def test_world_pci_is_cached_population_weighted(self):
+    def test_world_sol_is_cached_population_weighted(self):
         rich, poor = country(20, 10), country(2, 90)
         # Live population gates participation; cached populations weight the census.
         rich.population, poor.population = 1000, 1
         rt = RankingRuntime([poor, rich])
         rt.refresh()
         self.assert_ladder(rt, [rich, poor])
-        self.assertAlmostEqual(rt.globals["sol_ls_world_pci"], 3.8)
+        self.assertAlmostEqual(rt.globals["sol_ls_world_sol"], 3.8)
 
     def test_exact_low_and_high_thresholds_belong_to_middle_tier(self):
         values = (7.499, 7.5, 13.3, 13.301, 8.4)
         countries = [country(value, 1) for value in values]
         rt = RankingRuntime(countries)
         rt.refresh()
-        self.assertEqual(rt.globals["sol_ls_world_pci"], 10)
+        self.assertEqual(rt.globals["sol_ls_world_sol"], 10)
         self.assertEqual([c.variables["sol_ls_tier"] for c in countries], [0, 1, 1, 2, 1])
         self.assertEqual([rt.globals["sol_ls_tier_count_" + str(i)] for i in range(3)], [1, 3, 1])
 
@@ -259,12 +276,12 @@ class RankingTests(unittest.TestCase):
         rt.refresh()
         actual = sorted(countries, key=lambda c: c.variables["sol_ls_rank"])
         self.assert_ladder(rt, actual)
-        self.assertEqual(rt.globals["sol_ls_world_pci"], 0)
-        self.assertEqual(rt.globals["sol_ls_top_pci"], 0)
+        self.assertEqual(rt.globals["sol_ls_world_sol"], 0)
+        self.assertEqual(rt.globals["sol_ls_top_sol"], 0)
         self.assertEqual([c.variables["sol_ls_tier"] for c in countries], [1, 1, 1])
 
-    def test_lost_territory_population_or_income_clears_stale_country_links(self):
-        for loss in ("territory", "population", "income", "cached_population", "missing_cached_population"):
+    def test_lost_territory_population_or_living_standard_clears_stale_country_links(self):
+        for loss in ("territory", "population", "living_standard", "cached_population", "missing_cached_population"):
             with self.subTest(loss=loss):
                 countries = [country(value) for value in (40, 30, 20, 10)]
                 rt = RankingRuntime(countries)
@@ -274,8 +291,8 @@ class RankingTests(unittest.TestCase):
                     removed.locations.count = 0
                 elif loss == "population":
                     removed.population = 0
-                elif loss == "income":
-                    del removed.variables["sol_ls_pci"]
+                elif loss == "living_standard":
+                    del removed.variables["sol_ls_sol"]
                 elif loss == "cached_population":
                     removed.variables["sol_ls_pop_all"] = 0
                 else:
@@ -285,9 +302,9 @@ class RankingTests(unittest.TestCase):
                 for key in CACHE_KEYS:
                     self.assertNotIn(key, removed.variables)
                 self.assertNotIn(removed, [v for k, v in rt.globals.items() if k.startswith("sol_ls_top_")])
-                self.assertEqual(rt.globals["sol_ls_world_pci"], 20)
+                self.assertEqual(rt.globals["sol_ls_world_sol"], 20)
 
-    def test_equal_income_visits_every_country_without_repeating_ties(self):
+    def test_equal_living_standard_visits_every_country_without_repeating_ties(self):
         countries = [country(10, index + 1) for index in range(16)]
         rt = RankingRuntime(countries)
         rt.refresh()
@@ -297,18 +314,18 @@ class RankingTests(unittest.TestCase):
         self.assert_ladder(rt, actual)
         self.assertEqual(len({id(rt.globals["sol_ls_top_" + str(i)]) for i in range(1, 11)}), 10)
 
-    def test_existing_ranking_recomputes_after_income_changes_and_shrink(self):
+    def test_existing_ranking_recomputes_after_living_standard_changes_and_shrink(self):
         countries = [country(value) for value in range(1, 13)]
         rt = RankingRuntime(countries)
         rt.refresh()
         for index, target in enumerate(countries):
-            target.variables["sol_ls_pci"] = 12 - index
+            target.variables["sol_ls_sol"] = 12 - index
         rt.refresh()
         self.assert_ladder(rt, countries)
         rt.countries = countries[:2]
         rt.refresh()
         self.assert_ladder(rt, countries[:2])
-        self.assertEqual(rt.globals["sol_ls_world_pci"], 11.5)
+        self.assertEqual(rt.globals["sol_ls_world_sol"], 11.5)
 
     def test_annual_situation_hook_runs_once_outside_country_iterators(self):
         for target in ("stable", "sol_standalone"):

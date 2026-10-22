@@ -1,4 +1,4 @@
-"""Exercise the shipped map values, raw-income provenance and map registration."""
+"""Exercise the shipped map values, living-standard provenance and map registration."""
 from pathlib import Path
 import struct
 import sys
@@ -36,33 +36,29 @@ class MapRuntime(RankingRuntime):
         return super().test(node, scope)
 
 
-def variable_name(node):
-    if node.key == "set_variable":
-        return next(n.value for n in node.value if n.key == "name")
-    return None
-
-
 class MapModeTests(unittest.TestCase):
-    def test_income_uses_local_savings_adjusted_net_income_before_solver(self):
+    def test_living_standard_map_reads_sol_and_ignores_solver(self):
         for target in ("stable", "sol_standalone"):
             runtime = MapRuntime(target)
-            effects = parse((ROOT / "src" / target / "in_game/common/scripted_effects/A_SOL_economy_effects.txt").read_text(encoding="utf-8-sig"))
-            body = next(n.value for n in effects if n.key == "sol_compute_location_pop_demand")
-            total = next(n for n in body if variable_name(n) == "sol_location_total_income")
-            start = next(i for i, n in enumerate(body) if variable_name(n) == "sol_location_savings_pressure_adjustment")
-            end = next(i for i, n in enumerate(body) if variable_name(n) == "gls_location_actual_per_capita_spending")
-            owner = country(999)
-            location = Scope("location", owner=owner, pops={"peasants": 10}, variables={
-                "sol_location_nobles_net_income": 2, "sol_location_clergy_net_income": 3,
-                "sol_location_burghers_net_income": 5, "sol_location_commoners_net_income": 10,
-                "sol_location_tribesmen_net_income": 0})
-            for pressure, expected in ((-.25, 1.5), (0, 2), (.5, 3)):
-                owner.variables["gls_savings_pressure_adjustment"] = pressure
-                for final_scale in (.01, 1, 100):
-                    location.variables["sol_location_final_demand_scale"] = final_scale
-                    location.variables["sol_location_pop_demand_modifier_size"] = final_scale - 1
-                    runtime.execute([total, *body[start:end + 1]], location)
-                    self.assertEqual(location.variables["gls_location_actual_per_capita_spending"], expected)
+            location = Scope("location")
+            self.assertEqual(runtime.value("sol_map_living_standard_value", location), 0)
+            # (SOL-equivalent value, purchasing-power funds, baseline, expected SOL - 1)
+            for equivalent, funds, baseline, expected in ((10, 10, 10, 0), (13, 10, 10, .3), (0, 0, 10, -1),
+                                                          (30, 30, 10, 2), (5, 0, 10, -.5), (10, 10, 0, 0)):
+                for final_scale in (.01, 100):
+                    location.variables.update(sol_location_sol_equivalent=equivalent, sol_location_liquid_funds=funds,
+                                              sol_location_base_total_spending=baseline,
+                                              sol_location_final_demand_scale=final_scale)
+                    self.assertAlmostEqual(runtime.value("sol_map_living_standard_value", location), expected)
+                    self.assertAlmostEqual(runtime.value("sol_map_living_standard_below_factor", location),
+                                           min(max(expected + 1, 0), 1))
+                    self.assertAlmostEqual(runtime.value("sol_map_living_standard_above_factor", location),
+                                           min(max(expected / 2, 0), 1))
+            # The situation data map and its tooltip use the same living-standard value.
+            situation = (ROOT / "src" / target / "in_game/common/situations/SOL_economy_situation.txt").read_text(encoding="utf-8-sig")
+            self.assertIn("sol_map_living_standard_below_factor", situation)
+            self.assertIn("sol_map_living_standard_value >= 1", situation)
+            self.assertNotIn("per_capita", situation)
 
     def test_power_raw_percentage_and_neutral_missing_baseline(self):
         for target in ("stable", "sol_standalone"):
@@ -77,13 +73,13 @@ class MapModeTests(unittest.TestCase):
                     self.assertEqual(runtime.value("sol_map_purchasing_power_value", location), expected)
 
     def test_rank_colors_follow_overall_rank_including_single_country(self):
-        countries = [country(pci) for pci in (10, 30, 20)]
+        countries = [country(sol) for sol in (10, 30, 20)]
         runtime = MapRuntime(countries=countries)
         runtime.refresh()
         self.assertEqual([runtime.value("sol_map_rank_color_factor", c) for c in countries], [0, 1, .5])
         for owner in countries:
-            for local_income in (0, 99999):
-                location = Scope("location", owner=owner, variables={"gls_location_actual_per_capita_spending": local_income})
+            for local_sol in (0, 99999):
+                location = Scope("location", owner=owner, variables={"sol_location_sol_equivalent": local_sol})
                 self.assertEqual(runtime.value("owner.sol_map_rank_color_factor", location), owner.variables["sol_ls_percentile"])
         runtime = MapRuntime(countries=[country(10)])
         runtime.refresh()

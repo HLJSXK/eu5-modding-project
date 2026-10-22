@@ -46,12 +46,16 @@ $env:PYTHONUTF8='1'
 | `sol_ls_spend_1 … 5` | 国家，**goods 作用域变量** | 按月度总价排序的前 5 消费商品 |
 | `sol_ls_spend_<n>_gold` / `_share` | 国家 | 该商品月度消费总价 / 占全国消费比例 |
 | `sol_ls_spend_total` | 国家 | 全国月度消费总价 |
-| `sol_ls_rank_<e>` / `sol_ls_percentile_<e>` | 国家 | 阶层人均在世界同阶层中的排名 / 百分位 |
+| `sol_ls_rank_<e>` / `sol_ls_percentile_<e>` | 国家 | 阶层生活水平在世界同阶层中的排名 / 百分位 |
 | `sol_ls_rank_count_<e>` | 全局 | 有该阶层人口的国家数 |
-| `sol_ls_top_1_<e>` / `sol_ls_top_pci_<e>` | 全局 | 该阶层人均世界第一的国家 / 数值 |
+| `sol_ls_top_1_<e>` / `sol_ls_top_sol_<e>` | 全局 | 该阶层生活水平世界第一的国家 / 数值（比值，1 = 基准） |
 
 商品支出可在现有 `gls_country_consumes_*` 累计遍历里顺带求和（每商品数量 × 市场价），不新增地块遍历；
 阶层排名在现有 1 月 1 日排行里对每个阶层各做一次 `ordered_country`（只读缓存）。
+
+2026-10-23 起，等级徽章、全国排名与各阶层排名改按生活水平（`sol_ls_sol` / `sol_ls_sol_<e>`，
+＝购买力＋当地加成，目前加成为 0）计算，不再按人均收入；收入与同比（第 1 格数字、tooltip 1 表格）
+和购买力（第 2 格）不变。详见 `docs/technical/SOL_Living_Standard_Purchasing_Power_Separation_20261023.md`。
 
 ## 4. 渲染结果（`ai_gui_assessment/images/living_standard_4sections_20261018/`）
 

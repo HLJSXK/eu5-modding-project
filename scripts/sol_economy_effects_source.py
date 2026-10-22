@@ -16,6 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from sol_lshud_income_source import render_income_effects
+from sol_living_standard_source import render_effects as render_living_standard_effects
 
 
 @dataclass
@@ -1064,7 +1065,6 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\t}",
         "\tset_variable = { name = sol_location_liquid_funds_multiplier value = { value = 1 add = var:sol_location_savings_pressure_adjustment min = 0 } }",
         "\tset_variable = { name = sol_location_liquid_funds value = { value = var:sol_location_total_income multiply = var:sol_location_liquid_funds_multiplier } }",
-        "\tset_variable = { name = gls_location_actual_per_capita_spending value = { value = var:sol_location_liquid_funds divide = local_sol_total_population min = 0 } }",
         "\tset_variable = { name = sol_location_nobles_liquid_funds value = { value = var:sol_location_nobles_net_income multiply = var:sol_location_liquid_funds_multiplier } }",
         "\tset_variable = { name = sol_location_clergy_liquid_funds value = { value = var:sol_location_clergy_net_income multiply = var:sol_location_liquid_funds_multiplier } }",
         "\tset_variable = { name = sol_location_burghers_liquid_funds value = { value = var:sol_location_burghers_net_income multiply = var:sol_location_liquid_funds_multiplier } }",
@@ -1089,6 +1089,8 @@ def emit_section_20_location_pop_demand(writer: ScriptWriter) -> None:
         "\t\tset_variable = { name = sol_location_share_burghers value = { value = var:sol_location_burghers_base_spending divide = var:sol_location_base_total_spending min = 0 } }",
         "\t\tset_variable = { name = sol_location_share_lower value = { value = var:sol_location_lower_base_spending divide = var:sol_location_base_total_spending min = 0 } }",
         "\t}",
+        "\t# Living standard is derived from the purchasing-power caches above; demand never reads it.",
+        "\tsol_compute_location_living_standard = yes",
         "}",
         "",
         "sol_location_demand_clip_class_score = {",
@@ -1533,6 +1535,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
         "\t\t\tsol_ls_accumulate_country_income = yes",
+        "\t\t\tsol_ls_accumulate_country_living_standard = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }",
@@ -1566,6 +1569,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "",
         "sol_solve_country_pop_demand = {",
         "\tsol_ls_reset_country_income = yes",
+        "\tsol_ls_reset_country_living_standard = yes",
         "\tsol_refresh_country_substitution = yes",
         "\tgls_compute_savings_pressure = yes",
         "\t# Size prefilter, checked before anything else because num_locations is",
@@ -1607,6 +1611,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\tsol_country_demand_census_outcome = yes",
         "\t}",
         "\telse = { sol_solve_country_pop_demand_raw_only = yes }",
+        "\tsol_ls_finalize_country_living_standard = yes",
         "\tsol_ls_finalize_country_income = yes",
         "}",
         "",
@@ -1804,6 +1809,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
         "\t\t\tsol_ls_accumulate_country_income = yes",
+        "\t\t\tsol_ls_accumulate_country_living_standard = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_clergy add = scope:sol_demand_cached_location.var:sol_location_clergy_liquid_funds }",
@@ -2048,7 +2054,6 @@ def emit_section_50_panel_stats_stable(writer: ScriptWriter) -> None:
         *[f"\tset_variable = {{ name = gls_sol_{estate}_{metric} value = 0 }}"
           for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
           for metric in ("liquid", "base")],
-        "\tset_variable = { name = gls_country_sol_all value = 1 }",
         "\tsave_scope_as = gls_panel_country",
         "\tremove_from_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country }",
         "\tadd_to_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country value = 0 }",
@@ -2769,7 +2774,6 @@ def emit_section_50_panel_stats_stable(writer: ScriptWriter) -> None:
         "\t}",
         "\tif = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_location_avg_scale value = { add = var:gls_location_scale_sum divide = var:gls_location_count } } }",
         "\tif = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_final_demand_scale_avg value = var:gls_country_location_avg_scale } }",
-        "\tif = { limit = { var:gls_country_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_base_spending min = 0 } } }",
         "}",
     ])
 
@@ -2804,7 +2808,6 @@ def emit_section_50_panel_stats_standalone(writer: ScriptWriter) -> None:
         *[f"\tset_variable = {{ name = gls_sol_{estate}_{metric} value = 0 }}"
           for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen")
           for metric in ("liquid", "base")],
-        "\tset_variable = { name = gls_country_sol_all value = 1 }",
         "\tsave_scope_as = gls_panel_country",
         "\tremove_from_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country }",
         "\tadd_to_global_variable_map = { name = gls_country_consumes_amber key = scope:gls_panel_country value = 0 }",
@@ -3526,7 +3529,6 @@ def emit_section_50_panel_stats_standalone(writer: ScriptWriter) -> None:
         "\t}",
         "\tif = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_location_avg_scale value = { add = var:gls_location_scale_sum divide = var:gls_location_count } } }",
         "\tif = { limit = { var:gls_location_count > 0 } set_variable = { name = gls_country_final_demand_scale_avg value = var:gls_country_location_avg_scale } }",
-        "\tif = { limit = { var:gls_country_base_spending > 0 } set_variable = { name = gls_country_sol_all value = { value = var:gls_country_liquid_funds divide = var:gls_country_base_spending min = 0 } } }",
         "}",
     ])
 
@@ -3588,4 +3590,5 @@ def render_static_sections(
         if name == "10_standard_of_living_prelude":
             sections.append(refresh_block.strip())
     sections.append(render_income_effects().strip())
+    sections.append(render_living_standard_effects().strip())
     return "\n\n".join(sections).rstrip() + "\n"

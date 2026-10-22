@@ -1,5 +1,9 @@
 """Emit the annual country-cache ranking consumed by SOL's HUD badge.
 
+Countries and estates are ranked by living standard (``sol_ls_sol*``, a ratio
+where 1 is the baseline basket), not by income or purchasing power. The world
+average is population-weighted; tiers compare a country's SOL with it.
+
 The census and sorted pass read country variables only. Neighbour links are
 built while walking the sorted countries, without an N-by-N country scan.
 """
@@ -23,15 +27,15 @@ def render_values(*, standalone: bool = False) -> str:
         "sol_ls_hud_enabled = { value = 0 if = { limit = { sol_sol_is_on = yes } value = 1 } }\n"
     )
     text = HEADER + enabled + """
-sol_ls_pci_order_value = { value = 0 if = { limit = { has_variable = sol_ls_pci } value = var:sol_ls_pci } }
+sol_ls_sol_order_value = { value = 0 if = { limit = { has_variable = sol_ls_sol } value = var:sol_ls_sol } }
 sol_ls_rank_population_value = { value = 1 if = { limit = { has_global_variable = sol_ls_rank_population } value = global_var:sol_ls_rank_population } }
-sol_ls_world_pci_value = { value = 0 if = { limit = { has_global_variable = sol_ls_world_pci } value = global_var:sol_ls_world_pci } }
-sol_ls_low_tier_cutoff = { value = sol_ls_world_pci_value multiply = 0.75 }
-sol_ls_high_tier_cutoff = { value = sol_ls_world_pci_value multiply = 1.33 }
+sol_ls_world_sol_value = { value = 0 if = { limit = { has_global_variable = sol_ls_world_sol } value = global_var:sol_ls_world_sol } }
+sol_ls_low_tier_cutoff = { value = sol_ls_world_sol_value multiply = 0.75 }
+sol_ls_high_tier_cutoff = { value = sol_ls_world_sol_value multiply = 1.33 }
 """
     for estate in ESTATES:
         text += (
-            f"sol_ls_{estate}_pci_order_value = {{ value = 0 if = {{ limit = {{ has_variable = sol_ls_pci_{estate} }} value = var:sol_ls_pci_{estate} }} }}\n"
+            f"sol_ls_{estate}_sol_order_value = {{ value = 0 if = {{ limit = {{ has_variable = sol_ls_sol_{estate} }} value = var:sol_ls_sol_{estate} }} }}\n"
             f"sol_ls_rank_population_{estate}_value = {{ value = 1 if = {{ limit = {{ has_global_variable = sol_ls_rank_population_{estate} }} value = global_var:sol_ls_rank_population_{estate} }} }}\n"
         )
     return text
@@ -39,12 +43,12 @@ sol_ls_high_tier_cutoff = { value = sol_ls_world_pci_value multiply = 1.33 }
 
 def render_world_ranking() -> str:
     lines = [HEADER.rstrip(), "", "sol_ls_recalculate_world_ranking = {",
-             "\t# No location traversal: use the completed country income samples.",
+             "\t# No location traversal: rank the completed country living-standard (SOL) caches.",
              "\tset_global_variable = { name = sol_ls_rank_count value = 0 }",
-             "\tset_global_variable = { name = sol_ls_top_pci value = 0 }",
-             "\tset_global_variable = { name = sol_ls_world_pci value = 0 }",
+             "\tset_global_variable = { name = sol_ls_top_sol value = 0 }",
+             "\tset_global_variable = { name = sol_ls_world_sol value = 0 }",
              "\tset_global_variable = { name = sol_ls_rank_population value = 0 }",
-             "\tset_global_variable = { name = sol_ls_rank_income value = 0 }",
+             "\tset_global_variable = { name = sol_ls_rank_sol_weighted value = 0 }",
              "\tset_global_variable = { name = sol_ls_rank_cursor value = 0 }"]
     for tier in range(3):
         lines.append(f"\tset_global_variable = {{ name = sol_ls_tier_count_{tier} value = 0 }}")
@@ -52,10 +56,10 @@ def render_world_ranking() -> str:
         lines.extend([
             f"\tset_global_variable = {{ name = sol_ls_rank_count_{estate} value = 0 }}",
             f"\tset_global_variable = {{ name = sol_ls_rank_population_{estate} value = 0 }}",
-            f"\tset_global_variable = {{ name = sol_ls_rank_income_{estate} value = 0 }}",
+            f"\tset_global_variable = {{ name = sol_ls_rank_sol_weighted_{estate} value = 0 }}",
             f"\tset_global_variable = {{ name = sol_ls_rank_cursor_{estate} value = 0 }}",
-            f"\tset_global_variable = {{ name = sol_ls_world_pci_{estate} value = 0 }}",
-            f"\tset_global_variable = {{ name = sol_ls_top_pci_{estate} value = 0 }}",
+            f"\tset_global_variable = {{ name = sol_ls_world_sol_{estate} value = 0 }}",
+            f"\tset_global_variable = {{ name = sol_ls_top_sol_{estate} value = 0 }}",
             f"\tremove_global_variable = sol_ls_top_1_{estate}",
         ])
     for i in range(1, 11):
@@ -72,21 +76,21 @@ def render_world_ranking() -> str:
         ])
     lines += [
         "\t\tif = {",
-        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_pci has_variable = sol_ls_pop_all }",
+        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_sol has_variable = sol_ls_pop_all }",
         "\t\t\tif = {",
         "\t\t\t\tlimit = { var:sol_ls_pop_all > 0 }",
         "\t\t\t\tchange_global_variable = { name = sol_ls_rank_count add = 1 }",
         "\t\t\t\tchange_global_variable = { name = sol_ls_rank_population add = var:sol_ls_pop_all }",
-        "\t\t\t\tchange_global_variable = { name = sol_ls_rank_income add = { value = var:sol_ls_pci multiply = var:sol_ls_pop_all } }",
+        "\t\t\t\tchange_global_variable = { name = sol_ls_rank_sol_weighted add = { value = var:sol_ls_sol multiply = var:sol_ls_pop_all } }",
         "\t\t\t}",
     ]
     # Census every estate in the same country pass as the all-population cache.
     for estate in ESTATES:
         lines += [
-            f"\t\t\tif = {{ limit = {{ has_variable = sol_ls_pci_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
+            f"\t\t\tif = {{ limit = {{ has_variable = sol_ls_sol_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
             f"\t\t\t\tchange_global_variable = {{ name = sol_ls_rank_count_{estate} add = 1 }}",
             f"\t\t\t\tchange_global_variable = {{ name = sol_ls_rank_population_{estate} add = var:sol_ls_pop_{estate} }}",
-            f"\t\t\t\tchange_global_variable = {{ name = sol_ls_rank_income_{estate} add = {{ value = var:sol_ls_pci_{estate} multiply = var:sol_ls_pop_{estate} }} }}",
+            f"\t\t\t\tchange_global_variable = {{ name = sol_ls_rank_sol_weighted_{estate} add = {{ value = var:sol_ls_sol_{estate} multiply = var:sol_ls_pop_{estate} }} }}",
             "\t\t\t}",
         ]
     lines += ["\t\t}", "\t}"]
@@ -94,19 +98,19 @@ def render_world_ranking() -> str:
         lines += [
             "\tif = {",
             f"\t\tlimit = {{ global_var:sol_ls_rank_population_{estate} > 0 }}",
-            f"\t\tset_global_variable = {{ name = sol_ls_world_pci_{estate} value = {{ value = global_var:sol_ls_rank_income_{estate} divide = sol_ls_rank_population_{estate}_value }} }}",
+            f"\t\tset_global_variable = {{ name = sol_ls_world_sol_{estate} value = {{ value = global_var:sol_ls_rank_sol_weighted_{estate} divide = sol_ls_rank_population_{estate}_value }} }}",
             "\t}",
         ]
     lines += [
         "\tif = {",
         "\t\tlimit = { global_var:sol_ls_rank_population > 0 }",
-        "\t\tset_global_variable = { name = sol_ls_world_pci value = { value = global_var:sol_ls_rank_income divide = sol_ls_rank_population_value } }",
+        "\t\tset_global_variable = { name = sol_ls_world_sol value = { value = global_var:sol_ls_rank_sol_weighted divide = sol_ls_rank_population_value } }",
         "\t}",
         "\tif = {",
         "\t\tlimit = { global_var:sol_ls_rank_count > 0 }",
         "\t\tordered_country = {",
-        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_pci has_variable = sol_ls_pop_all var:sol_ls_pop_all > 0 }",
-        "\t\t\torder_by = sol_ls_pci_order_value",
+        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_sol has_variable = sol_ls_pop_all var:sol_ls_pop_all > 0 }",
+        "\t\t\torder_by = sol_ls_sol_order_value",
         "\t\t\tmax = global_var:sol_ls_rank_count",
         "\t\t\tcheck_range_bounds = no",
         "\t\t\tchange_global_variable = { name = sol_ls_rank_cursor add = 1 }",
@@ -136,15 +140,15 @@ def render_world_ranking() -> str:
     for i in range(1, 11):
         lines.append(f"\t\t\tif = {{ limit = {{ var:sol_ls_rank = {i} }} set_global_variable = {{ name = sol_ls_top_{i} value = scope:sol_ls_ranked_country }} }}")
     lines += [
-        "\t\t\tif = { limit = { var:sol_ls_rank = 1 } set_global_variable = { name = sol_ls_top_pci value = var:sol_ls_pci } }",
+        "\t\t\tif = { limit = { var:sol_ls_rank = 1 } set_global_variable = { name = sol_ls_top_sol value = var:sol_ls_sol } }",
         "\t\t\t# Equality belongs to the middle tier, including an all-zero world.",
         "\t\t\tif = {",
-        "\t\t\t\tlimit = { var:sol_ls_pci < sol_ls_low_tier_cutoff }",
+        "\t\t\t\tlimit = { var:sol_ls_sol < sol_ls_low_tier_cutoff }",
         "\t\t\t\tset_variable = { name = sol_ls_tier value = 0 }",
         "\t\t\t\tchange_global_variable = { name = sol_ls_tier_count_0 add = 1 }",
         "\t\t\t}",
         "\t\t\telse_if = {",
-        "\t\t\t\tlimit = { var:sol_ls_pci > sol_ls_high_tier_cutoff }",
+        "\t\t\t\tlimit = { var:sol_ls_sol > sol_ls_high_tier_cutoff }",
         "\t\t\t\tset_variable = { name = sol_ls_tier value = 2 }",
         "\t\t\t\tchange_global_variable = { name = sol_ls_tier_count_2 add = 1 }",
         "\t\t\t}",
@@ -158,8 +162,8 @@ def render_world_ranking() -> str:
             "\tif = {",
             f"\t\tlimit = {{ global_var:sol_ls_rank_count_{estate} > 0 }}",
             "\t\tordered_country = {",
-            f"\t\t\tlimit = {{ total_population > 0 num_locations > 0 has_variable = sol_ls_pci_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
-            f"\t\t\torder_by = sol_ls_{estate}_pci_order_value",
+            f"\t\t\tlimit = {{ total_population > 0 num_locations > 0 has_variable = sol_ls_sol_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
+            f"\t\t\torder_by = sol_ls_{estate}_sol_order_value",
             f"\t\t\tmax = global_var:sol_ls_rank_count_{estate}",
             "\t\t\tcheck_range_bounds = no",
             f"\t\t\tchange_global_variable = {{ name = sol_ls_rank_cursor_{estate} add = 1 }}",
@@ -170,14 +174,14 @@ def render_world_ranking() -> str:
             f"\t\t\t\tset_variable = {{ name = sol_ls_percentile_{estate} value = {{ value = global_var:sol_ls_rank_count_{estate} subtract = var:sol_ls_rank_{estate} divide = {{ value = global_var:sol_ls_rank_count_{estate} subtract = 1 }} }} }}",
             "\t\t\t}",
             f"\t\t\tsave_scope_as = sol_ls_ranked_country_{estate}",
-            f"\t\t\tif = {{ limit = {{ var:sol_ls_rank_{estate} = 1 }} set_global_variable = {{ name = sol_ls_top_1_{estate} value = scope:sol_ls_ranked_country_{estate} }} set_global_variable = {{ name = sol_ls_top_pci_{estate} value = var:sol_ls_pci_{estate} }} }}",
+            f"\t\t\tif = {{ limit = {{ var:sol_ls_rank_{estate} = 1 }} set_global_variable = {{ name = sol_ls_top_1_{estate} value = scope:sol_ls_ranked_country_{estate} }} set_global_variable = {{ name = sol_ls_top_sol_{estate} value = var:sol_ls_sol_{estate} }} }}",
             "\t\t}",
             "\t}",
         ]
-    for name in ("rank_population", "rank_income", "rank_cursor", "rank_previous_1", "rank_previous_2"):
+    for name in ("rank_population", "rank_sol_weighted", "rank_cursor", "rank_previous_1", "rank_previous_2"):
         lines.append(f"\tremove_global_variable = sol_ls_{name}")
     for estate in ESTATES:
-        for name in (f"rank_population_{estate}", f"rank_income_{estate}", f"rank_cursor_{estate}"):
+        for name in (f"rank_population_{estate}", f"rank_sol_weighted_{estate}", f"rank_cursor_{estate}"):
             lines.append(f"\tremove_global_variable = sol_ls_{name}")
     lines += ["}", ""]
     return "\n".join(lines)
