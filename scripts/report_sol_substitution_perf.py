@@ -34,7 +34,7 @@ from tools.eu5_save_parser.parser import (  # noqa: E402
 
 PREFIX = "sol_sub_perf_"
 STRATEGY = "sol_country_demand_selected_strategy"
-CONTROL = "sol_demand_snapshot_human"
+CONTROL = "sol_sub_perf_human"
 REASONS = {
     1: "初始化/开关/控制",
     2: "领土数量/归属",
@@ -50,7 +50,7 @@ DETAIL_NAMES = (
 )
 VARIABLE_RE = re.compile(
     rb"(?m)^\t{4}flag=(sol_sub_perf_[A-Za-z0-9_]+|"
-    rb"sol_country_demand_selected_strategy|sol_demand_snapshot_human)\r?$"
+    rb"sol_country_demand_selected_strategy)\r?$"
     rb"\n\t{4}data=\{\r?$"
     rb"\n\t{5}type=value\r?$"
     rb"(?:\n\t{5}identity=(\d+)\r?$)?"

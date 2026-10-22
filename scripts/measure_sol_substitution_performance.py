@@ -27,6 +27,9 @@ class CountingRuntime(Runtime):
             source = source.replace('add_country_modifier = { name = sol_substitute_',
                                     'add_country_modifier = { modifier = sol_substitute_')
             self.effects = {n.key: n.value for n in parse(source.lstrip('\ufeff'))}
+            # Historical fixtures used static grants rather than cached autos.
+            if 'sol_apply_country_substitution' in self.effects:
+                self.auto_modifiers = {}
         self.reads = Counter()
         self.conditions = 0
         self.modifier_total_reads = 0
@@ -82,9 +85,11 @@ def scenario(source, locations, market_count, nonneutral=False):
                                pops=dict.fromkeys(POPS, 10.)) for i in range(locations)]
     report = {'refresh': rt.measure('sol_refresh_country_substitution', [country]),
               'all_location_spending': rt.measure('sol_compute_substitute_unit_spending', country.locations),
-              'clean_snapshot': rt.measure('sol_check_substitution_snapshot', [country]),
-              'unchanged_apply': rt.measure('sol_apply_country_substitution', [country]),
               'unchanged_refresh': rt.measure('sol_refresh_country_substitution', [country])}
+    for label, effect in (('clean_snapshot', 'sol_check_substitution_snapshot'),
+                          ('unchanged_apply', 'sol_apply_country_substitution')):
+        if effect in rt.effects:
+            report[label] = rt.measure(effect, [country])
     return report
 
 

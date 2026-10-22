@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'ai_gui_assessment/renderer'))
 from pdx import parse
 from gen_market_unit_consumption import _load_good_rows
-from sol_substitution import CORE, GROUPS, CONFIG, POPS, price_weight, response, aggregate, render_country_runtime, render_location_spending, render_values, market_details
+from sol_substitution import CORE, GROUPS, CONFIG, POPS, price_weight, response, aggregate, render_country_runtime, render_location_spending, render_modifiers, render_values, market_details
 from gen_whole_group_baskets import validate_baskets, read_quantities, load_subscriptions, round_component
 
 
@@ -44,8 +44,15 @@ class Runtime:
         self.saved = {}
         self.enabled = enabled
         self.script_values = {n.key: n.value for n in parse(render_values())}
+        self.auto_modifiers = {n.key: n.value for n in parse(render_modifiers())}
         self.operations = Counter()
         self.local_context = {}
+
+    def auto_strength(self, good, scope):
+        fields = {n.key: n.value for n in self.auto_modifiers.get('sol_substitute_' + good, [])}
+        if not fields or not self.condition(fields['potential_trigger'], scope):
+            return 0.
+        return self.value(fields['scales_with'], scope) * self.value(fields['global_' + good + '_pop_demand'], scope)
 
     def value(self, node, scope, initial=0.):
         if isinstance(node, list):
@@ -75,7 +82,7 @@ class Runtime:
         if node.startswith('num_pop_type:'): return scope.pops.get(node[13:], 0.)
         if node.startswith('modifier:global_'):
             good = node[len('modifier:global_'):-len('_pop_demand')]
-            return scope.external.get(good, 0.) + scope.modifiers.get('sol_substitute_' + good, 0.)
+            return scope.external.get(good, 0.) + scope.modifiers.get('sol_substitute_' + good, 0.) + self.auto_strength(good, scope)
         if node.startswith('country_modifier_strength('):
             return scope.modifiers[node[len('country_modifier_strength('):-1]]
         if node.startswith('global_variable_map('):
@@ -222,7 +229,14 @@ class SubstitutionTests(unittest.TestCase):
         rt, country, loc = self.fixture(dict.fromkeys(CORE, 1))
         rt.run('sol_refresh_country_substitution', country)
         self.assertFalse(country.modifiers)
-        for good in CORE: self.assertEqual(country.variables['sol_sub_multiplier_' + good], 1)
+        for good in CORE:
+            self.assertEqual(country.variables['sol_sub_multiplier_' + good], 1)
+            self.assertNotIn('sol_sub_size_' + good, country.variables)
+            potential = next(n.value for n in rt.auto_modifiers['sol_substitute_' + good]
+                             if n.key == 'potential_trigger')
+            self.assertFalse(rt.condition(potential, country))
+            self.assertEqual(rt.auto_strength(good, country), 0)
+            self.assertEqual(country.variables['sol_good_effective_' + good], 1)
         self.assertFalse(country.local)
         self.assertFalse(loc.local)
         rt.run('sol_clear_country_substitution', country)
@@ -248,9 +262,9 @@ class SubstitutionTests(unittest.TestCase):
         expected = (90 * 8/9 + 30 * 10/9) / 120
         self.assertAlmostEqual(country.variables['sol_sub_multiplier_cloth'], expected)
         size = .25 * (expected - 1)
-        self.assertAlmostEqual(country.modifiers['sol_substitute_cloth'], size)
+        self.assertAlmostEqual(rt.auto_strength('cloth', country), size)
         rt.run('sol_refresh_country_substitution', country)
-        self.assertAlmostEqual(country.modifiers['sol_substitute_cloth'], size)
+        self.assertAlmostEqual(rt.auto_strength('cloth', country), size)
         rt.enabled = False
         rt.run('sol_refresh_country_substitution', country)
         self.assertFalse(country.modifiers)
@@ -304,44 +318,21 @@ class SubstitutionTests(unittest.TestCase):
         rt.run('sol_compute_substitute_unit_spending', loc)
         self.assertEqual(loc.variables['sol_unit_spending_nobles'], 0)
 
-    def test_generated_snapshot_lifecycle(self):
+    def test_periodic_refresh_rebuilds_market_population_and_external_inputs(self):
         rt, country, loc = self.fixture({'cloth': .5, 'leather': 1})
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
         rt.run('sol_refresh_country_substitution', country)
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 0)
-        country.external['cloth'] = -.75
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
-        rt.run('sol_refresh_country_substitution', country)
-        country.human = False
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
-        rt.run('sol_refresh_country_substitution', country)
+        before = rt.auto_strength('cloth', country)
         loc.market = rt.market({'cloth': 2, 'leather': 1})
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
+        loc.pops = {'burghers': 20}
+        country.external['cloth'] = -.75
         rt.run('sol_refresh_country_substitution', country)
-        loc.market = None
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
-        rt.run('sol_refresh_country_substitution', country)
-        replacement = Scope('location', market=rt.market({'cloth': 1}), owner=country, pops={'nobles': 90})
-        country.locations = [replacement]
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
-        rt.run('sol_refresh_country_substitution', country)
-        rt.enabled = False
-        rt.run('sol_refresh_country_substitution', country)
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 0)
-        country.external['cloth'] = 0
-        rt.run('sol_check_substitution_snapshot', country)
-        self.assertEqual(country.variables['sol_substitute_dirty'], 1)
+        self.assertNotAlmostEqual(rt.auto_strength('cloth', country), before)
+        self.assertAlmostEqual(country.variables['sol_sub_external_cloth'], .25)
+        self.assertAlmostEqual(country.variables['sol_good_effective_cloth'],
+                               .25 + rt.auto_strength('cloth', country))
         rt.run('sol_clear_country_substitution', country)
         self.assertFalse(country.variables)
-        self.assertFalse(replacement.variables)
+        self.assertEqual(rt.auto_strength('cloth', country), 0)
 
     def test_missing_supply_and_pp_frozen_goods(self):
         rt, country, loc = self.fixture({'cloth': .5, 'leather': 1})
@@ -492,14 +483,41 @@ class SubstitutionTests(unittest.TestCase):
         for target in ('stable', 'sol_standalone'):
             path = ROOT / 'src' / target / 'in_game/common/scripted_effects/C_SOL_substitution.txt'
             self.assertTrue(path.read_bytes().startswith(b'\xef\xbb\xbf'))
-            effects = {n.key for n in parse(path.read_text(encoding='utf-8-sig'))}
+            source = path.read_text(encoding='utf-8-sig')
+            effects = {n.key for n in parse(source)}
             self.assertIn('sol_compute_substitute_unit_spending', effects)
             self.assertIn('sol_clear_country_substitution', effects)
+            for obsolete in ('add_country_modifier', 'remove_country_modifier',
+                             'country_modifier_strength', 'sol_apply_country_substitution',
+                             'sol_check_substitution_snapshot'):
+                self.assertNotIn(obsolete, source)
+            self.assertFalse((ROOT / 'src' / target / 'main_menu/common/static_modifiers/SOL_substitute_global_modifiers.txt').exists())
+            auto_path = ROOT / 'src' / target / 'in_game/common/auto_modifiers/SOL_substitute_global_modifiers.txt'
+            self.assertEqual(auto_path.read_text(encoding='utf-8-sig'), render_modifiers())
+            self.assertEqual(len(parse(render_modifiers())), len(CORE))
+            for language in ('english', 'simp_chinese'):
+                loc_path = ROOT / 'src' / target / 'main_menu/localization' / language / f'SOL_substitution_modifiers_l_{language}.yml'
+                self.assertTrue(loc_path.read_bytes().startswith(b'\xef\xbb\xbf'))
+                localization = loc_path.read_text(encoding='utf-8-sig')
+                keys = re.findall(r'^ ([A-Za-z0-9_]+):', localization, re.MULTILINE)
+                expected = {f'AUTO_MODIFIER_{kind}_sol_substitute_{good}'
+                            for kind in ('NAME', 'DESC') for good in CORE}
+                self.assertEqual(set(keys), expected)
+                self.assertEqual(len(keys), len(expected))
+                for line in localization.splitlines()[1:]:
+                    self.assertRegex(line, r'^ [A-Za-z0-9_]+: "[^"\r\n]+"$')
         pp = (ROOT / 'src/sol_pp_compatibility_submod/in_game/common/scripted_effects/zz_A_SOL_economy_effects.txt').read_text(encoding='utf-8-sig')
         refresh = next(n for n in parse(pp) if n.key == 'REPLACE:sol_refresh_country_substitution')
         body = repr(refresh.value)
         self.assertNotIn('sol_sub_neutral_lumber', body)
         self.assertNotIn('sol_sub_multiplier_victuals', pp)
+        # Compatibility targets can embed a complete generated country runtime.
+        # Reject stale copies even when the base targets already use auto caches.
+        for path in (ROOT / 'src').glob('*/in_game/common/scripted_effects/*.txt'):
+            source = path.read_text(encoding='utf-8-sig')
+            self.assertNotRegex(source, r'(?:add|remove)_country_modifier[^\n]*\bsol_substitute_', str(path))
+            self.assertNotIn('sol_apply_country_substitution', source, str(path))
+            self.assertNotIn('sol_check_substitution_snapshot', source, str(path))
 
 
 if __name__ == '__main__':

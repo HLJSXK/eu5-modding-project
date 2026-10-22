@@ -1,4 +1,12 @@
 # eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: sol_substitution_auto_modifier_recomputes_baskets
+  pattern: null
+  bad: Granting static country modifiers for SOL goods substitution, or computing price preferences, group allocation, population/market aggregation or external offsets inside an auto modifier or its scale script value.
+  correction: Compute size=(1+e)*(M-1) in the existing monthly human/normal-AI or yearly reduced-frequency-AI solve. Country auto modifiers only read guarded sol_sub_size_<good> caches through sol_substitute_<good>_scale. Delete zero size caches after effective spending and summary calculations consume them, so neutral goods fail the auto potential. Generate AUTO_MODIFIER_NAME_ and AUTO_MODIFIER_DESC_ keys in both supported languages, as current vanilla does. The scheduled solve subtracts that same active cached contribution from the total modifier before deriving external demand. Keep solver spending in sol_good_effective_<good>; never read aggregate modifiers from the auto scale. Remove static grants, live-strength/request snapshots and dead dirty polling; no old-save migration.
+  category: modifier
+  scope: country
+  source: User decision 2026-10-23; scripts/sol_substitution.py; scripts/test_sol_substitution_performance.py; docs/technical/SOL_Substitution_Auto_Modifiers_20261023.md
+  notes: Engine actions can reevaluate auto modifiers at very high frequency. Source and offline tests verify constant per-good cache reads, no writes or economic reads during repeated auto evaluation, and unchanged scheduled basket results. Engine refresh timing and fixed-point rounding remain unverified.
 - id: sol_living_standard_feeds_demand
   pattern: null
   bad: Treating living standard (SOL) and purchasing power as one number, for example reading a SOL value or the local SOL bonus in the raw/final demand scale, the country solver targets, or the applied local_pop_demand modifier, or labelling an income or purchasing-power figure as living standard.
@@ -484,15 +492,11 @@
   pattern: null
   bad: Attributing default monthly AI cost to the entire substitution aggregate, or assuming solver/substitution toggles skip
     every newly added runtime cost
-  correction: Trace monthly and yearly callers separately. Clean reduced-frequency AI only checks snapshots and applies modifiers;
-    dirty AI enters the full solve. Country substitution refresh precedes size/solver gates, and substitution-off still computes
-    per-good external spending. Count actual dirty solves and successful modifier writes before claiming engine-time attribution.
+  correction: Trace monthly and yearly callers separately. Humans and normal-cadence AI solve monthly; reduced-frequency AI solves on its yearly anniversary with no monthly snapshot polling. Country substitution refresh precedes size/solver gates, and substitution-off still computes external spending. Auto modifiers only read cached deltas. Count scheduled refreshes and economic reads before claiming engine-time attribution.
   category: scope
   scope: country
-  source: src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:32; src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:5039,5438;
-    docs/technical/SOL_Monthly_Performance_Audit_20261014.md
-  notes: Source and offline operation-count audit, 2026-10-14. A 7-to-215 map-read increase is confined to location recomputation,
-    not every clean AI month. Existing logs are not an effect-time profiler.
+  source: src/stable/in_game/common/on_action/SOL_economy_on_actions.txt; scripts/sol_substitution.py; docs/technical/SOL_Substitution_Auto_Modifiers_20261023.md
+  notes: The 2026-10-14 snapshot/static-modifier audit described an earlier implementation. The 2026-10-23 cache-only auto refactor removes that polling and grant path. Offline operation counts do not measure native demand refresh cost.
 - id: sol_substitution_partial_group_from_quantities
   pattern: null
   bad: Inferring each pop's substitute groups or members from positive calibrated quantities, producing partial groups and singleton responses

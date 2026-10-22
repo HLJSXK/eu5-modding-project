@@ -1,4 +1,4 @@
-"""Generate SOL substitution effects, values and country static modifiers."""
+"""Generate SOL substitution pulse effects, cached values and country auto modifiers."""
 import argparse
 import sys
 from pathlib import Path
@@ -22,13 +22,17 @@ def main():
     files = {
         "in_game/common/scripted_effects/C_SOL_substitution.txt": render_country_runtime(rows) + render_location_spending(rows),
         "in_game/common/script_values/SOL_country_substitute_values.txt": render_values(),
-        "main_menu/common/static_modifiers/SOL_substitute_global_modifiers.txt": render_modifiers(),
+        "in_game/common/auto_modifiers/SOL_substitute_global_modifiers.txt": render_modifiers(),
         "in_game/common/scripted_triggers/SOL_substitution_triggers.txt": 'sol_substitution_is_on = {\n\tsol_sol_is_on = yes\n\tOR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_substitution_enabled }\n}\n',
     }
-    for language, label in (("english", "Goods substitution"), ("simp_chinese", "商品替代")):
+    for language, label, description in (
+        ("english", "Goods substitution", "Adjusts population demand for ${good}$ through goods substitution."),
+        ("simp_chinese", "商品替代", "商品替代调整${good}$的人口需求。"),
+    ):
         content = f"l_{language}:\n"
         for good in CORE:
-            content += f' sol_substitute_{good}: "{label}: ${good}$"\n'
+            content += f' AUTO_MODIFIER_NAME_sol_substitute_{good}: "{label}: ${good}$"\n'
+            content += f' AUTO_MODIFIER_DESC_sol_substitute_{good}: "{description.format(good=good)}"\n'
         files[f"main_menu/localization/{language}/SOL_substitution_modifiers_l_{language}.yml"] = content
     failed = False
     for target in targets:

@@ -46,6 +46,7 @@ class PerfSaveReportTests(unittest.TestCase):
     def test_country_only_parse_signed_and_omitted_identity_with_crlf(self):
         values = variables(2, 0, dirty_reason=7, cached_own=-0.03125, actual_own=-0.03124)
         values[STRATEGY] = 8
+        values[CONTROL] = 1
         values["unrelated_private_variable"] = 123
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "snapshot.eu5"
@@ -54,6 +55,7 @@ class PerfSaveReportTests(unittest.TestCase):
         self.assertEqual(parsed.variables[1][PREFIX + "cached_own"], -0.03125)
         self.assertEqual(parsed.variables[1][PREFIX + "dirty_count"], 0)
         self.assertEqual(parsed.variables[1][STRATEGY], 8)
+        self.assertEqual(parsed.variables[1][CONTROL], 1)
         self.assertNotIn("unrelated_private_variable", parsed.variables[1])
         self.assertEqual(parsed.variables[2], {})
         self.assertEqual(parsed.label, "snapshot.eu5")
