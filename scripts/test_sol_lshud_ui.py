@@ -136,6 +136,58 @@ class LivingStandardHUD(unittest.TestCase):
         eng, _ex, root, *_ = self.context("stable", "simp_chinese", "", enabled=0)
         self.assertFalse(any(visible_walk(eng, root)))
 
+    def test_each_section_previews_and_selects_its_map_mode(self):
+        from sol_map_modes_source import MAP_MODES
+        for target in self.databases:
+            _eng, _ex, _root, row, *_ = self.context(target, "english", "")
+            for idx, mode in enumerate(MAP_MODES, 1):
+                section = next(e for e in hud.walk(row) if e.props.get("name") == f"sol_lshud4_section_{idx}")
+                self.assertEqual(section.props["onmousehierarchyenter"], f"[PdxGuiWidget.PushMapModeOverride('{mode}')]")
+                source = (ROOT / "src" / target / "in_game/gui/SOL_lshud.gui").read_text(encoding="utf-8")
+                self.assertIn(f"[GetMapMode('{mode}').SetMapMode]", source)
+                self.assertIsNotNone(section.tooltipwidget)
+
+    def test_foreign_country_map_tooltips_keep_the_primary_country(self):
+        for target in self.databases:
+            for language in ("english", "simp_chinese"):
+                for mode, idx in (("sol_substitution", 3), ("sol_ranking", 4)):
+                    with self.subTest(target=target, language=language, mode=mode):
+                        base, ex, *_ = self.context(target, language, "")
+                        # Deliberately distinct from every country in the HUD fixtures.
+                        country_name = "Foreign test country" if language == "english" else "异国测试"
+                        mocks = [(r"Country.IsValid", True), (r"Country.MakeScope", {"__type__": "Scope"}),
+                                 (r"Scope.GetCountry", fixtures.country("FOREIGN", country_name, 12, 1.86, .045, 1)),
+                                 (r"Scope.GetCountry.GetNameWithNoTooltip", country_name),
+                                 (r"Scope.GetCountry.MakeScope.ScriptValue\('sol_substitute_(\w+)_display'\)",
+                                  lambda m: {"status": 2, "year": 1338, "goods_count": 56, "max_size": .4}.get(m[1], 1.5)),
+                                 (r"Scope.GetCountry.MakeScope.GetVariable\('sol_ls_spend_total'\).GetValue", 31415.9)]
+                        mocks += [(rx.pattern.replace("Player", r"Scope\.GetCountry"), value) for rx, value in base.ev.mocks]
+                        log = []
+                        eng = Engine(ex, Evaluator(mocks, base.loc, log), base.loc, Formats(), TextIcons(), 1)
+                        path = ROOT / "src" / target / "in_game/gui/SOL_map_tooltips.gui"
+                        node = next(n for n in ex.db.roots[str(path)] if n.is_block() and any(
+                            child.key == "name" and child.value == f"CountryMapTooltip_{mode}" for child in n.value))
+                        tip = ex.build(node.key, node.value, {}, str(path), node.line)
+                        width, height = eng.measure(tip, None)["hint"]
+                        eng.place(tip, 12, 12, width, height)
+                        texts = [eng.text_of(e) or "" for e in visible_walk(eng, tip) if e.kind == "textbox"]
+                        self.assertIn(country_name, " ".join(texts))
+                        if idx == 4:
+                            self.assertEqual(sum(country_name in text for text in texts), 2)  # title + highlighted self row
+                        if idx == 3:
+                            self.assertTrue(any("31415.9" in text for text in texts), texts[:10])
+                            self.assertTrue(any("1338" in text for text in texts), texts[-10:])
+                        self.assertLessEqual(width, 524)
+                        self.assertLessEqual(height, 1080)
+                        self.assertFalse(eng.unresolved_contexts, eng.unresolved_contexts)
+                        self.assertEqual(log, [], log[:10])
+                        image = Image.new("RGBA", (int(width + 24), int(height + 24)), (40, 52, 46, 255))
+                        eng.render(tip, image)
+                        self.assertEqual(log, [], log[:10])
+                        self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
+                        if self.out:
+                            image.save(self.out / f"{target}_{language}_{mode}.png")
+
     def test_leftrow_hides_when_left_panel_is_open_or_ui_is_disabled(self):
         for shown, attached, enabled in ((True, False, 1), (False, True, 1), (False, False, 0)):
             with self.subTest(shown=shown, attached=attached, enabled=enabled):

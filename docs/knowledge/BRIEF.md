@@ -59,6 +59,8 @@ performance boundary.
 
 14. **Living Standard four-section left-panel HUD** - Stable and standalone ship a 570×36 row below the nine left-panel buttons, split into income/YoY, purchasing power, spending/substitution, and world-ranking sections with independent contextual tooltips. Current income remains available on the first solve while YoY waits for a same-month prior-year baseline; the ranking tooltip also exposes generated per-estate world rank, percentile, count, and top-country caches. The spending section is gated pending a country-side per-good spending cache and uses static goods branches because GUI variable-to-Goods promotion is invalid at runtime. An independent Glorp UI shim shifts its own stats bar and collapse toggle down one row; offline rendering covers both languages, pending/ranking states, and Glorp UI, while in-game hover, click pass-through, scaling, and actual load order remain to be confirmed.
 
+15. **SOL map modes and HUD navigation** - The four HUD sections preview their corresponding map on hover and select it on left click: local savings-adjusted per-capita income, local raw purchasing power, country goods substitution in each country's own color, and overall world ranking from red to green. Country map tooltips reuse sections three/four with a preserved hovered-country scope, including translated summary bindings and nested ranking peers; the two local maps are independent of the country solver's applied modifier. Both targets ship the map menu icons and bilingual labels. Offline scope tests and renders cover the bindings; engine hover, selection and country aggregation still need in-game acceptance.
+
 ## Directory Structure
 
 ```text
@@ -93,6 +95,7 @@ eu5-modding-project/
 |       |       |-- vanilla/             generated vanilla type support extracted by Glorp UI
 |       |       |-- SOL_economy_local.gui location SOL tooltip/panel content
 |       |       |-- SOL_lshud.gui        generated left-panel Living Standard row and contextual tooltip
+|       |       |-- SOL_map_tooltips.gui generated country substitution/ranking tooltips and local purchasing-power tooltip registration
 |       |       |-- SOL_lshud_glorp_compat.gui generated shifted Glorp UI stats-bar and toggle types
 |       |       |-- SOL_living_standard_kit.gui shared UI kit for both SOL economy surfaces (headline figures, caption band, composition ring, estate ledger, substitute-group rows)
 |       |       |-- SOL_migration_caller.gui after-lobby migration/cache callers
@@ -111,7 +114,7 @@ eu5-modding-project/
 |       |-- loading_screen/common/defines/
 |       |-- in_game/
 |       |   |-- common/                 SOL goods, on_actions, resolutions, script values/effects, situation, map mode
-|       |   |-- gfx/map/map_modes/      SOL map mode
+|       |   |-- gfx/map/map_modes/      four SOL map modes
 |       |   `-- gui/                    generated location window, panels/tooltips, shared/market_tooltips override, and a generated copy of the shared SOL UI kit
 |       `-- main_menu/
 |           |-- common/                 SOL modifier icons and static modifiers
@@ -162,7 +165,7 @@ eu5-modding-project/
 | `sync_location_window.py` | After updating the Glorp UI reference; called by `gen_sol_chain.py` for `stable`/`all` | Unified Glorp UI-based stable location window with optional Construction Manager references, 1.4 button/road-builder migration, one SOL tooltip button, and migrated extracted vanilla type support |
 | `gen_sol_economy_effects.py` | After changing SOL economy emitters, the country solver, or demand data; called by `gen_sol_chain.py` for `stable`/`sol_standalone`/`all` | Emits the location aggregation/runtime `A_SOL_economy_effects.txt` and the separate fixed-dimensional `B_SOL_country_demand_solver.txt` for stable and standalone |
 | `gen_sol_ls_gui.py` | After changing the SOL economy UI design, the shared kit, the estate/goods vocabulary, or `data/goods_weights.csv`; called by `gen_sol_chain.py` | Rebuilds the location tooltip and country situation panel for stable/standalone, plus `SOL_ls_ui_l_*.yml`; copies stable's `SOL_living_standard_kit.gui` to standalone and includes that copy in its generated-output check |
-| `gen_sol_lshud.py` | After changing the adopted left-row design, translations, ranking source, or vendored Glorp UI type source; called by `gen_sol_chain.py` | Stable/standalone row GUI, Glorp type shim, scripted-widget registration, bilingual localization, ranking effects and shared unit/threshold values; `--check` verifies all outputs |
+| `gen_sol_lshud.py` | After changing the four-section design, translations, income/ranking/map sources or Glorp UI types; called by `gen_sol_chain.py` | Stable/standalone HUD, Glorp shim, four map modes, scoped tooltips, map icons, bilingual localization and ranking caches; `--check` verifies all outputs |
 | `sol_lshud_income_source.py` / `sol_lshud_ranking_source.py` | Imported by the economy and HUD generators | Fused income accumulation, same-month annual histories and trend classes; annual country-only population-weighted ranking, tiers, top-ten and neighbour slots |
 | `test_sol_lshud_income.py` / `test_sol_lshud_ranking.py` / `test_sol_lshud_ui.py` | After changing HUD data, sorting or presentation | Executes generated income/ranking effects and renders the row/tooltip in both languages/targets plus Glorp UI bar/toggle composition; `SOL_LSHUD_PREVIEW_OUT` saves review images |
 | `gen_sol_goods_tooltip.py` | After changing `data/goods_weights.csv` or vanilla goods_details/market_tooltips; called by `gen_sol_chain.py` | Generates sheet C group icon/name rows and seven static price preferences in goods_details, plus a full preserved market_tooltips override supplying the live market/base-price ratio and gold current-tier highlight only for SpecificGoodsMarket_tooltip. Emits bilingual membership/group/price localization and location-market snippets |
@@ -625,6 +628,7 @@ Fourth case, tv_academy_world_debate_monthly_effect (scripts/philosophy_debate_c
 | script | building | A while loop checks location_building_level and then tries to drive construct_building instant = yes or change_building_level_in_location until the level catches up | Do not wait for location_building_level to change inside the same effect. Use fixed if / else_if branches or a bounded script-value delta so the effect runs once and never depends on a 0-day build task updating synchronously. | Wonder selection/finalization previously used while loops that assumed instant construction updated the location building level during the same effect. That can deadlock or spin forever because the engine only creates a queued task. Treat instant construction as asynchronous for script control flow. |
 | localization | any | Smart/curly quotes (“”‘’) in localization YAML | Use straight ASCII double-quotes (") only; escape with \" inside values | This rule applies only to localization files, as declared by only_in_paths. Script comments and other source text are outside its scope; the vanilla flavor_fra.428 header contains d’Opera and must survive verbatim copying. Scope metadata and provenance corrected 2026-10-22; validators must honor the generic path metadata rather than special-case this rule ID. |
 | gui | any | Recognizing only lowercase types declarations silently omits vanilla HUD bars. | Parse both types and Types group keywords; preserve type-name case and register their children normally. | Shared parser regression covers both spellings and type expansion; full HUD preview retains unresolved-binding diagnostics. |
+| gui | country | Reusing SOL HUD sections three/four for another country's map tooltip while leaving player-bound GUI or localization, or letting nested ranking rows replace the primary country. | Capture the hovered country's MakeScope as Scope and adapt primary Player expressions to Scope.GetCountry. Adapt localized expressions from both gen_sol_lshud and gen_sol_ls_gui, including SOL_SUB_SUMMARY, while peer rows continue to bind Country. Register CountryMapTooltip_<mode> with country tooltip contexts at every zoom and verify a foreign title, self row, spending total and substitution summary in both languages. | SOL-specific integration rule. Offline regression initially caught the external SOL_SUB_SUMMARY key still reading Player even after direct GUI adaptation. Source and offline rendering confirm the correction; native map tooltip dispatch remains pending in-game acceptance. |
 | gui | any | Giving the SOL income table 460-unit row decorations while its visible columns and padding only occupy 418 units, and verifying only the declared row rectangle. | Make the header and every income row use the same full-width column budget, explicit zero spacing, and symmetric padding. Include the combined arrow/annual-change cell or its same-width no-prior-year placeholder in that budget. Verify the sum of in-flow child widths equals the row width and that every decoration and cell remains inside the tooltip content margins. | The screenshot's roughly 21-unit left offset agrees with half of the 42-unit shortfall; the exact engine allocation path is inferred. The correction uses 6-unit padding on both sides and columns totaling 448 units. Later readability tuning narrows the estate column to 96 units and widens annual income/per-capita income to 108/90, each with a 6-unit left text gutter. Bilingual stable/standalone regressions cover annual-data and placeholder states, aligned headers, intrinsic and decoration bounds, and nine-digit income/eight-character per-capita values that fit at 11-point type. Corrected runtime acceptance remains pending. |
 | gui | any | Computing SOL purchasing-power labels or ticks with a different mapping from the fill, retaining nonlinear spacing after the user requested linear halves, or aligning the ruler through an unsized expanding spacer. | Share the row/ruler column geometry and use a fixed full-width ruler wrapper with an explicit track offset. For clamped raw alpha-minus-one c, map negative values to (c+1)/2 and positive values to 1/2+c/4; the five labels belong at 0, 1/4, 1/2, 3/4, and 1. Center ticks vertically on the track and keep a zero-baseline cursor at 1/2. Clamp only the visual bar; preserve the full raw percentage. | The screenshot shows the entire ruler shifted right; its hbox spacer handling is inferred, so the replacement uses explicit coordinates. The first correction retained the old nonlinear fill; the user then requested equidistant labels with -50% and +100% bisecting their respective halves. Offline bilingual tests compare every label/tick with the fill and cover intermediate values, clamped endpoints, and no consumption; in-game acceptance remains pending. |
 | scope | country | Reading a country-solver class coefficient in the tens or hundreds (e.g. Class 1 = 105.98) as a data error or numerical blow-up | Expect it. Capacity targets are baseline_total * capacity_floor + baseline_total * negative_pool * pressure_share, and pressure is clipped at zero, so a stratum whose baseline is BELOW target (needs scaling up) contributes zero pressure and its class receives only the 1% floor. That class column then carries ~1-3% of the mass of the dominant class, and ||W^-1 row|| reaches 96-404, so a normal 0.01 monthly move in a compression ratio swings that coefficient by 1-4 units. Switching capacity to abs(baseline - target) cuts median amplification from 120.6 to 55.9 but does NOT improve feasibility and shrinks the surviving Class 4 margin from 0.164 to 0.033. | Documentation-only (no regex lint). Amplification and feasibility are independent problems: amplification comes from unequal column mass (the 1% anchor), feasibility comes from cone containment. Raising capacity_floor trades jitter for margin in both directions, so it is a tuning decision rather than a fix. HUN is especially exposed because nobles are 68% of national spending yet carry zero pressure, leaving the class that represents them with almost no matrix mass. |
@@ -690,13 +694,13 @@ Fourth case, tv_academy_world_debate_monthly_effect (scripts/philosophy_debate_c
 | Scripted Triggers | 559 | `data/index/scripted_triggers.txt` | Verify name before using in `trigger = { ... }` |
 | Scripted Effects | 846 | `data/index/scripted_effects.txt` | Verify name before using in `effect = { ... }` |
 | Static Modifiers | 2657 | `data/index/static_modifiers.txt` | Modifier name whitelist; validate.py checks these |
-| English Loc Keys | 673 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
+| English Loc Keys | 703 | `data/index/loc_keys_en.txt` | All defined EN keys; cross-check before adding duplicates |
 
 ## Codegen Script Map
 
 | Script | Input(s) | Output(s) | When to run |
 | --- | --- | --- | --- |
-| `scripts/gen_sol_lshud.py` | SOL left-row GUI/localization source + income and ranking emitters + vendored Glorp UI type source | stable/standalone left-panel row and Glorp stats-bar offset shim, bilingual localization and country ranking caches | Run by gen_sol_chain; supports --check; stable must load after Glorp UI for type override; verify with test_sol_lshud_income/ranking/ui.py |
+| `scripts/gen_sol_lshud.py` | SOL four-section source + income/ranking/map emitters + vendored Glorp UI types | stable/standalone HUD, Glorp offset shim, four map modes, scoped map tooltips, icons, bilingual localization and ranking caches | Run by gen_sol_chain; supports --check; stable must load after Glorp UI; verify with test_sol_lshud_income/ranking/ui.py and test_sol_map_modes.py |
 | `scripts/gen_sol_substitution.py` | goods_weights.csv + pop_group_baskets.csv + substitute_groups.json + calibrated demand | country substitution effects, display values, triggers and 56 static modifiers | Run by gen_sol_chain; edit sol_substitution.py, regenerate, then run test_sol_substitution.py |
 | `scripts/gen_whole_group_baskets.py` | pop_group_baskets.csv + goods_weights.csv + calibrated demand | whole-group and emittable-net checks; one-time budget-preserving target_demand.csv migration | --check runs first in gen_sol_chain; --fill migrates incomplete baskets once |
 | `scripts/update_mod_version.py` | local date or explicit --date | selected src/<target>/.metadata/metadata.json version fields | Run automatically by build.bat before deployment; supports --target and --check |
@@ -770,6 +774,14 @@ Fourth case, tv_academy_world_debate_monthly_effect (scripts/philosophy_debate_c
 | `src/stable/in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt` | `scripts/gen_sol_lshud.py` |
 | `src/stable/in_game/common/scripted_effects/D_SOL_lshud_ranking.txt` | `scripts/gen_sol_lshud.py` |
 | `src/stable/in_game/common/script_values/SOL_lshud_ranking_values.txt` | `scripts/gen_sol_lshud.py` |
+| `src/stable/in_game/gfx/map/map_modes/SOL_map_modes.txt` | `scripts/gen_sol_lshud.py` |
+| `src/stable/in_game/common/script_values/SOL_map_values.txt` | `scripts/gen_sol_lshud.py` |
+| `src/stable/in_game/gui/SOL_map_tooltips.gui` | `scripts/gen_sol_lshud.py` |
+| `src/stable/main_menu/gfx/interface/icons/map_modes/sol_purchasing_power.dds` | `scripts/gen_sol_lshud.py` |
+| `src/stable/main_menu/gfx/interface/icons/map_modes/sol_substitution.dds` | `scripts/gen_sol_lshud.py` |
+| `src/stable/main_menu/gfx/interface/icons/map_modes/sol_ranking.dds` | `scripts/gen_sol_lshud.py` |
+| `src/stable/main_menu/localization/english/SOL_map_modes_l_english.yml` | `scripts/gen_sol_lshud.py` |
+| `src/stable/main_menu/localization/simp_chinese/SOL_map_modes_l_simp_chinese.yml` | `scripts/gen_sol_lshud.py` |
 | `src/stable/main_menu/localization/english/SOL_lshud_l_english.yml` | `scripts/gen_sol_lshud.py` |
 | `src/stable/main_menu/localization/simp_chinese/SOL_lshud_l_simp_chinese.yml` | `scripts/gen_sol_lshud.py` |
 | `src/sol_standalone/in_game/gui/SOL_lshud.gui` | `scripts/gen_sol_lshud.py` |
@@ -777,5 +789,13 @@ Fourth case, tv_academy_world_debate_monthly_effect (scripts/philosophy_debate_c
 | `src/sol_standalone/in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt` | `scripts/gen_sol_lshud.py` |
 | `src/sol_standalone/in_game/common/scripted_effects/D_SOL_lshud_ranking.txt` | `scripts/gen_sol_lshud.py` |
 | `src/sol_standalone/in_game/common/script_values/SOL_lshud_ranking_values.txt` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/in_game/gfx/map/map_modes/SOL_map_modes.txt` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/in_game/common/script_values/SOL_map_values.txt` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/in_game/gui/SOL_map_tooltips.gui` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/main_menu/gfx/interface/icons/map_modes/sol_purchasing_power.dds` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/main_menu/gfx/interface/icons/map_modes/sol_substitution.dds` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/main_menu/gfx/interface/icons/map_modes/sol_ranking.dds` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/main_menu/localization/english/SOL_map_modes_l_english.yml` | `scripts/gen_sol_lshud.py` |
+| `src/sol_standalone/main_menu/localization/simp_chinese/SOL_map_modes_l_simp_chinese.yml` | `scripts/gen_sol_lshud.py` |
 | `src/sol_standalone/main_menu/localization/english/SOL_lshud_l_english.yml` | `scripts/gen_sol_lshud.py` |
 | `src/sol_standalone/main_menu/localization/simp_chinese/SOL_lshud_l_simp_chinese.yml` | `scripts/gen_sol_lshud.py` |

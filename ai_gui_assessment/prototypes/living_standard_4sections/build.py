@@ -39,6 +39,7 @@ sys.path[:0] = [str(WORKSPACE / ".eu5-base" / "ai_gui_assessment" / "renderer"),
 sys.setrecursionlimit(20000)
 
 import gen_sol_ls_gui as panel  # noqa: E402  (read-only reuse of the situation panel builders)
+from sol_map_modes_source import MAP_MODES  # noqa: E402
 
 GUI_FILE = HERE / "sol_lshud4.gui"
 LOC_FILE = HERE / "sol_lshud4_l_simp_chinese.yml"
@@ -220,11 +221,19 @@ def divider():
 
 def section(idx, body):  # caption-free: icon + value only
     w = SECTION_W[idx - 1]
+    mode = MAP_MODES[idx - 1]
     return f"""
-		widget = {{
+		button = {{
 			name = "sol_lshud4_section_{idx}"
 			size = {{ {w} {ROW_H} }}
 			alwaystransparent = no
+			onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('{mode}')]"
+			action_tooltip = {{
+				click_type = left
+				click_mode = single
+				title = "MAPMODE_SELECT"
+				on_action = "[GetMapMode('{mode}').SetMapMode]"
+			}}
 			tooltipwidget = {{ using = SOL_LSHUD4_tooltip_{idx} }}
 			hbox = {{ size = {{ {w} {ROW_H} }} margin = {{ 6 0 }} spacing = 5
 				{body}

@@ -4,6 +4,43 @@ Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guid
 
 ## SOL scenario adapter
 
+### Map modes and four-section navigation (2026-10-23)
+
+**[Source + offline scope execution/rendering; native hover/selection pending.]**
+`gen_sol_lshud.py` now owns all four `SOL_map_modes.txt` entries through
+`sol_map_modes_source.py`. The original income map still reads
+`gls_location_actual_per_capita_spending`: sum of individually nonnegative local
+net incomes × (1 + savings adjustment, floored at zero) ÷ local population.
+It is cached before country solving and does not read the final modifier.
+The local purchasing-power map uses liquid funds / baseline spending − 1,
+red/yellow/green at −100%/0%/+200%, neutral gray without baseline consumption.
+Its number is uncapped; only its color saturates.
+
+Substitution and rankings use country names and country tooltip contexts at all
+zoom levels. Substitution uses `owner.country_color`; ranking uses the cached
+overall percentile (best green, worst red; a sole ranked country is green).
+`SOL_map_tooltips.gui` registers `CountryMapTooltip_sol_substitution` and
+`CountryMapTooltip_sol_ranking`, reusing the third/fourth tooltip builders.
+A parent `[Country.MakeScope]` retains a primary `Scope`; adapting primary
+`Player` references to `Scope.GetCountry` keeps them stable when ladder rows bind
+peer `Country` objects. Localization also needs adaptation, including the panel
+generator's `SOL_SUB_SUMMARY`; changing direct GUI bindings alone is incomplete.
+
+Each HUD section keeps its existing tooltip, previews its map with
+`onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('...')]"`, and selects
+it through `GetMapMode('...').SetMapMode` on a single left click, following
+Glorp UI `location_window.gui:2617–2633`. Native dispatch examples are in
+`.eu5-base/reference_game_files/game/in_game/gui/cooltip.gui`; typed scope
+promotion is documented by `data_types_script.txt:438,1776`.
+Map menu icons reuse the existing complete-mip SOL DDS.
+
+`test_sol_map_modes.py` executes the shipped income/power/rank value paths,
+varies applied solver scales independently, and checks both targets' map
+contexts and icons. `test_sol_lshud_ui.py` renders foreign-country map tooltips
+in both languages, checks their primary identity and distinct spending/summary
+bindings, and retains all existing HUD/Glorp layout checks. Mock review images
+are in `../../ai_gui_assessment/images/map_modes_20261023/`.
+
 ### Living Standard left-panel row (2026-10-18)
 
 **[Source and offline rendering; in-game acceptance pending.]** The latest design moves the persistent summary into a 570×36 row at `{ 0 130 }`, below the left panel's nine navigation buttons, and keeps the adopted contextual tooltip unchanged. Stable and standalone register a separate `layer = bottom` scripted widget. It hides while `LeftView.IsShown` or `LeftView.IsSideAttached`, follows `Animation_Show_Hide_UI`, and stable's SOL master switch still disables it. `scripts/gen_sol_lshud.py` owns both target GUIs, bilingual localization, ranking outputs and the Glorp UI compatibility shim.

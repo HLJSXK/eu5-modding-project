@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-22
+> Last updated: 2026-10-23
 
 ## Project Identity
 
@@ -58,6 +58,8 @@ performance boundary.
 
 14. **Living Standard four-section left-panel HUD** - Stable and standalone ship a 570×36 row below the nine left-panel buttons, split into income/YoY, purchasing power, spending/substitution, and world-ranking sections with independent contextual tooltips. Current income remains available on the first solve while YoY waits for a same-month prior-year baseline; the ranking tooltip also exposes generated per-estate world rank, percentile, count, and top-country caches. The spending section is gated pending a country-side per-good spending cache and uses static goods branches because GUI variable-to-Goods promotion is invalid at runtime. An independent Glorp UI shim shifts its own stats bar and collapse toggle down one row; offline rendering covers both languages, pending/ranking states, and Glorp UI, while in-game hover, click pass-through, scaling, and actual load order remain to be confirmed.
 
+15. **SOL map modes and HUD navigation** - The four HUD sections preview their corresponding map on hover and select it on left click: local savings-adjusted per-capita income, local raw purchasing power, country goods substitution in each country's own color, and overall world ranking from red to green. Country map tooltips reuse sections three/four with a preserved hovered-country scope, including translated summary bindings and nested ranking peers; the two local maps are independent of the country solver's applied modifier. Both targets ship the map menu icons and bilingual labels. Offline scope tests and renders cover the bindings; engine hover, selection and country aggregation still need in-game acceptance.
+
 ## Directory Structure
 
 ```text
@@ -92,6 +94,7 @@ eu5-modding-project/
 |       |       |-- vanilla/             generated vanilla type support extracted by Glorp UI
 |       |       |-- SOL_economy_local.gui location SOL tooltip/panel content
 |       |       |-- SOL_lshud.gui        generated left-panel Living Standard row and contextual tooltip
+|       |       |-- SOL_map_tooltips.gui generated country substitution/ranking tooltips and local purchasing-power tooltip registration
 |       |       |-- SOL_lshud_glorp_compat.gui generated shifted Glorp UI stats-bar and toggle types
 |       |       |-- SOL_living_standard_kit.gui shared UI kit for both SOL economy surfaces (headline figures, caption band, composition ring, estate ledger, substitute-group rows)
 |       |       |-- SOL_migration_caller.gui after-lobby migration/cache callers
@@ -110,7 +113,7 @@ eu5-modding-project/
 |       |-- loading_screen/common/defines/
 |       |-- in_game/
 |       |   |-- common/                 SOL goods, on_actions, resolutions, script values/effects, situation, map mode
-|       |   |-- gfx/map/map_modes/      SOL map mode
+|       |   |-- gfx/map/map_modes/      four SOL map modes
 |       |   `-- gui/                    generated location window, panels/tooltips, shared/market_tooltips override, and a generated copy of the shared SOL UI kit
 |       `-- main_menu/
 |           |-- common/                 SOL modifier icons and static modifiers
@@ -161,7 +164,7 @@ eu5-modding-project/
 | `sync_location_window.py` | After updating the Glorp UI reference; called by `gen_sol_chain.py` for `stable`/`all` | Unified Glorp UI-based stable location window with optional Construction Manager references, 1.4 button/road-builder migration, one SOL tooltip button, and migrated extracted vanilla type support |
 | `gen_sol_economy_effects.py` | After changing SOL economy emitters, the country solver, or demand data; called by `gen_sol_chain.py` for `stable`/`sol_standalone`/`all` | Emits the location aggregation/runtime `A_SOL_economy_effects.txt` and the separate fixed-dimensional `B_SOL_country_demand_solver.txt` for stable and standalone |
 | `gen_sol_ls_gui.py` | After changing the SOL economy UI design, the shared kit, the estate/goods vocabulary, or `data/goods_weights.csv`; called by `gen_sol_chain.py` | Rebuilds the location tooltip and country situation panel for stable/standalone, plus `SOL_ls_ui_l_*.yml`; copies stable's `SOL_living_standard_kit.gui` to standalone and includes that copy in its generated-output check |
-| `gen_sol_lshud.py` | After changing the adopted left-row design, translations, ranking source, or vendored Glorp UI type source; called by `gen_sol_chain.py` | Stable/standalone row GUI, Glorp type shim, scripted-widget registration, bilingual localization, ranking effects and shared unit/threshold values; `--check` verifies all outputs |
+| `gen_sol_lshud.py` | After changing the four-section design, translations, income/ranking/map sources or Glorp UI types; called by `gen_sol_chain.py` | Stable/standalone HUD, Glorp shim, four map modes, scoped tooltips, map icons, bilingual localization and ranking caches; `--check` verifies all outputs |
 | `sol_lshud_income_source.py` / `sol_lshud_ranking_source.py` | Imported by the economy and HUD generators | Fused income accumulation, same-month annual histories and trend classes; annual country-only population-weighted ranking, tiers, top-ten and neighbour slots |
 | `test_sol_lshud_income.py` / `test_sol_lshud_ranking.py` / `test_sol_lshud_ui.py` | After changing HUD data, sorting or presentation | Executes generated income/ranking effects and renders the row/tooltip in both languages/targets plus Glorp UI bar/toggle composition; `SOL_LSHUD_PREVIEW_OUT` saves review images |
 | `gen_sol_goods_tooltip.py` | After changing `data/goods_weights.csv` or vanilla goods_details/market_tooltips; called by `gen_sol_chain.py` | Generates sheet C group icon/name rows and seven static price preferences in goods_details, plus a full preserved market_tooltips override supplying the live market/base-price ratio and gold current-tier highlight only for SpecificGoodsMarket_tooltip. Emits bilingual membership/group/price localization and location-market snippets |
