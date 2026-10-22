@@ -98,3 +98,13 @@ box.packed=require('node:zlib').gzipSync(JSON.stringify({fit_only:true,marker:'�
 run('unpackReport(packed)').then(data=>{
  assert.equal(data.fit_only,true);assert.equal(data.marker,'离线数据完整');
 }).catch(error=>{console.error(error);process.exitCode=1;});
+
+box.clockSample={mode:'S',end_month:6000,clocks:{tea:{history:[
+ {country:0,first_touch_month:0,national_month:1300},
+ {country:1,first_touch_month:4700,national_month:null},
+ {country:2,first_touch_month:5000,national_month:null},
+ {country:3,first_touch_month:0,national_month:100}]}}};
+const origins=run('clockOrigins(clockSample,"tea")');
+assert.equal(origins.national,1);assert.equal(origins.cap,2);assert.equal(origins.pending,1);
+box.clockSample.mode='H';box.clockSample.clock_counts={tea:{national:7,cap:2}};
+assert.equal(run('clockOrigins(clockSample,"tea").national'),7,'event modes retain observed counts rather than infer natural anchors');

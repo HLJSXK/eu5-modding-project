@@ -18,7 +18,7 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 # 先提交 selected_params.json 与 selection_log.json，再通知审计方。
 & $env:EU5_PYTHON -m tools.obsession_sim.round3_workflow diagnostics
 & $env:EU5_PYTHON docs/design/obsession/experiments/build_round3_report.py
-& $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8767
+& $env:EU5_PYTHON -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --port 8877
 ```
 
 习俗区按静态地图一次构造并定格，拒收全部输入，不向区外邻接输出；同市场输入使用排除习俗区的开放聚合。商人/领地来源与先占继续读取全量值。国家时钟存截止月D：首次非习俗接触后1440月封顶，开放全国流行后缩到240月；未退潮国家开新波不重置D。`tea_1`保留为不计分输入。
@@ -28,6 +28,8 @@ $env:EU5_PYTHON='C:/Users/Hades/anaconda3/envs/eu5/python.exe'
 `fit` 要求新排序协议已提交；`diagnostics` 要求选参文件与日志已提交，且运行时和冻结哈希匹配。选参只读拟合集，正式诊断包含 S/H×R 各30种子、双局 S/G×O 各10种子、五通道消融、四项单因素回退与双倍预算（均10种子）。超过三分之一拟合 A/B 里程碑在双倍预算下移动超过容差，将阻止 L2 宣称。
 
 年度入口量按用户确认解释为年风险率，可大于 1，每月用 `1-exp(-r/12)` 抽样；退潮期间拒收。报告构建器校验R30种子/O10种子及当前冻结身份，输出 `docs/design/obsession/27_Round3_Results.md`，并为 JSON/离线 HTML 报告补充已知拟合集必要条件差项。正式闸门仍交审计方。离线 HTML 无损压缩内嵌完整报告，原始 JSON 另行保留；载入后移除一次性 DOM 数据块，支持两局与全部种子查看。
+
+`clock_counts` 保留原始的“曾达到全国流行 / 未流行已退潮”观察计数。无事件模式的保持期起算统计由报告器和界面从 `clocks.history` 按 `min(全国流行月, 首次接触月+L)` 派生，包含上限已起算而尚未退潮的情况；同月相等归全国流行，跨波次国家可重叠。`mechanics_clock_origins.json` 绑定原始体检哈希，原始缓存与协议保持不变。事件模式显示观察计数，避免把禁令提前退潮混作自然上限。
 
 工作台位于 `/docs/design/obsession/experiments/structural_workbench.html`：只显示六个可调参数，固定值另列，支持两局结果切换、习俗区拒收与恒定性、国家截止时钟及全国流行/退潮日志、p_order可达上限、K2对手从未出现，以及队列延迟、放弃事件与逐商品 E_gap。R 地图回放在导出前屏蔽留出地点及其到达列，相关统计也去掉留出地点。实现者接口不运行或加载留出结果；正式全集矩阵留给审计方用显式 `--auditor-holdout` 运行。
 

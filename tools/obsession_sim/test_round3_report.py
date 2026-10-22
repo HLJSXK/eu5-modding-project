@@ -19,7 +19,7 @@ builder=importlib.util.module_from_spec(ms);ms.loader.exec_module(builder)
 def synthetic_artifacts(tmp_path):
     g,s=tiny_world();sim=StructuralRun(g,Timeline(g,[s]),CONFIG,SPEC,end_month=1).run()
     sample=sim.metrics.report(sim)
-    sample.update(identity=dict(code='code',frozen='frozen',fit_only=True),params=CONFIG['params'],country_labels=['TUR','CAS','F_SAFAVID'])
+    sample.update(identity=dict(code='code',frozen='frozen',fit_only=True),params=CONFIG['params'],country_labels=['TUR','CAS','F_SAFAVID'],end_month=1)
     sample['milestones']=[dict(id='synthetic',name='Synthetic region',good='coffee',grade='B',split='fit',target_year=1500,
         target_month=1956,tolerance_months=120,simulated_year=None,simulated_month=None,within_tolerance=False,within_2tol=False)]
     for k in ('fit_within_tol','fit_within_2tol','fit_p_order','fit_p_order_upper'):sample[k]=0.
@@ -31,7 +31,7 @@ def synthetic_artifacts(tmp_path):
         world_cells={'S×O · test':observer},baseline_10=rec,ablations={'wine':rec},rollbacks={'R1':rec},gates={k:dict(failures=[]) for k in ('L1','L2','L3')},
         budget_sensitivity=dict(double_budget=rec,eligible_milestones=1,moved_fraction=0,blocks_L2=False,milestones=[dict(moved_beyond_tolerance=False)]))
     protocol=dict(grid=[CONFIG['params']],fit_AB_targets=24,mechanics_run_count=2,parameter_names=list(CONFIG['params']))
-    mechanical={**sim.mechanics_report(), 'params':CONFIG['params']}
+    mechanical={**sim.mechanics_report(), 'params':CONFIG['params'], 'end_month':1}
     artifacts={'fit_report.json':report,'mechanics_only.json':mechanical,'round3_fit_selection.json':dict(finalists=[rec]),
         'round3_fit_protocol.json':protocol,'world_audit_batch.json':dict(passed=True,zero_impact_errors=[]),
         'round3_fit_phase_a.json':[deepcopy(rec) for _ in range(64)],'selected_params.json':CONFIG['params'],'synthetic-run':runs[0]}
@@ -61,3 +61,13 @@ def test_incomplete_or_holdout_report_is_rejected(tmp_path,monkeypatch):
     artifacts=prepare(monkeypatch,tmp_path)
     artifacts['fit_report.json']['cells']['S×R']['runs'].pop()
     with pytest.raises(AssertionError):builder.build_report()
+
+
+def test_clock_origins_use_earlier_anchor_and_include_pending_retreat():
+    def row(country,touch,national):return dict(country=country,first_touch_month=touch,national_month=national)
+    h=[row(0,0,1300),row(1,0,900),row(2,5000,None),row(3,4500,None),
+       row(4,0,1200),row(5,5999,None),row(1,2000,None)]
+    out=builder.clock_origins(h,6000)
+    assert (out['national'],out['cap'],out['pending'])==(2,3,2)
+    assert out['late_national_episodes']==1 and out['simultaneous_anchor_episodes']==1
+    assert sum(out['episodes'].values())==len(h)

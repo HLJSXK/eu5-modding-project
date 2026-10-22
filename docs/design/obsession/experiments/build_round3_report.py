@@ -16,10 +16,39 @@ from tools.obsession_sim.acceptance import q
 from tools.obsession_sim.experiment import HERE, code_hash, freeze_status, read_json
 from tools.obsession_sim.fit_workflow import median_arrival
 from tools.obsession_sim.round3_workflow import assert_fit
+from tools.obsession_sim.worlds import canonical_hash
+from tools.obsession_sim.graph import load_json
 from tools.eu5_save_parser.world_export import atomic_json
 
 OUT = ROOT / "tmp/obsession_round3"
 TARGET = ROOT / "docs/design/obsession/27_Round3_Results.md"
+
+
+def clock_origins(history, end_month, limit=1200):
+    """Classify the start of T, using the earlier national/L anchor.
+
+    A late national crossing does not replace the cap. The cap can start T
+    before retreat is observed. Counts are distinct countries per category;
+    different episodes of one country can occupy different categories.
+    """
+    countries = {k:set() for k in ('national','cap','pending')}
+    episodes = Counter()
+    late = ties = 0
+    for row in history:
+        upper = row['first_touch_month'] + limit
+        national = row['national_month']
+        if national is not None and national <= upper:
+            kind = 'national'
+            ties += national == upper
+        elif upper < end_month:
+            kind = 'cap'
+            late += national is not None
+        else:
+            kind = 'pending'
+        countries[kind].add(row['country'])
+        episodes[kind] += 1
+    return {**{k:len(v) for k,v in countries.items()}, 'episodes':dict(episodes),
+            'late_national_episodes':late, 'simultaneous_anchor_episodes':ties}
 
 
 def build_report():
@@ -27,6 +56,7 @@ def build_report():
     valid, frozen, _ = freeze_status()
     assert valid and frozen == r["frozen_hash"] and code_hash() == r["runtime_hash"]
     assert r["params"] == read_json(HERE / "selected_params.json")
+    r.update(frozen_valid=True,diagnostics_complete=True,report_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
     cells = {k:v for k,v in r["cells"].items() if k.endswith("×R")}
     cells.update(r["world_cells"])
     for key,cell in cells.items():
@@ -35,6 +65,19 @@ def build_report():
         assert all(x["identity"]["code"] == r["runtime_hash"] and x["identity"]["frozen"] == frozen for x in cell["runs"])
     base = cells["S×R"]["runs"]
     mechanics = read_json(OUT / "mechanics_only.json")
+    limit = read_json(HERE/'structural_config.json')['fixed']['first_touch_limit']
+    mechanics_origins = {g:clock_origins(c['history'],mechanics['end_month'],limit)
+                         for g,c in mechanics['clocks'].items()}
+    for cell in [*r['cells'].values(),*r['world_cells'].values()]:
+        for run in cell['runs']:
+            if run.get('mode','S') == 'S':
+                run['clock_origins'] = {g:clock_origins(c['history'],run['end_month'],limit)
+                                        for g,c in run['clocks'].items()}
+                run['clock_origin_limit'] = limit
+    r['mechanics_clock_origins'] = mechanics_origins
+    r['clock_origin_definition'] = 'S/no-event runs: T starts at min(first national adoption, first touch + L); ties national; cap hold may still be pending retreat; distinct countries can overlap across episodes. Event modes retain observed reaching/retreat counts because bans can shorten deadlines.'
+    atomic_json(OUT/'mechanics_clock_origins.json',dict(source_sha256=canonical_hash(mechanics),
+        definition=r['clock_origin_definition'],clock_origins=mechanics_origins))
     selection = read_json(OUT / "round3_fit_selection.json")
     protocol = read_json(ROOT / "docs/design/obsession/experiments/round3_fit_protocol.json")
     facts = read_json(HERE / "world_facts.json")
@@ -53,18 +96,18 @@ def build_report():
         values = [v for v in vs if v is not None]
         return "无" if not values else f"n={len(values)}；p10/中位/p90={q(values,.1):.1f}/{q(values):.1f}/{q(values,.9):.1f}"
     text("## 实现选择与边界")
-    text("习俗区与过滤后的入边表是载入时的静态配置；没有新增地点级持久变量。四个聚合分别维护国家/市场的全量与开放值，沿用 12 片轮转。酒通过静态地区与当月宗教组直接求值，没有酒模拟器或酒 U 项。D 是唯一国家接触时钟；首次接触、全国流行和波次历史仅进入诊断输出。禁令截止月向上取整到整数月，等价于旧浮点时钟的首个整数退潮月。人口相同按稳定国家索引排列。")
-    text("六维 Latin 分层抽样一次，64 个候选，生成种子 2026102201；前 6 名各补种子 1–4。五种子排序逐项取中位数。p_K 仅在双方候选都有至少 3 条可判定 K 时比较；稀疏 K 比较先按规范参数哈希排好输入，以保证确定性。回退 R2 同时恢复首次接触+240及旧的未退潮国家开波重置规则。")
+    text("习俗区与过滤后的入边表是载入时的静态配置；没有新增地点级持久变量。四个聚合分别维护国家/市场的全量与开放值，沿用 12 片轮转。酒通过静态地区与当月宗教组直接求值，没有酒模拟器或酒 U 项。D 存为 RuleSimulation.deadline，是唯一国家接触时钟；续期沿用原有预算内国家任务与游标，单个国家原子执行，等候续期期间时钟照常运行；首次接触、全国流行和波次历史仅进入诊断输出。禁令截止月向上取整到整数月，等价于旧浮点时钟的首个整数退潮月。人口相同按稳定国家索引排列。同月同时出现新商人对与新领地对时，开波原因取 contact_pair；活跃波内不另开波。")
+    text("六维 Latin 分层抽样一次，64 个候选，生成种子 2026102201；前 6 名各补种子 1–4。五种子排序逐项取中位数。协议validation_seeds的0–29用于R；O的0–9按已登记脚本和26 §6.4执行。p_K 仅在双方候选都有至少 3 条可判定 K 时比较；稀疏 K 比较先按规范参数哈希排好输入，以保证确定性。回退 R2 同时恢复首次接触+240及旧的未退潮国家开波重置规则。")
     text(f"运行时 `{r['runtime_hash']}`；冻结身份 `{frozen}`；6 个拟合参数，{protocol['fit_AB_targets']} 个拟合 A/B 目标，D4 上限 8。手设常数清单 {read_json(HERE/'structural_config.json')['manual_constant_count']} 项。")
     text("## 输入")
     raw_hash = hashlib.sha256((HERE / "world_facts.json").read_bytes()).hexdigest()
     text(f"事实总数 {len(facts['facts'])}；文件 SHA256 `{raw_hash}`。审计方新增 43 条 re_、4 条 ea_、1 条 ru_，逐字保留。30 种子世界输入审计通过，zero_impact_errors 为空。")
     table(["组", "事实数"], sorted(Counter(f["id"].split("_")[0] for f in facts["facts"]).items()))
     text("既有五处首都缺项保留：af_dendi_formation、eu_scotland_capital_edinburgh、sa_dec_form_berar、sa_mse_luangprabang_formation、sa_ins_mat_capital_kartasura。re_por_calicut、re_ned_masulipatnam、re_eng_surat 在样本月份因同市场有领土被排除，符合商人资格规则。")
-    text("编纂局限（冻结 additions 文件）：" + json.dumps(additions.get("known_gaps", facts.get("known_gaps")), ensure_ascii=False))
-    text("存档可用范围核查：两份正式 timeline.json 均为 52 档，1338.4.1–1840.4.1。磁盘另有 SOL 局 1930 年导出，但原版局对应导出和原始归档均未找到；没有将孤立文件或推断年份拼成另一份清单。本轮按可验证的两份完整清单运行 O 诊断，保持 23 的真实终点规则。R 商人先验仍只使用冻结的 1338–1630 样本，不重算。")
+    text("编纂局限（冻结 world_facts.json 的 known_gaps；additions 副本不含该字段）：" + json.dumps(additions.get("known_gaps", facts.get("known_gaps")), ensure_ascii=False))
+    text("存档可用范围核查：两份正式 timeline.json 均为 52 档，1338.4.1–1840.4.1。磁盘另有 SOL 局 1930 年导出，但原版局对应导出和原始归档均未找到；没有将孤立文件或推断年份拼成另一份清单。本轮按可验证的两份完整清单运行 O 诊断，保持 23 的真实终点规则。R 商人先验仍只使用冻结的 1338–1630 样本，不重算。分位字段在 Experiment.timeline 和输入审计入口读取，再将共同份额传给 Timeline 的 residency_power；O 保留真实份额。")
     text("## 测试与期望值改动")
-    text("全部 obsession_sim Python 测试、存档解析/关系/世界导出/归档四组依赖和两组 Node 工作台检查通过。core 的四组合成参考实验与修改前完整结果 JSON 哈希逐位相同，证据在 tmp/obsession_round3/core_equivalence.json。")
+    text("全部 obsession_sim Python 测试及存档解析/关系/世界导出/归档四组依赖共211项、33项子测试通过，两组 Node 工作台检查通过。core 的四组合成参考实验与修改前完整结果 JSON 哈希逐位相同，证据在 tmp/obsession_round3/core_equivalence.json。")
     table(["测试/夹具", "旧值或语义", "新值或语义", "依据"], [
         ["KFixture（影响 K1/K5 既有区间测试）", "等人口；不设大国条件", "国家1人口2，其余1，保持区间测试对象为大国", "J15"],
         ["test_j6_observer_nonoccurrence_window_is_shortened[K2]", "对手0也通过", "对手至少1后检验90年窗口", "J14"],
@@ -80,15 +123,18 @@ def build_report():
         ["test_validation.seed_cache", "旧缓存身份", "补rollbacks=[]、mechanics_only=False", "C1–C4 新诊断隔离"],
         ["test_acceptance_endpoint_labels_partial_report_when_matrix_is_absent", "round2目录", "round3目录；内容与状态码不变", "可视化轮次切换"],
     ])
-    text("structural.py 对 join 的全文检索仅余兼容接口名 clock_joined、历史计费字典键 join_write，以及字符串 join 方法；无 self.join、sim.join 或加入月计算。对应检索输出保存于 tmp/obsession_round3/join_search.txt。")
+    text("structural.py 对 join 的全文检索仅余兼容接口名 clock_joined、历史计费字典键 join_write，以及字符串 join 方法；正式路径无 self.join、sim.join；R2对照以D−T重建旧续期判定，属于计划要求的回退分支。对应检索输出保存于 tmp/obsession_round3/join_search.txt。")
+    text("```text\n" + "\n".join(f"{i}:{line}" for i,line in enumerate((HERE/'structural.py').read_text(encoding='utf-8').splitlines(),1) if 'join' in line) + "\n```")
     text("## 机制体检（第二轮冻结参数，无目标表或判分器）")
     text(f"正式机制体检次数 {protocol['mechanics_run_count']}。参数：`{json.dumps(mechanics['params'],ensure_ascii=False)}`。")
     table(["商品", "习俗地点", "值恒定", "习俗邻接到达", "拒收输入", "曾为成员地点", "波次数"],
           [[g,mechanics['zone_sizes'][g],mechanics['zone_values_constant'][g],mechanics['zone_adjacency_arrivals'][g],mechanics['zone_rejected_inputs'][g],mechanics['ever_member'][g],len(mechanics['waves'][g])] for g in ('coffee','tea','tobacco')])
     for g,c in mechanics['clocks'].items():
         history=c['history']
-        text(f"{g}：全国流行国家 {len({h['country'] for h in history if h['national_month'] is not None})}；上限退潮且未全国流行国家 {len({h['country'] for h in history if h['national_month'] is None and h['decay_start_month'] is not None})}。首次接触到退潮间隔/月：{dist([h['decay_start_month']-h['first_touch_month'] for h in history if h['decay_start_month'] is not None])}。开波原因：{dict(Counter(w['reason'] for w in mechanics['waves'][g]))}。")
-    text(f"峰值 U={mechanics['peak_U']}；最大轮次延迟={mechanics['peak_round_delay_months']}月；因预算放弃事件={mechanics['events_abandoned_budget']}。维护工作可超过服务预算，超预算如实报告，不改固定值。")
+        origin=mechanics_origins[g]
+        text(f"{g}：全国流行起算国家 {origin['national']}；L上限起算国家 {origin['cap']}；尚未起算国家 {origin['pending']}；晚于L才全国流行的波次 {origin['late_national_episodes']}。首次接触到退潮间隔/月：{dist([h['decay_start_month']-h['first_touch_month'] for h in history if h['decay_start_month'] is not None])}。开波原因：{dict(Counter(w['reason'] for w in mechanics['waves'][g]))}。")
+    text("起算按 min(全国流行月, 首次接触月+L) 分类，同月相等计全国流行。上限已起算但240月保持尚未结束的国家也计入；跨波次国家可出现在不同类别。原始 clock_counts 是达到全国流行/未流行已退潮的辅助计数，不能代替起算分类。此处与可视化从冻结原始历史作纯诊断后处理，未改运行时代码、缓存结果、评分、选参或预注册协议。")
+    text(f"峰值 U={mechanics['peak_U']}；最大轮次延迟={mechanics['peak_round_delay_months']}月；因预算放弃事件={mechanics['events_abandoned_budget']}。维护工作可超过服务预算，超预算如实报告，不改固定值。U是加权脚本成本估算，不是CPU时间；未进行改变执行结果的性能优化。")
     text("## 预注册扫描与选参")
     text("第二轮已登记49+147组；本轮只扫描一次。协议先提交，选参文件/日志先于诊断提交。未扩大范围，未增加参数，未读取留出或全集成绩。")
     text("冻结参数：`" + json.dumps(r['params'],ensure_ascii=False) + "`。")
@@ -116,10 +162,10 @@ def build_report():
             if m['grade'] not in ('A','B'):continue
             samples=[next(a for a in run['milestones'] if a['id']==m['id']) for run in runs]
             got=median_arrival([a['simulated_year'] for a in samples])
-            rows.append([key,m['id'],m['name'],m['target_year'],m['tolerance_months']/12,'未到达' if got is None else f'{got:.1f}',sum(a['simulated_month'] is not None for a in samples),pct(sum(a['within_tolerance'] for a in samples)/30),pct(sum(a['within_2tol'] for a in samples)/30)])
-    table(['配置','目标','地区','目标年','容差/年','含未到达中位年','到达/30','tol','2tol'],rows)
+            rows.append([key,m['id'],m['name'],json.dumps(m.get('where',{}),ensure_ascii=False),m['target_year'],m['tolerance_months']/12,'未到达' if got is None else f'{got:.1f}',sum(a['simulated_month'] is not None for a in samples),pct(sum(a['within_tolerance'] for a in samples)/30),pct(sum(a['within_2tol'] for a in samples)/30)])
+    table(['配置','目标','名称','静态地区口径','目标年','容差/年','含未到达中位年','到达/30','tol','2tol'],rows)
     text("## 新事实接触次数（S×R 30次）")
-    text("触发次数取实际成功注入，另列月风险抽样成功的尝试次数（可因习俗区/退潮拒收）。两列按当前有效常驻事实逐条计数，零次照常报告。")
+    text("触发次数取实际成功注入，另列月风险抽样成功的尝试次数（可因习俗区/退潮拒收）。两列按当前有效常驻事实逐条计数，零次照常报告。同一商人/市场有多条有效事实时分别共记，不能把各事实相加当作独立接触。")
     new_facts=[f for f in additions['facts'] if f['id'].startswith('re_')]
     assert len(new_facts)==43
     table(['常驻事实','成功注入次数中位','最小','最大','抽样触发尝试中位','咖啡/茶/烟草成功注入中位'],[[f['id'],q([x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base]),min(x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base),max(x.get('fact_contact_inputs',{}).get(f['id'],0) for x in base),q([x['fact_contacts'].get(f['id'],0) for x in base]),[q([x.get('fact_contact_by_good',{}).get(g,{}).get(f['id'],0) for x in base]) for g in ('coffee','tea','tobacco')]] for f in new_facts])
@@ -134,6 +180,7 @@ def build_report():
             cases.append([key,kid,counts['pass'],counts['fail'],counts['untriggered'],sum(a.get('reason')=='rival never present' for a in samples),dict(Counter(a.get('reason','interval result') for a in samples))])
     table(['配置/世界','规则','通过次数','失败次数','未触发次数'],rows)
     table(['配置/世界','规则','通过案例','失败案例','未触发案例','K2对手从未出现','原因计数'],cases)
+    text("左边界已满足的机会只入 seen，不建案例；案例表不包含这些机会。未触发包含右删失、首都变化和对手从未出现，不等于通过。K6通过表示观察期内强度仍至少保留一半，即禁令未充分压制，不是政策成功率。")
     text("## 国家时钟与波次")
     rows=[]
     for key in ('S×R','H×R'):
@@ -155,6 +202,42 @@ def build_report():
     variants=[('基线',r['baseline_10']),*r['ablations'].items(),*r['rollbacks'].items(),('双倍预算',r['budget_sensitivity']['double_budget'])]
     table(['对照','tol','2tol','次序','上限','K','可判K','违反中位','峰U中位','延迟中位/月','放弃中位'],[[name,pct(v['metrics']['fit_within_tol']),pct(v['metrics']['fit_within_2tol']),pct(v['metrics']['fit_p_order']),pct(v['metrics']['fit_p_order_upper']),pct(v['metrics']['p_K']),v['metrics']['triggered_K'],v['metrics']['violation_count'],v['metrics']['peak_U'],v['metrics']['peak_round_delay_months'],v['metrics']['events_abandoned_budget']] for name,v in variants])
     b=r['budget_sensitivity'];text(f"双倍预算 {sum(a['moved_beyond_tolerance'] for a in b['milestones'])}/{b['eligible_milestones']} 条拟合 A/B 目标中位位移超容差，比例 {pct(b['moved_fraction'])}；{'否决' if b['blocks_L2'] else '不单独否决'} L2/L3。回退只用于解释，不据此重选设计或参数。")
+    text("### 通道输入与史料案例（沿用23，仅报告）")
+    priors=read_json(HERE/'world_priors.json')
+    share=priors['foreign_share_quantiles'][priors['r_common_share_quantile']]
+    grades=lambda kinds:dict(Counter(f['grade'] for f in facts['facts'] if f['kind'] in kinds))
+    table(['通道','读取的世界状态与资格','出处/W级','冻结强度'],[
+        ['商人常驻','来源市场全量均值≥20；外国居民正份额且无该市场有人口领地；正向首都、反向外国市场中心',str(grades({'residency'})),f"λ={r['params']['lambda_contact']}; R份额={share:.10g}; 未乘亲和/先占的基础年风险率={r['params']['lambda_contact']*share:.6g}"],
+        ['领地回流','首都<20；本国首都市场外x≥20人口/全国人口；习俗区照常作来源',str(grades({'ownership','ownership_region','formation','capital'})),f"λ={r['params']['lambda_ownership']} × A_C"],
+        ['同市场带动','成员地点读取市场开放均值，排除习俗区；R近开局市场边界，O真实存档', '冻结市场输入；不按领土构造商人份额',r['params']['internal_rate']],
+        ['饮品先占','对手全量国家均值与当地酒背景取max，再减20截零','固定机制；酒背景C级',r['params']['preemption']],
+        ['酒背景','意大利/法国/伊比利亚地区，当月本地基督教；无酒模拟器/U项','26 C1固定设计背景',30]])
+    text("两条入口年风险率均乘固定亲和并除以1+先占，再以1-exp(-r/12)逐月抽样，入口剂量7；退潮拒收。两个λ乘的尺度不同，数值大小不直接表示通道强弱。关闭通道也可能减少开波机会，不能把差异只解释为剂量效应。")
+    rows=[]
+    for good in ('coffee','tea','tobacco'):
+        for channel in ('contact','ownership'):
+            samples=[run.get('channel_audit',{}).get(good,{}).get(channel,{}) for run in base]
+            rows.append([good,channel,num(q([x.get('inputs') for x in samples])),num(q([x.get('receiving_countries') for x in samples])),num(q([x.get('ownership_population_share_median') for x in samples])) if channel=='ownership' else '—'])
+    table(['商品','通道','成功入口次数中位','接收国家数中位','回流人口份额中位'],rows)
+    rows=[]
+    for tag,context in [('ENG',60),('FRA',160),('VEN',170)]:
+        cases=[]
+        for run in base:
+            cases.extend(c for k in run['K'] if k['id']=='K1' for c in k['cases']
+                         if c.get('country') is not None and run['country_labels'][c['country']]==tag)
+        lags=[(c['t1']-c['t0'])/12 if c.get('t1') is not None else None for c in cases]
+        rows.append([tag,len(cases),sum(v is not None for v in lags),num(median_arrival(lags)),dict(Counter(c['status'] for c in cases)),context])
+    table(['K1国家','有案例次数','记录到首都阶段2','含未到达中位年差','判定状态','23给定史料背景约/年'],rows)
+    own=[c for run in base for c in run.get('ownership_case_studies',[])]
+    graph_path=ROOT/'tmp/obsession_real/eu5_1337.json'
+    names=load_json(graph_path).names if own and graph_path.exists() else []
+    rows=[]
+    for tag,context in [('TUR',17),('CAS','40–50')]:
+        cases=[c for c in own if c['country']==tag]
+        nodes=Counter((names[c['capital_stage2']['node']] if names else c['capital_stage2']['node']) for c in cases if c.get('capital_stage2'))
+        rows.append([tag,len(cases),sum(c.get('capital_stage2') is not None for c in cases),dict(nodes),num(median_arrival([c.get('lag_years') for c in cases])),context])
+    table(['领地案例','样本数','记录到首都阶段2','实际首都地点/次数','含未到达中位年差','23给定史料背景约/年'],rows)
+    text("这些是23 §5.6给定的报告性史料背景，不是新拟合目标。K1从首次合格商人机会起算；领地案例从指定政治事实起算，其他领地、邻接或商人路径可同时生效，年差可能为负，不能据此作单一通道因果归因。首都变动及删失照实保留。")
     text("## 闸门")
     s=cells['S×R']
     l1=[]
@@ -171,7 +254,7 @@ def build_report():
         r['gates'][level]['failures']=gaps
     text("## 计划冲突处理与待决问题")
     text("扫描前体检重复原因：首次时钟计数把波次当国家，修正后复核；随后将新事实接触分成成功注入与抽样尝试，增加按商品分列，并使诊断路径和回放颜色遵守习俗区不外溢、不退潮，再用相同参数复核。另补奇数剩余保持期的禁令等价性测试，按旧时钟首个整数退潮月向上取整，并使R2沿用旧物化计费。全部体检均不读取成绩，次数如实预登记。新增事实副本没有 known_gaps 字段，编纂局限实际位于 world_facts.json，按原文引用，未改输入。没有改变四项机制、判分口径、参数范围、固定值、世界事实或目标定义。可用观察者档案与用户所述1930年存在范围差异，采用可验证的两份52档清单（见输入节），没有延长世界终点。协议交叉引用 §6.2 实际排序位于 §6.3，按后者的完整列表执行；tea_0 在既有文件中已删除，tea_1 保留定义并 scored=false。上述为执行细节，未据成绩调整规则。")
-    text("待决问题：观察者原版局1840年之后的原始归档/完整导出在当前工作区不可用；不阻塞本轮按真实终点执行的10种子诊断。模型与事实的进一步修改由审计方决定。")
+    text("待决问题：无。观察者可用范围差异已按真实终点规则处理并在输入节披露；模型与事实的进一步修改由审计方决定。")
     text("## 交付物与复现")
     text("`tools/obsession_sim/round3_workflow.py` 依次提供 mechanics、protocol、fit、select、diagnostics。输入审计用 round2 audit-batch。报告构建器校验完整种子和冻结身份。所有大文件留 tmp/obsession_round3，不进 Git；fit_report.html 可离线双击打开，工作台支持习俗区、截止时钟、K2未触发、四项回退与双局切换。通知审计方的可审阅交付为本报告及已提交的选参日志；未自动向其他聊天发送消息。")
     TARGET.write_text("\n".join(lines),encoding='utf-8')
