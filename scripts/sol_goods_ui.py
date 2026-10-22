@@ -216,7 +216,8 @@ def group_label_keys() -> list[str]:
     return [f"SOL_SUBGROUP_{group.upper()}" for group in GROUP_ORDER] + ["SOL_SUBGROUP_UNGROUPED"]
 
 
-def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: str) -> str:
+def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: str,
+                      *, show_supply_note: bool = True) -> str:
     """The whole goods vbox, so the compat generators rebuild it instead of patching it.
 
     The compat submods each add goods (PP adds victuals, JTG adds 26), and goods are now
@@ -240,9 +241,9 @@ def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: s
         lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 11 '
                      f'text = "SOL_SUB_LEGEND" tooltip = "SOL_SUB_LEGEND_TOOLTIP" }}')
     lines.extend(render_group_columns(goods, variable_map, scope, f"{indent}\t"))
-    if scope.startswith("Location."):
+    if show_supply_note and scope.startswith("Location."):
         lines.append(f'{indent}\ttextbox = {{ using = tooltip_text_block_template max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
-    else:
+    elif show_supply_note:
         # Regular panels have no ExtraTooltipInfo; the tooltip template binds
         # its font tint to that context even when the text itself is static.
         lines.append(f'{indent}\ttext_multi = {{ layoutpolicy_horizontal = expanding autoresize = yes max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')

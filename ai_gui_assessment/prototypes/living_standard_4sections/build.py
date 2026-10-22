@@ -380,8 +380,6 @@ def tooltip_income():
 				hbox = {{ name = "sol_lshud4_income_header" size = {{ {w} 18 }} layoutpolicy_horizontal = expanding spacing = 0 {head} }}
 {row('nobles', 'sol_ls_pop_all', 'sol_ls_income_all', 'sol_ls_pci', 'sol_ls_pci_yoy', 'sol_ls_pci_yoy_class', 'sol_lshud4_income_nation', hero=True)}
 {estates}
-				widget = {{ size = {{ 1 6 }} }}
-				text_multi = {{ max_width = {w} autoresize = yes fontsize = 12 default_format = "#weak" text = "SOL_LSHUD4_T1_NOTE" }}
 			}}"""
     return tooltip("SOL_LSHUD4_tooltip_1", medallion(42, 30), "SOL_LSHUD4_T1_TITLE", "SOL_LSHUD4_T1_SUB", body)
 
@@ -389,9 +387,7 @@ def tooltip_income():
 # ------------------------------------------------------------------ tooltip 2: purchasing power (migrated)
 def tooltip_power():
     lines = panel.balance_sections(3, POWER, "gls_sol", W_GOODS)
-    body = "\n".join(lines) + f"""
-			widget = {{ size = {{ 1 4 }} }}
-			text_multi = {{ max_width = {W_GOODS} autoresize = yes fontsize = 12 default_format = "#weak" text = "SOL_LSHUD4_T2_NOTE" }}"""
+    body = "\n".join(lines)
     return tooltip("SOL_LSHUD4_tooltip_2", title_icon("gfx/interface/sol_proto/icon_funds.dds"),
                    "SOL_LSHUD4_T2_TITLE", "SOL_LSHUD4_T2_SUB", body)
 
@@ -421,7 +417,8 @@ def tooltip_goods():
         return "".join(rows)
 
     spend = "".join(spend_row(n) for n in range(1, 6))
-    goods_lines = panel.goods_block(3, "SOL_GUI_SECTION_COUNTRY_GOODS", "gls_country_consumes", POWER, panel._goods_names())
+    goods_lines = panel.goods_block(3, "SOL_GUI_SECTION_COUNTRY_GOODS", "gls_country_consumes", POWER,
+                                    panel._goods_names(), show_supply_note=False)
     body = f"""			vbox = {{ name = "sol_lshud4_spend" spacing = 1
 				{section_title('SOL_LSHUD4_T3_SPEND', w, text('SOL_LSHUD4_T3_SPEND_TOTAL', None, None, fs=12, fmt='#weak'))}
 				{text('SOL_LSHUD_ROW_PENDING', w, 22, fs=13, fmt='#weak', visible=f'[Not({SPENT})]')}
@@ -498,8 +495,6 @@ def tooltip_rank():
 				{section_title('SOL_LSHUD4_T4_ESTATES', w, text('SOL_LSHUD4_T4_ESTATES_HINT', None, None, fs=11, fmt='#weak'))}
 				hbox = {{ size = {{ {w} 18 }} spacing = 4 {head} }}
 {''.join(estate_rank(i, e) for i, e in enumerate(ESTATES))}
-				widget = {{ size = {{ 1 6 }} }}
-				text_multi = {{ max_width = {w} autoresize = yes fontsize = 12 default_format = "#weak" text = "SOL_LSHUD4_T4_NOTE" }}
 			}}"""
     return tooltip("SOL_LSHUD4_tooltip_4", title_icon("gfx/interface/great_powers/banner_rank.dds"),
                    "SOL_LSHUD4_T4_TITLE", "SOL_LSHUD4_T4_SUB", body)

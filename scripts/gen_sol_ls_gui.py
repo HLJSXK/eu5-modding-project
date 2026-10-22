@@ -205,7 +205,8 @@ def balance_sections(base: int, scope: str, prefix: str, width: int) -> list[str
     return out
 
 
-def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[str]) -> list[str]:
+def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[str],
+                *, show_supply_note: bool = True) -> list[str]:
     i = T(base)
     out = [
         f'{i}hbox = {{ layoutpolicy_horizontal = expanding',
@@ -213,7 +214,8 @@ def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[
         f'{i}\texpand = {{}}',
         f'{i}}}',
     ]
-    out.extend(render_goods_vbox(goods, variable_map, scope, i).splitlines())
+    out.extend(render_goods_vbox(goods, variable_map, scope, i,
+                                 show_supply_note=show_supply_note).splitlines())
     return out
 
 
