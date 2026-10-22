@@ -67,6 +67,18 @@ DEMAND_SCALES = {
     "tribesmen": 0.0,
 }
 
+# Apply the 1340 purchasing-power basket rebase after the legacy JTG rounding,
+# so clergy/commoner quantities are exactly twice/four times their old targets.
+BASKET_REBASE_FACTORS = {
+    "nobles": Decimal("1"),
+    "clergy": Decimal("2"),
+    "burghers": Decimal("0.6555443548387097"),
+    "laborers": Decimal("4"),
+    "peasants": Decimal("4"),
+    "soldiers": Decimal("4"),
+    "tribesmen": Decimal("1"),
+}
+
 CLEAN_ROUNDING_STEPS = (
     (0.01, Decimal("0.01")),
     (0.001, Decimal("0.001")),
@@ -130,6 +142,15 @@ def _clean_target(value: float) -> float:
             rounded = Decimal(str(value)).quantize(step, rounding=ROUND_HALF_UP)
             return _script_float(float(rounded))
     raise ValueError(f"No clean rounding step for value: {value}")
+
+
+def _rebased_target(native: float, pop_type: str) -> float:
+    baseline = Decimal(str(_clean_target(native * DEMAND_SCALES[pop_type])))
+    value = baseline * BASKET_REBASE_FACTORS[pop_type]
+    if pop_type == "burghers" and value > 0:
+        quantum = max(Decimal("0.00001"), Decimal(1).scaleb(value.adjusted() - 1))
+        value = value.quantize(quantum, rounding=ROUND_HALF_UP)
+    return _script_float(float(value))
 
 
 def _parse_modifier_csv(raw: str, label: str) -> Dict[str, float]:
@@ -219,7 +240,7 @@ def _load_rows() -> List[Dict[str, object]]:
         missing = sorted(EXPECTED_DEMAND_GOODS - actual_goods)
         extra = sorted(actual_goods - EXPECTED_DEMAND_GOODS)
         raise ValueError(f"Invalid JTG demand-good set; missing={missing}, extra={extra}")
-    if set(DEMAND_SCALES) != set(POP_TYPES):
+    if set(DEMAND_SCALES) != set(POP_TYPES) or set(BASKET_REBASE_FACTORS) != set(POP_TYPES):
         raise ValueError("JTG demand scales must cover exactly the SOL pop types")
     wealth_goods = {str(row["good"]) for row in rows if row["wealth_all"] is not None}
     if wealth_goods != EXPECTED_WEALTH_THRESHOLD_GOODS:
@@ -256,7 +277,7 @@ def _target_quantities(row: Dict[str, object]) -> Dict[str, float]:
     native = row["native"]
     assert isinstance(native, dict)
     return {
-        pop_type: _clean_target(float(native[pop_type]) * DEMAND_SCALES[pop_type])
+        pop_type: _rebased_target(float(native[pop_type]), pop_type)
         for pop_type in POP_TYPES
     }
 
@@ -316,7 +337,8 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
         "# Apply SOL's approximate per-stratum scaling to JTG pop demand.",
-        "# Targets use clean magnitude-aware steps: 0.01, 0.001, 0.0001, or 0.00001.",
+        "# Legacy clean-rounded targets are rebased: nobles x1, clergy x2, commoners x4.",
+        "# Burgher targets use approximately x0.6555 and one or two significant digits.",
         "# Every source threshold and regional demand modifier is fully negated.",
         "# Slave demand is intentionally left unchanged and is never injected here.",
     ]

@@ -395,9 +395,9 @@ def _compat_quantities(
         for good in GRAINS:
             quantities[good][pop_type] = equal_quantity
 
-    if quantities["tools"]["laborers"] != Decimal("0.00050"):
+    if quantities["tools"]["laborers"] != Decimal("0.00200"):
         raise ValueError(
-            "tools laborer compatibility quantity must be 0.0005, got "
+            "tools laborer compatibility quantity must be 0.002, got "
             f"{quantities['tools']['laborers']}"
         )
     from gen_whole_group_baskets import groups_for_pop, validate_baskets

@@ -149,11 +149,11 @@ VISIBLE_CMM_SETTINGS = (
 HIDDEN_CMM_SETTINGS = ("gdp_dev",)
 COMPACT_VICTUALS_TARGET_QUANTITIES = {
     "nobles": 0.05,
-    "clergy": 0.015,
-    "burghers": 0.035,
-    "laborers": 0.0004,
-    "peasants": 0.0002,
-    "soldiers": 0.0004,
+    "clergy": 0.03,
+    "burghers": 0.023,
+    "laborers": 0.0016,
+    "peasants": 0.0008,
+    "soldiers": 0.0016,
     "tribesmen": 0.0,
 }
 
@@ -282,7 +282,7 @@ def _render_values(rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
         "# Adds only PP victuals values. Existing SOL values remain owned by the\n"
         "# full SOL mod, and lumber is omitted because PP sets its demand to zero.\n"
         "# These values mirror final PP + compatibility pop demand. They are fixed,\n"
-        "# rounded Compact targets chosen from the PP-only victuals/staples ratios.\n"
+        "# rounded Compact targets rebased with SOL's purchasing-power baskets.\n"
         "# Yearly market spending multiplies these quantities by\n"
         "# min(market_price, default_price).\n",
         1,
@@ -373,8 +373,8 @@ def _render_goods_injections(
             raise ValueError(f"victuals demand correction failed for {pop_type}: {final}")
 
     lines.extend([
-        "# Apply fixed, rounded Compact victuals targets chosen from the PP-only",
-        "# default-price spending ratios versus the six staple goods.",
+        "# Apply the Compact victuals targets rebased with SOL's baskets:",
+        "# nobles x1, clergy x2, commoners x4, and clean-rounded burghers.",
         "INJECT:victuals = {",
     ])
     victuals_threshold = _parse_development_threshold(PP_VICTUALS_FILE, "victuals")

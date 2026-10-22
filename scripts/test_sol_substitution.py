@@ -433,7 +433,7 @@ class SubstitutionTests(unittest.TestCase):
         _validate_demand_invariants(targets, q, prices, blocks)
         validate_baskets(q)
         self.assertEqual(q['salt']['peasants'], Decimal('.00001'))
-        self.assertEqual(q['tools']['laborers'], Decimal('.0005'))
+        self.assertEqual(q['tools']['laborers'], Decimal('.002'))
 
     def test_migration_rounding_preserves_small_budget_and_net_lattice(self):
         ideal = {'sugar': Decimal('.00025') / 9, 'salt': Decimal('.00025') / 12,
