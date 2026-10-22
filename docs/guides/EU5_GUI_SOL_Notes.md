@@ -29,6 +29,27 @@ $env:PYTHONUTF8='1'
 
 The `proto` JSON supports `script_values`, `gvm`, `paths`, and `scenario`; explicit mock keys override the scenario. Missing script-value mocks are reported rather than replaced with zero. The actual game remains the authority when a static render differs; record comparisons in `ai_gui_assessment/08_round2_results.md`.
 
+### Income tooltip table bounds (2026-10-23)
+
+**[User runtime screenshot + source arithmetic; corrected layout verified offline, runtime acceptance pending.]**
+The income table's columns and left spacer totaled 418 units while its gold outline and
+zebra backgrounds were 460 units wide. The screenshot's approximately 21-unit left gap
+agrees with half of that shortfall; the exact engine centering path remains inferred.
+The header and all data rows now explicitly expand across the same 460-unit content
+width with zero spacing: 6-unit padding, columns of 96/64/108/90/90 units, and 6-unit
+right padding. The last column right-aligns the arrow immediately before the annual
+percentage in one text run. Missing annual data replaces that column with a 90-unit
+placeholder, preserving the budget. The tooltip retains its native 10-unit content margins.
+The narrower estate column frees space for annual income and per-capita income, whose
+textboxes also reserve a 6-unit left gutter. Nine-digit annual income and per-capita
+values of 99999.99 retain their coin icons and fit at 11-point type in offline checks.
+
+`test_income_table_fills_content_and_stays_inside_frame` checks the shipped stable and
+standalone GUIs in Chinese and English, with and without annual data. It verifies
+intrinsic in-flow widths as well as declared rectangles, large-number ink widths, header alignment, and all row
+descendants including decorative borders. Review images are saved under
+`../../ai_gui_assessment/images/income_columns_20261023/`.
+
 ## SOL examples behind shared rules
 
 - The bare `widget` has no `sol_good_tooltip` block. SOL goods cells assign `tooltip` directly; a location hover uses `Location.GetOwner.MakeScope`, whereas country goods use the panel country. Only the location surface has a market price weight, so the generic goods tooltip keeps static membership.
@@ -86,9 +107,30 @@ $env:SOL_UI_PREVIEW_OUT='../../ai_gui_assessment/images/substitution_integration
 ### Current SOL layout decision: compact sheet C balances (2026-10-15)
 
 **User-directed design, source-backed bars, offline preview checked; new runtime confirmation pending.**
-SOL shows three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use centered signed nonlinear bars with one shared numeric ruler (-100%, -50%, 0%, +100%, +200%) above the estate rows. Every track keeps two short minor ticks and a fixed two-unit-wide zero line. Labels, tracks and right-aligned values share columns. Estate rows are 42 units high with 18-point percentages and an 11-point gray funds / baseline pair underneath; its bilingual tooltip explains the ordering. The 64-unit total row has a faint gold background and one-unit gold outline, a 12-unit bar (estate bars: 8), and a 24-point percentage. No numeric scale is repeated inside individual rows. The negative fill uses `1-q²` for funds/base `q` in 0..1, with cursor position `q²/2`; positive raw balance `c=q-1` uses `c(4-c)/4` in 0..2, with cursor position `1/2 + fill/2`. Zero funds reaches -100%, baseline reaches centered 0%, and three times baseline reaches +200%. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
+SOL shows three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use centered signed bars with a linear scale on each side of zero and one shared numeric ruler (-100%, -50%, 0%, +100%, +200%) above the estate rows. Every track keeps two short minor ticks and a fixed two-unit-wide zero line. Labels, tracks and right-aligned values share columns. Estate rows are 42 units high with 18-point percentages and an 11-point gray funds / baseline pair underneath; its bilingual tooltip explains the ordering. The 64-unit total row has a faint gold background and one-unit gold outline, a 12-unit bar (estate bars: 8), and a 24-point percentage. No numeric scale is repeated inside individual rows. For funds/base `q` in 0..1, negative fill is `1-q` and cursor position is `q/2`; positive raw balance `c=q-1` in 0..2 uses fill `c/2` and cursor position `1/2+c/4`. Zero funds reaches -100%, baseline reaches centered 0%, and three times baseline reaches +200%. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
 
-All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Current bilingual previews are in ../../ai_gui_assessment/images/compact_balances_20261015/; these use mock data, and new in-game confirmation is pending.
+All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Current bilingual previews are in ../../ai_gui_assessment/images/purchasing_power_fix_20261022/linear/; these use mock data, and new in-game confirmation is pending.
+
+### Purchasing-power axis correction (2026-10-22)
+
+**[Runtime screenshot + generator source; corrected layout checked offline, in-game acceptance pending.]**
+The screenshot exposed a ruler shifted to the right, labels using a linear negative branch,
+and positive labels/ticks using half the fill's raw input. The shared generator now places
+the ruler in a fixed full-width row at the same explicit column origin as every track.
+The suspected runtime handling of the former unsized hbox spacer remains an inference;
+the replacement does not depend on it. After the user's subsequent request for linear halves, the ruler, ticks, fill and cursor
+use one piecewise-linear mapping: -100%, -50%, 0%, +100%, +200% are at 0%, 25%, 50%, 75%,
+100% of track width. Zero stays centered while -50% and +100% bisect their respective halves.
+Endpoint labels stay centered on the ends; 10-point labels have 40-unit text boxes above
+the 244-unit track within the 500-unit row. Values retain their right edge and full raw values.
+Minor ticks, zero line, cursor and fill share a vertical center. With no baseline,
+both fills are empty and the cursor stays at 0%, including the 0 / 0 case.
+
+`gen_sol_ls_gui.py` and its HUD consumer regenerate stable/standalone, country/location
+surfaces, and PP/JTG overrides together; M&T inherits the base UI. Bilingual layout
+regressions compare all labels and ticks with the linear fill, cover its endpoints and
+no-consumption state, and save review images under
+`../../ai_gui_assessment/images/purchasing_power_fix_20261022/linear/`.
 
 ### Sheet C goods tooltips (2026-10-15)
 

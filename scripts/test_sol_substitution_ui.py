@@ -296,6 +296,10 @@ class SubstitutionUI(unittest.TestCase):
                     labels = ruler[0].children
                     self.assertEqual([e.props['raw_text'] for e in labels],
                                      ['-100%', '-50%', '0%', '+100%', '+200%'])
+                    # Each half is linear: -50% and +100% bisect their halves.
+                    for label, fraction in zip(labels, (0, .25, .5, .75, 1)):
+                        self.assertAlmostEqual(label.x + label.w / 2,
+                                               ruler[0].x + fraction * ruler[0].w, delta=.5)
                     for left, right in zip(labels, labels[1:]):
                         self.assertLessEqual(left.x + left.w, right.x)
                     rows = [e for e in elements if e.props.get('name') == 'sol_balance_total_row'
@@ -325,6 +329,9 @@ class SubstitutionUI(unittest.TestCase):
                         minors = [e for e in descendants if str(e.props.get('name', '')).startswith('sol_balance_minor_tick_')]
                         self.assertEqual(len(minors), 2)
                         self.assertTrue(all(e.w == 1 for e in minors))
+                        for tick, label in zip(minors, (labels[1], labels[3])):
+                            self.assertAlmostEqual(tick.x + tick.w / 2,
+                                                   label.x + label.w / 2, delta=.5)
                         self.assertAlmostEqual(track.x, ruler[0].x)
                         self.assertAlmostEqual(track.w, ruler[0].w)
                         self.assertAlmostEqual(labels[2].x + labels[2].w / 2, zero.x + zero.w / 2)
@@ -332,6 +339,8 @@ class SubstitutionUI(unittest.TestCase):
                                             ('-100%', '-50%', '0%', '+100%', '+200%') for e in descendants))
                         bars = [e for e in descendants if e.kind == 'progressbar']
                         self.assertEqual([e.h for e in bars], [12, 12] if index == 0 else [8, 8])
+                        for tick in minors + [zero]:
+                            self.assertAlmostEqual(tick.y + tick.h / 2, bars[0].y + bars[0].h / 2)
                         for child in descendants:
                             if eng.visible(child) and child.w > 0:
                                 self.assertGreaterEqual(child.x, row.x)
@@ -346,7 +355,7 @@ class SubstitutionUI(unittest.TestCase):
                         preview.save(self.out / f'balances_{surface}_{language}.png')
                     self.assertFalse(log, log)
 
-    def test_nonlinear_capacity_bar_and_cursor(self):
+    def test_linear_capacity_bar_and_cursor(self):
         from gen_sol_ls_gui import balance_cursor, capacity_bar, f_capacity_components, f_coef
         for position in (0, .166667, .333333, .5, .666667, .833333, 1):
             eng, log = self.engine([])
@@ -367,7 +376,7 @@ class SubstitutionUI(unittest.TestCase):
             self.assertEqual(values, [min(1, max(0, position)), min(1, max(0, position))])
             self.assertEqual(progresses[0].props['max'], '1')
             self.assertFalse(log, log)
-        # The signed bar maps ratio q=funds/baseline through smooth curves:
+        # The signed bar maps ratio q=funds/baseline linearly within each half:
         # q=0 -> -100%, q=1 -> 0%, q=3 -> +200%.
         eng, log = self.engine([
             (r"Test.ScriptValue\('funds'\)", 0), (r"Test.ScriptValue\('need'\)", 1),
@@ -377,18 +386,28 @@ class SubstitutionUI(unittest.TestCase):
         self.assertEqual(eng.resolve(f"[{positive}]"), 0)
         self.assertEqual(eng.resolve(f"[{position}]"), 0)
         self.assertFalse(log, log)
-        for funds, expected in ((1, 0), (2, .75), (3, 1), (6, 1)):
+        for funds, expected_negative, expected_positive, expected_position in (
+            (.25, .75, 0, .125), (.5, .5, 0, .25), (.75, .25, 0, .375),
+            (1, 0, 0, .5), (1.5, 0, .25, .625), (2, 0, .5, .75), (2.5, 0, .75, .875),
+            (3, 0, 1, 1), (6, 0, 1, 1),
+        ):
             eng, log = self.engine([
                 (r"Test.ScriptValue\('funds'\)", funds), (r"Test.ScriptValue\('need'\)", 1),
             ])
             negative, positive, position = f_capacity_components('Test', 'funds', 'need')
-            self.assertAlmostEqual(eng.resolve(f"[{negative}]"), 0)
-            self.assertAlmostEqual(eng.resolve(f"[{positive}]"), expected)
+            self.assertAlmostEqual(eng.resolve(f"[{negative}]"), expected_negative)
+            self.assertAlmostEqual(eng.resolve(f"[{positive}]"), expected_positive)
+            self.assertAlmostEqual(eng.resolve(f"[{position}]"), expected_position)
             self.assertFalse(log, log)
         # Raw alpha is neutral for a baseline-free estate.
-        eng, log = self.engine([(r"Test.ScriptValue\('funds'\)", 5), (r"Test.ScriptValue\('need'\)", 0)])
-        self.assertEqual(eng.resolve(f"[{f_coef('Test', 'funds', 'need')}]"), 0)
-        self.assertFalse(log, log)
+        for funds in (0, 5):
+            eng, log = self.engine([(r"Test.ScriptValue\('funds'\)", funds), (r"Test.ScriptValue\('need'\)", 0)])
+            self.assertEqual(eng.resolve(f"[{f_coef('Test', 'funds', 'need')}]"), 0)
+            negative, positive, position = f_capacity_components('Test', 'funds', 'need')
+            self.assertEqual(eng.resolve(f"[{negative}]"), 0)
+            self.assertEqual(eng.resolve(f"[{positive}]"), 0)
+            self.assertEqual(eng.resolve(f"[{position}]"), .5)
+            self.assertFalse(log, log)
 
     def test_goods_tooltip_preserves_vanilla_and_packages_both_targets(self):
         vanilla = VANILLA_GUI.read_text(encoding='utf-8-sig')

@@ -5,6 +5,7 @@ Set SOL_LSHUD_PREVIEW_OUT to retain the badge and tooltip review images.
 """
 import importlib.util
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -96,10 +97,12 @@ class LivingStandardHUD(unittest.TestCase):
             return dict(fixtures.PLAYER_VARS, **overrides)[match[1]]
 
         four_state = {"_rank2": "", "_yoy_pending": "", "_rank_yoy_pending": "_rank_pending"}.get(state, state)
-        mocks = four_design.mocks(four_state) + [
+        # Per-test visibility switches must precede the design's default values.
+        mocks = [
             (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", enabled),
             (r"LeftView\.IsShown", left_shown),
             (r"LeftView\.IsSideAttached", left_attached),
+        ] + four_design.mocks(four_state) + [
             (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
             (r"Player\.MakeScope\.GetVariable\('sol_ls_(rank|tier)'\)\.IsSet", ready and not rank_pending),
             (r"Player\.MakeScope\.GetVariable\('sol_ls_pci_yoy'\)\.IsSet", yoy_ready),
@@ -130,14 +133,103 @@ class LivingStandardHUD(unittest.TestCase):
         self.assertEqual(LOC.keys(), LOC_ENGLISH.keys())
 
     def test_disabled_sol_hides_the_row(self):
-        eng, *_ = self.context("stable", "simp_chinese", "", enabled=0)
-        self.assertFalse(list(visible_walk(eng, root)))
+        eng, _ex, root, *_ = self.context("stable", "simp_chinese", "", enabled=0)
+        self.assertFalse(any(visible_walk(eng, root)))
 
     def test_leftrow_hides_when_left_panel_is_open_or_ui_is_disabled(self):
         for shown, attached, enabled in ((True, False, 1), (False, True, 1), (False, False, 0)):
             with self.subTest(shown=shown, attached=attached, enabled=enabled):
-                eng, *_ = self.context("stable", "simp_chinese", "", enabled, shown, attached)
-                self.assertFalse(list(visible_walk(eng, root)))
+                eng, _ex, root, *_ = self.context("stable", "simp_chinese", "", enabled, shown, attached)
+                self.assertFalse(any(visible_walk(eng, root)))
+
+    def test_purchasing_power_tooltip_axis(self):
+        for target in self.databases:
+            for language in ("simp_chinese", "english"):
+                with self.subTest(target=target, language=language):
+                    eng, ex, _root, row, *_ = self.context(target, language, "")
+                    section = next(e for e in hud.walk(row)
+                                   if e.props.get("name") == "sol_lshud4_section_2")
+                    tip = ex.build_lazy(section.tooltipwidget)
+                    width, height = eng.measure(tip, None)["hint"]
+                    eng.place(tip, 12, 12, width, height)
+                    elements = list(visible_walk(eng, tip))
+                    ruler = next(e for e in elements if e.props.get("name") == "sol_balance_scale")
+                    tracks = [e for e in elements if e.props.get("name") == "sol_balance_track"]
+                    self.assertEqual(len(tracks), 6)
+                    for track in tracks:
+                        self.assertEqual((track.x, track.w), (ruler.x, ruler.w))
+                    for label, fraction in zip(ruler.children, (0, .25, .5, .75, 1)):
+                        self.assertAlmostEqual(label.x + label.w / 2,
+                                               tracks[0].x + fraction * tracks[0].w, delta=.5)
+                    image = Image.new("RGBA", (int(width + 24), int(height + 24)), (40, 52, 46, 255))
+                    eng.render(tip, image)
+                    self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
+                    self.assertFalse([entry for entry in eng.ev.log if "sol_substitute_" not in entry], eng.ev.log)
+                    if self.out:
+                        image.save(self.out / f"{target}_{language}_power.png")
+
+    def test_income_table_fills_content_and_stays_inside_frame(self):
+        for target in self.databases:
+            for language in ("simp_chinese", "english"):
+                for annual, late_income in ((True, False), (False, False), (True, True)):
+                    with self.subTest(target=target, language=language, annual=annual, late_income=late_income):
+                        eng, ex, _root, row, *_ = self.context(target, language, "")
+                        eng.ev.mocks.insert(0, (re.compile(
+                            r"Player\.MakeScope\.GetVariable\('sol_ls_pci_yoy(?:_\w+)?'\)\.IsSet"
+                        ), annual))
+                        if late_income:
+                            values = {'sol_ls_income_all': 999999999, 'sol_ls_pci': 99999.99}
+                            for estate in ('nobles', 'clergy', 'burghers', 'commoners', 'tribesmen'):
+                                values[f'sol_ls_income_{estate}'] = 99999999
+                                values[f'sol_ls_pci_{estate}'] = 99999.99
+                            eng.ev.mocks[:0] = [
+                                (re.compile(re.escape(f"Player.MakeScope.GetVariable('{key}').GetValue")), value)
+                                for key, value in values.items()
+                            ]
+                        section = next(e for e in hud.walk(row)
+                                       if e.props.get("name") == "sol_lshud4_section_1")
+                        tip = ex.build_lazy(section.tooltipwidget)
+                        width, height = eng.measure(tip, None)["hint"]
+                        eng.place(tip, 12, 12, width, height)
+                        elements = list(visible_walk(eng, tip))
+                        header = next(e for e in elements
+                                      if e.props.get("name") == "sol_lshud4_income_header")
+                        rows = [e for e in elements if e.kind == 'hbox'
+                                and str(e.props.get("name", "")).startswith("sol_lshud4_income_")
+                                and e.props.get("name") not in ("sol_lshud4_income_header", "sol_lshud4_income_hero")]
+                        self.assertGreaterEqual(len(rows), 2)
+                        header_cells = [c for c in eng.layout_children(header) if c.kind == 'textbox']
+                        for table_row in [header, *rows]:
+                            # A fixed parent rectangle hid this 418-vs-460 mismatch
+                            # in the old preview. Check the in-flow width as well.
+                            children = eng.layout_children(table_row)
+                            intrinsic_width = sum(eng.measure(c, None)['hint'][0] for c in children)
+                            intrinsic_width += float(table_row.props.get('spacing', 0)) * (len(children) - 1)
+                            self.assertAlmostEqual(intrinsic_width, table_row.w)
+                            self.assertAlmostEqual(table_row.x, header.x)
+                            self.assertGreaterEqual(table_row.x, tip.x + 10)
+                            self.assertLessEqual(table_row.x + table_row.w, tip.x + tip.w - 10)
+                            cells = [c for c in children if c.kind == 'textbox']
+                            for cell, label in zip(cells[:4], header_cells[:4]):
+                                self.assertEqual((cell.x, cell.w), (label.x, label.w))
+                            if table_row is not header:
+                                # Large incomes must remain legible with their coin
+                                # icons and leave a gutter before the adjacent column.
+                                for cell in cells[2:4]:
+                                    left, _, right, _ = eng.margins(cell)
+                                    self.assertGreaterEqual(left, 6)
+                                    ink = eng.richtext(cell, size_override=11)
+                                    self.assertLessEqual(ink.width, cell.w - left - right)
+                            for child in visible_walk(eng, table_row):
+                                if child.w > 0:
+                                    self.assertGreaterEqual(child.x, table_row.x)
+                                    self.assertLessEqual(child.x + child.w, table_row.x + table_row.w)
+                        image = Image.new("RGBA", (int(width + 24), int(height + 24)), (40, 52, 46, 255))
+                        eng.render(tip, image)
+                        self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
+                        if self.out:
+                            suffix = 'late_income' if late_income else ('annual' if annual else 'no_annual')
+                            image.save(self.out / f"{target}_{language}_income_{suffix}.png")
 
     def test_four_section_row_and_tooltip_states(self):
         for target in self.databases:

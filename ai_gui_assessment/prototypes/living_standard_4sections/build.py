@@ -316,32 +316,36 @@ widget = {{
 # ------------------------------------------------------------------ tooltip 1: income
 def tooltip_income():
     w = W_INCOME
-    cols = (96, 72, 86, 66, 26, 66)   # estate, pop, income, pci, arrow, yoy
+    padding = 6
+    cols = (96, 64, 108, 90)   # estate, pop, income, pci
+    # In-flow columns and padding must fill the same width as the decorations.
+    cols = (*cols, w - 2 * padding - sum(cols))   # arrow + yoy
 
     def row(label, pop, income, pci, yoy_var, cls_var, name, hero=False, alt=False):
         deco = outline(w, 30) if hero else (zebra(w, 26) if alt else "")
         h = 30 if hero else 26
         fs = 15 if hero else 13
         return f"""
-				hbox = {{ name = "{name}" size = {{ {w} {h} }} {'' if hero else f'visible = "{estate_visible(label)}"'}
+				hbox = {{ name = "{name}" size = {{ {w} {h} }} layoutpolicy_horizontal = expanding spacing = 0 {'' if hero else f'visible = "{estate_visible(label)}"'}
 					{deco}
-					widget = {{ size = {{ 6 1 }} }}
+					widget = {{ size = {{ {padding} 1 }} }}
 					{text('SOL_LSHUD4_NATION' if hero else 'SOL_ESTATE_' + label.upper(), cols[0], h, fs=fs, font='Font_Type_Headers' if hero else None)}
 					{text(f"[{V(pop)}|0]", cols[1], h, fs=fs, align='right|nobaseline', raw=True)}
-					{text(f"[{V(income)}|0] @gold!", cols[2], h, fs=fs, align='right|nobaseline', raw=True)}
-					{text(f"[{V(pci)}|2]", cols[3], h, fs=fs, align='right|nobaseline', fmt='#high', raw=True)}
-					{text(trend_select('SOL_LSHUD_TREND_ICON', cls_var), cols[4], h, fs=fs, align='right|nobaseline', visible=f"[{IS(yoy_var)}]")}
-					{text(f"[{V(yoy_var)}|+=1%]", cols[5], h, fs=fs, align='right|nobaseline', raw=True, visible=f"[{IS(yoy_var)}]")}
-					{text('SOL_LSHUD4_DASH', cols[4] + cols[5], h, fs=fs, align='right|nobaseline', fmt='#weak', visible=f"[Not({IS(yoy_var)})]")}
+					{text(f"[{V(income)}|0] @gold!", cols[2], h, fs=fs, align='right|nobaseline', raw=True, extra='margin_left = 6')}
+					{text(f"[{V(pci)}|2] @gold!", cols[3], h, fs=fs, align='right|nobaseline', fmt='#high', raw=True, extra='margin_left = 6')}
+					{text(f"{trend_select('SOL_LSHUD_TREND_ICON', cls_var)} [{V(yoy_var)}|+=1%]", cols[4], h, fs=fs, align='right|nobaseline', raw=True, visible=f"[{IS(yoy_var)}]")}
+					{text('SOL_LSHUD4_DASH', cols[4], h, fs=fs, align='right|nobaseline', fmt='#weak', visible=f"[Not({IS(yoy_var)})]")}
+					widget = {{ size = {{ {padding} 1 }} }}
 				}}"""
 
     head = " ".join([
-        "widget = { size = { 6 1 } }",
+        f"widget = {{ size = {{ {padding} 1 }} }}",
         text('SOL_LSHUD4_COL_ESTATE', cols[0], 18, fs=11, fmt='#weak'),
         text('SOL_LSHUD4_COL_POP', cols[1], 18, fs=11, fmt='#weak', align='right|nobaseline'),
         text('SOL_LSHUD4_COL_INCOME', cols[2], 18, fs=11, fmt='#weak', align='right|nobaseline'),
         text('SOL_LSHUD4_COL_PCI', cols[3], 18, fs=11, fmt='#weak', align='right|nobaseline'),
-        text('SOL_LSHUD4_COL_YOY', cols[4] + cols[5], 18, fs=11, fmt='#weak', align='right|nobaseline'),
+        text('SOL_LSHUD4_COL_YOY', cols[4], 18, fs=11, fmt='#weak', align='right|nobaseline'),
+        f"widget = {{ size = {{ {padding} 1 }} }}",
     ])
     estates = "".join(row(e, f"sol_ls_pop_{e}", f"sol_ls_income_{e}", f"sol_ls_pci_{e}", f"sol_ls_pci_yoy_{e}",
                           f"sol_ls_pci_yoy_class_{e}", f"sol_lshud4_income_{e}", alt=i % 2 == 0)
@@ -373,7 +377,7 @@ def tooltip_income():
 				{text('SOL_LSHUD4_PREV_LINE', w, 18, fs=12, fmt='#weak', visible=f"[{IS('sol_ls_pci_yoy')}]")}
 				widget = {{ size = {{ 1 6 }} }}
 				{section_title('SOL_LSHUD4_T1_TABLE', w)}
-				hbox = {{ size = {{ {w} 18 }} {head} }}
+				hbox = {{ name = "sol_lshud4_income_header" size = {{ {w} 18 }} layoutpolicy_horizontal = expanding spacing = 0 {head} }}
 {row('nobles', 'sol_ls_pop_all', 'sol_ls_income_all', 'sol_ls_pci', 'sol_ls_pci_yoy', 'sol_ls_pci_yoy_class', 'sol_lshud4_income_nation', hero=True)}
 {estates}
 				widget = {{ size = {{ 1 6 }} }}
