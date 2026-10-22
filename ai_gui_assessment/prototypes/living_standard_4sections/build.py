@@ -444,7 +444,7 @@ def tooltip_rank():
 					{text('[Country.GetNameWithNoTooltip]', 150, 24, fmt='#high' if me else None, raw=True)}
 					{bar(rel, 160, 8, 'gold' if me else 'steel')}
 					expand = {{}}
-					{text(f"[{V('sol_ls_pci', 'Country')}|2]", 60, 24, align='right|nobaseline', raw=True)}
+					{text(f"[{V('sol_ls_pci', 'Country')}|2] @gold!", 60, 24, align='right|nobaseline', raw=True)}
 					widget = {{ size = {{ 4 1 }} }}
 				}}"""
 
@@ -468,12 +468,12 @@ def tooltip_rank():
 					{zebra(w, 26) if i % 2 == 0 else ''}
 					widget = {{ size = {{ 2 1 }} }}
 					{text('SOL_ESTATE_' + e.upper(), cols[0], 26, fs=13)}
-					{text(f"[{V('sol_ls_pci_' + e)}|2]", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True)}
+					{text(f"[{V('sol_ls_pci_' + e)}|2] @gold!", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True)}
 					{text(f'SOL_LSHUD4_ESTATE_RANK_{e.upper()}', cols[2], 26, fs=13, align='right|nobaseline', visible=f'[{ranked}]')}
 					{text('SOL_LSHUD4_DASH', cols[2], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f'[Not({ranked})]')}
 					widget = {{ size = {{ {cols[3]} 26 }} widget = {{ size = {{ {cols[3] - 8} 8 }} position = {{ 4 9 }} {bar(f"FixedPointToFloat({V('sol_ls_percentile_' + e)})", cols[3] - 8, 8)} }} }}
 					widget = {{ size = {{ {cols[4]} 26 }} visible = "[GetGlobalVariable('sol_ls_top_1_{e}').IsSet]"
-						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_pci_' + e)}|1]", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
+						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_pci_' + e)}|1] @gold!", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
 					}}
 				}}"""
 
