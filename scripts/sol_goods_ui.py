@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sol_goods_order import GROUP_ORDER, GROUP_MEMBERS, GROUP_TIERS, PRIMARY_GROUP  # noqa: E402
 from sol_substitution import CORE  # noqa: E402
 
-# Goods support @good! through engine registration. These standalone widgets need
-# a fixed footprint and positioned substitution markers; use their standard DDS.
+# Goods use fixed-size DDS widgets; substitution levels use native inline icons
+# in a separate row below them.
 ICON_DIR = "gfx/interface/icons/trade_goods"
 
 # Full and dim icons are mutually exclusive. A translucent copy drawn over an
@@ -41,11 +41,19 @@ DIM_ALPHA = "0.3"
 # Six 18px icons + five 1px gaps + two 4px margins fit a 122px card.
 # Four cards + three 4px gaps give a 500px content column on both surfaces.
 ICON_W = 18
+GOOD_CELL_H = 36
+GROUP_CARD_H = 66
 LOCATION_CARD_W = 122
 COUNTRY_CARD_W = 122
 LOCATION_ICONS_PER_ROW = 6
 COUNTRY_ICONS_PER_ROW = 6
 GOODS_CONTENT_W = 500
+
+SUBSTITUTION_LEVEL_ICONS = (
+    'arrow_malus_tier_3', 'arrow_malus_tier_2', 'arrow_malus_tier_1',
+    'price_stable',
+    'arrow_bonus_tier_1', 'arrow_bonus_tier_2', 'arrow_bonus_tier_3',
+)
 
 # Player-facing group names, [english, simp_chinese]. Kept short: the label column is
 # 80px and a long name would shrink to fontsize_min and look broken.
@@ -93,8 +101,25 @@ def _consumed_expr(variable_map: str, good: str, scope: str) -> str:
     )
 
 
+def _substitution_level_conditions(value: str) -> tuple[str, ...]:
+    """Three decreases, unchanged, three increases of the actual country multiplier.
+
+    Preserve every non-neutral direction: the weak bands extend to, but exclude,
+    1. Exact 25% and 50% changes remain in the lower-magnitude tier.
+    """
+    return (
+        f"LessThan_CFixedPoint({value}, '(CFixedPoint)0.5')",
+        f"And(GreaterThanOrEqualTo_CFixedPoint({value}, '(CFixedPoint)0.5'), LessThan_CFixedPoint({value}, '(CFixedPoint)0.75'))",
+        f"And(GreaterThanOrEqualTo_CFixedPoint({value}, '(CFixedPoint)0.75'), LessThan_CFixedPoint({value}, '(CFixedPoint)1'))",
+        f"EqualTo_CFixedPoint({value}, '(CFixedPoint)1')",
+        f"And(GreaterThan_CFixedPoint({value}, '(CFixedPoint)1'), LessThanOrEqualTo_CFixedPoint({value}, '(CFixedPoint)1.25'))",
+        f"And(GreaterThan_CFixedPoint({value}, '(CFixedPoint)1.25'), LessThanOrEqualTo_CFixedPoint({value}, '(CFixedPoint)1.5'))",
+        f"GreaterThan_CFixedPoint({value}, '(CFixedPoint)1.5')",
+    )
+
+
 def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
-    """Supply state, country substitution direction and context-specific hover data."""
+    """Supply image, separate country substitution level, and contextual hover."""
     texture = f"{ICON_DIR}/icon_goods_{good}.dds"
     country = "Location.GetOwner.MakeScope" if scope.startswith("Location.") else scope
     multiplier = f"[{country}.ScriptValue('sol_substitute_{good}_display')|2]" if good in CORE else "1.00"
@@ -110,18 +135,19 @@ def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
     tooltip = "[Localize('NEWLINE_BREAK')]".join(tooltip_lines)
     out = [
         f"{indent}widget = {{",
-        f"{indent}\tsize = {{ {ICON_W} 18 }}",
+        f"{indent}\tsize = {{ {ICON_W} {GOOD_CELL_H} }}",
         f'{indent}\ttooltip = "{tooltip}"',
-        f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center visible = "[{consumed}]" texture = "{texture}" }}',
-        f'{indent}\ticon = {{ size = {{ 100% 100% }} parentanchor = center alpha = "{DIM_ALPHA}" '
+        f'{indent}\ticon = {{ size = {{ {ICON_W} 18 }} visible = "[{consumed}]" texture = "{texture}" }}',
+        f'{indent}\ticon = {{ size = {{ {ICON_W} 18 }} alpha = "{DIM_ALPHA}" '
         f'visible = "[Not({consumed})]" texture = "{texture}" }}',
     ]
     if good in CORE:
         value = f"{country}.ScriptValue('sol_substitute_{good}_display')"
-        for op, marker in (("GreaterThan_CFixedPoint", "#G +#!"), ("LessThan_CFixedPoint", "#R -#!")):
-            out.append(f'{indent}\ttext_single = {{ size = {{ 9 10 }} autoresize = no fontsize = 11 '
-                       f'position = {{ 8 7 }} raw_text = "{marker}" '
-                       f'visible = "[And({consumed}, {op}({value}, \'(CFixedPoint)1\'))]" }}')
+        ready = f"GreaterThan_CFixedPoint({country}.ScriptValue('sol_substitute_status_display'), '(CFixedPoint)1')"
+        for icon, condition in zip(SUBSTITUTION_LEVEL_ICONS, _substitution_level_conditions(value)):
+            out.append(f'{indent}\ttext_single = {{ size = {{ {ICON_W} 18 }} autoresize = no fontsize = 14 '
+                       f'position = {{ 0 18 }} align = center|nobaseline raw_text = "@{icon}!" '
+                       f'visible = "[And({ready}, {condition})]" }}')
     out.append(f"{indent}}}")
     return out
 
@@ -138,7 +164,7 @@ def _group_row(indent: str, group: str | None, goods: list[str], variable_map: s
     location = scope.startswith("Location.")
     card_w = LOCATION_CARD_W if location else COUNTRY_CARD_W
     icons_per_row = LOCATION_ICONS_PER_ROW if location else COUNTRY_ICONS_PER_ROW
-    card_h = 48 + 19 * ((len(goods) - 1) // icons_per_row)
+    card_h = GROUP_CARD_H + (GOOD_CELL_H + 1) * ((len(goods) - 1) // icons_per_row)
     count = "'(int32)0'"
     for good in goods:
         count = f"Add_int32({count}, Select_int32({_consumed_expr(variable_map, good, scope)}, '(int32)1', '(int32)0'))"
@@ -154,7 +180,7 @@ def _group_row(indent: str, group: str | None, goods: list[str], variable_map: s
     ]
     for start in range(0, len(goods), icons_per_row):
         row = goods[start : start + icons_per_row]
-        out.append(f"{indent}\t\thbox = {{ size = {{ {len(row) * 19 - 1} 18 }} layoutpolicy_horizontal = fixed spacing = 1")
+        out.append(f"{indent}\t\thbox = {{ size = {{ {len(row) * 19 - 1} {GOOD_CELL_H} }} layoutpolicy_horizontal = fixed spacing = 1")
         for good in goods[start : start + icons_per_row]:
             out.extend(_good_cell(f"{indent}\t\t\t", good, _consumed_expr(variable_map, good, scope), scope))
         out.append(f"{indent}\t\t}}")

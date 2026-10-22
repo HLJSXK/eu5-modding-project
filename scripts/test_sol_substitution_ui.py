@@ -26,7 +26,8 @@ from data import Evaluator, Formats, Loc, TextIcons
 from engine import Engine
 from gui import Expander, GuiDB
 from pdx import parse
-from sol_goods_ui import _consumed_expr, _good_cell, render_goods_vbox, GOODS_CONTENT_W, LOCATION_CARD_W
+from sol_goods_ui import (_consumed_expr, _good_cell, render_goods_vbox, GOODS_CONTENT_W,
+                          LOCATION_CARD_W, GOOD_CELL_H, GROUP_CARD_H, SUBSTITUTION_LEVEL_ICONS)
 from sol_substitution import CORE
 from gen_sol_goods_tooltip import inject, inject_market, price_template, VANILLA_GUI, VANILLA_MARKET_GUI, PRICE_TIERS
 
@@ -149,16 +150,16 @@ class SubstitutionUI(unittest.TestCase):
             self.assertEqual(len(icons), 1)
             self.assertEqual(float(icons[0].props.get('alpha', 1)), 1 if consumed else .3)
             eng.measure(cell, None)
-            eng.place(cell, 0, 0, 20, 24)
-            img = Image.new('RGBA', (20, 24), (0, 0, 0, 255))
+            eng.place(cell, 0, 0, 18, GOOD_CELL_H)
+            img = Image.new('RGBA', (18, GOOD_CELL_H), (0, 0, 0, 255))
             eng.render(cell, img)
-            brightness = sum(ImageStat.Stat(img.convert('RGB')).mean)
+            brightness = sum(ImageStat.Stat(img.crop((0, 0, 18, 18)).convert('RGB')).mean)
             if consumed:
                 bright = brightness
             else:
                 self.assertLess(brightness, bright * .6)
             markers = [eng.text_of(e) for e in cell.children if e.kind == 'textbox' and eng.visible(e)]
-            self.assertEqual(markers, ['#R -#!'] if consumed else [])
+            self.assertEqual(markers, ['@arrow_malus_tier_1!'])
             self.assertFalse(log)
         # Compatibility-only goods remain neutral and have no substitution marker.
         eng, log = self.engine(scenarios.tooltip())
@@ -166,6 +167,52 @@ class SubstitutionUI(unittest.TestCase):
         self.assertFalse([e for e in extra.children if e.kind == 'textbox'])
         self.assertIn('1.00', eng.process(extra.props['tooltip'], raw=True))
         self.assertFalse(log)
+
+    def test_seven_substitution_levels_below_goods(self):
+        cases = (
+            (0, 'arrow_malus_tier_3'), (.49999, 'arrow_malus_tier_3'),
+            (.5, 'arrow_malus_tier_2'), (.74999, 'arrow_malus_tier_2'),
+            (.75, 'arrow_malus_tier_1'), (.99999, 'arrow_malus_tier_1'),
+            (1, 'price_stable'), (1.00001, 'arrow_bonus_tier_1'),
+            (1.25, 'arrow_bonus_tier_1'), (1.25001, 'arrow_bonus_tier_2'),
+            (1.5, 'arrow_bonus_tier_2'), (1.50001, 'arrow_bonus_tier_3'),
+            (3, 'arrow_bonus_tier_3'),
+        )
+        seen = set()
+        for scope, country, scenario in (
+            ('Location.GetMarket.MakeScope', 'Location.GetOwner.MakeScope', scenarios.tooltip),
+            ('Player.MakeScope', 'Player.MakeScope', scenarios.situation),
+        ):
+            for value, expected in cases:
+                with self.subTest(scope=scope, value=value):
+                    eng, log = self.engine([
+                        (re.escape(country) + r"\.ScriptValue\('sol_substitute_cloth_display'\)", value),
+                    ] + scenario())
+                    cell = self.cell(eng, scope=scope)
+                    eng.measure(cell, None)
+                    eng.place(cell, 0, 0, 18, GOOD_CELL_H)
+                    markers = [e for e in cell.children if e.kind == 'textbox' and eng.visible(e)]
+                    self.assertEqual([eng.text_of(e) for e in markers], [f'@{expected}!'])
+                    marker = markers[0]
+                    good = next(e for e in cell.children if e.kind == 'icon' and eng.visible(e))
+                    self.assertGreaterEqual(marker.y, good.y + good.h)
+                    self.assertEqual(marker.x + marker.w / 2, good.x + good.w / 2)
+                    self.assertLessEqual(marker.y + marker.h, cell.h)
+                    preview = Image.new('RGBA', (18, GOOD_CELL_H), (0, 0, 0, 255))
+                    eng.render(cell, preview)
+                    ink = preview.crop((0, 18, 18, GOOD_CELL_H)).convert('RGB').getbbox()
+                    self.assertIsNotNone(ink)
+                    self.assertGreaterEqual(ink[2] - ink[0], 8)
+                    seen.add(expected)
+                    self.assertFalse(log, log)
+            for status in (0, 1):
+                eng, log = self.engine([
+                    (re.escape(country) + r"\.ScriptValue\('sol_substitute_status_display'\)", status),
+                ] + scenario())
+                cell = self.cell(eng, scope=scope)
+                self.assertFalse([e for e in cell.children if e.kind == 'textbox' and eng.visible(e)])
+                self.assertFalse(log, log)
+        self.assertEqual(seen, set(SUBSTITUTION_LEVEL_ICONS))
 
     def test_country_summary_states(self):
         for status, key in ((0, 'SOL_SUB_DISABLED'), (1, 'SOL_SUB_PENDING'), (2, 'SOL_SUB_SUMMARY')):
@@ -238,7 +285,7 @@ class SubstitutionUI(unittest.TestCase):
                             self.assertGreaterEqual(child.x, -1, child.kind)
                             self.assertLessEqual(child.x + child.w, width + 1, child.kind)
                     # Every supplied group, including compatibility tails, is one icon row.
-                    cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size') == ['122', '48']]
+                    cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size') == ['122', str(GROUP_CARD_H)]]
                     self.assertGreaterEqual(len(cards), 20)
                     for card in cards:
                         cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
@@ -593,7 +640,7 @@ class SubstitutionUI(unittest.TestCase):
             cards = [e for e in walk(root) if any(str(c.props.get('text', '')).startswith('SOL_SUBGROUP_') for c in walk(e)) and e.kind == 'vbox' and e is not root]
             for card in cards:
                 self.assertAlmostEqual(card.w, LOCATION_CARD_W)
-                self.assertAlmostEqual(card.h, 48)
+                self.assertAlmostEqual(card.h, GROUP_CARD_H)
                 cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
                 self.assertLessEqual(len(cells), 6)
                 self.assertEqual(len({round(c.y, 1) for c in cells}), 1)

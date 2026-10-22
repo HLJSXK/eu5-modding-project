@@ -293,8 +293,8 @@ UI_STRINGS = {
         "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] goods · max change [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
         "SOL_SUB_SUMMARY_TOOLTIP": "Year of the last country substitution refresh, number of eligible goods and largest absolute SOL commodity modifier. This modifier includes the external demand offset; it differs from the substitution multiplier. Market weights refresh yearly and on full recalculation.",
         "SOL_SUB_SCOPE_NOTE": "The multiplier applies country-wide; price weights come from the cached market basket.",
-        "SOL_SUB_LEGEND": "+/- substitution; dim: no supply; repeated: shared group",
-        "SOL_SUB_LEGEND_TOOLTIP": "Plus/minus marks a country substitution multiplier above/below 1. Dim icons indicate no cached supply. Goods in multiple groups appear in each group; this does not count their spending twice.",
+        "SOL_SUB_LEGEND": "Below goods: substitution level; dim: no supply; repeated: shared group",
+        "SOL_SUB_LEGEND_TOOLTIP": "The icon below each good shows one of seven country substitution levels: three decreases, unchanged, and three increases. Levels appear after the country calculation, including for locally unavailable goods. Dim goods indicate no cached supply. Goods in multiple groups appear in each group; their spending is counted only once.",
     },
     "simp_chinese": {
         "PERFORM_global_living_standard_recalculate_ACTION": "生活水平已重算",
@@ -344,8 +344,8 @@ UI_STRINGS = {
         "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] 年 · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] 种商品 · 最大修正 [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
         "SOL_SUB_SUMMARY_TOOLTIP": "最近一次国家替代刷新的年份、参与商品数与 SOL 商品修正的最大绝对幅度。修正计入外部需求影响，与替代倍率不同。市场权重按年或完整重算时更新。",
         "SOL_SUB_SCOPE_NOTE": "倍率在全国统一生效；价格权重来自缓存的市场商品篮子。",
-        "SOL_SUB_LEGEND": "+/- 替代增减 · 灰：无供应 · 重复：跨组",
-        "SOL_SUB_LEGEND_TOOLTIP": "+/- 表示国家替代倍率高于/低于 1。灰色表示缓存中无供应。跨组商品会在每个所属组内显示，消费支出仍只计一次。",
+        "SOL_SUB_LEGEND": "下排图标：替代等级 · 灰：无供应 · 重复：跨组",
+        "SOL_SUB_LEGEND_TOOLTIP": "每个商品下方的图标表示国家替代的七个等级：三级降低、不变、三级提高。国家完成计算后显示，包括本地无供应的商品；商品本体灰显仍表示缓存中无供应。跨组商品会在每个所属组内显示，消费支出仍只计一次。",
     },
 }
 

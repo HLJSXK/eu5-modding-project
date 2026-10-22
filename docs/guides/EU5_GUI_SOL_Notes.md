@@ -87,6 +87,29 @@ intrinsic in-flow widths as well as declared rectangles, large-number ink widths
 descendants including decorative borders. Review images are saved under
 `../../ai_gui_assessment/images/income_columns_20261023/`.
 
+### Separate substitution-level icon row (2026-10-23)
+
+**[User screenshot + native icon definitions; offline rendering, runtime acceptance pending.]**
+The tiny +/- corner overlay has been replaced by a separate 18-unit indicator row
+below each 18-unit goods image. Cells are 18x36 and cards are 122x66; wrapped goods
+rows advance by 37 units. This keeps the native 16-unit glyph clear of the artwork.
+The seven icons are `arrow_malus_tier_3/2/1`, `price_stable`, and
+`arrow_bonus_tier_1/2/3`, registered in vanilla `font_icons.gui:947,2084-2134`.
+The row contains icons only. Parent hover still exposes the existing country multiplier.
+
+These are seven visual bands of the actual country substitution multiplier `m`,
+not the separate market-price weights: `m<0.5`, `0.5<=m<0.75`, `0.75<=m<1`, `m=1`,
+`1<m<=1.25`, `1.25<m<=1.5`, `m>1.5`. Small changes retain their direction rather than
+being rounded to neutral. Every CORE grouped good gets its country indicator after
+initialization, including unavailable local goods, whose image remains dim. Disabled
+and pending calculations show no level; compatibility-only ungrouped goods have no
+substitution indicator. Supply counts, bars, memberships and contextual data are unchanged.
+
+The shared renderer feeds stable, standalone, PP/JTG, the HUD and country-map tooltips;
+M&T inherits the base UI. Regressions cover all seven icons and exact boundaries,
+initialization, actual visible pixels, separate row alignment and complete tooltip bounds.
+Review images are saved under `../../ai_gui_assessment/images/substitution_levels_20261023/`.
+
 ## SOL examples behind shared rules
 
 - The bare `widget` has no `sol_good_tooltip` block. SOL goods cells assign `tooltip` directly; a location hover uses `Location.GetOwner.MakeScope`, whereas country goods use the panel country. Only the location surface has a market price weight, so the generic goods tooltip keeps static membership.
@@ -113,7 +136,7 @@ descendants including decorative borders. Review images are saved under
 - **[源 + 渲染像素检查] Full and dim icons must be mutually exclusive.** Drawing an alpha-0.3 copy over an opaque icon leaves the original bright. Bind the full copy to the cached supply condition and the dim copy to its inverse; verify the pixels as well as the properties. SOL's `sol_market_consumes_*` maps record supply, so dimming means no cached supply, not a shortage or zero demand.
 - **[数据源 + 渲染检查] Labelled groups show every membership.** `goods_weights.csv` contains 56 unique goods and 67 memberships across 20 groups. `ordered()` uses the primary group to order a unique list; `group_rows()` shows an overlapping good in each of its groups. Repeated icons do not repeat spending. PP/JTG extras stay in the ungrouped tail.
 - **[官方 API + 原版源 + 离线检查] Missing market weights are pending data, not neutral prices.** Check `GetVariableFromGlobalVariableMap(...).IsSet` (data_types_script.txt:34,3427), then use `SelectLocalization` (goods_details.gui:135) to choose the location price snippet or pending text. Only the location hover has a market; country goods use `Player.MakeScope` for the multiplier and the generic goods tooltip keeps static memberships.
-- **[模组源 + 离线检查，实机悬停待验收] Show substitution lifecycle explicitly.** The guarded display value distinguishes disabled, enabled awaiting a snapshot, and initialized. Country goods show a compact refresh-year / eligible-count / largest-absolute-modifier summary; the last metric includes external demand offsets and differs from the substitution multiplier. The +/- corner markers indicate country multipliers above/below 1 only on supplied goods. Hover text explains the country scope and annual/full-refresh market cache.
+- **[模组源 + 离线检查，实机悬停待验收] Show substitution lifecycle explicitly.** The guarded display value distinguishes disabled, enabled awaiting a snapshot, and initialized. Country goods show a compact refresh-year / eligible-count / largest-absolute-modifier summary; the last metric includes external demand offsets and differs from the substitution multiplier. Each grouped good now has a native seven-level icon beneath it after country initialization, including locally unavailable goods; the goods image itself retains its supply dimming. Hover text explains the country scope and annual/full-refresh market cache.
 
 `scripts/test_sol_substitution_ui.py` reads the shipped templates and installed game assets. It checks
 all memberships, supply pixels, localized hover content, missing-cache text, lifecycle summaries, and
