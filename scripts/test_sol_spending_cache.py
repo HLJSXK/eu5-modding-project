@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class CountingRuntime(Runtime):
-    def __init__(self, rows):
-        super().__init__(rows)
+    def __init__(self, rows, *, removed_goods=()):
+        super().__init__(rows, removed_goods=removed_goods)
         self.spending_reads = 0
         self.cached_spending_reads = 0
 
@@ -28,9 +28,9 @@ class CountingRuntime(Runtime):
 
 
 class SpendingCacheTests(unittest.TestCase):
-    def fixture(self, rows=None, markets=1, locations=1):
+    def fixture(self, rows=None, markets=1, locations=1, *, removed_goods=()):
         rows = _load_good_rows() if rows is None else rows
-        rt = CountingRuntime(rows)
+        rt = CountingRuntime(rows, removed_goods=removed_goods)
         country = Scope('country')
         market_scopes = [rt.market(dict.fromkeys(CORE, 1)) for _ in range(markets)]
         for index, market in enumerate(market_scopes):
@@ -61,9 +61,9 @@ class SpendingCacheTests(unittest.TestCase):
             self.assert_spending(rows, rt, location)
         pairs = sum(round(q[pop], 5) > 0 for _, _, q in rows for pop in POPS)
         self.assertEqual(rt.spending_reads, len(markets) * pairs)
-        self.assertEqual(pairs, 215)
-        # The previous location loop performed 180 * 215 map reads here.
-        self.assertEqual(rt.spending_reads, 645)
+        self.assertEqual(pairs, 246)
+        # A location-level basket loop would perform 180 * 246 reads here.
+        self.assertEqual(rt.spending_reads, 738)
         self.assertEqual(rt.cached_spending_reads, len(country.locations) * len(POPS))
         for market in markets:
             self.assertFalse(market.local)
@@ -101,7 +101,7 @@ class SpendingCacheTests(unittest.TestCase):
         rt.run('sol_compute_substitute_unit_spending', location)
         self.assert_spending(rows, rt, location)
         self.assertNotEqual(before, location.variables['sol_unit_spending_nobles'])
-        self.assertEqual(rt.spending_reads, 215)
+        self.assertEqual(rt.spending_reads, 246)
         rt.run('sol_clear_country_substitution', country)
         self.assertFalse(any(name.startswith('sol_country_market_spending_') and target == id(markets[0]) for name, target in rt.maps))
 
@@ -128,10 +128,10 @@ class SpendingCacheTests(unittest.TestCase):
                 rt.run('sol_compute_substitute_unit_spending', location)
                 self.assert_spending(rows, rt, location)
                 self.assertNotEqual(before, location.variables['sol_unit_spending_nobles'])
-                self.assertEqual(rt.spending_reads, 215)
+                self.assertEqual(rt.spending_reads, 246)
                 # Reuse resumes after rebuilding; no country refresh is needed.
                 rt.run('sol_compute_substitute_unit_spending', location)
-                self.assertEqual(rt.spending_reads, 215)
+                self.assertEqual(rt.spending_reads, 246)
 
     def test_missing_market_or_owner_resets_all_location_totals(self):
         _, rt, country, _ = self.fixture()
@@ -160,7 +160,7 @@ class SpendingCacheTests(unittest.TestCase):
 
     def test_pp_zero_lumber_and_neutral_extra_good(self):
         from gen_sol_pp_compat import _compat_good_rows
-        rows, rt, country, markets = self.fixture(_compat_good_rows(), locations=3)
+        rows, rt, country, markets = self.fixture(_compat_good_rows(), locations=3, removed_goods={'lumber'})
         country.variables.update(sol_good_effective_cloth=.25, sol_good_effective_victuals=20)
         rt.maps[('sol_market_good_spending_nobles_lumber', id(markets[0]))] = 999
         for location in country.locations:

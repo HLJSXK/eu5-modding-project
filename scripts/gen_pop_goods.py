@@ -382,6 +382,9 @@ def generate_inject_file(
     vanilla_thresh: Dict[str, Dict],
 ) -> str:
     """Generate the complete z_SOL_pop_goods.txt text (without BOM)."""
+    from gen_whole_group_baskets import validate_target, validate_net_targets
+    validate_target(target_rows)
+    validate_net_targets(target_rows, vanilla_net)
     rows_by_good = {row.good: row for row in target_rows}
     for good, thresholds in vanilla_thresh.items():
         row = rows_by_good.get(good)

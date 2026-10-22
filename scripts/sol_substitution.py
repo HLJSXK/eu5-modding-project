@@ -5,7 +5,6 @@ neutral basket. No Engel/development/era/scarcity scale is restored.
 """
 from __future__ import annotations
 
-import csv
 import json
 import sys
 from pathlib import Path
@@ -13,17 +12,16 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from gen_whole_group_baskets import (  # noqa: E402
+    CORE, GROUPS, POPS, SUBSCRIBED, groups_for_pop, read_quantities, validate_baskets,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = json.loads((ROOT / "data/substitute_groups.json").read_text(encoding="utf-8"))
-POPS = ("nobles", "clergy", "burghers", "laborers", "peasants", "soldiers", "tribesmen")
-GROUPS: dict[str, list[str]] = {}
-with (ROOT / "data/goods_weights.csv").open(encoding="utf-8-sig", newline="") as handle:
-    for row in csv.DictReader(handle):
-        GROUPS.setdefault(row["group"], []).append(row["good"])
-CORE = sorted({good for members in GROUPS.values() for good in members})
 assert len(CORE) == 56 and len(GROUPS) == 20
 assert set(GROUPS) == set(CONFIG["historical_sizes"])
 assert CONFIG["algorithm"] == "A" and CONFIG["preference"] == 1 and CONFIG["epsilon"] == 0
+validate_baskets(read_quantities(ROOT / "data/target_demand.csv")[0], label="target_demand.csv")
 
 
 def price_weight(ratio: float) -> float:
@@ -38,7 +36,12 @@ def price_weight(ratio: float) -> float:
 
 def response(weights: dict[str, float], eligible: set[str],
              groups: dict[str, list[str]] | None = None,
-             sizes: dict[str, int] | None = None) -> dict[str, float]:
+             sizes: dict[str, int] | None = None, *,
+             pop: str | None = None, removed_goods=()) -> dict[str, float]:
+    if pop is not None:
+        if groups is not None:
+            raise ValueError("Pass either explicit groups or a pop subscription")
+        groups = groups_for_pop(pop, removed_goods)
     groups = GROUPS if groups is None else groups
     sizes = CONFIG["historical_sizes"] if sizes is None else sizes
     current = {good: 0. for good in weights}
@@ -147,8 +150,8 @@ def render_values() -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_country_runtime(rows) -> str:
-    quantities = {good: q for good, _, q in rows if good in CORE}
+def render_country_runtime(rows, *, removed_goods=()) -> str:
+    validate_baskets({good: q for good, _, q in rows}, removed_goods=removed_goods, label="runtime")
     # Record the first invalidation, without logging every country every month.
     def dirty(reason: int) -> str:
         cleanup = " ".join(f"remove_variable = sol_sub_perf_{field}" for field in
@@ -232,15 +235,15 @@ def render_country_runtime(rows) -> str:
                   f'\t\t\t\t"global_variable_map({supply}|scope:sol_sub_market)" > 0 scope:sol_sub_country.var:sol_sub_external_{good} > 0 }}',
                   f'\t\t\t\tset_local_variable = {{ name = sol_sub_weight_{good} value = "global_variable_map({name}|scope:sol_sub_market)" }}', "\t\t\t}"]
     for pop in POPS:
-        used = [good for good in CORE if round(quantities[good][pop], 5) > 0]
+        groups = groups_for_pop(pop, removed_goods)
+        used = sorted({good for members in groups.values() for good in members})
         if not used:
             continue
         lines.append(f"\t\t\tif = {{ limit = {{ local_var:sol_sub_population_{pop} > 0 }}")
         for good in used:
             lines += [f"\t\t\t\tset_local_variable = {{ name = sol_sub_current_{good} value = 0 }}",
                       f"\t\t\t\tset_local_variable = {{ name = sol_sub_neutral_{good} value = 0 }}"]
-        for group, members in GROUPS.items():
-            active = [good for good in members if good in used]
+        for group, active in groups.items():
             if not active:
                 continue
             size = CONFIG["historical_sizes"][group]

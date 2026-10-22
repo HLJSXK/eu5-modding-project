@@ -400,6 +400,11 @@ def _compat_quantities(
             "tools laborer compatibility quantity must be 0.0005, got "
             f"{quantities['tools']['laborers']}"
         )
+    from gen_whole_group_baskets import groups_for_pop, validate_baskets
+    for pop_type in POP_TYPES:
+        for good in {good for members in groups_for_pop(pop_type).values() for good in members}:
+            quantities[good][pop_type] = max(QUANTUM, quantities[good][pop_type])
+    validate_baskets(quantities, label="M&T calibrated basket")
     return quantities
 
 
@@ -478,7 +483,8 @@ def _validate_demand_invariants(
         mnt_price = _default_price(goods_blocks[good].body, good)
         for pop_type in POP_TYPES:
             ideal = target[pop_type] * vanilla_prices[good] / mnt_price
-            if abs(quantities[good][pop_type] - ideal) > QUANTUM / 2:
+            expected = max(QUANTUM, _round_quantity(ideal)) if target[pop_type] > 0 else Decimal(0)
+            if quantities[good][pop_type] != expected:
                 raise ValueError(f"Rounded compatibility quantity is out of range: {good}/{pop_type}")
 
     grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
@@ -493,6 +499,10 @@ def _validate_demand_invariants(
             quantities[good][pop_type] * grain_prices[good] for good in GRAINS
         )
         max_rounding_drift = sum(grain_prices.values()) * QUANTUM / 2
+        if 0 < sol_spending < sum(grain_prices.values()) * QUANTUM:
+            # Minimum positive quantities may exceed nearest rounding by half
+            # a quantum; all subscribed grain members must still survive.
+            max_rounding_drift = sum(grain_prices.values()) * QUANTUM
         if abs(sol_spending - compat_spending) > max_rounding_drift:
             raise ValueError(f"Grain spending drift exceeds fixed-point rounding for {pop_type}")
 

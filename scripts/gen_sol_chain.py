@@ -73,6 +73,7 @@ def main() -> None:
     targets = _resolve_targets(args.target)
     mode_args = ["--check"] if args.check else []
 
+    _run(["scripts/gen_whole_group_baskets.py", "--check"])
     if not args.check:
         _run(["scripts/update_mod_version.py", "--target", args.target])
 

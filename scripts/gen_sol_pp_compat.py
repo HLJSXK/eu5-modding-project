@@ -464,7 +464,7 @@ def _render_effects(rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
         block = _find_named_block_in_text(text, key, str(STABLE_EFFECTS))
         lines.extend(["", f"REPLACE:{key} = {{", block, "}"])
     lines.append("")
-    runtime = render_country_runtime(rows).replace("\nsol_", "\nREPLACE:sol_")
+    runtime = render_country_runtime(rows, removed_goods={"lumber"}).replace("\nsol_", "\nREPLACE:sol_")
     return "\n".join(lines) + runtime + render_location_spending(rows, replace=True)
 
 

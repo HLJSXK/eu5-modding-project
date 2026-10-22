@@ -47,8 +47,8 @@ class PerformanceTests(unittest.TestCase):
     def test_multimarket_mixed_strata_matches_location_oracle(self):
         from gen_sol_pp_compat import _compat_good_rows
         rng = random.Random(20261015)
-        for rows in (_load_good_rows(), _compat_good_rows()):
-            rt = Runtime(rows)
+        for rows, removed in ((_load_good_rows(), ()), (_compat_good_rows(), {'lumber'})):
+            rt = Runtime(rows, removed_goods=removed)
             country = Scope('country', external={g: rng.choice((-1.5, -.75, 0., .125)) for g in CORE})
             weights = [{g: rng.choice((.25, .5, .75, 1., 1.25, 1.5, 2.)) for g in CORE} for _ in range(3)]
             supplied = [{g for g in CORE if rng.random() > .2} for _ in weights]
@@ -64,7 +64,7 @@ class PerformanceTests(unittest.TestCase):
                     eligible = {g for g in CORE if q[g][pop] > 0 and g in supplied[m]
                                 and 1 + country.external[g] > 0}
                     bases.append({g: pops[pop] * q[g][pop] * prices[g] for g in eligible})
-                    responses.append(response(weights[m], eligible))
+                    responses.append(response(weights[m], eligible, pop=pop, removed_goods=removed))
             # An owned location without a market contributes no basket weight.
             country.locations.append(Scope('location', owner=country, pops=dict.fromkeys(POPS, 999.)))
             expected = aggregate(bases, responses)
