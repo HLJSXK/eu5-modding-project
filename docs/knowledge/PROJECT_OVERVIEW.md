@@ -110,7 +110,8 @@ eu5-modding-project/
 |       |       `-- scripted_widgets/
 |       `-- main_menu/
 |           |-- gfx/interface/icons/    generated SOL icon targets for shared UI, map modes, modifier types, and situations
-|           |-- gui/                   generated vanilla + SOL messagetypes.txt database and the goods-details override with the SOL substitute-group section
+|           |-- gui/                   goods-details override with the SOL substitute-group section
+|           |   `-- messagetypes/       additive SOL_messages.txt containing only SOL's recalculation message (EU5 1.4.3)
 |           |-- common/
 |           |   |-- modifier_icons/      SOL modifier-type icon mappings
 |           |   |-- modifier_type_definitions/ generated flat and percent location SOL modifier types
@@ -127,7 +128,7 @@ eu5-modding-project/
 |       `-- main_menu/
 |           |-- common/                 SOL modifier icons and static modifiers
 |           |-- gfx/interface/icons/    shared generated SOL icon DDS targets
-|           |-- gui/                    generated vanilla + SOL messagetypes.txt database
+|           |-- gui/messagetypes/        additive SOL_messages.txt containing only SOL's recalculation message (EU5 1.4.3)
 |           `-- localization/           SOL economy localization
 |   `-- sol_pp_compatibility_submod/     late-loading SOL / Prosper or Perish compatibility target
 |       |-- .metadata/                   compatibility metadata and SOL dependency
@@ -166,7 +167,7 @@ eu5-modding-project/
 |---|---|---|
 | `update_mod_version.py` | Automatically before every `build.bat` deployment; may also be run manually with `--target` and `--date` | Selected target metadata `version` fields in `YYMMDD` form |
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all five deploy targets |
-| `gen_sol_messages.py` | After a vanilla message-database update or SOL resolution message changes; called by gen_sol_chain.py | Fixed-path main_menu/gui/messagetypes.txt for stable/standalone, preserving all current vanilla types and adding the SOL recalculation type; same-path third-party definitions require a compatibility merge |
+| `gen_sol_messages.py` | After SOL resolution message changes; called by gen_sol_chain.py; supports --check | Additive main_menu/gui/messagetypes/SOL_messages.txt for stable/standalone with only SOL's recalculation type; checks every vanilla message file for id collisions and rejects obsolete gui/messagetypes.txt; update mode removes only its own legacy generated file |
 | `gen_sol_pp_compat.py` | After changing SOL balance/demand/effects/UI or updating the PP reference; called by `gen_sol_chain.py` | Generated compact feature cleanup plus lumber correction, fixed rounded victuals demand/accounting, effect/GUI overrides, and the default-off PP GDP-to-development CMF opt-in with localization; also verifies that PP's road-price file still wins by same-operation filename order |
 | `gen_sol_mnt_compat.py` | After changing SOL demand/effects/UI or updating the M&T reference; called by `gen_sol_chain.py` | Generated M&T-based goods, unit-consumption values, economic authority, EPBM location caches, CMF/action overrides, merged location window, and the default-off SOL economic opt-in settings/value callbacks with localization in `src/sol_mnt_compatibility_submod/` |
 | `gen_sol_jtg_compat.py` | After changing `jtg_pop_demand.csv`, SOL demand/effects/UI, or updating the Just Goods Workshop reference; called by `gen_sol_chain.py` | Generated JTG demand corrections, unit-consumption values, two effect replacements, and both 82-good GUI overrides in `src/sol_jtg_compatibility_submod/` |
