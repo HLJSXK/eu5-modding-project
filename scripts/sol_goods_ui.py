@@ -243,7 +243,7 @@ def group_label_keys() -> list[str]:
 
 
 def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: str,
-                      *, show_supply_note: bool = True) -> str:
+                      *, show_supply_note: bool = True, show_summary: bool = True) -> str:
     """The whole goods vbox, so the compat generators rebuild it instead of patching it.
 
     The compat submods each add goods (PP adds victuals, JTG adds 26), and goods are now
@@ -257,7 +257,7 @@ def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: s
         f"{indent}\tmargin = {{ 0 2 }}",
         f"{indent}\tspacing = 4",
     ]
-    if not scope.startswith("Location."):
+    if show_summary and not scope.startswith("Location."):
         status = f"{scope}.ScriptValue('sol_substitute_status_display')"
         summary = (f"[SelectLocalization(GreaterThan_CFixedPoint({status}, '(CFixedPoint)1'), "
                    f"'SOL_SUB_SUMMARY', SelectLocalization(GreaterThan_CFixedPoint({status}, "

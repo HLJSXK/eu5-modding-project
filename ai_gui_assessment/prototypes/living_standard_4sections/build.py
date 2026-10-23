@@ -390,7 +390,6 @@ def tooltip_living_standard():
 				hbox = {{ name = "sol_lshud4_sol_header" size = {{ {w} 18 }} layoutpolicy_horizontal = expanding spacing = 0 {head} }}
 {row('nobles', 'sol_ls_pop_all', 'sol_ls_sol', 'sol_ls_sol_yoy', 'sol_ls_sol_yoy_class', 'sol_lshud4_sol_nation', hero=True)}
 {estates}
-				text_multi = {{ max_width = {w} autoresize = yes fontsize = 12 default_format = "#weak" text = "SOL_LSHUD4_T1_NOTE" }}
 			}}"""
     return tooltip("SOL_LSHUD4_tooltip_1", medallion(42, 30), "SOL_LSHUD4_T1_TITLE", "SOL_LSHUD4_T1_SUB", body,
                    wrap_subtitle=True)
@@ -430,7 +429,7 @@ def tooltip_goods():
 
     spend = "".join(spend_row(n) for n in range(1, 6))
     goods_lines = panel.goods_block(3, "SOL_GUI_SECTION_COUNTRY_GOODS", "gls_country_consumes", POWER,
-                                    panel._goods_names(), show_supply_note=False)
+                                    panel._goods_names(), show_supply_note=False, show_summary=False)
     body = f"""			vbox = {{ name = "sol_lshud4_spend" spacing = 1
 				{section_title('SOL_LSHUD4_T3_SPEND', w, text('SOL_LSHUD4_T3_SPEND_TOTAL', None, None, fs=12, fmt='#weak'))}
 				{text('SOL_LSHUD_PENDING_SHORT', w, 22, fs=13, fmt='#weak', visible=f'[Not({SPENT})]')}
@@ -502,10 +501,10 @@ def tooltip_rank():
 				text_multi = {{ max_width = {w} autoresize = yes text = "SOL_LSHUD_RANK_PENDING" }}
 			}}
 			vbox = {{ name = "sol_lshud4_rank_body" visible = "[And({READY}, {RANKED})]" spacing = 2
-				{section_title('SOL_LSHUD4_T4_NATION', w, text('SOL_LSHUD_PERCENTILE', None, None, fs=13))}
+				{section_title('SOL_LSHUD4_T4_NATION', w)}
 {nat}
 				widget = {{ size = {{ 1 8 }} }}
-				{section_title('SOL_LSHUD4_T4_ESTATES', w, text('SOL_LSHUD4_T4_ESTATES_HINT', None, None, fs=11, fmt='#weak'))}
+				{section_title('SOL_LSHUD4_T4_ESTATES', w)}
 				hbox = {{ size = {{ {w} 18 }} spacing = 4 {head} }}
 {''.join(estate_rank(i, e) for i, e in enumerate(ESTATES))}
 			}}"""
@@ -521,8 +520,8 @@ LOC = {
     "SOL_LSHUD4_DASH": "—",
     "SOL_LSHUD4_NATION": "全国",
     "SOL_LSHUD4_TIER_PENDING": "生活水平等级待 1 月 1 日排行",
-    "SOL_LSHUD4_T1_TITLE": "生活水平与同比",
-    "SOL_LSHUD4_T1_SUB": "生活水平 = 固定值之和 +（1 + 百分比之和）× 千人均年流动资金",
+    "SOL_LSHUD4_T1_TITLE": "生活水平",
+    "SOL_LSHUD4_T1_SUB": "每千人每年可自由支配的钱，反映人们手头有多宽裕。",
     "SOL_LSHUD4_T1_TABLE": "全国与各阶层",
     "SOL_LSHUD4_COL_ESTATE": "阶层",
     "SOL_LSHUD4_COL_POP": "人口(千)",
@@ -531,19 +530,17 @@ LOC = {
     "SOL_LSHUD4_COL_RANK": "世界排名",
     "SOL_LSHUD4_COL_PERCENTILE": "百分位",
     "SOL_LSHUD4_COL_BEST": "世界最高",
-    "SOL_LSHUD4_T1_NOTE": "乘数和结果最低为0，全国按人口加权。修正不改变资金或需求。同比与去年同月比较：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低。",
     "SOL_LSHUD4_T2_TITLE": "购买力",
-    "SOL_LSHUD4_T2_SUB": "可支配资金 ÷ 基准消费 − 1",
+    "SOL_LSHUD4_T2_SUB": "手里的钱够买多少基本生活所需。",
     "SOL_LSHUD4_T2_NOTE": "0% 表示刚好买得起基准消费篮子；−100% 表示没有可支配资金。顶栏显示的是全国总计。",
-    "SOL_LSHUD4_T3_TITLE": "主要支出与替代组",
+    "SOL_LSHUD4_T3_TITLE": "商品替代",
     "SOL_LSHUD4_T3_SPEND": "支出最多的商品（按总价）",
-    "SOL_LSHUD4_T3_SUB": "按月度消费总价排序 · 下方为替代组供应情况",
+    "SOL_LSHUD4_T3_SUB": "钱花在哪，缺货时改买什么。",
     "SOL_LSHUD4_T3_SPEND_TOTAL": f"全国消费 [{P}('sol_ls_spend_total').GetValue|1] @gold! / 月",
     "SOL_LSHUD4_T4_TITLE": "全球排名",
-    "SOL_LSHUD4_T4_SUB": "按生活水平数值排名，每年 1 月 1 日更新",
+    "SOL_LSHUD4_T4_SUB": "和世界各国比生活水平。",
     "SOL_LSHUD4_T4_NATION": "全国排名",
     "SOL_LSHUD4_T4_ESTATES": "各阶层排名",
-    "SOL_LSHUD4_T4_ESTATES_HINT": "与世界同阶层的生活水平比较",
     "SOL_LSHUD4_T4_NOTE": "各阶层只在拥有该阶层人口的国家之间排名。百分位条 = 超过的国家比例。",
 }
 for _e in ESTATES:
