@@ -1,7 +1,7 @@
 """Emit the annual country-cache ranking consumed by SOL's HUD badge.
 
 Countries and estates are ranked by living standard (``sol_ls_sol*``, annual
-funds per thousand people + SOL modifier), not by income or purchasing power. The world
+funds per thousand people with flat/percentage SOL bonuses), not by income or purchasing power. The world
 average is population-weighted; tiers compare a country's SOL with it.
 
 The census and sorted pass read country variables only. Neighbour links are

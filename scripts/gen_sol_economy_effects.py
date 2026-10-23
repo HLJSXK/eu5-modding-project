@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate SOL economy effects, country solver, values and gameplay feedback modifiers.
+"""Generate SOL economy, solver, values, building sources and feedback modifiers.
 
 The output is emitted by Python code in :mod:`sol_economy_effects_source`.
 Only data-dependent repetitions (currently the market refresh block) are
@@ -34,6 +34,10 @@ from sol_living_standard_source import (  # noqa: E402
     render_values as render_living_standard_values,
     render_feedback_modifiers,
     render_feedback_localization,
+    render_modifier_types,
+    render_modifier_icons,
+    render_building_sources,
+    render_modifier_type_localization,
 )
 
 TARGET_NAMES = ("stable", "sol_standalone")
@@ -90,9 +94,13 @@ def _auxiliary_outputs(target: str) -> dict[Path, str]:
     outputs = {
         _values_output_path(target): render_living_standard_values(),
         root / "main_menu/common/static_modifiers/SOL_living_standard_modifiers.txt": render_feedback_modifiers(),
+        root / "main_menu/common/modifier_type_definitions/SOL_living_standard_modifier_types.txt": render_modifier_types(),
+        root / "main_menu/common/modifier_icons/SOL_living_standard_modifier_icons.txt": render_modifier_icons(),
+        root / "in_game/common/building_types/SOL_living_standard_buildings.txt": render_building_sources(),
     }
     for language in ("english", "simp_chinese"):
         outputs[root / f"main_menu/localization/{language}/SOL_living_standard_modifiers_l_{language}.yml"] = render_feedback_localization(language)
+        outputs[root / f"main_menu/localization/{language}/SOL_living_standard_modifier_types_l_{language}.yml"] = render_modifier_type_localization(language)
     return outputs
 
 

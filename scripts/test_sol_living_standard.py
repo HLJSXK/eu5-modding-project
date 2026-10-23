@@ -2,7 +2,7 @@
 
 Executes the generated SOL effects in the offline scope fixture and checks the
 shipped scripts of every deploy target for the one-way data flow:
-purchasing power -> demand, and annual liquid funds per thousand + modifier -> SOL.
+purchasing power -> demand, and flat + (1 + percent) * annual funds per thousand -> SOL.
 """
 from pathlib import Path
 import re
@@ -13,8 +13,11 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from sol_living_standard_source import (ESTATES, SOL_ONLY_TOKENS, FEEDBACK_MODIFIERS,
+                                        FLAT_MODIFIER, PERCENT_MODIFIER, BUILDING_SOURCES,
                                         public_name, render_effects, render_values,
-                                        render_feedback_modifiers, render_feedback_localization)
+                                        render_feedback_modifiers, render_feedback_localization,
+                                        render_modifier_types, render_modifier_icons,
+                                        render_building_sources, render_modifier_type_localization)
 from test_sol_substitution import Runtime, Scope, parse
 from sol_lshud_income_source import render_income_effects, render_income_values
 
@@ -61,6 +64,8 @@ class LivingStandardRuntime(Runtime):
             self.script_values[name] = parse(f"x = {{ value = {value} }}")[0].value
 
     def value(self, node, scope, initial=0.):
+        if isinstance(node, str) and node in (f"modifier:{FLAT_MODIFIER}", f"modifier:{PERCENT_MODIFIER}"):
+            return scope.external.get(node.removeprefix("modifier:"), 0.)
         if node == "local_commoner_population":
             return sum(scope.pops.get(key, 0) for key in ("laborers", "peasants", "soldiers"))
         if node == "local_sol_population_sum":
@@ -119,6 +124,106 @@ def mentions_sol(node):
 
 
 class LivingStandardTests(unittest.TestCase):
+    def test_native_flat_and_percent_formula_and_floors(self):
+        # x, flat contributions, percent contributions, expected SOL.
+        for x, flat, percent, expected in (
+                (1, (.2,), (.05,), 1.25),
+                (1, (.2,), (.05, .03), 1.28),
+                (1, (.2,), (-1.5,), .2),
+                (1, (.2,), (-1,), .2),
+                (.05, (-.1,), (), 0),
+                (1, (-2,), (.05,), 0),
+                (0, (.2,), (.5,), .2),
+                (300, (.05,), (.05,), 315.05)):
+            with self.subTest(x=x, flat=flat, percent=percent):
+                runtime, country = LivingStandardRuntime(), Scope("country")
+                place = location(country, {"commoners": x / 12}, {"commoners": .5}, {"peasants": 1})
+                before = dict(place.variables)
+                place.external.update({FLAT_MODIFIER: sum(flat), PERCENT_MODIFIER: sum(percent)})
+                solve(runtime, country)
+                self.assertAlmostEqual(place.variables["sol_location_sol"], expected)
+                self.assertAlmostEqual(country.variables["sol_ls_sol_commoners"], expected)
+                for name, value in before.items():
+                    self.assertEqual(place.variables[name], value, name)
+
+    def test_building_sources_combine_with_population_weights_and_feedback(self):
+        runtime, country = LivingStandardRuntime(), fixture()
+        solve(runtime, country)
+        before = [dict(p.variables) for p in country.locations]
+        coefficients = {building: (modifier, float(value)) for building, modifier, value in BUILDING_SOURCES}
+        # Model native modifier totals supplied by the engine; this fixture does
+        # not claim to execute building-level or goods-access scaling in EU5.
+        sources = (("hospital", "aqueduct_system", "tanning_workshop", "theater", "opera_house"),
+                   ("pest_house", "iron_mill", "library"))
+        expected_total = 0
+        for place, snapshot, buildings in zip(country.locations, before, sources):
+            for building in buildings:
+                modifier, amount = coefficients[building]
+                place.external[modifier] = place.external.get(modifier, 0) + amount
+            flat, percent = place.external.get(FLAT_MODIFIER, 0), place.external.get(PERCENT_MODIFIER, 0)
+            population = sum(place.pops.values())
+            expected = flat + (1 + percent) * snapshot["sol_location_sol"]
+            runtime.run("sol_compute_location_living_standard", place)
+            runtime.run("sol_apply_location_living_standard_modifiers", place)
+            self.assertAlmostEqual(place.variables["sol_location_sol"], expected)
+            self.assertAlmostEqual(place.modifiers[FEEDBACK_MODIFIERS[0]], min(.5, .02 * expected))
+            for name, value in snapshot.items():
+                if "sol_total" not in name and name != "sol_location_sol":
+                    self.assertEqual(place.variables[name], value, name)
+            expected_total += expected * population
+        solve(runtime, country)
+        self.assertAlmostEqual(country.variables["sol_ls_sol"], expected_total / country.variables["sol_ls_pop_all"])
+
+    def test_percent_estate_override_only_affects_target_estate(self):
+        runtime, country = LivingStandardRuntime(), fixture()
+        solve(runtime, country)
+        before = dict(country.variables)
+        boosted = LivingStandardRuntime({"sol_location_nobles_local_sol_percent_value": .25})
+        solve(boosted, country)
+        self.assertAlmostEqual(country.variables["sol_ls_sol_nobles"], before["sol_ls_sol_nobles"] * 1.25)
+        for estate in ("commoners", "burghers"):
+            self.assertEqual(country.variables[public_name(estate)], before[public_name(estate)])
+
+    def test_first_batch_native_definitions_and_inherited_compatibility(self):
+        expected_flat = dict(hospital=.05, lazaretto=.03, pest_house=.03, aqueduct_system=.02,
+                             darussifa=.08, charite_of_berlin=.06, magistrato_alla_sanita=.06,
+                             tanning_workshop=-.01, tannery_manufactory=-.02, tannery_mill=-.03,
+                             putrefaction_works=-.02, putrefaction_mill=-.03, iron_mill=-.02, steel_mill=-.02)
+        expected_percent = dict(theater=.02, opera_house=.03, library=.01)
+        sources = parse(render_building_sources())
+        self.assertEqual({n.key for n in sources}, {f"TRY_INJECT:{key}" for key in expected_flat | expected_percent})
+        for source in sources:
+            building = source.key.removeprefix("TRY_INJECT:")
+            self.assertEqual([n.key for n in source.value], ["modifier"])
+            fields = source.value[0].value
+            self.assertEqual(len(fields), 1)
+            modifier = FLAT_MODIFIER if building in expected_flat else PERCENT_MODIFIER
+            self.assertEqual(fields[0].key, modifier)
+            self.assertEqual(float(fields[0].value), (expected_flat | expected_percent)[building])
+        types = {n.key: {f.key: f.value for f in n.value} for n in parse(render_modifier_types())}
+        self.assertEqual(set(types), {FLAT_MODIFIER, PERCENT_MODIFIER})
+        self.assertEqual(types[FLAT_MODIFIER]["decimals"], "2")
+        self.assertEqual(types[PERCENT_MODIFIER]["percent"], "yes")
+        for definition in types.values():
+            self.assertEqual(definition["game_data"][0].value, "location")
+        for target in ALL_TARGETS:
+            # Compatibility submods inherit stable's additive definitions.
+            roots = [ROOT / "src/stable", ROOT / "src" / target] if target not in BASE_TARGETS else [ROOT / "src" / target]
+            expected = {
+                "in_game/common/building_types/SOL_living_standard_buildings.txt": render_building_sources(),
+                "main_menu/common/modifier_type_definitions/SOL_living_standard_modifier_types.txt": render_modifier_types(),
+                "main_menu/common/modifier_icons/SOL_living_standard_modifier_icons.txt": render_modifier_icons(),
+            }
+            for language in ("english", "simp_chinese"):
+                expected[f"main_menu/localization/{language}/SOL_living_standard_modifier_types_l_{language}.yml"] = render_modifier_type_localization(language)
+            for relative, content in expected.items():
+                path = next(root / relative for root in reversed(roots) if (root / relative).is_file())
+                self.assertTrue(path.read_bytes().startswith(b"\xef\xbb\xbf"))
+                self.assertEqual(path.read_text(encoding="utf-8-sig"), content)
+            for icon in parse(render_modifier_icons()):
+                for field in icon.value:
+                    self.assertTrue((roots[0] / "main_menu" / field.value).is_file())
+
     def test_feedback_boundaries_and_native_units(self):
         runtime = LivingStandardRuntime()
         modifiers = {n.key: {c.key: c.value for c in n.value}

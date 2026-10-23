@@ -1,6 +1,6 @@
 """Emit SOL's local living-standard/purchasing-power and country substitution/ranking maps.
 
-The living-standard map shows annual funds per thousand + SOL modifier; the
+The living-standard map shows flat + (1 + percent) * annual funds per thousand; the
 purchasing-power map shows raw purchasing power only. Both read location caches
 written before the country solver. Never substitute the solver's final demand
 scale or applied modifier for either local map's display value.
@@ -128,7 +128,7 @@ def render_map_modes(*, standalone: bool = False) -> str:
 
 def render_map_values() -> str:
     return HEADER + """
-# Location scope. SOL amount: annual liquid funds per thousand + SOL modifier.
+# Location scope. SOL amount: flat + (1 + percent) * annual funds per thousand.
 sol_map_living_standard_value = {
 \tvalue = 0
 \tif = {

@@ -8,7 +8,7 @@ numeric SOL without a coin icon.
 ## Definitions
 
 ```
-Living standard = annual liquid funds per thousand people + SOL modifier
+Living standard = max(0, flat SOL bonuses + max(0, 1 + summed percent SOL bonuses) * annual liquid funds per thousand people)
 Purchasing power = annual liquid funds per thousand / annual baseline consumption per thousand
 ```
 
@@ -16,7 +16,8 @@ Purchasing power = annual liquid funds per thousand / annual baseline consumptio
 |---|---|---|
 | Annual liquid funds per thousand | gold / 1,000 people / year | monthly liquid funds × 12 / population (thousands) |
 | Annual baseline consumption per thousand | gold / 1,000 people / year | monthly baseline total × 12 / population (thousands) |
-| SOL modifier | annual gold-equivalent / 1,000 people | location script-value hook, currently 0 |
+| Flat SOL modifier | annual gold-equivalent / 1,000 people | location modifier value, shared by all estates unless overridden |
+| Percentage SOL modifier | fraction | summed location percentage; multiplies funds only, with a minimum multiplier of 0 |
 | Living standard | annual gold-equivalent / 1,000 people | amount, displayed directly; floored at 0 per estate/location |
 | Purchasing power | ratio | monthly liquid funds / monthly baseline total; display ratio − 1 as percent |
 
@@ -25,6 +26,11 @@ have SOL **1.8** and PP **1.5 (+50%)**. 0.05 thousand nobles with 0.4 monthly
 funds and 0.2 baseline have SOL **96** and PP **2 (+100%)**. National SOL is
 8.4 / 2.05 ≈ **4.10**; national PP is 0.7 / 0.4 = **1.75**. A +3 modifier
 raises commoner SOL to **4.8**, with PP unchanged.
+
+For x = 1 annual funds per thousand, a +0.2 flat bonus and +5% give SOL 1.25.
+Percentage contributions add, so +5% and +3% give a multiplier of 1.08; they
+never scale the flat bonus. A sum below -100% leaves only the flat bonus,
+then the estate result floors at zero.
 
 With zero modifiers, SOL = PP × annual baseline per thousand. SOL is weighted
 by population, never by baseline spending. People without baseline consumption
@@ -35,9 +41,11 @@ unset. Changing baseline baskets changes purchasing power, not SOL.
 
 | Name | Scope | Meaning |
 |---|---|---|
-| `sol_location_local_sol_modifier_value` | location SV | shared annual per-thousand modifier, currently 0 |
+| `sol_location_local_sol_modifier_value` | location SV | reads `modifier:local_sol_living_standard`, an annual per-thousand flat bonus |
+| `sol_location_local_sol_percent_value` | location SV | reads `modifier:local_sol_living_standard_modifier`, summed fractional bonus |
 | `sol_location_<estate>_local_sol_modifier_value` | location SV | estate override, defaults to shared hook |
-| `sol_location_<estate>_sol_total`, `sol_location_sol_total` | location var | max(0, funds × annualization + modifier × population), and estate sum |
+| `sol_location_<estate>_local_sol_percent_value` | location SV | estate percent override, defaults to shared hook |
+| `sol_location_<estate>_sol_total`, `sol_location_sol_total` | location var | max(0, flat × population + max(0, 1 + percent) × funds × annualization), and estate sum |
 | `sol_location_sol` | location var | annual total / population, unset at zero population |
 | `sol_ls_sol_total_<metric>` | country var | annual totals, metric = all or estate |
 | `sol_ls_pop_<metric>` | country var | shared income population accumulator (thousands) |
@@ -126,14 +134,23 @@ renders; all five targets passed generation consistency checks, and changed mod
 files passed static validation. Shared/workspace knowledge, enum, route and
 migration-coverage checks passed. No game session was launched for this change.
 
-## Adding a building modifier (next step)
+## Building modifier sources (2026-10-23)
 
-Edit `LOCAL_MODIFIER_ALL` or `LOCAL_MODIFIER_BY_ESTATE` in
-`scripts/sol_living_standard_source.py` and regenerate with `gen_sol_chain.py`.
-These are location script-value bodies in annual per-thousand units: +3 means
-each present estate gains 3 SOL. They add no spendable funds. Never add them to
-liquid funds, baseline spending or demand variables. A real engine modifier type
-for buildings/events requires separate source verification and implementation.
+The first batch registers two native location modifier types and 17 building
+sources from section 4.5 of `SOL_Living_Standard_Modifier_Sources_Design_20261023.md`.
+Healthcare and clean water add flat bonuses; pollution subtracts flat amounts;
+theater/opera/library add +2%/+3%/+1%. All use minimal building `TRY_INJECT`
+`modifier` blocks, which vanilla documents as scaled by level and goods access.
+Names, descriptions and existing SOL icon mappings are generated in both languages.
+
+Edit `BUILDING_SOURCES` in `scripts/sol_living_standard_source.py` and regenerate
+with `gen_sol_chain.py`. `LOCAL_MODIFIER_ALL` / `LOCAL_MODIFIER_BY_ESTATE` and
+`LOCAL_PERCENT_ALL` / `LOCAL_PERCENT_BY_ESTATE` own the location script-value
+hooks. Neither modifier adds funds or changes baseline spending, purchasing
+power or demand. Compatibility targets inherit the native types and building
+injections from SOL. Country-wide and estate-specific native modifier types,
+war/disease/institution sources remain deferred; the per-estate hooks remain
+available for later verified extensions.
 
 ## Verification
 
