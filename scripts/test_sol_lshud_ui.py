@@ -317,6 +317,35 @@ class LivingStandardHUD(unittest.TestCase):
                             image.save(self.out / f"{stem}_tooltip.png")
                             bar.crop((0, ROW_Y - 5, PANEL_W, ROW_Y + ROW_H + 5)).save(self.out / f"{stem}_row.png")
 
+    def test_living_standard_title_and_ranking_render_amounts(self):
+        for target in self.databases:
+            for language in ("simp_chinese", "english"):
+                eng, ex, _root, row, tip, (width, height), log = self.context(target, language, "")
+                titles = [eng.text_of(e) for e in visible_walk(eng, tip) if e.kind == "textbox"]
+                self.assertTrue(any("18.0" in (t or "") for t in titles), titles)
+                if self.out:
+                    image = Image.new("RGBA", (round(width + 24), round(height + 24)), (40, 52, 46, 255))
+                    eng.render(tip, image)
+                    image.save(self.out / f"{target}_{language}_sol_amount.png")
+                section = next(e for e in hud.walk(row) if e.props.get("name") == "sol_lshud4_section_4")
+                ranking = ex.build_lazy(section.tooltipwidget)
+                width, height = eng.measure(ranking, None)["hint"]
+                eng.place(ranking, 12, 12, width, height)
+                for element in visible_walk(eng, ranking):
+                    if element.kind == "textbox":
+                        self.assertGreaterEqual(element.x, 12 - .5, element.props)
+                        self.assertLessEqual(element.x + element.w, 12 + width + .5, element.props)
+                amounts = [eng.text_of(e) or "" for e in visible_walk(eng, ranking) if e.kind == "textbox"]
+                for value in ("192.0", "284.0"):
+                    matching = [text for text in amounts if value in text]
+                    self.assertTrue(matching, (value, amounts))
+                    self.assertTrue(all("%" not in text for text in matching), matching)
+                if self.out:
+                    image = Image.new("RGBA", (round(width + 24), round(height + 24)), (40, 52, 46, 255))
+                    eng.render(ranking, image)
+                    image.save(self.out / f"{target}_{language}_sol_ranking_amount.png")
+                self.assertFalse([entry for entry in log if "sol_ls_sol" in entry], log)
+
     def test_actual_glorp_ui_composition_pushes_its_bar_below_the_row(self):
         target_root = ROOT / "src/stable"
         row_path = target_root / "in_game/gui/SOL_lshud.gui"
@@ -345,7 +374,7 @@ class LivingStandardHUD(unittest.TestCase):
                     match = Loc.LINE_RE.match(line)
                     if match:
                         loc.d[match[1]] = match[2]
-            mocks = row_design.glorp_mocks(bar_shown=True) + row_design.sol_mocks("") + hud.mocks()
+            mocks = row_design.glorp_mocks(bar_shown=True) + four_design.mocks("") + hud.mocks()
             eng = Engine(ex, Evaluator(mocks, loc, log), loc, Formats(), TextIcons(), 1)
             eng.place(root, 0, 0, 1920, 1080)
             bar = next(e for e in hud.walk(root) if e.typename == "left_panel_info_bar")

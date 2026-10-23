@@ -8,10 +8,7 @@ Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guid
 
 **[Source + offline scope execution/rendering; native hover/selection pending.]**
 `gen_sol_lshud.py` now owns all four `SOL_map_modes.txt` entries through
-`sol_map_modes_source.py`. The original income map still reads
-`gls_location_actual_per_capita_spending`: sum of individually nonnegative local
-net incomes × (1 + savings adjustment, floored at zero) ÷ local population.
-It is cached before country solving and does not read the final modifier.
+`sol_map_modes_source.py`. The living-standard map reads `sol_location_sol`: annual liquid funds per thousand + SOL modifier. Values display directly; colors are red at 0, yellow at the population-weighted world average and green at 3× average (fallback reference 6 until a positive average exists). The situation data map uses the same factors and relative tooltip tiers (0.5× / 1× / 2×). Zero-baseline populations retain SOL.
 The local purchasing-power map uses liquid funds / baseline spending − 1,
 red/yellow/green at −100%/0%/+200%, neutral gray without baseline consumption.
 Its number is uncapped; only its color saturates.

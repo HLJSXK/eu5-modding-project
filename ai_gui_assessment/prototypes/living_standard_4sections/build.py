@@ -68,11 +68,6 @@ def G(name):
     return f"GetGlobalVariable('{name}').GetValue"
 
 
-def SOL_INDEX(name, scope="Player"):
-    """Living-standard ratio cache shown as an index: ratio - 1 (0% = baseline basket)."""
-    return f"Subtract_CFixedPoint({V(name, scope)}, {fp(1)})"
-
-
 def fp(x):
     return f"'(CFixedPoint){x}'"
 
@@ -458,7 +453,7 @@ def tooltip_rank():
 					{text('[Country.GetNameWithNoTooltip]', 150, 24, fmt='#high' if me else None, raw=True)}
 					{bar(rel, 160, 8, 'gold' if me else 'steel')}
 					expand = {{}}
-					{text(f"[{SOL_INDEX('sol_ls_sol', 'Country')}|+=1%]", 60, 24, align='right|nobaseline', raw=True)}
+					{text(f"[{V('sol_ls_sol', 'Country')}|1]", 60, 24, align='right|nobaseline', raw=True)}
 					widget = {{ size = {{ 4 1 }} }}
 				}}"""
 
@@ -482,13 +477,13 @@ def tooltip_rank():
 					{zebra(w, 26) if i % 2 == 0 else ''}
 					widget = {{ size = {{ 2 1 }} }}
 					{text('SOL_ESTATE_' + e.upper(), cols[0], 26, fs=13)}
-					{text(f"[{SOL_INDEX('sol_ls_sol_' + e)}|+=1%]", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True, visible=f"[{IS('sol_ls_sol_' + e)}]")}
+					{text(f"[{V('sol_ls_sol_' + e)}|1]", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True, visible=f"[{IS('sol_ls_sol_' + e)}]")}
 					{text('SOL_LSHUD4_DASH', cols[1], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f"[Not({IS('sol_ls_sol_' + e)})]")}
 					{text(f'SOL_LSHUD4_ESTATE_RANK_{e.upper()}', cols[2], 26, fs=13, align='right|nobaseline', visible=f'[{ranked}]')}
 					{text('SOL_LSHUD4_DASH', cols[2], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f'[Not({ranked})]')}
 					widget = {{ size = {{ {cols[3]} 26 }} widget = {{ size = {{ {cols[3] - 8} 8 }} position = {{ 4 9 }} {bar(f"FixedPointToFloat({V('sol_ls_percentile_' + e)})", cols[3] - 8, 8)} }} }}
 					widget = {{ size = {{ {cols[4]} 26 }} visible = "[GetGlobalVariable('sol_ls_top_1_{e}').IsSet]"
-						{text(f"[{best}.GetNameWithNoTooltip] [Subtract_CFixedPoint({G('sol_ls_top_sol_' + e)}, {fp(1)})|+=0%]", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
+						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_sol_' + e)}|1]", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
 					}}
 				}}"""
 
@@ -545,7 +540,7 @@ LOC = {
     "SOL_LSHUD4_T3_SUB": "按月度消费总价排序 · 下方为替代组供应情况",
     "SOL_LSHUD4_T3_SPEND_TOTAL": f"全国消费 [{P}('sol_ls_spend_total').GetValue|1] @gold! / 月",
     "SOL_LSHUD4_T4_TITLE": "全球排名",
-    "SOL_LSHUD4_T4_SUB": "按生活水平（购买力＋当地加成），每年 1 月 1 日更新",
+    "SOL_LSHUD4_T4_SUB": "按生活水平数值排名，每年 1 月 1 日更新",
     "SOL_LSHUD4_T4_NATION": "全国排名",
     "SOL_LSHUD4_T4_ESTATES": "各阶层排名",
     "SOL_LSHUD4_T4_ESTATES_HINT": "与世界同阶层的生活水平比较",
@@ -571,15 +566,15 @@ EXTRA = {
     "sol_ls_rank_nobles": 7, "sol_ls_rank_clergy": 15, "sol_ls_rank_burghers": 23, "sol_ls_rank_commoners": 9,
     "sol_ls_percentile_nobles": .93, "sol_ls_percentile_clergy": .84, "sol_ls_percentile_burghers": .74,
     "sol_ls_percentile_commoners": .91,
-    # Living-standard ratios (1 = baseline basket) for the tier title and rankings.
-    "sol_ls_sol": 1.18, "sol_ls_sol_nobles": 1.92, "sol_ls_sol_clergy": 1.41, "sol_ls_sol_burghers": 1.57,
-    "sol_ls_sol_commoners": 0.94, "sol_ls_top_sol": 1.86,
+    # Annual SOL amounts per thousand people, independent of baseline baskets.
+    "sol_ls_sol": 18.0, "sol_ls_sol_nobles": 192.0, "sol_ls_sol_clergy": 141.0, "sol_ls_sol_burghers": 57.0,
+    "sol_ls_sol_commoners": 9.4, "sol_ls_top_sol": 59.04,
 }
 for _n, (_g, _gold, _share) in enumerate(SPEND, 1):
     EXTRA[f"sol_ls_spend_{_n}_gold"] = _gold
     EXTRA[f"sol_ls_spend_{_n}_share"] = _share
 ESTATE_COUNT = {"nobles": 86, "clergy": 87, "burghers": 85, "commoners": 87}
-ESTATE_BEST = {"nobles": ("威尼斯", 2.84), "clergy": ("教皇国", 2.12), "burghers": ("热那亚", 2.46), "commoners": ("佛兰德斯", 1.63)}
+ESTATE_BEST = {"nobles": ("威尼斯", 284.0), "clergy": ("教皇国", 212.0), "burghers": ("热那亚", 146.0), "commoners": ("佛兰德斯", 16.3)}
 STATES = {
     # suffix: (fixture state, spending ready, purchasing-power funds scale)
     "": ("", True, 1.0),
@@ -623,7 +618,7 @@ def mocks(state):
 
     return [
         (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", 1),
-        (r"Player\.MakeScope\.ScriptValue\('(sol_ls_sol\w*)_index_display'\)", lambda m: pv.get(m[1], 1) - 1 if ready else 0),
+        (r"Player\.MakeScope\.ScriptValue\('sol_ls_sol_display'\)", pv['sol_ls_sol'] if ready else 0),
         (r"Player\.MakeScope\.ScriptValue\('(\w+)'\)", script_value),
         (r"Player\.MakeScope\.GetVariable\('sol_ls_(above|below)_(\d)'\)\.IsSet", lambda m: ready and not rank_pending),
         (r"Player\.MakeScope\.GetVariable\('(sol_ls_\w+)'\)\.IsSet", is_set),

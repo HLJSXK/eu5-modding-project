@@ -451,9 +451,9 @@ LOC = {
     "SOL_LSHUD_ROW_PENDING": "等待首次计算",
     "SOL_LSHUD_YOY_PENDING": "暂无去年数据",
     "SOL_LSHUD_LABEL": "生活水平",
-    "SOL_LSHUD_TITLE_LOW": "生活水平：#N 低#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
-    "SOL_LSHUD_TITLE_MID": "生活水平：#Y 中#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
-    "SOL_LSHUD_TITLE_HIGH": "生活水平：#P 高#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
+    "SOL_LSHUD_TITLE_LOW": "生活水平：#N 低#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
+    "SOL_LSHUD_TITLE_MID": "生活水平：#Y 中#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
+    "SOL_LSHUD_TITLE_HIGH": "生活水平：#P 高#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
     "SOL_LSHUD_UNIT": "每千人每年净收入",
     "SOL_LSHUD_TREND_BIG_UP": "@arrow_bonus_tier_2! #P 大增长#!",
     "SOL_LSHUD_TREND_UP": "@arrow_bonus_tier_1! #P 增长#!",
@@ -472,8 +472,8 @@ LOC = {
     "SOL_LSHUD_PENDING_SHORT": "等待首次计算",
     "SOL_LSHUD_PENDING_BODY": "人均收入在首次计算后即可显示；同比需要去年同月数据。全球排行每年 1 月 1 日刷新，首次初始化或手动全局重算时也会更新。",
     "SOL_LSHUD_RANK_PENDING": "全球排行与等级将在下一次 1 月 1 日刷新后显示。",
-    "SOL_LSHUD_FOOTNOTE": ("人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。生活水平等级以世界人口加权平均生活水平 "
-                           "[GetGlobalVariable('sol_ls_world_sol').GetValue|2] 倍基准消费为基准：低于其 75% 为低，高于其 133% 为高。"
+    "SOL_LSHUD_FOOTNOTE": ("人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。生活水平 = 千人均年流动资金 + 生活水平修正。生活水平等级以世界人口加权平均生活水平 "
+                           "[GetGlobalVariable('sol_ls_world_sol').GetValue|2] 为基准：低于其 75% 为低，高于其 133% 为高。"
                            "同比：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低；暂无去年同月数据时不显示。玩家按月、AI 按计算频率设置刷新（默认周年）。排行每年 1 月 1 日更新。"),
     "SOL_LSHUD_FOOTNOTE_PENDING": "人均收入 = 各阶层月净收入之和 ÷ 人口（千人）× 12，已扣建筑维护费。玩家按月、AI 按计算频率设置刷新（默认周年）；同比需要去年同月数据。",
 }
@@ -491,9 +491,9 @@ LOC_ENGLISH = {
     "SOL_LSHUD_ROW_PENDING": "Awaiting first calculation",
     "SOL_LSHUD_YOY_PENDING": "No prior-year data",
     "SOL_LSHUD_LABEL": "Living Standard",
-    "SOL_LSHUD_TITLE_LOW": "Living Standard: #N Low#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
-    "SOL_LSHUD_TITLE_MID": "Living Standard: #Y Medium#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
-    "SOL_LSHUD_TITLE_HIGH": "Living Standard: #P High#! [Player.MakeScope.ScriptValue('sol_ls_sol_index_display')|+=0%]",
+    "SOL_LSHUD_TITLE_LOW": "Living Standard: #N Low#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
+    "SOL_LSHUD_TITLE_MID": "Living Standard: #Y Medium#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
+    "SOL_LSHUD_TITLE_HIGH": "Living Standard: #P High#! [Player.MakeScope.ScriptValue('sol_ls_sol_display')|1]",
     "SOL_LSHUD_UNIT": "Annual net income per 1,000 people",
     "SOL_LSHUD_TREND_BIG_UP": "@arrow_bonus_tier_2! #P Strong rise#!",
     "SOL_LSHUD_TREND_UP": "@arrow_bonus_tier_1! #P Rise#!",
@@ -511,7 +511,7 @@ LOC_ENGLISH = {
     "SOL_LSHUD_RANK_PENDING": "World rankings and tiers will appear after the next 1 January refresh.",
     "SOL_LSHUD_FOOTNOTE": (
         "Income per person = monthly net estate income ÷ population (thousands) × 12, after building maintenance. "
-        "Living-standard tiers use the population-weighted world average of [GetGlobalVariable('sol_ls_world_sol').GetValue|2] baseline baskets: "
+        "Living standard = annual liquid funds per 1,000 people + SOL modifier. Living-standard tiers use the population-weighted world average of [GetGlobalVariable('sol_ls_world_sol').GetValue|2]: "
         "low below 75%, high above 133%. Annual change: ≥ +5% strong rise; 0 to +5% rise; −5% to 0 fall; ≤ −5% strong fall. "
         "Annual change is unavailable without data from the same month last year. Player figures refresh monthly; AI follows the calculation frequency setting (annual by default). Rankings refresh on 1 January."
     ),
@@ -551,7 +551,7 @@ _FOUR_SECTION_EN = {
     "SOL_LSHUD4_T3_SUB": "Monthly spending total; substitute-group supply is shown below",
     "SOL_LSHUD4_T3_SPEND_TOTAL": f"National spending [{P}('sol_ls_spend_total').GetValue|1] @gold! / month",
     "SOL_LSHUD4_T4_TITLE": "World ranking",
-    "SOL_LSHUD4_T4_SUB": "By living standard (purchasing power + local bonus); refreshed every 1 January",
+    "SOL_LSHUD4_T4_SUB": "Ranked by living standard; updated each 1 January",
     "SOL_LSHUD4_T4_NATION": "National rank",
     "SOL_LSHUD4_T4_ESTATES": "Estate ranks",
     "SOL_LSHUD4_T4_ESTATES_HINT": "Living standard compared with the same estate worldwide",

@@ -7308,81 +7308,75 @@ sol_ls_compute_income_yoy = {
 	else_if = { limit = { var:sol_ls_pci_yoy_tribesmen <= sol_ls_yoy_big_decrease_threshold } set_variable = { name = sol_ls_pci_yoy_class_tribesmen value = -2 } }
 }
 
-# Living standard (SOL) layer. Reads purchasing-power caches; nothing in the
-# demand path reads what it writes. See scripts/sol_living_standard_source.py.
+# Living standard: annual funds per thousand + modifier, population weighted.
+# Annual SOL totals are accounting amounts, never spendable funds or demand inputs.
 sol_compute_location_living_standard = {
-	# root = location, called at the end of sol_compute_location_pop_demand.
-	set_variable = { name = sol_location_nobles_sol_equivalent value = { value = sol_location_nobles_local_sol_bonus_value multiply = var:sol_location_nobles_base_spending add = var:sol_location_nobles_liquid_funds min = 0 } }
-	set_variable = { name = sol_location_clergy_sol_equivalent value = { value = sol_location_clergy_local_sol_bonus_value multiply = var:sol_location_clergy_base_spending add = var:sol_location_clergy_liquid_funds min = 0 } }
-	set_variable = { name = sol_location_burghers_sol_equivalent value = { value = sol_location_burghers_local_sol_bonus_value multiply = var:sol_location_burghers_base_spending add = var:sol_location_burghers_liquid_funds min = 0 } }
-	set_variable = { name = sol_location_commoners_sol_equivalent value = { value = sol_location_commoners_local_sol_bonus_value multiply = var:sol_location_commoners_base_spending add = var:sol_location_commoners_liquid_funds min = 0 } }
-	set_variable = { name = sol_location_tribesmen_sol_equivalent value = { value = sol_location_tribesmen_local_sol_bonus_value multiply = var:sol_location_tribesmen_base_spending add = var:sol_location_tribesmen_liquid_funds min = 0 } }
-	set_variable = { name = sol_location_sol_equivalent value = { add = var:sol_location_nobles_sol_equivalent add = var:sol_location_clergy_sol_equivalent add = var:sol_location_burghers_sol_equivalent add = var:sol_location_commoners_sol_equivalent add = var:sol_location_tribesmen_sol_equivalent } }
+	# Location scope, last step of sol_compute_location_pop_demand.
+	set_variable = { name = sol_location_nobles_sol_total value = { value = sol_location_nobles_local_sol_modifier_value multiply = num_pop_type:nobles add = { value = var:sol_location_nobles_liquid_funds multiply = sol_ls_annualization_factor } min = 0 } }
+	set_variable = { name = sol_location_clergy_sol_total value = { value = sol_location_clergy_local_sol_modifier_value multiply = num_pop_type:clergy add = { value = var:sol_location_clergy_liquid_funds multiply = sol_ls_annualization_factor } min = 0 } }
+	set_variable = { name = sol_location_burghers_sol_total value = { value = sol_location_burghers_local_sol_modifier_value multiply = num_pop_type:burghers add = { value = var:sol_location_burghers_liquid_funds multiply = sol_ls_annualization_factor } min = 0 } }
+	set_variable = { name = sol_location_commoners_sol_total value = { value = sol_location_commoners_local_sol_modifier_value multiply = local_commoner_population add = { value = var:sol_location_commoners_liquid_funds multiply = sol_ls_annualization_factor } min = 0 } }
+	set_variable = { name = sol_location_tribesmen_sol_total value = { value = sol_location_tribesmen_local_sol_modifier_value multiply = num_pop_type:tribesmen add = { value = var:sol_location_tribesmen_liquid_funds multiply = sol_ls_annualization_factor } min = 0 } }
+	set_variable = { name = sol_location_sol_total value = { add = var:sol_location_nobles_sol_total add = var:sol_location_clergy_sol_total add = var:sol_location_burghers_sol_total add = var:sol_location_commoners_sol_total add = var:sol_location_tribesmen_sol_total } }
+	remove_variable = sol_location_sol
+	if = {
+		limit = { local_sol_population_sum > 0 }
+		set_variable = { name = sol_location_sol value = { value = var:sol_location_sol_total divide = local_sol_population_sum } }
+	}
 }
 
 sol_ls_reset_country_living_standard = {
-	set_variable = { name = sol_ls_sol_equivalent_all value = 0 }
-	set_variable = { name = sol_ls_sol_base_all value = 0 }
-	set_variable = { name = sol_ls_sol_equivalent_nobles value = 0 }
-	set_variable = { name = sol_ls_sol_base_nobles value = 0 }
-	set_variable = { name = sol_ls_sol_equivalent_clergy value = 0 }
-	set_variable = { name = sol_ls_sol_base_clergy value = 0 }
-	set_variable = { name = sol_ls_sol_equivalent_burghers value = 0 }
-	set_variable = { name = sol_ls_sol_base_burghers value = 0 }
-	set_variable = { name = sol_ls_sol_equivalent_commoners value = 0 }
-	set_variable = { name = sol_ls_sol_base_commoners value = 0 }
-	set_variable = { name = sol_ls_sol_equivalent_tribesmen value = 0 }
-	set_variable = { name = sol_ls_sol_base_tribesmen value = 0 }
+	set_variable = { name = sol_ls_sol_total_all value = 0 }
+	set_variable = { name = sol_ls_sol_total_nobles value = 0 }
+	set_variable = { name = sol_ls_sol_total_clergy value = 0 }
+	set_variable = { name = sol_ls_sol_total_burghers value = 0 }
+	set_variable = { name = sol_ls_sol_total_commoners value = 0 }
+	set_variable = { name = sol_ls_sol_total_tribesmen value = 0 }
 }
 
 sol_ls_accumulate_country_living_standard = {
-	# Location scope, inside the solver preparation pass after sol_compute_location_pop_demand.
+	# Existing preparation pass, immediately after population/income accumulation.
 	save_scope_as = sol_ls_living_standard_location
 	owner = {
-		change_variable = { name = sol_ls_sol_equivalent_all add = scope:sol_ls_living_standard_location.var:sol_location_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_all add = scope:sol_ls_living_standard_location.var:sol_location_base_total_spending }
-		change_variable = { name = sol_ls_sol_equivalent_nobles add = scope:sol_ls_living_standard_location.var:sol_location_nobles_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_nobles add = scope:sol_ls_living_standard_location.var:sol_location_nobles_base_spending }
-		change_variable = { name = sol_ls_sol_equivalent_clergy add = scope:sol_ls_living_standard_location.var:sol_location_clergy_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_clergy add = scope:sol_ls_living_standard_location.var:sol_location_clergy_base_spending }
-		change_variable = { name = sol_ls_sol_equivalent_burghers add = scope:sol_ls_living_standard_location.var:sol_location_burghers_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_burghers add = scope:sol_ls_living_standard_location.var:sol_location_burghers_base_spending }
-		change_variable = { name = sol_ls_sol_equivalent_commoners add = scope:sol_ls_living_standard_location.var:sol_location_commoners_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_commoners add = scope:sol_ls_living_standard_location.var:sol_location_commoners_base_spending }
-		change_variable = { name = sol_ls_sol_equivalent_tribesmen add = scope:sol_ls_living_standard_location.var:sol_location_tribesmen_sol_equivalent }
-		change_variable = { name = sol_ls_sol_base_tribesmen add = scope:sol_ls_living_standard_location.var:sol_location_tribesmen_base_spending }
+		change_variable = { name = sol_ls_sol_total_all add = scope:sol_ls_living_standard_location.var:sol_location_sol_total }
+		change_variable = { name = sol_ls_sol_total_nobles add = scope:sol_ls_living_standard_location.var:sol_location_nobles_sol_total }
+		change_variable = { name = sol_ls_sol_total_clergy add = scope:sol_ls_living_standard_location.var:sol_location_clergy_sol_total }
+		change_variable = { name = sol_ls_sol_total_burghers add = scope:sol_ls_living_standard_location.var:sol_location_burghers_sol_total }
+		change_variable = { name = sol_ls_sol_total_commoners add = scope:sol_ls_living_standard_location.var:sol_location_commoners_sol_total }
+		change_variable = { name = sol_ls_sol_total_tribesmen add = scope:sol_ls_living_standard_location.var:sol_location_tribesmen_sol_total }
 	}
 }
 
 sol_ls_finalize_country_living_standard = {
+	# sol_ls_pop_* is complete in both solver paths; income finalize does not reset it.
 	remove_variable = sol_ls_sol
 	if = {
-		limit = { var:sol_ls_sol_base_all > 0 }
-		set_variable = { name = sol_ls_sol value = { value = var:sol_ls_sol_equivalent_all divide = var:sol_ls_sol_base_all } }
+		limit = { var:sol_ls_pop_all > 0 }
+		set_variable = { name = sol_ls_sol value = { value = var:sol_ls_sol_total_all divide = var:sol_ls_pop_all } }
 	}
 	remove_variable = sol_ls_sol_nobles
 	if = {
-		limit = { var:sol_ls_sol_base_nobles > 0 }
-		set_variable = { name = sol_ls_sol_nobles value = { value = var:sol_ls_sol_equivalent_nobles divide = var:sol_ls_sol_base_nobles } }
+		limit = { var:sol_ls_pop_nobles > 0 }
+		set_variable = { name = sol_ls_sol_nobles value = { value = var:sol_ls_sol_total_nobles divide = var:sol_ls_pop_nobles } }
 	}
 	remove_variable = sol_ls_sol_clergy
 	if = {
-		limit = { var:sol_ls_sol_base_clergy > 0 }
-		set_variable = { name = sol_ls_sol_clergy value = { value = var:sol_ls_sol_equivalent_clergy divide = var:sol_ls_sol_base_clergy } }
+		limit = { var:sol_ls_pop_clergy > 0 }
+		set_variable = { name = sol_ls_sol_clergy value = { value = var:sol_ls_sol_total_clergy divide = var:sol_ls_pop_clergy } }
 	}
 	remove_variable = sol_ls_sol_burghers
 	if = {
-		limit = { var:sol_ls_sol_base_burghers > 0 }
-		set_variable = { name = sol_ls_sol_burghers value = { value = var:sol_ls_sol_equivalent_burghers divide = var:sol_ls_sol_base_burghers } }
+		limit = { var:sol_ls_pop_burghers > 0 }
+		set_variable = { name = sol_ls_sol_burghers value = { value = var:sol_ls_sol_total_burghers divide = var:sol_ls_pop_burghers } }
 	}
 	remove_variable = sol_ls_sol_commoners
 	if = {
-		limit = { var:sol_ls_sol_base_commoners > 0 }
-		set_variable = { name = sol_ls_sol_commoners value = { value = var:sol_ls_sol_equivalent_commoners divide = var:sol_ls_sol_base_commoners } }
+		limit = { var:sol_ls_pop_commoners > 0 }
+		set_variable = { name = sol_ls_sol_commoners value = { value = var:sol_ls_sol_total_commoners divide = var:sol_ls_pop_commoners } }
 	}
 	remove_variable = sol_ls_sol_tribesmen
 	if = {
-		limit = { var:sol_ls_sol_base_tribesmen > 0 }
-		set_variable = { name = sol_ls_sol_tribesmen value = { value = var:sol_ls_sol_equivalent_tribesmen divide = var:sol_ls_sol_base_tribesmen } }
+		limit = { var:sol_ls_pop_tribesmen > 0 }
+		set_variable = { name = sol_ls_sol_tribesmen value = { value = var:sol_ls_sol_total_tribesmen divide = var:sol_ls_pop_tribesmen } }
 	}
 }

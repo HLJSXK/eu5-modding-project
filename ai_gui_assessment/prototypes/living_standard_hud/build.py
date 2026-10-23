@@ -365,14 +365,14 @@ def country(tag, name, rank, pci, yoy, tier):
     return {"__type__": "Country", "Self": tag, "GetNameWithNoTooltip": name, "GetName": name,
             "MakeScope.GetVariable('sol_ls_rank').GetValue": rank,
             "MakeScope.GetVariable('sol_ls_pci').GetValue": pci,
-            # Living-standard ratio used by the four-section ranking ladder.
-            "MakeScope.GetVariable('sol_ls_sol').GetValue": pci,
+            # Annual SOL amounts used by the adopted four-section ranking fixture.
+            "MakeScope.GetVariable('sol_ls_sol').GetValue": pci * 12,
             "MakeScope.GetVariable('sol_ls_pci_yoy').GetValue": yoy,
             "MakeScope.GetVariable('sol_ls_tier').GetValue": tier}
 
 
 PLAYER_VARS = {
-    "sol_ls_pci": 1.86, "sol_ls_pci_prev": 1.78, "sol_ls_pci_yoy": .045,
+    "sol_ls_sol": 18.0, "sol_ls_pci": 1.86, "sol_ls_pci_prev": 1.78, "sol_ls_pci_yoy": .045,
     "sol_ls_pci_yoy_class": 1, "sol_ls_tier": 1, "sol_ls_rank": 12, "sol_ls_percentile": .87,
     "sol_ls_pop_nobles": 41, "sol_ls_pop_clergy": 88, "sol_ls_pop_burghers": 520, "sol_ls_pop_commoners": 7770,
     "sol_ls_pop_tribesmen": 0,
@@ -384,7 +384,7 @@ PLAYER_VARS = {
     "sol_ls_pci_yoy_class_commoners": 1, "sol_ls_pci_yoy_class_tribesmen": 1,
 }
 GLOBAL_VARS = {"sol_ls_rank_count": 87, "sol_ls_world_pci": 1.62, "sol_ls_top_pci": 4.92,
-               "sol_ls_world_sol": 1.62, "sol_ls_top_sol": 4.92}
+               "sol_ls_world_sol": 19.44, "sol_ls_top_sol": 59.04}
 
 STATES = {
     # suffix: (player variable overrides, player rank, data ready)
@@ -402,6 +402,8 @@ def state_mocks(overrides, rank, ready):
     board.insert(rank - 1, ("HUN", "匈牙利", pv["sol_ls_pci"], pv["sol_ls_pci_yoy"], pv["sol_ls_tier"]))
     countries = [country(tag, n, i + 1, p, y, t) for i, (tag, n, p, y, t) in enumerate(board)]
     me = rank - 1
+    # Income and SOL are independent; keep the player ladder equal to the title fixture.
+    countries[me]["MakeScope.GetVariable('sol_ls_sol').GetValue"] = pv['sol_ls_sol']
     slots = {"above_1": me - 1, "above_2": me - 2, "below_1": me + 1, "below_2": me + 2}
     slots = {k: countries[i] for k, i in slots.items() if 0 <= i < len(countries)}
     return [

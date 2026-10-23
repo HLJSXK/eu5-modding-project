@@ -1,6 +1,6 @@
 """Execute the generated SOL world ranking with offline country scopes.
 
-Countries are ranked by living standard (sol_ls_sol ratio), not by income.
+Countries are ranked by living standard (sol_ls_sol annual amount), not by income.
 """
 from collections import Counter
 from dataclasses import dataclass
@@ -235,8 +235,8 @@ class RankingTests(unittest.TestCase):
                 # Execute the shipped January gate rather than bypassing it.
                 rt.execute([ancestors[-1]], Scope("global"))
                 self.assert_ladder(rt, [player, ai])
-                # Player 3 x 16 / 8 = 6, AI 2 x 16 / 8 = 4, equal cached populations.
-                self.assertAlmostEqual(rt.globals["sol_ls_world_sol"], 5)
+                # Player 3 x 16 x 12 / 10 = 57.6; AI 38.4, equal cached populations.
+                self.assertAlmostEqual(rt.globals["sol_ls_world_sol"], 48)
                 self.assertEqual(player.variables["sol_ls_rank"], 1)
                 self.assertEqual(ai.variables["sol_ls_rank"], 2)
 
