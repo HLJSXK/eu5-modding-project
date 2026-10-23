@@ -38,7 +38,7 @@ class Country(Scope):
     population: float = 100
 
 
-def country(sol, population=100, locations=1):
+def country(sol, population=100, locations=2):
     return Country("country", variables={"sol_ls_sol": sol, "sol_ls_pop_all": population},
                    locations=LocationCount(locations), population=population)
 
@@ -235,9 +235,45 @@ class RankingTests(unittest.TestCase):
         self.assert_ladder(rt, expected)
         self.assertEqual(rt.visits["every_country"], 13)
         self.assertEqual(rt.visits["ordered_country"], 13)
-        self.assertEqual(rt.operations["every_country"], 1)
+        # Census pass plus the (empty here) unranked-tier pass.
+        self.assertEqual(rt.operations["every_country"], 2)
         self.assertEqual(rt.operations["ordered_country"], 1)
         self.assertEqual(expected[-1].variables["sol_ls_rank"], 13)
+
+    def test_single_location_countries_are_unranked_but_tiered(self):
+        ranked = [country(value) for value in (30, 20, 10)]
+        tiny_rich, tiny_poor = country(500, 1000, locations=1), country(1, 1000, locations=1)
+        tiny_rich.variables.update(sol_ls_sol_nobles=900, sol_ls_pop_nobles=5)
+        rt = RankingRuntime([tiny_rich, *ranked, tiny_poor])
+        rt.refresh()
+        self.assert_ladder(rt, ranked)
+        # Excluded from the world average, the leader and every estate ranking.
+        self.assertAlmostEqual(rt.globals["sol_ls_world_sol"], 20)
+        self.assertEqual(rt.globals["sol_ls_top_sol"], 30)
+        self.assertEqual(rt.globals["sol_ls_rank_count_nobles"], 0)
+        self.assertNotIn("sol_ls_top_1_nobles", rt.globals)
+        for tiny, tier in ((tiny_rich, 2), (tiny_poor, 0)):
+            self.assertEqual(tiny.variables["sol_ls_unranked"], 1)
+            self.assertEqual(tiny.variables["sol_ls_tier"], tier)
+            for key in ("sol_ls_rank", "sol_ls_percentile", "sol_ls_rank_nobles", *("sol_ls_" + n for n in NEIGHBOURS)):
+                self.assertNotIn(key, tiny.variables)
+        for target in ranked:
+            self.assertNotIn("sol_ls_unranked", target.variables)
+        # Tier counts describe ranked countries only.
+        self.assertEqual(sum(rt.globals["sol_ls_tier_count_" + str(i)] for i in range(3)), 3)
+
+    def test_shrinking_to_one_location_leaves_and_growing_rejoins_the_ranking(self):
+        countries = [country(value) for value in (40, 30, 20)]
+        rt = RankingRuntime(countries)
+        rt.refresh()
+        countries[0].locations.count = 1
+        rt.refresh()
+        self.assert_ladder(rt, countries[1:])
+        self.assertEqual(countries[0].variables["sol_ls_unranked"], 1)
+        countries[0].locations.count = 3
+        rt.refresh()
+        self.assert_ladder(rt, countries)
+        self.assertNotIn("sol_ls_unranked", countries[0].variables)
 
     def test_world_sol_is_cached_population_weighted(self):
         rich, poor = country(20, 10), country(2, 90)

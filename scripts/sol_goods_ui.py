@@ -130,7 +130,6 @@ def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
     if scope.startswith("Location."):
         weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', {scope})"
         tooltip_lines.append(f"[SelectLocalization({weight}.IsSet, 'SOL_SUB_PRICE_{good}', 'SOL_SUB_PRICE_PENDING')]")
-    tooltip_lines += ["[Localize('SOL_SUB_SCOPE_NOTE')]", "[Localize('SOL_SUB_LEGEND_TOOLTIP')]"]
     # GUI quoted strings cannot escape newlines; the vanilla localization can.
     tooltip = "[Localize('NEWLINE_BREAK')]".join(tooltip_lines)
     out = [
@@ -242,8 +241,7 @@ def group_label_keys() -> list[str]:
     return [f"SOL_SUBGROUP_{group.upper()}" for group in GROUP_ORDER] + ["SOL_SUBGROUP_UNGROUPED"]
 
 
-def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: str,
-                      *, show_supply_note: bool = True, show_summary: bool = True) -> str:
+def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: str) -> str:
     """The whole goods vbox, so the compat generators rebuild it instead of patching it.
 
     The compat submods each add goods (PP adds victuals, JTG adds 26), and goods are now
@@ -257,22 +255,7 @@ def render_goods_vbox(goods: list[str], variable_map: str, scope: str, indent: s
         f"{indent}\tmargin = {{ 0 2 }}",
         f"{indent}\tspacing = 4",
     ]
-    if show_summary and not scope.startswith("Location."):
-        status = f"{scope}.ScriptValue('sol_substitute_status_display')"
-        summary = (f"[SelectLocalization(GreaterThan_CFixedPoint({status}, '(CFixedPoint)1'), "
-                   f"'SOL_SUB_SUMMARY', SelectLocalization(GreaterThan_CFixedPoint({status}, "
-                   "'(CFixedPoint)0'), 'SOL_SUB_PENDING', 'SOL_SUB_DISABLED'))]")
-        lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 12 '
-                     f'raw_text = "{summary}" tooltip = "SOL_SUB_SUMMARY_TOOLTIP" }}')
-        lines.append(f'{indent}\ttext_single = {{ layoutpolicy_horizontal = expanding fontsize = 11 '
-                     f'text = "SOL_SUB_LEGEND" tooltip = "SOL_SUB_LEGEND_TOOLTIP" }}')
     lines.extend(render_group_columns(goods, variable_map, scope, f"{indent}\t"))
-    if show_supply_note and scope.startswith("Location."):
-        lines.append(f'{indent}\ttextbox = {{ using = tooltip_text_block_template max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
-    elif show_supply_note:
-        # Regular panels have no ExtraTooltipInfo; the tooltip template binds
-        # its font tint to that context even when the text itself is static.
-        lines.append(f'{indent}\ttext_multi = {{ layoutpolicy_horizontal = expanding autoresize = yes max_width = {GOODS_CONTENT_W} fontsize = 11 text = "SOL_F_GOODS_SUPPLY_NOTE" }}')
     lines.append(f"{indent}}}")
     return "\n".join(lines)
 

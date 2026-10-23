@@ -1,8 +1,13 @@
 """Emit the annual country-cache ranking consumed by SOL's HUD badge.
 
-Countries and estates are ranked by living standard (``sol_ls_sol*``, annual
-funds per thousand people with flat/percentage SOL bonuses), not by income or purchasing power. The world
-average is population-weighted; tiers compare a country's SOL with it.
+Countries and estates are ranked by living standard (``sol_ls_sol*``), not by
+income or purchasing power. The world average is population-weighted; tiers
+compare a country's SOL with it.
+
+Countries with a single location are excluded from the census, the ladder, the
+world average and every estate ranking. They are marked ``sol_ls_unranked`` for
+the GUI and the ranking map (striped), and still receive a tier against the
+world average of the ranked countries.
 
 The census and sorted pass read country variables only. Neighbour links are
 built while walking the sorted countries, without an N-by-N country scan.
@@ -67,7 +72,7 @@ def render_world_ranking() -> str:
     for i in (1, 2):
         lines.append(f"\tremove_global_variable = sol_ls_rank_previous_{i}")
     lines += ["\tevery_country = {", "\t\t# Clear vanished neighbours and excluded countries before rebuilding."]
-    for name in ("rank", "percentile", "tier", *NEIGHBOURS):
+    for name in ("rank", "percentile", "tier", "unranked", *NEIGHBOURS):
         lines.append(f"\t\tremove_variable = sol_ls_{name}")
     for estate in ESTATES:
         lines.extend([
@@ -76,7 +81,11 @@ def render_world_ranking() -> str:
         ])
     lines += [
         "\t\tif = {",
-        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_sol has_variable = sol_ls_pop_all }",
+        "\t\t\tlimit = { num_locations = 1 total_population > 0 has_variable = sol_ls_sol }",
+        "\t\t\tset_variable = { name = sol_ls_unranked value = 1 }",
+        "\t\t}",
+        "\t\tif = {",
+        "\t\t\tlimit = { total_population > 0 num_locations > 1 has_variable = sol_ls_sol has_variable = sol_ls_pop_all }",
         "\t\t\tif = {",
         "\t\t\t\tlimit = { var:sol_ls_pop_all > 0 }",
         "\t\t\t\tchange_global_variable = { name = sol_ls_rank_count add = 1 }",
@@ -109,7 +118,7 @@ def render_world_ranking() -> str:
         "\tif = {",
         "\t\tlimit = { global_var:sol_ls_rank_count > 0 }",
         "\t\tordered_country = {",
-        "\t\t\tlimit = { total_population > 0 num_locations > 0 has_variable = sol_ls_sol has_variable = sol_ls_pop_all var:sol_ls_pop_all > 0 }",
+        "\t\t\tlimit = { total_population > 0 num_locations > 1 has_variable = sol_ls_sol has_variable = sol_ls_pop_all var:sol_ls_pop_all > 0 }",
         "\t\t\torder_by = sol_ls_sol_order_value",
         "\t\t\tmax = global_var:sol_ls_rank_count",
         "\t\t\tcheck_range_bounds = no",
@@ -157,12 +166,21 @@ def render_world_ranking() -> str:
         "\t\t\t\tchange_global_variable = { name = sol_ls_tier_count_1 add = 1 }",
         "\t\t\t}", "\t\t}", "\t}",
     ]
+    lines += [
+        "\t# Unranked single-location countries still get a tier; they are not counted per tier.",
+        "\tevery_country = {",
+        "\t\tlimit = { has_variable = sol_ls_unranked }",
+        "\t\tif = { limit = { var:sol_ls_sol < sol_ls_low_tier_cutoff } set_variable = { name = sol_ls_tier value = 0 } }",
+        "\t\telse_if = { limit = { var:sol_ls_sol > sol_ls_high_tier_cutoff } set_variable = { name = sol_ls_tier value = 2 } }",
+        "\t\telse = { set_variable = { name = sol_ls_tier value = 1 } }",
+        "\t}",
+    ]
     for estate in ESTATES:
         lines += [
             "\tif = {",
             f"\t\tlimit = {{ global_var:sol_ls_rank_count_{estate} > 0 }}",
             "\t\tordered_country = {",
-            f"\t\t\tlimit = {{ total_population > 0 num_locations > 0 has_variable = sol_ls_sol_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
+            f"\t\t\tlimit = {{ total_population > 0 num_locations > 1 has_variable = sol_ls_sol_{estate} has_variable = sol_ls_pop_{estate} var:sol_ls_pop_{estate} > 0 }}",
             f"\t\t\torder_by = sol_ls_{estate}_sol_order_value",
             f"\t\t\tmax = global_var:sol_ls_rank_count_{estate}",
             "\t\t\tcheck_range_bounds = no",

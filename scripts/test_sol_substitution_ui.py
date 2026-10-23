@@ -214,51 +214,24 @@ class SubstitutionUI(unittest.TestCase):
                 self.assertFalse(log, log)
         self.assertEqual(seen, set(SUBSTITUTION_LEVEL_ICONS))
 
-    def test_country_summary_states(self):
-        for status, key in ((0, 'SOL_SUB_DISABLED'), (1, 'SOL_SUB_PENDING'), (2, 'SOL_SUB_SUMMARY')):
-            mocks = scenarios.substitution_mocks('Player.MakeScope', status) + scenarios.situation()
-            eng, log = self.engine(mocks)
-            source = render_goods_vbox(['cloth'], 'gls_country_consumes', 'Player.MakeScope', '')
-            node = parse(source)[0]
-            element = eng.ex.build(node.key, node.value, {}, '<country goods>', 0)
-            summary = next(e for e in element.children if 'raw_text' in e.props)
-            text = eng.text_of(summary)
-            if status == 2:
-                self.assertIn('1337', text)
-                self.assertIn('42', text)
-                self.assertIn('33.0%', text)
-            else:
-                self.assertEqual(text, eng.loc.get(key))
-                self.assertNotIn('1337', text)
-            self.assertFalse(log)
+    def test_no_explanatory_text_in_goods_block(self):
+        # Player-facing rule: no summary/legend lines above the groups and no
+        # explanatory notes in each good's hover, on every surface.
+        for scope in ('Player.MakeScope', 'Location'):
+            source = render_goods_vbox(['cloth'], 'gls_country_consumes', scope, '')
+            for key in ('SOL_SUB_SUMMARY', 'SOL_SUB_LEGEND', 'SOL_SUB_SCOPE_NOTE'):
+                self.assertNotIn(key, source)
 
-    def test_country_supply_note_has_no_tooltip_context(self):
+    def test_supply_legend_removed_everywhere(self):
         for target in ('stable', 'sol_standalone', 'sol_pp_compatibility_submod', 'sol_jtg_compatibility_submod'):
-            path = ROOT / 'src' / target / 'in_game/gui/panels/situation/global_living_standard.gui'
-            nodes = parse(path.read_text(encoding='utf-8-sig'), str(path))
-            def find_note(items):
-                for node in items:
-                    if node.is_block():
-                        if any(n.key == 'text' and n.value == 'SOL_F_GOODS_SUPPLY_NOTE' for n in node.value):
-                            return node
-                        found = find_note(node.value)
-                        if found is not None:
-                            return found
-            note = find_note(nodes)
-            self.assertIsNotNone(note, target)
-            for language in ('english', 'simp_chinese'):
-                eng, log = self.engine(scenarios.situation(), language)
-                element = eng.ex.build(note.key, note.value, {}, str(path), 0)
-                self.assertNotIn('ExtraTooltipInfo', repr(element.props))
-                self.assertEqual(element.props.get('multiline'), 'yes')
-                self.assertEqual(int(element.props['max_width']), GOODS_CONTENT_W)
-                eng.measure(element, GOODS_CONTENT_W)
-                self.assertEqual(eng.text_of(element), eng.loc.get('SOL_F_GOODS_SUPPLY_NOTE'))
-                self.assertFalse(log, log)
+            for rel in ('in_game/gui/panels/situation/global_living_standard.gui',):
+                text = (ROOT / 'src' / target / rel).read_text(encoding='utf-8-sig')
+                self.assertNotIn('SOL_F_GOODS_SUPPLY_NOTE', text, target)
 
+    def test_tooltip_text_block_outside_tooltip_is_flagged(self):
         # Prove that the original misuse is caught by the renderer, while a real
         # location tooltip continues to supply the tint context.
-        bad = parse('textbox = { using = tooltip_text_block_template max_width = 500 text = "SOL_F_GOODS_SUPPLY_NOTE" }')[0]
+        bad = parse('textbox = { using = tooltip_text_block_template max_width = 500 text = "SOL_SUB_MULTIPLIER" }')[0]
         eng, log = self.engine(scenarios.situation())
         eng.measure(eng.ex.build(bad.key, bad.value, {}, '<bad panel note>', 0), 500)
         self.assertIn('ExtraTooltipInfo.GetTintColor', log)

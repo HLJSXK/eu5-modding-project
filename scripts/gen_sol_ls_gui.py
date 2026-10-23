@@ -231,8 +231,7 @@ def balance_sections(base: int, scope: str, prefix: str, width: int) -> list[str
     return out
 
 
-def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[str],
-                *, show_supply_note: bool = True, show_summary: bool = True) -> list[str]:
+def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[str]) -> list[str]:
     i = T(base)
     out = [
         f'{i}hbox = {{ layoutpolicy_horizontal = expanding',
@@ -240,8 +239,7 @@ def goods_block(base: int, key: str, variable_map: str, scope: str, goods: list[
         f'{i}\texpand = {{}}',
         f'{i}}}',
     ]
-    out.extend(render_goods_vbox(goods, variable_map, scope, i,
-                                 show_supply_note=show_supply_note, show_summary=show_summary).splitlines())
+    out.extend(render_goods_vbox(goods, variable_map, scope, i).splitlines())
     return out
 
 
@@ -289,7 +287,6 @@ UI_STRINGS = {
         "SOL_C_BASELINE_SHORT": "Base",
         "SOL_C_FUNDS_BASELINE_TOOLTIP": "Available funds / baseline consumption. The first number is money available for consumption; the second is the cost of the baseline basket.",
         "SOL_C_BALANCE_TOOLTIP": "Raw purchasing power = available funds / baseline consumption - 1. The bar uses separate linear scales from -100% to 0% and from 0% to +200%; the number shows the full raw value.",
-        "SOL_F_GOODS_SUPPLY_NOTE": "Count / gold line: supplied goods in group. Dim: no cached supply.",
         "SOL_F_DASHBOARD_FUNDS": "Available funds",
         "SOL_F_DASHBOARD_BASELINE": "Baseline consumption",
         "SOL_F_DASHBOARD_NO_CONSUMPTION": "No consumption",
@@ -316,11 +313,6 @@ UI_STRINGS = {
         "SOL_SUB_ACTIVE": "Active",
         "SOL_SUB_PENDING": "Awaiting refresh",
         "SOL_SUB_DISABLED": "Disabled",
-        "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] goods · max change [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
-        "SOL_SUB_SUMMARY_TOOLTIP": "Year of the last country substitution refresh, number of eligible goods and largest absolute SOL commodity modifier. This modifier includes the external demand offset; it differs from the substitution multiplier. Market weights refresh yearly and on full recalculation.",
-        "SOL_SUB_SCOPE_NOTE": "The multiplier applies country-wide; price weights come from the cached market basket.",
-        "SOL_SUB_LEGEND": "Below goods: substitution level; dim: no supply; repeated: shared group",
-        "SOL_SUB_LEGEND_TOOLTIP": "The icon below each good shows one of seven country substitution levels: three decreases, unchanged, and three increases. Levels appear after the country calculation, including for locally unavailable goods. Dim goods indicate no cached supply. Goods in multiple groups appear in each group; their spending is counted only once.",
     },
     "simp_chinese": {
         "PERFORM_global_living_standard_recalculate_ACTION": "生活水平已重算",
@@ -340,7 +332,6 @@ UI_STRINGS = {
         "SOL_C_BASELINE_SHORT": "基准",
         "SOL_C_FUNDS_BASELINE_TOOLTIP": "可支配资金 / 基准消费。前一个数字为可用于消费的资金，后一个数字为基准消费篮子的支出。",
         "SOL_C_BALANCE_TOOLTIP": "原始购买力＝可支配资金 / 基准消费 - 1。进度条在 0% 两侧分别线性显示（-100% 至 +200%）；数字仍显示完整原值。",
-        "SOL_F_GOODS_SUPPLY_NOTE": "计数与金线＝组内有供应商品比例；暗色＝缓存中无供应。",
         "SOL_F_DASHBOARD_FUNDS": "可支配资金",
         "SOL_F_DASHBOARD_BASELINE": "基准消费",
         "SOL_F_DASHBOARD_NO_CONSUMPTION": "无消费",
@@ -367,11 +358,6 @@ UI_STRINGS = {
         "SOL_SUB_ACTIVE": "已启用",
         "SOL_SUB_PENDING": "待刷新",
         "SOL_SUB_DISABLED": "已关闭",
-        "SOL_SUB_SUMMARY": "[Player.MakeScope.ScriptValue('sol_substitute_year_display')|0] 年 · [Player.MakeScope.ScriptValue('sol_substitute_goods_count_display')|0] 种商品 · 最大修正 [Player.MakeScope.ScriptValue('sol_substitute_max_size_display')|1%]",
-        "SOL_SUB_SUMMARY_TOOLTIP": "最近一次国家替代刷新的年份、参与商品数与 SOL 商品修正的最大绝对幅度。修正计入外部需求影响，与替代倍率不同。市场权重按年或完整重算时更新。",
-        "SOL_SUB_SCOPE_NOTE": "倍率在全国统一生效；价格权重来自缓存的市场商品篮子。",
-        "SOL_SUB_LEGEND": "下排图标：替代等级 · 灰：无供应 · 重复：跨组",
-        "SOL_SUB_LEGEND_TOOLTIP": "每个商品下方的图标表示国家替代的七个等级：三级降低、不变、三级提高。国家完成计算后显示，包括本地无供应的商品；商品本体灰显仍表示缓存中无供应。跨组商品会在每个所属组内显示，消费支出仍只计一次。",
     },
 }
 

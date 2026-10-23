@@ -392,6 +392,8 @@ class LivingStandardTests(unittest.TestCase):
         for item in (settled, tribal):
             solve(LivingStandardRuntime(), item)
             item.population = item.variables["sol_ls_pop_all"]
+        # Single-location countries are unranked; give the tribal fixture a second (empty) location.
+        tribal.locations.append(Scope("location"))
         ranking = RankingRuntime([settled, tribal])
         ranking.refresh()
         self.assertIn("sol_ls_rank", tribal.variables)

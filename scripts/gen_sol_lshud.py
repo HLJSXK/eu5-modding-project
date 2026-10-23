@@ -185,11 +185,12 @@ LOC_ENGLISH = {
 _FOUR_SECTION_EN = {
     "SOL_LSHUD4_S4_VALUE": f"#high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0]",
     "SOL_LSHUD4_S4_PENDING": "Pending",
+    "SOL_LSHUD4_S4_UNRANKED": "Unranked",
     "SOL_LSHUD4_DASH": "—",
     "SOL_LSHUD4_NATION": "Nation",
     "SOL_LSHUD4_TIER_PENDING": "Living-standard tier pending the 1 January ranking",
     "SOL_LSHUD4_T1_TITLE": "Living standard",
-    "SOL_LSHUD4_T1_SUB": "Money people have to spare each year per 1,000 people.",
+    "SOL_LSHUD4_T1_SUB": "The overall quality of people's food, housing and daily life.",
     "SOL_LSHUD4_T1_TABLE": "Nation and estates",
     "SOL_LSHUD4_COL_ESTATE": "Estate",
     "SOL_LSHUD4_COL_POP": "Population (k)",
@@ -208,6 +209,7 @@ _FOUR_SECTION_EN = {
     "SOL_LSHUD4_T4_TITLE": "World ranking",
     "SOL_LSHUD4_T4_SUB": "Living standard compared with the rest of the world.",
     "SOL_LSHUD4_T4_NATION": "National rank",
+    "SOL_LSHUD4_T4_UNRANKED": "Countries with a single location are not ranked.",
     "SOL_LSHUD4_T4_ESTATES": "Estate ranks",
     "SOL_LSHUD4_T4_NOTE": "Estate ranks include only countries with that estate. The percentile bar is the share of countries surpassed.",
 }

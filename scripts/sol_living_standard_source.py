@@ -88,12 +88,12 @@ def render_building_sources() -> str:
 def render_modifier_type_localization(language: str) -> str:
     entries = {
         "english": (
-            ("Local Living Standard", "Adds a fixed amount to each estate's living standard, in annual units per thousand people. Living standard = fixed bonuses + (1 + summed percentage bonuses) * annual liquid funds per thousand, floored at zero. Affects migration attraction, population growth and rankings; adds no funds and does not change purchasing power or demand."),
-            ("Local Living Standard Modifier", "Percentage bonuses add together and multiply only annual liquid funds per thousand, with a minimum multiplier of zero. Fixed living-standard bonuses are added afterward. Affects migration attraction, population growth and rankings; adds no funds and does not change purchasing power or demand."),
+            ("Local Living Standard", "Raises the local living standard."),
+            ("Local Living Standard Modifier", "Raises the local living standard by a percentage."),
         ),
         "simp_chinese": (
-            ("本地生活水平", "为各阶层增加固定生活水平，单位为每千人每年。生活水平 = 固定值之和 +（1 + 百分比之和）× 千人均年流动资金，最低为0。只影响移民吸引力、人口增长和排行；不增加资金，不改变购买力或需求。"),
-            ("本地生活水平比例修正", "百分比修正相加后只乘千人均年流动资金，乘数最低为0，再加固定生活水平修正。只影响移民吸引力、人口增长和排行；不增加资金，不改变购买力或需求。"),
+            ("本地生活水平", "提高当地的生活水平。"),
+            ("本地生活水平比例修正", "按比例提高当地的生活水平。"),
         ),
     }[language]
     lines = [f"l_{language}:"]
@@ -117,14 +117,14 @@ def render_feedback_modifiers() -> str:
 def render_feedback_localization(language: str) -> str:
     entries = {
         "english": (
-            ("SOL Living Standard: Migration", "Local living standard adds 0.02 migration attraction per SOL, up to +0.5 at 25 SOL."),
-            ("SOL Living Standard: Low Population Growth", "Local living standard below 0.1 reduces population growth by 0.1 percentage points."),
-            ("SOL Living Standard: High Population Growth", "Local living standard above 10 increases population growth by 0.1 percentage points."),
+            ("SOL Living Standard: Migration", "A higher local living standard attracts more migrants."),
+            ("SOL Living Standard: Low Population Growth", "A very low local living standard slows population growth."),
+            ("SOL Living Standard: High Population Growth", "A high local living standard speeds up population growth."),
         ),
         "simp_chinese": (
-            ("SOL生活水平：移民吸引力", "当地生活水平每增加1点，移民吸引力增加0.02点；生活水平达到25时封顶为+0.5点。"),
-            ("SOL生活水平：人口增长减缓", "当地生活水平低于0.1时，人口增长率降低0.1个百分点。"),
-            ("SOL生活水平：人口增长加快", "当地生活水平高于10时，人口增长率提高0.1个百分点。"),
+            ("SOL生活水平：移民吸引力", "当地生活水平越高，越能吸引移民。"),
+            ("SOL生活水平：人口增长减缓", "当地生活水平过低，人口增长变慢。"),
+            ("SOL生活水平：人口增长加快", "当地生活水平较高，人口增长加快。"),
         ),
     }[language]
     lines = [f"l_{language}:"]
