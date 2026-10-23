@@ -53,9 +53,13 @@ GAME_GUI = Path(
 UTF8_BOM = b"\xef\xbb\xbf"
 
 from sol_goods_order import GROUP_TIERS
-from sol_goods_ui import GROUP_LABELS as SHORT_GROUP_LABELS, TIER_LABELS
+from sol_goods_ui import GROUP_LABELS as SHORT_GROUP_LABELS, TIER_LABELS, TIER_TEXTURES
 
 CONTENT_W = 420
+# Substitute rows: label column (inset + tier icon + text) and chips fill CONTENT_W.
+LABEL_INSET, TIER_ICON, LABEL_TEXT_W = 6, 16, 96
+LABEL_W = LABEL_INSET + TIER_ICON + 4 + LABEL_TEXT_W     # 122
+CHIP_W = 72                                              # 122 + 4 + 4 * 72 + 3 * 2 = 420
 PRICE_TIERS = (
     ("2", "<0.40", "r < 0.40", "G"),
     ("1.5", "<0.65", "0.40 <= r < 0.65", "G"),
@@ -165,6 +169,22 @@ def _all_goods() -> list[str]:
 
 
 # ------------------------------------------------------------------------ gui text
+def gold_frame(indent: str, name: str, width: int, height: int, visible: str) -> list[str]:
+    """Current-item highlight shared by price tiers and substitute chips.
+
+    A faint gold fill plus four flat one-unit edges; this avoids the thick bevel
+    of a framed tile. Laid over its parent with ignore_layout.
+    """
+    lines = [f'{indent}widget = {{ name = "{name}" size = {{ {width} {height} }} ignore_layout = yes visible = "[{visible}]"',
+             f'{indent}\tbackground = {{ using = color_gold_texture alpha = 0.07 }}']
+    for w, h, x, y in ((width, 1, 0, 0), (width, 1, 0, height - 1),
+                       (1, height - 2, 0, 1), (1, height - 2, width - 1, 1)):
+        lines.append(f'{indent}\twidget = {{ size = {{ {w} {h} }} position = {{ {x} {y} }} '
+                     'background = { using = color_gold_texture alpha = 0.65 } }')
+    lines.append(f'{indent}}}')
+    return lines
+
+
 def goods_block() -> str:
     """Static memberships and price legend; safe with only Goods in context."""
     by_good, by_group = _memberships()
@@ -174,27 +194,40 @@ def goods_block() -> str:
         '\t\ttext_single = { size = { 420 23 } autoresize = no text = "SOL_GOOD_SUBSTITUTES_HEADER" fontsize = 15 align = left|nobaseline }',
         "\t\tdivider_center_gold = {}",
     ]
-    for _, groups in GROUP_TIERS:
+    for tier, groups in GROUP_TIERS:
         for group in groups:
             members = by_group[group]
             lines += [
                 f'\t\thbox = {{ visible = "[{_member_condition(members)}]" layoutpolicy_horizontal = expanding spacing = 4',
-                f'\t\t\ttext_single = {{ size = {{ 108 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline text = "SOL_GOOD_GROUP_{group}" tooltip = "SOL_GOOD_GROUP_{group}" }}',
+                # Same tier icons as the panel group headers (sol_goods_ui._tier_header).
+                f'\t\t\thbox = {{ size = {{ {LABEL_W} 27 }} layoutpolicy_horizontal = fixed spacing = 0',
+                f'\t\t\t\twidget = {{ size = {{ {LABEL_INSET} 1 }} }}',
+                f'\t\t\t\ticon = {{ size = {{ {TIER_ICON} {TIER_ICON} }} texture = "gfx/interface/sol_proto/{TIER_TEXTURES[tier]}" texture_density = 2 }}',
+                '\t\t\t\twidget = { size = { 4 1 } }',
+                f'\t\t\t\ttext_single = {{ size = {{ {LABEL_TEXT_W} 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline text = "SOL_GOOD_GROUP_{group}" tooltip = "SOL_GOOD_GROUP_{group}" }}',
+                '\t\t\t}',
                 "\t\t\tvbox = { layoutpolicy_horizontal = expanding spacing = 2",
             ]
             # Explicit wrapping; a layout box does not wrap at its available width.
             for start in range(0, len(members), 4):
                 lines.append("\t\t\t\thbox = { layoutpolicy_horizontal = expanding spacing = 2")
                 for good in members[start:start + 4]:
-                    lines.append(
-                        '\t\t\t\t\ttext_single = { size = { 75 27 } autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
-                        f'using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{good}\')]" tooltip = "{good}" }}'
-                    )
+                    lines += [
+                        f'\t\t\t\t\twidget = {{ size = {{ {CHIP_W} 27 }}',
+                        f'\t\t\t\t\t\ttext_single = {{ size = {{ {CHIP_W} 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
+                        f'using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{good}\')]" tooltip = "{good}" }}',
+                        # The hovered good itself is framed like the current price tier.
+                        *gold_frame('\t\t\t\t\t\t', f'sol_sub_chip_current_{good}', CHIP_W, 27,
+                                    f"EqualTo_string(Goods.GetKey, '{good}')"),
+                        '\t\t\t\t\t}',
+                    ]
                 lines += ["\t\t\t\t\texpand = {}", "\t\t\t\t}"]
             lines += ["\t\t\t}", "\t\t}"]
     lines += [
         "\t}",
-        '\tblock "sol_goods_price_context" { using = SOL_goods_price_tiers }',
+        # Price tiers need a market; only SpecificGoodsMarket_tooltip overrides this.
+        # Generic goods tooltips (e.g. from pop needs) have no market, so show nothing.
+        '\tblock "sol_goods_price_context" {}',
     ]
     return "\n".join(lines) + "\n"
 
@@ -242,19 +275,8 @@ def price_template(market: bool = False) -> str:
     for index, (weight, label, interval, color) in enumerate(PRICE_TIERS):
         lines.append(f'\t\t\tvbox = {{ size = {{ 58 40 }} layoutpolicy_horizontal = fixed spacing = 2 using = bg_number_container_bckg tooltip = "SOL_GOOD_PRICE_TIER_{index}"')
         if market:
-            lines += [
-                f'\t\t\t\twidget = {{ name = "sol_price_tier_active_{index}" size = {{ 58 40 }} ignore_layout = yes '
-                f'visible = "[{price_tier_condition(interval)}]"',
-                '\t\t\t\t\tbackground = { using = color_gold_texture alpha = 0.07 }',
-            ]
-            # Four flat one-unit edges avoid the thick bevel of a framed tile.
-            for width, height, x, y in ((58, 1, 0, 0), (58, 1, 0, 39),
-                                       (1, 38, 0, 1), (1, 38, 57, 1)):
-                lines.append(
-                    f'\t\t\t\t\twidget = {{ size = {{ {width} {height} }} position = {{ {x} {y} }} '
-                    'background = { using = color_gold_texture alpha = 0.65 } }'
-                )
-            lines.append('\t\t\t\t}')
+            lines += gold_frame('\t\t\t\t', f'sol_price_tier_active_{index}', 58, 40,
+                                price_tier_condition(interval))
         lines += [
             f'\t\t\t\ttext_single = {{ size = {{ 58 19 }} autoresize = no align = center fontsize = 13 raw_text = "#{color} ×{weight}#!" }}',
             f'\t\t\t\ttext_single = {{ size = {{ 58 17 }} autoresize = no align = center fontsize = 11 raw_text = "{label}" }}',
@@ -329,7 +351,7 @@ def gui_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
     source = source_path.read_text(encoding="utf-8-sig", errors="replace")
     if "\ufeff" in source:
         source = source.replace("\ufeff", "")
-    patched = inject(source) + price_template()
+    patched = inject(source)
     relative = Path("main_menu") / "gui" / "shared" / "goods_details.gui"
     market_source = VANILLA_MARKET_GUI.read_text(encoding="utf-8-sig")
     market_relative = Path("in_game/gui/shared/market_tooltips.gui")
@@ -351,7 +373,7 @@ def _good_line(good: str, by_good: dict, by_group: dict, language: str) -> str:
         label = GROUP_LABELS[group][index]
         icons = " ".join(f"@{peer}!" for peer in peers)
         suffix = "" if abs(factor - 1.0) < 1e-9 else f" #E x{factor:g}#!"
-        parts.append(f"{label}: {icons}{suffix}")
+        parts.append(f"{label} {icons}{suffix}")
     return "\\n".join(parts) if parts else NONE_LABEL[language][1]
 
 
@@ -386,7 +408,7 @@ def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
             lines.append(f' SOL_GOOD_SUB_{good}: "{_good_line(good, by_good, by_group, language)}"')
             # Selected only by the location hover when the market entry exists.
             weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', Location.GetMarket.MakeScope)"
-            lines.append(f' SOL_SUB_PRICE_{good}: "$SOL_SUB_PRICE_WEIGHT$: [{weight}.GetValue|2]"')
+            lines.append(f' SOL_SUB_PRICE_{good}: "$SOL_SUB_PRICE_WEIGHT$ [{weight}.GetValue|2]"')
         lines.append("")
         text = "\n".join(lines)
         for root in roots:

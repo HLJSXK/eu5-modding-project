@@ -138,6 +138,16 @@ def text(t, w=None, h=None, fs=None, fmt=None, raw=False, font=None, align="left
     return " ".join(parts)
 
 
+def sol_icon(fs=14):
+    """Inline SOL unit icon as its own text.
+
+    A texticon scales with the font of the text it sits in, and header fonts
+    widen it so it overlaps the last digit. Big header-font numbers therefore
+    keep the icon in a separate default-font text, so its size matches the rows.
+    """
+    return text("@sol_living_standard!", None, None, fs=fs, align="left|nobaseline", raw=True)
+
+
 def rule(w, alpha=0.45):
     return f"widget = {{ size = {{ {w} 1 }} background = {{ using = color_gold_texture alpha = {alpha} }} }}"
 
@@ -256,7 +266,8 @@ def row_source():
     s1 = f"""{medallion(28, 20)}
 				hbox = {{ name = "sol_lshud4_s1_ready" visible = "[{READY}]" spacing = 8
 					hbox = {{ name = "sol_lshud4_s1_value" spacing = 2
-						{text(f"[{V('sol_ls_sol')}|1] @sol_living_standard!", None, None, fs=16, font='Font_Type_Headers', fmt='#high', raw=True)}
+						{text(f"[{V('sol_ls_sol')}|1]", None, None, fs=16, font='Font_Type_Headers', fmt='#high', raw=True)}
+						{sol_icon()}
 					}}
 					hbox = {{ name = "sol_lshud4_s1_change" spacing = 1 visible = "[{IS('sol_ls_sol_yoy')}]"
 						{text(trend_select('SOL_LSHUD_TREND_ICON'), None, None, fs=13)}
@@ -375,7 +386,11 @@ def tooltip_living_standard():
 					vbox = {{
 						{text(tier_select('SOL_LSHUD_TITLE'), 210, 22, fs=15, font='Font_Type_Headers', visible=f'[{TIERED}]')}
 						{text('SOL_LSHUD4_TIER_PENDING', 210, 22, fs=13, fmt='#weak', visible=f'[Not({TIERED})]')}
-						{text(f"[{V('sol_ls_sol')}|1] @sol_living_standard!", 190, 30, fs=26, font='Font_Type_Headers', fmt='#high', raw=True)}
+						hbox = {{ name = "sol_lshud4_sol_hero_value" size = {{ 190 30 }} spacing = 4
+							{text(f"[{V('sol_ls_sol')}|1]", None, None, fs=26, font='Font_Type_Headers', fmt='#high', raw=True)}
+							{sol_icon()}
+							expand = {{}}
+						}}
 					}}
 					expand = {{}}
 					widget = {{ size = {{ 150 56 }}
@@ -448,14 +463,17 @@ def tooltip_rank():
     w = W_RANK
 
     def ladder(name, ctx, visible, me=False):
+        # Vanilla country row: small flag + [Country.GetName] link (hoverable, country tooltip).
+        # Widths: 34 + 30 + 136 + 140 + 60 + 4 + 6 * 6 spacing = 440 of 460.
         rel = (f"FixedPointToFloat(Divide_CFixedPoint({V('sol_ls_sol', 'Country')}, "
                f"Max_CFixedPoint({G('sol_ls_top_sol')}, {fp(0.01)})))")
         return f"""
 				hbox = {{ name = "{name}" size = {{ {w} 24 }} visible = "{visible}" spacing = 6 datacontext = "[{ctx}]"
 					{outline(w, 24) if me else ''}
 					{text(f"[{V('sol_ls_rank', 'Country')}|0]", 34, 24, fmt='#weak', align='right|nobaseline', raw=True)}
-					{text('[Country.GetNameWithNoTooltip]', 150, 24, fmt='#high' if me else None, raw=True)}
-					{bar(rel, 160, 8, 'gold' if me else 'steel')}
+					country_flag_very_small = {{ datacontext = "[Country]" }}
+					{text('[Country.GetName]', 136, 24, fmt='#high' if me else None, raw=True)}
+					{bar(rel, 140, 8, 'gold' if me else 'steel')}
 					expand = {{}}
 					{text(f"[{V('sol_ls_sol', 'Country')}|1] @sol_living_standard!", 60, 24, align='right|nobaseline', raw=True)}
 					widget = {{ size = {{ 4 1 }} }}
@@ -486,8 +504,10 @@ def tooltip_rank():
 					{text(f'SOL_LSHUD4_ESTATE_RANK_{e.upper()}', cols[2], 26, fs=13, align='right|nobaseline', visible=f'[{ranked}]')}
 					{text('SOL_LSHUD4_DASH', cols[2], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f'[Not({ranked})]')}
 					widget = {{ size = {{ {cols[3]} 26 }} widget = {{ size = {{ {cols[3] - 8} 8 }} position = {{ 4 9 }} {bar(f"FixedPointToFloat({V('sol_ls_percentile_' + e)})", cols[3] - 8, 8)} }} }}
-					widget = {{ size = {{ {cols[4]} 26 }} visible = "[GetGlobalVariable('sol_ls_top_1_{e}').IsSet]"
-						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_sol_' + e)}|1] @sol_living_standard!", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
+					hbox = {{ size = {{ {cols[4]} 26 }} spacing = 3 visible = "[GetGlobalVariable('sol_ls_top_1_{e}').IsSet]"
+						expand = {{}}
+						country_flag_mini = {{ datacontext = "[{best}]" }}
+						{text(f"[{best}.GetName] [{G('sol_ls_top_sol_' + e)}|1] @sol_living_standard!", None, None, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
 					}}
 				}}"""
 
@@ -629,9 +649,11 @@ def mocks(state):
         (r"GetGlobalVariable\('sol_ls_(?:rank_count|top_1)_(\w+)'\)\.IsSet", lambda m: not rank_pending and m[1] in ESTATE_COUNT),
         (r"GetGlobalVariable\('sol_ls_rank_count_(\w+)'\)\.GetValue", lambda m: ESTATE_COUNT.get(m[1], 0)),
         (r"GetGlobalVariable\('sol_ls_top_sol_(\w+)'\)\.GetValue", lambda m: ESTATE_BEST.get(m[1], ("", 0))[1]),
-        (r"GetGlobalVariable\('sol_ls_top_1_(\w+)'\)\.GetCountry\.GetNameWithNoTooltip",
+        (r"GetGlobalVariable\('sol_ls_top_1_(\w+)'\)\.GetCountry\.GetName\b",
          lambda m: ESTATE_BEST.get(m[1], ("", 0))[0]),
         (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
+        # Ranking rows carry vanilla small flags; the preview draws a placeholder.
+        (r"GetCountryCoatOfArms\(.*\)|CoatOfArmsWrapper\.GetTexture\(.*\)", "gfx/interface/icons/flat_icons/country.dds"),
     ] + fixtures.state_mocks(overrides, rank, ready) + situation
 
 

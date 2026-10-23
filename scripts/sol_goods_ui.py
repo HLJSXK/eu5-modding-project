@@ -125,7 +125,7 @@ def _good_cell(indent: str, good: str, consumed: str, scope: str) -> list[str]:
     multiplier = f"[{country}.ScriptValue('sol_substitute_{good}_display')|2]" if good in CORE else "1.00"
     tooltip_lines = [f"@{good}! [Localize('{good}')]",
                      f"[Localize('SOL_GOOD_SUB_{good}')]",
-                     f"[Localize('SOL_SUB_MULTIPLIER')]: {multiplier}",
+                     f"[Localize('SOL_SUB_MULTIPLIER')] {multiplier}",
                      substitution_status(country)]
     if scope.startswith("Location."):
         weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', {scope})"

@@ -117,14 +117,14 @@ def render_feedback_modifiers() -> str:
 def render_feedback_localization(language: str) -> str:
     entries = {
         "english": (
-            ("SOL Living Standard: Migration", "A higher local living standard attracts more migrants."),
-            ("SOL Living Standard: Low Population Growth", "A very low local living standard slows population growth."),
-            ("SOL Living Standard: High Population Growth", "A high local living standard speeds up population growth."),
+            ("SOL Living Standard", "A higher local living standard attracts more migrants."),
+            ("SOL Low Living Standard", "A very low local living standard slows population growth."),
+            ("SOL High Living Standard", "A high local living standard speeds up population growth."),
         ),
         "simp_chinese": (
-            ("SOL生活水平：移民吸引力", "当地生活水平越高，越能吸引移民。"),
-            ("SOL生活水平：人口增长减缓", "当地生活水平过低，人口增长变慢。"),
-            ("SOL生活水平：人口增长加快", "当地生活水平较高，人口增长加快。"),
+            ("SOL生活水平", "当地生活水平越高，越能吸引移民。"),
+            ("SOL生活水平过低", "当地生活水平过低，人口增长变慢。"),
+            ("SOL生活水平较高", "当地生活水平较高，人口增长加快。"),
         ),
     }[language]
     lines = [f"l_{language}:"]

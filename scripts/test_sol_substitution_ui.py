@@ -574,13 +574,20 @@ class SubstitutionUI(unittest.TestCase):
                     highlights = [e.props['name'] for e in visible_walk(eng, root)
                                   if str(e.props.get('name', '')).startswith('sol_price_tier_active_')]
                     self.assertEqual(highlights, ['sol_price_tier_active_4'] if market else [])
+                    # The hovered good is framed in every substitute group it belongs to.
+                    chips = [e.props['name'] for e in visible_walk(eng, root)
+                             if str(e.props.get('name', '')).startswith('sol_sub_chip_current_')]
+                    self.assertEqual(chips, ['sol_sub_chip_current_wine'] * 2)
                     if market:
                         ratio_line = next(e for e in visible_walk(eng, root)
                                           if 'SOL_GOOD_MARKET_RATIO_PREFIX' in str(e.props.get('raw_text', '')))
                         self.assertGreaterEqual(ratio_line.w, 400)
                         self.assertLessEqual(ratio_line.h, 50)
                     weights = [text for text in texts if '×' in text]
-                    self.assertEqual(len(weights), 7)
+                    # No market, no tier table: a table without a current tier is not shown.
+                    self.assertEqual(len(weights), 7 if market else 0)
+                    if not market:
+                        self.assertNotIn(eng.loc.get('SOL_GOOD_PRICE_TIERS'), texts)
                     self.assertLessEqual(width, 444)
                     self.assertLessEqual(height, 1080)
                     self.assertFalse(log, log)
@@ -623,10 +630,9 @@ class SubstitutionUI(unittest.TestCase):
         # Verify that selecting a tier really changes its pixels, while the
         # unselected columns retain the generic legend's appearance.
         images = []
-        for market in (False, True):
-            eng, log = self.goods_engine('wine', 1.42 if market else None)
-            template = 'SOL_goods_market_price_tiers' if market else 'SOL_goods_price_tiers'
-            node = parse(f'vbox = {{ using = {template} }}')[0]
+        for ratio in (1.0, 1.42):
+            eng, log = self.goods_engine('wine', ratio)
+            node = parse('vbox = { using = SOL_goods_market_price_tiers }')[0]
             root = eng.ex.build(node.key, node.value, {}, '<price tier pixels>', 0)
             width, height = eng.measure(root, None)['hint']
             eng.place(root, 0, 0, width, height)
@@ -635,11 +641,12 @@ class SubstitutionUI(unittest.TestCase):
             row = next(e for e in visible_walk(eng, root) if e.kind == 'hbox')
             images.append((image, row.children))
             self.assertFalse(log, log)
+        # Moving from tier 3 (x1) to tier 4 (x0.75) changes exactly those two columns.
         plain, columns = images[0]
         selected = images[1][0]
         for index, column in enumerate(columns):
             rect = (int(column.x), int(column.y), int(column.x + column.w), int(column.y + column.h))
-            self.assertEqual(plain.crop(rect).tobytes() == selected.crop(rect).tobytes(), index != 4)
+            self.assertEqual(plain.crop(rect).tobytes() == selected.crop(rect).tobytes(), index not in (3, 4))
 
     def test_goods_price_legend_intervals_match_runtime(self):
         from sol_substitution import price_weight

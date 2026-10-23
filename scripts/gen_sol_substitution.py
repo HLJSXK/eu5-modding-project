@@ -25,13 +25,14 @@ def main():
         "in_game/common/auto_modifiers/SOL_substitute_global_modifiers.txt": render_modifiers(),
         "in_game/common/scripted_triggers/SOL_substitution_triggers.txt": 'sol_substitution_is_on = {\n\tsol_sol_is_on = yes\n\tOR = { NOT = { has_global_variable_map = cmm } has_global_variable = sol_substitution_enabled }\n}\n',
     }
+    # Names carry no colon: breakdowns split a name at the colon and right-align the rest.
     for language, label, description in (
-        ("english", "Goods substitution", "Adjusts population demand for ${good}$ through goods substitution."),
-        ("simp_chinese", "商品替代", "商品替代调整${good}$的人口需求。"),
+        ("english", "Goods substitution (${good}$)", "Adjusts population demand for ${good}$ through goods substitution."),
+        ("simp_chinese", "商品替代（${good}$）", "商品替代调整${good}$的人口需求。"),
     ):
         content = f"l_{language}:\n"
         for good in CORE:
-            content += f' AUTO_MODIFIER_NAME_sol_substitute_{good}: "{label}: ${good}$"\n'
+            content += f' AUTO_MODIFIER_NAME_sol_substitute_{good}: "{label.format(good=good)}"\n'
             content += f' AUTO_MODIFIER_DESC_sol_substitute_{good}: "{description.format(good=good)}"\n'
         files[f"main_menu/localization/{language}/SOL_substitution_modifiers_l_{language}.yml"] = content
     failed = False
