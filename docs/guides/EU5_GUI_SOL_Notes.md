@@ -52,7 +52,7 @@ it through `GetMapMode('...').SetMapMode` on a single left click, following
 Glorp UI `location_window.gui:2617–2633`. Native dispatch examples are in
 `.eu5-base/reference_game_files/game/in_game/gui/cooltip.gui`; typed scope
 promotion is documented by `data_types_script.txt:438,1776`.
-Map menu icons reuse the existing complete-mip SOL DDS.
+Map menu icons are looked up by key (`MAP_MODES_ICON_PATH` + key + `.dds`). `gen_sol_lshud.py` builds all four from `assets/icons/sol_living_standard.png` via `compose_sol_mapmode_icons.variant_dds()`: the bowl, plus a lower-right badge (coins / up arrow / ⇄) for purchasing power, ranking and substitution. It must not copy the base DDS; the old copy step silently erased the badges (2026-10-24).
 
 `test_sol_map_modes.py` executes the shipped income/power/rank value paths,
 varies applied solver scales independently, and checks both targets' map
