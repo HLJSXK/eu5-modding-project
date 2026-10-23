@@ -36,7 +36,8 @@ class CadenceRuntime(Runtime):
             ROOT/'src'/target/'in_game/common/on_action/SOL_economy_on_actions.txt')}
         economy = {n.key:n.value for n in read_nodes(
             ROOT/'src'/target/'in_game/common/scripted_effects/A_SOL_economy_effects.txt')}
-        for name in ('sol_apply_local_pop_demand_modifiers','sol_update_local_pop_demand_modifiers'):
+        for name in ('sol_apply_local_pop_demand_modifiers','sol_update_local_pop_demand_modifiers',
+                     'sol_apply_location_living_standard_modifiers', 'sol_clear_location_living_standard_modifiers'):
             self.effects[name] = deepcopy(economy[name])
         # Keep the generated size expression and metadata; adapt only the native
         # modifier write, which the shared offline fixture does not implement.
@@ -57,6 +58,7 @@ class CadenceRuntime(Runtime):
             set_variable = { name = sol_country_demand_solve_status value = 1 }
             every_owned_location = {
                 set_variable = { name = sol_location_pop_demand_modifier_size value = 0.25 }
+                set_variable = { name = sol_location_sol value = 12 }
             }
         ''')
 
@@ -103,6 +105,32 @@ def country(human=False,cached=True):
 
 
 class CadenceTests(unittest.TestCase):
+    def test_feedback_reapplies_ai_cache_monthly_and_refreshes_on_anniversary(self):
+        for target in TARGETS:
+            rt, c = CadenceRuntime(target), country()
+            place = c.locations[0]
+            place.variables['sol_location_sol'] = 2
+            for _ in range(12):
+                rt.pulse('sol_local_pop_demand_monthly_pulse', c)
+                self.assertAlmostEqual(place.modifiers['sol_living_standard_migration_modifier'], .04)
+                self.assertNotIn('sol_living_standard_high_growth_modifier', place.modifiers)
+            self.assertEqual(rt.calls['sol_solve_country_pop_demand'], 0)
+            rt.pulse('sol_ai_yearly_pop_demand_pulse', c)
+            self.assertEqual(rt.calls['sol_solve_country_pop_demand'], 1)
+            self.assertAlmostEqual(place.modifiers['sol_living_standard_migration_modifier'], .24)
+            self.assertEqual(place.modifiers['sol_living_standard_high_growth_modifier'], 1)
+
+    def test_feedback_and_demand_clear_on_disabled_monthly_pulse(self):
+        rt, c = CadenceRuntime('stable'), country()
+        place = c.locations[0]
+        place.variables['sol_location_sol'] = 0
+        rt.pulse('sol_local_pop_demand_monthly_pulse', c)
+        self.assertIn('sol_living_standard_low_growth_modifier', place.modifiers)
+        rt.master = False
+        rt.pulse('sol_substitution_cleanup_monthly_pulse', c)
+        self.assertFalse(place.modifiers)
+        self.assertEqual(rt.calls['sol_solve_country_pop_demand'], 0)
+
     def test_ai_cached_months_ignore_all_snapshot_changes_and_substitution_modes(self):
         for target in TARGETS:
             for enabled in (False,True):

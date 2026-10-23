@@ -12,8 +12,9 @@ import unittest
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from sol_living_standard_source import (ESTATES, SOL_ONLY_TOKENS, public_name, render_effects,
-                                        render_values)
+from sol_living_standard_source import (ESTATES, SOL_ONLY_TOKENS, FEEDBACK_MODIFIERS,
+                                        public_name, render_effects, render_values,
+                                        render_feedback_modifiers, render_feedback_localization)
 from test_sol_substitution import Runtime, Scope, parse
 from sol_lshud_income_source import render_income_effects, render_income_values
 
@@ -31,6 +32,7 @@ SOL_EFFECTS = {
     "sol_ls_accumulate_country_living_standard",
     "sol_ls_finalize_country_living_standard",
     "sol_ls_recalculate_world_ranking",
+    "sol_apply_location_living_standard_modifiers",
     # Calls sol_compute_location_living_standard as its final statement only.
     "sol_compute_location_pop_demand",
 }
@@ -117,6 +119,98 @@ def mentions_sol(node):
 
 
 class LivingStandardTests(unittest.TestCase):
+    def test_feedback_boundaries_and_native_units(self):
+        runtime = LivingStandardRuntime()
+        modifiers = {n.key: {c.key: c.value for c in n.value}
+                     for n in parse(render_feedback_modifiers())}
+        migration, low, high = FEEDBACK_MODIFIERS
+        place = Scope("location")
+        for sol, attraction, growth in ((0, 0, -.001), (.09999, .0019998, -.001),
+                                        (.1, .002, 0), (1, .02, 0), (5, .1, 0),
+                                        (10, .2, 0), (10.00001, .2000002, .001),
+                                        (24.99999, .4999998, .001), (25, .5, .001),
+                                        (25.00001, .5, .001), (100, .5, .001)):
+            with self.subTest(sol=sol):
+                place.variables['sol_location_sol'] = sol
+                # Reapply twice to verify replacement rather than accumulation.
+                for _ in range(2):
+                    runtime.run('sol_apply_location_living_standard_modifiers', place)
+                self.assertAlmostEqual(place.modifiers[migration] * float(modifiers[migration]['local_migration_attraction']), attraction)
+                actual_growth = sum(place.modifiers.get(name, 0) * float(modifiers[name]['local_population_growth'])
+                                    for name in (low, high))
+                self.assertAlmostEqual(actual_growth, growth)
+                self.assertFalse(low in place.modifiers and high in place.modifiers)
+
+    def test_missing_sol_clears_feedback_and_is_neutral(self):
+        runtime, place = LivingStandardRuntime(), Scope('location')
+        for sol in (0, 20):
+            place.variables['sol_location_sol'] = sol
+            runtime.run('sol_apply_location_living_standard_modifiers', place)
+            del place.variables['sol_location_sol']
+            runtime.run('sol_apply_location_living_standard_modifiers', place)
+            self.assertFalse(place.modifiers)
+        runtime.run('sol_clear_location_living_standard_modifiers', place)
+        self.assertFalse(place.modifiers)
+
+    def test_feedback_follows_local_sol_and_modifier_without_changing_demand(self):
+        runtime, country = LivingStandardRuntime(), Scope('country')
+        poor = location(country, {'commoners': .001}, {'commoners': 5}, {'peasants': 1})
+        rich = location(country, {'commoners': 1}, {'commoners': 5}, {'peasants': 1})
+        solve(runtime, country)
+        snapshots = [dict(place.variables) for place in country.locations]
+        for place in country.locations:
+            runtime.run('sol_apply_location_living_standard_modifiers', place)
+        self.assertIn(FEEDBACK_MODIFIERS[1], poor.modifiers)
+        self.assertIn(FEEDBACK_MODIFIERS[2], rich.modifiers)
+        for place, before in zip(country.locations, snapshots):
+            self.assertEqual(place.variables, before)
+        boosted = LivingStandardRuntime({'sol_location_local_sol_modifier_value': 11})
+        solve(boosted, country)
+        boosted.run('sol_apply_location_living_standard_modifiers', poor)
+        self.assertIn(FEEDBACK_MODIFIERS[2], poor.modifiers)
+        self.assertNotIn(FEEDBACK_MODIFIERS[1], poor.modifiers)
+        for place, before in zip(country.locations, snapshots):
+            for name, value in before.items():
+                if 'sol_total' not in name and name != 'sol_location_sol':
+                    self.assertEqual(place.variables[name], value, name)
+
+    def test_feedback_uses_existing_apply_pass_and_cleanup_paths(self):
+        for target in BASE_TARGETS:
+            effects = {node.key: node.value for _, node in effects_of(target)}
+            apply_nodes = list(walk(effects['sol_apply_local_pop_demand_modifiers']))
+            self.assertEqual(sum(n.key == 'every_owned_location' for n in apply_nodes), 1)
+            self.assertEqual(sum(n.key == 'sol_apply_location_living_standard_modifiers' for n in apply_nodes), 1)
+            feedback = list(walk(effects['sol_apply_location_living_standard_modifiers']))
+            self.assertFalse(any(n.key.startswith('every_') for n in feedback))
+            for node in feedback:
+                if node.key == 'add_location_modifier':
+                    fields = {n.key: n.value for n in node.value}
+                    self.assertEqual(fields['months'], '1')
+                    self.assertEqual(fields['mode'], 'replace')
+        for target in ('stable', 'sol_pp_compatibility_submod', 'sol_mnt_compatibility_submod'):
+            folder = ROOT / 'src' / target / 'in_game/common/scripted_effects'
+            path = next(folder.glob('*cmm_effects.txt'))
+            effects = {n.key.removeprefix('REPLACE:'): n.value for n in parse(path.read_text(encoding='utf-8-sig'))}
+            callbacks = list(walk(effects['sol_handle_cmf_callback']))
+            setting = next(n for n in callbacks if n.key == 'flag:sol__sol_on')
+            self.assertTrue(any(n.key == 'sol_clear_location_living_standard_modifiers' for n in walk([setting])))
+        actions = parse((ROOT / 'src/stable/in_game/common/on_action/SOL_economy_on_actions.txt').read_text(encoding='utf-8-sig'))
+        cleanup = next(n for n in actions if n.key == 'sol_substitution_cleanup_monthly_pulse')
+        self.assertTrue(any(n.key == 'sol_clear_location_living_standard_modifiers' for n in walk([cleanup])))
+
+    def test_generated_feedback_definitions_and_bilingual_names(self):
+        for target in BASE_TARGETS:
+            root = ROOT / 'src' / target / 'main_menu'
+            paths = {root / 'common/static_modifiers/SOL_living_standard_modifiers.txt': render_feedback_modifiers()}
+            for language in ('english', 'simp_chinese'):
+                paths[root / f'localization/{language}/SOL_living_standard_modifiers_l_{language}.yml'] = render_feedback_localization(language)
+            for path, expected in paths.items():
+                self.assertTrue(path.read_bytes().startswith(b'\xef\xbb\xbf'))
+                self.assertEqual(path.read_text(encoding='utf-8-sig'), expected)
+            definitions = parse(render_feedback_modifiers())
+            for definition in definitions:
+                self.assertEqual(next(n.value for n in definition.value if n.key == 'game_data')[0].value, 'location')
+
     def test_zero_modifier_is_annual_funds_per_thousand(self):
         runtime, country = LivingStandardRuntime(), fixture()
         solve(runtime, country)

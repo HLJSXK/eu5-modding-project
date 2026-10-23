@@ -73,12 +73,58 @@ existing algorithms. Tribesmen with population now participate normally.
 | Location tooltip, situation panel bars, HUD section 2, purchasing-power map | purchasing power; existing presentation retained |
 | HUD tier/title and world/estate ranking, ranking map tooltip | SOL amount; no percent format or subtract-one conversion |
 | Living-standard map and situation data map | local SOL; red at 0, yellow at world average, green at 3× world average |
+| Local migration attraction and population growth | cached population-weighted local SOL; see gameplay feedback below |
 | HUD section 1 income and YoY | per-capita net income, unchanged |
 
 Map tooltip bands are ≥2× world average (high), ≥1× (medium), ≥0.5× (low),
 otherwise very low. Until a positive world average exists, the map uses a named
 fallback of 6 annual units. Values remain uncapped; colors saturate. The
 situation panel retains its existing title and purchasing-power bars.
+
+## Gameplay feedback (2026-10-23)
+
+The user's current specification replaces the unavailable early plan. The source
+is `scripts/sol_living_standard_source.py`; `gen_sol_economy_effects.py` also
+generates three native location static modifiers and their English/Chinese names.
+All five deploy targets receive the feature through stable/standalone or their
+SOL dependency, independently of the economic-balance compatibility setting.
+
+| Local SOL | Migration attraction | Population growth change |
+|---|---|---|
+| 0 | 0 | -0.1 percentage points |
+| 0 < SOL < 0.1 | 0.02 × SOL | -0.1 percentage points |
+| 0.1 ≤ SOL ≤ 10 | 0.02 × SOL | 0 |
+| 10 < SOL < 25 | 0.02 × SOL | +0.1 percentage points |
+| SOL ≥ 25 | +0.5 | +0.1 percentage points |
+| No cache (including a solved zero-population location) | no modifier | no modifier |
+
+This uses the location's population-weighted SOL amount, not national SOL, a
+world-relative ratio, purchasing power, or the solver's demand coefficient.
+The growth change is additive `local_population_growth = ±0.001`, not a
+multiplier of the existing growth rate, and affects the whole location.
+
+`sol_apply_location_living_standard_modifiers` runs inside the existing monthly
+`sol_apply_local_pop_demand_modifiers` traversal. Native modifiers last one month
+and use `mode = replace`. Crossing thresholds removes the opposite growth
+modifier immediately; the inclusive middle range removes both. Missing SOL
+clears all three modifiers. No new traversal or economic cache is introduced:
+human SOL refreshes monthly; reduced-frequency AI retains its cached SOL until
+its annual solve. Initial/start/load/manual refreshes apply feedback immediately.
+An acquired location with no cache stays neutral until its scheduled solve;
+existing local SOL follows the same cached-data policy as demand. Empty or
+ownerless locations stop receiving renewal and expire within a month.
+
+The SOL master switch clears feedback immediately in base, PP and M&T setting
+callbacks, with monthly cleanup as a fallback. Standalone remains always enabled.
+Tests execute the generated effects for strict thresholds, caps, repeated writes,
+transitions, missing caches, local versus national values, local SOL modifiers,
+unchanged demand inputs, AI cadence and disabling. Actual migration flows,
+growth settlement and native modifier tooltips still require in-game acceptance.
+
+Initial feature acceptance: all 146 script tests passed, including Windows UI regression
+renders; all five targets passed generation consistency checks, and changed mod
+files passed static validation. Shared/workspace knowledge, enum, route and
+migration-coverage checks passed. No game session was launched for this change.
 
 ## Adding a building modifier (next step)
 

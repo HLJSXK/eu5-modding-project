@@ -170,11 +170,11 @@ class Runtime:
                 target[name] = result
             elif key in ('remove_variable', 'remove_local_variable'):
                 (self.local_context if key == 'remove_local_variable' else scope.variables).pop(val, None)
-            elif key == 'remove_country_modifier': scope.modifiers.pop(val, None)
-            elif key == 'add_country_modifier':
+            elif key in ('remove_country_modifier', 'remove_location_modifier'): scope.modifiers.pop(val, None)
+            elif key in ('add_country_modifier', 'add_location_modifier'):
                 fields = {n.key: n.value for n in val}
                 # Match the current 1.4 source schema; the engine rejects name=.
-                scope.modifiers[fields['modifier']] = self.value(fields['size'], scope)
+                scope.modifiers[fields['modifier']] = self.value(fields.get('size', '1'), scope)
             elif key == 'save_scope_as': self.saved[val] = scope
             elif key in ('remove_from_global_variable_map', 'add_to_global_variable_map'):
                 fields = {n.key: n.value for n in val}

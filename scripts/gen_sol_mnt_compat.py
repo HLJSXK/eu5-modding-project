@@ -977,7 +977,7 @@ def _append_callback(
     if setting_id == "substitution":
         lines.extend(["\t\tevery_country = { sol_clear_country_substitution = yes }", "\t\tif = { limit = { sol_sol_is_on = yes } gls_recalculate_global_living_standard = yes }"])
     if setting_id == "sol_on":
-        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier } } }")
+        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier sol_clear_location_living_standard_modifiers = yes } } }")
     lines.append("\t\t}")
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the stable/standalone SOL economy effects, country solver and SOL values.
+"""Generate SOL economy effects, country solver, values and gameplay feedback modifiers.
 
 The output is emitted by Python code in :mod:`sol_economy_effects_source`.
 Only data-dependent repetitions (currently the market refresh block) are
@@ -30,7 +30,11 @@ from sol_country_demand_solver_source import (  # noqa: E402
     render_country_demand_solver,
 )
 from sol_economy_effects_source import render_static_sections  # noqa: E402
-from sol_living_standard_source import render_values as render_living_standard_values  # noqa: E402
+from sol_living_standard_source import (  # noqa: E402
+    render_values as render_living_standard_values,
+    render_feedback_modifiers,
+    render_feedback_localization,
+)
 
 TARGET_NAMES = ("stable", "sol_standalone")
 OUTPUT_RELATIVE = (
@@ -81,6 +85,17 @@ def _values_output_path(target: str) -> Path:
     return REPO_ROOT / "src" / target / Path(*VALUES_OUTPUT_RELATIVE)
 
 
+def _auxiliary_outputs(target: str) -> dict[Path, str]:
+    root = REPO_ROOT / "src" / target
+    outputs = {
+        _values_output_path(target): render_living_standard_values(),
+        root / "main_menu/common/static_modifiers/SOL_living_standard_modifiers.txt": render_feedback_modifiers(),
+    }
+    for language in ("english", "simp_chinese"):
+        outputs[root / f"main_menu/localization/{language}/SOL_living_standard_modifiers_l_{language}.yml"] = render_feedback_localization(language)
+    return outputs
+
+
 def _write_utf8_bom(path: Path, text: str) -> None:
     path.write_bytes(UTF8_BOM + text.encode("utf-8"))
 
@@ -119,13 +134,13 @@ def _check_target(target: str) -> bool:
         return False
 
     ok = True
-    values_path = _values_output_path(target)
-    if not values_path.exists() or not _has_utf8_bom(values_path):
-        print(f"[FAIL] Missing or non-BOM generated target: {values_path.relative_to(REPO_ROOT)}")
-        ok = False
-    elif values_path.read_text(encoding="utf-8-sig") != render_living_standard_values():
-        print(f"[FAIL] Out of date: {values_path.relative_to(REPO_ROOT)}")
-        ok = False
+    for path, expected in _auxiliary_outputs(target).items():
+        if not path.exists() or not _has_utf8_bom(path):
+            print(f"[FAIL] Missing or non-BOM generated target: {path.relative_to(REPO_ROOT)}")
+            ok = False
+        elif path.read_text(encoding="utf-8-sig") != expected:
+            print(f"[FAIL] Out of date: {path.relative_to(REPO_ROOT)}")
+            ok = False
     if not _has_utf8_bom(output_path):
         print(f"[FAIL] Missing UTF-8 BOM: {output_path.relative_to(REPO_ROOT)}")
         ok = False
@@ -165,9 +180,9 @@ def _write_target(target: str) -> None:
     economy, solver = _render_target(target)
     _write_utf8_bom(output_path, economy)
     _write_utf8_bom(solver_output_path, solver)
-    values_path = _values_output_path(target)
-    values_path.parent.mkdir(parents=True, exist_ok=True)
-    _write_utf8_bom(values_path, render_living_standard_values())
+    for path, content in _auxiliary_outputs(target).items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_utf8_bom(path, content)
     print(
         "[gen_sol_economy_effects] Wrote "
         f"{output_path.relative_to(REPO_ROOT)} and "

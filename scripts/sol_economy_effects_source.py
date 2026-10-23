@@ -2000,6 +2000,7 @@ def emit_section_40_country_update_and_map(writer: ScriptWriter) -> None:
         "\t\t\t\tmode = replace",
         "\t\t\t\tsize = var:sol_location_pop_demand_modifier_size",
         "\t\t\t}",
+        "\t\t\tsol_apply_location_living_standard_modifiers = yes",
         "\t\t}",
         "\t}",
         "}",

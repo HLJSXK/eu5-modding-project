@@ -5812,6 +5812,7 @@ sol_apply_local_pop_demand_modifiers = {
 				mode = replace
 				size = var:sol_location_pop_demand_modifier_size
 			}
+			sol_apply_location_living_standard_modifiers = yes
 		}
 	}
 }
@@ -7379,4 +7380,39 @@ sol_ls_finalize_country_living_standard = {
 		limit = { var:sol_ls_pop_tribesmen > 0 }
 		set_variable = { name = sol_ls_sol_tribesmen value = { value = var:sol_ls_sol_total_tribesmen divide = var:sol_ls_pop_tribesmen } }
 	}
+}
+
+# Location scope. Read the scheduled SOL cache in the existing monthly apply pass.
+# No new traversal or calculation cadence; an absent cache is neutral.
+sol_apply_location_living_standard_modifiers = {
+	if = {
+		limit = { has_variable = sol_location_sol }
+		add_location_modifier = {
+			modifier = sol_living_standard_migration_modifier
+			months = 1
+			mode = replace
+			size = { value = var:sol_location_sol multiply = 0.02 min = 0 max = 0.5 }
+		}
+		if = {
+			limit = { var:sol_location_sol < 0.1 }
+			add_location_modifier = { modifier = sol_living_standard_low_growth_modifier months = 1 mode = replace }
+			remove_location_modifier = sol_living_standard_high_growth_modifier
+		}
+		else_if = {
+			limit = { var:sol_location_sol > 10 }
+			add_location_modifier = { modifier = sol_living_standard_high_growth_modifier months = 1 mode = replace }
+			remove_location_modifier = sol_living_standard_low_growth_modifier
+		}
+		else = {
+			remove_location_modifier = sol_living_standard_low_growth_modifier
+			remove_location_modifier = sol_living_standard_high_growth_modifier
+		}
+	}
+	else = { sol_clear_location_living_standard_modifiers = yes }
+}
+
+sol_clear_location_living_standard_modifiers = {
+	remove_location_modifier = sol_living_standard_migration_modifier
+	remove_location_modifier = sol_living_standard_low_growth_modifier
+	remove_location_modifier = sol_living_standard_high_growth_modifier
 }

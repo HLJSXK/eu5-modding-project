@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Added local SOL gameplay feedback: migration attraction rises by 0.02 per SOL up to +0.5 at 25 SOL; population growth changes by -0.1 percentage points below 0.1 SOL and +0.1 percentage points above 10 SOL. Existing monthly application and AI calculation cadence are preserved, with bilingual modifiers and SOL-disable cleanup across compatibility callbacks.
 - Corrected the SOL formula and population weighting: annual liquid funds per thousand + SOL modifier (floor 0), displayed as an amount in titles and rankings. Tribesmen retain SOL without baseline baskets. Both living-standard maps use world-relative colors (0 / average / 3× average; positive fallback 6). Purchasing power and demand remain unchanged.
 
 - Separated living standard (SOL) from purchasing power. Purchasing power (available funds / baseline consumption) remains the only demand input; living standard is annual liquid funds per thousand people plus an annual per-thousand SOL modifier, with modifier hooks currently zero. This prepares buildings that raise living standard without adding spendable money.
