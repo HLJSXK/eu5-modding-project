@@ -1186,6 +1186,7 @@ BUTTON_ANCHOR_RE = re.compile(
 SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-standard tooltip.
 \t\t\t\t\t\t\t\t\tnavigational_button_alt = {
 \t\t\t\t\t\t\t\t\t\tsize = {38 38}
+\t\t\t\t\t\t\t\t\t\tvisible = "[Location.HasOwner]"
 
 \t\t\t\t\t\t\t\t\t\tblockoverride "icon_texture" {
 \t\t\t\t\t\t\t\t\t\t\tpiechart = {

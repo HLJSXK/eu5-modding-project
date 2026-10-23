@@ -161,7 +161,7 @@ def bar(value, w, h=8, colour="steel"):
 
 
 def estate_visible(e):
-    return f"[GreaterThan_CFixedPoint({V('sol_ls_pop_' + e)}, {fp(0)})]"
+    return panel.estate_visible(e)
 
 
 def goods_flag(slot, good):
@@ -342,7 +342,7 @@ def tooltip_living_standard():
 				hbox = {{ name = "{name}" size = {{ {w} {h} }} layoutpolicy_horizontal = expanding spacing = 0 {'' if hero else f'visible = "{estate_visible(label)}"'}
 					{deco}
 					widget = {{ size = {{ {padding} 1 }} }}
-					{text('SOL_LSHUD4_NATION' if hero else 'SOL_ESTATE_' + label.upper(), cols[0], h, fs=fs, font='Font_Type_Headers' if hero else None)}
+					{text('SOL_LSHUD4_NATION' if hero else 'SOL_ESTATE_' + label.upper(), cols[0], h, fs=fs, font='Font_Type_Headers' if hero else None, extra='' if hero else panel.estate_tooltip(label))}
 					{text(f"[{V(pop)}|0]", cols[1], h, fs=fs, align='right|nobaseline', raw=True)}
 					{text(f"[{V(sol)}|1] @sol_living_standard!", cols[2], h, fs=fs, align='right|nobaseline', fmt='#high', raw=True, extra='margin_left = 6')}
 					{text(f"{trend_select('SOL_LSHUD_TREND_ICON', cls_var)} [{V(yoy_var)}|+=1%]", cols[3], h, fs=fs, align='right|nobaseline', raw=True, visible=f"[{IS(yoy_var)}]")}
@@ -479,7 +479,7 @@ def tooltip_rank():
 				hbox = {{ name = "sol_lshud4_rank_{e}" size = {{ {w} 26 }} visible = "{estate_visible(e)}" spacing = 4
 					{zebra(w, 26) if i % 2 == 0 else ''}
 					widget = {{ size = {{ 2 1 }} }}
-					{text('SOL_ESTATE_' + e.upper(), cols[0], 26, fs=13)}
+					{text('SOL_ESTATE_' + e.upper(), cols[0], 26, fs=13, extra=panel.estate_tooltip(e))}
 					{text(f"[{V('sol_ls_sol_' + e)}|1] @sol_living_standard!", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True, visible=f"[{IS('sol_ls_sol_' + e)}]")}
 					{text('SOL_LSHUD4_DASH', cols[1], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f"[Not({IS('sol_ls_sol_' + e)})]")}
 					{text(f'SOL_LSHUD4_ESTATE_RANK_{e.upper()}', cols[2], 26, fs=13, align='right|nobaseline', visible=f'[{ranked}]')}

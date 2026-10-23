@@ -33,12 +33,33 @@ HEADER = (
 )
 F_TEX = "gfx/interface/sol_proto"
 F_ESTATES = ("nobles", "clergy", "burghers", "commoners", "tribesmen")
+ESTATE_KEYS = {
+    "nobles": "nobles_estate",
+    "clergy": "clergy_estate",
+    "burghers": "burghers_estate",
+    "commoners": "peasants_estate",
+    "tribesmen": "tribes_estate",
+}
 TOOLTIP_BASE = 4
 PANEL_BASE = 4
 LOC = "Location.MakeScope"
 MARKET = "Location.GetMarket.MakeScope"
 COUNTRY = "Player.MakeScope"
 BALANCE_MARGIN, BALANCE_LABEL_W, BALANCE_VALUES_W, BALANCE_GAP = 8, 110, 110, 10
+
+
+def estate_context(estate: str, country: str = "Player") -> str:
+    return f"{country}.GetGovernment.GetEstateFromKey('{ESTATE_KEYS[estate]}')"
+
+
+def estate_visible(estate: str, country: str = "Player") -> str:
+    # Vanilla shared/cards.gui uses this predicate, independently of population.
+    return f"[{estate_context(estate, country)}.ExistsForCountry]"
+
+
+def estate_tooltip(estate: str, country: str = "Player") -> str:
+    return (f'datacontext = "[{estate_context(estate, country)}]" '
+            'tooltipwidget = { using = Estate_tooltip } alwaystransparent = no')
 
 
 def T(n: int) -> str:
@@ -147,7 +168,7 @@ def balance_scale(base: int, width: int) -> list[str]:
 
 
 def balance_row(base: int, scope: str, funds: str, need: str, label: str,
-                width: int, hero: bool = False) -> list[str]:
+                width: int, hero: bool = False, *, estate: str | None = None) -> list[str]:
     """Align label, track and right-aligned values in a compact two-line row."""
     i = T(base)
     margin, label_w, values_w = BALANCE_MARGIN, BALANCE_LABEL_W, BALANCE_VALUES_W
@@ -159,8 +180,12 @@ def balance_row(base: int, scope: str, funds: str, need: str, label: str,
     coef = f_coef(scope, funds, need)
     negative, positive, position = f_capacity_components(scope, funds, need)
     consumed = f"GreaterThan_CFixedPoint({scope}.ScriptValue('{need}'), '(CFixedPoint)0')"
+    country = "Location.GetOwner" if scope == LOC else scope.removesuffix(".MakeScope")
+    visibility = f' visible = "{estate_visible(estate, country)}"' if estate else ""
+    label_tooltip = (estate_tooltip(estate, country) if estate else
+                     'tooltip = "SOL_C_BALANCE_TOOLTIP" alwaystransparent = no')
     out = [
-        f'{i}widget = {{ name = "{row_name}" size = {{ {width} {row_h} }}',
+        f'{i}widget = {{ name = "{row_name}" size = {{ {width} {row_h} }}{visibility}',
         f'{i}\tbackground = {{ using = tooltip_table_field_texture alpha = {0.3 if hero else 0.12} }}',
     ]
     if hero:
@@ -169,7 +194,7 @@ def balance_row(base: int, scope: str, funds: str, need: str, label: str,
                             (1, row_h - 2, 0, 1), (1, row_h - 2, width - 1, 1)):
             out.append(f'{i}\twidget = {{ size = {{ {w} {h} }} position = {{ {x} {y} }} background = {{ using = color_gold_texture alpha = 0.6 }} }}')
     out.extend([
-        f'{i}\ttext_single = {{ name = "sol_balance_label" size = {{ {label_w} {line_h} }} position = {{ {margin} {top} }} autoresize = no fontsize = {14 if hero else 12} align = left|nobaseline text = "{label}" tooltip = "SOL_C_BALANCE_TOOLTIP" alwaystransparent = no }}',
+        f'{i}\ttext_single = {{ name = "sol_balance_label" size = {{ {label_w} {line_h} }} position = {{ {margin} {top} }} autoresize = no fontsize = {14 if hero else 12} align = left|nobaseline text = "{label}" {label_tooltip} }}',
         f'{i}\twidget = {{ size = {{ {bar_w} {16 if hero else 12} }} position = {{ {bar_x} {top + 6} }}',
     ])
     out.extend(capacity_bar(base + 2, bar_w, negative, positive, position, 12 if hero else 8))
@@ -200,7 +225,8 @@ def balance_sections(base: int, scope: str, prefix: str, width: int) -> list[str
     out.extend([f'{i}\t\t}}', f'{i}\t}}'])
     for estate in F_ESTATES:
         out.extend(balance_row(base + 1, scope, f"{prefix}_{estate}_liquid_display",
-                               f"{prefix}_{estate}_base_display", f"SOL_ESTATE_{estate.upper()}", width))
+                               f"{prefix}_{estate}_base_display", f"SOL_ESTATE_{estate.upper()}", width,
+                               estate=estate))
     out.extend([f'{i}}}'])
     return out
 

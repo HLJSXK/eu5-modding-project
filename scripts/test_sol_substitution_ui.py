@@ -337,7 +337,7 @@ class SubstitutionUI(unittest.TestCase):
                     root = eng.ex.build(node.key, node.value, {}, '<compact balances>', 0)
                     w, h = eng.measure(root, None)['hint']
                     eng.place(root, 0, 0, w, h)
-                    elements = list(walk(root))
+                    elements = list(visible_walk(eng, root))
                     ruler = [e for e in elements if e.props.get('name') == 'sol_balance_scale']
                     self.assertEqual(len(ruler), 1)
                     labels = ruler[0].children
@@ -351,8 +351,8 @@ class SubstitutionUI(unittest.TestCase):
                         self.assertLessEqual(left.x + left.w, right.x)
                     rows = [e for e in elements if e.props.get('name') == 'sol_balance_total_row'
                             or str(e.props.get('name', '')).startswith('sol_balance_estate_row_')]
-                    self.assertEqual(len(rows), 6)
-                    self.assertEqual([e.h for e in rows], [64, 42, 42, 42, 42, 42])
+                    self.assertEqual(len(rows), 5)  # no tribal estate in this government
+                    self.assertEqual([e.h for e in rows], [64, 42, 42, 42, 42])
                     right_edges = []
                     for index, row in enumerate(rows):
                         descendants = list(walk(row))
@@ -400,6 +400,64 @@ class SubstitutionUI(unittest.TestCase):
                     eng.render(root, preview)
                     if self.out:
                         preview.save(self.out / f'balances_{surface}_{language}.png')
+                    self.assertFalse(log, log)
+
+    def test_estate_hover_and_government_visibility_on_shipped_surfaces(self):
+        estate_keys = {'nobles': 'nobles_estate', 'clergy': 'clergy_estate',
+                       'burghers': 'burghers_estate', 'commoners': 'peasants_estate',
+                       'tribesmen': 'tribes_estate'}
+        for target in ('stable', 'sol_standalone', 'sol_pp_compatibility_submod', 'sol_jtg_compatibility_submod'):
+            for surface, country in (('location', 'Location.GetOwner'), ('country', 'Player')):
+                root_path = ROOT / 'src' / target / 'in_game/gui'
+                path = (root_path / ('SOL_economy_local.gui' if target in ('stable', 'sol_standalone') else 'zz_SOL_economy_local.gui')
+                        if surface == 'location' else root_path / 'panels/situation/global_living_standard.gui')
+                for exists in (False, True):
+                    with self.subTest(target=target, surface=surface, exists=exists):
+                        eng, log = self.engine([
+                            (re.escape(country) + r"\.GetGovernment\.GetEstateFromKey\('[^']+'\)\.ExistsForCountry", exists),
+                            # All sample population is zero: existence still controls the row.
+                            (r"(?:Player|Location)\.MakeScope\.ScriptValue\('[^']*pop[^']*'\)", 0),
+                        ] + (scenarios.tooltip() if surface == 'location' else scenarios.situation()))
+                        node = next(n for n in parse(path.read_text(encoding='utf-8-sig'), str(path)) if n.is_block())
+                        root = eng.ex.build(node.key, node.value, {}, str(path), node.line)
+                        elements = list(walk(root))
+                        total = next(e for e in elements if e.props.get('name') == 'sol_balance_total_row')
+                        self.assertTrue(eng.visible(total))
+                        total_label = next(e for e in walk(total) if e.props.get('name') == 'sol_balance_label')
+                        self.assertEqual(total_label.props['tooltip'], 'SOL_C_BALANCE_TOOLTIP')
+                        for estate, key in estate_keys.items():
+                            row = next(e for e in elements if e.props.get('name') == f'sol_balance_estate_row_{estate}')
+                            self.assertEqual(eng.visible(row), exists)
+                            label = next(e for e in walk(row) if e.props.get('name') == 'sol_balance_label')
+                            self.assertEqual(label.props['datacontexts'], [f"[{country}.GetGovernment.GetEstateFromKey('{key}')]"])
+                            self.assertEqual(label.props['alwaystransparent'], 'no')
+                            self.assertNotIn('tooltip', label.props)
+                            pushed = eng.push(label)
+                            try:
+                                self.assertEqual(eng.ev.item_stack[-1]['__type__'], 'Estate')
+                                self.assertEqual(eng.ev.item_stack[-1]['Estate.GetType'], key)
+                            finally:
+                                eng.pop(pushed)
+                            tip = eng.ex.build_lazy(label.tooltipwidget)
+                            self.assertTrue(any(e.props.get('text') == '[Estate.GetLongNameWithNoTooltip]' for e in walk(tip)))
+                        self.assertFalse(eng.unresolved_contexts, eng.unresolved_contexts)
+                        self.assertFalse(log, log)
+
+    def test_unowned_locations_hide_sol_button_in_all_windows(self):
+        import sync_location_window
+        import generate_sol_location_window
+        import gen_sol_mnt_compat
+        for target, generator in (('stable', sync_location_window),
+                                  ('sol_standalone', generate_sol_location_window),
+                                  ('sol_mnt_compatibility_submod', gen_sol_mnt_compat)):
+            with self.subTest(target=target):
+                path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'
+                self.assertIn(generator.SOL_BUTTON, path.read_text(encoding='utf-8-sig'))
+                node = parse(generator.SOL_BUTTON)[0]
+                for has_owner in (False, True):
+                    eng, log = self.engine([(r'Location.HasOwner', has_owner)])
+                    button = eng.ex.build(node.key, node.value, {}, str(path), node.line)
+                    self.assertEqual(eng.visible(button), has_owner)
                     self.assertFalse(log, log)
 
     def test_linear_capacity_bar_and_cursor(self):

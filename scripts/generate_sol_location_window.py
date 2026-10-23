@@ -38,6 +38,7 @@ BUTTON_ANCHOR_RE = re.compile(
 SOL_BUTTON = """							# SOL standalone insertion: location living-standard tooltip.
 							navigational_button_alt = {
 								size = {38 38}
+								visible = "[Location.HasOwner]"
 
 								blockoverride "icon_texture" {
 									piechart = {

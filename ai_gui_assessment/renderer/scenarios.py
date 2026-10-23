@@ -23,6 +23,11 @@ def substitution_mocks(country, status=2):
     ]
 
 COMMON = [
+    # Invented government setup: four estates exist, no tribal estate.
+    (r"(?:Player|Location\.GetOwner)\.GetGovernment\.GetEstateFromKey\('(nobles_estate|clergy_estate|burghers_estate|peasants_estate|tribes_estate)'\)\.ExistsForCountry",
+     lambda m: m[1] != "tribes_estate"),
+    (r"(?:Player|Location\.GetOwner)\.GetGovernment\.GetEstateFromKey\('(nobles_estate|clergy_estate|burghers_estate|peasants_estate|tribes_estate)'\)",
+     lambda m: {"__type__": "Estate", "Estate.GetType": m[1]}),
     (r"GetGraphicalCultureTexture\('(\w+)'\)", lambda m: GC.format(m.group(1))),
     (r"GetGraphicalCultureTextureForCountry\('(\w+)',.*\)", lambda m: GC.format(m.group(1))),
     (r"LateralView\.IsRightPanel", False),

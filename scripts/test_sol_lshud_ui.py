@@ -147,6 +147,31 @@ class LivingStandardHUD(unittest.TestCase):
                 self.assertIn(f"[GetMapMode('{mode}').SetMapMode]", source)
                 self.assertIsNotNone(section.tooltipwidget)
 
+    def assert_estate_hovers(self, eng, ex, tip, country, row_prefix):
+        keys = {'nobles': 'nobles_estate', 'clergy': 'clergy_estate',
+                'burghers': 'burghers_estate', 'commoners': 'peasants_estate',
+                'tribesmen': 'tribes_estate'}
+        for estate, key in keys.items():
+            row = next(e for e in hud.walk(tip) if e.props.get('name') == row_prefix + estate)
+            label = next(e for e in hud.walk(row) if e.props.get('text') == 'SOL_ESTATE_' + estate.upper())
+            self.assertEqual(label.props['datacontexts'], [f"[{country}.GetGovernment.GetEstateFromKey('{key}')]"])
+            self.assertEqual(label.props['alwaystransparent'], 'no')
+            native = ex.build_lazy(label.tooltipwidget)
+            self.assertTrue(any(e.props.get('text') == '[Estate.GetLongNameWithNoTooltip]' for e in hud.walk(native)))
+            # A missing estate with population is hidden; an existing zero-pop estate stays visible.
+            eng.ev.mocks.insert(0, (re.compile(re.escape(f"{country}.GetGovernment.GetEstateFromKey('{key}').ExistsForCountry")), estate == 'tribesmen'))
+            self.assertEqual(eng.visible(row), estate == 'tribesmen')
+
+    def test_estate_hovers_and_existence_ignore_cached_population(self):
+        for target in self.databases:
+            for language in ('english', 'simp_chinese'):
+                with self.subTest(target=target, language=language):
+                    eng, ex, _root, row, *_ = self.context(target, language, '')
+                    for idx, prefix in ((1, 'sol_lshud4_sol_'), (4, 'sol_lshud4_rank_')):
+                        section = next(e for e in hud.walk(row) if e.props.get('name') == f'sol_lshud4_section_{idx}')
+                        tip = ex.build_lazy(section.tooltipwidget)
+                        self.assert_estate_hovers(eng, ex, tip, 'Player', prefix)
+
     def test_foreign_country_map_tooltips_keep_the_primary_country(self):
         for target in self.databases:
             for language in ("english", "simp_chinese"):
@@ -187,6 +212,8 @@ class LivingStandardHUD(unittest.TestCase):
                         self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
                         if self.out:
                             image.save(self.out / f"{target}_{language}_{mode}.png")
+                        if idx == 4:
+                            self.assert_estate_hovers(eng, ex, tip, 'Scope.GetCountry', 'sol_lshud4_rank_')
 
     def test_leftrow_hides_when_left_panel_is_open_or_ui_is_disabled(self):
         for shown, attached, enabled in ((True, False, 1), (False, True, 1), (False, False, 0)):
@@ -207,7 +234,7 @@ class LivingStandardHUD(unittest.TestCase):
                     elements = list(visible_walk(eng, tip))
                     ruler = next(e for e in elements if e.props.get("name") == "sol_balance_scale")
                     tracks = [e for e in elements if e.props.get("name") == "sol_balance_track"]
-                    self.assertEqual(len(tracks), 6)
+                    self.assertEqual(len(tracks), 5)  # total plus four existing estates
                     for track in tracks:
                         self.assertEqual((track.x, track.w), (ruler.x, ruler.w))
                     for label, fraction in zip(ruler.children, (0, .25, .5, .75, 1)):

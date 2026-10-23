@@ -4,6 +4,29 @@ Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guid
 
 ## SOL scenario adapter
 
+### Estate hover, row visibility and ownerless locations (2026-10-24)
+
+**[Vanilla source + offline binding/layout tests; no in-game hot test, as requested.]**
+`gen_sol_ls_gui.py` owns the cache/display-name to estate-key map and shared
+`estate_context`, `estate_visible`, and `estate_tooltip` helpers. Estate labels
+bind the country government's estate object and use native `Estate_tooltip`;
+only the total balance row keeps `SOL_C_BALANCE_TOOLTIP` and its bilingual text.
+Whole estate rows use `ExistsForCountry`, as vanilla `shared/cards.gui:3908`
+does, so existing zero-population estates remain visible. This applies to
+stable/standalone location and country panels, PP/JTG overrides, HUD SOL/power/
+rank tables, and the map country ranking tooltip. Contexts are respectively
+`Location.GetOwner`, `Player`, and retained primary `Scope.GetCountry`.
+
+The stable, standalone and M&T location-window generators hide the entire SOL
+button with `Location.HasOwner`; ownerless locations have no SOL hover entry.
+Offline fixtures explicitly model estate existence independently of population.
+`test_sol_substitution_ui.py` checks shipped label contexts and buttons across
+targets; `test_sol_lshud_ui.py` checks HUD/map contexts and contradictory
+population/existence cases. Both retain Chinese/English render checks. Review
+images are in `../../ai_gui_assessment/images/estate_tooltips_20261024/`.
+Reusable API evidence, including `ShowGoodsName('key')`, lives in the shared
+anti-pattern registry and GUI guide; this update does not change goods labels.
+
 ### Map modes and four-section navigation (2026-10-23)
 
 **[Source + offline scope execution/rendering; native hover/selection pending.]**
