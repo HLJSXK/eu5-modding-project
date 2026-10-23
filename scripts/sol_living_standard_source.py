@@ -193,6 +193,8 @@ def population(estate: str) -> str:
 def render_values() -> str:
     lines = [
         HEADER.rstrip(), "",
+        "# Monthly liquid funds -> annual funds for living-standard accounting.",
+        "sol_ls_annualization_factor = { value = 12 }",
         "# Location SOL modifier: annual gold-equivalent per thousand, not baseline baskets.",
         "# Raises SOL only; adds no funds and is never read by demand.",
         f"sol_location_local_sol_modifier_value = {{ {LOCAL_MODIFIER_ALL} }}",
@@ -229,16 +231,19 @@ def render_effects() -> str:
     ]
     for metric in METRICS:
         lines.append(f"\tset_variable = {{ name = sol_ls_sol_total_{metric} value = 0 }}")
+        lines.append(f"\tset_variable = {{ name = sol_ls_pop_{metric} value = 0 }}")
     lines += [
         "}", "", "sol_ls_accumulate_country_living_standard = {",
-        "\t# Existing preparation pass, immediately after population/income accumulation.",
+        "\t# SOL and its population weights share the existing preparation pass.",
         "\tsave_scope_as = sol_ls_living_standard_location", "\towner = {",
     ]
     for metric in METRICS:
         total = location_total(None if metric == "all" else metric)
+        pop = "local_sol_population_sum" if metric == "all" else population(metric)
+        lines.append(f"\t\tchange_variable = {{ name = sol_ls_pop_{metric} add = scope:sol_ls_living_standard_location.{pop} }}")
         lines.append(f"\t\tchange_variable = {{ name = sol_ls_sol_total_{metric} add = scope:sol_ls_living_standard_location.var:{total} }}")
     lines += ["\t}", "}", "", "sol_ls_finalize_country_living_standard = {",
-              "\t# sol_ls_pop_* is complete in both solver paths; income finalize does not reset it."]
+              "\t# SOL and population totals are complete in both solver paths."]
     for metric in METRICS:
         name = public_name(metric)
         lines += [

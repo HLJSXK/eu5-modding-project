@@ -196,37 +196,24 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(rt.globals["sol_ls_world_sol"], 25)
 
     def test_first_january_ranks_current_living_standard_without_prior_year_samples(self):
-        from test_sol_lshud_income import IncomeRuntime, country_fixture, scale_income
-        from test_sol_living_standard import LivingStandardRuntime, solve
-
-        def solve_living_standard(item):
-            # Purchasing-power caches written by the same solver pass: funds = net income,
-            # four gold of baseline spending per location.
-            for place in item.locations:
-                for estate in ("nobles", "clergy", "burghers", "commoners", "tribesmen"):
-                    place.variables[f"sol_location_{estate}_liquid_funds"] = place.variables[f"sol_location_{estate}_net_income"]
-                    place.variables[f"sol_location_{estate}_base_spending"] = 4 if estate == "commoners" else 0
-                place.variables["sol_location_base_total_spending"] = 4
-            solve(LivingStandardRuntime(), item)
+        from test_sol_lshud_income import SolYoyRuntime, country_fixture, scale_funds
 
         for target in ("stable", "sol_standalone"):
             with self.subTest(target=target):
-                income = IncomeRuntime()
+                sampling = SolYoyRuntime()
                 player, ai = country_fixture(), country_fixture()
-                scale_income(ai, 2)
+                scale_funds(ai, 2)
                 # Startup samples exist, but no country has a full-year baseline.
                 for item in (player, ai):
-                    income.sample(item, year=1337, month=4, day=1)
-                    solve_living_standard(item)
+                    sampling.sample(item, year=1337, month=4, day=1)
                     item.population = 10
                 # Player keeps sampling monthly; reduced-frequency AI can still
                 # rank using its last solve. January has no prior-year baseline.
-                scale_income(player, 3)
-                income.sample(player, year=1338, month=1)
-                solve_living_standard(player)
+                scale_funds(player, 3)
+                sampling.sample(player, year=1338, month=1)
                 for item in (player, ai):
-                    self.assertNotIn("sol_ls_pci_yoy", item.variables)
-                    self.assertNotIn("sol_ls_pci_prev", item.variables)
+                    self.assertNotIn("sol_ls_sol_yoy", item.variables)
+                    self.assertNotIn("sol_ls_sol_prev", item.variables)
                 rt = RankingRuntime([player, ai])
                 original_value = rt.value
                 rt.value = lambda node, scope, initial=0.: 1 if node == "current_month" else original_value(node, scope, initial)

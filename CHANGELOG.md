@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Built the Glorp UI version of `location_window.gui` directly into the main SOL target without adding runtime dependencies. SOL vendors the required extracted vanilla types and its own zoom-button type, removes external Construction Manager automation calls, and adds the SOL income display and Living Standard tooltip button on top.
 
 ### Changed
+- Replaced the HUD's obsolete annual net income per thousand with living standard and its same-month annual change. Removed country income aggregation and retired HUD code, fused population weights into SOL accumulation, isolated new SOL history from legacy save samples, and added a dedicated unit icon to SOL tooltip amounts. Purchasing power and location income inputs are preserved.
 - The HUD living-standard tier, the world ranking and the SOL living-standard map (map mode and situation map) now use living standard instead of per-capita income. The purchasing-power HUD section, purchasing-power map and the panel bars still show purchasing power.
 - Migrated the SOL-JTG compatibility target to the merged Just Goods Workshop mod (`3785316314` / `moveably.goods`), expanding coverage to 26 direct-demand goods including the new clocks goods and neutralizing Just Goods regional demand modifiers.
 - Changed all SOL release targets to date-based `YYMMDD` mod versions, stamped automatically by the build workflow while keeping the EU5 compatibility version separate.

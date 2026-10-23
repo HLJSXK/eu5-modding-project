@@ -361,37 +361,34 @@ BOARD = [
 ]
 
 
-def country(tag, name, rank, pci, yoy, tier):
+def country(tag, name, rank, sol, yoy, tier):
     return {"__type__": "Country", "Self": tag, "GetNameWithNoTooltip": name, "GetName": name,
             "MakeScope.GetVariable('sol_ls_rank').GetValue": rank,
-            "MakeScope.GetVariable('sol_ls_pci').GetValue": pci,
-            # Annual SOL amounts used by the adopted four-section ranking fixture.
-            "MakeScope.GetVariable('sol_ls_sol').GetValue": pci * 12,
-            "MakeScope.GetVariable('sol_ls_pci_yoy').GetValue": yoy,
+            "MakeScope.GetVariable('sol_ls_sol').GetValue": sol,
+            "MakeScope.GetVariable('sol_ls_sol_yoy').GetValue": yoy,
             "MakeScope.GetVariable('sol_ls_tier').GetValue": tier}
 
 
 PLAYER_VARS = {
-    "sol_ls_sol": 18.0, "sol_ls_pci": 1.86, "sol_ls_pci_prev": 1.78, "sol_ls_pci_yoy": .045,
-    "sol_ls_pci_yoy_class": 1, "sol_ls_tier": 1, "sol_ls_rank": 12, "sol_ls_percentile": .87,
+    "sol_ls_sol": 18.0, "sol_ls_sol_prev": 17.22, "sol_ls_sol_yoy": .045,
+    "sol_ls_sol_yoy_class": 1, "sol_ls_tier": 1, "sol_ls_rank": 12, "sol_ls_percentile": .87,
     "sol_ls_pop_nobles": 41, "sol_ls_pop_clergy": 88, "sol_ls_pop_burghers": 520, "sol_ls_pop_commoners": 7770,
     "sol_ls_pop_tribesmen": 0,
-    "sol_ls_pci_nobles": 38.40, "sol_ls_pci_clergy": 14.20, "sol_ls_pci_burghers": 6.85, "sol_ls_pci_commoners": 1.12,
-    "sol_ls_pci_tribesmen": 0,
-    "sol_ls_pci_yoy_nobles": .061, "sol_ls_pci_yoy_clergy": .018, "sol_ls_pci_yoy_burghers": -.023,
-    "sol_ls_pci_yoy_commoners": .041, "sol_ls_pci_yoy_tribesmen": 0,
-    "sol_ls_pci_yoy_class_nobles": 2, "sol_ls_pci_yoy_class_clergy": 1, "sol_ls_pci_yoy_class_burghers": -1,
-    "sol_ls_pci_yoy_class_commoners": 1, "sol_ls_pci_yoy_class_tribesmen": 1,
+    "sol_ls_sol_nobles": 38.40, "sol_ls_sol_clergy": 14.20, "sol_ls_sol_burghers": 6.85, "sol_ls_sol_commoners": 1.12,
+    "sol_ls_sol_tribesmen": 0,
+    "sol_ls_sol_yoy_nobles": .061, "sol_ls_sol_yoy_clergy": .018, "sol_ls_sol_yoy_burghers": -.023,
+    "sol_ls_sol_yoy_commoners": .041, "sol_ls_sol_yoy_tribesmen": 0,
+    "sol_ls_sol_yoy_class_nobles": 2, "sol_ls_sol_yoy_class_clergy": 1, "sol_ls_sol_yoy_class_burghers": -1,
+    "sol_ls_sol_yoy_class_commoners": 1, "sol_ls_sol_yoy_class_tribesmen": 1,
 }
-GLOBAL_VARS = {"sol_ls_rank_count": 87, "sol_ls_world_pci": 1.62, "sol_ls_top_pci": 4.92,
-               "sol_ls_world_sol": 19.44, "sol_ls_top_sol": 59.04}
+GLOBAL_VARS = {"sol_ls_rank_count": 87, "sol_ls_world_sol": 19.44, "sol_ls_top_sol": 59.04}
 
 STATES = {
     # suffix: (player variable overrides, player rank, data ready)
     "": ({}, 12, True),
-    "_high_bigup": ({"sol_ls_tier": 2, "sol_ls_pci_yoy_class": 2, "sol_ls_pci_yoy": .081, "sol_ls_pci_prev": 1.72}, 12, True),
-    "_low_bigdown": ({"sol_ls_tier": 0, "sol_ls_pci_yoy_class": -2, "sol_ls_pci_yoy": -.070, "sol_ls_pci_prev": 2.00}, 12, True),
-    "_rank2": ({"sol_ls_tier": 2, "sol_ls_rank": 2, "sol_ls_percentile": .99, "sol_ls_pci": 4.50}, 2, True),
+    "_high_bigup": ({"sol_ls_tier": 2, "sol_ls_sol_yoy_class": 2, "sol_ls_sol_yoy": .081, "sol_ls_sol_prev": 16.65}, 12, True),
+    "_low_bigdown": ({"sol_ls_tier": 0, "sol_ls_sol_yoy_class": -2, "sol_ls_sol_yoy": -.070, "sol_ls_sol_prev": 19.35}, 12, True),
+    "_rank2": ({"sol_ls_tier": 2, "sol_ls_rank": 2, "sol_ls_percentile": .99, "sol_ls_sol": 54.0}, 2, True),
     "_pending": ({}, 12, False),
 }
 
@@ -399,16 +396,16 @@ STATES = {
 def state_mocks(overrides, rank, ready):
     pv = dict(PLAYER_VARS, **overrides)
     board = [b for b in BOARD if b[0] != "HUN"]
-    board.insert(rank - 1, ("HUN", "匈牙利", pv["sol_ls_pci"], pv["sol_ls_pci_yoy"], pv["sol_ls_tier"]))
-    countries = [country(tag, n, i + 1, p, y, t) for i, (tag, n, p, y, t) in enumerate(board)]
+    board.insert(rank - 1, ("HUN", "匈牙利", pv["sol_ls_sol"], pv["sol_ls_sol_yoy"], pv["sol_ls_tier"]))
+    countries = [country(tag, n, i + 1, p * 12 if tag != "HUN" else p, y, t) for i, (tag, n, p, y, t) in enumerate(board)]
     me = rank - 1
-    # Income and SOL are independent; keep the player ladder equal to the title fixture.
+    # Keep the player ladder equal to the shared SOL fixture.
     countries[me]["MakeScope.GetVariable('sol_ls_sol').GetValue"] = pv['sol_ls_sol']
     slots = {"above_1": me - 1, "above_2": me - 2, "below_1": me + 1, "below_2": me + 2}
     slots = {k: countries[i] for k, i in slots.items() if 0 <= i < len(countries)}
     return [
         (r"Player\.Self", "HUN"),
-        (r"Player\.MakeScope\.GetVariable\('sol_ls_pci'\)\.IsSet", ready),
+        (r"Player\.MakeScope\.GetVariable\('sol_ls_sol'\)\.IsSet", ready),
         (r"Player\.MakeScope\.GetVariable\('sol_ls_(\w+)'\)\.IsSet", lambda m: ready and m[1] in slots),
         # The renderer evaluates a hidden row's datacontext too; the game does not.
         (r"Player\.MakeScope\.GetVariable\('sol_ls_(\w+)'\)\.GetCountry", lambda m: slots.get(m[1], countries[0])),

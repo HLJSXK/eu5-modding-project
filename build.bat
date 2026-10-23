@@ -15,10 +15,12 @@ REM   build.bat sol_mnt_compatibility_submod
 REM   build.bat sol_jtg_compatibility_submod
 REM   build.bat --target sol_standalone
 REM   build.bat --all
+REM   build.bat --validate-only
 
 set "REPO_ROOT=%~dp0"
 set "TARGET_ROOT=C:\Program Files (x86)\Steam\steamapps\common\Europa Universalis V\game\mod"
 set "TARGET_SELECTION=all"
+set "VALIDATE_ONLY=0"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -64,6 +66,11 @@ if /I "%~1"=="--all" (
     shift
     goto parse_args
 )
+if /I "%~1"=="--validate-only" (
+    set "VALIDATE_ONLY=1"
+    shift
+    goto parse_args
+)
 if /I "%~1"=="--help" goto usage
 if /I "%~1"=="-h" goto usage
 
@@ -94,20 +101,42 @@ if /I "%TARGET_SELECTION%"=="stable" (
 )
 
 set "PYTHONUTF8=1"
+if not defined EU5_PYTHON if defined CONDA_PREFIX (
+    for %%P in ("%CONDA_PREFIX%") do if /I "%%~nxP"=="eu5" set "EU5_PYTHON=%%~fP\python.exe"
+)
+if not defined EU5_PYTHON set "EU5_PYTHON=%USERPROFILE%\anaconda3\envs\eu5\python.exe"
+if not exist "%EU5_PYTHON%" (
+    echo [ERROR] EU5 Python not found: "%EU5_PYTHON%"
+    echo [ERROR] Set EU5_PYTHON to the eu5 environment's python.exe.
+    exit /b 1
+)
+echo [INFO] Python: "%EU5_PYTHON%"
+echo [INFO] Validator: "%REPO_ROOT%scripts\validate.py"
 
 echo [INFO] Regenerating SOL generated sources...
-python "%REPO_ROOT%scripts\gen_sol_chain.py" --target "%TARGET_SELECTION%"
+"%EU5_PYTHON%" "%REPO_ROOT%scripts\gen_sol_chain.py" --target "%TARGET_SELECTION%"
 if errorlevel 1 exit /b 1
 
-echo [INFO] Running static validator on changed files...
-set "VALIDATE_OUT=%TEMP%\sol_validate_out.txt"
-python "%REPO_ROOT%scripts\validate.py" --changed > "!VALIDATE_OUT!" 2>&1
+set "VALIDATE_ARGS=--changed"
+if "%VALIDATE_ONLY%"=="1" (
+    set "VALIDATE_ARGS="
+    echo [INFO] Running static validator on all source files...
+) else (
+    echo [INFO] Running static validator on changed files...
+)
+if not exist "%REPO_ROOT%tmp" mkdir "%REPO_ROOT%tmp"
+set "VALIDATE_OUT=%REPO_ROOT%tmp\build_validate.log"
+"%EU5_PYTHON%" "%REPO_ROOT%scripts\validate.py" !VALIDATE_ARGS! > "!VALIDATE_OUT!" 2>&1
 set "VALIDATE_RC=!errorlevel!"
 type "!VALIDATE_OUT!"
-del "!VALIDATE_OUT!" 2>nul
+echo [INFO] Validation log: "!VALIDATE_OUT!"
 if !VALIDATE_RC! neq 0 (
     echo [ERROR] Validation failed. Fix the issues above before deploying.
     exit /b 1
+)
+if "%VALIDATE_ONLY%"=="1" (
+    echo [OK] Generation and validation completed.
+    exit /b 0
 )
 
 echo [INFO] Ensuring UTF-8 BOM on all .yml and .txt files under src...
@@ -163,7 +192,7 @@ exit /b 0
 
 :usage
 echo Usage:
-echo   build.bat [stable^|sol_standalone^|sol_pp_compatibility_submod^|sol_mnt_compatibility_submod^|sol_jtg_compatibility_submod^|all] [--target TARGET] [--all]
+echo   build.bat [stable^|sol_standalone^|sol_pp_compatibility_submod^|sol_mnt_compatibility_submod^|sol_jtg_compatibility_submod^|all] [--target TARGET] [--all] [--validate-only]
 echo.
 echo Targets:
 echo   stable          Build and deploy src\stable to mod\stable.
@@ -177,4 +206,7 @@ echo Notes:
 echo   - If no target is provided, script builds and deploys all targets.
 echo   - The script only deploys selected targets.
 echo   - The script does not create repository build\ archives.
+echo   - --validate-only runs generation and full validation, then exits before deployment.
+echo   - EU5_PYTHON selects the interpreter; defaults to the active eu5 environment or the user's Anaconda eu5 environment.
+echo   - Validation output is retained in tmp\build_validate.log.
 exit /b 1

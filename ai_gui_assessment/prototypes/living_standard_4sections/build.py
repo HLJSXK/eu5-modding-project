@@ -5,7 +5,7 @@ file and renders them offline over the vanilla HUD (and over GlorpUI with the
 shipped compatibility file).  Never writes src/ or scripts/.
 
 Sections (left to right) and their tooltips:
-  1 living-standard tier icon + per-capita income + YoY -> tier/SOL, national and per-estate income, YoY
+  1 living-standard tier icon + living standard + YoY -> tier, national and per-estate SOL, YoY
   2 purchasing power %                       -> the situation panel's balance rows (migrated)
   3 main spending goods (by total price)     -> top spending goods + the panel's substitute groups (migrated)
   4 world rank (by living standard)          -> national ranking + per-estate rankings
@@ -45,7 +45,7 @@ GUI_FILE = HERE / "sol_lshud4.gui"
 LOC_FILE = HERE / "sol_lshud4_l_simp_chinese.yml"
 ESTATES = ["nobles", "clergy", "burghers", "commoners", "tribesmen"]
 ROW_Y, ROW_H, PANEL_W = 130, 36, 570     # unchanged: GlorpUI compat still pushes by 36
-W_INCOME, W_RANK, W_GOODS = 460, 460, panel.GOODS_CONTENT_W
+W_SOL, W_RANK, W_GOODS = 460, 460, panel.GOODS_CONTENT_W
 SECTION_W = (172, 112, 168, 104)
 GOODS = panel._goods_names()
 
@@ -72,7 +72,7 @@ def fp(x):
     return f"'(CFixedPoint){x}'"
 
 
-READY = IS("sol_ls_pci")
+READY = IS("sol_ls_sol")
 TIERED = f"And({READY}, {IS('sol_ls_tier')})"
 RANKED = f"And({IS('sol_ls_rank')}, GetGlobalVariable('sol_ls_rank_count').IsSet)"
 POWER = "Player.MakeScope"
@@ -80,7 +80,7 @@ POWER_CONSUMED = f"GreaterThan_CFixedPoint({POWER}.ScriptValue('gls_country_base
 POWER_VALUE = panel.f_coef(POWER, "gls_country_liquid_funds_display", "gls_country_base_spending_display")
 
 
-def trend_select(prefix, var="sol_ls_pci_yoy_class"):
+def trend_select(prefix, var="sol_ls_sol_yoy_class"):
     v = V(var)
     return (f"[SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(1.5)}), '{prefix}_BIG_UP', "
             f"SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(0)}), '{prefix}_UP', "
@@ -195,13 +195,17 @@ def section_title(key, w, right=None):
             f"\t\t\t\t{rule(w)}")
 
 
-def tooltip(name, icon, title, subtitle, body):
+def tooltip(name, icon, title, subtitle, body, wrap_subtitle=False):
+    subtitle_source = (f'''blockoverride "concept_link_obj" {{
+            text_multi = {{ layoutpolicy_horizontal = expanding max_width = 408 autoresize = yes
+                fontsize = 13 default_format = "#weak" text = "{subtitle}" }}
+        }}''' if wrap_subtitle else f'blockoverride "concept_link" {{ text = "{subtitle}" }}')
     return f"""
 template {name} {{
 	ContextualTooltipType = {{
 		blockoverride "title_icon" {{ {icon} }}
 		blockoverride "title_text" {{ text = "{title}" }}
-		blockoverride "concept_link" {{ text = "{subtitle}" }}
+		{subtitle_source}
 		blockoverride "tooltip_content" {{
 {body}
 		}}
@@ -250,15 +254,15 @@ def row_source():
     s1 = f"""{medallion(28, 20)}
 				hbox = {{ name = "sol_lshud4_s1_ready" visible = "[{READY}]" spacing = 12
 					hbox = {{ name = "sol_lshud4_s1_value" spacing = 2
-						{text(f"[{V('sol_ls_pci')}|2] @gold!", None, None, fs=16, font='Font_Type_Headers', fmt='#high', raw=True)}
+						{text(f"[{V('sol_ls_sol')}|1]", None, None, fs=16, font='Font_Type_Headers', fmt='#high', raw=True)}
 					}}
-					hbox = {{ name = "sol_lshud4_s1_change" spacing = 1 visible = "[{IS('sol_ls_pci_yoy')}]"
+					hbox = {{ name = "sol_lshud4_s1_change" spacing = 1 visible = "[{IS('sol_ls_sol_yoy')}]"
 						{text(trend_select('SOL_LSHUD_TREND_ICON'), None, None, fs=13)}
-						{text(f"[{V('sol_ls_pci_yoy')}|+=1%]", None, None, fs=13, raw=True)}
+						{text(f"[{V('sol_ls_sol_yoy')}|+=1%]", None, None, fs=13, raw=True)}
 					}}
 				}}
 				vbox = {{ visible = "[Not({READY})]"
-					{text('SOL_LSHUD_ROW_PENDING', 120, 18, fs=13, fmt='#weak')}
+					{text('SOL_LSHUD_PENDING_SHORT', 120, 18, fs=13, fmt='#weak')}
 				}}"""
     s2 = f"""icon = {{ size = {{ 24 24 }} texture = "gfx/interface/sol_proto/icon_funds.dds" texture_density = 2 }}
 				vbox = {{
@@ -279,7 +283,7 @@ def row_source():
 					}}
 				}}
 				vbox = {{ visible = "[Not({SPENT})]"
-					{text('SOL_LSHUD_ROW_PENDING', 140, 18, fs=13, fmt='#weak')}
+					{text('SOL_LSHUD_PENDING_SHORT', 140, 18, fs=13, fmt='#weak')}
 				}}"""
     s4 = f"""icon = {{ size = {{ 18 26 }} texture = "gfx/interface/great_powers/banner_rank.dds" texture_density = 2 }}
 				vbox = {{
@@ -322,15 +326,15 @@ widget = {{
 """
 
 
-# ------------------------------------------------------------------ tooltip 1: income
-def tooltip_income():
-    w = W_INCOME
+# ------------------------------------------------------------------ tooltip 1: living standard
+def tooltip_living_standard():
+    w = W_SOL
     padding = 6
-    cols = (96, 64, 108, 90)   # estate, pop, income, pci
+    cols = (120, 94, 132)   # estate, population, living standard
     # In-flow columns and padding must fill the same width as the decorations.
     cols = (*cols, w - 2 * padding - sum(cols))   # arrow + yoy
 
-    def row(label, pop, income, pci, yoy_var, cls_var, name, hero=False, alt=False):
+    def row(label, pop, sol, yoy_var, cls_var, name, hero=False, alt=False):
         deco = outline(w, 30) if hero else (zebra(w, 26) if alt else "")
         h = 30 if hero else 26
         fs = 15 if hero else 13
@@ -340,10 +344,9 @@ def tooltip_income():
 					widget = {{ size = {{ {padding} 1 }} }}
 					{text('SOL_LSHUD4_NATION' if hero else 'SOL_ESTATE_' + label.upper(), cols[0], h, fs=fs, font='Font_Type_Headers' if hero else None)}
 					{text(f"[{V(pop)}|0]", cols[1], h, fs=fs, align='right|nobaseline', raw=True)}
-					{text(f"[{V(income)}|0] @gold!", cols[2], h, fs=fs, align='right|nobaseline', raw=True, extra='margin_left = 6')}
-					{text(f"[{V(pci)}|2] @gold!", cols[3], h, fs=fs, align='right|nobaseline', fmt='#high', raw=True, extra='margin_left = 6')}
-					{text(f"{trend_select('SOL_LSHUD_TREND_ICON', cls_var)} [{V(yoy_var)}|+=1%]", cols[4], h, fs=fs, align='right|nobaseline', raw=True, visible=f"[{IS(yoy_var)}]")}
-					{text('SOL_LSHUD4_DASH', cols[4], h, fs=fs, align='right|nobaseline', fmt='#weak', visible=f"[Not({IS(yoy_var)})]")}
+					{text(f"[{V(sol)}|1] @sol_living_standard!", cols[2], h, fs=fs, align='right|nobaseline', fmt='#high', raw=True, extra='margin_left = 6')}
+					{text(f"{trend_select('SOL_LSHUD_TREND_ICON', cls_var)} [{V(yoy_var)}|+=1%]", cols[3], h, fs=fs, align='right|nobaseline', raw=True, visible=f"[{IS(yoy_var)}]")}
+					{text('SOL_LSHUD4_DASH', cols[3], h, fs=fs, align='right|nobaseline', fmt='#weak', visible=f"[Not({IS(yoy_var)})]")}
 					widget = {{ size = {{ {padding} 1 }} }}
 				}}"""
 
@@ -351,46 +354,46 @@ def tooltip_income():
         f"widget = {{ size = {{ {padding} 1 }} }}",
         text('SOL_LSHUD4_COL_ESTATE', cols[0], 18, fs=11, fmt='#weak'),
         text('SOL_LSHUD4_COL_POP', cols[1], 18, fs=11, fmt='#weak', align='right|nobaseline'),
-        text('SOL_LSHUD4_COL_INCOME', cols[2], 18, fs=11, fmt='#weak', align='right|nobaseline'),
-        text('SOL_LSHUD4_COL_PCI', cols[3], 18, fs=11, fmt='#weak', align='right|nobaseline'),
-        text('SOL_LSHUD4_COL_YOY', cols[4], 18, fs=11, fmt='#weak', align='right|nobaseline'),
+        text('SOL_LSHUD4_COL_SOL', cols[2], 18, fs=11, fmt='#weak', align='right|nobaseline'),
+        text('SOL_LSHUD4_COL_YOY', cols[3], 18, fs=11, fmt='#weak', align='right|nobaseline'),
         f"widget = {{ size = {{ {padding} 1 }} }}",
     ])
-    estates = "".join(row(e, f"sol_ls_pop_{e}", f"sol_ls_income_{e}", f"sol_ls_pci_{e}", f"sol_ls_pci_yoy_{e}",
-                          f"sol_ls_pci_yoy_class_{e}", f"sol_lshud4_income_{e}", alt=i % 2 == 0)
+    estates = "".join(row(e, f"sol_ls_pop_{e}", f"sol_ls_sol_{e}", f"sol_ls_sol_yoy_{e}",
+                          f"sol_ls_sol_yoy_class_{e}", f"sol_lshud4_sol_{e}", alt=i % 2 == 0)
                       for i, e in enumerate(ESTATES))
-    hero_up = f"[GreaterThan_CFixedPoint({V('sol_ls_pci_yoy_class')}, {fp(0)})]"
-    hero_down = f"[LessThan_CFixedPoint({V('sol_ls_pci_yoy_class')}, {fp(0)})]"
-    body = f"""			vbox = {{ name = "sol_lshud4_income_pending" visible = "[Not({READY})]"
+    hero_up = f"[GreaterThan_CFixedPoint({V('sol_ls_sol_yoy_class')}, {fp(0)})]"
+    hero_down = f"[LessThan_CFixedPoint({V('sol_ls_sol_yoy_class')}, {fp(0)})]"
+    body = f"""			vbox = {{ name = "sol_lshud4_sol_pending" visible = "[Not({READY})]"
 				text_multi = {{ max_width = {w} autoresize = yes text = "SOL_LSHUD_PENDING_BODY" }}
 			}}
-			vbox = {{ name = "sol_lshud4_income_body" visible = "[{READY}]" spacing = 2
-				hbox = {{ name = "sol_lshud4_income_hero" size = {{ {w} 64 }} spacing = 10
+			vbox = {{ name = "sol_lshud4_sol_body" visible = "[{READY}]" spacing = 2
+				hbox = {{ name = "sol_lshud4_sol_hero" size = {{ {w} 64 }} spacing = 10
 					{medallion(56, 40)}
 					vbox = {{
-						{text(tier_select('SOL_LSHUD_TITLE'), 230, 22, fs=15, font='Font_Type_Headers', visible=f'[{TIERED}]')}
-						{text('SOL_LSHUD4_TIER_PENDING', 230, 22, fs=13, fmt='#weak', visible=f'[Not({TIERED})]')}
-						{text(f"[{V('sol_ls_pci')}|2] @gold!", 190, 30, fs=26, font='Font_Type_Headers', fmt='#high', raw=True)}
+						{text(tier_select('SOL_LSHUD_TITLE'), 210, 22, fs=15, font='Font_Type_Headers', visible=f'[{TIERED}]')}
+						{text('SOL_LSHUD4_TIER_PENDING', 210, 22, fs=13, fmt='#weak', visible=f'[Not({TIERED})]')}
+						{text(f"[{V('sol_ls_sol')}|1] @sol_living_standard!", 190, 30, fs=26, font='Font_Type_Headers', fmt='#high', raw=True)}
 					}}
 					expand = {{}}
 					widget = {{ size = {{ 150 56 }}
 						widget = {{ size = {{ 150 56 }} visible = "{hero_up}" background = {{ using = color_mid_green_texture alpha = 0.25 }} }}
 						widget = {{ size = {{ 150 56 }} visible = "{hero_down}" background = {{ using = color_mid_red_texture alpha = 0.25 }} }}
-						vbox = {{ size = {{ 150 56 }} margin = {{ 6 4 }} visible = "[{IS('sol_ls_pci_yoy')}]"
+						vbox = {{ size = {{ 150 56 }} margin = {{ 6 4 }} visible = "[{IS('sol_ls_sol_yoy')}]"
 							{text(trend_select('SOL_LSHUD_TREND'), 138, 20, fs=14, align='center|nobaseline')}
-							{text(f"[{V('sol_ls_pci_yoy')}|+=1%]", 138, 24, fs=20, font='Font_Type_Headers', align='center|nobaseline', raw=True)}
+							{text(f"[{V('sol_ls_sol_yoy')}|+=1%]", 138, 24, fs=20, font='Font_Type_Headers', align='center|nobaseline', raw=True)}
 						}}
-						{text('SOL_LSHUD_YOY_PENDING', 150, 56, fs=13, fmt='#weak', align='center|nobaseline', visible=f"[Not({IS('sol_ls_pci_yoy')})]")}
+						{text('SOL_LSHUD_YOY_PENDING', 150, 56, fs=13, fmt='#weak', align='center|nobaseline', visible=f"[Not({IS('sol_ls_sol_yoy')})]")}
 					}}
 				}}
-				{text('SOL_LSHUD4_PREV_LINE', w, 18, fs=12, fmt='#weak', visible=f"[{IS('sol_ls_pci_yoy')}]")}
 				widget = {{ size = {{ 1 6 }} }}
 				{section_title('SOL_LSHUD4_T1_TABLE', w)}
-				hbox = {{ name = "sol_lshud4_income_header" size = {{ {w} 18 }} layoutpolicy_horizontal = expanding spacing = 0 {head} }}
-{row('nobles', 'sol_ls_pop_all', 'sol_ls_income_all', 'sol_ls_pci', 'sol_ls_pci_yoy', 'sol_ls_pci_yoy_class', 'sol_lshud4_income_nation', hero=True)}
+				hbox = {{ name = "sol_lshud4_sol_header" size = {{ {w} 18 }} layoutpolicy_horizontal = expanding spacing = 0 {head} }}
+{row('nobles', 'sol_ls_pop_all', 'sol_ls_sol', 'sol_ls_sol_yoy', 'sol_ls_sol_yoy_class', 'sol_lshud4_sol_nation', hero=True)}
 {estates}
+				text_multi = {{ max_width = {w} autoresize = yes fontsize = 12 default_format = "#weak" text = "SOL_LSHUD4_T1_NOTE" }}
 			}}"""
-    return tooltip("SOL_LSHUD4_tooltip_1", medallion(42, 30), "SOL_LSHUD4_T1_TITLE", "SOL_LSHUD4_T1_SUB", body)
+    return tooltip("SOL_LSHUD4_tooltip_1", medallion(42, 30), "SOL_LSHUD4_T1_TITLE", "SOL_LSHUD4_T1_SUB", body,
+                   wrap_subtitle=True)
 
 
 # ------------------------------------------------------------------ tooltip 2: purchasing power (migrated)
@@ -430,7 +433,7 @@ def tooltip_goods():
                                     panel._goods_names(), show_supply_note=False)
     body = f"""			vbox = {{ name = "sol_lshud4_spend" spacing = 1
 				{section_title('SOL_LSHUD4_T3_SPEND', w, text('SOL_LSHUD4_T3_SPEND_TOTAL', None, None, fs=12, fmt='#weak'))}
-				{text('SOL_LSHUD_ROW_PENDING', w, 22, fs=13, fmt='#weak', visible=f'[Not({SPENT})]')}
+				{text('SOL_LSHUD_PENDING_SHORT', w, 22, fs=13, fmt='#weak', visible=f'[Not({SPENT})]')}
 {spend}
 			}}
 			widget = {{ size = {{ 1 6 }} }}
@@ -453,7 +456,7 @@ def tooltip_rank():
 					{text('[Country.GetNameWithNoTooltip]', 150, 24, fmt='#high' if me else None, raw=True)}
 					{bar(rel, 160, 8, 'gold' if me else 'steel')}
 					expand = {{}}
-					{text(f"[{V('sol_ls_sol', 'Country')}|1]", 60, 24, align='right|nobaseline', raw=True)}
+					{text(f"[{V('sol_ls_sol', 'Country')}|1] @sol_living_standard!", 60, 24, align='right|nobaseline', raw=True)}
 					widget = {{ size = {{ 4 1 }} }}
 				}}"""
 
@@ -467,7 +470,7 @@ def tooltip_rank():
         ladder("sol_lshud4_self", "Player", "yes", me=True),
         ladder("sol_lshud4_below_1", "Player.MakeScope.GetVariable('sol_ls_below_1').GetCountry", f"[{IS('sol_ls_below_1')}]"),
     ])
-    cols = (100, 62, 70, 96, 112)   # estate, living standard, rank, percentile bar, world best
+    cols = (92, 82, 66, 84, 116)   # estate, living standard, rank, percentile bar, world best
 
     def estate_rank(i, e):
         best = f"GetGlobalVariable('sol_ls_top_1_{e}').GetCountry"
@@ -477,13 +480,13 @@ def tooltip_rank():
 					{zebra(w, 26) if i % 2 == 0 else ''}
 					widget = {{ size = {{ 2 1 }} }}
 					{text('SOL_ESTATE_' + e.upper(), cols[0], 26, fs=13)}
-					{text(f"[{V('sol_ls_sol_' + e)}|1]", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True, visible=f"[{IS('sol_ls_sol_' + e)}]")}
+					{text(f"[{V('sol_ls_sol_' + e)}|1] @sol_living_standard!", cols[1], 26, fs=13, fmt='#high', align='right|nobaseline', raw=True, visible=f"[{IS('sol_ls_sol_' + e)}]")}
 					{text('SOL_LSHUD4_DASH', cols[1], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f"[Not({IS('sol_ls_sol_' + e)})]")}
 					{text(f'SOL_LSHUD4_ESTATE_RANK_{e.upper()}', cols[2], 26, fs=13, align='right|nobaseline', visible=f'[{ranked}]')}
 					{text('SOL_LSHUD4_DASH', cols[2], 26, fs=13, fmt='#weak', align='right|nobaseline', visible=f'[Not({ranked})]')}
 					widget = {{ size = {{ {cols[3]} 26 }} widget = {{ size = {{ {cols[3] - 8} 8 }} position = {{ 4 9 }} {bar(f"FixedPointToFloat({V('sol_ls_percentile_' + e)})", cols[3] - 8, 8)} }} }}
 					widget = {{ size = {{ {cols[4]} 26 }} visible = "[GetGlobalVariable('sol_ls_top_1_{e}').IsSet]"
-						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_sol_' + e)}|1]", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
+						{text(f"[{best}.GetNameWithNoTooltip] [{G('sol_ls_top_sol_' + e)}|1] @sol_living_standard!", cols[4], 26, fs=11, fmt='#weak', align='right|nobaseline', raw=True)}
 					}}
 				}}"""
 
@@ -518,20 +521,17 @@ LOC = {
     "SOL_LSHUD4_DASH": "—",
     "SOL_LSHUD4_NATION": "全国",
     "SOL_LSHUD4_TIER_PENDING": "生活水平等级待 1 月 1 日排行",
-    "SOL_LSHUD4_PREV_LINE": f"一年前人均 [{P}('sol_ls_pci_prev').GetValue|2]；全国年净收入 [{P}('sol_ls_income_all').GetValue|0] @gold!",
-    "SOL_LSHUD4_T1_TITLE": "收入与同比",
-    "SOL_LSHUD4_T1_SUB": "人均 = 年净收入 ÷ 人口（千人）",
+    "SOL_LSHUD4_T1_TITLE": "生活水平与同比",
+    "SOL_LSHUD4_T1_SUB": "生活水平 = 固定值之和 +（1 + 百分比之和）× 千人均年流动资金",
     "SOL_LSHUD4_T1_TABLE": "全国与各阶层",
     "SOL_LSHUD4_COL_ESTATE": "阶层",
     "SOL_LSHUD4_COL_POP": "人口(千)",
-    "SOL_LSHUD4_COL_INCOME": "年净收入",
-    "SOL_LSHUD4_COL_PCI": "人均",
     "SOL_LSHUD4_COL_SOL": "生活水平",
     "SOL_LSHUD4_COL_YOY": "同比",
     "SOL_LSHUD4_COL_RANK": "世界排名",
     "SOL_LSHUD4_COL_PERCENTILE": "百分位",
     "SOL_LSHUD4_COL_BEST": "世界最高",
-    "SOL_LSHUD4_T1_NOTE": "净收入已扣建筑维护费。同比与去年同月比较：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低。",
+    "SOL_LSHUD4_T1_NOTE": "乘数和结果最低为0，全国按人口加权。修正不改变资金或需求。同比与去年同月比较：≥ +5% 大增长，0 ~ +5% 增长，−5% ~ 0 降低，≤ −5% 大降低。",
     "SOL_LSHUD4_T2_TITLE": "购买力",
     "SOL_LSHUD4_T2_SUB": "可支配资金 ÷ 基准消费 − 1",
     "SOL_LSHUD4_T2_NOTE": "0% 表示刚好买得起基准消费篮子；−100% 表示没有可支配资金。顶栏显示的是全国总计。",
@@ -552,7 +552,7 @@ for _e in ESTATES:
 
 
 def write_sources():
-    src = row_source() + tooltip_income() + tooltip_power() + tooltip_goods() + tooltip_rank()
+    src = row_source() + tooltip_living_standard() + tooltip_power() + tooltip_goods() + tooltip_rank()
     GUI_FILE.write_text("\n".join(line.rstrip() for line in src.splitlines()) + "\n", encoding="utf-8-sig")
     LOC_FILE.write_text("l_simp_chinese:\n" + "".join(f' {k}: "{v}"\n' for k, v in LOC.items()), encoding="utf-8-sig")
 
@@ -560,9 +560,7 @@ def write_sources():
 # ------------------------------------------------------------------ mock data
 SPEND = [("wheat", 41.8, .186), ("cloth", 27.3, .121), ("wine", 19.6, .087), ("beer", 15.2, .068), ("fish", 12.9, .057)]
 EXTRA = {
-    "sol_ls_pop_all": 8419, "sol_ls_income_all": 15659,
-    "sol_ls_income_nobles": 1574, "sol_ls_income_clergy": 1250, "sol_ls_income_burghers": 3562,
-    "sol_ls_income_commoners": 8702, "sol_ls_income_tribesmen": 0, "sol_ls_spend_total": 224.6,
+    "sol_ls_pop_all": 8419, "sol_ls_spend_total": 224.6,
     "sol_ls_rank_nobles": 7, "sol_ls_rank_clergy": 15, "sol_ls_rank_burghers": 23, "sol_ls_rank_commoners": 9,
     "sol_ls_percentile_nobles": .93, "sol_ls_percentile_clergy": .84, "sol_ls_percentile_burghers": .74,
     "sol_ls_percentile_commoners": .91,
@@ -612,7 +610,7 @@ def mocks(state):
             return ready and not rank_pending
         if name.startswith("sol_ls_spend"):
             return spent
-        if name.startswith("sol_ls_pci_yoy"):
+        if name.startswith("sol_ls_sol_yoy"):
             return ready
         return ready and (name in pv or name.startswith(("sol_ls_above", "sol_ls_below")))
 

@@ -109,6 +109,7 @@ enabled-mod combination, not on the presence of a `cm_` prefix alone.
 
 | Log entries | Classification | Meaning |
 |---|---|---|
+| `SOL_lshud_glorp_compat.gui:54` / property widgets must specify exactly one widget | SOL-owned copied Glorp tooltip error; source corrected, native hover pending | Glorp referenced legislative_efficiency_tooltip, which current vanilla comments out. The generator restores its still-valid modifier/localization content under a SOL-owned name and rewrites the copied reference. Composition tests now inspect this tooltip and the missing-template warning. |
 | Metadata parse error for `src/sol_standalone/.metadata/metadata.json` | Real error | Standalone metadata is missing the required `relationships` member. |
 | `OnMouseEnterBuildRoadButton`, `OnMouseLeaveBuildRoadButton` callbacks | Real error | Legacy Glorp/1.3 callbacks are not present in the verified 1.4 API. |
 | `ShowRoadbuilder` | Real error in the logged deployment | 1.4 uses `ShowRoadBuilder`; the current generator migrates this, so this line indicates an old deployed window or stale log and must be rechecked after deployment. |

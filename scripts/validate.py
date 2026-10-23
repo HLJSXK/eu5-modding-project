@@ -14,6 +14,7 @@ import re
 import sys
 import subprocess
 import os
+from functools import lru_cache
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -34,6 +35,8 @@ if not _BASE_DEFAULT.exists():
 BASE_ROOT = Path(os.environ.get("EU5_MODDING_BASE", str(_BASE_DEFAULT))).resolve()
 sys.path.insert(0, str(BASE_ROOT / "docs" / "knowledge"))
 from knowledge_loader import load_anti_patterns, load_valid_enums
+sys.path.insert(0, str(BASE_ROOT / "ai_gui_assessment" / "renderer"))
+from eu5_gui_renderer.pdx import parse as parse_script, parse_file
 MODIFIER_TYPES_FILE = (
     REPO_ROOT
     / ".eu5-base" / "reference_game_files"
@@ -120,8 +123,77 @@ def check_bom(path: Path):
         issues.append(f"[ENCODING] Missing UTF-8 BOM: {path.relative_to(REPO_ROOT)}")
 
 
+def strip_script_comments(content: str) -> str:
+    """Mask comments without moving source offsets or removing # inside strings."""
+    return re.sub(
+        r'"(?:[^"\\]|\\.)*"|#[^\n]*',
+        lambda match: match[0] if match[0].startswith('"') else " " * len(match[0]),
+        content,
+    )
+
+
+def walk_script(nodes):
+    for node in nodes:
+        yield node
+        if node.is_block():
+            yield from walk_script(node.value)
+
+
+@lru_cache(maxsize=16)
+def reference_objects(base: Path, database: str) -> dict:
+    objects = {}
+    for source in sorted((base / "reference_game_files/game/in_game/common" / database).glob("*.txt")):
+        if source.stem.lower() == "readme":
+            continue
+        for node in parse_file(source):
+            if node.is_block():
+                objects[node.key] = node
+    return objects
+
+
+def mod_search_roots(mod_root: Path) -> list[Path]:
+    """Include assets supplied by declared dependencies available in this workspace."""
+    roots = [mod_root]
+    metadata = {}
+    for source in (REPO_ROOT / "src").glob("*/.metadata/metadata.json"):
+        data = json.loads(source.read_text(encoding="utf-8-sig"))
+        metadata[source.parent.parent] = data
+    by_id = {data["id"]: root for root, data in metadata.items() if "id" in data}
+    for root in roots:
+        for relation in metadata.get(root, {}).get("relationships", []):
+            dependency = by_id.get(relation.get("id"))
+            if relation.get("rel_type") == "dependency" and dependency and dependency not in roots:
+                roots.append(dependency)
+    return roots
+
+
+def missing_io_icons(path: Path) -> list[str]:
+    try:
+        target = path.relative_to(REPO_ROOT / "src").parts[0]
+    except ValueError:
+        return []
+    mod_root = REPO_ROOT / "src" / target
+    sources = sorted((mod_root / "in_game/common/international_organizations").glob("*.txt"))
+    if not sources:
+        return []
+    vanilla = reference_objects(BASE_ROOT, "international_organizations")
+    roots = mod_search_roots(mod_root)
+    missing = set()
+    for source in sources:
+        for node in parse_file(source):
+            key = node.key.rsplit(":", 1)[-1]
+            if not node.is_block() or key in vanilla:
+                continue
+            icon = Path("main_menu/gfx/interface/icons/international_organizations") / f"{key}.dds"
+            if not any((root / icon).is_file() for root in roots):
+                missing.add(key)
+    return sorted(missing)
+
+
 def check_anti_patterns(path: Path, content: str, patterns: list[dict]):
     path_str = str(path).replace("\\", "/")
+    code = strip_script_comments(content)
+    nodes = None
     for entry in patterns:
         regex = entry.get("pattern", "")
         if not regex:
@@ -135,12 +207,44 @@ def check_anti_patterns(path: Path, content: str, patterns: list[dict]):
         if only_in and not any(sub in path_str for sub in only_in):
             continue
         try:
-            for m in re.finditer(regex, content, re.MULTILINE | re.IGNORECASE):
-                line_num = content[: m.start()].count("\n") + 1
+            ident = entry.get("id")
+            detail = ""
+            if ident == "change_variable_uses_value_key":
+                if path.suffix not in {".txt", ".gui"} or "change_variable" not in code:
+                    continue
+                if nodes is None:
+                    nodes = parse_script(code, str(path))
+                # An arithmetic operand may itself contain a script-value block.
+                lines = [child.line for node in walk_script(nodes)
+                         if node.key == "change_variable" and node.is_block()
+                         for child in node.value if child.key == "value" and child.op == "="]
+            elif ident == "custom_goods_reuses_vanilla_goods_color":
+                if "/common/goods/" not in path_str or path.suffix != ".txt":
+                    continue
+                if nodes is None:
+                    nodes = parse_script(code, str(path))
+                vanilla = reference_objects(BASE_ROOT, "goods")
+                colors = {child.value for node in vanilla.values() for child in node.value
+                          if child.key == "color" and isinstance(child.value, str)}
+                lines = [child.line for node in nodes
+                         if node.is_block() and node.key.rsplit(":", 1)[-1] not in vanilla
+                         for child in node.value if child.key == "color"
+                         and isinstance(child.value, str) and child.value in colors]
+            elif ident == "mod_io_geticon_without_matching_texture":
+                match = re.search(regex, code)
+                missing = missing_io_icons(path) if match else []
+                if not missing:
+                    continue
+                lines = [code[:match.start()].count("\n") + 1]
+                detail = " Missing custom IO icons: " + ", ".join(missing) + "."
+            else:
+                lines = [code[:m.start()].count("\n") + 1
+                         for m in re.finditer(regex, code, re.MULTILINE | re.IGNORECASE)]
+            for line_num in lines:
                 issues.append(
                     f"[{entry.get('category', 'pattern').upper()}] "
                     f"{path.relative_to(REPO_ROOT)}:{line_num} -- "
-                    f"Bad: \"{entry['bad']}\" -> {entry['correction']}"
+                    f"Bad: \"{entry['bad']}\" -> {entry['correction']}{detail}"
                 )
         except re.error:
             pass

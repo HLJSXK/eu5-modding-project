@@ -19,7 +19,7 @@ from sol_living_standard_source import (ESTATES, SOL_ONLY_TOKENS, FEEDBACK_MODIF
                                         render_modifier_types, render_modifier_icons,
                                         render_building_sources, render_modifier_type_localization)
 from test_sol_substitution import Runtime, Scope, parse
-from sol_lshud_income_source import render_income_effects, render_income_values
+from sol_lshud_income_source import render_yoy_effects, render_yoy_values
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE_TARGETS = ("stable", "sol_standalone")
@@ -34,6 +34,8 @@ SOL_EFFECTS = {
     "sol_ls_reset_country_living_standard",
     "sol_ls_accumulate_country_living_standard",
     "sol_ls_finalize_country_living_standard",
+    "sol_ls_finalize_country_living_standard_yoy",
+    "sol_ls_compute_living_standard_yoy",
     "sol_ls_recalculate_world_ranking",
     "sol_apply_location_living_standard_modifiers",
     # Calls sol_compute_location_living_standard as its final statement only.
@@ -58,8 +60,8 @@ class LivingStandardRuntime(Runtime):
         self.local_context = {}
         from collections import Counter
         self.operations = Counter()
-        self.effects = {n.key: n.value for n in parse(render_effects() + render_income_effects())}
-        self.script_values = {n.key: n.value for n in parse(render_values() + render_income_values())}
+        self.effects = {n.key: n.value for n in parse(render_effects() + render_yoy_effects())}
+        self.script_values = {n.key: n.value for n in parse(render_values() + render_yoy_values())}
         for name, value in (modifier or {}).items():
             self.script_values[name] = parse(f"x = {{ value = {value} }}")[0].value
 
@@ -88,11 +90,9 @@ def location(owner, liquid, base, pops=None):
 
 
 def solve(runtime, country):
-    runtime.run("sol_ls_reset_country_income", country)
     runtime.run("sol_ls_reset_country_living_standard", country)
     for place in country.locations:
         runtime.run("sol_compute_location_living_standard", place)
-        runtime.run("sol_ls_accumulate_country_income", place)
         runtime.run("sol_ls_accumulate_country_living_standard", place)
     runtime.run("sol_ls_finalize_country_living_standard", country)
 
@@ -421,7 +421,7 @@ class LivingStandardTests(unittest.TestCase):
                     continue
                 text = path.read_text(encoding="utf-8-sig")
                 for binding in re.findall(r"\[[^\]\n]*\]", text):
-                    if re.search(r"sol_ls_(?:sol|top_sol|world_sol)|sol_map_living_standard_value", binding):
+                    if re.search(r"sol_ls_(?:sol(?:_(?:nobles|clergy|burghers|commoners|tribesmen|display))?|(?:top|world)_sol(?:_\w+)?)['\"]|sol_map_living_standard_value", binding):
                         self.assertNotRegex(binding, r"\|[^\]]*%", str(path))
                         self.assertNotIn("Subtract_CFixedPoint", binding, str(path))
 
@@ -452,11 +452,13 @@ class LivingStandardTests(unittest.TestCase):
                         "sol_solve_country_pop_demand_raw_only": ["sol_ls_accumulate_country_living_standard"],
                         "sol_solve_country_pop_demand_solver": ["sol_ls_accumulate_country_living_standard"]}
             wrapper = [n.key for n in effects["sol_solve_country_pop_demand"]]
-            self.assertLess(wrapper.index("sol_ls_reset_country_income"), wrapper.index("sol_ls_reset_country_living_standard"))
-            self.assertLess(wrapper.index("sol_ls_finalize_country_living_standard"), wrapper.index("sol_ls_finalize_country_income"))
-            for path_name in ("sol_solve_country_pop_demand_raw_only", "sol_solve_country_pop_demand_solver"):
-                sequence = [n.key for n in walk(effects[path_name])]
-                self.assertLess(sequence.index("sol_ls_accumulate_country_income"), sequence.index("sol_ls_accumulate_country_living_standard"))
+            self.assertEqual(wrapper[0], "sol_ls_reset_country_living_standard")
+            self.assertLess(wrapper.index("sol_ls_finalize_country_living_standard"),
+                            wrapper.index("sol_ls_finalize_country_living_standard_yoy"))
+            accumulator = effects["sol_ls_accumulate_country_living_standard"]
+            names = {n.value[0].value for n in walk(accumulator) if n.key == "change_variable"}
+            self.assertIn("sol_ls_pop_all", names)
+            self.assertIn("sol_ls_sol_total_all", names)
             for name, calls in expected.items():
                 found = [n.key for n in walk(effects[name]) if n.key.endswith("_country_living_standard")]
                 self.assertEqual(found, calls, name)

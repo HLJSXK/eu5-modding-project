@@ -1,4 +1,22 @@
 # eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: sol_glorp_hud_retired_tooltip_template
+  pattern: null
+  detectability: advisory
+  bad: Copying Glorp's legislative_efficiency_tooltip reference into the SOL HUD compatibility shim after vanilla commented out that template, or ignoring non-SOL-named renderer warnings inside SOL-owned copied bodies.
+  correction: Generate SOL_lshud_legislative_efficiency_tooltip using the existing native contextual tooltip, legislative modifier and localization. Rewrite only that reference in the copied Glorp stats bar, preserving the statistic and its description. Test the actual Glorp composition, require a nonempty legislative tooltip with its modifier-source textcontext, and reject the missing-template warning for both shipped targets.
+  category: gui
+  scope: country
+  source: Runtime log 2026-10-23 gui/SOL_lshud_glorp_compat.gui:54; .eu5-base/reference_game_files/game/in_game/gui/shared/government_tooltips.gui:2301-2337; .eu5-base/reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11503; scripts/gen_sol_lshud.py; scripts/test_sol_lshud_ui.py
+  notes: The renderer already reported the missing template, but the old test filtered warnings by SOL text and never inspected this inherited tooltip. Source-level composition tests do not confirm native hover; verify a fresh runtime log after deployment. Other CMF/Glorp source errors and missing cm_/atd_ dependencies have separate owners.
+- id: sol_validator_context_free_pattern_false_positives
+  pattern: null
+  detectability: advisory
+  bad: Treating raw regex hits in generated SOL files as confirmed errors without checking comments, brace depth, database identity or actual missing assets.
+  correction: In scripts/validate.py mask comments while preserving quoted text and line offsets. Use the shared parser to check only direct change_variable value fields; permit nested arithmetic script values. Compare goods ids and color keys with the vanilla database so compatibility overrides retain their colors. For IO GetIcon, verify an actual custom IO definition and missing icon, including assets supplied by declared local dependencies. Keep positive regression cases for the real errors in test_validate.py.
+  category: workflow
+  scope: any
+  source: scripts/validate.py; scripts/test_validate.py; .eu5-base/reference_official_defines/docs/effects.log:1116-1122; .eu5-base/reference_game_files/game/in_game/common/goods/00_raw_materials.txt:1-4; .eu5-base/reference_game_files/game/in_game/gui/location_window.gui:2043; src/sol_mnt_compatibility_submod/in_game/gui/location_window.gui:6563
+  notes: The full SOL validation on 2026-10-23 reported 119 false positives (56 vanilla-goods overrides, 44 nested script-value operands, 18 generic IO icon lookups and one commented UIAction binding). This is a validator implementation rule; shared engine rules remain in the base. Do not silence whole rule categories or alter valid generated gameplay/GUI just to satisfy a context-free match. Reproduce build-time reports with build.bat --validate-only, which regenerates then validates all sources using an explicit interpreter and retains tmp/build_validate.log; a standalone check does not exercise the batch entry point.
 - id: sol_substitution_auto_modifier_recomputes_baskets
   pattern: null
   bad: Granting static country modifiers for SOL goods substitution, or computing price preferences, group allocation, population/market aggregation or external offsets inside an auto modifier or its scale script value.
@@ -541,3 +559,13 @@
     work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact
     is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07)
     traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations.
+
+- id: sol_living_standard_yoy_reuses_income_samples
+  pattern: null
+  category: scope
+  scope: country
+  detectability: advisory
+  bad: Reusing legacy income samples as denominators after replacing HUD income with living standard.
+  correction: Use sol_ls_sol_sample_<month>_* for SOL history; never read or rewrite legacy sol_ls_sample_* income samples. Show no prior-year data until a complete matching SOL year exists, and leave absent estates unsampled.
+  source: docs/technical/SOL_Topbar_PCI_Removal_Boundary_20261023.md section 4.4; scripts/sol_lshud_income_source.py; scripts/test_sol_lshud_income.py test_legacy_income_samples_cannot_supply_sol_baseline
+  notes: Project migration contract verified by offline scope execution. Population weighting belongs to the SOL accumulator; location net income remains a purchasing-power input.

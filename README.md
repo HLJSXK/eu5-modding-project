@@ -42,6 +42,17 @@ python scripts\gen_sol_chain.py --target all
 python scripts\gen_sol_chain.py --target all --check
 ```
 
+To run the build's generation and full validation without deployment:
+
+```cmd
+build.bat --validate-only
+```
+
+The build prints its Python and validator paths and retains validation output in
+`tmp/build_validate.log`. Set `EU5_PYTHON` to the eu5 environment's `python.exe`
+to select it explicitly; otherwise the active eu5 environment or the user's
+Anaconda eu5 environment is used.
+
 For the default deployment of stable, SOL standalone, and all compatibility
 compatibility submods, run:
 

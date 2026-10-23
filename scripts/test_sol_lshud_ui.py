@@ -23,7 +23,7 @@ import textures
 from data import Evaluator, Formats, Loc, TextIcons
 from engine import Engine
 from gui import Expander, GuiDB, collect_files
-from gen_sol_lshud import LOC, LOC_ENGLISH, PANEL_W, PENDING_BODY_W, ROW_H, ROW_Y, TIER_TEX, W, outputs
+from gen_sol_lshud import LOC, LOC_ENGLISH, PANEL_W, ROW_H, ROW_Y, outputs
 
 # Reuse the adopted prototype's invented country/estate fixtures, never its GUI.
 spec = importlib.util.spec_from_file_location(
@@ -105,8 +105,8 @@ class LivingStandardHUD(unittest.TestCase):
         ] + four_design.mocks(four_state) + [
             (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
             (r"Player\.MakeScope\.GetVariable\('sol_ls_(rank|tier)'\)\.IsSet", ready and not rank_pending),
-            (r"Player\.MakeScope\.GetVariable\('sol_ls_pci_yoy'\)\.IsSet", yoy_ready),
-            (r"Player\.MakeScope\.GetVariable\('(sol_ls_pci_(?:prev|yoy)\w*)'\)\.GetValue", annual_value),
+            (r"Player\.MakeScope\.GetVariable\('sol_ls_sol_yoy'\)\.IsSet", yoy_ready),
+            (r"Player\.MakeScope\.GetVariable\('(sol_ls_sol_(?:prev|yoy)\w*)'\)\.GetValue", annual_value),
             (r"GetGlobalVariable\('sol_ls_rank_count'\)\.IsSet", not rank_pending),
         ] + fixtures.state_mocks(overrides, rank, ready) + hud.mocks()
         log = []
@@ -156,7 +156,7 @@ class LivingStandardHUD(unittest.TestCase):
                         # Deliberately distinct from every country in the HUD fixtures.
                         country_name = "Foreign test country" if language == "english" else "异国测试"
                         mocks = [(r"Country.IsValid", True), (r"Country.MakeScope", {"__type__": "Scope"}),
-                                 (r"Scope.GetCountry", fixtures.country("FOREIGN", country_name, 12, 1.86, .045, 1)),
+                                 (r"Scope.GetCountry", fixtures.country("FOREIGN", country_name, 12, 18.0, .045, 1)),
                                  (r"Scope.GetCountry.GetNameWithNoTooltip", country_name),
                                  (r"Scope.GetCountry.MakeScope.ScriptValue\('sol_substitute_(\w+)_display'\)",
                                   lambda m: {"status": 2, "year": 1338, "goods_count": 56, "max_size": .4}.get(m[1], 1.5)),
@@ -220,20 +220,19 @@ class LivingStandardHUD(unittest.TestCase):
                     if self.out:
                         image.save(self.out / f"{target}_{language}_power.png")
 
-    def test_income_table_fills_content_and_stays_inside_frame(self):
+    def test_sol_table_fills_content_and_stays_inside_frame(self):
         for target in self.databases:
             for language in ("simp_chinese", "english"):
-                for annual, late_income in ((True, False), (False, False), (True, True)):
-                    with self.subTest(target=target, language=language, annual=annual, late_income=late_income):
+                for annual, large_sol in ((True, False), (False, False), (True, True)):
+                    with self.subTest(target=target, language=language, annual=annual, large_sol=large_sol):
                         eng, ex, _root, row, *_ = self.context(target, language, "")
                         eng.ev.mocks.insert(0, (re.compile(
-                            r"Player\.MakeScope\.GetVariable\('sol_ls_pci_yoy(?:_\w+)?'\)\.IsSet"
+                            r"Player\.MakeScope\.GetVariable\('sol_ls_sol_yoy(?:_\w+)?'\)\.IsSet"
                         ), annual))
-                        if late_income:
-                            values = {'sol_ls_income_all': 999999999, 'sol_ls_pci': 99999.99}
+                        if large_sol:
+                            values = {'sol_ls_sol': 99999.9}
                             for estate in ('nobles', 'clergy', 'burghers', 'commoners', 'tribesmen'):
-                                values[f'sol_ls_income_{estate}'] = 99999999
-                                values[f'sol_ls_pci_{estate}'] = 99999.99
+                                values[f'sol_ls_sol_{estate}'] = 99999.9
                             eng.ev.mocks[:0] = [
                                 (re.compile(re.escape(f"Player.MakeScope.GetVariable('{key}').GetValue")), value)
                                 for key, value in values.items()
@@ -245,10 +244,10 @@ class LivingStandardHUD(unittest.TestCase):
                         eng.place(tip, 12, 12, width, height)
                         elements = list(visible_walk(eng, tip))
                         header = next(e for e in elements
-                                      if e.props.get("name") == "sol_lshud4_income_header")
+                                      if e.props.get("name") == "sol_lshud4_sol_header")
                         rows = [e for e in elements if e.kind == 'hbox'
-                                and str(e.props.get("name", "")).startswith("sol_lshud4_income_")
-                                and e.props.get("name") not in ("sol_lshud4_income_header", "sol_lshud4_income_hero")]
+                                and str(e.props.get("name", "")).startswith("sol_lshud4_sol_")
+                                and e.props.get("name") not in ("sol_lshud4_sol_header", "sol_lshud4_sol_hero")]
                         self.assertGreaterEqual(len(rows), 2)
                         header_cells = [c for c in eng.layout_children(header) if c.kind == 'textbox']
                         for table_row in [header, *rows]:
@@ -265,9 +264,9 @@ class LivingStandardHUD(unittest.TestCase):
                             for cell, label in zip(cells[:4], header_cells[:4]):
                                 self.assertEqual((cell.x, cell.w), (label.x, label.w))
                             if table_row is not header:
-                                # Large incomes must remain legible with their coin
+                                # Large SOL amounts must remain legible with their unit
                                 # icons and leave a gutter before the adjacent column.
-                                for cell in cells[2:4]:
+                                for cell in cells[2:3]:
                                     left, _, right, _ = eng.margins(cell)
                                     self.assertGreaterEqual(left, 6)
                                     ink = eng.richtext(cell, size_override=11)
@@ -280,8 +279,8 @@ class LivingStandardHUD(unittest.TestCase):
                         eng.render(tip, image)
                         self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
                         if self.out:
-                            suffix = 'late_income' if late_income else ('annual' if annual else 'no_annual')
-                            image.save(self.out / f"{target}_{language}_income_{suffix}.png")
+                            suffix = 'large_sol' if large_sol else ('annual' if annual else 'no_annual')
+                            image.save(self.out / f"{target}_{language}_sol_{suffix}.png")
 
     def test_four_section_row_and_tooltip_states(self):
         for target in self.databases:
@@ -298,9 +297,9 @@ class LivingStandardHUD(unittest.TestCase):
                             if element.kind == "textbox":
                                 texts.append(eng.text_of(element) or "")
                         names = {e.props.get("name") for e in elements}
-                        self.assertTrue(any(name == "sol_lshud4_income_body" for name in names) or state == "_pending")
-                        self.assertIn("sol_lshud4_income_pending" if state == "_pending" else "sol_lshud4_income_body", names)
-                        self.assertTrue(any("1.86" in text for text in texts) or state == "_pending")
+                        self.assertTrue(any(name == "sol_lshud4_sol_body" for name in names) or state == "_pending")
+                        self.assertIn("sol_lshud4_sol_pending" if state == "_pending" else "sol_lshud4_sol_body", names)
+                        self.assertTrue(any("18.0" in text or "54.0" in text for text in texts) or state == "_pending")
                         sections = [next(e for e in hud.walk(row) if e.props.get("name") == f"sol_lshud4_section_{i}") for i in range(1, 5)]
                         self.assertEqual(len(sections), 4)
                         for section in sections:
@@ -379,6 +378,16 @@ class LivingStandardHUD(unittest.TestCase):
             eng.place(root, 0, 0, 1920, 1080)
             bar = next(e for e in hud.walk(root) if e.typename == "left_panel_info_bar")
             bar_body = next(child for child in bar.children if child.kind == "widget")
+            legislative_stat = next(e for e in hud.walk(bar_body)
+                                    if e.typename == "stat_item" and any(
+                                        child.props.get("texture") == "gfx/interface/icons/flat_icons/legislative_efficiency.dds"
+                                        for child in e.children))
+            self.assertIsNotNone(legislative_stat.tooltipwidget)
+            legislative_tip = ex.build_lazy(legislative_stat.tooltipwidget)
+            self.assertEqual(legislative_tip.typename, "ContextualTooltipType")
+            self.assertTrue(any(e.props.get("textcontext") == "[Country.GetDescriptionFor('legislative_efficiency')]"
+                                for e in hud.walk(legislative_tip)))
+            self.assertNotIn("missing template legislative_efficiency_tooltip", log)
             self.assertEqual((row.x, row.y, row.w, row.h), (0, ROW_Y, PANEL_W, ROW_H))
             self.assertEqual(round(bar_body.y), ROW_Y + ROW_H)
             image = Image.new("RGBA", (1920, 800), (29, 35, 42, 255))
@@ -422,7 +431,11 @@ class LivingStandardHUD(unittest.TestCase):
             original = GLORP_ROOT.read_text(encoding="utf-8-sig")
             for type_name in ("left_panel_info_bar", "left_panel_info_toggle"):
                 source_body = _extract_widget_type(original, type_name)
-                self.assertIn(source_body, text)
+                expected = source_body.replace("using = legislative_efficiency_tooltip",
+                                               "using = SOL_lshud_legislative_efficiency_tooltip")
+                self.assertIn(expected, text)
+            self.assertIn("template SOL_lshud_legislative_efficiency_tooltip", text)
+            self.assertNotRegex(text, r"using\s*=\s*legislative_efficiency_tooltip\b")
         registration = (ROOT / "src/stable/in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt").read_text(encoding="utf-8")
         self.assertIn("gui/SOL_lshud.gui = sol_lshud4_root", registration)
 

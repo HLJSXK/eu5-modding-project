@@ -15,7 +15,7 @@ from typing import Callable, List, Sequence
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from sol_lshud_income_source import render_income_effects
+from sol_lshud_income_source import render_yoy_effects
 from sol_living_standard_source import render_effects as render_living_standard_effects
 
 
@@ -1534,7 +1534,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tlimit = { is_land = yes }",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
-        "\t\t\tsol_ls_accumulate_country_income = yes",
         "\t\t\tsol_ls_accumulate_country_living_standard = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
@@ -1568,7 +1567,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "}",
         "",
         "sol_solve_country_pop_demand = {",
-        "\tsol_ls_reset_country_income = yes",
         "\tsol_ls_reset_country_living_standard = yes",
         "\tsol_refresh_country_substitution = yes",
         "\tgls_compute_savings_pressure = yes",
@@ -1612,7 +1610,7 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t}",
         "\telse = { sol_solve_country_pop_demand_raw_only = yes }",
         "\tsol_ls_finalize_country_living_standard = yes",
-        "\tsol_ls_finalize_country_income = yes",
+        "\tsol_ls_finalize_country_living_standard_yoy = yes",
         "}",
         "",
         "# Global census counters. Incremented per country during the monthly pass",
@@ -1808,7 +1806,6 @@ def emit_section_32_country_demand_driver(writer: ScriptWriter) -> None:
         "\t\t\tlimit = { is_land = yes }",
         "\t\t\tsol_compute_location_pop_demand = yes",
         "\t\t\tsave_scope_as = sol_demand_cached_location",
-        "\t\t\tsol_ls_accumulate_country_income = yes",
         "\t\t\tsol_ls_accumulate_country_living_standard = yes",
         "\t\t\towner = {",
         "\t\t\t\tchange_variable = { name = sol_country_demand_target_nobles add = scope:sol_demand_cached_location.var:sol_location_nobles_liquid_funds }",
@@ -3590,6 +3587,6 @@ def render_static_sections(
         sections.append(section_writer.render().rstrip())
         if name == "10_standard_of_living_prelude":
             sections.append(refresh_block.strip())
-    sections.append(render_income_effects().strip())
+    sections.append(render_yoy_effects().strip())
     sections.append(render_living_standard_effects().strip())
     return "\n\n".join(sections).rstrip() + "\n"
