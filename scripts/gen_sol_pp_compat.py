@@ -29,6 +29,7 @@ from gen_market_unit_consumption import (  # noqa: E402
 from tools.sol_demand_simulator.parser import (  # noqa: E402
     _collect_brace_block,
     _expand_demand_add,
+    _slave_demand,
     _find_sub_block,
     _parse_kv_block,
     _parse_inject_file,
@@ -349,6 +350,15 @@ def _render_goods_injections(
         if abs(value) <= EPSILON:
             continue
         lines.append(f"\t\t{pop_type} = {_format_float(value)}")
+    # Base SOL already cancels vanilla slave demand; undo PP's duplicate cancellation.
+    pp_text = _read(PP_LUMBER_FILE)
+    pp_match = re.search(r"(?:TRY_)?INJECT:lumber\s*=\s*\{", pp_text)
+    if pp_match is None:
+        raise ValueError("PP lumber injection missing")
+    pp_body, _ = _collect_brace_block(pp_text, pp_text.index("{", pp_match.start()))
+    slave_correction = -_slave_demand(pp_body)
+    if abs(slave_correction) > EPSILON:
+        lines.append(f"\t\tslaves = {_format_float(slave_correction)}")
     lines.extend(["\t}", "}", ""])
 
     victuals_rows = [row for row in rows if row[0] == "victuals"]
@@ -386,6 +396,16 @@ def _render_goods_injections(
         if abs(value) <= EPSILON:
             continue
         lines.append(f"\t\t{pop_type} = {_format_float(value)}")
+    victuals_text = _read(PP_VICTUALS_FILE)
+    victuals_match = re.search(r"(?m)^victuals\s*=\s*\{", victuals_text)
+    if victuals_match is None:
+        raise ValueError("PP victuals definition missing")
+    victuals_body, _ = _collect_brace_block(
+        victuals_text, victuals_text.index("{", victuals_match.start())
+    )
+    slave_quantity = _slave_demand(victuals_body)
+    if abs(slave_quantity) > EPSILON:
+        lines.append(f"\t\tslaves = {_format_float(-slave_quantity)}")
     lines.extend(["\t}", "}", ""])
     return "\n".join(lines)
 

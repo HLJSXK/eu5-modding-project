@@ -34,6 +34,7 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
     _find_sub_block,
     _parse_kv_block,
     _parse_vanilla_goods_file,
+    _slave_demand,
 )
 from sol_goods_ui import replace_goods_vbox  # noqa: E402
 
@@ -340,7 +341,7 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
         "# Legacy clean-rounded targets are rebased: nobles x1, clergy x2, commoners x4.",
         "# Burgher targets use approximately x0.6555 and one or two significant digits.",
         "# Every source threshold and regional demand modifier is fully negated.",
-        "# Slave demand is intentionally left unchanged and is never injected here.",
+        "# Slaves have no income: fully cancel their native JTG demand.",
     ]
     for row in rows:
         good = str(row["good"])
@@ -363,6 +364,8 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
             if abs(correction) <= EPSILON:
                 continue
             lines.append(f"\t\t{pop_type} = {_format_float(correction)}")
+        if float(row["slaves"]) > EPSILON:
+            lines.append(f"\t\tslaves = {_format_float(-float(row['slaves']))}")
         lines.append("\t}")
         wealth_all = row["wealth_all"]
         if wealth_all is not None:
@@ -526,10 +529,7 @@ def _raw_slave_demand(path: Path, good: str) -> float:
         raise ValueError(f"{good} block not found in {path}")
     brace_start = text.index("{", match.start())
     block, _end = _collect_brace_block(text, brace_start)
-    demand_add = _find_sub_block(block, "demand_add")
-    if demand_add is None:
-        return 0.0
-    return float(_parse_kv_block(demand_add).get("slaves", 0.0))
+    return _slave_demand(block)
 
 
 def _source_thresholds(
@@ -667,7 +667,7 @@ def _audit_workshop(workshop_root: Path, rows: List[Dict[str, object]]) -> None:
         if path is None:
             raise ValueError(f"Expected one Workshop definition for excluded good {good}")
         source = parsed_by_path[path][good]
-        if any(
+        if abs(_raw_slave_demand(path, good)) > EPSILON or any(
             abs(float(source["add"][pop_type]) * float(source["mult"][pop_type])) > EPSILON
             for pop_type in POP_TYPES
         ):

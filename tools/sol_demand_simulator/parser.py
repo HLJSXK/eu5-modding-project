@@ -144,6 +144,18 @@ def _expand_demand_add(kv: Dict[str, float]) -> Dict[str, float]:
     return result
 
 
+def _slave_demand(block: str) -> float:
+    """Resolve slaves separately from SOL's seven income-bearing pop types."""
+    block = re.sub(r"#[^\n]*", "", block)
+    additions = _parse_kv_block(_find_sub_block(block, "demand_add") or "")
+    multipliers = _parse_kv_block(_find_sub_block(block, "demand_multiply") or "")
+    return (
+        (additions.get("all", 0.0) + additions.get("slaves", 0.0))
+        * multipliers.get("all", 1.0)
+        * multipliers.get("slaves", 1.0)
+    )
+
+
 def _expand_demand_multiply(kv: Dict[str, float]) -> Dict[str, float]:
     """
     Expand demand_multiply {all, upper, pop_type_name} to per-EU5-pop-type multipliers.

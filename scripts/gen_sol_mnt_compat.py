@@ -410,15 +410,14 @@ def _compat_quantities(
 
 def _render_demand_block(
     quantities: Dict[str, Decimal],
-    slave_quantity: Decimal,
 ) -> str:
     lines = ["\tdemand_add = {"]
-    for pop_type in ALL_POP_TYPES:
-        value = slave_quantity if pop_type == "slaves" else quantities[pop_type]
+    for pop_type in POP_TYPES:
+        value = quantities[pop_type]
         if value == 0:
             continue
         lines.append(f"\t\t{pop_type} = {_format_decimal(value)}")
-    lines.append("\t}")
+    lines.extend(["\t\tslaves = 0", "\t}"])
     return "\n".join(lines)
 
 
@@ -455,12 +454,12 @@ def _render_goods(
         GENERATED_HEADER.rstrip(),
         "# M&T owns every non-demand field where defined; new vanilla goods use the current vanilla base.",
         "# Wealth and development demand gates remain removed for SOL's continuous scaling.",
+        "# Slaves have no income and no goods demand, including M&T's native slave quantities.",
     ]
     for good in sol_targets:
         original = goods_blocks[good].body
-        mnt_pop_demand = _final_pop_demand(original)
         base = _remove_fields(original, DEMAND_FIELDS)
-        demand_block = _render_demand_block(quantities[good], mnt_pop_demand["slaves"])
+        demand_block = _render_demand_block(quantities[good])
         rendered = _insert_after_default_price(base, demand_block, good)
         if _normalize_without_demand(rendered) != _normalize_without_demand(original):
             raise ValueError(f"Non-demand M&T fields changed while rendering {good}")
