@@ -7,7 +7,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from gen_market_unit_consumption import _load_good_rows
-from sol_substitution import CORE, render_country_runtime, render_location_spending, render_modifiers, render_values
+from sol_substitution import CORE, HUD_GOODS_LIMIT, HUD_ICON_PREFIX, render_country_runtime, render_location_spending, render_modifiers, render_values
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -31,9 +31,12 @@ def main():
         ("simp_chinese", "商品替代（${good}$）", "商品替代调整${good}$的人口需求。"),
     ):
         content = f"l_{language}:\n"
+        for slot in range(1, HUD_GOODS_LIMIT + 1):
+            content += f' SOL_LSHUD_GOOD_SLOT_{slot}: "[Player.MakeScope.GetVariable(\'sol_sub_hud_good_{slot}\').GetFlagName]"\n'
         for good in CORE:
             content += f' AUTO_MODIFIER_NAME_sol_substitute_{good}: "{label.format(good=good)}"\n'
             content += f' AUTO_MODIFIER_DESC_sol_substitute_{good}: "{description.format(good=good)}"\n'
+            content += f' {HUD_ICON_PREFIX}{good}: "@{good}!"\n'
         files[f"main_menu/localization/{language}/SOL_substitution_modifiers_l_{language}.yml"] = content
     failed = False
     for target in targets:

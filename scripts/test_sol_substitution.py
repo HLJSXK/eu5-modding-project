@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'ai_gui_assessment/renderer'))
 from pdx import parse
 from gen_market_unit_consumption import _load_good_rows
-from sol_substitution import CORE, GROUPS, CONFIG, POPS, price_weight, response, aggregate, render_country_runtime, render_location_spending, render_modifiers, render_values, market_details
+from sol_substitution import CORE, GROUPS, CONFIG, POPS, HUD_GOODS, HUD_ICON_PREFIX, price_weight, response, aggregate, render_country_runtime, render_location_spending, render_modifiers, render_values, market_details
 from gen_whole_group_baskets import validate_baskets, read_quantities, load_subscriptions, round_component
 
 
@@ -79,6 +79,7 @@ class Runtime:
             return self.value(tail, value) if sep else value
         if node.startswith('local_var:'): return self.local_context[node[10:]]
         if node.startswith('var:'): return scope.variables[node[4:]]
+        if node.startswith('flag:'): return node[5:]
         if node.startswith('num_pop_type:'): return scope.pops.get(node[13:], 0.)
         if node.startswith('modifier:global_'):
             good = node[len('modifier:global_'):-len('_pop_demand')]
@@ -321,11 +322,19 @@ class SubstitutionTests(unittest.TestCase):
     def test_periodic_refresh_rebuilds_market_population_and_external_inputs(self):
         rt, country, loc = self.fixture({'cloth': .5, 'leather': 1})
         rt.run('sol_refresh_country_substitution', country)
+        def check_hud():
+            expected = [HUD_ICON_PREFIX + g for g in HUD_GOODS
+                        if country.variables.get('sol_sub_multiplier_' + g, 1) > 1][:6]
+            actual = [country.variables[f'sol_sub_hud_good_{slot}'] for slot in range(1, 7)
+                      if f'sol_sub_hud_good_{slot}' in country.variables]
+            self.assertEqual(actual, expected)
+        check_hud()
         before = rt.auto_strength('cloth', country)
         loc.market = rt.market({'cloth': 2, 'leather': 1})
         loc.pops = {'burghers': 20}
         country.external['cloth'] = -.75
         rt.run('sol_refresh_country_substitution', country)
+        check_hud()
         self.assertNotAlmostEqual(rt.auto_strength('cloth', country), before)
         self.assertAlmostEqual(country.variables['sol_sub_external_cloth'], .25)
         self.assertAlmostEqual(country.variables['sol_good_effective_cloth'],
@@ -333,6 +342,29 @@ class SubstitutionTests(unittest.TestCase):
         rt.run('sol_clear_country_substitution', country)
         self.assertFalse(country.variables)
         self.assertEqual(rt.auto_strength('cloth', country), 0)
+
+    def test_hud_goods_cache_discards_stale_slots_and_missing_data(self):
+        rt = Runtime(self.rows)
+        country = Scope('country', variables={'sol_substitute_initialized': 1})
+        for good in CORE:
+            country.variables['sol_sub_multiplier_' + good] = 1.25
+        rt.run('sol_refresh_substitution_hud_goods', country)
+        self.assertEqual([country.variables[f'sol_sub_hud_good_{n}'] for n in range(1, 7)],
+                         [HUD_ICON_PREFIX + g for g in HUD_GOODS[:6]])
+        for good in CORE:
+            country.variables.pop('sol_sub_multiplier_' + good)
+        country.variables['sol_sub_multiplier_' + HUD_GOODS[-1]] = 1.00001
+        rt.run('sol_refresh_substitution_hud_goods', country)
+        self.assertEqual(country.variables['sol_sub_hud_good_1'], HUD_ICON_PREFIX + HUD_GOODS[-1])
+        self.assertFalse(any(f'sol_sub_hud_good_{n}' in country.variables for n in range(2, 7)))
+        rt.enabled = False
+        rt.run('sol_refresh_substitution_hud_goods', country)
+        self.assertFalse(any(k.startswith('sol_sub_hud_good_') for k in country.variables))
+        self.assertFalse(rt.local_context)
+        # Cleanup also removes an old cache even if its initialization marker is absent.
+        country.variables = {'sol_sub_hud_good_1': HUD_ICON_PREFIX + HUD_GOODS[0]}
+        rt.run('sol_clear_country_substitution', country)
+        self.assertFalse(country.variables)
 
     def test_missing_supply_and_pp_frozen_goods(self):
         rt, country, loc = self.fixture({'cloth': .5, 'leather': 1})
@@ -487,6 +519,8 @@ class SubstitutionTests(unittest.TestCase):
             effects = {n.key for n in parse(source)}
             self.assertIn('sol_compute_substitute_unit_spending', effects)
             self.assertIn('sol_clear_country_substitution', effects)
+            self.assertIn('sol_refresh_substitution_hud_goods', effects)
+            self.assertIn('sol_clear_substitution_hud_goods', effects)
             for obsolete in ('add_country_modifier', 'remove_country_modifier',
                              'country_modifier_strength', 'sol_apply_country_substitution',
                              'sol_check_substitution_snapshot'):
@@ -502,6 +536,8 @@ class SubstitutionTests(unittest.TestCase):
                 keys = re.findall(r'^ ([A-Za-z0-9_]+):', localization, re.MULTILINE)
                 expected = {f'AUTO_MODIFIER_{kind}_sol_substitute_{good}'
                             for kind in ('NAME', 'DESC') for good in CORE}
+                expected.update(HUD_ICON_PREFIX + good for good in CORE)
+                expected.update(f'SOL_LSHUD_GOOD_SLOT_{slot}' for slot in range(1, 7))
                 self.assertEqual(set(keys), expected)
                 self.assertEqual(len(keys), len(expected))
                 for line in localization.splitlines()[1:]:

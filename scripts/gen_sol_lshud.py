@@ -10,6 +10,7 @@ import importlib.util
 import re
 import sys
 from pathlib import Path
+from textwrap import dedent
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -49,10 +50,10 @@ def glorp_compat_source() -> str:
         "# Preserves the vendored Glorp UI bodies and moves its stats bar and toggle below the SOL row.",
         "# Requires SOL to load after Glorp UI; the two overrides are unused without Glorp UI.",
         "",
-        "Types SOLLivingStandardGlorpCompat {",
         # Current vanilla comments out legislative_efficiency_tooltip, but Glorp
         # still uses it. Restore its existing content under a SOL-owned name.
-        '''	template SOL_lshud_legislative_efficiency_tooltip {
+        # Templates must be top-level declarations, outside the Types group.
+        dedent('''	template SOL_lshud_legislative_efficiency_tooltip {
 		ContextualTooltipType = {
 			blockoverride "title_text" {
 				datacontext = "[Country]"
@@ -81,7 +82,9 @@ def glorp_compat_source() -> str:
 				}
 			}
 		}
-	}''',
+	}'''),
+        "",
+        "Types SOLLivingStandardGlorpCompat {",
     ]
     for name in ("left_panel_info_bar", "left_panel_info_toggle"):
         body = _extract_widget_type(source, name)
@@ -203,9 +206,7 @@ _FOUR_SECTION_EN = {
     "SOL_LSHUD4_T2_SUB": "How much of the basic necessities people can afford.",
     "SOL_LSHUD4_T2_NOTE": "0% means the baseline basket is exactly affordable; -100% means no available funds. The row shows the national total.",
     "SOL_LSHUD4_T3_TITLE": "Goods substitution",
-    "SOL_LSHUD4_T3_SPEND": "Highest spending goods (by total price)",
-    "SOL_LSHUD4_T3_SUB": "Where the money goes, and what people buy instead when goods run short.",
-    "SOL_LSHUD4_T3_SPEND_TOTAL": f"National spending [{P}('sol_ls_spend_total').GetValue|1] @gold! / month",
+    "SOL_LSHUD4_T3_SUB": "What people buy instead when goods run short.",
     "SOL_LSHUD4_T4_TITLE": "World ranking",
     "SOL_LSHUD4_T4_SUB": "Living standard compared with the rest of the world.",
     "SOL_LSHUD4_T4_NATION": "National rank",

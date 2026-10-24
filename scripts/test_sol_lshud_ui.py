@@ -74,7 +74,7 @@ class LivingStandardHUD(unittest.TestCase):
         textures.SEARCH[:] = cls.original_search
         textures.TEXTURES.load.cache_clear()
 
-    def context(self, target, language, state, enabled=1, left_shown=False, left_attached=False):
+    def context(self, target, language, state, enabled=1, left_shown=False, left_attached=False, extra_mocks=()):
         binding.LANG = language
         target_root = ROOT / "src" / target
         textures.SEARCH[:] = [target_root / stage for stage in ("loading_screen", "main_menu", "in_game")]
@@ -98,7 +98,7 @@ class LivingStandardHUD(unittest.TestCase):
 
         four_state = {"_rank2": "", "_yoy_pending": "", "_rank_yoy_pending": "_rank_pending"}.get(state, state)
         # Per-test visibility switches must precede the design's default values.
-        mocks = [
+        mocks = list(extra_mocks) + [
             (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", enabled),
             (r"LeftView\.IsShown", left_shown),
             (r"LeftView\.IsSideAttached", left_attached),
@@ -135,6 +135,86 @@ class LivingStandardHUD(unittest.TestCase):
     def test_disabled_sol_hides_the_row(self):
         eng, _ex, root, *_ = self.context("stable", "simp_chinese", "", enabled=0)
         self.assertFalse(any(visible_walk(eng, root)))
+
+    def test_discounted_goods_icons_follow_country_weights(self):
+        from gen_market_unit_consumption import _load_good_rows
+        from test_sol_substitution import Runtime, Scope
+
+        goods = four_design.GOODS
+        runtime = Runtime(_load_good_rows())
+        boundaries = dict(zip(goods[:6], (1.00001, 1.25, 1.25001, 1.5, 1.50001, 2)))
+        mixed = {good: (1.2 if i % 3 else .8) for i, good in enumerate(goods)}
+        late = {good: 1.5 for good in goods[-8:]}
+        cases = (
+            ("none", 2, {goods[0]: .75, goods[1]: 1}, []),
+            ("few", 2, {goods[2]: 1.00001, goods[-1]: 1.25}, [goods[2], goods[-1]]),
+            ("boundaries", 2, boundaries, goods[:6]),
+            ("many", 2, mixed, [good for good in goods if mixed[good] > 1][:6]),
+            ("late", 2, late, goods[-8:-2]),
+            ("disabled", 0, boundaries, []),
+            ("pending", 1, boundaries, []),
+        )
+        for target in self.databases:
+            for language in ("simp_chinese", "english"):
+                labels = {}
+                path = ROOT / "src" / target / "main_menu/localization" / language / f"SOL_substitution_modifiers_l_{language}.yml"
+                for line in path.read_text(encoding="utf-8-sig").splitlines():
+                    match = Loc.LINE_RE.match(line)
+                    if match:
+                        labels[match[1]] = match[2]
+                self.assertEqual(sum(labels[f"SOL_LSHUD_GOOD_SLOT_{n}"].count(".GetFlagName")
+                                     for n in range(1, 7)), 6)
+                for label, status, weights, expected in cases:
+                    with self.subTest(target=target, language=language, state=label):
+                        country = Scope("country", variables={f"sol_sub_multiplier_{g}": v for g, v in weights.items()})
+                        if status == 2:
+                            country.variables["sol_substitute_initialized"] = 1
+                        runtime.enabled = status > 0
+                        runtime.run("sol_refresh_substitution_hud_goods", country)
+
+                        def unexpected_multiplier_read(match):
+                            raise AssertionError("HUD tick evaluated a goods multiplier: " + match[0])
+
+                        mocks = [
+                            (r"Player\.MakeScope\.GetVariable\('(sol_sub_hud_good_\d)'\)\.IsSet",
+                             lambda m: m[1] in country.variables),
+                            (r"Player\.MakeScope\.GetVariable\('(sol_sub_hud_good_\d)'\)\.GetFlagName",
+                             lambda m: labels[country.variables[m[1]]]),
+                            (r"Player\.MakeScope\.ScriptValue\('sol_substitute_status_display'\)", status),
+                            (r"Player\.MakeScope\.ScriptValue\('sol_substitute_(\w+)_display'\)",
+                             unexpected_multiplier_read),
+                        ]
+                        eng, ex, root, row, *_ = self.context(target, language, "", extra_mocks=mocks)
+                        section = next(e for e in hud.walk(row) if e.props.get("name") == "sol_lshud4_section_3")
+                        icons = [e for e in visible_walk(eng, section)
+                                 if e.props.get("name", "").startswith("sol_lshud4_cheap_")]
+                        self.assertEqual([eng.text_of(e) for e in icons], [f"@{good}!" for good in expected])
+                        self.assertEqual(sum(e.props.get("name", "").startswith("sol_lshud4_cheap_")
+                                             for e in hud.walk(section)), 6)
+                        self.assertFalse(any(e.props.get("text") == "SOL_LSHUD_PENDING_SHORT"
+                                             for e in hud.walk(section)))
+                        for icon in icons:
+                            self.assertGreaterEqual(icon.x, section.x)
+                            self.assertLessEqual(icon.x + icon.w, section.x + section.w)
+                        for left, right in zip(icons, icons[1:]):
+                            self.assertLessEqual(left.x + left.w, right.x)
+                        self.assertIsNotNone(section.tooltipwidget)
+                        image = Image.new("RGBA", (PANEL_W, ROW_Y + ROW_H + 5), (29, 35, 42, 255))
+                        eng.render(root, image)
+                        self.assertFalse(eng.unresolved_contexts, eng.unresolved_contexts)
+                        self.assertFalse(textures.TEXTURES.missing, textures.TEXTURES.missing)
+                        if self.out:
+                            image.crop((0, ROW_Y - 5, PANEL_W, ROW_Y + ROW_H + 5)).save(
+                                self.out / f"{target}_{language}_cheap_goods_{label}.png")
+
+        # The persistent row has one status check, six existence checks and six
+        # cached labels. No per-good script values or prefix-count expressions.
+        source = four_design.discounted_goods_row()
+        self.assertEqual(source.count(".ScriptValue("), 1)
+        self.assertEqual(source.count(".IsSet"), 6)
+        self.assertEqual(source.count('text = "SOL_LSHUD_GOOD_SLOT_'), 6)
+        self.assertNotIn("Add_int32", source)
+        self.assertNotIn("Select_int32", source)
 
     def test_each_section_previews_and_selects_its_map_mode(self):
         from sol_map_modes_source import MAP_MODES
@@ -184,8 +264,7 @@ class LivingStandardHUD(unittest.TestCase):
                                  (r"Scope.GetCountry", fixtures.country("FOREIGN", country_name, 12, 18.0, .045, 1)),
                                  (r"Scope.GetCountry.GetNameWithNoTooltip", country_name),
                                  (r"Scope.GetCountry.MakeScope.ScriptValue\('sol_substitute_(\w+)_display'\)",
-                                  lambda m: {"status": 2, "year": 1338, "goods_count": 56, "max_size": .4}.get(m[1], 1.5)),
-                                 (r"Scope.GetCountry.MakeScope.GetVariable\('sol_ls_spend_total'\).GetValue", 31415.9)]
+                                  lambda m: {"status": 2, "year": 1338, "goods_count": 56, "max_size": .4}.get(m[1], 1.5))]
                         mocks += [(rx.pattern.replace("Player", r"Scope\.GetCountry"), value) for rx, value in base.ev.mocks]
                         log = []
                         eng = Engine(ex, Evaluator(mocks, base.loc, log), base.loc, Formats(), TextIcons(), 1)
@@ -200,7 +279,6 @@ class LivingStandardHUD(unittest.TestCase):
                         if idx == 4:
                             self.assertEqual(sum(country_name in text for text in texts), 2)  # title + highlighted self row
                         if idx == 3:
-                            self.assertTrue(any("31415.9" in text for text in texts), texts[:10])
                             self.assertTrue(any("1338" in text for text in texts), texts[-10:])
                         self.assertLessEqual(width, 524)
                         self.assertLessEqual(height, 1080)
@@ -454,6 +532,11 @@ class LivingStandardHUD(unittest.TestCase):
         for target in self.databases:
             path = ROOT / "src" / target / "in_game/gui/SOL_lshud_glorp_compat.gui"
             text = path.read_text(encoding="utf-8")
+            nodes = gui.parse(text, str(path))
+            self.assertEqual([node.key for node in nodes],
+                             ["template:SOL_lshud_legislative_efficiency_tooltip", "types"])
+            self.assertEqual([node.key for node in nodes[1].value],
+                             ["type:left_panel_info_bar", "type:left_panel_info_toggle"])
             self.assertIn("position = { 0 36 }", text)
             original = GLORP_ROOT.read_text(encoding="utf-8-sig")
             for type_name in ("left_panel_info_bar", "left_panel_info_toggle"):
