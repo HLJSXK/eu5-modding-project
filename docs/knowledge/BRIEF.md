@@ -170,6 +170,7 @@ eu5-modding-project/
 
 | Script | When to run | Output |
 |---|---|---|
+| `update_workshop_tags.py` | SOL launcher for `.eu5-base/scripts/update_workshop_tags.py`; explicit `--item-id`, default stable metadata, optional `--metadata` override | Shared implementation owns Steam tag updates and verification; offline preview by default, `--check` reads Steam, `--apply` replaces tags; local usage in `docs/guides/Workshop_Tags.md` |
 | `update_mod_version.py` | Automatically before every `build.bat` deployment; may also be run manually with `--target` and `--date` | Selected target metadata `version` fields in `YYMMDD` form |
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all five deploy targets |
 | `build.bat` | Build/deploy selected targets; use `--validate-only` for generation plus full source validation | Uses the explicit EU5_PYTHON interpreter or resolves the eu5 environment, prints the interpreter and validator paths, and retains tmp/build_validate.log. Normal deployment validates changed files before BOM normalization and mirroring; --validate-only checks all sources and exits before those steps |

@@ -8,7 +8,8 @@
 | 4 | Discord mod coop 论坛 | `04_discord_modcoop_forum_en.md` | 拆成首帖 + 第一条回复（各低于 2000 字符），面向其他模组作者 |
 | 5 | QQ 群公告 | `05_qq_announcement_zh.txt` | B站视频链接处留了占位 |
 | 6 | Reddit | `06_reddit_post_en.md` | 首次发帖，覆盖模组全部内容；附标题、flair 和配图建议 |
-| 7 | Paradox 官方论坛 | `07_paradox_forum_post_en.md` | BBCode，面向普通玩家（非 modder）；按 Reddit 版改写并适配论坛格式，标题带 `[Mod]` 前缀 |
+| 7 | Paradox 官方论坛 · 更新回复 | `07_paradox_forum_post_en.md` | 帖 1916241 下的回复，只讲更新内容；BBCode，带链接 |
+| 7b | Paradox 官方论坛 · 替代组技术帖 | `docs/technical/SOL_Substitution_Forum_Post.bbcode` | 单独开新帖讲替代组实现，15562 字符（论坛单帖上限内，无需拆分）；用 `prepare_forum_post.py --source ... --write` 校验通过 |
 | 8 | GitHub Wiki | `docs/wiki/Feature-List.md` / `docs/wiki/Feature-List-ZH.md` | 全文按当前版本重写（只保留最新版）。分别粘贴到 Wiki 的 `Feature-List` 和 `mod特性列表` 页面 |
 | 9 | B站视频 | `docs/video/2026-10_major_update/导演分镜.md` | 口播稿、全部白底页、粗剪预览、估算字幕、素材清单 |
 
