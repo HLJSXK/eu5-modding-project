@@ -50,8 +50,10 @@ provided by whichever mods are enabled.
    relative path;
 2. accepting the current Glorp UI 1.4 action-button and road-builder APIs,
    while migrating those APIs when an older reference snapshot is supplied;
-3. replacing the shared `zoom_to_button` type with the SOL-owned
-   `sol_zoom_to_button` type;
+3. shipping a SOL-owned copy of the shared `zoom_to_button` type in
+   `gui/SOL_glorp_location_support.gui` (same name as the Glorp UI and
+   Construction Manager copies; the name is not changed, and which duplicate
+   definition the engine keeps is unverified);
 4. replacing `Location.GetTotalIncome` with SOL's
    `local_sol_total_income`;
 5. inserting the SOL Living Standard tooltip button before the migration
@@ -71,13 +73,20 @@ Workshop `3812518640` nor `3736668860` is declared as a SOL metadata
 dependency. Their definitions remain optional runtime inputs to the unified
 location window.
 
+The Living Standard row below the left-panel buttons adds one GUI type-load
+condition: when Glorp UI is enabled, load SOL after Glorp UI so the generated
+`SOL_lshud_glorp_compat.gui` definitions of `left_panel_info_bar` and
+`left_panel_info_toggle` take effect. The generator preserves both Glorp type
+bodies and adds a 36px offset. These definitions are unused without Glorp UI;
+the compatibility shim does not replace a vanilla or Glorp GUI file path.
+
 The effective combinations are:
 
 | Enabled mods | Winning `location_window.gui` | Expected result |
 |---|---|---|
 | SOL only | SOL's generated Glorp-based file | SOL + Glorp UI layout and button. `cm_*` references report missing definitions, but those errors do not prevent the SOL/Glorp layout from displaying. |
-| SOL + Glorp UI | SOL's generated file (configure load order so SOL wins this exact path) | Same location window as SOL only. Other Glorp UI files also load, but Glorp UI cannot replace the SOL file when SOL wins the path. |
-| SOL + Glorp UI + Construction Manager | SOL's generated Glorp-based file, with CM definitions loaded | SOL + Glorp UI + Construction Manager controls, with no missing `cm_*` definitions. Keep Construction Manager above Glorp UI so its definitions load while Glorp's integrated GUI remains the selected UI file. |
+| SOL + Glorp UI | SOL's generated file (configure load order so SOL wins this exact path) | Same location window as SOL only; the living-standard row appears below the left-panel buttons and Glorp's stats bar/toggle move below the row. |
+| SOL + Glorp UI + Construction Manager | SOL's generated Glorp-based file, with CM definitions loaded | SOL + Glorp UI + Construction Manager controls, with no missing `cm_*` definitions. Keep Construction Manager above Glorp UI and SOL after Glorp UI so its definitions load and SOL's window/type overrides are selected. |
 
 For Glorp UI + Construction Manager without SOL, keep Construction Manager
 above Glorp UI so Glorp's integrated `location_window.gui` wins while
@@ -100,10 +109,11 @@ enabled-mod combination, not on the presence of a `cm_` prefix alone.
 
 | Log entries | Classification | Meaning |
 |---|---|---|
+| `SOL_lshud_glorp_compat.gui:54` / property widgets must specify exactly one widget | SOL-owned copied Glorp tooltip error; source corrected, native hover pending | Glorp referenced legislative_efficiency_tooltip, which current vanilla comments out. The generator restores its still-valid modifier/localization content under a SOL-owned name and rewrites the copied reference. Composition tests now inspect this tooltip and the missing-template warning. |
 | Metadata parse error for `src/sol_standalone/.metadata/metadata.json` | Real error | Standalone metadata is missing the required `relationships` member. |
 | `OnMouseEnterBuildRoadButton`, `OnMouseLeaveBuildRoadButton` callbacks | Real error | Legacy Glorp/1.3 callbacks are not present in the verified 1.4 API. |
 | `ShowRoadbuilder` | Real error in the logged deployment | 1.4 uses `ShowRoadBuilder`; the current generator migrates this, so this line indicates an old deployed window or stale log and must be rechecked after deployment. |
 | `GetArmyLevyPercentage`, `GetNavyLevyPercentage` | Real error | The current 1.4 API exposes the `...ForCountry(Arg0)` forms; old getter calls remain in the affected GUI snapshot. |
 | `cm_is_auto_expand_on_icon`, `cm_auto_food_widget_location_window`, `cm_auto_expand_rgo_widget_location_window` | Optional Construction Manager dependency missing | Expected when Construction Manager is not enabled. Keep these references in the unified Glorp/SOL window; removing them would break the SOL + Glorp UI + Construction Manager combination. |
 | `use_global_input_instance` | Real error | The property was removed from the 1.4 engine. The current Glorp snapshot still carries it in shared types, so SOL's copied zoom-button support must remove it; updating the location-window source alone cannot fix this file. |
-| `PERFORM_global_living_standard_recalculate_ACTION` | Deployment/load-state issue requiring retest | The message type exists in both stable and standalone SOL message files. Re-deploy and collect a fresh log after fixing metadata and stale GUI output before treating it as a missing definition. |
+| `PERFORM_global_living_standard_recalculate_ACTION` | Message registration migrated for 1.4.3; native registration still needs runtime retest | Older builds required gui/messagetypes.txt; EU5 1.4.3 reads the messagetypes/ directory. gen_sol_messages.py now emits only SOL's type in main_menu/gui/messagetypes/SOL_messages.txt for stable/standalone, with no vanilla copy. Compatibility submods inherit this registration. |

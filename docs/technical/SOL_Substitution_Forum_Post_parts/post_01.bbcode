@@ -1,0 +1,154 @@
+[SIZE=2][I]A technical write-up. Sections: 1. The interface problem, 2. What the engine does with it, 3. Whole-group consumption, 4. Price tiers, 5. Publishing 56 modifiers cheaply, 6. What is lost, 7. Status[/I][/SIZE]
+
+[SIZE=6][B]Rebuilding goods substitution on a country modifier[/B][/SIZE]
+
+[I]A technical write-up on goods substitution in Standard of Living (SOL), a mod for EU5. If you get something out of reading this, please consider supporting [URL=https://forum.paradoxplaza.com/forum/threads/mod-standard-of-living-dynamic-economy-mod.1916241/]my mod thread[/URL] — since PDX will not restore per-pop demand access, rebuilding this system meant working around the engine rather than with it.[/I]
+
+[HR][/HR]
+
+[SIZE=5][B]Contents[/B][/SIZE]
+
+1. The interface problem
+2. What the engine does with it
+3. Whole-group consumption
+4. Price tiers
+5. Publishing 56 modifiers cheaply
+6. What is lost
+7. Status
+
+[HR][/HR]
+
+[SIZE=5][B]1. The interface problem[/B][/SIZE]
+
+The original SOL in 1.1 resolved demand per POP. That allowed a Vic3-style model: Engel curves, per-stratum baskets, and substitution groups where a consumer abandons a good as it becomes expensive. The 1.2 update removed direct pop access — I take this to be a performance decision, since cultural and religious demand modifiers were hardcoded into the engine instead — and that destroyed the entire approach.
+
+1.3 restored a much coarser handle. Three modifier types are relevant, and all of them are scalars:
+
+[CODE]global_pop_demand          = { percent = yes game_data = { category = country } }
+local_pop_demand           = { percent = yes game_data = { category = location } }
+global_<good>_pop_demand   = { percent = yes game_data = { category = country } }[/CODE]
+
+The third form is the only per-good, scriptable demand interface that exists. All 56 core goods have a definition; [ICODE]victuals[/ICODE] does not, and no such definition exists in the vanilla or Prosper or Perish reference trees. Just Goods declares its own 26 types, which is worth knowing before assuming a custom good can never participate.
+
+That interface is a country-level scalar per good. It cannot express "nobles in this market substitute away from wheat while peasants in the next market do not." Every market, stratum and POP inside one country has to be compressed into one number per good before the engine ever sees it. Everything below is about making that compression behave sensibly rather than pretending it is not happening.
+
+[HR][/HR]
+
+[SIZE=5][B]2. What the engine does with it[/B][/SIZE]
+
+None of the above is useful without knowing how the engine combines these numbers. The observed rule, from a 1.4 test that opened the pop demand detail tooltip for Hungarian nobles immediately after adding modifiers:
+
+[CODE]demand = base
+       x (1 + sum of all global_<good>_pop_demand for that good)
+       x (1 + global_pop_demand)
+       x (1 + local_pop_demand)
+       x (1 + vanilla percentage terms)
+       x other multipliers[/CODE]
+
+The important part is which operations are additive and which are multiplicative. In the same test, two sources of +0.5 on the same good produced x2.0, not x2.25 — they summed. A +0.25 and a -0.75 on sugar produced x0.5. But a +0.5 on the good, +0.5 on the global type and +1.0 on the location type produced x4.5, which is 1.5 x 1.5 x 2.0. Same type adds, different types multiply. A coefficient driven below zero truncates the good out of the demand list entirely; fish at -1.5 simply disappeared.
+
+This has a consequence that bites immediately. Other mods and vanilla ages already write [ICODE]global_<good>_pop_demand[/ICODE]. Age one alone writes liquor -0.75, tobacco -0.75, coffee -0.5. If SOL writes its desired total multiplier [ICODE]M[/ICODE] directly as the modifier size, it will stack on top of those external values and the result will be wrong, and it will drift as ages change.
+
+So the size written has to be solved backwards from the desired ratio. With an external offset [ICODE]e[/ICODE] on that good, writing size [ICODE]x[/ICODE] gives an actual ratio of [ICODE](1 + e + x) / (1 + e)[/ICODE]. Setting that equal to [ICODE]M[/ICODE]:
+
+[CODE]x = (1 + e) × (M - 1)[/CODE]
+
+If the external offset is -0.75 and the desired multiplier is 0.5, the correct size is -0.125, not -0.5. At [ICODE]e = 0[/ICODE] it degrades to the obvious [ICODE]M - 1[/ICODE].
+
+The second requirement is that [ICODE]e[/ICODE] must exclude SOL's own contribution, or every refresh compounds on the last one. The aggregate total is read, the previous own strength is subtracted, and the remainder is the external offset. The first version of this subtracted a cached request value, which is not the same thing as the engine's actual strength; the fix reads [ICODE]country_modifier_strength(<key>)[/ICODE] and keeps the requested value and the actual value in separate diagnostic fields. That distinction is not cosmetic — see section 6.
+
+[HR][/HR]
+
+[SIZE=5][B]3. Whole-group consumption[/B][/SIZE]
+
+A substitution model that moves demand between wheat and rice needs to know what a pop was going to buy in the first place. Per-pop access is gone, but the engine still accepts a demand quantity per good per pop type as the calibration baseline, and that baseline can be written as a whole basket rather than good by good.
+
+The design decision that matters here is that estates subscribe to entire groups, not to individual goods. [ICODE]data/pop_group_baskets.csv[/ICODE] decides which of the 20 groups each of the seven pop types consumes. A peasant needs [I]a[/I] staple; which staple is the model's problem, not the script's. This removed a class of bug where a partial group had its multiplier diluted because some members were missing from the basket — residual cells in the old calibration were migrated, and positive-demand good/stratum pairs went from 215 to 246, with 291 subscribed group/stratum/member triples.
+
+For each location [ICODE]l[/ICODE], stratum [ICODE]s[/ICODE] and good [ICODE]i[/ICODE], the baseline amount is quantity times a neutral reference price:
+
+[CODE]q(l,s,i) = population(l,s) × calibrated_unit_quantity(s,i) × supply_eligible(market(l),i)
+B(l,s,i) = q(l,s,i) × default_price(i)[/CODE]
+
+The reference price is the default price, deliberately not the current market price. This matters: if current prices entered the aggregation weights, a price rise would change both the numerator and the weighting of the average, and the country multiplier would no longer mean what it says it means.
+
+Inside a group [ICODE]g[/ICODE], the price tier weight [ICODE]T[/ICODE] redistributes shares. With non-price preference [ICODE]V[/ICODE] fixed at 1 for now (price substitution only; religious and cultural preferences would need per-POP aggregation I do not have), the current and neutral allocations are:
+
+[CODE]W(l,s,i)     = T(market(l),i) × V(l,s,i)
+F_T(l,s,g,i) = N_g × W(l,s,i) / sum over j in g of W(l,s,j)
+F_1(l,s,g,i) = N_g × V(l,s,i) / sum over j in g of V(l,s,j)
+H_T(l,s,i)   = sum over g containing i of F_T(l,s,g,i) / membership_count(i)
+H_1(l,s,i)   = sum over g containing i of F_1(l,s,g,i) / membership_count(i)
+D(l,s,i)     = H_T(l,s,i) / H_1(l,s,i)[/CODE]
+
+Dividing current by neutral is the whole trick. It extracts only the response to price and cancels the group constants, so no assumption about absolute basket size leaks into the multiplier. Goods in several groups — cloth, lumber, pottery, paper, glass, wine, fish, mercury and five others — contribute through each group and are averaged by membership count, all 67 relationships retained.
+
+The country aggregate then sums the target and baseline amounts over the locations that country actually owns:
+
+[CODE]E_C(i)        = sum over owned l,s of B(l,s,i)
+E_target_C(i) = sum over owned l,s of B(l,s,i) × D(l,s,i)
+M(C,i)        = E_target_C(i) / E_C(i)[/CODE]
+
+Because the reference price is identical for a good in every location, summing amounts and summing quantities give the same answer, so the choice is cosmetic. What is not cosmetic is the ownership boundary: aggregating by market owner or by capital market instead of by owned locations produces visibly wrong multipliers in fragmented realms.
+
+[HR][/HR]
+
+[SIZE=5][B]4. Price tiers[/B][/SIZE]
+
+The tier table is inherited from 1.1, because it is the part players actually felt. The ratio is market price over default price:
+
+[TABLE]
+[TR][TH]Price ratio r[/TH][TH]Weight T[/TH][/TR]
+[TR][TD]r < 0.40[/TD][TD]2.00[/TD][/TR]
+[TR][TD]0.40 ≤ r < 0.65[/TD][TD]1.50[/TD][/TR]
+[TR][TD]0.65 ≤ r < 0.85[/TD][TD]1.25[/TD][/TR]
+[TR][TD]0.85 ≤ r ≤ 1.30[/TD][TD]1.00[/TD][/TR]
+[TR][TD]1.30 < r ≤ 1.70[/TD][TD]0.75[/TD][/TR]
+[TR][TD]1.70 < r ≤ 2.30[/TD][TD]0.50[/TD][/TR]
+[TR][TD]r > 2.30[/TD][TD]0.25[/TD][/TR]
+[/TABLE]
+
+The boundary handling is load-bearing. In script this is a chain of strict comparisons checked from the extremes inward — [ICODE]> 2.30[/ICODE], [ICODE]> 1.70[/ICODE], [ICODE]> 1.30[/ICODE], then [ICODE]< 0.40[/ICODE], [ICODE]< 0.65[/ICODE], [ICODE]< 0.85[/ICODE] — so a price exactly on a threshold always lands in the milder tier: 2.30 is 0.50, 0.40 is 1.50, and both 0.85 and 1.30 stay neutral. Writing the chain in the wrong order, or with non-strict comparisons, silently shifts every boundary price one tier harsher.
+
+There is no hysteresis. Instead the price lists are rebuilt on a yearly cadence, which is enough to stop month-to-month oscillation at the boundary while still reacting within a campaigning season. Six non-neutral bands times 56 goods is 336 market list entries in the 1.1 implementation; the current build reads the same tiers through cached market data instead of 336 persistent lists.
+
+[HR][/HR]
+
+[SIZE=5][B]5. Publishing 56 modifiers cheaply[/B][/SIZE]
+
+Writing 56 country modifiers per country per refresh is exactly the kind of thing that destroys turn times, and the first attempt did. The current design uses [ICODE]auto_modifiers[/ICODE] with a [ICODE]scales_with[/ICODE] script value, which is the cheapest way I found to publish a computed number that the engine can read continuously.
+
+Each generated definition has category country and a scale that returns zero when the feature is disabled or the cache is missing, and otherwise reads exactly one script value, [ICODE]sol_sub_size_<good>[/ICODE]. Neither the auto modifier nor its scale reads prices, population, markets, variable maps or aggregate modifiers. The solve itself runs in a scheduled country pulse — monthly for humans and normal-cadence AI, yearly on the country's own anniversary for reduced-frequency AI — and publishes into those caches:
+
+[CODE]external            = max(1 + total_goods_modifier - active_cached_substitution_delta, 0)
+multiplier          = target_spending / baseline_spending    # 1 when baseline is zero
+sol_sub_size_good   = external × (multiplier - 1)
+sol_good_effective  = max(external + sol_sub_size_good, 0)[/CODE]
+
+The first line is the guard against self-accumulation. It reads the same guarded scale the auto modifier uses, then overwrites that good's cache, so the previous substitution delta cannot feed back into the next solve. External modifier changes wait for the next scheduled solve rather than forcing a recompute; the engine's frequent auto-modifier reevaluation keeps reading the previous result at negligible cost.
+
+Zero deltas are dropped after effective spending and maximum-size statistics have consumed them, and a missing size cache makes the definition's potential false, so neutral goods never activate a zero-strength modifier. This does not eliminate the engine's per-definition potential checks — that cost is unavoidable — but it does eliminate the modifier application itself.
+
+The gain is measurable in operation counts rather than seconds. The heavier version of this chain executed roughly an order of magnitude more script nodes per month, and the rework cut that by a large factor; I will not quote a wall-clock reduction, because script node counts are not EU5 seconds and the engine-side demand recalculation is not in them at all.
+
+[HR][/HR]
+
+[SIZE=5][B]6. What is lost[/B][/SIZE]
+
+This section exists because the honest version of the design is more useful than the sales version.
+
+[B]No conservation.[/B] Algorithm A does not preserve group spending. Take a baseline of 90 and 10 split between two goods, with price weights 0.5 and 1.0. Both multipliers normalize against the neutral allocation, so the targets become 60 and 13.33 — a total of 73.33, not 100. The group shrinks when the expensive good gets expensive, because the same basket now buys less. The location-level solver recomputes total demand afterwards from the new basket cost, which is not the same thing as the substitution step conserving anything, and it would be wrong to describe it as such. A budget-conserving variant was specified and not chosen; it redirects the full 90 to the cheap good instead, which makes substitution much stronger.
+
+[B]One multiplier per good per country.[/B] Market and stratum precision is genuinely lost. Two markets with opposite price situations inside one realm average into one number. This is accepted, not solved, and it is the main reason the feature is described as approximate.
+
+[B]Missing interfaces mean neutral.[/B] A good with no [ICODE]global_<good>_pop_demand[/ICODE] definition cannot participate and stays neutral; [ICODE]victuals[/ICODE] is the standing example. Prosper or Perish excludes lumber from the crude goods and heating groups entirely, M&amp;T gets its own calibrated quantities and prices, and Just Goods' 26 extra goods stay neutral and ungrouped. Silently pretending those goods substitute would corrupt the denominator.
+
+[B]A real bug, for anyone building something similar.[/B] After the first optimisation pass, players still reported turn times around ten times baseline, recovering when substitution was switched off. Three consecutive saves from one campaign showed why: of 1,570 comparable AI countries, 1,461 did a full recompute in a single month, 93.1% of them. The cause was a guard that clamped a baseline of 1 to 0 inside a local effect, so the external offset was recorded as 0 when the correct value was 1, and every country looked dirty every month. The yearly AI cadence had been silently degraded back into monthly world-wide solving. Nothing in the script looked wrong; the arithmetic was wrong by one. Reading the engine's actual modifier strength instead of a cached request value fixed it, and the diagnostic fields now separate the two so the next occurrence is visible in a save rather than only as a slow turn.
+
+[HR][/HR]
+
+[SIZE=5][B]7. Status[/B][/SIZE]
+
+The generated chain, 42 substitution rule tests, readback boundary tests, cache tests, save-report tests and five generator consistency checks pass. Offline tests execute the generated effects and auto definitions, compare mixed market and stratum results against an independent oracle, and repeatedly evaluate all 56 auto scales while rejecting any economic read or write.
+
+What offline tests cannot establish: EU5's fixed-point rounding at the sizes involved, the engine's actual demand refresh timing, and whether the displayed tooltip value equals the number the market uses. Those need in-game acceptance, and the acceptance checklist is the part of this project I trust least until someone runs it. If you try the mod and a good's substitution direction looks inverted against its price, that is the failure mode worth reporting, because it points at exactly those three unknowns rather than at the group definitions.

@@ -73,6 +73,7 @@ def main() -> None:
     targets = _resolve_targets(args.target)
     mode_args = ["--check"] if args.check else []
 
+    _run(["scripts/gen_whole_group_baskets.py", "--check"])
     if not args.check:
         _run(["scripts/update_mod_version.py", "--target", args.target])
 
@@ -82,7 +83,15 @@ def main() -> None:
         _run(["scripts/gen_pop_goods.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_demand_csv.py", *mode_args])
         _run(["scripts/gen_market_unit_consumption.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_substitution.py", "--target", target_arg, *mode_args])
         _run(["scripts/gen_sol_economy_effects.py", "--target", target_arg, *mode_args])
+        # The two economy-UI surfaces and the goods tooltip override. They build from
+        # SOL_living_standard_kit.gui and data/goods_weights.csv, and must run before
+        # the compatibility generators, which rebuild the goods block inside their output.
+        _run(["scripts/gen_sol_ls_gui.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_lshud.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_goods_tooltip.py", "--target", target_arg, *mode_args])
+        _run(["scripts/gen_sol_messages.py", "--target", target_arg, *mode_args])
 
     if "sol_standalone" in base_targets:
         location_args = ["--check"] if args.check else []

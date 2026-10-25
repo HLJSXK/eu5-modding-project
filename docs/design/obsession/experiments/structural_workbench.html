@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>痴迷传播 · 三层模型与验收</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#233b3c;background:#edf2ef;font-size:14px}*{box-sizing:border-box}body{max-width:1480px;margin:auto;padding:28px}header{display:flex;justify-content:space-between;align-items:center;gap:24px}h1{font-size:26px;margin:0}h2{font-size:18px;margin:0 0 15px}p{line-height:1.7}.muted{color:#627570}.layout{display:grid;grid-template-columns:310px 1fr;gap:20px;margin-top:22px}.layout>main,.layout>aside{min-width:0}.card{background:#fffefa;border:1px solid #d5dfd8;border-radius:10px;padding:20px;margin-bottom:16px}label{display:block;font-size:12px;color:#526c62;margin-bottom:5px}input,select,button{font:inherit;border:1px solid #c4d2c9;border-radius:5px;padding:8px;background:white;max-width:100%}select{width:100%}button{cursor:pointer}button.primary{background:#216b5b;color:white;border-color:#216b5b}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.params{display:grid;grid-template-columns:1fr 1fr;gap:10px}.params input{width:100%}.gates{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.gate{padding:16px;border-radius:8px;background:#f0f3ee}.ok{color:#17684c}.bad{color:#a44130}.pending{color:#68746e}.matrix{width:100%;border-collapse:separate;border-spacing:8px;table-layout:fixed;margin:0 -8px;width:calc(100% + 16px)}th{text-align:left;color:#61736d;font-size:12px}th:first-child{width:76px}.cell{background:#f7f8f3;border:1px solid #dce4da;padding:14px;border-radius:7px;vertical-align:top}.cell strong{display:block;margin-bottom:8px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:12px}.metrics span{color:#60736a}.metrics b{display:block;font-size:17px;color:#233b3c;font-weight:550}.bar{height:5px;background:#dfe6df;border-radius:3px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:#478b70}.scroll{overflow:auto;max-height:530px}table.details{width:100%;border-collapse:collapse;font-size:12px}.details th,.details td{padding:10px;border-bottom:1px solid #e1e7df;text-align:left;white-space:nowrap}.scope{display:block;white-space:normal;max-width:260px;color:#627570;font-size:11px}.badge{display:inline-block;border-radius:4px;padding:3px 7px;background:#eff3ea;font-size:12px}.status{border-left:3px solid #588e72;padding-left:12px;min-height:24px}.mono{font:11px/1.6 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}a{color:#216b5b}details{margin:12px 0}summary{cursor:pointer}.empty{padding:24px;color:#6e7e72}progress{width:100%;accent-color:#216b5b}#events,#worlds{max-height:230px;overflow:auto}#errors{white-space:pre-wrap;color:#a44130}@media(max-width:900px){body{padding:16px}.layout{grid-template-columns:1fr}header{display:block}.gates{grid-template-columns:1fr}.matrix{font-size:12px}.metrics{grid-template-columns:1fr}.params{grid-template-columns:repeat(3,1fr)}}
+</style>
+<body>
+<header><div><h1>痴迷传播 · 三层模型</h1><p class="muted">固有档案 → 世界状态与结构规则 → 条件事件 → 人口加权验收</p></div><a href="/">打开地图实验台 ↗</a></header>
+<div class="layout"><aside>
+<section class="card"><h2>实验设置</h2><label for="world">世界</label><select id="world"><option value="R">R · 史实世界状态</option></select><p id="coverage" class="muted"></p>
+<label for="mode">事件配置</label><select id="mode"><option value="S">S · 关闭事件</option><option value="H">H · 历史事件</option><option value="G">G · 通用事件</option><option value="F">F · 混合事件</option></select>
+<div class="row"><div><label for="seed">固定种子</label><input id="seed" type="number" min="0" max="29" value="0"></div></div>
+<label><input id="fit-only" type="checkbox" checked disabled> 本轮仅运行拟合集与 K 条</label>
+<details open><summary>六个共同拟合参数</summary><div id="params" class="params"></div></details>
+<details><summary>设计固定值与手设常数</summary><p id="fixed" class="muted">δ=.01，θ=20，入口剂量=7；全国流行后保持 240 月，首次接触上限 L=1200 月，退潮 .98/月；咖啡与茶 κ=.3，烟草 κ=.4。习俗区定格且无邻接/同市场输出；亲和表全开，酒仅意大利/法国/伊比利亚的当月基督教地点 x=30，邻接与海峡边权均为 1。R 常驻份额取 0.9 分位（0.0160543）；K1/K5 限人口前 20%；tea_1 作为输入不计分。</p></details>
+<div class="row"><button id="quick" class="primary">快速检查</button><button id="screen">缓存筛查</button><button id="run">单次全时段诊断</button><button id="cancel" hidden>取消</button></div>
+<details><summary>独立审计</summary><p class="muted">参数与选参日志提交后，由审计方运行全集、留出及 L1/L2/L3 判分。本工作台不提供留出入口。</p><input id="force-full" type="checkbox" hidden disabled><button id="matrix" disabled>完整矩阵由审计方执行</button></details>
+<progress id="progress" hidden></progress><p id="status" class="status">连接本地模拟服务…</p><p id="errors"></p>
+<div class="row"><button id="refresh">导入新增存档</button><button id="reload">读取验收报告</button></div>
+<p class="muted">日常默认只跑两个月工程检查；缓存筛查仅读取本轮拟合集。两局观察者世界均按最后一档截止。R 地图回放会在导出前屏蔽留出范围。</p></section>
+<section class="card"><h2>世界输入</h2><div id="worlds" class="muted">尚未加载</div><details><summary>证据与冻结</summary><p id="frozen" class="mono"></p><a href="../20_Acceptance_Matrix_Spec.md">验收规格</a> · <a href="../19_Next_Round_Mechanisms.md">机制计划</a></details></section>
+</aside><main>
+<section class="card"><div class="row"><h2>日常验证</h2><button id="download-check">导出检查结果</button></div><div id="check-summary" class="status">快速检查覆盖初始化与开关；缓存筛查只证明差项，不证明闸门通过。</div><div id="check-details"></div></section>
+<section class="card"><h2>验收闸门</h2><div class="gates" id="gates"><div class="empty">载入矩阵后逐项判定；缺项保持“无法判定”。</div></div><div id="gate-details"></div></section>
+<section class="card"><div class="row"><h2>配置 × 世界</h2><select id="observer-cell" aria-label="观察者汇总" style="width:auto"></select></div><table class="matrix"><thead><tr><th>配置</th><th>R · 史实时间线</th><th>O · 观察者世界</th></tr></thead><tbody id="cells"></tbody></table><p class="muted">R 同时报年份与 K 条；O 仅报条件规律、传播健全性和事件落点。本轮 R 固定 30 次，O 各配置10次仅作诊断，不作 L2 判断；格内显示实际次数。O 的 K 条少于 3 条时保持无法判定。</p></section>
+<section class="card"><h2>通道与预算对照</h2><p id="budget-summary" class="status">对照尚未完成。</p><p class="muted">关闭通道也会改变 K 的合格案例构成，须结合完整报告判断。固定同一组参数，各用种子 0–9。预算位移比较每条拟合 A/B 目标的十次中位到达；单侧未到达记超容差，双未到达不记移动。</p><div class="scroll"><table class="details"><thead><tr><th>对照</th><th>拟合 2×容差内</th><th>拟合次序</th><th>K</th><th>约束违反</th><th>队列延迟/月</th><th>预算放弃事件</th></tr></thead><tbody id="ablations"></tbody></table></div></section>
+<section class="card"><div class="row"><h2>运行详情</h2><select id="detail-cell" aria-label="配置与世界" style="width:auto"></select><select id="detail-seed" aria-label="查看种子" style="width:auto"></select><select id="good" style="width:auto"><option value="coffee">咖啡</option><option value="tea">茶</option><option value="tobacco">烟草</option></select><button id="download">导出 JSON</button><button id="import">载入报告</button><input id="report-file" type="file" accept=".json" hidden></div><div id="replays" class="row"></div>
+<div id="summary" class="muted"></div><details open><summary>习俗区与国家截止时钟</summary><div id="mechanics"></div></details><h3>条件式规律 K1–K7</h3><div class="scroll"><table class="details"><thead><tr><th>规则</th><th>证据</th><th>结果</th><th>已判定案例 / 全部案例</th><th>删失或限制</th></tr></thead><tbody id="krows"></tbody></table></div>
+<details id="case-details" hidden><summary id="case-title">K 案例</summary><div class="scroll" id="cases"></div></details><h3>人口加权区域里程碑</h3><div class="scroll"><table class="details"><thead><tr><th>商品 / 区域</th><th>集合</th><th>强度门槛</th><th>目标年</th><th>模拟年</th><th>误差 / 容差</th><th>结果</th><th>首次成员父链 W-A/B/C</th></tr></thead><tbody id="milestones"></tbody></table></div>
+<details><summary>事件触发与条件审计</summary><div id="events"></div></details></section>
+</main></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), percent=v=>v==null?'无法判定':(v*100).toFixed(1)+'%', num=v=>v==null?'无法判定':Number(v).toFixed(2), label={coffee:'咖啡',tea:'茶',tobacco:'烟草'};
+let report=null,checkReport=null,job=null,config=null;
+const paramNames={rho:'保留率 ρ',p:'邻接传播 p',lambda_contact:'商人常驻 λ',lambda_ownership:'领地回流 λ',preemption:'饮品先占',internal_rate:'同市场带动'};
+function node(tag,text,cls){const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;}
+async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const data=await r.json();if(!r.ok)throw Error(data.error||r.status);return data;}
+function busy(on){for(const id of ['quick','screen','run','refresh'])$(id).disabled=on;$('matrix').disabled=true;$('cancel').hidden=!on;$('progress').hidden=!on;}
+function fillParams(values){$('params').replaceChildren();for(const [k,v] of Object.entries(values||{})){if(!(k in paramNames))continue;const box=node('div'),l=node('label',paramNames[k]),input=node('input');input.type='number';input.step='any';input.value=v;input.dataset.key=k;l.htmlFor='param-'+k;input.id=l.htmlFor;box.append(l,input);$('params').append(box);}}
+function params(){return Object.fromEntries([...$('params').querySelectorAll('input')].map(n=>[n.dataset.key,Number(n.value)]));}
+function currentRuns(){if(!report)return [];if(report.cells){const c={...report.cells,...report.world_cells}[$('detail-cell').value];return c?.runs||[];}return [report];}
+function details(){const runs=currentRuns(),chosen=Number($('detail-seed')?.value||0),r=runs[chosen]||runs[0];if(!r)return;$('case-details').hidden=true;$('krows').replaceChildren();for(const k of r.K||[]){const tr=node('tr');const decided=(k.cases||[]).filter(c=>c.status==='pass'||c.status==='fail');for(const text of [k.id,k.level,k.status==='pass'?'通过':k.status==='fail'?'违反':'未触发',decided.length+' / '+(k.cases||[]).length,k.reason||((k.cases||[]).some(c=>c.reason==='right censored')?'含右删失案例':'')])tr.append(node('td',text));const first=tr.children[0];first.replaceChildren();const b=node('button',k.id);b.onclick=()=>showCases(k);first.append(b);$('krows').append(tr);}
+ $('milestones').replaceChildren();if(r.world_kind==='O'){const tr=node('tr'),td=node('td','观察者是非史实时间线，仅检查条件规律；不比较历史年份。');td.colSpan=8;tr.append(td);$('milestones').append(tr);}else for(const m of r.milestones||[]){if(m.good!==$('good').value)continue;const tr=node('tr');for(const text of [label[m.good]+' / '+m.name,m.split,m.threshold==='positive'?'x>0':m.threshold==null?'—':'x≥'+m.threshold,m.target_year,m.simulated_year==null?'未到达':m.simulated_year.toFixed(1),m.error_months==null?'∞':(m.error_months/12).toFixed(1)+' / ±'+m.tolerance_months/12+' 年',m.within_tolerance?'容差内':m.within_2tol?'2 倍容差内':'未达',m.world_evidence?['W-A','W-B','W-C'].map(k=>m.world_evidence.counts[k]||0).join(' / '):'—'])tr.append(node('td',text));if(m.where)tr.children[0].append(node('small',Object.entries(m.where).map(([k,v])=>k+': '+(Array.isArray(v)?v.join(', '):v)).join('; '),'scope'));$('milestones').append(tr);}
+ renderMechanics(r);
+ $('summary').textContent=`${r.mode||''} · seed ${r.seed??'—'} · ${r.identity?.mechanics_only?'机制体检，不计算拟合或 K 成绩':(r.world_kind==='O'?'非史实 K':'拟合集 / K')+' '+percent(r.p_K)} · 月峰值 U ${r.peak_U?.toLocaleString()||'—'} · 最大队列轮次延迟 ${r.peak_round_delay_months??'—'} 月 · 预算放弃事件 ${r.events_abandoned_budget??'—'} · 约束违反 ${r.violation_count??'—'} · E_gap 咖啡 / 茶 / 烟草 ${['coffee','tea','tobacco'].map(g=>num(r.E_gap_by_good?.[g])).join(' / ')} 年`;
+ $('replays').replaceChildren();for(const [g,path] of Object.entries(r.replays||{})){const a=node('a',label[g]+'地图回放 ↗');const safe=path.replaceAll('\\','/').match(/(?:^|\/)(tmp\/obsession_round[23]\/replays\/[A-Za-z0-9_.-]+\.json)$/);if(!safe)continue;a.href='/'+safe[1].replace(/\.json$/,'.html');a.target='_blank';$('replays').append(a);}
+ $('events').replaceChildren();for(const e of (r.events||[]).slice(0,200))$('events').append(node('p',`${(1337+e.month/12).toFixed(1)} · ${e.id} · ${label[e.good]} · 国 ${r.country_labels?.[e.country]||e.country} · ${e.condition_valid?'条件成立':'误触发'} · ${e.linked?'落点有据':'联系不足'}`));}
+function clockOrigins(r,g){
+ if(r.mode&&r.mode!=='S'&&!r.identity?.mechanics_only)return r.clock_counts?.[g]||{};
+ if(r.clock_origins?.[g])return r.clock_origins[g];
+ const national=new Set(),cap=new Set(),pending=new Set(),L=r.clock_origin_limit??1200;
+ for(const h of r.clocks?.[g]?.history||[]){const upper=h.first_touch_month+L;
+  if(h.national_month!=null&&h.national_month<=upper)national.add(h.country);
+  else if(upper<r.end_month)cap.add(h.country);else pending.add(h.country);}
+ return {national:national.size,cap:cap.size,pending:pending.size};
+}
+function renderMechanics(r){
+ $('mechanics').replaceChildren();if(!r.zone_sizes){$('mechanics').append(node('p','此报告未包含第三轮机制诊断。'));return;}
+ const table=node('table',null,'details'),head=node('tr');for(const t of ['商品','习俗地点','值恒定','拒收输入','习俗邻接到达',(r.mode&&r.mode!=='S'&&!r.identity?.mechanics_only?'已全国流行 / 未流行已退潮':'全国流行 / L上限起算'),'波次数'])head.append(node('th',t));table.append(head);
+ for(const g of ['coffee','tea','tobacco']){const row=node('tr'),c=clockOrigins(r,g);for(const t of [label[g],r.zone_sizes[g],r.zone_values_constant?.[g]?'是':'否',r.zone_rejected_inputs?.[g]??'—',r.zone_adjacency_arrivals?.[g]??'—',(c.national??'—')+' / '+(c.cap??'—'),r.waves?.[g]?.length??'—'])row.append(node('td',String(t)));table.append(row);}
+ $('mechanics').append(table,node('p','拟合次序可达上限 '+percent(r.fit_p_order_upper)+'；可判定 K '+(r.triggered_K??'—')+'。K2 对手从未出现：'+(r.K?.find(k=>k.id==='K2')?.cases||[]).filter(c=>c.reason==='rival never present').length+' 例。','muted'));
+ const history=r.clocks?.[$('good').value]?.history||[],clocks=node('details'),title=node('summary','国家时钟记录（前 200 条）');clocks.append(title);const rows=node('table',null,'details'),h=node('tr');for(const t of ['国家','首次接触月','全国流行月','截止月 D','退潮月','定格月'])h.append(node('th',t));rows.append(h);
+ for(const c of history.slice(0,200)){const row=node('tr');for(const t of [r.country_labels?.[c.country]||c.country,c.first_touch_month,c.national_month,c.deadline,c.decay_start_month,c.finished_month])row.append(node('td',t==null?'—':String(t)));rows.append(row);}clocks.append(rows);$('mechanics').append(clocks);
+}
+function showCases(k){const r=currentRuns()[Number($('detail-seed')?.value||0)]||currentRuns()[0];
+ $('case-details').hidden=false;$('case-details').open=true;$('case-title').textContent=k.id+' · 案例（显示前 200 条）';
+ const table=node('table',null,'details'),header=node('tr');for(const text of ['国家索引','t₀','t₁','结果','原因'])header.append(node('th',text));table.append(header);
+ for(const c of (k.cases||[]).slice(0,200)){const tr=node('tr');for(const value of [c.country==null?'市场':(r.country_labels?.[c.country]||c.country)+' · #'+c.country,c.t0==null?'—':(1337+c.t0/12).toFixed(1),c.t1==null?'尚未到达':(1337+c.t1/12).toFixed(1),c.status,c.reason||''])tr.append(node('td',String(value)));table.append(tr);}$('cases').replaceChildren(table);
+}
+function renderCheck(data){checkReport=data;$('check-details').replaceChildren();
+ const quick=data.format==='obsession.quick-check/1';
+ $('check-summary').textContent=(quick?(data.passed?'快速检查通过':'快速检查失败'):(data.decision==='early_reject'?'缓存已证实验收差项':'缓存尚不足以判定'))+' · '+Number(data.elapsed_seconds||0).toFixed(2)+' 秒'+(data.cached?' · 复用缓存':'');
+ $('check-details').append(node('p',data.limitation,'muted'));
+ if(quick){$('check-details').append(node('p',`${data.rows.length} 项短程检查 · ${data.transitions.length} 项世界更新 · 不执行历史年份计分`));for(const row of data.rows)$('check-details').append(node('span',`${row.world.split(':')[0]} / ${row.mode} / ${row.disabled_rules.join(',')||'基础'} ✓ `,'badge'));}
+ else{for(const [name,c] of Object.entries(data.coverage||{}))$('check-details').append(node('span',`${name} ${c.completed}/${c.required} `,'badge'));for(const g of Object.values(data.gates||{}))for(const failure of g.failures||[])$('check-details').append(node('p',failure,'bad'));}}
+function render(data){
+ const safeRuns=data?.cells?Object.values({...data.cells,...data.world_cells}).flatMap(c=>c.runs||[]):[data];
+ if(safeRuns.some(r=>(r?.milestones||[]).some(m=>m.split==='holdout')||r?.holdout_within_tol!=null||r?.holdout_p_order!=null))throw Error('本轮不加载留出结果；请交由独立审计方查看');
+ if(data?.format==='obsession.quick-check/1'){renderCheck(data);return;}
+ if(data?.format==='obsession.cache-screen/1')renderCheck(data);
+ if(!data||(!data.cells&&!Array.isArray(data.K)&&!data.identity?.mechanics_only))throw Error('不是痴迷传播验收报告');
+ report=data;if(data.complete_protocol===false)$('status').textContent='阶段性拟合集诊断；实际次数见各格，完整对照尚未完成。';if(data.params)fillParams(data.params);$('detail-cell').replaceChildren();if(data.worlds){$('worlds').replaceChildren();for(const w of data.worlds)$('worlds').append(node('p',(w.label||w.id.slice(0,8))+' · '+w.dates.length+' 档 · '+w.dates[0]+' → '+w.dates.at(-1)));$('frozen').textContent=(typeof data.frozen_valid==='boolean'?'冻结 '+(data.frozen_valid?'有效':'已变化'):'冻结哈希')+'\n'+data.frozen_hash;}
+ $('ablations').replaceChildren();const ablationNames={contact:'关闭商人常驻',ownership:'关闭领地回流',market:'关闭同市场带动',preemption:'关闭先占',wine:'移除酒背景'};
+ const contrasts=[...(data.baseline_10?[['基线',data.baseline_10]]:[]),...Object.entries(data.ablations||{}).map(([k,v])=>[ablationNames[k]||k,v]),...Object.entries(data.rollbacks||{}).map(([k,v])=>[({R1:'R1 · 习俗区旧行为',R2:'R2 · 首次接触旧时钟',R3:'R3 · 全欧洲酒背景',R4:'R4 · R份额中位数'})[k]||('回退 '+k),v]),...(data.budget_sensitivity?[['双倍预算',data.budget_sensitivity.double_budget]]:[])];
+ for(const [name,rec] of contrasts){const m=rec.metrics,tr=node('tr');for(const text of [name,percent(m.fit_within_2tol),percent(m.fit_p_order),percent(m.p_K),m.violation_count,m.peak_round_delay_months,m.events_abandoned_budget])tr.append(node('td',String(text)));$('ablations').append(tr);}
+ const budget=data.budget_sensitivity;$('budget-summary').textContent=budget?`双倍预算：${budget.eligible_milestones} 条拟合 A/B 目标中，${percent(budget.moved_fraction)} 的中位位移超过容差；${budget.blocks_L2?'超过三分之一，阻止 L2 宣称':'未超过三分之一，预算检查不单独阻止 L2'}。`:'对照尚未完成。';
+ for(const key of Object.keys(data.cells?{...data.cells,...data.world_cells}:{'单次诊断':data}))$('detail-cell').append(new Option(key,key));
+ $('case-details').hidden=true;seedOptions();details();$('gates').replaceChildren();$('gate-details').replaceChildren();
+ if(!data.gates)$('gates').append(node('p','单次诊断；完整 30 种子矩阵尚未判定。','pending'));
+ for(const [name,g] of Object.entries(data.gates||{})){const box=node('div',null,'gate');box.append(node('strong',name+' · '+g.status,g.status==='达到'?'ok':g.status==='未达'?'bad':'pending'));$('gates').append(box);const d=node('details');d.append(node('summary',name+' 的差项'));for(const text of [...(g.failures||[]),...(g.missing||[])])d.append(node('p',text));$('gate-details').append(d);}
+ const selectedObserver=$('observer-cell').value,observers=[...new Set(Object.keys(data.world_cells||{}).map(k=>k.split(' · ').slice(1).join(' · ')).filter(Boolean))];
+ $('observer-cell').replaceChildren(...(observers.length?observers.map(k=>new Option(k,k)):[new Option('主世界 / 单次结果','')]));$('observer-cell').value=observers.includes(selectedObserver)?selectedObserver:(observers[0]||'');$('observer-cell').disabled=!observers.length;renderMatrix(data);
+}
+function renderMatrix(data){
+ if(!data)return;
+ const display=data.cells||{[data.mode+'×'+data.world_kind]:{...data,run_count:1,healthy_rate:data.healthy==null?null:Number(data.healthy)}};
+ $('cells').replaceChildren();
+ for(const mode of ['S','H','G','F']){const tr=node('tr');tr.append(node('th',mode));for(const world of ['R','O']){const observer=$('observer-cell').value,c=world==='O'&&observer?data.world_cells?.[mode+'×O · '+observer]:display[mode+'×'+world],td=node('td',null,'cell');if(!c)td.append(node('p','尚无结果','muted'));else{td.append(node('strong',mode+'×'+world+(world==='O'&&observer?' · '+observer:'')+' · '+c.run_count+' 次'));const metrics=node('div',null,'metrics');for(const [key,text] of (world==='R'?[['fit_within_2tol','拟合集 2×容差内'],['fit_p_order','拟合集顺序'],['fit_p_order_upper','顺序可达上限'],['p_K','K 条通过'],['p_unseeded','下游到达']]:[['p_K','K 条中位'],['p_K_p10','K 条 P10'],['healthy_rate','传播健全'],['p_link','落点有据']])){const span=node('span',text);span.append(node('b',percent(c[key])));metrics.append(span);}td.append(metrics);const bar=node('div',null,'bar'),i=node('i');i.style.width=(100*Math.max(0,Math.min(1,c.p_K||0)))+'%';bar.append(i);td.append(bar);}tr.append(td);}$('cells').append(tr);}
+}
+function seedOptions(){const options=currentRuns();$('detail-seed').replaceChildren();options.forEach((r,i)=>$('detail-seed').append(new Option('seed '+(r.seed??i),String(i))));}
+async function poll(){if(!job)return;try{const r=await api('/api/jobs/'+job);$('status').textContent=r.progress||`${r.status} · ${r.month? (1337+r.month/12).toFixed(0)+' 年':''}`;if(r.status==='running'){setTimeout(poll,1200);return;}busy(false);job=null;if(r.status==='failed')throw Error(r.error);if(r.result)render(r.result);else if(r.status==='cancelled')$('status').textContent='已取消；已完成的验收运行保留为可续算检查点。';else await loadReport();}catch(e){busy(false);$('errors').textContent=e.message;job=null;}}
+async function start(action){$('errors').textContent='';try{busy(true);const r=await api('/api/structural',{action,world:$('world').value,mode:$('mode').value,seed:Number($('seed').value),params:params(),fit_only:true,force_full:$('force-full').checked});job=r.id;poll();}catch(e){busy(false);$('errors').textContent=e.message;}}
+async function loadReport(){try{const data=await api('/api/acceptance');render(data);$('status').textContent=data.complete_protocol===false?'已载入部分缓存筛查；缺失项目尚未执行。':'已载入拟合集与条件诊断报告。';}catch(e){$('errors').textContent=e.message;}}
+async function unpackReport(text){
+ if(typeof DecompressionStream!=='function')throw Error('浏览器不支持压缩离线报告；请通过本地服务打开工作台或导入完整 JSON。');
+ const bytes=Uint8Array.from(atob(text.trim()),c=>c.charCodeAt(0));
+ const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+ return JSON.parse(await new Response(stream).text());
+}
+async function init(){
+ const embedded=document.getElementById('obsession-acceptance-data'),packed=document.getElementById('obsession-acceptance-gzip');
+ if(embedded||packed){try{const text=(packed||embedded).textContent;(packed||embedded).remove();$('status').textContent='正在载入离线报告…';render(packed?await unpackReport(text):JSON.parse(text));$('status').textContent='离线报告；可查看已有结果并导出数据。';for(const id of ['quick','screen','run','matrix','refresh','reload'])$(id).disabled=true;return;}catch(e){$('errors').textContent=e.message;return;}}
+ try{config=await api('/api/structural-config');fillParams(config.params);$('fixed').textContent+=' 已公开 '+config.manual_constant_count+' 个固定数字；只有六个参数参与历史拟合。';
+ $('worlds').replaceChildren();for(const w of config.worlds){$('world').append(new Option('O · '+(w.label||w.id.slice(0,8))+' · 至 '+w.last_date,'O:'+w.id));$('worlds').append(node('p',(w.label||w.id.slice(0,8))+' · '+w.snapshots+' 档 · '+w.first_date+' → '+w.last_date));}if(!config.worlds.length)$('worlds').textContent='尚无正式导出快照。点“导入新增存档”。';$('frozen').textContent='冻结 '+(config.frozen_valid?'有效':'已变化')+'\n'+config.frozen_hash;$('status').textContent='本地服务已连接。单次诊断不代表闸门通过。';$('coverage').textContent='O 世界按上一档阶梯保持；R 的市场边界使用近开局观察值。';try{render(await api('/api/acceptance'));}catch{}}
+ catch(e){$('status').textContent='请从本地模拟服务打开此页。';$('errors').textContent=e.message;}}
+$('quick').onclick=()=>start('quick');$('screen').onclick=()=>start('screen');$('run').onclick=()=>start('run');$('matrix').onclick=()=>start('matrix');$('refresh').onclick=()=>start('refresh');$('reload').onclick=loadReport;$('cancel').onclick=()=>job&&api('/api/jobs/'+job+'/cancel',{});$('observer-cell').onchange=()=>renderMatrix(report);$('detail-cell').onchange=()=>{seedOptions();details();};$('detail-seed').onchange=details;$('good').onchange=details;
+$('download-check').onclick=()=>{if(!checkReport)return;const url=URL.createObjectURL(new Blob([JSON.stringify(checkReport,null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='obsession-check.json';a.click();URL.revokeObjectURL(url);};
+$('download').onclick=()=>{if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=node('a');a.href=url;a.download='obsession-acceptance.json';a.click();URL.revokeObjectURL(url);};
+$('import').onclick=()=>$('report-file').click();
+$('report-file').onchange=async()=>{try{const file=$('report-file').files[0];if(file)render(JSON.parse(await file.text()));}catch(e){$('errors').textContent=e.message;}};
+render({cells:{},gates:Object.fromEntries(['L1','L2','L3'].map(k=>[k,{status:'无法判定',failures:[],missing:['尚未载入完整矩阵']}]))});
+addEventListener('DOMContentLoaded',init);
+</script></body></html>

@@ -202,7 +202,7 @@ INDICATORS_FILE       = ROOT / "src/stable/in_game/common/script_values/SOL_subs
 GROUP_INDICATORS_FILE = ROOT / "src/stable/in_game/common/script_values/SOL_substitute_group_indicators.txt"
 LOCALIZATION_FILE     = ROOT / "src/stable/main_menu/localization/english/SOL_substitute_goods_l_english.yml"
 LOCALIZATION_FILE_ZH  = ROOT / "src/stable/main_menu/localization/simp_chinese/SOL_substitute_goods_l_simp_chinese.yml"
-GOODS_DIR             = ROOT / "reference_game_files/game/in_game/common/goods"
+GOODS_DIR             = ROOT / ".eu5-base/reference_game_files/game/in_game/common/goods"
 GUI_OVERRIDE_FILE     = ROOT / "src/stable/in_game/gui/z_SOL_goods_tooltip_override.gui"
 
 # ── Scarcity score ────────────────────────────────────────────────────────────

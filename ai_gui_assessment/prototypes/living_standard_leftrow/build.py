@@ -1,0 +1,405 @@
+"""Prototype: living-standard row under the left panel's nine tab buttons, GlorpUI-compatible.
+
+Design-only. Writes three prototype sources next to this file and renders them
+offline over the vanilla HUD, with and without GlorpUI.  Never writes src/.
+
+  sol_lshud_leftrow.gui              row root (scripted-widget candidate), reuses the
+                                     shipped SOL_LSHUD_tooltip from src/stable unchanged
+  sol_lshud_glorp_compat.gui         GlorpUI stats bar + toggle tab, wrapped and pushed
+                                     down by ROW_H; bodies copied verbatim from GlorpUI
+  sol_lshud_leftrow_l_simp_chinese.yml  new row-only localization keys
+
+Invented country data comes from the adopted B prototype's fixtures (read-only).
+
+usage: python build.py [output_dir]
+"""
+from __future__ import annotations
+
+import importlib.util
+import os
+import re
+import sys
+from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+HERE = Path(__file__).resolve().parent
+WORKSPACE = HERE.parents[2]
+GLORP = WORKSPACE / ".eu5-base" / "reference_mods" / "3601047146"
+SOL = WORKSPACE / "src" / "stable"
+os.environ.setdefault("EU5_RENDER_WORKSPACE", str(WORKSPACE))
+os.environ.setdefault("EU5_RENDER_MOD_ROOT", str(SOL))
+os.environ["RENDER_EXTRA_ROOTS"] = os.pathsep.join(str(GLORP / s) for s in ("main_menu", "in_game"))
+sys.path.insert(0, str(WORKSPACE / ".eu5-base" / "ai_gui_assessment" / "renderer"))
+sys.setrecursionlimit(20000)
+
+ROW_GUI = HERE / "sol_lshud_leftrow.gui"
+COMPAT_GUI = HERE / "sol_lshud_glorp_compat.gui"
+LOC_FILE = HERE / "sol_lshud_leftrow_l_simp_chinese.yml"
+
+PANEL_W = 570          # @left_panel_width (ingame_topbar.gui:15)
+ROW_Y = 130            # @topbar_height 40 + left-panel bar 90 = under the nine tab buttons
+ROW_H = 36             # also the GlorpUI push-down offset
+
+spec = importlib.util.spec_from_file_location(
+    "lshud_fixtures", WORKSPACE / "ai_gui_assessment/prototypes/living_standard_hud/build.py")
+fixtures = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fixtures)
+
+
+# ------------------------------------------------------------------ expressions
+def V(name):
+    return f"Player.MakeScope.GetVariable('{name}').GetValue"
+
+
+def IS(name):
+    return f"Player.MakeScope.GetVariable('{name}').IsSet"
+
+
+def fp(x):
+    return f"'(CFixedPoint){x}'"
+
+
+READY = IS("sol_ls_pci")
+RANKED = f"And({IS('sol_ls_rank')}, GetGlobalVariable('sol_ls_rank_count').IsSet)"
+TIERED = f"And({READY}, {IS('sol_ls_tier')})"
+
+
+def tier_select(prefix):
+    v = V("sol_ls_tier")
+    return (f"[SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(1.5)}), '{prefix}_HIGH', "
+            f"SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(0.5)}), '{prefix}_MID', '{prefix}_LOW'))]")
+
+
+def trend_select(prefix):
+    v = V("sol_ls_pci_yoy_class")
+    return (f"[SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(1.5)}), '{prefix}_BIG_UP', "
+            f"SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(0)}), '{prefix}_UP', "
+            f"SelectLocalization(GreaterThan_CFixedPoint({v}, {fp(-1.5)}), '{prefix}_DOWN', '{prefix}_BIG_DOWN')))]")
+
+
+def tier_icons():
+    v = V("sol_ls_tier")
+    vis = {0: f"[LessThan_CFixedPoint({v}, {fp(0.5)})]",
+           1: f"[And(GreaterThan_CFixedPoint({v}, {fp(0.5)}), LessThan_CFixedPoint({v}, {fp(1.5)}))]",
+           2: f"[GreaterThan_CFixedPoint({v}, {fp(1.5)})]"}
+    icons = "\n".join(
+        f'\t\t\t\t\ticon = {{ size = {{ 100% 100% }} texture = "{fixtures.TIER_TEX[t]}" texture_density = 2 '
+        f'visible = "{vis[t]}" alwaystransparent = yes }}' for t in (0, 1, 2))
+    return (f'widget = {{ size = {{ 22 22 }} parentanchor = center\n'
+            f'\t\t\t\t\twidget = {{ size = {{ 100% 100% }} visible = "[{TIERED}]"\n{icons}\n\t\t\t\t\t}}\n'
+            f'\t\t\t\t\ticon = {{ size = {{ 100% 100% }} texture = "{fixtures.PENDING_TEX}" texture_density = 2 alpha = 0.6 '
+            f'visible = "[Not({TIERED})]" alwaystransparent = yes }}\n\t\t\t\t}}')
+
+
+def text(t, w=None, h=None, fs=None, fmt=None, raw=False, font=None, align="left|nobaseline", visible=None):
+    parts = ["text_single = {"]
+    parts.append(f"size = {{ {w} {h} }} autoresize = no" if w else "autoresize = yes")
+    if fs:
+        parts.append(f"fontsize = {fs}")
+    if font:
+        parts.append(f"using = {font}")
+    parts.append(f"align = {align}")
+    if fmt:
+        parts.append(f'default_format = "{fmt}"')
+    if visible:
+        parts.append(f'visible = "{visible}"')
+    parts.append(f'{"raw_text" if raw else "text"} = "{t}"')
+    parts.append("}")
+    return " ".join(parts)
+
+
+def divider():
+    return f"widget = {{ size = {{ 1 {ROW_H - 14} }} background = {{ using = color_gold_texture alpha = 0.35 }} }}"
+
+
+# ------------------------------------------------------------------ row
+def row_source():
+    return f"""# Generated by ai_gui_assessment/prototypes/living_standard_leftrow/build.py - design prototype only.
+# Living-standard row directly under the left panel's nine tab buttons.
+# Tooltip: the shipped SOL_LSHUD_tooltip (src/stable/in_game/gui/SOL_lshud.gui), unchanged.
+
+widget = {{
+	name = "sol_lshud_leftrow_root"
+	size = {{ 100% 100% }}
+	layer = bottom
+	alwaystransparent = yes
+	visible = "[And(And(IsPlayerValid, Not(Or(LeftView.IsShown, LeftView.IsSideAttached))), GreaterThan_CFixedPoint(Player.MakeScope.ScriptValue('sol_ls_hud_enabled'), {fp(0)}))]"
+
+	widget = {{
+		name = "sol_lshud_leftrow"
+		size = {{ {PANEL_W} {ROW_H} }}
+		position = {{ 0 {ROW_Y} }}
+		alwaystransparent = no
+		tooltipwidget = {{ using = SOL_LSHUD_tooltip }}
+
+		using = Animation_Show_Hide_UI
+		blockoverride "on_hide_ui" {{ position_x = -{PANEL_W} alpha = 0 }}
+		blockoverride "on_show_ui" {{ position_x = 0 alpha = 1 }}
+
+		using = bg_panel_bar
+		widget = {{ size = {{ {PANEL_W} 1 }} position = {{ 0 {ROW_H - 1} }} background = {{ using = color_gold_texture alpha = 0.55 }} }}
+
+		hbox = {{
+			name = "sol_lshud_leftrow_ready"
+			size = {{ {PANEL_W} {ROW_H} }}
+			margin = {{ 10 0 }}
+			spacing = 8
+			visible = "[{READY}]"
+
+			widget = {{ size = {{ 30 30 }}
+				background = {{ texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds" texture_density = 2 modify_texture = {{ using = color_intense_bg_blue_texture }} }}
+				{tier_icons()}
+				icon = {{ size = {{ 100% 100% }} texture = "[GetGraphicalCultureTexture('circle_frame')]" texture_density = 2 alwaystransparent = yes }}
+			}}
+			{text('SOL_LSHUD_ROW_LABEL', 66, 22, fs=15, font='Font_Type_Headers')}
+			{text(tier_select('SOL_LSHUD_ROW_TIER'), 30, 22, fs=15, visible=f'[{TIERED}]')}
+			{text('SOL_LSHUD_ROW_TIER_PENDING', 30, 22, fs=13, fmt='#weak', visible=f'[Not({TIERED})]')}
+			{divider()}
+			{text('SOL_LSHUD_ROW_PCI_LABEL', 52, 22, fs=12, fmt='#weak')}
+			{text(f"[{V('sol_ls_pci')}|2] @gold!", 76, 24, fs=17, font='Font_Type_Headers', fmt='#high', raw=True)}
+			{divider()}
+			{text('SOL_LSHUD_ROW_YOY_LABEL', 28, 22, fs=12, fmt='#weak')}
+			{text(trend_select('SOL_LSHUD_TREND_ICON'), 18, 22, fs=14, align='center|nobaseline')}
+			{text(f"[{V('sol_ls_pci_yoy')}|+=1%]", 56, 22, fs=15, raw=True)}
+			{divider()}
+			{text('SOL_LSHUD_ROW_RANK', 120, 22, fs=14, visible=f'[{RANKED}]')}
+			{text('SOL_LSHUD_ROW_RANK_PENDING', 120, 22, fs=13, fmt='#weak', visible=f'[Not({RANKED})]')}
+			expand = {{}}
+		}}
+
+		hbox = {{
+			name = "sol_lshud_leftrow_pending"
+			size = {{ {PANEL_W} {ROW_H} }}
+			margin = {{ 10 0 }}
+			spacing = 8
+			visible = "[Not({READY})]"
+			widget = {{ size = {{ 30 30 }}
+				background = {{ texture = "gfx/interface/component_tiles/hud_corners/circle_background.dds" texture_density = 2 modify_texture = {{ using = color_intense_bg_blue_texture }} }}
+				{tier_icons()}
+				icon = {{ size = {{ 100% 100% }} texture = "[GetGraphicalCultureTexture('circle_frame')]" texture_density = 2 alwaystransparent = yes }}
+			}}
+			{text('SOL_LSHUD_ROW_LABEL', 66, 22, fs=15, font='Font_Type_Headers')}
+			{divider()}
+			{text('SOL_LSHUD_ROW_PENDING', None, None, fs=13, fmt='#weak')}
+			expand = {{}}
+		}}
+	}}
+}}
+"""
+
+
+# ------------------------------------------------------------------ GlorpUI compatibility
+def extract_type(source: str, name: str) -> str:
+    """Return the verbatim body (between the outer braces) of `type <name> = widget { ... }`."""
+    match = re.search(rf"\btype\s+{name}\s*=\s*widget\s*\{{", source)
+    if not match:
+        raise SystemExit(f"GlorpUI type not found: {name}")
+    depth, i = 1, match.end()
+    while depth:
+        depth += {"{": 1, "}": -1}.get(source[i], 0)
+        i += 1
+    return source[match.end():i - 1]
+
+
+def compat_source():
+    glorp = (GLORP / "in_game/gui/glorp.gui").read_text(encoding="utf-8-sig")
+    out = [f"""# Generated by ai_gui_assessment/prototypes/living_standard_leftrow/build.py - design prototype only.
+# GlorpUI ({GLORP.name}, glorp.gui) stats bar and its toggle tab, pushed down by the SOL row height.
+# Each original type body is copied verbatim into an inner widget; only the outer offset is SOL's.
+# The outer widget is unsized with allow_outside, the same pattern GlorpUI's own left_panel uses to
+# hold both elements, so GlorpUI's positions, show/hide states and visibility switches still apply.
+# Type redefinition: must load after GlorpUI. Unused (harmless) when GlorpUI is absent.
+
+Types SOLLivingStandardGlorpCompat {{"""]
+    for name in ("left_panel_info_bar", "left_panel_info_toggle"):
+        body = extract_type(glorp, name)
+        out.append(f"""
+	type {name} = widget {{
+		allow_outside = yes
+		position = {{ 0 {ROW_H} }}
+
+		widget = {{{body}}}
+	}}""")
+    out.append("}\n")
+    return "\n".join(out)
+
+
+# ------------------------------------------------------------------ localization
+P = "Player.MakeScope.GetVariable"
+LOC = {
+    "SOL_LSHUD_ROW_LABEL": "生活水平",
+    "SOL_LSHUD_ROW_TIER_LOW": "#N 低#!",
+    "SOL_LSHUD_ROW_TIER_MID": "#Y 中#!",
+    "SOL_LSHUD_ROW_TIER_HIGH": "#P 高#!",
+    "SOL_LSHUD_ROW_TIER_PENDING": "—",
+    "SOL_LSHUD_ROW_PCI_LABEL": "人均收入",
+    "SOL_LSHUD_ROW_YOY_LABEL": "同比",
+    "SOL_LSHUD_ROW_RANK": f"世界 #high [{P}('sol_ls_rank').GetValue|0]#! / [GetGlobalVariable('sol_ls_rank_count').GetValue|0]",
+    "SOL_LSHUD_ROW_RANK_PENDING": "排行待更新",
+    "SOL_LSHUD_ROW_PENDING": "待年度结算",
+}
+
+
+def write_sources():
+    ROW_GUI.write_text(row_source(), encoding="utf-8-sig")
+    COMPAT_GUI.write_text(compat_source(), encoding="utf-8-sig")
+    LOC_FILE.write_text("l_simp_chinese:\n" + "".join(f' {k}: "{v}"\n' for k, v in LOC.items()), encoding="utf-8-sig")
+
+
+# ------------------------------------------------------------------ mock data
+GLORP_STATS = {
+    "legislative_efficiency": "+12%", "country_cabinet_efficiency": "+8%", "tax_income_efficiency": "+15%",
+    "global_pop_promotion_speed_modifier": "+5%", "diplomatic_reputation": "1", "global_production_efficiency": "+10%",
+    "selling_efficiency": "+20%", "merchant_maintenance_efficiency": "-5%",
+}
+
+
+def glorp_mocks(bar_shown):
+    return [
+        (r"Player\.MakeScope\.GetVariable\('toggleLeftPanelStatsBar'\)\.IsSet", bar_shown),
+        (r"Player\.MakeScope\.GetVariable\('(disableLeftPanelStatsBar|controlStatToggle)'\)\.IsSet", False),
+        (r"Player\.MakeScope\.GetVariable\('glorpui_avg_(proximity|max_control)'\)\.GetValue", .62),
+        (r"Player\.GetModifierValueNoFormat\('(\w+)'\)", lambda m: GLORP_STATS.get(m[1], "0")),
+        (r"Player\.GetDoubleModifierValueNoFormat\([^)]*\)", "+7%"),
+        (r"Player\.GetTotalTaxBase", "118.4"),
+        (r"Player\.GetCulture\.GetTradition", 42.0),
+        (r"Player\.GetCulture\.GetInfluence", 3.1),
+        (r"Player\.GetAverageControl", .58),
+        (r"Player\.GetCulture", {"__type__": "Culture"}),
+        (r"EstatesItem\.GetEstate\.GetRelativePower", .18),
+        (r"Country\.GetGovernment\.GetEstateFromKey\('crown_estate'\)\.GetType", "crown_estate"),
+        (r"EstatesItem\.GetEstate\.GetType", "crown_estate"),
+        (r"GetEstateIcon\(EstatesItem\.GetEstate\.GetType\)", "gfx/interface/icons/estates/crown_estate.dds"),
+    ]
+
+
+def sol_mocks(state):
+    rank_pending = state == "_rank_pending"
+    overrides, rank, ready = fixtures.STATES.get(state, fixtures.STATES[""])
+    base = fixtures.state_mocks(overrides, rank, ready)
+    pv = dict(fixtures.PLAYER_VARS, **overrides)
+    return [
+        (r"Player\.MakeScope\.ScriptValue\('sol_ls_hud_enabled'\)", 1),
+        (r"ExtraTooltipInfo.GetUIAction", {"__type__": "UIAction"}),
+        (r"Player\.MakeScope\.GetVariable\('sol_ls_(rank|tier)'\)\.IsSet", ready and not rank_pending),
+        (r"GetGlobalVariable\('sol_ls_rank_count'\)\.IsSet", not rank_pending),
+        (r"Player\.MakeScope\.GetVariable\('(sol_ls_\w+)'\)\.GetValue", lambda m: pv.get(m[1], 0) if ready else 0),
+    ] + base
+
+
+# ------------------------------------------------------------------ rendering
+SCENES = {
+    # name: (with GlorpUI, compat patch, Glorp bar shown, SOL row, SOL data state)
+    "vanilla": (False, False, False, True, ""),
+    "glorp_before": (True, False, True, False, ""),
+    "glorp_after": (True, True, True, True, ""),
+    "glorp_after_bar_hidden": (True, True, False, True, ""),
+    "glorp_wrong_load_order": (True, False, True, True, ""),
+}
+ROW_STATES = ["", "_high_bigup", "_low_bigdown", "_rank2", "_rank_pending", "_pending"]
+
+
+def gui_files(with_glorp, compat, with_row):
+    from eu5_gui_renderer.gui import collect_files, _relpath
+    from eu5_gui_renderer.paths import GAME
+    files: dict[str, Path] = {}
+    roots = [GAME] + ([GLORP] if with_glorp else []) + [SOL]
+    for root in roots:
+        for stage in ("loading_screen", "main_menu", "in_game"):
+            gui = root / stage / "gui"
+            if gui.exists():
+                for p in sorted(gui.rglob("*.gui")):
+                    files[f"{stage}/{_relpath(p, gui)}"] = p
+    extra = ([ROW_GUI] if with_row else []) + ([COMPAT_GUI] if compat else [])
+    return list(files.values()) + extra
+
+
+def load_loc(with_glorp):
+    from eu5_gui_renderer.data import Loc
+    loc = Loc()
+    paths = list((GLORP / "main_menu/localization/simp_chinese").glob("*.yml")) if with_glorp else []
+    for path in paths + [LOC_FILE]:
+        for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            m = Loc.LINE_RE.match(line)
+            if m:
+                loc.d[m[1]] = m[2]
+    return loc
+
+
+def main():
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else WORKSPACE / "ai_gui_assessment/images/living_standard_leftrow_20261017"
+    out.mkdir(parents=True, exist_ok=True)
+    write_sources()
+
+    from PIL import Image
+    from eu5_gui_renderer import hud
+    from eu5_gui_renderer.data import Evaluator, Formats, TextIcons
+    from eu5_gui_renderer.engine import Engine
+    from eu5_gui_renderer.gui import Expander, GuiDB, dump
+    from eu5_gui_renderer.textures import TEXTURES
+
+    dbs = {}
+
+    def render(scene, state=""):
+        with_glorp, compat, bar_shown, with_row, _ = SCENES[scene]
+        key = (with_glorp, compat, with_row)
+        if key not in dbs:
+            dbs[key] = GuiDB(gui_files(*key))
+        db = dbs[key]
+        log = []
+        ex = Expander(db, log)
+        root = hud.build(db, ex, 1920, 1080)
+        row = None
+        if with_row:
+            node = next(n for n in db.roots[str(ROW_GUI)] if n.is_block())
+            row_root = ex.build(node.key, node.value, {}, str(ROW_GUI), node.line)
+            root.children.append(row_root)
+            row = next(e for e in hud.walk(row_root) if e.props.get("name") == "sol_lshud_leftrow")
+        mocks = (glorp_mocks(bar_shown) if with_glorp else []) + sol_mocks(state) + hud.mocks()
+        eng = Engine(ex, Evaluator(mocks, load_loc(with_glorp), log), load_loc(with_glorp), Formats(), TextIcons(), 1.0)
+        eng.place(root, 0, 0, 1920, 1080)
+        img = Image.new("RGBA", (1920, 1080), (29, 35, 42, 255))
+        eng.render(root, img)
+        issues = sorted({x for x in log if "sol_ls" in x or "SOL_LSHUD" in x or "TYPE ERROR" in x or "INVALID" in x})
+        return eng, ex, root, row, img, issues
+
+    def report(tag, issues, extra=""):
+        print(f"{tag}: prototype issues {len(issues)} {extra}")
+        for issue in issues:
+            print("   ", issue)
+
+    for scene in SCENES:
+        eng, ex, root, row, img, issues = render(scene)
+        img.crop((0, 0, 760, 400)).save(out / f"{scene}_left.png")
+        if scene in ("vanilla", "glorp_after"):
+            img.save(out / f"{scene}_hud.png")
+            (out / f"{scene}_tree.txt").write_text("\n".join(dump(root)) + "\n", encoding="utf-8")
+        bar = next((e for e in hud.walk(root) if e.typename == "left_panel_info_bar"), None)
+        geo = f"glorp bar y={round(bar.y)}" if bar is not None and bar.h else ""
+        if row is not None:
+            geo += f" row {round(row.x)},{round(row.y)} {round(row.w)}x{round(row.h)}"
+            tip = ex.build_lazy(row.tooltipwidget)
+            tw, th = eng.measure(tip, None)["hint"]
+            eng.place(tip, 8, round(row.y + row.h + 6), tw, th)
+            hover = img.copy()
+            eng.render(tip, hover)
+            hover.crop((0, 0, 900, min(1080, round(row.y + row.h + 6 + th + 20)))).save(out / f"{scene}_hover.png")
+        report(scene, issues, geo)
+
+    strips = []
+    for state in ROW_STATES:
+        eng, ex, root, row, img, issues = render("glorp_after", state)
+        strips.append(img.crop((0, 120, 600, 260)))
+        report(f"row{state or '_normal'}", issues)
+    sheet = Image.new("RGBA", (600, sum(s.height + 6 for s in strips)), (20, 24, 30, 255))
+    for i, strip in enumerate(strips):
+        sheet.paste(strip, (0, i * (strip.height + 6)))
+    sheet.save(out / "row_states.png")
+    print("missing textures:", sorted(TEXTURES.missing))
+    print("output:", out)
+
+
+if __name__ == "__main__":
+    main()

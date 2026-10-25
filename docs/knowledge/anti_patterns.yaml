@@ -1,708 +1,599 @@
-# EU5 Known Anti-Patterns
-# ========================
-# Machine-readable knowledge store. Feed into:
-#   - scripts/validate.py  (static pre-flight checks)
-#   - scripts/gen_brief.py (generates docs/knowledge/BRIEF.md)
-#
-# Fields:
-#   id        : unique slug (no spaces)
-#   pattern   : Python regex to detect the bad form in source files
-#   bad       : human-readable description of the bad form
-#   correction: what to do instead
-#   category  : modifier | enum | encoding | gui | scope | event | localization | trigger
-#   scope     : country | location | character | global | any
-#   source    : reference file that verifies the correction (path:line if known)
-#   notes     : one-line explanation of why the bad form fails
-#
-# To add a new entry: append a YAML dict with all fields, then run:
-#   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_brief.py
-
-- id: location_auto_modifier_nonfunctional
-  pattern: 'category\s*=\s*location'
-  only_in_paths: ['auto_modifiers']
-  bad: "auto_modifier with category = location (inside auto_modifiers/ file)"
-  correction: "Use main_menu/common/static_modifiers/: define new objects with game_data.category = location, or use a minimal TRY_INJECT delta when modifying an existing object"
-  category: modifier
-  scope: location
-  source: "src/stable/main_menu/common/static_modifiers/A_SOL_war_modifiers.txt:4-8; reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439"
-  notes: "Location auto_modifiers are NON-FUNCTIONAL in EU5; bake effects into static_modifier values instead"
-
-- id: sol_demand_add_baseline_must_remain
+# eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: sol_slaves_without_income_must_have_zero_goods_demand
   pattern: null
-  bad: "Deleting or bypassing the calibrated SOL demand_add baseline when moving runtime demand to local_pop_demand"
-  correction: "Keep data/target_demand.csv -> src/stable/in_game/common/goods/z_SOL_pop_goods.txt as the corrected demand_add baseline; apply local_pop_demand only as the monthly location-level multiplier."
+  detectability: advisory
+  category: goods
+  scope: pop
+  bad: Excluding slaves from SOL accounting while retaining vanilla or compatibility goods demand for them.
+  correction: Slaves have no income and must have zero goods demand in every SOL target. Cancel resolved vanilla and JTG demand with slave-specific demand_add deltas; emit zero in M&T replacements and account for PP's existing lumber cancellation. Keep slaves out of the seven income-bearing basket and solver types.
+  source: User design requirement 2026-10-24; scripts/gen_pop_goods.py; scripts/gen_sol_mnt_compat.py; scripts/gen_sol_jtg_compat.py; scripts/gen_sol_pp_compat.py; scripts/test_sol_slave_demand.py
+  notes: Resolve all plus slaves additions and all times slaves multipliers before cancellation, including goods outside the calibration CSV. Commodity demand is separate from native pop_food_consumption. Offline tests cover all five targets and leave native food consumption unchanged.
+- id: sol_glorp_hud_template_inside_types_group
+  pattern: null
+  detectability: advisory
+  bad: Emitting SOL_lshud_legislative_efficiency_tooltip inside Types SOLLivingStandardGlorpCompat, causing Unexpected token errors at template and its body.
+  correction: Emit the preserved tooltip template at file scope before the Types group in gen_sol_lshud.py. Regenerate both stable and sol_standalone; retain the two Glorp widget overrides and their 36px offset. Check the declaration tree as well as the rendered tooltip.
+  category: gui
+  scope: country
+  source: User runtime log 2026-10-24 17:11:07 gui/SOL_lshud_glorp_compat.gui:6-34; scripts/gen_sol_lshud.py; scripts/test_sol_lshud_ui.py; shared gui_template_inside_types_group rule
+  notes: The offline parser previously accepted the invalid nesting. Its shared regression now rejects a template directly inside types/Types; native reload remains the final acceptance check.
+- id: sol_glorp_hud_retired_tooltip_template
+  pattern: null
+  detectability: advisory
+  bad: Copying Glorp's legislative_efficiency_tooltip reference into the SOL HUD compatibility shim after vanilla commented out that template, or ignoring non-SOL-named renderer warnings inside SOL-owned copied bodies.
+  correction: Generate SOL_lshud_legislative_efficiency_tooltip using the existing native contextual tooltip, legislative modifier and localization. Rewrite only that reference in the copied Glorp stats bar, preserving the statistic and its description. Test the actual Glorp composition, require a nonempty legislative tooltip with its modifier-source textcontext, and reject the missing-template warning for both shipped targets.
+  category: gui
+  scope: country
+  source: Runtime log 2026-10-23 gui/SOL_lshud_glorp_compat.gui:54; .eu5-base/reference_game_files/game/in_game/gui/shared/government_tooltips.gui:2301-2337; .eu5-base/reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11503; scripts/gen_sol_lshud.py; scripts/test_sol_lshud_ui.py
+  notes: The renderer already reported the missing template, but the old test filtered warnings by SOL text and never inspected this inherited tooltip. Source-level composition tests do not confirm native hover; verify a fresh runtime log after deployment. Other CMF/Glorp source errors and missing cm_/atd_ dependencies have separate owners.
+- id: sol_validator_context_free_pattern_false_positives
+  pattern: null
+  detectability: advisory
+  bad: Treating raw regex hits in generated SOL files as confirmed errors without checking comments, brace depth, database identity or actual missing assets.
+  correction: In scripts/validate.py mask comments while preserving quoted text and line offsets. Use the shared parser to check only direct change_variable value fields; permit nested arithmetic script values. Compare goods ids and color keys with the vanilla database so compatibility overrides retain their colors. For IO GetIcon, verify an actual custom IO definition and missing icon, including assets supplied by declared local dependencies. Keep positive regression cases for the real errors in test_validate.py.
+  category: workflow
+  scope: any
+  source: scripts/validate.py; scripts/test_validate.py; .eu5-base/reference_official_defines/docs/effects.log:1116-1122; .eu5-base/reference_game_files/game/in_game/common/goods/00_raw_materials.txt:1-4; .eu5-base/reference_game_files/game/in_game/gui/location_window.gui:2043; src/sol_mnt_compatibility_submod/in_game/gui/location_window.gui:6563
+  notes: The full SOL validation on 2026-10-23 reported 119 false positives (56 vanilla-goods overrides, 44 nested script-value operands, 18 generic IO icon lookups and one commented UIAction binding). This is a validator implementation rule; shared engine rules remain in the base. Do not silence whole rule categories or alter valid generated gameplay/GUI just to satisfy a context-free match. Reproduce build-time reports with build.bat --validate-only, which regenerates then validates all sources using an explicit interpreter and retains tmp/build_validate.log; a standalone check does not exercise the batch entry point.
+- id: sol_substitution_auto_modifier_recomputes_baskets
+  pattern: null
+  bad: Granting static country modifiers for SOL goods substitution, or computing price preferences, group allocation, population/market aggregation or external offsets inside an auto modifier or its scale script value.
+  correction: Compute size=(1+e)*(M-1) in the existing monthly human/normal-AI or yearly reduced-frequency-AI solve. Country auto modifiers only read guarded sol_sub_size_<good> caches through sol_substitute_<good>_scale. Delete zero size caches after effective spending and summary calculations consume them, so neutral goods fail the auto potential. Generate AUTO_MODIFIER_NAME_ and AUTO_MODIFIER_DESC_ keys in both supported languages, as current vanilla does. The scheduled solve subtracts that same active cached contribution from the total modifier before deriving external demand. Keep solver spending in sol_good_effective_<good>; never read aggregate modifiers from the auto scale. Remove static grants, live-strength/request snapshots and dead dirty polling; no old-save migration.
+  category: modifier
+  scope: country
+  source: User decision 2026-10-23; scripts/sol_substitution.py; scripts/test_sol_substitution_performance.py; docs/technical/SOL_Substitution_Auto_Modifiers_20261023.md
+  notes: Engine actions can reevaluate auto modifiers at very high frequency. Source and offline tests verify constant per-good cache reads, no writes or economic reads during repeated auto evaluation, and unchanged scheduled basket results. Engine refresh timing and fixed-point rounding remain unverified.
+- id: sol_living_standard_is_not_a_ratio
+  pattern: null
+  bad: Treating SOL as baseline-basket multiples, weighting it by baseline consumption, displaying it as a percentage, or assuming a one-to-one conversion means equality without checking units.
+  correction: SOL = flat bonuses + max(0, 1 + summed percentage bonuses) * annual liquid funds per thousand people, with a zero floor per estate/location. Percentage bonuses never multiply flat bonuses. Aggregate annual totals with population denominators and display the amount directly. PP = annual funds per thousand / annual baseline per thousand; only PP displays ratio minus one as percent. Zero-baseline populations still have SOL. Changing baskets must change PP but not SOL. Map color comparisons may normalize SOL against world average; displayed SOL must remain an amount.
+  category: scope
+  scope: location
+  source: Explicit user formula correction 2026-10-23; docs/technical/SOL_Living_Standard_Formula_Correction_Plan_20261023.md; scripts/test_sol_living_standard.py
+  notes: Project definition, not engine behavior. Regression fixtures distinguish the old and corrected formulas with unequal estate populations, basket rescaling and zero-baseline tribesmen. Native in-game acceptance remains pending.
+- id: sol_living_standard_feeds_demand
+  pattern: null
+  bad: Treating living standard (SOL) and purchasing power as one number, for example reading a SOL value or the local SOL modifier in the raw/final demand scale, the country solver targets, or the applied local_pop_demand modifier, or labelling an income or purchasing-power figure as living standard.
+  correction: Purchasing power is liquid funds / baseline spending and alone drives demand. Living standard is flat bonuses + max(0, 1 + summed percentage bonuses) * annual liquid funds per thousand people, floored at zero per estate/location and aggregated by population. Compute it after the demand pass. The tier, world ranking, living-standard maps and local migration/population-growth feedback read SOL; location/panel bars, HUD section 2 and purchasing-power map read purchasing power. Feedback uses cached local SOL in the existing monthly apply traversal (attraction clamp 0.02*SOL to 0..0.5; growth -0.001 below 0.1 and +0.001 above 10, neutral at both boundaries). Put modifiers in scripts/sol_living_standard_source.py, never in demand emitters.
+  category: scope
+  scope: location
+  source: User decision 2026-10-23 (SOL separated from purchasing power before building-based SOL bonuses); scripts/sol_living_standard_source.py; scripts/test_sol_living_standard.py; docs/technical/SOL_Living_Standard_Purchasing_Power_Separation_20261023.md
+  notes: Project design rule, not engine behavior. At zero modifier SOL equals purchasing power times annual baseline consumption per thousand, not purchasing power itself. test_sol_living_standard.py fails if any demand variable in any of the five deploy targets reads a SOL-only name, if location SOL stops being the last step of sol_compute_location_pop_demand, or if a purchasing-power surface reads SOL. In-game acceptance of the SOL-ranked tier, ranking and both SOL maps is pending.
+- id: sol_living_standard_building_sources_bypass_native_modifiers
+  pattern: null
+  detectability: advisory
+  bad: Computing SOL building bonuses by scanning buildings or changing liquid funds, registering deferred country/estate sources as part of the first batch, multiplying flat bonuses by percentages, or changing generated outputs directly.
+  correction: Keep the 17 first-batch building coefficients in BUILDING_SOURCES in sol_living_standard_source.py. Generate two location modifier types, matching icon entries and MODIFIER_TYPE_NAME_/DESC_ localization in both languages. Inject only modifier blocks with TRY_INJECT; read native totals through modifier:local_sol_living_standard and modifier:local_sol_living_standard_modifier. Native modifier scaling follows building level and goods access. Estate hooks inherit shared flat and percent hooks; clamp 1 + summed percentages at zero before multiplying funds, then add flat * population and floor the total. Do not introduce traversals or demand reads. Compatibility submods inherit these definitions from SOL.
   category: modifier
   scope: location
-  source: "src/stable/in_game/common/goods/z_SOL_pop_goods.txt; reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11864"
-  notes: "The SOL multiplier is calibrated against corrected demand_add values. Removing that baseline changes absolute pop demand before the multiplier is applied."
-
+  source: docs/technical/SOL_Living_Standard_Modifier_Sources_Design_20261023.md sections 2 and 4.5; scripts/sol_living_standard_source.py; scripts/test_sol_living_standard.py; .eu5-base/reference_mods/3613232232/in_game/common/script_values/pp_farming_capacity.txt:70; .eu5-base/reference_game_files/game/in_game/common/building_types/readme.txt:34
+  notes: SOL implementation contract using the source-verified custom modifier bridge already specified in the design. Offline fixtures cover mixed sources and isolation; actual building/tooltips, scaling and migration/growth settlement remain pending in-game acceptance. War, disease, social values and estate-specific native modifier types are deferred.
+- id: sol_substitution_level_icons_need_a_separate_row
+  pattern: null
+  bad: Overlaying tiny +/- text on the goods image, or replacing actual country substitution direction with the seven market price weights.
+  correction: Keep each goods image at 18 by 18 and put one native level icon in an independent 18-unit row underneath. Use three malus arrows, price_stable, and three bonus arrows for the actual country multiplier; reserve no neutral dead band. Require an initialized country calculation before showing a level. Keep unavailable goods dim while their initialized country level remains visible. Increase card and wrapped-row heights together and preserve supply counts and hover data.
+  category: gui
+  scope: any
+  source: User screenshot and icon-only request 2026-10-23; scripts/sol_goods_ui.py; reference_game_files/game/main_menu/gui/shared/font_icons.gui:947,2084-2134; reference_official_defines/docs/data_types_common.txt:414,571,742.
+  notes: The seven display bands are m<0.5; 0.5<=m<0.75; 0.75<=m<1; m=1; 1<m<=1.25; 1.25<m<=1.5; m>1.5. Exact 25%/50% changes stay in the lower-magnitude band. This is a display classification, not a change to country multipliers or seven-tier price preference weights. CORE grouped goods show one icon after initialization; compatibility-only goods outside substitution groups keep no level. Offline tests cover all levels and boundaries, readiness, visible pixels, row alignment and compatibility tooltip bounds; corrected runtime acceptance is pending.
+- id: sol_country_map_tooltip_keeps_player_localization
+  pattern: null
+  bad: Reusing SOL HUD sections three/four for another country's map tooltip while leaving player-bound GUI or localization, or letting nested ranking rows replace the primary country.
+  correction: Capture the hovered country's MakeScope as Scope and adapt primary Player expressions to Scope.GetCountry. Adapt localized expressions from both gen_sol_lshud and gen_sol_ls_gui, including SOL_SUB_SUMMARY, while peer rows continue to bind Country. Register CountryMapTooltip_<mode> with country tooltip contexts at every zoom and verify a foreign title, self row, spending total and substitution summary in both languages.
+  category: gui
+  scope: country
+  source: scripts/sol_map_modes_source.py; scripts/test_sol_lshud_ui.py; .eu5-base/reference_game_files/game/in_game/gui/cooltip.gui:4622; .eu5-base/reference_official_defines/docs/data_types_script.txt:438,1776.
+  notes: SOL-specific integration rule. Offline regression initially caught the external SOL_SUB_SUMMARY key still reading Player even after direct GUI adaptation. Source and offline rendering confirm the correction; native map tooltip dispatch remains pending in-game acceptance.
+- id: sol_income_table_columns_shorter_than_row_decorations
+  pattern: null
+  bad: Giving the SOL income table 460-unit row decorations while its visible columns and padding only occupy 418 units, and verifying only the declared row rectangle.
+  correction: Make the header and every income row use the same full-width column budget, explicit zero spacing, and symmetric padding. Include the combined arrow/annual-change cell or its same-width no-prior-year placeholder in that budget. Verify the sum of in-flow child widths equals the row width and that every decoration and cell remains inside the tooltip content margins.
+  category: gui
+  scope: any
+  source: User runtime screenshot 2026-10-23; ai_gui_assessment/prototypes/living_standard_4sections/build.py tooltip_income; reference_game_files/game/main_menu/gui/shared/main_menu_cooltip_types.gui:1742.
+  notes: The screenshot's roughly 21-unit left offset agrees with half of the 42-unit shortfall; the exact engine allocation path is inferred. The correction uses 6-unit padding on both sides and columns totaling 448 units. Later readability tuning narrows the estate column to 96 units and widens annual income/per-capita income to 108/90, each with a 6-unit left text gutter. Bilingual stable/standalone regressions cover annual-data and placeholder states, aligned headers, intrinsic and decoration bounds, and nine-digit income/eight-character per-capita values that fit at 11-point type. Corrected runtime acceptance remains pending.
+- id: sol_purchasing_power_ruler_curve_and_origin_drift
+  pattern: null
+  bad: Computing SOL purchasing-power labels or ticks with a different mapping from the fill, retaining nonlinear spacing after the user requested linear halves, or aligning the ruler through an unsized expanding spacer.
+  correction: Share the row/ruler column geometry and use a fixed full-width ruler wrapper with an explicit track offset. For clamped raw alpha-minus-one c, map negative values to (c+1)/2 and positive values to 1/2+c/4; the five labels belong at 0, 1/4, 1/2, 3/4, and 1. Center ticks vertically on the track and keep a zero-baseline cursor at 1/2. Clamp only the visual bar; preserve the full raw percentage.
+  category: gui
+  scope: any
+  source: User runtime screenshot and subsequent request for linear halves 2026-10-22; scripts/gen_sol_ls_gui.py; reference_official_defines/docs/data_types_common.txt:366,1117.
+  notes: The screenshot shows the entire ruler shifted right; its hbox spacer handling is inferred, so the replacement uses explicit coordinates. The first correction retained the old nonlinear fill; the user then requested equidistant labels with -50% and +100% bisecting their respective halves. Offline bilingual tests compare every label/tick with the fill and cover intermediate values, clamped endpoints, and no consumption; in-game acceptance remains pending.
+- id: capacity_floor_starves_zero_pressure_classes
+  bad: Reading a country-solver class coefficient in the tens or hundreds (e.g. Class 1 = 105.98) as a data error or numerical
+    blow-up
+  correction: Expect it. Capacity targets are baseline_total * capacity_floor + baseline_total * negative_pool * pressure_share,
+    and pressure is clipped at zero, so a stratum whose baseline is BELOW target (needs scaling up) contributes zero pressure
+    and its class receives only the 1% floor. That class column then carries ~1-3% of the mass of the dominant class, and
+    ||W^-1 row|| reaches 96-404, so a normal 0.01 monthly move in a compression ratio swings that coefficient by 1-4 units.
+    Switching capacity to abs(baseline - target) cuts median amplification from 120.6 to 55.9 but does NOT improve feasibility
+    and shrinks the surviving Class 4 margin from 0.164 to 0.033.
+  category: scope
+  scope: country
+  source: 'HUN five-save series 2026-08-11: Class 1 column mass 1.98-5.50 vs Class 4 156-177; capacity targets C1/C2 ~1.9-2.3
+    vs C4 140-193 with capacity_floor = 0.01, negative_pool = 0.96'
+  notes: 'Documentation-only (no regex lint). Amplification and feasibility are independent problems: amplification comes
+    from unequal column mass (the 1% anchor), feasibility comes from cone containment. Raising capacity_floor trades jitter
+    for margin in both directions, so it is a tuning decision rather than a fix. HUN is especially exposed because nobles
+    are 68% of national spending yet carry zero pressure, leaving the class that represents them with almost no matrix mass.'
+- id: commodity_offset_must_exclude_own_modifier
+  pattern: null
+  bad: Reading global commodity demand while the previous SOL substitution modifier is still included, or writing M-1 despite
+    an external additive offset
+  correction: Remove the own named country modifier, read modifier:global_<good>_pop_demand, and write (1+e)(M-1). Apply the
+    same nonnegative effective factor once in internal spending. Read live modifier values rather than copying age definitions.
+  category: modifier
+  scope: country
+  source: reference_official_defines/docs/effects.log:105; reference_game_files/game/in_game/common/scripted_effects/country_effects.txt:2376;
+    SOL_Substitute_Groups_Global_Modifier_Implementation.md section 4.3
+  notes: Modifier read syntax is source-verified. Same-type addition and cross-type multiplication were measured on 2026-10-10;
+    removal-to-read timing, engine refresh and fixed-point stability of this generated implementation still require in-game
+    acceptance.
 - id: country_pulse_manual_on_action_merge_unnecessary
   pattern: null
-  bad: "Copying vanilla or framework entries into monthly_country_pulse/yearly_country_pulse just to preserve existing on_actions"
-  correction: "Use the compact yearly_country_pulse style for both monthly_country_pulse and yearly_country_pulse: define only this mod's on_actions entries. The engine merges on_actions from duplicate pulse definitions automatically."
+  bad: Copying vanilla or framework entries into monthly_country_pulse/yearly_country_pulse just to preserve existing on_actions
+  correction: 'Use the compact yearly_country_pulse style for both monthly_country_pulse and yearly_country_pulse: define
+    only this mod''s on_actions entries. The engine merges on_actions from duplicate pulse definitions automatically.'
   category: scope
   scope: country
-  source: "user-reported engine behavior (2026-06-08); src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:5-12"
-  notes: "Manual payload copies are noisy and drift-prone. Keep events/random_events only when this mod itself adds them; do not duplicate vanilla or CMF on_action dispatchers."
-
-- id: cost_modifier_renamed_to_efficiency_1_3
-  pattern: '\b(?:global_build_buildings_cost|local_build_buildings_cost|local_build_new_buildings_cost|local_trade_embark_disembark_cost_modifier|stability_cost)\s*='
-  only_in_paths: ['src/stable']
-  bad: "EU5 <=1.2 cost modifier name for construction, trade embark/disembark, or stability investment"
-  correction: "Use the EU5 1.3 efficiency modifier name: global_build_buildings_efficiency, local_build_buildings_efficiency, local_build_new_buildings_efficiency, local_trade_embark_disembark_efficiency, or stability_cost_efficiency. Flip the sign when preserving old cost penalties/discounts."
-  category: modifier
-  scope: any
-  source: "reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:4103,4167,4175,6838,10255"
-  notes: "EU5 1.3 renamed these cost-style modifiers to positive-good efficiency modifiers. Positive efficiency reduces cost, so old positive cost penalties become negative efficiency and old negative cost discounts become positive efficiency."
-
-- id: location_rank_invalid_village
-  pattern: 'location_rank\s*[=?]=\s*location_rank:village'
-  bad: "location_rank:village"
-  correction: "location_rank:rural_settlement"
-  category: enum
-  scope: location
-  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
-  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
-
-- id: location_rank_invalid_hamlet
-  pattern: 'location_rank\s*[=?]=\s*location_rank:hamlet'
-  bad: "location_rank:hamlet"
-  correction: "location_rank:rural_settlement"
-  category: enum
-  scope: location
-  source: "reference_game_files/game/in_game/common/diseases/bubonic_plague.txt"
-  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
-
-- id: location_rank_invalid_metropolis
-  pattern: 'location_rank\s*[=?]=\s*location_rank:metropolis'
-  bad: "location_rank:metropolis"
-  correction: "location_rank:city"
-  category: enum
-  scope: location
-  source: "reference_game_files/game/in_game/common/building_types/unique_buildings.txt"
-  notes: "EU4 rank name; EU5 valid values are rural_settlement, town, city"
-
-- id: custom_tooltip_do_not_remove
-  pattern: ''
-  bad: "Removing custom_tooltip from event options (wrong fix for dotted key confusion)"
-  correction: "Keep custom_tooltip; verify key format via Step 2/3 — dotted suffix IS valid in event options"
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/common/character_interactions/ali_qushji_settles.txt"
-  notes: "AI wrongly removed custom_tooltip thinking dotted key format was invalid. Never remove; only verify format."
-
-- id: blockoverride_widget_child_invalid
-  pattern: 'blockoverride\s+"common_header_text"\s*\{[^}]*text_single'
-  bad: "text_single widget inside blockoverride \"common_header_text\""
-  correction: "blockoverride overrides a 'text' property value, not a widget container; do not add child widgets"
-  category: gui
-  scope: any
-  source: "reference_game_files/game/main_menu/common/cards.gui:1084"
-  notes: "Guessing block structure causes silent failures; always read cards.gui before using blockoverride"
-
-- id: yaml_localization_non_ascii_quotes
-  pattern: '[“”‘’]'
-  bad: "Smart/curly quotes (“”‘’) in localization YAML"
-  correction: "Use straight ASCII double-quotes (\") only; escape with \\\" inside values"
-  category: localization
-  scope: any
-  source: "reference_official_defines/docs/data_types_gui.txt"
-  notes: "PDX parser rejects non-ASCII quote characters; the failure is silent"
-
-- id: eu4_province_modifier_scope
-  pattern: 'add_province_modifier'
-  bad: "add_province_modifier (EU4 effect)"
-  correction: "add_location_modifier or add_static_modifier with location scope"
+  source: user-reported engine behavior (2026-06-08); src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:5-12
+  notes: Manual payload copies are noisy and drift-prone. Keep events/random_events only when this mod itself adds them; do
+    not duplicate vanilla or CMF on_action dispatchers.
+- id: country_solver_infeasibility_misdiagnosis
+  bad: Diagnosing a country-solver negative_factor or a class-wide -100% local_pop_demand by inspecting condition number,
+    classifier churn, coefficient magnitude, or by assuming a near-zero coefficient was a clamped floating-point artifact
+  correction: Run tools/eu5_save_parser/cone_feasibility.py FIRST. Exact-solve feasibility means target in cone(class columns);
+    because every class column sums nonnegative location vectors, cone(any 4-way partition) is contained in cone(all owned
+    locations). If the all-location residual exceeds ~0.01 the target is unreachable and NO classifier change, class count,
+    capacity rule, or conditioning fix can help - only relaxing the target or accepting an approximation. See docs/technical/SOL_Country_Level_Strata_Demand_Model.md
+    section 3.9.
   category: scope
-  scope: location
-  source: "reference_game_files/game/in_game/common/"
-  notes: "EU4 province scope effects do not exist in EU5; use location-scoped equivalents"
-
-- id: eu4_has_province_modifier
-  pattern: 'has_province_modifier'
-  bad: "has_province_modifier (EU4 trigger)"
-  correction: "has_location_modifier"
+  scope: country
+  source: 'HUN five-save series 2026-08-11 (SP_HUN_1337_10_02 .. 1338_02_02, playthrough d95e1b3a): all-location cone residual
+    0.0465-0.1057, 8-43 locations require negative factors; docs/technical/SOL_Country_Level_Strata_Demand_Model.md section
+    3.9'
+  notes: 'Documentation-only (no regex lint). Linear independence is NOT the feasibility criterion: det(M) != 0 only gives
+    uniqueness, and measured HUN condition numbers were a healthy 55.6-96.0 while the exact solve still failed. A zero coefficient
+    returned by a nonnegative approximation is a legitimate boundary optimum, not a clamped artifact, so tightening the gate
+    to reject delta < 0 does not stop -100% (it cannot reject = 0). Four wrong attributions were ruled out by data: silent
+    zero-clamping, ill-conditioning, the yearly unit-spending refresh as switch trigger (1337.10/11/12 had frozen unit spending
+    yet flipped infeasible->feasible), and classifier churn as an independent cause (1338 data under 1337 classes still gave
+    Class 4 = -1.089). The real conflict is structural: nobles/clergy need scaling up while lower needs scaling down ~41%,
+    but their per-location spending is coupled (nobles-vs-lower share correlation 0.29-0.47), so no nonnegative factor field
+    separates them.'
+- id: country_substitution_repeated_monthly_replace
+  pattern: null
+  bad: Repeating market/pop basket expansion for every location and replacing unchanged country goods modifiers every month
+  correction: Aggregate owned population by market/pop type, evaluate each basket once, and cache seven country-adjusted market
+    spending totals. Apply permanent goods modifiers only on real size changes or missing modifiers; subtract the actually
+    applied size when reading external offsets and retain an observed-total snapshot for clean-month checks. Keep the separate
+    monthly location modifier lifetime policy.
   category: scope
-  scope: location
-  source: "reference_game_files/game/in_game/common/"
-  notes: "EU4 province scope triggers do not exist in EU5"
-
-- id: script_value_inline_subexpr_variable_refs
-  pattern: 'multiply\s*=\s*\{[^}]*(?:multiply|divide)\s*=\s*local_'
-  bad: "multiply = { value = X  multiply = local_var  divide = local_var  add = local_var } inside a script_value"
-  correction: "Flatten to top-level sequence: multiply = local_var  (no braces); each op on its own line"
-  category: encoding
-  scope: any
-  source: "reference_game_files/game/in_game/common/script_values/_script_values.info:77-82"
-  notes: "Inline sub-expression example in .info only shows scalar literals; variable refs (local_*, named sv) inside multiply={} blocks are unconfirmed and likely silently broken"
-
-- id: float_precision_exceeds_5dp
-  pattern: '\d\.\d{6,}'
-  bad: "float literal with 6+ decimal places (e.g. value = 0.123456789)"
-  correction: "Round to at most 5 decimal places: value = 0.12346; EU5 engine reads no further"
-  category: precision
-  scope: any
-  source: "user-reported engine behavior (2026-04)"
-  notes: "EU5 engine truncates all float literals at 5 decimal places; digits beyond the 5th are silently ignored"
-
-- id: gui_no_getgoods_from_string
-  pattern: "GetGoods\\('|GetGoodsFromKey|MakeGoods\\("
-  bad: "GetGoods('key'), GetGoodsFromKey, or MakeGoods('key') in GUI expressions to construct a Goods object from a string literal"
-  correction: "Goods datacontext must come from a data model accessor chain (e.g. GoodsMarketEntry.GetGoods, Trade.GetGoods, GoodsItem.GetGoods in a foreach); there is no string-to-Goods lookup function in EU5 GUI"
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/gui/shared/market_tooltips.gui:435"
-  notes: "Exhaustive search of all reference_game_files *.gui files found zero occurrences of any string-to-Goods constructor; all goods access is typed accessor chains only"
-
-- id: gui_goodsview_inaccessible_in_tooltip
-  pattern: 'GoodsView\.GetGoods'
-  bad: "datamodel = \"[GoodsView.GetGoods]\" inside a ContextualTooltipType or tooltipwidget template to iterate all goods and filter by key"
-  correction: "GoodsView is a view-model object only available in goods_overview.gui panel scope; it is not accessible from tooltip/ContextualTooltipType contexts. No equivalent all-goods datamodel exists for tooltip scope."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/gui/goods_overview.gui:77"
-  notes: "Exhaustive search of reference_game_files found GoodsView only in the goods_overview panel; tooltip templates have no equivalent all-goods iteration datamodel"
-
-- id: multiply_global_variable_nonexistent
-  pattern: 'multiply_global_variable'
-  bad: "multiply_global_variable = { name = X  value = 0.95 } to scale a global variable in-place"
-  correction: "Use set_global_variable with hardcoded per-case values: set_global_variable = { name = X  value = computed_literal }. For era-decay patterns, hardcode the result per age (idempotent, no dedup guard needed). If truly dynamic, compute in a local_variable then use set_global_variable = { name = X  value = local_var:tmp }."
+  scope: country
+  source: reference_official_defines/docs/effects.log:2824-2828; country_effects.txt:846-850; docs/technical/SOL_Monthly_Performance_Optimization_20261015.md
+  notes: Offline 180-location/3-market fixture cuts refresh variable operations from 571285 to 12023. This is not measured
+    EU5 wall time; intermediate fixed-point rounding and engine cache invalidation require in-game acceptance.
+- id: empty_sol_caches_mistaken_for_parser_failure
+  bad: Seeing every sol_location_* column empty in an exported save and concluding the parser broke, the export is corrupt,
+    or the save is unusable for analysis
+  correction: 'Check metadata.json''s countries_with_sol_variables field first. A value of 0 means the save itself carries
+    no SOL runtime state -- the mod was absent or disabled when it was written -- so no amount of re-parsing will produce
+    those columns. Confirm against the raw save with ''grep -c sol_location_demand_class <save>.eu5'': a working save returns
+    tens of thousands of hits, an unusable one returns 0. Crucially, such a save is NOT useless: every engine-native column
+    still exports (population per stratum, shares, owner, market, rank, development, control), which is enough for population-structure
+    and heterogeneity analysis. Only SOL-derived quantities are lost -- per-stratum base spending B_s(l), net income I_s(l),
+    and the raw coefficient m_raw(l) -- which means feasibility and improvement analysis is impossible because the target
+    vector t cannot be reconstructed.'
   category: scope
-  scope: any
-  source: "reference_game_files/game/in_game/common/scripted_effects/global_effects.txt"
-  notes: "Exhaustive search of reference_game_files/ and reference_mods/ found no multiply_global_variable effect. Only set_global_variable and change_global_variable exist for global-scope numeric variables."
-
-- id: positive_sign_in_float_literal
-  pattern: 'value = +0.xxx'
-  bad: "Writing a leading + sign on positive float literals, e.g. value = +0.025 or change_variable = { ... value = +0.003 }"
-  correction: "Omit the + sign entirely: value = 0.025. The EU5/Jomini parser does not accept a leading + on numeric literals and will misread the value."
-  category: scripted_values
-  scope: any
-  source: "runtime observation"
-  notes: "Triggered by Python f-string format spec +:  e.g. f'{delta:+.5f}' emits +0.00357 for positive deltas. Fix: use f'{delta:.5f}' so no leading sign is emitted for positive values."
-
-- id: icon_widget_before_texticon_check
-  pattern: ''
-  bad: "Using an icon widget or designing custom icon syntax without first checking if @icon_name! inline texticon syntax already covers the case"
-  correction: "Check font_icons.gui for existing texticon definitions first; use @icon_name! in raw_text/text/localization if available; fall back to icon widget; only design from scratch as last resort"
-  category: gui
-  scope: any
-  source: "reference_game_files/game/main_menu/gui/shared/font_icons.gui"
-  notes: "EU5 has 180+ pre-defined inline icons via the @xxx! texticon system; skipping this check causes unnecessary widget complexity and misses the preferred engine-native approach"
-
-- id: modifier_icon_not_effect_field
-  pattern: null
-  bad: "Trying to assign an icon to add_location_modifier, add_static_modifier, or the static modifier block itself"
-  correction: "Define the icon in main_menu/common/modifier_icons/<file>.txt using modifier keys with positive/negative texture paths. For a custom static modifier, map the static modifier id; only map the contained modifier type if that key is not already defined by vanilla or another loaded mod."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/main_menu/common/modifier_icons/00_modifier_icons.txt:1-4; reference_mods/3613232232/main_menu/common/modifier_icons/pp_victuals_modifier_icons.txt:4-7"
-  notes: "Modifier tooltips and location modifier rows call GetIcon on StaticModifier/ModifierWrap objects; the texture mapping is data-driven from modifier_icons, not an effect parameter."
-
-- id: modifier_icon_duplicate_vanilla_key
-  pattern: null
-  bad: "Defining a vanilla modifier_icons key such as local_pop_demand in a mod add-on file to override its texture"
-  correction: "Do not duplicate existing modifier_icons keys in additive files. Map the custom static modifier id instead, or use an explicit replacement strategy for the whole vanilla definition if a vanilla-key override is truly required."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/main_menu/common/modifier_icons/00_modifier_icons.txt:5853-5855"
-  notes: "modifier_icons is a keyed database; duplicate keys are rejected with a 'Duplicated key ... will not be created' log, leaving the original definition active."
-
-- id: mapmode_dds_incomplete_mips
-  pattern: null
-  bad: "Custom mapmode DDS with an incomplete mip chain or non-vanilla-compatible DDS header"
-  correction: "Write mapmode DDS files with a full mip chain down to 1x1 and a Clausewitz-style 2D header (`dwDepth = 1`); keep the file under `main_menu/gfx/interface/icons/map_modes/<map_mode_id>.dds`."
-  category: gui
-  scope: any
-  source: "reference_mods/3613232232/in_game/gfx/map/map_modes/MAP_MODE_ICONS.md:75-83; reference_mods/3613232232/main_menu/gfx/interface/icons/map_modes/pp_local_fruit_output_modifier.dds header"
-  notes: "MapMode.GetIcon uses ID-based DDS lookup and is stricter than direct GUI texture references; reference mapmode DXT5 assets use complete mip chains (for 128x128, 8 levels and 22,000 bytes)."
-
-- id: mapmode_pinned_by_default_field_invalid
-  pattern: 'pinned_by_default\s*='
-  only_in_paths: ['gfx/map/map_modes']
-  bad: "Adding pinned_by_default = yes/no inside an in_game/gfx/map/map_modes/*.txt mapmode definition"
-  correction: "Omit pinned_by_default from mapmode data files unless a current official schema verifies the field. Keep category/index so the mapmode remains selectable; players can pin it from the UI."
-  category: gui
-  scope: any
-  source: "EU5 error.log: Malformed token: yes in gfx/map/map_modes/SOL_map_modes.txt; reference_official_defines/1.3.4-beta/docs/data_types_uncategorized.txt:88402"
-  notes: "The UI exposes MapMode.IsMapModePinnedByDefault, but the current mapmode data parser does not accept pinned_by_default as a writable field and can fail on the yes/no value."
-
-- id: variable_prefix_must_be_var
-  pattern: '\bvariable:[a-zA-Z_]'
-  bad: "variable:NAME as an event-target / value reference (e.g. value = variable:foo, multiply = variable:foo, add = variable:foo)"
-  correction: "Use the short form: var:NAME (e.g. value = var:foo). EU5/Jomini's event-target link prefix for scope variables is 'var', not 'variable'. The long form does not resolve."
-  category: scripted_values
-  scope: any
-  source: "reference_game_files/game/in_game/common/attribute_columns/06_country.txt:149"
-  notes: "Engine error: 'Failed to find a valid event target link variable:NAME' / 'Cannot read [variable:NAME] as a script value'. The set_variable / change_variable / has_variable effects all use the keyword 'variable' inside their own block (name = NAME, value = X), but READING a variable elsewhere in script_values, triggers, or modifier values requires the var: prefix. Comments in source files often informally write 'variable:foo' for documentation — never copy that into actual code."
-
-- id: change_variable_value_op_invalid
-  pattern: 'change_variable\s*=\s*\{[^{}]*\bvalue\s*='
-  bad: "change_variable = { name = X  value = Y } — value is not a valid operation for change_variable"
-  correction: "Use change_variable = { name = X  add = Y } (or subtract / multiply / divide). Negative literals are fine for add: e.g. add = -0.00020. value = is reserved for set_variable."
-  category: scripted_values
-  scope: any
-  source: "EU5 engine error: 'change_variable effect [ No operation specified ]'"
-  notes: "set_variable accepts 'value = X' (absolute assignment); change_variable does NOT — it requires an operation keyword (add/subtract/multiply/divide). Mixing them up emits a runtime PostValidate error and the change is silently dropped. Often introduced by codegen scripts that mirror set_variable templates without adapting the op keyword. Pattern uses [^{}]* (not [^}]*) so it does NOT cross nested-block boundaries — this prevents false positives on the legal form 'change_variable = { name = X  add = { value = Y  multiply = Z } }' where value = is the inner-block scalar literal of add's value-with-operations form."
-
-- id: global_var_unguarded_in_script_value
-  pattern: 'multiply\s*=\s*global_var:|add\s*=\s*global_var:|divide\s*=\s*global_var:|subtract\s*=\s*global_var:'
-  bad: "Direct 'multiply = global_var:NAME' (or add/subtract/divide) inside a script_value, expecting an on_game_start effect to set the global first"
-  correction: "Wrap the global read in a guarded local script_value: define 'local_NAME = { value = <safe_default>  if = { limit = { has_global_variable = NAME }  value = global_var:NAME } }' and reference 'multiply = local_NAME' instead. Optionally also init via on_game_start as defense-in-depth, but the wrapper is the load-bearing fix."
-  category: scope
-  scope: global
-  source: "runtime observation from EU5 script_value validation"
-  notes: "EU5 evaluates script_values during file-load validation BEFORE any on_action (including on_game_start) fires. An unguarded global_var read produces 'Failed to fetch variable', 'Event target link global_var returned an unset scope', and 'Got value of type none' errors that propagate up to every caller script_value. on_game_start init alone cannot fix this — the validation pass runs earlier. Wrapping with has_global_variable + safe default is the only robust approach."
-
-- id: global_variable_map_add_does_not_update
-  pattern: null
-  bad: "Using add_to_global_variable_map by itself to update an existing key"
-  correction: "Remove the existing key first, then add the new value: remove_from_global_variable_map = { name = X key = scope:Y } followed by add_to_global_variable_map = { name = X key = scope:Y value = Z }."
-  category: scope
-  scope: global
-  source: "user-reported engine behavior (2026-06)"
-  notes: "add_to_global_variable_map only inserts missing keys. If the key already exists, the old value is silently kept."
-
-- id: temporary_local_variables_must_be_removed
-  pattern: null
-  bad: "Leaving set_local_variable/change_local_variable scratch values alive after the scripted effect has finished using them"
-  correction: "At the matching evaluation scope, add remove_local_variable = <name> after the last read of every temporary local variable. In generated loops, generate the cleanup list together with the declarations so added goods or pop types cannot bypass it."
-  category: scope
-  scope: any
-  source: "reference_game_files/game/in_game/common/scripted_effects/international_organization_effects.txt:719-756; reference_mods/3735059838/in_game/common/scripted_effects/SYS-scripted_effect.txt:44,138-140,214-220"
-  notes: "Local variables used as calculation scratch space are not durable caches. Explicit cleanup prevents repeated market, country, or UI calculations from retaining temporary state and growing memory use."
-
-- id: market_scope_set_variable_unsupported
-  pattern: 'every_market_in_world\s*=\s*\{[^{}]*\bset_variable\b'
-  bad: "Direct set_variable / change_variable on market scope (e.g. every_market_in_world = { set_variable = { name = X value = Y } ... })"
-  correction: "Markets do NOT support persistent script variables. For market-keyed caches, write a global_variable_map and use the market scope as key: remove_from_global_variable_map/add_to_global_variable_map with key = scope:market_cache, then read via global_variable_map(name|scope:market_cache) or GUI GetVariableFromGlobalVariableMap('name', Market.MakeScope)."
-  category: scope
-  scope: global
-  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_game_files/game/in_game/gui/context_menu.gui:1748"
-  notes: "Market scopes are valid keys for global_variable_map even though direct market set_variable/change_variable storage is unsupported. Do not use the market center location as an artificial cache owner for SOL market data."
-
-- id: sol_market_center_location_cache
-  pattern: "GetCenterLocation\\.MakeScope\\.GetVariable\\('sol_market_|location\\s*=\\s*\\{\\s*set_variable\\s*=\\s*\\{\\s*name\\s*=\\s*sol_market_"
-  only_in_paths: ['src/stable']
-  bad: "Using a market center location variable as a SOL market-keyed cache"
-  correction: "Use global_variable_map keyed by the market scope instead. Script: remove_from_global_variable_map = { name = sol_market_* key = scope:sol_market_cache } then add_to_global_variable_map = { name = sol_market_* key = scope:sol_market_cache value = ... }. GUI: GetVariableFromGlobalVariableMap('sol_market_*', Location.GetMarket.MakeScope)."
-  category: scope
-  scope: global
-  source: "reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_mods/3692202776/loading_screen/data_binding/cmm_macros_settings.txt:88"
-  notes: "SOL market data belongs to the market key, not to an arbitrary center location. Center-location caches are brittle and obscure the actual key."
-
-- id: demands_goods_by_pops_is_shortage_not_consumption
-  pattern: null
-  bad: "Using demands_goods_by_pops = goods:<good> as a generic consumed-good or market pop-demand test"
-  correction: "For a known market, scope to the good and use is_demanded_in_market_by_pops = scope:<market>. Reserve demands_goods_by_pops for checks where pop demand exceeds supply."
-  category: trigger
-  scope: market
-  source: "reference_game_files/game/main_menu/localization/english/triggers_l_english.yml:5842; reference_game_files/game/in_game/common/trigger_localization/goods_triggers.txt:61; reference_mods/3629022149/in_game/common/on_action/country_monthly_stockpile.txt:3967"
-  notes: "The trigger localization for demands_goods_by_pops describes a shortage condition, not mere consumption. The goods-scope trigger is_demanded_in_market_by_pops accepts a market scope target."
-
-- id: gui_only_scope_variable_unused_warning
-  pattern: null
-  bad: "Using set_variable only to feed GUI/localization display, with no live script-side read"
-  correction: "For GUI-only display caches, ensure the scope variable is also read in a live script path. Moving the cache to global_variable_map can be correct for keying/storage, but does not by itself satisfy unused-variable validation."
-  category: gui
-  scope: any
-  source: "EU5 error.log jomini_effect.cpp:1162; reference_official_defines/docs/data_types_script.txt:34; reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17"
-  notes: "Jomini's unused-variable validation does not count GUI/localization-only reads. Scope variables written only for panel display can flood error.log with 'Variable X is set but is never used'."
-
-- id: gui_only_global_variable_map_unused_warning
-  pattern: null
-  bad: "Writing global_variable_map values only for GUI display, with GetVariableFromGlobalVariableMap(...) as the sole read"
-  correction: "Keep global_variable_map for keyed caches when appropriate, but also read each map name in a live script path with global_variable_map(name|scope:key). A local-variable count or no-op script-side read is enough when the value is only displayed."
-  category: gui
-  scope: global
-  source: "EU5 error.log jomini_effect.cpp:1162 for gls_country_consumes_*; reference_mods/3692202776/in_game/common/scripted_triggers/cmf_core_triggers.txt:9"
-  notes: "Jomini's unused-variable validation also ignores GUI-only GetVariableFromGlobalVariableMap reads. Use in unused scripted triggers/effects does not count; the read must sit in an effect/trigger that actually runs."
-
-- id: gui_market_getlocation_invalid
-  pattern: '\.GetMarket\.GetLocation\b'
-  bad: "Calling .GetMarket.GetLocation in GUI expressions to access a market's hub location"
-  correction: "Use .GetMarket.GetCenterLocation only when the UI truly needs the trade-center Location object. For market-keyed caches, prefer global_variable_map keyed by Market.MakeScope instead of center-location variables."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/gui/context_menu.gui:940 — 'ondoubleclick = \"[PanToLocation(Location.GetMarket.GetCenterLocation)]\"'"
-  notes: "Exhaustive search of reference_game_files for .GetMarket.GetLocation returned zero matches; .GetMarket.GetCenterLocation is the canonical accessor for navigation to the center location. It is not a recommended cache storage path for SOL market data."
-
-- id: situation_custom_mapmode_not_script_field
-  pattern: null
-  bad: "Adding map_mode = <tag> to a situation definition or using a child widget's _show state when the child is created already visible"
-  correction: "Keep is_data_map/map_color for the situation data map. For a separate custom mapmode, add a zero-size widget inside the situation_panel and use a trigger_on_create state whose on_start calls \"[PdxGuiWidget.PushMapModeOverride('<tag>')]\". The widget-scoped override is removed when the situation-specific panel widget is destroyed."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/common/situations/readme.txt:12-18; reference_official_defines/docs/data_types_gui.txt:5872-5882; src/stable/in_game/gui/SOL_migration_caller.gui:35-50; reference_game_files/game/in_game/gui/shared/population_tooltip.gui:9-13"
-  notes: "Situation script exposes data-map coloring but no verified field selecting a separate custom mapmode. A dynamically instantiated situation child can start already visible, so _show never runs; trigger_on_create handles that case. Vanilla PushMapModeOverride callers do not manually PopMapModeOverride because the override belongs to the PdxGuiWidget lifecycle."
-
-- id: gui_state_on_start_does_not_inherit_datacontext
-  pattern: 'state\s*=\s*\{[^{}]*\btrigger_on_create\s*=\s*yes[^{}]*\bon_start\s*=\s*"\[MapMode\.SetMapMode\]"'
-  only_in_paths: ['src/stable/in_game/gui']
-  bad: "Calling [MapMode.SetMapMode] from state.on_start while expecting a sibling or parent datacontext = [GetMapMode('<tag>')] to supply the MapMode object"
-  correction: "Call the object-returning function inside the action expression: on_start = \"[GetMapMode('<tag>').SetMapMode]\"."
-  category: gui
-  scope: any
-  source: "EU5 error.log: No context supplied, wanted context of type 'MapMode' for 'MapMode.SetMapMode'; reference_mods/3692202776/in_game/gui/cmf/cmf_after_lobby_caller.gui:10"
-  notes: "trigger_on_create state actions do not inherit the widget's datacontext for method dispatch. The action expression must create or receive the required object itself."
-
-- id: situation_custom_mapmode_visibility_states
-  pattern: null
-  bad: "Using _show/_hide plus global SetMapMode/SetDefaultMapMode to manage a mapmode for a dynamically instantiated situation panel"
-  correction: "Use trigger_on_create with PdxGuiWidget.PushMapModeOverride on a zero-size child of the situation-specific panel. This fires when the child is created already visible and ties cleanup to that widget's destruction."
-  category: gui
-  scope: any
-  source: "In-game SOL panel test (2026-07-22): _show did not enter sol_living_standard; src/stable/in_game/gui/SOL_migration_caller.gui:35-50; reference_official_defines/docs/data_types_gui.txt:5872-5882"
-  notes: "_show only runs after an existing widget changes from hidden to shown. It is not a construction callback, so it misses a situation child created after its parent is already shown. A global SetDefaultMapMode cleanup can also discard the player's prior mapmode instead of restoring the overridden mode."
-
-- id: yearly_january_pulse_spike
-  pattern: ''
-  bad: "Gating heavy per-country / per-location work behind 'limit = { current_month = 1 }' inside a situation's on_monthly block — fires on every January 1 for every country at once"
-  correction: "Use vanilla 'yearly_country_pulse' on_action instead — it fires once per country per year on each country's own anniversary date, naturally distributing load across the whole year. For globally-scoped yearly work (e.g. every_market_in_world scans), keep the situation-month-1 gate but split the work into market-hub-cached or quarterly passes. Anything that iterates every_owned_location per country per year MUST go through yearly_country_pulse, not the global situation."
-  category: scope
-  scope: global
-  source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:23-71; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:6-10"
-  notes: "Documentation-only (no regex lint). The situation's on_monthly with current_month=1 gate causes ALL countries to recompute simultaneously on Jan 1, producing a yearly frame-time spike. Vanilla yearly_country_pulse staggers per-country work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07) traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations."
-
-- id: estate_building_count_hardcoded_lists
-  pattern: null
-  bad: "Counting estate buildings with hard-coded building type lists or plain num_buildings instead of checking the building's estate owner/type"
-  correction: "Iterate a location with every_buildings_in_location and filter the building scope with estate_type ?= estate_type:<estate>, e.g. estate_type ?= estate_type:nobles_estate."
-  category: scope
-  scope: location
-  source: "reference_game_files/game/in_game/events/DHE/flavor_SWE.txt:1076-1078"
-  notes: "Building scope exposes estate_type; this avoids brittle building-name lists and excludes non-estate buildings while counting per-location estate buildings."
-
-- id: event_missing_outcome_field
-  pattern: ''
-  bad: "country_event / age_event / etc. without an 'outcome = ...' top-level field"
-  correction: "Add 'outcome = neutral' (or good / bad / positive / negative) below 'desc = ...' in every event block. Vanilla 1.2 added a hard validator: events without an outcome emit 'Event #X is missing an outcome' to error.log on game-load. The five accepted values are neutral, good, bad, positive, negative — match the event's actual flavor (use neutral for pure-notification events with no consequential choice)."
-  category: event
-  scope: any
-  source: "reference_game_files/game/in_game/events/ages.txt:7 (ages_of_eu.1 uses 'outcome = neutral'); EU5 1.2 changelog — added in unscoped 'Bug Fixes' / event_database validator pass; engine error: 'Event #X is missing an outcome in events/Y.txt' from event_database.cpp:648"
-  notes: "Pre-1.2 events did not require this field and ran fine without it. 1.2 added the validator that emits the missing-outcome warning per event, per file-load. The warning does NOT block the event from firing in-game, but it floods error.log and indicates a category mismatch. Use 'outcome = neutral' for tooltip-only / show_as_tooltip notification events (matches vanilla age events). Use 'good' / 'bad' / 'positive' / 'negative' when the event has a clear directional flavor for the player. Documentation-only entry (no regex lint) because parsing top-level event blocks reliably is hard, and validate.py would over- or under-match."
-
-- id: goods_demand_block_value_syntax
-  pattern: ''
-  bad: "goods demand entry using block syntax: wine = { value = SOL_wine_demand }"
-  correction: "Direct scalar assignment — no block wrapper: wine = SOL_wine_demand"
-  category: scripted_values
-  scope: pop
-  source: "reference_game_files/game/in_game/common/goods_demand/pop_demands.txt"
-  notes: "pop_demand good entries must be plain key = value pairs (matching vanilla wine = 1 pattern). Block wrapper { value = ... } causes the parser to load only the first entry and drop all subsequent goods plus category. Both quoted strings and block wrappers are broken; direct assignment is the only valid form."
-
-- id: limit_in_scope_transition_block
-  pattern: null
-  bad: "'limit = { ... }' directly inside a scope-transition block such as 'location = { limit = { ... } }', 'country = { limit = { ... } }', etc."
-  correction: "Wrap with 'if = { limit = { ... } }' inside the scope-transition block. 'limit' is only valid directly inside iteration effects (every_*, random_*, ordered_*, while). Inside a scope-hop block it is an 'Unknown effect limit' error."
-  category: scope
-  scope: any
-  source: "src/stable/in_game/common/scripted_effects/z_SOL_scarcity_score.txt:1864 — engine error: 'Unknown effect limit at ... :1864' from jomini_effect.cpp:556"
-  notes: "Scope-transition blocks (location={}, country={}, etc.) are NOT loops — the engine does not recognise 'limit' there. Use 'if = { limit = { ... } }' for conditional execution inside a scope hop."
-
-- id: database_operation_priority_ignored
-  pattern: null
-  bad: "Using a later filename, a zz_ prefix, or a lower playlist position as a universal way to make any INJECT/REPLACE database edit win"
-  correction: "Separate exact-path file overwrites from database object edits. For object edits, compare operation type first (INJECT_OR_CREATE -> REPLACE_OR_CREATE -> TRY_INJECT -> TRY_REPLACE -> INJECT -> REPLACE), then use filename order only when the operation types are identical."
-  category: compatibility
-  scope: top-level database object
-  source: "User-provided EU5 compatibility mechanics note (2026-07-21); docs/technical/EU5_Multi_Mod_Compatibility.md"
-  notes: "Documentation-only (no regex lint). Database entries are batched by operation type before filename ordering. Exact-path collisions use a separate whole-file rule: mod over base/DLC, then the lower mod in the playlist. INJECT is top-level append rather than nested deep merge, and scripted effects/triggers treat INJECT like replacement."
-
-- id: static_modifier_full_replace_for_numeric_delta
-  pattern: null
-  bad: "Copying an entire vanilla static modifier into TRY_REPLACE when the intended change is only an additive numeric adjustment"
-  correction: "Use TRY_INJECT with only the difference between the desired final modifier value and the verified vanilla value; omit game_data and unchanged fields"
-  category: compatibility
-  scope: any
-  source: "reference_mods/3613232232/main_menu/common/static_modifiers/pp_location_modifier_adjustments.txt:439-455; reference_mods/3613232232/in_game/common/static_modifiers/pp_population_growth_and_food_adjustments.txt:174-177"
-  notes: "Static modifier values accumulate across injected entries. Delta-only injection preserves unrelated vanilla fields and allows other mods to contribute their own modifier deltas. Fields that cannot be neutralized additively still require replacement."
-
-- id: price_resource_inject_treated_as_additive
-  pattern: null
-  bad: "Treating a repeated price resource field such as gold as an additive delta, or injecting a negative value to cancel an earlier mod's price injection"
-  correction: "Repeated scalar fields injected into a price object replace the earlier field value. When two mods use the same operation type, use filename order to select the owner; use a verified full replacement only when filename ordering cannot express the intended final object. Never emit a negative cleanup injection."
-  category: compatibility
-  scope: price
-  source: "user-reported EU5 1.3.11 runtime behavior (2026-07-24); src/stable/in_game/common/prices/A_SOL_economy_prices.txt:177-191; reference_mods/3613232232/in_game/common/prices/pp_road_gold_adjustments.txt:2-13"
-  notes: "In the SOL-PP stack, A_SOL_economy_prices.txt loads before pp_road_gold_adjustments.txt within TRY_INJECT, so PP's road gold fields naturally replace SOL's. A later compatibility injection of -10/-25/-100/-400 became authoritative and road costs were clamped to zero. This price behavior differs from additive numeric static modifiers."
-
+  scope: country
+  source: 'data/save_analysis/_all_SP_*_1536_09_21_636b7b0a/metadata.json reports countries_with_sol_variables: 0 while exporting
+    28,573 location records and 16,660 owned locations; the 1386 save at identical location count reports 13,630 non-empty
+    sol_location_raw_demand_scale values. Raw-save grep: 1386 has 84,215 hits for sol_location_demand_class, 1536 has 0'
+  notes: 'Documentation-only (no regex lint). The earlier cone_survey note recorded this save as ''623 no-valid-location countries
+    and 0 scored, likely a data issue'', which reads as a defect to investigate rather than a save that simply predates or
+    excludes the mod. The distinction matters because the two situations call for opposite responses: a parser defect needs
+    fixing, whereas a SOL-less save should be routed to the analyses it can still support. Verified usable for the heterogeneity
+    measurement in tools/eu5_save_parser/heterogeneity_survey.py: it yields 295 countries with 5+ locations and the widest
+    noble-share spread of any save examined (median 7.1x max/min, versus 3.8x in 1337). It is not in that tool''s default
+    save list -- the write-up settled on three timepoints -- but pass it explicitly with --saves 1536_09_21 to include it.
+    The point stands regardless: a SOL-less save is a restricted dataset, not a broken one.'
 - id: goods_upper_group_includes_workers_1_3_11
   pattern: null
-  bad: "Expanding the goods demand group key 'upper' to nobles, clergy, and burghers only"
-  correction: "In EU5 1.3.11, expand 'upper' to nobles, clergy, burghers, laborers, and soldiers for both demand_add and demand_multiply. Peasants and tribesmen remain outside the group."
+  bad: Expanding the goods demand group key 'upper' to nobles, clergy, and burghers only
+  correction: In EU5 1.3.11, expand 'upper' to nobles, clergy, burghers, laborers, and soldiers for both demand_add and demand_multiply.
+    Peasants and tribesmen remain outside the group.
   category: goods
   scope: pop
-  source: "user-reported engine behavior (2026-07-21); tools/sol_demand_simulator/parser.py"
-  notes: "Documentation-only (no regex lint). Any calibrated demand_add injection must be regenerated after applying the expanded group to vanilla demand, otherwise laborer and soldier injections are computed from an understated vanilla net demand."
-
-- id: pop_demand_development_controls_left_active
+  source: user-reported engine behavior (2026-07-21); tools/sol_demand_simulator/parser.py
+  notes: Documentation-only (no regex lint). Any calibrated demand_add injection must be regenerated after applying the expanded
+    group to vanilla demand, otherwise laborer and soldier injections are computed from an understated vanilla net demand.
+- id: gui_diagnostics_must_not_depend_on_optional_solver_caches
   pattern: null
-  bad: "Calibrating pop demand while leaving either NPop.DEVELOPMENT_SCALE_ON_DEMAND or per-good development_threshold values active"
-  correction: "Treat them as two independent controls. Set NPop.DEVELOPMENT_SCALE_ON_DEMAND = 0 to remove the engine-wide multiplier, and fully negate every goods development_threshold with a late INJECT so vanilla + inject = 0. Compatibility goods such as PP victuals need their own negation."
-  category: goods
-  scope: pop
-  source: "reference_game_files/game/loading_screen/common/defines/00_defines.txt:1599; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:292,425,538; reference_game_files/game/in_game/common/goods/02_produced_goods.txt:21,91,143,228,251,345; reference_mods/3613232232/in_game/common/goods/pp_goods_victuals.txt:32"
-  notes: "Documentation-only (no regex lint). DEVELOPMENT_SCALE_ON_DEMAND = 0 removes the universal (1 + development * scale) multiplier but does not clear goods gates. Conversely, negating every development_threshold does not remove the universal multiplier. Both layers must be disabled for development-independent demand calibration."
-
-- id: pop_demand_regional_modifiers_left_active
-  pattern: null
-  bad: "Taking over a compatibility good's pop demand while leaving loaded continent_demand_modifier or sub_continent_demand_modifier blocks active"
-  correction: "Audit every source goods block for continent_demand_modifier and sub_continent_demand_modifier. When the compatibility patch owns final demand, emit late negative INJECT blocks that exactly cancel each recorded key, just like wealth/development gate negations."
-  category: goods
-  scope: pop
-  source: "reference_game_files/game/in_game/common/goods/03_food.txt:100-102; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:298-300; reference_mods/3785316314/in_game/common/goods/soap_goods.txt:159-168,195-198"
-  notes: "Documentation-only (no regex lint). These goods-level regional modifiers change pop demand by continent or sub-continent after the base demand values are loaded. A compatibility target that recalibrates demand_add but leaves them active gets regionally divergent final demand. The Just Goods compatibility generator now audits and negates them for aromatics, palmoil, soap, and whaleoil."
-
-- id: cmm_disabled_setting_left_registered
-  pattern: null
-  bad: "Leaving a disabled feature in the mod's CMM registration effect, or directly mutating CMM internal maps to hide a stale setting from old saves"
-  correction: "Replace the mod registration effect and omit disabled settings and callbacks. CMM's _cmm_register_group clears each group's setting-key list during every registration cycle, so omitted settings disappear from both new games and upgraded saves. Hard-disable the gameplay trigger separately for defense in depth."
-  category: framework
+  bad: Reading estate diagnostics from solver-preparation caches
+  correction: Accumulate five estate funds/baselines in gls_accumulate_panel_stats alongside panel totals and expose gls_sol_*_display.
+  category: gui
   scope: country
-  source: "reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_effects.txt:198-199"
-  notes: "Documentation-only (no regex lint). Localization and unused scripted GUI definitions do not create a visible setting; CMM panel visibility is driven by the rebuilt per-group registration list."
-
-- id: cmm_compat_opt_in_reuses_legacy_setting_id
+  source: scripts/sol_economy_effects_source.py emit_section_50_panel_stats_stable / emit_section_50_panel_stats_standalone
+  notes: Raw-only paths skip preparation for small countries and disabled solvers, leaving absent or stale caches. Reuse the
+    panel traversal. Zero-baseline estates display No consumption, not -100%. Source evidence (2026-10-13).
+- id: gui_country_ranking_reads_backend_slots
   pattern: null
-  bad: "Reusing a formerly enabled or hidden CMM setting ID for a new compatibility opt-in and expecting default_value = 0 to reset upgraded saves"
-  correction: "Register a compatibility-specific setting ID with default_value = 0, sync it to the gameplay alias, and omit the legacy setting ID. Gate the gameplay trigger through that alias and keep the feature off when CMM is absent."
-  category: framework
+  bad: Ranking countries or computing ratios of script values inside a GUI tooltip, or showing other countries' figures through
+    ad-hoc per-country expressions
+  correction: Let the backend rank once and store display-ready slots - global country-scope variables for the top N, country-scope
+    neighbour pointers, rank/count/percentile values. Each GUI row binds datacontext = "[GetGlobalVariable('slot').GetCountry]"
+    (or Player.MakeScope.GetVariable('slot').GetCountry), then reads Country.MakeScope.GetVariable('value').GetValue and
+    highlights the player with ObjectsEqual(Country.Self, Player.Self).
+  category: gui
   scope: country
-  source: "reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_bool_setting_effects.txt:28-35,56-59; reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_alias_effects.txt:99-115"
-  notes: "Documentation-only (no regex lint). CMM applies a setting's default only when its variable-map key is missing. A saved legacy key keeps its old value, so a fresh compatibility ID is the safe way to preserve default-off behavior without directly rewriting CMM internal maps."
-
-- id: scripted_effect_duplicate_without_replace
+  source: reference_official_defines/docs/data_types_script.txt:28,2346,3292; reference_game_files/game/in_game/gui/panels/situation/hussite_wars.gui:112;
+    reference_game_files/game/in_game/gui/attribute_columns/country.gui:1401; reference_game_files/game/in_game/gui/diplomacy_macrobuilder_lateralview.gui:1462
+  notes: Source-verified binding chain, offline-rendered in ai_gui_assessment/prototypes/living_standard_hud (2026-10-16);
+    no in-game hover confirmation yet. A country-count distribution bar can use integer rank/count stretch weights.
+- id: sol_hud_income_requires_complete_same_month_history
   pattern: null
-  bad: "Defining an existing scripted effect again in a later or zz_-prefixed file without a REPLACE operation"
-  correction: "Emit REPLACE:<effect_name> for each scripted effect whose body must change. Prefer outputting only changed effects instead of copying the whole source file."
-  category: compatibility
-  scope: scripted_effect
-  source: "runtime error.log (2026-07-21): 'Duplicated key sol_refresh_market_pop_demand_maps will not be created from file: common/scripted_effects/zz_A_SOL_economy_effects.txt'"
-  notes: "A later filename does not turn a plain duplicate definition into an override. The engine keeps the original effect and rejects the duplicate, so compatibility-only branches never run."
-
-- id: inject_duplicate_nested_trigger_section
+  bad: Treating a calendar-year change or the latest monthly PCI as a full-year comparison, withholding current income/ranking until YoY exists, or rescanning owned locations for the HUD
+  correction: Accumulate cached per-estate net income in the solver's existing location pass. Annualize by twelve per thousand people,
+    and publish current PCI on every solve, starting with the first sample. Retain same-month samples with year/day guards only for
+    previous/YoY/trend publication. Clear unavailable comparisons instead of retaining stale YoY; show a no-prior-year-data state.
+    Rank current country income caches annually and on existing global refreshes without requiring YoY or any location traversal.
+  category: gui
+  scope: country
+  source: scripts/sol_lshud_income_source.py; scripts/sol_lshud_ranking_source.py; scripts/test_sol_lshud_income.py
+  notes: User-approved availability correction and offline execution evidence (2026-10-18). An April 1337 start can participate in January
+    1338 rankings before April's first valid YoY. Total net income is the sum of individually nonnegative cached
+    estate incomes (sol_location_total_income), preserving the solver's maintenance treatment rather than the older cross-estate display sum.
+- id: gui_fixed_group_row_overflows_with_compat_goods
   pattern: null
-  bad: "TRY_INJECT on an existing database object with a second nested trigger section such as allow = { ... }"
-  correction: "Copy the verified complete source object and use REPLACE when nested logic must change; preserve every required sibling field from the source."
-  category: compatibility
-  scope: top-level database object
-  source: "runtime error.log (2026-07-21): 'Trigger section already read earlier: allow' in common/cabinet_actions/A_SOL_war_cabinet_actions.txt"
-  notes: "Database injection appends top-level content and does not deep-merge nested trigger blocks. A duplicate singleton section is rejected by that database parser."
-
-- id: simple_assign_trigger_not_equal_operator
-  pattern: '\bbuilding_category\s*!='
-  bad: "Using != with the simple-assign building_category trigger"
-  correction: "Wrap the equality trigger in NOT, for example: NOT = { building_category = government_category }"
-  category: trigger
+  bad: Putting an arbitrarily large compatibility goods group inside one fixed-width hbox
+  correction: Budget labels, icons and every gap against the row width, then split members into explicit continuation rows
+    in the shared generator. Check descendant positions, not only the parent's measured size. SOL's 216px row uses an 80px
+    label, 20px icons and 2px gaps; six icons fit.
+  category: gui
   scope: any
-  source: "reference_mods/3735059838/in_game/common/scripted_effects/epbm_calculate.txt:32; runtime error.log (2026-07-22): 'building_category trigger [ Trigger is simple assign, but used a symbol other than = in the middle ]'"
-  notes: "Simple-assign triggers accept only = in the middle. Boolean negation belongs in a NOT block; != makes the scripted effect fail to compile."
-
-- id: removed_setting_leaves_unset_variable_reads
+  source: src/stable/in_game/gui/SOL_living_standard_kit.gui:299; scripts/sol_goods_ui.py render_group_columns; tmp/check_sol_ui_runtime.py
+  notes: 'Static renderer check (2026-10-13): JTG''s 26 ungrouped goods escaped the tooltip despite a nominal 216px row. Explicit
+    chunks preserve all goods and grouping; no new in-game measurement.'
+- id: gui_goods_tooltip_market_extension
   pattern: null
-  bad: "Removing a CMM setting and its active alias setter while leaving script values, triggers, or scripted GUIs that read the alias variable"
-  correction: "Remove or exact-path override every residual reader; retain variable-free constant fallbacks for referenced script values and only the scripted GUI callbacks that remain registered"
-  category: framework
-  scope: global
-  source: "runtime error.log (2026-07-22): Variable 'sol_cts' is used but is never set. Setting it in an unused scripted trigger or effect does not count"
-  notes: "The engine's variable analysis ignores setters that only occur in unreachable or unused scripted objects. Dummy setters do not cleanly retire a setting; remove the readers instead."
-
-- id: scripted_trigger_called_from_wrong_entry_scope
+  bad: Treating SOL basket-cell hover text as the actual goods tooltip redesign, or reading a Market in the shared goods_details
+    template
+  correction: Goods_tooltip, Goods_Cards_tooltip and SpecificGoodsMarket_tooltip all inline goods_details. Put static group
+    membership and price preferences there; expose a slot whose market-specific override is supplied only at SpecificGoodsMarket_tooltip,
+    where Market.GetMarketEntry(Goods.Self) already supplies the market entry. Preserve the full vanilla file when overriding
+    its path.
+  category: gui
+  scope: any
+  source: reference_game_files/game/main_menu/gui/shared/goods_details.gui:28; reference_game_files/game/in_game/gui/shared/production_tooltips.gui:458,495;
+    reference_game_files/game/in_game/gui/shared/market_tooltips.gui:1515-1523; reference_official_defines/docs/data_types_uncategorized.txt:76572,98436
+  notes: Source evidence, 2026-10-15. Sheet C rows include the current good and every member of every matching group. Seven
+    static preferences follow strict runtime thresholds; only a market tooltip adds the live price/base-price ratio, with
+    a protected denominator. Bilingual previews do not establish in-game hover behavior.
+- id: gui_missing_market_weight_is_not_neutral
   pattern: null
-  bad: "Calling a scripted trigger from a scope it does not support because one of its internal scope links happens to reach the desired object"
-  correction: "Verify the scripted trigger's entry scope from its complete body. Call it only from that scope, or replace it with equivalent triggers valid in the current scope"
+  bad: Displaying a missing market price-weight entry as the neutral weight 1.00
+  correction: Check Scope.IsSet and select pending-data localization when the entry is absent. Do not imply a missing cache
+    is neutral.
+  category: gui
+  scope: location
+  source: reference_official_defines/docs/data_types_script.txt:34,3427; reference_game_files/game/main_menu/gui/shared/goods_details.gui:135
+  notes: Official API/source evidence and offline hover checks, 2026-10-13; engine hover remains unverified.
+- id: gui_price_tier_selection_from_rounded_ratio
+  pattern: null
+  bad: Highlighting a price preference tier from the displayed/rounded ratio, or putting market-dependent selection in the
+    generic goods legend
+  correction: Use a market-only price legend and select exactly one tier by comparing actual price to base price multiplied
+    by each strict/inclusive threshold. Draw a one-unit gold outline and faint fill as a sized, conditional ignore-layout
+    child before the text; keep generic/card legends static and hide selection for zero base prices, invalid markets and ungrouped
+    goods.
+  category: gui
+  scope: any
+  source: reference_game_files/game/main_menu/gui/shared/window_components.gui:26; reference_game_files/game/main_menu/gui/shared/building_tooltips.gui:859;
+    reference_game_files/game/in_game/gui/shared/production_method_details.gui:160; scripts/sol_substitution.py:29-36; scripts/test_sol_substitution_ui.py:test_current_price_tier_highlight_boundaries_and_pixels
+  notes: Vanilla source and offline expression/pixel checks, 2026-10-15. Market ratios are display values, not the adopted
+    country multiplier; current-tier selection matches the runtime price comparisons without dividing first. New in-game confirmation
+    pending.
+- id: gui_standalone_target_missing_shared_types
+  pattern: null
+  bad: Generating standalone GUI instances while keeping their shared type definitions only in stable
+  correction: Include the shared kit in the standalone generator outputs and --check contract. Test target dependencies using
+    the game and selected target only. A renderer loaded with stable can hide missing standalone types.
+  category: gui
+  scope: any
+  source: build.bat deploy_target; scripts/gen_sol_ls_gui.py _outputs; src/sol_standalone/.metadata/metadata.json
+  notes: 'Source evidence (2026-10-13): build.bat mirrors each target''s own directory, and standalone does not depend on
+    stable. The generated standalone kit must match the stable source.'
+- id: gui_substitution_primary_group_hides_memberships
+  pattern: null
+  bad: Using a unique good's primary group to populate labelled substitution-group rows
+  correction: Show every membership from goods_weights.csv in labelled rows; reserve primary-group ordering for unique lists.
+    Keep spending deduplicated.
+  category: gui
+  scope: any
+  source: data/goods_weights.csv; scripts/sol_goods_order.py:group_rows; scripts/test_sol_substitution_ui.py:test_all_memberships_and_compat_extras
+  notes: 'Data-backed check, 2026-10-13: 56 unique goods have 67 memberships.'
+- id: gui_weight_is_not_a_percentage
+  pattern: null
+  bad: Formatting raw SOL tax/power weights as percentages or deriving irregular names by plural concatenation
+  correction: Map existing names explicitly and divide effective estate weights by local_total_tax_share before percent formatting.
+    Nobles/commoners use effective weights after the transfer.
+  category: gui
+  scope: location
+  source: src/stable/in_game/common/script_values/SOL_pop_values.txt:2-71; docs/error_log/error.log (missing local_commoners_tax_share)
+  notes: Screenshot displayed thousands of percent; weights are amounts, not fractions. The commoner key is singular. Mocks
+    now carry raw weights and report missing script values (2026-10-13).
+- id: local_effect_min_is_not_value_floor
+  pattern: change_local_variable\s*=\s*\{[^{}]*\bmin\s*=\s*0(?:\s|\})
+  bad: Using change_local_variable min=0 as a nonnegative lower-bound clamp
+  correction: Use set_local_variable with value={ value=... min=0 } to express the lower bound. Do not copy value-block clamp
+    semantics into the change-local effect or its offline interpreter.
   category: scope
   scope: any
-  source: "reference_game_files/game/in_game/common/scripted_triggers/pop_triggers.txt:28-39; runtime error.log (2026-07-22): owner trigger wrong scope country from is_gaelic_clans called by epbm_calculate"
-  notes: "is_gaelic_clans starts with pop-only culture and foreign-building checks and then follows owner to country. Calling it directly from country makes its owner link invalid even though the nested privilege checks are country-scoped."
-
-- id: gui_compatibility_merge_uses_stale_upstream_base
-  pattern: null
-  bad: "Building a final exact-path GUI compatibility override from vanilla or an earlier dependency when a later UI overhaul already owns and merges that file, then deleting the later file's optional cm_* references because the source mod is not a formal dependency"
-  correction: "Audit same-relative-path files and dependency metadata, choose the final downstream owner's GUI file as the merge base, and add the third mod's controls to that unified file. Keep valid references to optional definitions when the integration is intentionally load-order based; classify missing cm_* definitions as expected only when Construction Manager is not enabled. Do not turn an exact-path merge into a self-contained rewrite unless the feature is explicitly being removed."
-  category: compatibility
-  scope: gui
-  source: "reference_mods/3812518640/.metadata/metadata.json; reference_mods/3812518640/in_game/gui/location_window.gui:2256-2260,7884-7895,8069-8094"
-  notes: "Glorp UI and Construction Manager already conflict on the exact path in_game/gui/location_window.gui. Glorp's file integrates CM controls, so the correct SOL merge base is the complete Glorp file with the SOL button inserted. SOL does not declare either Workshop mod in metadata. With SOL alone, cm_* lookup errors are expected and do not prevent the Glorp/SOL layout from displaying; with all three mods, Construction Manager supplies the definitions and the errors disappear."
-
+  source: '2026-10-15 HUN debug saves 1337.5.15/6.15/7.15: 4311 reason6 samples; country_effects.txt:1660-1665; docs/technical/SOL_Three_Save_Performance_Fix_20261015.md'
+  notes: Every recorded sample has new_total=actual_own, hence external baseline must be1, but the old local-effect min produced0.
+    The offline fixture incorrectly modeled this as max(value,0), concealing mass monthly AI re-solving. Only this local-effect
+    behavior is established by saves; do not reverse persistent-variable or script-value clamp rules globally.
 - id: monthly_savings_pressure_recomputed_for_ai
   pattern: null
-  bad: "Calling gls_compute_savings_pressure unconditionally for every country (including AI) from the global situation's on_monthly, and again calling gls_compute_panel_display (which itself just re-runs gls_compute_savings_pressure) from gls_full_refresh_country right after sol_update_local_pop_demand_modifiers already refreshed it"
-  correction: "Gate gls_compute_savings_pressure in the situation on_monthly behind is_human = yes (AI never reads gls_savings_pressure_adjustment for panel display; the value that actually affects gameplay is recomputed monthly per-country by sol_update_local_pop_demand_modifiers via monthly_country_pulse). Drop the gls_compute_panel_display call from gls_full_refresh_country since sol_update_local_pop_demand_modifiers in the same effect chain already refreshed the identical cache."
+  bad: Calling gls_compute_savings_pressure unconditionally for every country (including AI) from the global situation's on_monthly,
+    and again calling gls_compute_panel_display (which itself just re-runs gls_compute_savings_pressure) from gls_full_refresh_country
+    right after sol_update_local_pop_demand_modifiers already refreshed it
+  correction: Gate gls_compute_savings_pressure in the situation on_monthly behind is_human = yes (AI never reads gls_savings_pressure_adjustment
+    for panel display; the value that actually affects gameplay is recomputed monthly per-country by sol_update_local_pop_demand_modifiers
+    via monthly_country_pulse). Drop the gls_compute_panel_display call from gls_full_refresh_country since sol_update_local_pop_demand_modifiers
+    in the same effect chain already refreshed the identical cache.
   category: scope
   scope: country
-  source: "src/stable/in_game/common/situations/SOL_economy_situation.txt:22-27; src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:2762-2779,2787-2790,3525-3532 (mirrored in src/sol_standalone)"
-  notes: "Documentation-only (no regex lint). gls_compute_savings_pressure only writes owner.var:gls_savings_pressure_adjustment, which sol_compute_location_pop_demand reads for the applied SOL modifier. For AI countries that cache is overwritten every month anyway by their own monthly_country_pulse tick before it can be consumed for display, so the situation's every-country every-month call was pure O(N_countries) waste. Same redundancy pattern as yearly_january_pulse_spike but on the monthly cadence; found during a 2026-07-28 review of monthly-tick computation cost."
-
-- id: pop_needs_income_scale_left_vanilla
+  source: src/stable/in_game/common/situations/SOL_economy_situation.txt:22-27; src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt:2762-2779,2787-2790,3525-3532
+    (mirrored in src/sol_standalone)
+  notes: Documentation-only (no regex lint). gls_compute_savings_pressure only writes owner.var:gls_savings_pressure_adjustment,
+    which sol_compute_location_pop_demand reads for the applied SOL modifier. For AI countries that cache is overwritten every
+    month anyway by their own monthly_country_pulse tick before it can be consumed for display, so the situation's every-country
+    every-month call was pure O(N_countries) waste. Same redundancy pattern as yearly_january_pulse_spike but on the monthly
+    cadence; found during a 2026-07-28 review of monthly-tick computation cost.
+- id: pop_demand_development_controls_left_active
   pattern: null
-  bad: "Calibrating strata income and pop demand while leaving NPop.POP_NEEDS_INCOME_SCALE at the vanilla value of 1.33"
-  correction: "Set NPop.POP_NEEDS_INCOME_SCALE = 1 in every base SOL deploy target so pop-needs expenditure uses the nominal cost of purchased goods"
+  bad: Calibrating pop demand while leaving either NPop.DEVELOPMENT_SCALE_ON_DEMAND or per-good development_threshold values
+    active
+  correction: Treat them as two independent controls. Set NPop.DEVELOPMENT_SCALE_ON_DEMAND = 0 to remove the engine-wide multiplier,
+    and fully negate every goods development_threshold with a late INJECT so vanilla + inject = 0. Compatibility goods such
+    as PP victuals need their own negation.
   category: goods
   scope: pop
-  source: "reference_game_files/game/loading_screen/common/defines/00_defines.txt:1600; user-reported in-game testing (2026-07-26)"
-  notes: "The vanilla 1.33 value makes pops pay 33% above nominal goods cost. Leaving it active breaks SOL's income-closed strata balance independently of demand quantities and development controls."
-
-- id: cmf_log_entry_overloaded
+  source: reference_game_files/game/loading_screen/common/defines/00_defines.txt:1599; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:292,425,538;
+    reference_game_files/game/in_game/common/goods/02_produced_goods.txt:21,91,143,228,251,345; reference_mods/3613232232/in_game/common/goods/pp_goods_victuals.txt:32
+  notes: Documentation-only (no regex lint). DEVELOPMENT_SCALE_ON_DEMAND = 0 removes the universal (1 + development * scale)
+    multiplier but does not clear goods gates. Conversely, negating every development_threshold does not remove the universal
+    multiplier. Both layers must be disabled for development-independent demand calibration.
+- id: pop_demand_regional_modifiers_left_active
   pattern: null
-  bad: "Packing many unrelated diagnostics or more than four dynamic values into one CMF log entry"
-  correction: "Keep each CMF entry to one diagnostic concept and at most four dynamic values. Prefer compact labels; split an essential wide vector into short rows, or omit secondary fields rather than emitting an unreadable line."
-  category: framework
-  scope: any
-  source: "user-reported in-game CMF log readability feedback (2026-08-07)"
-  notes: "CMF renders the actor and localized action text in one log row. Dense profile/equation entries become difficult to read or copy even when the total remains below the 200-entry cap."
-
-- id: ordered_scope_without_explicit_max
-  pattern: null
-  bad: "Omitting max from an ordered_* scope while expecting it to iterate every matching object"
-  correction: "Set an explicit sufficient max for full ordered traversal, or a verified dynamic bound. Reserve max = 1 or the default single result for deliberate best-candidate selection."
-  category: scope
-  scope: any
-  source: "user-reported in-game SOL classification log (2026-08-07); scripts/sol_economy_effects_source.py; reference_game_files/game/in_game/events/character/consort_events.txt:645-652"
-  notes: "In runtime testing, ordered_owned_location without max scored 189 valid locations in the first pass but assigned only the first location in the ordered pass. An explicit max = 100000 makes the classification pass traverse all practical country location counts."
-
-- id: variable_map_value_inline_math_block
-  pattern: 'add_to_(?:global_)?variable_map\s*=\s*\{[^\n]*\bvalue\s*=\s*\{'
-  bad: "Passing an inline arithmetic block such as value = { value = var:X divide = var:Y } to add_to_global_variable_map"
-  correction: "Evaluate arithmetic with set_variable first, pass the resulting scalar as value = var:temporary_value, then remove the temporary variable after the map write."
-  category: scope
-  scope: any
-  source: "runtime error.log (2026-08-07): Failed to find event target link '{' and Failed to read 'divide'/'min' for add_to_global_variable_map; reference_mods/3739393770/in_game/common/scripted_effects/dmsd_update_display.txt:30-33"
-  notes: "The variable-map effect parses value as a direct scalar or event target, not a script-math block. The invalid SOL CMF writes corrupted class raw-average/share diagnostics without changing classification or solver gameplay state."
-
-- id: value_expression_clamp_direction_reversed
-  pattern: 'value\s*=\s*\{[^\n}]*\bmax\s*=\s*0(?:\s|\})'
-  bad: "Using max = 0 when a value expression must be clamped to a nonnegative lower bound"
-  correction: "Use min = 0 for a lower bound and max = <positive limit> for an upper bound; verify both sides when writing a bounded value expression."
-  category: scope
-  scope: any
-  source: "reference_game_files/game/in_game/common/auto_modifiers/country.txt:330-335"
-  notes: "EU5 value expressions apply min as the lower clamp and max as the upper clamp. Reversing them can silently zero positive solver factors; the SOL exact-derived minimax candidate exposed this at runtime on 2026-08-08."
-
-- id: cmm_default_off_alias_initialized
-  bad: "Initializing a default-OFF CMM bool alias in the mod's on_game_start defaults effect, e.g. set_global_variable = { name = sol_x_enabled value = no }"
-  correction: "Omit default-OFF aliases from the init effect entirely. cmm_sync_bool_alias sets the global only when the toggle is ON and calls remove_global_variable when OFF, so has_global_variable must stay false until CMM enables it. Also invert the CMM-absent fallback in the matching sol_*_is_on trigger: default-ON toggles use OR = { NOT = { has_global_variable_map = cmm } ... }, while default-OFF toggles must NOT include that escape or they read as enabled without CMM."
-  category: framework
-  scope: global
-  source: "reference_mods/3692202776/in_game/common/scripted_effects/cmm_core_alias_effects.txt:105-125; reference_mods/3662193478/in_game/common/scripted_effects/fum_cmm_effects.txt:8-15 (FUM never initializes its default_value = 0 aliases)"
-  notes: "Documentation-only (no regex lint) because a legitimate default-ON init line is textually identical apart from the value. set_global_variable with value = no still creates the key, so has_global_variable returns true and a default-OFF feature runs from turn one. Any setting registered with default_value = 0 must appear in exactly four places: cmm_register_global_bool_setting, cmm_sync_bool_alias, the cmf_on_callback switch, and a <mod_id>__<setting_id>_on_changed scripted GUI when cmm_add_scripted_gui is called — but never in the init defaults."
-
-- id: country_solver_infeasibility_misdiagnosis
-  bad: "Diagnosing a country-solver negative_factor or a class-wide -100% local_pop_demand by inspecting condition number, classifier churn, coefficient magnitude, or by assuming a near-zero coefficient was a clamped floating-point artifact"
-  correction: "Run tools/eu5_save_parser/cone_feasibility.py FIRST. Exact-solve feasibility means target in cone(class columns); because every class column sums nonnegative location vectors, cone(any 4-way partition) is contained in cone(all owned locations). If the all-location residual exceeds ~0.01 the target is unreachable and NO classifier change, class count, capacity rule, or conditioning fix can help - only relaxing the target or accepting an approximation. See docs/technical/SOL_Country_Level_Strata_Demand_Model.md section 3.9."
-  category: scope
-  scope: country
-  source: "HUN five-save series 2026-08-11 (SP_HUN_1337_10_02 .. 1338_02_02, playthrough d95e1b3a): all-location cone residual 0.0465-0.1057, 8-43 locations require negative factors; docs/technical/SOL_Country_Level_Strata_Demand_Model.md section 3.9"
-  notes: "Documentation-only (no regex lint). Linear independence is NOT the feasibility criterion: det(M) != 0 only gives uniqueness, and measured HUN condition numbers were a healthy 55.6-96.0 while the exact solve still failed. A zero coefficient returned by a nonnegative approximation is a legitimate boundary optimum, not a clamped artifact, so tightening the gate to reject delta < 0 does not stop -100% (it cannot reject = 0). Four wrong attributions were ruled out by data: silent zero-clamping, ill-conditioning, the yearly unit-spending refresh as switch trigger (1337.10/11/12 had frozen unit spending yet flipped infeasible->feasible), and classifier churn as an independent cause (1338 data under 1337 classes still gave Class 4 = -1.089). The real conflict is structural: nobles/clergy need scaling up while lower needs scaling down ~41%, but their per-location spending is coupled (nobles-vs-lower share correlation 0.29-0.47), so no nonnegative factor field separates them."
-
-- id: capacity_floor_starves_zero_pressure_classes
-  bad: "Reading a country-solver class coefficient in the tens or hundreds (e.g. Class 1 = 105.98) as a data error or numerical blow-up"
-  correction: "Expect it. Capacity targets are baseline_total * capacity_floor + baseline_total * negative_pool * pressure_share, and pressure is clipped at zero, so a stratum whose baseline is BELOW target (needs scaling up) contributes zero pressure and its class receives only the 1% floor. That class column then carries ~1-3% of the mass of the dominant class, and ||W^-1 row|| reaches 96-404, so a normal 0.01 monthly move in a compression ratio swings that coefficient by 1-4 units. Switching capacity to abs(baseline - target) cuts median amplification from 120.6 to 55.9 but does NOT improve feasibility and shrinks the surviving Class 4 margin from 0.164 to 0.033."
-  category: scope
-  scope: country
-  source: "HUN five-save series 2026-08-11: Class 1 column mass 1.98-5.50 vs Class 4 156-177; capacity targets C1/C2 ~1.9-2.3 vs C4 140-193 with capacity_floor = 0.01, negative_pool = 0.96"
-  notes: "Documentation-only (no regex lint). Amplification and feasibility are independent problems: amplification comes from unequal column mass (the 1% anchor), feasibility comes from cone containment. Raising capacity_floor trades jitter for margin in both directions, so it is a tuning decision rather than a fix. HUN is especially exposed because nobles are 68% of national spending yet carry zero pressure, leaving the class that represents them with almost no matrix mass."
-
-- id: reduced_frequency_pulse_drops_modifier_between_solves
-  bad: "Implementing a 'reduce calculation frequency' toggle by moving both the solve AND the add_location_modifier call to yearly_country_pulse with years = 1, so the modifier's lifetime is what carries the value between solves"
-  correction: "Split the effect: keep applying the modifier every month from the cached per-location size variable (months = 1, mode = replace) and move only the expensive solve to yearly_country_pulse. A stale coefficient re-applied monthly is acceptable; a lapsed modifier is not."
-  category: scope
-  scope: country
-  source: "src/stable/in_game/common/on_action/SOL_economy_on_actions.txt; gls_full_refresh_country in scripts/sol_economy_effects_source.py calls the monthly updater unconditionally on every game start and save load"
-  notes: "Documentation-only (no regex lint). Relying on a years = 1 modifier to bridge yearly solves looks self-sustaining in steady state but breaks at every entry point that is not the yearly pulse: game start, save load, player-to-AI handover, a newly formed country, and switching the toggle on mid-game all write (or leave) a months = 1 modifier that expires long before the country's own anniversary date arrives. The country then runs on the bare demand_add baseline for up to 11 months with no error and no log line. Applying monthly from the cache also makes the toggle safe to flip at any time, and costs only the every_owned_location write the default configuration was already paying."
-
-- id: retired_solver_strategy_described_from_stale_docs
-  bad: "Describing or reasoning about the country demand solver's approximation strategy from BRIEF.md / PROJECT_OVERVIEW.md prose (e.g. 'player four-strategy L2 path', 'AI proportional_fast', 'minimax vertices', 'active-set candidates') without grepping the generated solver first"
-  correction: "Grep the generated file before describing runtime behaviour: 'grep -c <effect_name> src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt'. A count of 1 means definition-only (dead code, never called); 0 means the effect is not rendered at all and exists only in the generator's _SOLVER_EFFECTS name list used for file routing. As of 2026-08-13 only two strategies are live: id 7 exact-direct and id 8 the 209-case vertex sweep, with id 0 for raw_fallback. The objective is scaled L1 (mean of the four per-row relative residuals) with scaled L-infinity as a 1% tie-break, under a hard no-worsen constraint against raw -- NOT an L2 least-squares fit."
-  category: scope
-  scope: country
-  source: "src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt lines 528-575 (solve_approximation) and 577-670 (sol_vertex_row_metric / sol_vertex_metrics / sol_vertex_consider); verified counts on 2026-08-13: run_fast_proportional 0, minimax_vertex_enumeration 0, approx_candidate_* 0, approx_assess 1, select_approx_strategy 1, approx_prepare_strategy 1, solve_reduced_3 1, solve_reduced_4 1, vertex_case_* 209"
-  notes: "Documentation-only (no regex lint). BRIEF.md was self-contradictory: its Core Features paragraph correctly stated the L2 variants and minimax_ratio were retired, while the SOL System Architecture and runtime-cost paragraphs further down still described the retired L2/proportional_fast path and strategy ids 1-6. Reading the latter produced a technical write-up describing three algorithms that do not exist in the shipped mod. Two further traps: (a) the offline tool tools/eu5_save_parser/demand_analysis.py DOES still implement balanced_l2/improvement_l2/target_l2/absolute_l2/minimax_ratio/proportional_fast as comparison baselines, so finding them there is not evidence they run in-game; (b) A_SOL_economy_effects.txt still carries a CMF log branch for strategy id 6 (proportional fast) that no code path can now produce. Prefer the generated .txt as ground truth over any prose, including this file."
-
-- id: empty_sol_caches_mistaken_for_parser_failure
-  bad: "Seeing every sol_location_* column empty in an exported save and concluding the parser broke, the export is corrupt, or the save is unusable for analysis"
-  correction: "Check metadata.json's countries_with_sol_variables field first. A value of 0 means the save itself carries no SOL runtime state -- the mod was absent or disabled when it was written -- so no amount of re-parsing will produce those columns. Confirm against the raw save with 'grep -c sol_location_demand_class <save>.eu5': a working save returns tens of thousands of hits, an unusable one returns 0. Crucially, such a save is NOT useless: every engine-native column still exports (population per stratum, shares, owner, market, rank, development, control), which is enough for population-structure and heterogeneity analysis. Only SOL-derived quantities are lost -- per-stratum base spending B_s(l), net income I_s(l), and the raw coefficient m_raw(l) -- which means feasibility and improvement analysis is impossible because the target vector t cannot be reconstructed."
-  category: scope
-  scope: country
-  source: "data/save_analysis/_all_SP_*_1536_09_21_636b7b0a/metadata.json reports countries_with_sol_variables: 0 while exporting 28,573 location records and 16,660 owned locations; the 1386 save at identical location count reports 13,630 non-empty sol_location_raw_demand_scale values. Raw-save grep: 1386 has 84,215 hits for sol_location_demand_class, 1536 has 0"
-  notes: "Documentation-only (no regex lint). The earlier cone_survey note recorded this save as '623 no-valid-location countries and 0 scored, likely a data issue', which reads as a defect to investigate rather than a save that simply predates or excludes the mod. The distinction matters because the two situations call for opposite responses: a parser defect needs fixing, whereas a SOL-less save should be routed to the analyses it can still support. Verified usable for the heterogeneity measurement in tools/eu5_save_parser/heterogeneity_survey.py: it yields 295 countries with 5+ locations and the widest noble-share spread of any save examined (median 7.1x max/min, versus 3.8x in 1337). It is not in that tool's default save list -- the write-up settled on three timepoints -- but pass it explicitly with --saves 1536_09_21 to include it. The point stands regardless: a SOL-less save is a restricted dataset, not a broken one."
-
-- id: solver_entry_guards_omitted_from_description
-  bad: "Describing the country demand solver's control flow by reading only the solver file (B_SOL_country_demand_solver.txt) or only the effect that performs the work, and presenting the raw-error prefilter as if it were the first gate"
-  correction: "Read the dispatching effect sol_solve_country_pop_demand in A_SOL_economy_effects.txt top to bottom before describing when the solver runs. Its if/else_if/else chain applies three separate gates in order, and two of them live in the aggregation file rather than the solver: (1) num_locations < 5 routes straight to sol_solve_country_pop_demand_raw_only, skipping classification entirely; (2) the CMF per-side toggle check requires at least one of that side's exact/approx toggles to be on, else raw_only; (3) only then does the solver body run, where sol_country_demand_gate_possible checks whether any raw row exceeds tolerance. Grep for 'num_locations' in the aggregation file to find size gates -- they will never appear in the solver file."
-  category: scope
-  scope: country
-  source: "src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt lines 3598-3639 (sol_solve_country_pop_demand); the size gate's rationale is in the comment at 3600-3607: pigeonhole caps the matrix at three non-empty columns below four locations, median scaled L1 for a single-location country moves only 0.329 -> 0.310 versus 0.371 -> 0.222 from three locations up, and skipping them drops 70% of the exact-failed country count for 17% of the owned-location traversal"
-  notes: "Documentation-only (no regex lint). The size prefilter is deliberately placed before everything else because num_locations is known up front while the non-empty class count only exists after the confidence-ordered classification pass has already been paid for. It is easy to miss when tracing the solver because it sits in the caller, not in the solver file, and because the solver's own gate_possible variable looks like the entry condition. Anything describing solver cost, coverage, or the size-vs-feasibility relationship is wrong without it: it is also the direct engineering consequence of the 1-9 location bucket's 10.1% feasibility rate, so a write-up citing that bucket while omitting the gate leaves the reader without the reason it exists."
-
-- id: conditional_estate_enablement_misattributed_to_country_setup
-  bad: "Looking for an add_estate effect, government reform, or starting privilege to explain how a population-backed conditional estate such as dhimmi_estate is enabled"
-  correction: "Trace the pop type's ordered estate mappings and then the referenced pop-scoped trigger. Vanilla regular pop types map qualifying pops to dhimmi_estate with 'dhimmi_estate = { is_dhimmi = yes }'; is_dhimmi requires a protected non-Muslim religion group, a Muslim owner, and no link to a foreign building. Starting Muslim templates merely grant initial Dhimmi privileges."
-  category: scope
+  bad: Taking over a compatibility good's pop demand while leaving loaded continent_demand_modifier or sub_continent_demand_modifier
+    blocks active
+  correction: Audit every source goods block for continent_demand_modifier and sub_continent_demand_modifier. When the compatibility
+    patch owns final demand, emit late negative INJECT blocks that exactly cancel each recorded key, just like wealth/development
+    gate negations.
+  category: goods
   scope: pop
-  source: "reference_game_files/game/in_game/common/pop_types/00_default.txt:14,48,76,123,153,187,232; reference_game_files/game/in_game/common/scripted_triggers/pop_triggers.txt:1-15; reference_game_files/game/main_menu/setup/templates/muslim_monarchy.txt:27-52"
-  notes: "Documentation-only (no regex lint). Estate type definition, conditional pop membership, country_has_estate, and granted privileges are separate layers. The Dhimmi mapping covers nobles, clergy, burghers, laborers, soldiers, peasants, and slaves, but not tribesmen."
-
-- id: gui_legacy_header_action_copied_into_1_4
-  pattern: 'header_action_button_left(?!_uber)'
-  bad: "Copying a 1.3 location-window action button into EU5 1.4 with header_action_button_left and actor/parameter/left_*_action fields"
-  correction: "Use the verified 1.4 header_action_button_left_uber type, PdxGuiWidget.IsUberButtonVisible/Enabled, and a scripted_action_tooltip block. Keep the conversion in the generator and assert the expected number of migrated buttons."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/gui/shared/buttons.gui; reference_game_files/game/in_game/gui/location_window.gui:1038-1060,3762-3790,4774-4915"
-  notes: "The 1.4 type is not a rename-only compatibility alias: the old action properties were removed with the type. Stable SOL and M&T location-window generators now apply the migration to their third-party snapshots."
-
-- id: gui_old_road_builder_function_in_1_4
-  pattern: '(?-i:ShowRoadbuilder)\('
-  bad: "Copying a pre-1.4 location-window road button with ShowRoadbuilder into a 1.4 GUI"
-  correction: "Call ShowRoadBuilder with a capital B, and make the source generator migrate the third-party snapshot with an exact replacement-count check."
-  category: gui
-  scope: any
-  source: "reference_official_defines/changes_data_types.md:338,592; reference_official_defines/docs/data_types_uncategorized.txt:10321; reference_game_files/game/in_game/gui/location_window.gui:5955"
-  notes: "The official 1.4 data-type diff explicitly removes ShowRoadbuilder and adds ShowRoadBuilder. The old call survived the earlier header-button migration in both stable Glorp and M&T location windows; standalone already used the current spelling."
-
-- id: gui_migration_rejects_current_upstream_snapshot
+  source: reference_game_files/game/in_game/common/goods/03_food.txt:100-102; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:298-300;
+    reference_mods/3785316314/in_game/common/goods/soap_goods.txt:159-168,195-198
+  notes: Documentation-only (no regex lint). These goods-level regional modifiers change pop demand by continent or sub-continent
+    after the base demand values are loaded. A compatibility target that recalibrates demand_add but leaves them active gets
+    regionally divergent final demand. The Just Goods compatibility generator now audits and negates them for aromatics, palmoil,
+    soap, and whaleoil.
+- id: pop_needs_income_scale_left_vanilla
   pattern: null
-  bad: "Requiring every upstream GUI snapshot to contain the legacy 1.3 action-button count, so a current snapshot that is already migrated to 1.4 fails before the SOL integration button is inserted"
-  correction: "Make the shared GUI migration idempotent: migrate legacy markers when present, accept a fully migrated 1.4 snapshot after checking that removed APIs are absent, and reject mixed snapshots that still contain removed calls."
-  category: gui
-  scope: any
-  source: "reference_mods/3812518640/in_game/gui/location_window.gui; scripts/gui_14_migration.py:29-42,169-180"
-  notes: "The current Glorp UI `glorp.ui.rio` snapshot already uses `header_action_button_left_uber`, `scripted_action_tooltip`, and `ShowRoadBuilder`; the same generator still needs exact-count migration for older M&T or historical snapshots."
-
-- id: gui_removed_global_input_instance_property
-  pattern: '(?m)^\s*use_global_input_instance\s*='
-  bad: "Keeping use_global_input_instance in an active EU5 1.4 GUI widget because an upstream Glorp snapshot still contains the legacy field"
-  correction: "Remove use_global_input_instance from every active 1.4 GUI file. The input-action reimplementation removed this property; upstream reference files may retain it as stale compatibility code and must be audited before copying."
-  category: gui
-  scope: any
-  source: "reference_game_files/game/in_game/gui/diplomacydialogs.gui:167-168; reference_game_files/game/in_game/gui/single_unit_formation_window.gui:159-160; runtime error.log: pdx_gui_factory.cpp invalid widget/type/property"
-  notes: "The current Glorp UI snapshot still contains this property in glorpUI_shared_types.gui and other files. SOL's copied zoom-button support must omit it even when the location-window source is current."
-
-- id: compatibility_authority_stale_after_vanilla_patch
-  pattern: null
-  bad: "Copying a downstream compatibility mod's complete goods or static-modifier object without comparing its fields against the current vanilla object"
-  correction: "Compare current vanilla objects, modifier_type_definitions, and scripted-trigger definitions separately. Preserve valid downstream balance fields: removal from one vanilla object does not mean removal from the engine schema. Replace references to removed triggers with verified current conditions and use vanilla fallback objects for new SOL goods absent from the downstream reference."
-  category: modifier
-  scope: any
-  source: "reference_game_files/game/main_menu/common/static_modifiers/location.txt:519; reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:4360,4367,6853; reference_game_files/game/in_game/common/goods/00_raw_materials.txt:409,597,632"
-  notes: "In 1.4 inverse_control loses three military penalties but all three modifier types remain valid, so M&T's explicit balance stays intact. Lumber's old scripted trigger disappears and needs replacement. New camels demand needs accounting coverage; wine's new wealth threshold requires explicit negation and a generator guard. Also audit removal of whole action objects: create_colonial_charter disappears from generic_actions while the GUI calls ColonialCharterItem.CreateColonialCharter, so old TRY_REPLACE hooks cannot be assumed to run. The official script diff confirms ai_country_should_colonize is a valid added engine trigger despite its missing scripted-trigger file."
-
-- id: resolution_ai_will_select_instead_of_vote_fields
-  pattern: null
-  bad: "Using ai_will_select in a resolution to disable AI proposals and votes"
-  correction: "Use the documented resolution script values ai_will_propose and ai_will_do; set both to value = 0 when AI must not initiate or vote for the resolution."
+  bad: Calibrating strata income and pop demand while leaving NPop.POP_NEEDS_INCOME_SCALE at the vanilla value of 1.33
+  correction: Set NPop.POP_NEEDS_INCOME_SCALE = 1 in every base SOL deploy target so pop-needs expenditure uses the nominal
+    cost of purchased goods
+  category: goods
+  scope: pop
+  source: reference_game_files/game/loading_screen/common/defines/00_defines.txt:1600; user-reported in-game testing (2026-07-26)
+  notes: The vanilla 1.33 value makes pops pay 33% above nominal goods cost. Leaving it active breaks SOL's income-closed
+    strata balance independently of demand quantities and development controls.
+- id: reduced_frequency_pulse_drops_modifier_between_solves
+  bad: Implementing a 'reduce calculation frequency' toggle by moving both the solve AND the add_location_modifier call to
+    yearly_country_pulse with years = 1, so the modifier's lifetime is what carries the value between solves
+  correction: 'Split the effect: keep applying the modifier every month from the cached per-location size variable (months
+    = 1, mode = replace) and move only the expensive solve to yearly_country_pulse. A stale coefficient re-applied monthly
+    is acceptable; a lapsed modifier is not.'
   category: scope
-  scope: any
-  source: "reference_game_files/game/in_game/common/resolutions/readme.txt:70-71; reference_game_files/game/in_game/common/resolutions/repeal_law.txt:68-69"
-  notes: "The 1.4 resolution schema does not document ai_will_select, and no vanilla resolution uses it. The two fields control proposal and vote scoring separately."
-
-- id: situation_outcome_card_visible_without_outcomes
+  scope: country
+  source: src/stable/in_game/common/on_action/SOL_economy_on_actions.txt; gls_full_refresh_country in scripts/sol_economy_effects_source.py
+    calls the monthly updater unconditionally on every game start and save load
+  notes: 'Documentation-only (no regex lint). Relying on a years = 1 modifier to bridge yearly solves looks self-sustaining
+    in steady state but breaks at every entry point that is not the yearly pulse: game start, save load, player-to-AI handover,
+    a newly formed country, and switching the toggle on mid-game all write (or leave) a months = 1 modifier that expires long
+    before the country''s own anniversary date arrives. The country then runs on the bare demand_add baseline for up to 11
+    months with no error and no log line. Applying monthly from the cache also makes the toggle safe to flip at any time,
+    and costs only the every_owned_location write the default configuration was already paying.'
+- id: requested_modifier_size_is_not_live_strength
   pattern: null
-  bad: "Assuming a situation with no scripted outcomes will hide the 1.4 Outcome card automatically"
-  correction: "The outer Outcome card is unconditional in panels/situation/common.gui. For an information-only situation, hide that card by situation key while preserving the rest of the 1.4 template and other situations' outcomes."
+  bad: Subtracting a cached requested modifier size from a live aggregate getter and interpreting any difference as an external
+    modifier change
+  correction: When the named modifier exists, read country_modifier_strength(<modifier key>) and subtract that actual strength.
+    Keep the last requested size for change-only writes and a separate live-strength snapshot for own drift detection/repair.
+    Account internal spending with the actual applied strength.
+  category: scope
+  scope: country
+  source: reference_official_defines/docs/triggers.log:3517-3523; scripts/test_sol_substitution_performance.py
+  notes: Controlled offline tests cover corrupt request caches, actual own drift, real 0.00001 external changes and stale
+    diagnostic payload. They do not prove engine precision/refresh timing or establish the cause of the user's tenfold performance
+    regression. Ordinary clean guards do not add strength getter calls.
+- id: resolution_message_database_uses_fixed_path
+  pattern: null
+  bad: Generating the obsolete full-copy main_menu/gui/messagetypes.txt for SOL after the EU5 1.4.3 directory migration
+  correction: Run scripts/gen_sol_messages.py to generate only the SOL recalculation message in
+    main_menu/gui/messagetypes/SOL_messages.txt for stable and sol_standalone. Remove the obsolete generated file;
+    compatibility submods inherit the base target's registration and must not duplicate it.
   category: gui
   scope: any
-  source: "reference_game_files/game/in_game/gui/panels/situation/common.gui:263-289; reference_official_defines/docs/data_types_uncategorized.txt:128241"
-  notes: "The GetOutcomes datamodel is nested inside the card; an empty list removes the rows but leaves the header. The card has no dedicated blockoverride, so this requires a scoped common.gui template override."
+  source: EU5 1.4.3 changelog supplied by user, 2026-10-23;
+    .eu5-base/reference_game_files/game/main_menu/gui/messagetypes/00_messagetypes.txt;
+    .eu5-base/docs/technical/EU5_Modding_Knowledge_Base.md (Generic Action Message Types)
+  notes: The id is retained for continuity; its fixed-path correction applied to older game versions. In 1.4.3
+    all files in gui/messagetypes/ are read and duplicate ids log both file paths. The shared rule owns engine behavior;
+    this entry records SOL's generator and target ownership. Native registration still needs an in-game check.
+- id: retired_solver_strategy_described_from_stale_docs
+  bad: Describing or reasoning about the country demand solver's approximation strategy from BRIEF.md / PROJECT_OVERVIEW.md
+    prose (e.g. 'player four-strategy L2 path', 'AI proportional_fast', 'minimax vertices', 'active-set candidates') without
+    grepping the generated solver first
+  correction: 'Grep the generated file before describing runtime behaviour: ''grep -c <effect_name> src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt''.
+    A count of 1 means definition-only (dead code, never called); 0 means the effect is not rendered at all and exists only
+    in the generator''s _SOLVER_EFFECTS name list used for file routing. As of 2026-08-13 only two strategies are live: id
+    7 exact-direct and id 8 the 209-case vertex sweep, with id 0 for raw_fallback. The objective is scaled L1 (mean of the
+    four per-row relative residuals) with scaled L-infinity as a 1% tie-break, under a hard no-worsen constraint against raw
+    -- NOT an L2 least-squares fit.'
+  category: scope
+  scope: country
+  source: 'src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt lines 528-575 (solve_approximation)
+    and 577-670 (sol_vertex_row_metric / sol_vertex_metrics / sol_vertex_consider); verified counts on 2026-08-13: run_fast_proportional
+    0, minimax_vertex_enumeration 0, approx_candidate_* 0, approx_assess 1, select_approx_strategy 1, approx_prepare_strategy
+    1, solve_reduced_3 1, solve_reduced_4 1, vertex_case_* 209'
+  notes: 'Documentation-only (no regex lint). BRIEF.md was self-contradictory: its Core Features paragraph correctly stated
+    the L2 variants and minimax_ratio were retired, while the SOL System Architecture and runtime-cost paragraphs further
+    down still described the retired L2/proportional_fast path and strategy ids 1-6. Reading the latter produced a technical
+    write-up describing three algorithms that do not exist in the shipped mod. Two further traps: (a) the offline tool tools/eu5_save_parser/demand_analysis.py
+    DOES still implement balanced_l2/improvement_l2/target_l2/absolute_l2/minimax_ratio/proportional_fast as comparison baselines,
+    so finding them there is not evidence they run in-game; (b) A_SOL_economy_effects.txt still carries a CMF log branch for
+    strategy id 6 (proportional fast) that no code path can now produce. Prefer the generated .txt as ground truth over any
+    prose, including this file.'
+- id: situation_custom_mapmode_visibility_states
+  pattern: null
+  bad: Using _show/_hide plus global SetMapMode/SetDefaultMapMode to manage a mapmode for a dynamically instantiated situation
+    panel
+  correction: Use trigger_on_create with PdxGuiWidget.PushMapModeOverride on a zero-size child of the situation-specific panel.
+    This fires when the child is created already visible and ties cleanup to that widget's destruction.
+  category: gui
+  scope: any
+  source: 'In-game SOL panel test (2026-07-22): _show did not enter sol_living_standard; src/stable/in_game/gui/SOL_migration_caller.gui:35-50;
+    reference_official_defines/docs/data_types_gui.txt:5872-5882'
+  notes: _show only runs after an existing widget changes from hidden to shown. It is not a construction callback, so it misses
+    a situation child created after its parent is already shown. A global SetDefaultMapMode cleanup can also discard the player's
+    prior mapmode instead of restoring the overridden mode.
+- id: sol_country_goods_modifier_accounting_parity
+  pattern: null
+  bad: Writing size = M - 1 for a per-good country demand modifier when the same good already has other global_<good>_pop_demand
+    sources, or changing SOL accounting for a good without changing its engine demand
+  correction: Sources of the same modifier type add inside one factor (1 + sum); different types (per-good, global_pop_demand,
+    local_pop_demand, vanilla percent rows) multiply. For target relative factor M against external same-good offset e, write
+    size = (1+e)*(M-1). A factor below zero clamps demand to 0. Freeze unsupported goods at M=1 in both transfers and accounting.
+  category: modifier
+  scope: country
+  source: In-game test 2026-10 (tmp/demand modifier test/6-13.png); reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:12773;
+    docs/technical/EU5_Modding_Knowledge_Base.md 6.5.1
+  notes: 'Measured on HUN nobles: legumes +0.5/+0.5 -> x2.0; sugar +0.25/-0.75 -> x0.5; fish -1.5 -> removed; wheat per-good
+    0.5, global 0.5, local 1.0 -> x4.5. Per-good M therefore multiplies cleanly with SOL local_pop_demand. Age 1 goods_demand
+    offsets did not appear in the breakdown in this test; read e from the actual breakdown rather than age files.'
+- id: sol_demand_add_baseline_must_remain
+  pattern: null
+  bad: Deleting or bypassing the calibrated SOL demand_add baseline when moving runtime demand to local_pop_demand
+  correction: Keep data/target_demand.csv -> src/stable/in_game/common/goods/z_SOL_pop_goods.txt as the corrected demand_add
+    baseline; apply local_pop_demand only as the monthly location-level multiplier.
+  category: modifier
+  scope: location
+  source: src/stable/in_game/common/goods/z_SOL_pop_goods.txt; reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:11864
+  notes: The SOL multiplier is calibrated against corrected demand_add values. Removing that baseline changes absolute pop
+    demand before the multiplier is applied.
+- id: sol_market_center_location_cache
+  pattern: GetCenterLocation\.MakeScope\.GetVariable\('sol_market_|location\s*=\s*\{\s*set_variable\s*=\s*\{\s*name\s*=\s*sol_market_
+  only_in_paths:
+  - src/stable
+  bad: Using a market center location variable as a SOL market-keyed cache
+  correction: 'Use global_variable_map keyed by the market scope instead. Script: remove_from_global_variable_map = { name
+    = sol_market_* key = scope:sol_market_cache } then add_to_global_variable_map = { name = sol_market_* key = scope:sol_market_cache
+    value = ... }. GUI: GetVariableFromGlobalVariableMap(''sol_market_*'', Location.GetMarket.MakeScope).'
+  category: scope
+  scope: global
+  source: reference_mods/3692202776/in_game/common/scripted_guis/cmm_core_auto_apply_scripted_gui.txt:12-17; reference_mods/3692202776/loading_screen/data_binding/cmm_macros_settings.txt:88
+  notes: SOL market data belongs to the market key, not to an arbitrary center location. Center-location caches are brittle
+    and obscure the actual key.
+- id: sol_v11_overlap_uses_average
+  pattern: null
+  bad: Restoring v1.1 substitute groups as a direct sum of group demands or calling normalized weights a conserved quantity
+    or expenditure budget
+  correction: 'Read the final demand blocks at commit 9670e141: all 11 overlapping goods add two group multipliers and divide
+    by 2 before the engine applies the per-pop-type goods baseline. Preserve this distinction from any new budget-conserving
+    design.'
+  category: modifier
+  scope: pop
+  source: 9670e141:src/stable/in_game/common/script_values/SOL_goods_demand_values.txt:679; 9670e141:src/stable/in_game/common/goods_demand/z_SOL_pop_demand.txt:10;
+    docs/technical/SOL_Substitute_Groups_Global_Modifier_Audit.md
+  notes: v1.1 has 20 groups, 67 memberships and 56 goods including optional victuals. The current 56-good core replaces victuals
+    with camels. Legacy UI grouping comments and formula headers omit parts of the final runtime calculation.
+- id: solver_entry_guards_omitted_from_description
+  bad: Describing the country demand solver's control flow by reading only the solver file (B_SOL_country_demand_solver.txt)
+    or only the effect that performs the work, and presenting the raw-error prefilter as if it were the first gate
+  correction: 'Read the dispatching effect sol_solve_country_pop_demand in A_SOL_economy_effects.txt top to bottom before
+    describing when the solver runs. Its if/else_if/else chain applies three separate gates in order, and two of them live
+    in the aggregation file rather than the solver: (1) num_locations < 5 routes straight to sol_solve_country_pop_demand_raw_only,
+    skipping classification entirely; (2) the CMF per-side toggle check requires at least one of that side''s exact/approx
+    toggles to be on, else raw_only; (3) only then does the solver body run, where sol_country_demand_gate_possible checks
+    whether any raw row exceeds tolerance. Grep for ''num_locations'' in the aggregation file to find size gates -- they will
+    never appear in the solver file.'
+  category: scope
+  scope: country
+  source: 'src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt lines 3598-3639 (sol_solve_country_pop_demand);
+    the size gate''s rationale is in the comment at 3600-3607: pigeonhole caps the matrix at three non-empty columns below
+    four locations, median scaled L1 for a single-location country moves only 0.329 -> 0.310 versus 0.371 -> 0.222 from three
+    locations up, and skipping them drops 70% of the exact-failed country count for 17% of the owned-location traversal'
+  notes: 'Documentation-only (no regex lint). The size prefilter is deliberately placed before everything else because num_locations
+    is known up front while the non-empty class count only exists after the confidence-ordered classification pass has already
+    been paid for. It is easy to miss when tracing the solver because it sits in the caller, not in the solver file, and because
+    the solver''s own gate_possible variable looks like the entry condition. Anything describing solver cost, coverage, or
+    the size-vs-feasibility relationship is wrong without it: it is also the direct engineering consequence of the 1-9 location
+    bucket''s 10.1% feasibility rate, so a write-up citing that bucket while omitting the gate leaves the reader without the
+    reason it exists.'
+- id: substitution_performance_requires_actual_cadence
+  pattern: null
+  bad: Attributing default monthly AI cost to the entire substitution aggregate, or assuming solver/substitution toggles skip
+    every newly added runtime cost
+  correction: Trace monthly and yearly callers separately. Humans and normal-cadence AI solve monthly; reduced-frequency AI solves on its yearly anniversary with no monthly snapshot polling. Country substitution refresh precedes size/solver gates, and substitution-off still computes external spending. Auto modifiers only read cached deltas. Count scheduled refreshes and economic reads before claiming engine-time attribution.
+  category: scope
+  scope: country
+  source: src/stable/in_game/common/on_action/SOL_economy_on_actions.txt; scripts/sol_substitution.py; docs/technical/SOL_Substitution_Auto_Modifiers_20261023.md
+  notes: The 2026-10-14 snapshot/static-modifier audit described an earlier implementation. The 2026-10-23 cache-only auto refactor removes that polling and grant path. Offline operation counts do not measure native demand refresh cost.
+- id: sol_substitution_partial_group_from_quantities
+  pattern: null
+  bad: Inferring each pop's substitute groups or members from positive calibrated quantities, producing partial groups and singleton responses
+  correction: Use data/pop_group_baskets.csv subscriptions. Every subscribed member must have positive net demand of at least 0.00001, and core consumption must equal the subscribed group union. Validate before codegen; average overlaps only over subscribed groups. Remove PP lumber uniformly at target level and preserve M&T positive minima after price scaling.
+  category: goods
+  scope: pop
+  source: scripts/gen_whole_group_baskets.py; scripts/sol_substitution.py; scripts/test_sol_substitution.py; docs/technical/SOL_Substitution_Whole_Group_Basket_Plan_20261022.md
+  notes: CAS commoners previously consumed only olives in the sugar/salt/olives group, forcing their olive response to 1 and diluting substitution. Offline commoner-only and mixed-stratum regressions with no sugar now give olives 4/3 and salt 2/3 for weights 2 and 1. Migration preserves allocated group budgets before rounding; overlapping groups share final quantities and must be rounded together.
+- id: yearly_january_pulse_spike
+  pattern: ''
+  bad: Gating heavy per-country / per-location work behind 'limit = { current_month = 1 }' inside a situation's on_monthly
+    block — fires on every January 1 for every country at once
+  correction: Use vanilla 'yearly_country_pulse' on_action instead — it fires once per country per year on each country's
+    own anniversary date, naturally distributing load across the whole year. For globally-scoped yearly work (e.g. every_market_in_world
+    scans), keep the situation-month-1 gate but split the work into market-hub-cached or quarterly passes. Anything that iterates
+    every_owned_location per country per year MUST go through yearly_country_pulse, not the global situation.
+  category: scope
+  scope: global
+  source: src/stable/in_game/common/situations/SOL_economy_situation.txt:23-71; src/stable/in_game/common/on_action/SOL_economy_on_actions.txt:6-10
+  notes: Documentation-only (no regex lint). The situation's on_monthly with current_month=1 gate causes ALL countries to
+    recompute simultaneously on Jan 1, producing a yearly frame-time spike. Vanilla yearly_country_pulse staggers per-country
+    work because each country's pulse fires on its own creation-date anniversary, not all on Jan 1. The performance impact
+    is O(N_countries × per_country_work) compressed into a single tick. Detected when SOL January lag report (2026-05-07)
+    traced to 6.7M conditional checks on Jan 1 from 5-strata × 336-checks per location across 4000+ owned locations.
+
+- id: sol_living_standard_yoy_reuses_income_samples
+  pattern: null
+  category: scope
+  scope: country
+  detectability: advisory
+  bad: Reusing legacy income samples as denominators after replacing HUD income with living standard.
+  correction: Use sol_ls_sol_sample_<month>_* for SOL history; never read or rewrite legacy sol_ls_sample_* income samples. Show no prior-year data until a complete matching SOL year exists, and leave absent estates unsampled.
+  source: docs/technical/SOL_Topbar_PCI_Removal_Boundary_20261023.md section 4.4; scripts/sol_lshud_income_source.py; scripts/test_sol_lshud_income.py test_legacy_income_samples_cannot_supply_sol_baseline
+  notes: Project migration contract verified by offline scope execution. Population weighting belongs to the SOL accumulator; location net income remains a purchasing-power input.
+
+- id: mapmode_icon_opaque_medallion
+  pattern: null
+  category: gui
+  scope: global
+  detectability: advisory
+  bad: Shipping a map-mode / situation / modifier-type icon as an opaque circular medallion (glowing background, circle crop), or giving related map modes identical icons.
+  correction: Vanilla map_modes/, situations/ and modifier_types/ icons are one painted object on a transparent 128x128 (64x64 for modifier_types) canvas with a ~5-8px margin; related modes reuse the main object and add a small lower-right badge (peasants -> peasants_percentage, control -> missing_control). Prefer a hand-drawn SVG rendered to transparent PNG (assets/icons/sol_living_standard.svg -> scripts/render_sol_icon.py); image models rarely hit the vanilla style. Install the set with scripts/compose_sol_mapmode_icons.py.
+  source: game/main_menu/gfx/interface/icons/map_modes/*.dds (installed game, alpha bbox e.g. population (9,7,120,121), food (15,7,112,122)); scripts/generate_sol_icon.py build_generation_payload rejects background=transparent
+  notes: Vanilla stability.dds is already a balance scale, so a scale also collides semantically. Plain RGB-distance keying leaves a magenta halo on soft dark shadows; estimate alpha from key-ness min(R,B)-G instead.

@@ -44,6 +44,7 @@ from dds_image_lib import (  # noqa: E402
     resize_rgba,
     write_dds,
 )
+from icon_keying import flatten_onto, key_and_fit  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -90,6 +91,10 @@ class IconTarget:
     circle_crop_feather_px: int
     prompt_requirements: str
     style_reference_paths: tuple[str, ...]
+    background_key: tuple[int, int, int] | None = None
+    key_opaque_keyness: float = 24.0
+    key_clear_margin: float = 30.0
+    content_margin_px: int = 6
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -137,6 +142,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--convert-existing-png",
         metavar="PATH",
         help="Convert an existing PNG to the configured DDS target without calling the API.",
+    )
+    parser.add_argument(
+        "--candidate",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Generate preview PNGs for image.candidates[NAME] only (repeatable); no DDS is written.",
+    )
+    parser.add_argument(
+        "--all-candidates",
+        action="store_true",
+        help="Generate preview PNGs for every entry in image.candidates; no DDS is written.",
     )
     parser.add_argument(
         "--overwrite",
@@ -240,6 +257,12 @@ def load_target(config: dict[str, Any]) -> IconTarget:
         parse_size(image_size)
 
     paths = parse_path_list(style_reference.get("paths", []), "style_reference.paths")
+    key_config = output.get("background_key") or {}
+    if not isinstance(key_config, dict):
+        raise ValueError("output.background_key must be a JSON object")
+    background_key = None
+    if bool(key_config.get("enabled", False)):
+        background_key = parse_rgb(key_config.get("color", [255, 0, 255]), "output.background_key.color")
     return IconTarget(
         name=asset_name,
         path=path,
@@ -257,6 +280,10 @@ def load_target(config: dict[str, Any]) -> IconTarget:
         circle_crop_feather_px=int(output.get("circle_crop_feather_px", 8)),
         prompt_requirements=str(output.get("prompt_requirements") or ""),
         style_reference_paths=tuple(paths),
+        background_key=background_key,
+        key_opaque_keyness=float(key_config.get("opaque_keyness", 24)),
+        key_clear_margin=float(key_config.get("clear_margin", 30)),
+        content_margin_px=int(key_config.get("content_margin_px", 6)),
     )
 
 
@@ -293,6 +320,18 @@ def apply_circle_icon_crop(image: RgbaImage, feather_px: int) -> RgbaImage:
 
 
 def prepare_target_image(source_image: RgbaImage, target: IconTarget) -> RgbaImage:
+    if target.background_key is not None:
+        # Vanilla-style icon: key out the flat background, trim to the subject,
+        # and fit it with a small transparent margin (vanilla map-mode icons use ~5-8px).
+        return key_and_fit(
+            source_image,
+            target.background_key,
+            target.width,
+            target.height,
+            target.content_margin_px,
+            target.key_opaque_keyness,
+            target.key_clear_margin,
+        )
     image = resize_rgba(source_image, target.width, target.height, target.resize)
     if target.circle_crop:
         image = apply_circle_icon_crop(image, target.circle_crop_feather_px)
@@ -539,6 +578,13 @@ def build_final_prompt(prompt_config: dict[str, Any], image_config: dict[str, An
     ]
     if target.prompt_requirements:
         parts.append(f"Target requirements: {target.prompt_requirements}")
+    if target.background_key is not None:
+        r, g, b = target.background_key
+        parts.append(
+            f"Background: a perfectly flat, uniform solid colour RGB({r},{g},{b}) (#{r:02X}{g:02X}{b:02X}) filling the whole "
+            "canvas, with no gradient, vignette, glow, texture, frame, circle, plate or ground shadow. "
+            "The background is removed by chroma key afterwards, so never use that colour or purple/pink tones in the subject."
+        )
     if style_rules:
         parts.append(f"Style rules: {style_rules}")
     if composition_rules:
@@ -602,7 +648,11 @@ def collect_style_references(style_config: dict[str, Any], target: IconTarget, d
         path = resolve_repo_path(raw_path)
         if not path.exists():
             raise FileNotFoundError(f"Missing style reference: {path}")
-        png_bytes = encode_png_rgba(read_image_rgba(path))
+        ref_image = read_image_rgba(path)
+        if target.background_key is not None and bool(style_config.get("flatten_onto_key", True)):
+            # Show the model the same flat key background we ask it to paint on.
+            ref_image = flatten_onto(ref_image, target.background_key)
+        png_bytes = encode_png_rgba(ref_image)
         png_name = f"{index:02d}_{target.name}_{safe_slug(path.stem)}.png"
         if bool(style_config.get("write_converted_pngs", True)) and not dry_run:
             png_path = temporary_dir / png_name
@@ -792,6 +842,10 @@ def run(args: argparse.Namespace, config: dict[str, Any], target: IconTarget) ->
         print(f"[summary] converted existing PNG to {written['path']}")
         return 0
 
+    candidate_names = select_candidates(args, image_config)
+    if candidate_names:
+        return run_candidates(args, api_config, prompt_config, image_config, style_config, output_config, target, candidate_names)
+
     final_prompt = build_final_prompt(prompt_config, image_config, target)
     payload = build_generation_payload(image_config, final_prompt, target)
     style_uploads = collect_style_references(style_config, target, bool(args.dry_run))
@@ -821,6 +875,73 @@ def run(args: argparse.Namespace, config: dict[str, Any], target: IconTarget) ->
     if revised_prompt:
         print(f"[revised_prompt] {revised_prompt}")
     return 0
+
+
+def select_candidates(args: argparse.Namespace, image_config: dict[str, Any]) -> list[str]:
+    candidates = image_config.get("candidates") or {}
+    if not isinstance(candidates, dict):
+        raise ValueError("image.candidates must be a JSON object of name -> subject prompt")
+    if args.all_candidates:
+        names = list(candidates)
+    else:
+        names = list(args.candidate)
+    for name in names:
+        if name not in candidates:
+            raise ValueError(f"Unknown candidate {name!r}; known: {', '.join(candidates) or '(none)'}")
+    return names
+
+
+def run_candidates(
+    args: argparse.Namespace,
+    api_config: dict[str, Any],
+    prompt_config: dict[str, Any],
+    image_config: dict[str, Any],
+    style_config: dict[str, Any],
+    output_config: dict[str, Any],
+    target: IconTarget,
+    names: list[str],
+) -> int:
+    """Generate one preview per candidate subject. Writes PNG + metadata only, never DDS."""
+    png_dir = resolve_repo_path(output_config.get("png_dir"), DEFAULT_PNG_DIR) / "candidates"
+    style_uploads = collect_style_references(style_config, target, bool(args.dry_run))
+    timeout = float(api_config.get("timeout_seconds", 180))
+    retry_settings = load_retry_settings(api_config)
+    opener = build_url_opener(load_proxy_url(api_config))
+    api_key = "" if args.dry_run else resolve_api_key(api_config)
+    failures = 0
+    for name in names:
+        subject = str(image_config["candidates"][name]).strip()
+        cand_image_config = {**image_config, "prompt": subject}
+        final_prompt = build_final_prompt(prompt_config, cand_image_config, target)
+        payload = build_generation_payload(cand_image_config, final_prompt, target)
+        print(f"[candidate] {name}: {subject}")
+        if args.dry_run:
+            print(final_prompt)
+            continue
+        try:
+            response = call_image_api(api_config, style_config, payload, style_uploads, api_key, timeout, retry_settings, opener)
+            png_bytes, revised_prompt = extract_image_bytes(response, timeout, retry_settings, opener)
+        except Exception as exc:  # noqa: BLE001 - keep going with the other candidates
+            failures += 1
+            print(f"[candidate] {name} failed: {exc}", file=sys.stderr)
+            continue
+        if not png_bytes.startswith(PNG_SIGNATURE):
+            failures += 1
+            print(f"[candidate] {name}: payload is not a PNG", file=sys.stderr)
+            continue
+        png_dir.mkdir(parents=True, exist_ok=True)
+        raw_path = png_dir / f"{safe_slug(name)}_raw.png"
+        raw_path.write_bytes(png_bytes)
+        prepared = prepare_target_image(decode_png_rgba(png_bytes), target)
+        icon_path = png_dir / f"{safe_slug(name)}.png"
+        icon_path.write_bytes(encode_png_rgba(prepared))
+        meta = {"candidate": name, "subject": subject, "final_prompt": final_prompt, "payload": payload,
+                "revised_prompt": revised_prompt, "raw_png": display_path(raw_path), "icon_png": display_path(icon_path)}
+        (png_dir / f"{safe_slug(name)}.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"[candidate] {name}: {display_path(raw_path)} -> {display_path(icon_path)}")
+    print(f"[summary] {len(names) - failures}/{len(names)} candidates generated; pick one, then run "
+          "--convert-existing-png data/generated_icons/candidates/<name>_raw.png --overwrite")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:

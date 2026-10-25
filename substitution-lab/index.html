@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商品替代组：一步一步算</title>
+<link rel="stylesheet" href="styles.css">
+<script defer src="engine.js"></script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">SOL · 商品替代组恢复方案 · <a href="pipeline.html">人口需求完整计算链 →</a></p>
+    <h1>东西贵了，就换着买</h1>
+    <p class="lead">商品替代组只做一件事：<strong>同一类东西里，某样变贵了，人们少买它，转去多买同类里便宜的。</strong>下面把恢复方案从价格一路算到游戏里的 modifier，每一步都能自己改数字看结果。</p>
+    <ol class="flow" aria-label="计算链">
+      <li><a href="#s1"><b>1</b>价格 → 权重</a></li>
+      <li><a href="#s2"><b>2</b>组内倍率</a></li>
+      <li><a href="#s3"><b>3</b>跨组平均</a></li>
+      <li><a href="#s4"><b>4</b>钱守不守恒</a></li>
+      <li><a href="#s5"><b>5</b>压成国家倍率</a></li>
+      <li><a href="#s6"><b>6</b>写进游戏</a></li>
+      <li><a href="#s7"><b>7</b>接入 SOL</a></li>
+    </ol>
+    <p class="legend">
+      <span class="tag old">v1.1 原样</span> 旧版就是这么做的
+      <span class="tag new">新方案</span> 这次恢复新定的规则
+      <span class="tag test">待实测</span> 必须进游戏验证，网页只能假设
+    </p>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <h2><span class="num">1</span>价格比决定"吸引力权重" <span class="tag old">v1.1 原样</span></h2>
+  <p>每个市场里，每个商品有一个<strong>价格比 = 市场价 ÷ 默认价</strong>。价格比落进 7 档中的一档，每档对应一个权重：越贵权重越低（越不想买），越便宜权重越高。</p>
+  <div class="panel">
+    <label class="slider-row">
+      <span>价格比</span>
+      <input type="range" id="t-ratio" min="0.2" max="3" step="0.01" value="1.8">
+      <output id="t-ratio-out"></output>
+    </label>
+    <div id="t-ladder" class="ladder"></div>
+  </div>
+  <p class="note">边界是严格比较：价格比恰好 2.30 仍算"明显昂贵"（0.5），恰好 0.40 算"明显便宜"（1.5）。没有滞回，旧版每年一月刷新一次档位。</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2</span>同组商品互相比较 <span class="tag old">v1.1 原样</span></h2>
+  <p>把一个组里所有商品的权重放在一起。某商品的<strong>需求倍率 D = 它的权重 ÷ 组内平均权重</strong>。</p>
+  <ul class="plain">
+    <li>全部价格正常 → 权重都是 1 → 每个 D 都是 1，什么都不变。</li>
+    <li>只有一样变贵 → 它的 D 小于 1，<em>其他所有同组商品</em>的 D 都略大于 1。</li>
+    <li>组内 D 的平均永远是 1：需求只是在组内挪来挪去。</li>
+  </ul>
+  <div class="panel">
+    <div class="panel-head">
+      <label>选一个组 <select id="g-select"></select></label>
+      <button type="button" id="g-reset" class="ghost">全部恢复正常价</button>
+    </div>
+    <div id="g-rows" class="rows"></div>
+    <p class="caption">竖线是 D = 1（不变）。取消"有供给"的商品被冻结在 1，不参与分配<span class="tag new">新方案</span>；剩不到两个可买商品的组不替代。</p>
+  </div>
+  <details>
+    <summary>v1.1 原公式里还有什么？为什么这里没有？</summary>
+    <p>旧版直接把整条需求算出来：<code>权重 ÷ 组权重和 × N × 阶层收入曲线 × 时代系数 × 10 ÷ 开发度</code>。恢复方案<strong>只取其中"相对正常价格变了多少"的部分</strong>：用同一公式算一次当前价格、一次全部正常价格，两者相除就是上面的 D。阶层收入曲线、时代系数这些不再恢复，交给当前 SOL 的收入求解器，否则会和它重复计算。开发度抵消项当前分支已经关闭，也不照搬。</p>
+    <p>N 是组的商品数。在全部商品都有供给、且不考虑宗教文化偏好时，上面的公式化简后恰好就是"权重 ÷ 组内平均权重"。</p>
+  </details>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3</span>一个商品在两个组里：取平均 <span class="tag old">v1.1 原样</span></h2>
+  <p>有 11 种商品同时属于两个组（比如布料既是"基本衣物"也是"标准衣物"）。它在每个组各算一个倍率，最后<strong>两个倍率取平均</strong>。旧脚本的 11 个汇总块全部写着 <code>divide = 2</code>，不是相加。</p>
+  <div class="panel">
+    <div class="panel-head"><label>选一个跨组商品 <select id="o-select"></select></label></div>
+    <div id="o-groups" class="twin"></div>
+    <div id="o-result" class="result-line"></div>
+  </div>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4</span>倍率不等于钱：方案 A 还是方案 B <span class="tag new">新方案 · 需二选一</span></h2>
+  <p>D 只说"这个商品多买还是少买多少倍"。但组里商品原本花的钱可能差很多。一个商品原来占了 90% 的花费，它的倍率稍微降一点，组里总花费就明显下降。</p>
+  <div class="cmp">
+    <div><b>方案 A：照旧版手感</b><br>直接用上面的 D。组内总花费会变。规格建议用这个。</div>
+    <div><b>方案 B：组内预算守恒</b><br>组里原来总共花多少，替代后还是多少，只按"原花费 × 权重"重新分。旧版没有这条规则。</div>
+  </div>
+  <div class="panel">
+    <div class="ab-inputs">
+      <fieldset>
+        <legend>商品甲</legend>
+        <label class="slider-row"><span>原花费</span><input type="range" id="ab-ba" min="1" max="99" step="1" value="90"><output id="ab-ba-out"></output></label>
+        <label class="slider-row"><span>价格比</span><input type="range" id="ab-ra" min="0.2" max="3" step="0.01" value="2"><output id="ab-ra-out"></output></label>
+      </fieldset>
+      <fieldset>
+        <legend>商品乙</legend>
+        <label class="slider-row"><span>原花费</span><input type="range" id="ab-bb" min="1" max="99" step="1" value="10"><output id="ab-bb-out"></output></label>
+        <label class="slider-row"><span>价格比</span><input type="range" id="ab-rb" min="0.2" max="3" step="0.01" value="1"><output id="ab-rb-out"></output></label>
+      </fieldset>
+    </div>
+    <div id="ab-bars" class="stack"></div>
+  </div>
+  <p class="note">这里的"花费"按默认价计，是替代前的参照账本。方案 A 让总额变化并不是 bug：之后 SOL 的地点系数会按新篮子重新算总需求。两种方案不能叠用。</p>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5</span>一个国家只能写一个数 <span class="tag new">新方案</span></h2>
+  <p>游戏只提供国家级接口 <code>global_&lt;商品&gt;_pop_demand</code>，没有市场级的。所以一个国家里，各地点、各阶层算出的不同 D，必须压成每个商品一个<strong>国家倍率 M</strong>：</p>
+  <p class="formula">M = Σ(原消费量 × D) ÷ Σ(原消费量)</p>
+  <p>也就是按"本来要买多少"加权平均。消费量按默认价换成金额来记账，对同一商品就等于按数量加权；<strong>故意不用市场价</strong>，因为市场价已经通过 D 起过作用，再当权重用一次就算了两遍。只统计这个国家自己拥有的地点。</p>
+  <div class="panel">
+    <p class="caption" style="margin-top:0">例：一个国家有三个市场。改各市场的小麦价格比和小麦消费量（主食组其他商品都按正常价）。</p>
+    <div id="c-markets" class="markets"></div>
+    <div id="c-result" class="result-line"></div>
+  </div>
+  <p class="note">"想要"和"实际"的差距就是精度损失：贵的市场减得不够，便宜的市场加得不够。全国总量是对的，分布不对。这个损失已经接受。</p>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6</span>写成 modifier <span class="tag new">已实测</span></h2>
+  <p>每个商品定义一个国家静态 modifier，每月用 <code>mode = replace</code> 重写一次 size：</p>
+<pre><code># main_menu/common/static_modifiers/SOL_substitute_global_modifiers.txt
+sol_substitute_liquor = {
+    game_data = { category = country }
+    global_liquor_pop_demand = 1
+}
+
+# 每月
+add_country_modifier = {
+    name = sol_substitute_liquor
+    months = 2
+    mode = replace
+    size = <span id="m-code-size">-0.2</span>
+}</code></pre>
+  <p>2026-10 在游戏里看人口需求明细实测（匈牙利贵族，布达），引擎的规则是：</p>
+  <p class="formula">需求 = 基础 × (1 + Σ同商品修正) × (1 + global_pop_demand) × (1 + local_pop_demand) × (1 + Σ原版百分比) × 各"×"项</p>
+  <ul class="plain">
+    <li><b>同一商品的多个修正相加</b>：两个 +50% 得到 ×2.0，不是 ×2.25；+25% 和 −75% 得到 ×0.5。</li>
+    <li><b>不同类型的修正相乘</b>：商品修正、全局、地点各是一个独立系数。所以替代倍率和 SOL 的 <code>local_pop_demand</code> 互不干扰。</li>
+    <li><b>系数低于 0 截断为 0</b>：−150% 时该商品直接从需求列表消失。</li>
+  </ul>
+  <p>因此 <strong>size 不能直接写 M − 1</strong>。若同一商品已有别的修正 e（时代、思潮等），要写 <strong>size = (1 + e) × (M − 1)</strong>。e 要从实际生效的修正读，测试中时代 1 的商品修正并未出现在明细里，不能照抄时代文件。</p>
+  <div class="panel">
+    <label class="slider-row"><span>目标 M</span><input type="range" id="m-m" min="0.2" max="2.5" step="0.01" value="0.5"><output id="m-m-out"></output></label>
+    <label class="slider-row"><span>已有修正</span><input type="range" id="m-e" min="-0.9" max="1" step="0.05" value="-0.75"><output id="m-e-out"></output></label>
+    <div id="m-result" class="twin"></div>
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7</span>放进 SOL 现有流程</h2>
+  <p>现在 SOL 已经有一条"市场支出 → 地点收入 → 国家求解器 → 地点 local_pop_demand"的链。替代要插在中间，并且整个国家用同一份快照：</p>
+  <ol class="pipeline">
+    <li><b>每年 · 市场刷新</b>按校准消费量算每个市场的支出。<span class="chg">改：必须保留"每商品"明细，不能只存阶层总和——不同国家的 M 不同，总和没法复用。</span></li>
+    <li><b>国家 · 算替代</b>遍历自己拥有的地点，算出全部商品的 M，算完再统一提交。<span class="chg">新增</span></li>
+    <li><b>国家 · 写 modifier</b>每个商品写一次 size，每月重写。<span class="chg">新增</span></li>
+    <li><b>地点 · 算支出</b><code>sol_compute_location_pop_demand</code> 里每个商品支出乘上国家的实际倍率，再合计。<span class="chg">改：已实测商品修正与地点修正相乘，直接乘 M 即可</span></li>
+    <li><b>国家 · 阶层求解器</b>不变。</li>
+    <li><b>地点 · local_pop_demand</b>不变，继续只调总量；不再乘一次商品倍率。</li>
+  </ol>
+  <p class="note">缺缓存时一律 M = 1。关闭替代功能时，要对每个国家、每个商品显式 <code>remove_country_modifier</code>，不能只是"下次不算了"。国家 modifier 也会影响账本外的人口（如奴隶），验收时要看。</p>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8</span>特殊情况怎么处理</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>情况</th><th>处理</th><th>为什么</th></tr></thead>
+    <tbody>
+      <tr><td>市场里没有这个商品</td><td>冻结为 1，不参与本组分配</td><td>不能把需求分给买不到的东西</td></tr>
+      <tr><td>组里只剩一个能买的</td><td>整组不替代</td><td>没有可替换的对象</td></tr>
+      <tr><td>商品没有 <code>global_&lt;商品&gt;_pop_demand</code></td><td>冻结为 1（如 PP 的加工食品）</td><td>账本里改了而游戏里没改，账就对不上了</td></tr>
+      <tr><td>国家几乎不消费这个商品</td><td>M = 1，移除 modifier</td><td>避免除以接近 0 的数</td></tr>
+      <tr><td>功能关闭 / 国家失去全部领土</td><td>显式移除所有替代 modifier</td><td>防止旧值残留</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9</span>还没定的、必须测的</h2>
+  <div class="cmp">
+    <div>
+      <b>需要拍板</b>
+      <ul class="plain">
+        <li>方案 A 还是方案 B（规格建议 A）</li>
+        <li>是否恢复宗教 / 文化 / 地点偏好（第一阶段建议不恢复）</li>
+        <li>PP 加工食品要不要补接口</li>
+        <li>Just Goods 的 26 种新商品归哪个组（默认不替代）</li>
+      </ul>
+    </div>
+    <div>
+      <b>还要进游戏测</b>
+      <ul class="plain">
+        <li>时代 <code>goods_demand</code> 修正为何没出现在需求明细里，e 该从哪读</li>
+        <li>市场实际需求多久跟上 modifier（明细立即变，市场刷新慢且不规律）</li>
+        <li>国家 modifier 对奴隶等账本外人口的附带影响</li>
+        <li><s>同类相加还是相乘</s>、<s>与地点/全局怎么组合</s>、<s>负值截断</s>：已实测，见第 6 步</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">⊕</span>全部 20 组沙盒</h2>
+  <p>给任意商品设价格比，看全网（含跨组平均）的方案 A 倍率。<span class="dup-key">虚线框</span>是跨组商品，改一处两组同步。当前核心清单共 56 种商品；v1.1 的奢侈食物多一个加工食品、坐骑没有骆驼。</p>
+  <div class="panel-head">
+    <button type="button" id="x-random" class="ghost">随机价格</button>
+    <button type="button" id="x-reset" class="ghost">全部恢复正常价</button>
+  </div>
+  <div id="x-groups" class="grid"></div>
+</section>
+
+<footer>
+  依据：<code>docs/technical/SOL_Substitute_Groups_Global_Modifier_Implementation.md</code> 与同目录审计报告；旧版机制对照提交 <code>9670e141</code>（v1.1）。网页只是离线演示，不代表游戏内已实现。
+</footer>
+</main>
+</body>
+</html>

@@ -17,7 +17,7 @@ from gui_14_migration import migrate_location_gui, migrate_location_types
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # 3812518640 is the current Glorp UI Workshop snapshot. The older
 # 3601047146 directory is retained as historical reference data.
-GLORP_ROOT = REPO_ROOT / "reference_mods" / "3812518640"
+GLORP_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3812518640"
 SOURCE_PATH = GLORP_ROOT / "in_game" / "gui" / "location_window.gui"
 SOURCE_METADATA_PATH = GLORP_ROOT / ".metadata" / "metadata.json"
 SOURCE_TYPES_PATH = (
@@ -51,6 +51,7 @@ BUTTON_ANCHOR_RE = re.compile(
 SOL_BUTTON = """\t\t\t\t\t\t\t# SOL insertion: location living-standard tooltip in the Glorp UI row.
 \t\t\t\t\t\t\tnavigational_button_alt = {
 \t\t\t\t\t\t\t\tsize = {38 38}
+\t\t\t\t\t\t\t\tvisible = "[Location.HasOwner]"
 
 \t\t\t\t\t\t\t\tblockoverride "icon_texture" {
 \t\t\t\t\t\t\t\t\tpiechart = {

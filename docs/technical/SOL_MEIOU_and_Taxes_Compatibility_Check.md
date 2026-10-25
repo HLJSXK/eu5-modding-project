@@ -8,7 +8,7 @@
 ## 检查对象
 
 - SOL：`src/stable`，版本 `1.3.11`，目标游戏版本 `1.3.11`。
-- 目标模组：`reference_mods/3735059838`，即 **MEIOU and Taxes**（下称 M&T），版本 `0.1.6`，目标游戏版本 `1.3.*`。
+- 目标模组：`.eu5-base/reference_mods/3735059838`，即 **MEIOU and Taxes**（下称 M&T），版本 `0.1.6`，目标游戏版本 `1.3.*`。
 - 本报告基于仓库内文件进行静态检查，没有进行游戏内联合加载，也没有读取联合运行后的 `error.log`。
 
 ## 最终结论
@@ -51,10 +51,10 @@ SOL 的 `src/stable/in_game/common/goods/z_SOL_pop_goods.txt` 对 55 个商品�
 M&T 在以下文件中用 `REPLACE` 重新定义全部 74 个 vanilla goods，其中包括 SOL 修改的全部 55 个商品：
 
 ```text
-reference_mods/3735059838/in_game/common/goods/MnT_raw_materials.txt
-reference_mods/3735059838/in_game/common/goods/MnT_plantation_goods.txt
-reference_mods/3735059838/in_game/common/goods/MnT_produced_goods.txt
-reference_mods/3735059838/in_game/common/goods/MnT_food.txt
+.eu5-base/reference_mods/3735059838/in_game/common/goods/MnT_raw_materials.txt
+.eu5-base/reference_mods/3735059838/in_game/common/goods/MnT_plantation_goods.txt
+.eu5-base/reference_mods/3735059838/in_game/common/goods/MnT_produced_goods.txt
+.eu5-base/reference_mods/3735059838/in_game/common/goods/MnT_food.txt
 ```
 
 因此最终数据库对象采用 M&T 完整定义，SOL 注入的 `demand_add` 和 threshold 抵消项全部消失。静态解析结果为：

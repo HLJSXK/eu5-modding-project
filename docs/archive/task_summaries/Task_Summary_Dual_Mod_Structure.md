@@ -13,7 +13,7 @@ This document summarizes the transition of the EU5 MP Modding Project to a dual-
 The existing `dynamic_missions` mod in the `src/` directory was renamed to `develop`. This preserves all the complex mission systems, custom GUIs, and event chains that were previously developed, while clearly marking it as an experimental/development branch. Development on this branch is currently paused.
 
 ### 2. Stable Mod Creation
-The community reference mod **3644897537** (Amalgamation Synergy) was copied from `reference_mods/` to `src/stable/`. This mod now serves as the primary, stable mod for multiplayer sessions.
+The community reference mod **3644897537** (Amalgamation Synergy) was copied from `.eu5-base/reference_mods/` to `src/stable/`. This mod now serves as the primary, stable mod for multiplayer sessions.
 
 Key features of the `stable` mod include:
 - **War Mechanics:** Harsher war exhaustion penalties and more impactful occupation effects.

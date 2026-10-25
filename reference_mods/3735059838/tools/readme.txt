@@ -1,1 +1,0 @@
-﻿When running any script, make sure the working directory is a child of `tools` (or a sibling of `shared` folder)

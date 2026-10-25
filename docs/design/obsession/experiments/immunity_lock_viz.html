@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>痴迷扩散实验可视化</title>
+<style>
+:root{
+  color-scheme: light;
+  --paper:#F7F8F5; --sheet:#FFFFFF; --ink:#1E2633; --muted:#5D6875; --rule:#D5DAD6; --faint:#EEF1EE;
+  --tea:#2E7A6A; --coffee:#6B3F2A; --porcelain:#2F5C9E; --tobacco:#B9852A; --alarm:#A8452F;
+  --sans:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  --mono:"Cascadia Code","Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.6 var(--sans)}
+:focus-visible{outline:2px solid var(--porcelain);outline-offset:2px}
+code{font-family:var(--mono);font-size:.92em;background:var(--faint);padding:1px 4px;border-radius:3px}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 24px 48px}
+h1{font-size:24px;margin:0;font-weight:700}
+.sub{color:var(--muted);margin:4px 0 18px;max-width:940px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:22px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+.mapbox{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px}
+.maphead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;margin-bottom:8px}
+.clock{font:700 26px/1 var(--mono)}
+.clock small{font-size:13px;color:var(--muted);font-weight:400;margin-left:6px}
+.scen-name{font-weight:700;font-size:15px}
+.phase{font-size:12.5px;border:1px solid currentColor;border-radius:3px;padding:0 7px;line-height:20px}
+.phase.growth{color:var(--tea)} .phase.decay{color:var(--alarm)} .phase.lazy{color:var(--porcelain)} .phase.calm{color:var(--muted)}
+.mapwrap{position:relative;width:100%;aspect-ratio:235/200.9;cursor:crosshair}
+.mapwrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#map{image-rendering:pixelated;image-rendering:crisp-edges}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--faint);border-radius:4px;padding:6px 10px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font:700 17px/1.3 var(--mono)}
+.stat.warn .v{color:var(--alarm)}
+
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:14px 16px}
+.panel h2{font-size:15px;margin:0 0 6px}
+.panel h2 + p{margin:0 0 10px;font-size:12.5px;color:var(--muted)}
+.transport{display:flex;gap:6px;margin:4px 0 10px}
+.transport button,.ref button{font:13px var(--sans);border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:5px 10px;border-radius:4px;cursor:pointer}
+.transport button.primary{background:var(--tea);border-color:var(--tea);color:#fff;min-width:72px}
+.speed{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}
+.speed input{flex:1}
+select{width:100%;font:13px var(--sans);padding:5px 6px;border:1px solid var(--rule);border-radius:4px;background:#fff;color:var(--ink);margin-bottom:6px}
+.desc{font-size:12.5px;color:#38414d;background:var(--faint);border-radius:4px;padding:8px 10px;margin:4px 0 10px;min-height:58px}
+fieldset{border:0;border-top:1px solid var(--rule);margin:10px 0 0;padding:8px 0 0}
+fieldset[hidden],.f[hidden]{display:none}
+legend{font-size:12.5px;color:var(--muted);padding:0 6px 0 0}
+.f{display:grid;grid-template-columns:1fr 104px;gap:2px 8px;align-items:center;margin:4px 0;font-size:13px}
+.f input[type=number]{width:100%;font:13px var(--mono);padding:3px 6px;border:1px solid var(--rule);border-radius:3px;text-align:right}
+.f input[type=checkbox]{justify-self:end;width:16px;height:16px}
+.f select{margin:0}
+.f small{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:6px}
+
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
+@media (max-width:860px){.charts{grid-template-columns:1fr}}
+figure{margin:0;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px 12px 8px}
+figure h3{font-size:14px;margin:0 0 2px}
+figure .cap{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;flex-wrap:wrap;gap:2px 14px}
+figure .cap i{display:inline-block;width:16px;height:3px;margin-right:5px;vertical-align:3px;border-radius:2px}
+figure canvas{width:100%;height:210px;display:block}
+
+.ref{margin-top:22px}
+.ref h2{font-size:16px;margin:0 0 4px}
+.ref p{margin:0 0 8px;color:var(--muted);font-size:13px;max-width:940px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--sheet)}
+th,td{padding:6px 9px;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
+th{background:var(--faint);color:var(--muted);font-weight:600}
+td.k{font-family:var(--mono);font-size:12.5px;white-space:normal}
+tr.grp td{background:var(--paper);color:var(--muted);font-weight:600}
+tr.cur td{background:#E9F2EF}
+.tbl{overflow-x:auto;border:1px solid var(--rule);border-radius:6px}
+.match{color:var(--tea);font-weight:600}
+.pb-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:6px 0 8px;font-size:13px}
+.pb-bar button{font:13px var(--sans);border:1px solid var(--rule);background:var(--paper);padding:5px 10px;border-radius:4px;cursor:pointer}
+.pb-bar input[type=range]{flex:1;min-width:200px}
+.pb-file input{font:12px var(--sans);margin-left:6px}
+.pb-clock{font:700 15px var(--mono);min-width:150px}
+.pb-msg{font-size:12.5px;color:var(--alarm);min-height:18px}
+.pb-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;align-items:start}
+@media (max-width:980px){.pb-grid{grid-template-columns:1fr}}
+#pb-map{width:100%;display:block;background:#F7F8F5}
+.pb-viewport{position:relative;overflow:hidden;border:1px solid var(--rule);border-radius:4px;background:#dce8ed}
+.pb-viewport canvas{touch-action:none;cursor:grab}
+.pb-viewport canvas:active{cursor:grabbing}
+.pb-maptools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:8px;font-size:12px}
+.pb-maptools button{padding:3px 9px}
+.pb-maptools select{width:auto;margin:0}
+.pb-maptools input[type=search]{min-width:110px;flex:1;width:160px;padding:5px;border:1px solid var(--rule);border-radius:4px}
+.pb-detail{padding:8px 10px;min-height:92px;background:var(--faint);border-radius:4px;white-space:pre-line;font-size:12.5px;margin-top:8px}
+.pb-legend{margin:8px 0;font-size:12px;color:var(--muted)}
+.pb-legend span{display:inline-block;margin-right:10px}
+.pb-legend i{display:inline-block;width:12px;height:10px;margin-right:4px;vertical-align:-1px}
+.pb-meta{font-size:12px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere;white-space:pre-line}
+.pb-milestones{margin-top:14px}
+.pb-milestones p{font-size:12px}
+.pb-milestones td:first-child{white-space:normal;min-width:140px}
+.pb-milestones button{font:12px var(--sans);padding:2px 6px}
+.pb-run-panel{margin:12px 0;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
+.pb-controls{margin-bottom:12px;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);padding:10px 12px}
+.pb-controls>summary{font-weight:700;cursor:pointer}
+.pb-controls .pb-run-panel{border:0;padding:0;margin:10px 0 0}
+.pb-controls .pb-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pb-run-panel h3{margin:0 0 5px;font-size:15px}
+.pb-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 12px}
+.pb-fields label{display:flex;flex-direction:column;font-size:12px;color:var(--muted)}
+.pb-fields input,.pb-fields select{width:100%;font:13px var(--mono);padding:5px 6px;margin:3px 0 0;border:1px solid var(--rule);border-radius:3px;background:white;color:var(--ink)}
+.pb-run-panel textarea{display:block;width:100%;min-height:220px;margin-top:8px;padding:8px;font:12px/1.5 var(--mono);border:1px solid var(--rule);border-radius:4px;resize:vertical;tab-size:2}
+.pb-run-panel details{margin-top:10px;font-size:12px}
+.pb-run-panel summary{cursor:pointer;font-weight:600}
+.pb-run-panel .pb-bar{margin-bottom:0}
+.pb-run-status{font-size:12px;white-space:pre-line;color:var(--muted)}
+.pb-run-status.error{color:var(--alarm)}
+.pb-current{font-size:12px;background:var(--faint);border-radius:4px;padding:8px 10px;margin-top:10px;white-space:pre-line;overflow-wrap:anywhere}
+.legacy-experiments{margin-top:24px;border-top:1px solid var(--rule);padding-top:14px}
+.legacy-experiments>summary{font-size:16px;font-weight:700;cursor:pointer;margin-bottom:14px}
+.pb-run-progress{width:100%;height:7px;display:block;margin:8px 0 4px;accent-color:var(--tea)}
+.pb-run-progress[hidden]{display:none}
+.pb-offline{font-size:12px;background:var(--faint);border-radius:4px;padding:8px 10px;overflow-wrap:anywhere;margin-bottom:10px}
+.pb-offline code{white-space:pre-wrap}
+@media(max-width:720px){.pb-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pb-stats{grid-template-columns:repeat(2,1fr)}
+.mismatch{color:var(--alarm);font-weight:600}
+/* ---------- workbench ---------- */
+.wrap{max-width:1480px}
+#playback>p{max-width:1100px}
+.pb-top{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:8px 0 4px;padding:8px 10px;background:rgba(247,248,245,.96);border:1px solid var(--rule);border-radius:6px;font-size:13px;backdrop-filter:blur(2px)}
+.pb-top select{width:auto;margin:0}
+.pb-top input[type=range]{flex:1;min-width:220px}
+.pb-top button{font:13px var(--sans);border:1px solid var(--rule);background:var(--paper);padding:5px 12px;border-radius:4px;cursor:pointer}
+button.primary{background:var(--tea);border-color:var(--tea);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.pb-keys{font-size:11.5px;color:var(--muted)}
+.pb-grid{grid-template-columns:minmax(0,1fr) 400px}
+.pb-results .pb-stats{grid-template-columns:repeat(4,1fr);max-width:720px}
+.pb-maptools label{display:inline-flex;align-items:center;gap:4px}
+.pb-maptools button,.pb-select button,.pb-panel button,.pb-history button,.pb-sweep-out button,#pb-controls button{font:12.5px var(--sans);border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:4px 9px;border-radius:4px;cursor:pointer}
+.pb-maptools button.primary,.pb-panel button.primary,#pb-controls button.primary{background:var(--tea);border-color:var(--tea);color:#fff}
+.pb-live{position:absolute;left:10px;top:10px;background:rgba(30,38,51,.82);color:#fff;font:12px var(--sans);padding:4px 9px;border-radius:4px;pointer-events:none}
+.pb-select{margin-top:8px;padding:8px 10px;border:1px solid #BFD8D0;background:#F1F8F5;border-radius:4px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.pb-select b{font-size:13.5px;margin-right:4px}
+.pb-select .grp{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.pb-select .grp>span{color:var(--muted)}
+.pb-select button.on{background:var(--porcelain);border-color:var(--porcelain);color:#fff}
+.pb-select .scope-stat{flex-basis:100%;color:#38414d}
+.pb-tabs{display:flex;gap:2px;border-bottom:1px solid var(--rule);margin-bottom:0}
+.pb-tabs button{flex:1;font:13px var(--sans);padding:7px 6px;border:1px solid var(--rule);border-bottom:0;border-radius:6px 6px 0 0;background:var(--faint);color:var(--muted);cursor:pointer}
+.pb-tabs button[aria-selected=true]{background:var(--sheet);color:var(--ink);font-weight:700;position:relative;top:1px}
+.pb-panel{background:var(--sheet);border:1px solid var(--rule);border-top:0;border-radius:0 0 6px 6px;padding:10px 12px;margin-bottom:8px}
+.pb-panel h3{font-size:14px;margin:6px 0 2px}
+.pb-panel .note{margin:0 0 6px}
+.pb-controls{border:0;padding:0;margin:0;background:none}
+.pb-controls .pb-run-panel{border:0;padding:0;margin:0}
+.pb-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pb-fields label.dirty{color:var(--alarm)}
+.pb-fields label.dirty input,.pb-fields label.dirty select{border-color:var(--alarm);background:#FBF1EE}
+.pb-dirty{font-size:12px;color:var(--alarm);background:#FBF1EE;border-radius:4px;padding:5px 8px;margin-top:6px}
+.pb-bar-small{margin-top:0}
+.pb-inline{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+table.pb-edit{font-size:12px}
+table.pb-edit th,table.pb-edit td{padding:3px 4px}
+table.pb-edit input,table.pb-edit select{width:100%;min-width:44px;font:12px var(--mono);padding:2px 4px;border:1px solid var(--rule);border-radius:3px;margin:0;background:#fff}
+table.pb-edit input.bad{border-color:var(--alarm);background:#FBF1EE}
+table.pb-edit td.sel{white-space:normal;font-size:11.5px;color:var(--muted);max-width:110px;overflow-wrap:anywhere}
+table.pb-edit td.empty{color:var(--muted);text-align:center;white-space:normal}
+.pb-ms-list{display:flex;flex-direction:column;gap:6px}
+.pb-ms-card{border:1px solid var(--rule);border-radius:4px;padding:6px 8px;background:var(--paper)}
+.pb-ms-card .top{display:flex;gap:6px}
+.pb-ms-card .top input{flex:1;font:13px var(--sans);padding:3px 6px;border:1px solid var(--rule);border-radius:3px}
+.pb-ms-card .sel{font-size:11.5px;color:var(--muted);margin:3px 0;overflow-wrap:anywhere}
+.pb-ms-card .grid4{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px}
+.pb-ms-card label{display:flex;flex-direction:column;font-size:11px;color:var(--muted)}
+.pb-ms-card input,.pb-ms-card select{width:100%;font:12px var(--mono);padding:2px 4px;border:1px solid var(--rule);border-radius:3px;margin:2px 0 0;background:#fff}
+.pb-ms-list .empty{font-size:12px;color:var(--muted);text-align:center;padding:8px;border:1px dashed var(--rule);border-radius:4px}
+.pb-json{margin-top:10px;font-size:12px}
+.pb-json summary{cursor:pointer;font-weight:600}
+.pb-json textarea{display:block;width:100%;min-height:200px;margin-top:6px;padding:8px;font:12px/1.5 var(--mono);border:1px solid var(--rule);border-radius:4px;resize:vertical;tab-size:2}
+.pb-fields-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pb-results{margin-top:14px}
+.pb-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:12px}
+@media (max-width:980px){.pb-charts{grid-template-columns:1fr}}
+.pb-charts figure canvas{height:230px}
+#pb-chart,#pb-sweep-chart{cursor:col-resize}
+figure .cap i.dash{background:repeating-linear-gradient(90deg,#6B3F2A 0 4px,transparent 4px 7px);opacity:.75}
+.pb-history,.pb-sweep-out{margin-top:16px}
+.pb-history h3,.pb-sweep-out>h3,.pb-milestones h3{font-size:15px;margin:0 0 4px}
+.pb-history p{font-size:12px;color:var(--muted);margin:0 0 6px}
+.pb-history tr.cur td,.pb-sweep-out tr.best td{background:#E9F2EF}
+.pb-history tr.ref td:first-child{box-shadow:inset 3px 0 0 var(--porcelain)}
+.pb-history td.k,.pb-sweep-out td.k{font-family:var(--mono);font-size:12px;white-space:normal;max-width:300px}
+.pb-history td .btns{display:flex;gap:4px;flex-wrap:wrap}
+.pb-history button.on{background:var(--porcelain);border-color:var(--porcelain);color:#fff}
+.pb-sweep-out td.ok{color:var(--tea);font-weight:600}
+.pb-sweep-out td.bad{color:var(--alarm)}
+.pb-sweep-out td.na{color:var(--muted)}
+.pb-load{display:inline-block;margin-top:10px;font-size:12px;color:var(--muted)}
+.pb-milestones td.delta{font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>痴迷扩散实验可视化</h1>
+  <p><a href="/docs/design/obsession/experiments/structural_workbench.html">三层模型 · 动态世界 · 验收矩阵 ↗</a></p>
+  <p class="sub">真实 EU5 地图与合成六角网格在同一模拟区域切换，共用参数、播放控制与结果统计。连接本机服务后调整参数并用 Python 核心重算；导出结果可断网回放。历史浏览器实验与自动回归对照保留在折叠区。U 是离线抽象计数，系数是测试值。</p>
+
+  <div class="grid">
+    <section class="mapbox" aria-label="地图">
+      <div class="maphead">
+        <div class="clock" id="clock">第 0 月<small>0 年</small></div>
+        <span class="phase growth" id="phase">增长</span>
+        <div class="scen-name" id="scen-title"></div>
+      </div>
+      <div class="mapwrap" id="mapwrap">
+        <canvas id="map" width="235" height="116" aria-label="各地点强度 x"></canvas>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="stats">
+        <div class="stat"><div class="k">本月服务节点</div><div class="v" id="s-active">0</div></div>
+        <div class="stat"><div class="k">成员 x≥1</div><div class="v" id="s-mem">0</div></div>
+        <div class="stat"><div class="k">x≥45</div><div class="v" id="s-hot">0</div></div>
+        <div class="stat"><div class="k">平均 x（x&gt;0）</div><div class="v" id="s-mean">0</div></div>
+        <div class="stat" id="st-ulast"><div class="k">本月 U</div><div class="v" id="s-ulast">0</div></div>
+        <div class="stat"><div class="k">累计 U</div><div class="v" id="s-u">0</div></div>
+        <div class="stat"><div class="k">排队峰值</div><div class="v" id="s-peak">0</div></div>
+        <div class="stat"><div class="k" id="s-extra-k">逻辑轮</div><div class="v" id="s-extra">0</div></div>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="控制">
+      <h2>合成网格情景</h2>
+      <p>改任何参数都会从头重来。</p>
+      <select id="preset" aria-label="选择预设"></select>
+      <div class="desc" id="desc"></div>
+      <div class="transport">
+        <button type="button" class="primary" id="play">播放</button>
+        <button type="button" id="step">单步</button>
+        <button type="button" id="reset">重来</button>
+      </div>
+      <div class="speed"><label for="speed">速度</label><input id="speed" type="range" min="1" max="40" value="6"><span id="speed-v">6 步/帧</span></div>
+      <div class="f"><label for="show-active">高亮排队中的地点</label><input type="checkbox" id="show-active" checked></div>
+      <div class="f" data-m="country"><label for="show-borders">显示国界</label><input type="checkbox" id="show-borders" checked></div>
+
+      <fieldset><legend>模型与容差</legend>
+        <div class="f"><label for="p-model">模型</label><select id="p-model">
+          <option value="country">现行：国家时钟（方案A + 时钟）</option><option value="A">方案A 队列（无时钟/全局退潮）</option>
+          <option value="drop">水滴：脚本发源地</option><option value="set">集合版（旧）</option></select></div>
+        <div class="f"><label for="p-delta">变化容差 δ</label><input type="number" id="p-delta" step="0.01" min="0"></div>
+      </fieldset>
+      <fieldset><legend>传播系数</legend>
+        <div class="f"><label for="p-rho">ρ 保留率</label><input type="number" id="p-rho" step="0.001"></div>
+        <div class="f"><label for="p-p">p 每条入边</label><input type="number" id="p-p" step="0.0005"></div>
+        <div class="f" data-m="A set country"><label for="p-seed">种子强度</label><input type="number" id="p-seed" step="1"></div>
+        <div class="f" data-m="A"><label for="p-init">初始全图 x（0 = 中心种子）</label><input type="number" id="p-init" step="1" min="0"></div>
+        <div class="note" id="gain-note"></div>
+      </fieldset>
+      <fieldset data-m="A set"><legend>受控东半区（列 &gt; 63）</legend>
+        <div class="f"><label for="p-ctl">启用</label><input type="checkbox" id="p-ctl"></div>
+        <div class="f"><label for="p-crho">ρ</label><input type="number" id="p-crho" step="0.001"></div>
+        <div class="f"><label for="p-cp">p</label><input type="number" id="p-cp" step="0.0005"></div>
+      </fieldset>
+      <fieldset data-m="A"><legend>全局退潮阶段</legend>
+        <div class="f"><label for="p-dstart">开始月份（−1 关闭）</label><input type="number" id="p-dstart" step="12" min="-1"></div>
+        <div class="f"><label for="p-dmode">处理方式</label><select id="p-dmode">
+          <option value="monthly">① 逐节点，每月一步</option>
+          <option value="annual">② 逐节点，年度步长</option>
+          <option value="lazy">③ 阶段级懒衰退 S</option></select></div>
+        <div class="f"><label for="p-drho">退潮 ρ</label><input type="number" id="p-drho" step="0.001"></div>
+        <div class="f"><label for="p-dp">退潮 p</label><input type="number" id="p-dp" step="0.001"></div>
+        <div class="note" id="decay-note"></div>
+      </fieldset>
+      <fieldset data-m="country"><legend>国家级时钟（1,600 个合成国家，平均 8.5 个地点）</legend>
+        <div class="f"><label for="p-T">首次成员后保持 T（月）</label><input type="number" id="p-T" step="12" min="0"></div>
+        <div class="f"><label for="p-cg">退潮因子 / 月</label><input type="number" id="p-cg" step="0.005" min="0" max="1"></div>
+        <div class="f"><label for="p-kappa">习俗保留率 κ</label><input type="number" id="p-kappa" step="0.05" min="0" max="1"></div>
+        <div class="note">每国在第一个地点 x≥1 时记下月份（国家变量），T 个月后整国按 S_c ← 因子·S_c 衰退，且不再接收输入。κ &gt; 0 时 S_c 低于 0.01 整国定格为 κ×x（习俗）。</div>
+      </fieldset>
+      <fieldset data-m="drop"><legend>脚本发源地</legend>
+        <div class="f"><label for="p-layout">布局</label><select id="p-layout"><option value="single">中心单点</option><option value="relay">中线 6 个中继（间隔 15 跳、每 10 年点燃一个）</option></select></div>
+        <div class="f"><label for="p-rise">上升（月）</label><input type="number" id="p-rise" step="12" min="1"></div>
+        <div class="f"><label for="p-hold">保持 100（月）</label><input type="number" id="p-hold" step="12" min="0"></div>
+        <div class="f"><label for="p-fall">下降（月）</label><input type="number" id="p-fall" step="12" min="1"></div>
+        <div class="f"><label for="p-snap">衰减停滞即归零</label><input type="checkbox" id="p-snap"></div>
+      </fieldset>
+      <fieldset data-m="set"><legend>早期实验选项</legend>
+        <div class="f"><label for="p-sat">x=100 锁定跳过</label><input type="checkbox" id="p-sat"></div>
+        <div class="f"><label for="p-eps">入流阈值 ε_in</label><input type="number" id="p-eps" step="0.1" min="0"></div>
+        <div class="f"><label for="p-t1">T1 接触后（月，0 关闭）</label><input type="number" id="p-t1" step="12" min="0"></div>
+        <div class="f"><label for="p-contact">接触标准</label><select id="p-contact"><option value="1">x ≥ 1</option><option value="0.00001">x &gt; 0</option></select></div>
+        <div class="f"><label for="p-t2">T2 饱和后（月，0 关闭）</label><input type="number" id="p-t2" step="12" min="0"></div>
+      </fieldset>
+      <div class="note">每层每月 40,000 U 是把 480,000 平均分给 12 层的示意额度；本月 U 超过它会变红。</div>
+    </aside>
+  </div>
+
+  <div class="charts">
+    <figure>
+      <h3>节点数随月份</h3>
+      <div class="cap"><span><i style="background:#2E7A6A"></i>本月服务</span><span><i style="background:#6B3F2A"></i>成员 x≥1</span><span><i style="background:#3A2013;opacity:.5"></i>x≥45</span></div>
+      <canvas id="ch-nodes"></canvas>
+    </figure>
+    <figure>
+      <h3>每月 U</h3>
+      <div class="cap"><span><i style="background:#2E7A6A"></i>本月 U</span><span><i style="background:#A8452F"></i>每层 40,000 U/月示意额度</span></div>
+      <canvas id="ch-u"></canvas>
+    </figure>
+  </div>
+
+  <section class="ref" id="playback">
+    <h2>扩散模拟工作台</h2>
+    <p>真实 EU5 地图与合成六角网格共用参数、播放与统计，均由本机 Python 核心计算。点击地点可设种子、选观察范围、存为历史里程碑；每次重算自动进入运行记录，可设为基准做到达时间对比；参数扫描一次跑多组值，对照里程碑误差。</p>
+    <div class="pb-top">
+      <label>模拟地图 <select id="pb-run-map"><option value="real">真实 EU5 地图</option><option value="hex">合成六角网格</option></select></label>
+      <button type="button" id="pb-play" class="primary" disabled>播放</button>
+      <label>速度 <select id="pb-speed"><option value="320">很慢</option><option value="180">慢</option><option value="90" selected>中</option><option value="40">快</option><option value="0">最快</option></select></label>
+      <input type="range" id="pb-t" min="0" max="0" value="0" disabled aria-label="回放时间">
+      <span id="pb-clock" class="pb-clock">未载入</span>
+      <span class="pb-keys" title="焦点不在输入框时可用">空格 播放/暂停 · ← → 逐帧（Shift 十帧）· Ctrl+Enter 重算</span>
+    </div>
+    <div class="pb-msg" id="pb-msg" role="status"></div>
+    <div class="pb-grid">
+      <div class="mapbox">
+        <div class="pb-maptools">
+          <button type="button" id="pb-fit">全图</button><button type="button" id="pb-zoom-in" aria-label="放大地图">＋</button><button type="button" id="pb-zoom-out" aria-label="缩小地图">−</button>
+          <label>着色 <select id="pb-mode"><option value="intensity">当前强度</option><option value="arrival">首次 x≥1 时间</option><option value="compare">与基准比较到达</option><option value="owner">所属国家</option></select></label>
+          <label><input type="checkbox" id="pb-borders" checked>国界</label>
+          <label><input type="checkbox" id="pb-flip">y 轴向上</label>
+          <input type="search" id="pb-search" aria-label="查找地点" placeholder="查找地点，回车定位并选中">
+        </div>
+        <div class="pb-viewport"><canvas id="pb-map" tabindex="0" aria-label="回放地图：点击选中地点，滚轮缩放、拖拽平移，方向键平移，加减键缩放，Home 全图"></canvas><div class="pb-live" id="pb-live" hidden></div></div>
+        <div class="pb-legend" id="pb-legend"></div>
+        <div class="pb-select" id="pb-select" hidden></div>
+        <div class="pb-detail" id="pb-detail" aria-live="polite">载入回放后，悬浮或点击地点查看详情。</div>
+        <div class="pb-meta" id="pb-meta"></div>
+      </div>
+      <div id="pb-sidebar">
+        <div class="pb-tabs" role="tablist" id="pb-tabs">
+          <button type="button" role="tab" id="pb-tab-params" aria-selected="true">参数</button>
+          <button type="button" role="tab" id="pb-tab-scenario" aria-selected="false">情景与里程碑</button>
+          <button type="button" role="tab" id="pb-tab-sweep" aria-selected="false">参数扫描</button>
+        </div>
+        <div class="pb-panel" id="pb-panel-params" role="tabpanel">
+          <div id="pb-controls" class="pb-controls">
+          <form id="pb-run-form" class="pb-run-panel">
+            <div class="pb-offline" id="pb-api-help" hidden>当前仅能回放。要调整参数重算，请在项目目录启动：<br><code id="pb-api-command">python -m tools.obsession_sim serve --graph tmp/obsession_real/eu5_1337.json --scenario tools/obsession_sim/examples/map_demo.json --preset baseline --port 8765</code><br>然后打开 <a id="pb-api-link" href="http://127.0.0.1:8765/">本机可重算页面</a>。已载入的回放仍可离线查看。</div>
+            <div class="pb-fields">
+              <label>模型预设<select id="pb-run-preset"><option value="baseline">baseline</option><option value="growth_only">growth_only</option></select></label>
+              <label>模拟起始年份<input type="number" id="pb-run-start_year" step="1" value="1600" required></label>
+              <label>首个种子地点键<input type="text" id="pb-run-seed_name" value="" placeholder="地点键，或在地图上点选" required></label>
+              <label>首个种子强度<input type="number" id="pb-run-seed_value" min="0.000000001" max="100" step="any" value="25" required></label>
+              <label>传播系数 p<input type="number" id="pb-run-p" min="0" max="1" step="any" value="0.02" required></label>
+              <label>保留率 ρ<input type="number" id="pb-run-rho" min="0" max="1" step="any" value="0.99" required></label>
+              <label>变化容差 δ<input type="number" id="pb-run-delta" min="0" step="any" value="0.1" required></label>
+              <label>保持期 T（月）<input type="number" id="pb-run-hold_T" min="0" step="1" value="240" required></label>
+              <label>退潮月保留因子<input type="number" id="pb-run-decay_factor" min="0" max="1" step="any" value="0.98" required></label>
+              <label>习俗保留率 κ<input type="number" id="pb-run-habit_floor" min="0" max="1" step="any" value="0" required></label>
+              <label>月处理预算（留空＝不限）<input type="number" id="pb-run-budget" min="1" step="1" placeholder="不限" value=""></label>
+              <label>模拟最长月数<input type="number" id="pb-run-max_months" min="1" step="1" value="2400" required></label>
+              <label>每隔几月保留一帧<input type="number" id="pb-run-frames_every" min="1" step="1" value="12" required></label>
+              <label>每隔几月保留统计<input type="number" id="pb-run-series_every" min="1" step="1" value="12" required></label>
+            </div>
+            <div class="note" id="pb-gain"></div>
+            <div class="note" id="pb-run-preset-note">预设决定模型；下面数值是明确的参数覆盖值。</div>
+            <div class="pb-dirty" id="pb-dirty" hidden></div>
+            <div class="pb-bar"><button type="submit" id="pb-run-submit" class="primary" disabled>按当前参数重算</button><button type="button" id="pb-run-cancel" disabled>取消计算</button><label class="pb-inline"><input type="checkbox" id="pb-live-on" checked>计算时实时显示地图</label></div>
+            <div class="pb-bar pb-bar-small"><button type="button" id="pb-run-download">下载当前配置</button><label class="pb-file">导入配置 <input id="pb-run-import" type="file" accept=".json,application/json"></label><button type="button" id="pb-api-connect">连接本机计算服务</button></div>
+          </form>
+          </div>
+        </div>
+        <div class="pb-panel" id="pb-panel-scenario" role="tabpanel" hidden>
+          <h3>种子</h3>
+          <p class="note">第一行与参数页的首个种子同步。在地图上选中地点后，可“设为首个种子”或“在当前回放月份追加种子”。</p>
+          <div class="tbl"><table class="pb-edit"><thead><tr><th>地点键</th><th>月份</th><th>强度 x</th><th></th></tr></thead><tbody id="pb-seed-rows"></tbody></table></div>
+          <h3>历史里程碑</h3>
+          <p class="note">在地图上选中地点或观察范围后，用“存为里程碑”添加；目标年默认取当前回放年份，请改成史料年份。统计口径为等权地点比例。</p>
+          <div class="pb-ms-list" id="pb-ms-rows"></div>
+          <details class="pb-json"><summary>高级情景 JSON：地区系数、显式路线等</summary><p class="note">表格与此 JSON 双向同步。地区系数与路线目前只能在这里编辑。</p><textarea id="pb-run-scenario" spellcheck="false" aria-label="高级情景JSON">{}</textarea></details>
+        </div>
+        <div class="pb-panel" id="pb-panel-sweep" role="tabpanel" hidden>
+          <p class="note">以参数页的当前设置为基础，只改变一个参数，依次跑完每个值。扫描只记录统计与里程碑，不保存逐帧地图；挑中的值可一键完整重算。</p>
+          <div class="pb-fields pb-fields-2">
+            <label>扫描参数<select id="pb-sweep-param"><option value="p">传播系数 p</option><option value="rho">保留率 ρ</option><option value="delta">变化容差 δ</option><option value="hold_T">保持期 T</option><option value="decay_factor">退潮因子</option><option value="habit_floor">习俗保留率 κ</option><option value="budget">月处理预算</option><option value="seed_value">首个种子强度</option></select></label>
+            <label>取值（逗号分隔，最多 24 个）<input type="text" id="pb-sweep-values" value=""></label>
+            <label>从<input type="number" id="pb-sweep-from" step="any"></label>
+            <label>到<input type="number" id="pb-sweep-to" step="any"></label>
+            <label>个数<input type="number" id="pb-sweep-n" min="2" max="24" step="1" value="6"></label>
+            <label>间隔<select id="pb-sweep-scale"><option value="lin">等差</option><option value="log">等比</option></select></label>
+          </div>
+          <div class="pb-bar"><button type="button" id="pb-sweep-gen">生成取值</button><button type="button" id="pb-sweep-run" class="primary" disabled>开始扫描</button><button type="button" id="pb-sweep-cancel" disabled>取消</button></div>
+        </div>
+        <progress id="pb-run-progress" class="pb-run-progress" max="1" value="0" hidden></progress>
+        <div id="pb-run-status" class="pb-run-status" role="status">正在检查本机计算服务…</div>
+      </div>
+    </div>
+    <div class="pb-results">
+      <div class="stats pb-stats">
+        <div class="stat"><div class="k">成员 x≥1</div><div class="v" id="pb-mem">—</div></div>
+        <div class="stat"><div class="k">x≥45</div><div class="v" id="pb-hot">—</div></div>
+        <div class="stat"><div class="k">衰退中的组</div><div class="v" id="pb-dec">—</div></div>
+        <div class="stat"><div class="k">本月 U</div><div class="v" id="pb-u">—</div></div>
+      </div>
+      <div class="pb-charts">
+        <figure><h3>节点数随时间</h3>
+          <div class="cap"><span><i style="background:#2E7A6A"></i>本月服务</span><span><i style="background:#6B3F2A"></i>成员</span><span><i style="background:#3A2013;opacity:.5"></i>x≥45</span><span id="pb-chart-ref-cap" hidden><i class="dash"></i>基准成员</span><span>▲ 里程碑目标</span><span class="note">点击或拖动图表跳转</span></div>
+          <canvas id="pb-chart"></canvas></figure>
+        <figure id="pb-scope-fig" hidden><h3 id="pb-scope-title">观察范围</h3>
+          <div class="cap"><span><i style="background:#9FC9BD"></i>接触 x&gt;0</span><span><i style="background:#6B3F2A"></i>成员 x≥1</span><span><i style="background:#D1A274"></i>风尚 x≥20</span><span id="pb-scope-ref-cap" hidden><i class="dash"></i>基准成员</span></div>
+          <canvas id="pb-scope-chart"></canvas>
+          <div class="note" id="pb-scope-note"></div></figure>
+      </div>
+      <div class="pb-milestones" id="pb-milestones" hidden><h3>历史传播里程碑</h3><p>目标时间来自情景配置；模拟时间为指定比例地点首次达到阈值的月份。允许误差用于校准，并非对历史记录精度的声明。设了基准时增列基准结果。</p><div class="tbl"><table><thead><tr id="pb-ms-head"><th>目标</th><th>覆盖条件</th><th>目标时间</th><th>模拟时间</th><th>误差 / 容差</th><th>结果</th></tr></thead><tbody id="pb-milestone-rows"></tbody></table></div></div>
+      <div class="pb-history" id="pb-history" hidden><h3>运行记录</h3><p>每次重算或载入的回放都会记下（最多 8 次，仅存在本页内存中）。“设为基准”后，图表叠加基准曲线，着色可选“与基准比较到达”，里程碑表增列基准结果。</p>
+        <div class="tbl"><table><thead><tr><th>#</th><th>地图</th><th>参数</th><th>相对上一次</th><th>曾为成员</th><th>平静</th><th>总 U</th><th>里程碑</th><th></th></tr></thead><tbody id="pb-history-rows"></tbody></table></div></div>
+      <div class="pb-sweep-out" id="pb-sweep-out" hidden><h3 id="pb-sweep-title">参数扫描结果</h3>
+        <div class="pb-charts">
+          <figure><h3>成员数随时间（每组一条）</h3><div class="cap" id="pb-sweep-cap"></div><canvas id="pb-sweep-chart"></canvas></figure>
+          <figure id="pb-sweep-err-fig" hidden><h3>里程碑误差 ÷ 容差</h3><div class="cap"><span>阴影为 ±1（在容差内）；空心点表示未到达</span></div><canvas id="pb-sweep-err"></canvas></figure>
+        </div>
+        <div class="tbl"><table><thead><tr id="pb-sweep-head"></tr></thead><tbody id="pb-sweep-rows"></tbody></table></div></div>
+      <div class="note" id="pb-summary"></div>
+      <div class="pb-current" id="pb-applied"></div>
+      <div class="note" id="pb-scenario-note"></div>
+      <label class="pb-file pb-load">载入回放文件（JSON / HTML） <input type="file" id="pb-file" accept=".json,.html,application/json,text/html"></label>
+    </div>
+  </section>
+
+  <section class="ref" id="legacy-reference">
+    <h2>与 Python 结果对照</h2>
+    <p>对照脚本：方案A情景 <code>delta_adoption_study.py</code>，国家时钟 <code>ripple_country_clock_study.py</code> 与 <code>tools/obsession_sim</code>（κ 情景；国家划分直接嵌入了 Python 生成的那一份），水滴 <code>ripple_source_study.py</code>，集合版 <code>immunity_lock_study.py</code>。不改参数、不点地图地跑完，“浏览器”列会自动核对。</p>
+    <div class="tbl"><table id="ref"><thead><tr><th>情景</th><th>Python 关键值</th><th>浏览器</th><th></th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <details id="legacy-experiments" class="legacy-experiments"><summary>历史实验与回归对照</summary></details>
+</div>
+
+<script id="core">
+/* ---------- grid ---------- */
+const GW = 117, GH = 116, EPS_ZERO = 0.00001, CB = Math.floor(GW / 2) + 5;
+const NBRS = (() => {
+  const a = [];
+  for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++) {
+    const ds = r % 2 === 0 ? [[0,-1],[0,1],[-1,-1],[-1,0],[1,-1],[1,0]]
+                           : [[0,-1],[0,1],[-1,0],[-1,1],[1,0],[1,1]];
+    const l = [];
+    for (const [dr, dc] of ds) { const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < GH && cc >= 0 && cc < GW) l.push(rr * GW + cc); }
+    a.push(l);
+  }
+  return a;
+})();
+const N = NBRS.length, CENTER = Math.floor(GH / 2) * GW + Math.floor(GW / 2);
+const OWNER = (() => {           // ripple_country_clock_study.partition(1600), little-endian uint16
+  const bin = atob("MAAwADAAZgJmAmYCcgFyAXIBRgVGBUYFcgJyAnICcgJyAnICcgJyAqADoAPnBecF5wVgBWAFYAWTAOAEewG+AL4AvgC+AEYD9wT3BPcE9wN3BXcFdwV3BXcFpAQYBRgFUgVSBVIFUgVSBf0AqQCpAKkAqQAsBSwFYQJhAmECYQIyAjICMgIyAjICkwOTA5MDkwMjBCMEIwQjBCMEIwQjBCMEkAPxBPEELwEvAS8BIQANAA0ADQANAA0AWQC3ALEBsQGxAbEBsgNzAXMBcwFzAXMB5ADIAV0BXQFdAV0BXQFeAl4CXgJeAl4CMAAFAqEDZgJmAnIBcgFyAXIBRgVGBUYFRgVyAnICcgJyAnICnwSfBKADoAPnBecFIgZgBWAFkwDgBHsBewG+AL4AvgC+AEYD9wT3BPcDdwV3BXcFdwV3BaQEpAQYBRgFUgVSBVIFUgX9AP0AqQCpAKkAqQAsBSwFYQJhAmECMgIyAjYDNgM2A5MDkwOTA5MDkwMjBCMEIwQjBCMEIwSQA5AD8QTxBPEELwEhACEAQQFBAQ0A9ARZAFkAtwC3ALEBsQGyA7IDsgNzAXMBcwEKAOQA5ADIAV0BXQFdAV0BXgJeAl4CXgJeAl4CBQIFAgUCoQNyAXIBcgFyAXIBcgRGBUYFRgVGBXICcgJyAnICnwSfBDsCoAOgA+cFIgZgBWAFkwDgBHsBewF7Ab4AvgC+AOICRgP3BPcD9wN3BXcFdwV3BXcFpASkBBgFGAWHA4cDhwP9AP0A/QCpAKkAqQCpALAFsAX6BPoE+gQyAjYDNgM2A5MDkwOTA5MDkwMCBgIGhgMjBCMEkAOQA5AD3wHxBPEE8QQhACEAIQBBAUEBxwJZAFkAWQC3ALcAWQOIAbIDsgOyAwoACgAKAOQA5ADIAcgBXQFdAV0B/ABeAl4CXgJeAl4CBQIFAqEDoQNyAXIBcgHXBXIEcgRGBUYFRgVGBXICcgKfBJ8EnwSfBDsCoAOgA+cF7wWTAJMA4ATgBHsBewG+AL4AvgDiAkYDRgP3A/cDsgF3BXcFwAXABaQEpASkBBgFhwOHA4cD/QD9AP0A/QCpAKkAqQCwBWEBYQH6BPoE+gQ2AzYDuAGTA5MDkwOTA5MDAgYCBkQBhgOGA5ADkAOQA98B3wHtBe0FPAY8BiEAQQFBARoCxwJZAFkAtwBOAmUDiAHTBbIDsgMKAAoACgDkAOQA5ADIAcgBXQFdAfwA/ABeAl4CXgJeAl4CBQIFAgUCoQNyAXIBcgHXBdcFcgRyBEYFRgVGBf8B9AX0Bc0DnwSfBDsCOwI7AjsC7wXvBZMAkwDgBHsBewF7Ab4AvgDiAi0ALQBGA/cDsgGyAbIBwAXABcAFpASkBKQEpASHA4cD/QD9AP0A/QByA3IDqQCpAGEBYQFhAWEBKwYrBrgFuAW4AbgBkwOTAwIGAgYCBkQBRAGGA4YD3wHfAd8B3wHtBe0F7QU8BggB2QPZA04AGgIaAlkAswWzBU4CiAGIAdMFsgMKAAoACgAKAOQA5ADIAcgBfAB8AHwA/AD8APwA/AD8AAwEKwQrBCsEZwWmAqYCpgLXBdcFcgRyBEYFVwNXA/8B9AX0Bc0DzQM7AjsCOwI7Au8F7wXvBZMAkwC2AHsBewG+AL4AvgAtAC0ALQAtAI0BsgGyAewFwAUOAw4DDgOkBKQEhwOHA4cD/QD9AP0AcgNyA3IDcgNhAWEBYQFhASsGKwYmAbgFuAG4AbgBuAECBgIGAgYCBkQBRAGGA4YD3wHfAd8BegB6AHoAegAIAQgBCAFOAE4ATgBOALMFswVJAEkASQCIAdMFdgIKAAoACgAKAOQAfAB8AHwAfAB8AHwA/AD8APwAUQUMBAwEKwQrBCsEKwRnBaYCpgLzAGwFcgRyBGMCVwNXA1cD/wH0Bc0DzQPNAzsCOwI7Av4B/gH+Ae8FkwC2ALYAtgC2AL4AvgBsAmwCLQAtAI0BjQGyAbIB7AUOAw4DDgNgBGAEpASSAJIA3wT9AP0A/QByA3IDxwDHAJkFmQWZBScFJwUmASYBJgG4AbgBuAG9BAIGAgYCBkQBRAFEAYYDhgPfAbsEuwR6AHoAegB6AAgBCAFOAE4ATgBOAKkESQBJAEkASQAKBXYCdgJ2AgoACgAKAAoA5AB8AHwAfAB8AHwA/AD8APwAUQVRBQwEKwQrBCsEZwWmAqYC8wDzAGwF5AFjAmQAVwNXA/0B/wH/AQgENwM3Ax0DHQMdA/4B/gH6APoAtgC2ALYAtgC2AHEEJAQkBGwC3QWNAY0BjQHLBJUBDgMOAw4DYARgBGAEkgCSAJIA3wTfBN8EcgPHAMcAxwAwApkFmQUnBScFJwUmASYBJgG4AbgB5gG9BL0EAgZEAUQBRAFEAYYDhgO7BLsEuwR6AHoAegAIAe8D7wN+BH4ETgCpBKkEqQRJAEkACgUKBXYCdgJ2AnYCFwIXAhcCFwJ8AHwAfAB8AHwA/ABRBVEFUQUMBAwEKwQrBCsEKwSmAqYC8wDzAPMA5AFjAmQAPgX9Af0B/QH/AQgENwM3AzcDHQMdA/4B/gH6APoA+gC2ALYAtgC2AHEEcQSBA4ED3QXdBbwAlQTLBJUBlQEOAw4DDgNgBGAEkgCSAJIAkgDfBN8E3wTHAMcAxwAwApoFmgWfAp8CJwXsBOwE7AS5ALMB5gHmAb0EvQRoA0QBRAFEAUQBuAK7BLsEuwR6AHoAegDvA+8D7wNEAH4EfgTMBakEqQSpBBYACgUKBXYCdgJ2AnYCvAQXAhcCFwIXAnwAfAB8AHwAfABRBVEFUQVRBQwEKwQrBBcAFwAXABcA8wDzAPMAZABkAD4FPgX9Af0B/QH/ATcDNwM3Ax0DHQMdA/4B+gD6APoAHQAdAG4DbgNuA3EEgQOBA4EDvAC8ALwAlQGVAZUBtAVNBU0FDgNgBIwEkgCSAJIAkgDfBDgGOAbHAMcAxwAwApoFaAGfAp8CnwLsBLkAuQD2ArMB5gHmAWgDaAOwAa4ErgS4ArgCuAK7BLsEuwR6AHoARABEAEQARAAAAgACzAXMBakEFgAWABYAfAN2AnYCdgK8BLwEFwIXAhcCFwIXAnwAfAB8AHwAUQVRBVEFUQUMBAwEEwMXABcAFwAXABcAFwDzAPMAZABkAGQAPgX9Af0B/QH9Af8BNwM3AzcDSQRJBGICYgL6APoAHQAdAB0AbgNuA24DgQOBA4EDvAC8ALwARQGVAZUBtAVNBU0FTQW1BIwEjASMBJIAkgDMAjgGOAY4BscAxwDHAGgBaAFoAWgBaAG5ALkAuQD2ArMBswGzAWgDaAOwAbABrgS4ArgCuAK4ArgCuwQpACkAKQApAEQARABEAAACAALHBD8FFgAWABYAFgB8A3wDdgK8BLwEvAQXAhcCFwIXAhcCVwBXAFcAVwBXAFEFgQSBBIEEEwMXABcAFwAXABcAjwUGBAYEZABkAGQAPgWsAP0B/QH9ATcDNwNJBEkESQRiAmICYgIEBhECHQAdAB0AbgNuA24DgQOBA4EDHQVFAUUBRQFFAbQFtAVNBbUEtQSMBIwEjASMBMwCzALMAjgGOAYMBQwFDAXHAGgBaAEJAgkCUQO5ALkAuQD2ArMBswGzAWgDsAGwAbABsAG4ArgCuAK4AikAKQApACkAKQBqAEQAgAOAAwACxwTHBIcAMQYWABYAfAN8A3wDfAO8BLwEFwIXAhcCFwIXAl8CVwBXAFcAVwBXAIEEgQSBBIEEEwMTAxMDFwAXABcAjwUGBAYEBgQGBKwArACsAKwArAD9ATcDNwNJBEkESQRJBGICYgIEBhECEQIdAB0AHQBMAUwBgQP+A/4D/gMdBUUBRQHlBbQFtAWdArUEtQS1BIwEjASMBMwCzALMAuEA4QAMBQwFDAUMBSwBaAEJAgkCUQNRA2EFgAKyBLIEswGzAWgDsAGwAbABsAG4ArgCuAJJAkMEKQApACkAKQBqAGoAgAOAA4ADgAPHBIcAhwCHAFQBVAF8A3wDzgPOA84DvAQXAhcCFwIXAl8CXwJXAFcAVwBXAIEEgQSBBIEEEwMTAxMDegJ6AnoCjwUGBAYEPQY+AKwArACsAKwArACsADcDSQRJBEkESQRiAmICBAbRBRECEQIdAEwBTAFMAUwB/gP+A/4D/gPBBMEE5QXlBVIDnQKdAp0CtQS1BIwEjASJAuIA4gDhAOEA4QAMBQwFLAEsASwBpwWnBVEDUQNhBYACgAKAAoACswGzAbABsAGwAb8AvwC/AEkCSQJDBEMEKQApACkAagBqAGoAgAOAA5IDwgGHAIcAhwBUAVQBVAF8A84DzgPOA84DzQLNAs0CLQRfAl8CXwJXAFcAVwBXAIEEgQSBBI8EEwMTAxMDEwM4AjgC/wDdA90DPQY+AKwArACsAKwArACsAKwAhASEBEkESQRiAmIC0QXRBdEF0QVMAUwBTAFMAUwBTAH+A/4D/gP+A8EEwQRSA1IDnQKdAp0CnQKdAgQCBAIEAokC4gDiAOEA4QAaAxoDbQMsASwBLAGnBUYERgRGBGEFgAKAAgwCDAKzAbABsAG/AL8AvwC/AEkCSQKWAEMEQwQpACkAKQBqAGoAOwOSA5IDTwPCAcIBhwBUAVQBVAEDAAMAzgPOAxoEdwTNAs0CLQQtBF8CXwJXAFcAVwBXAFcAgQSBBI8EEwMTAxMDOAI4Av8A/wDdA90DPgA+AKwAaAVoBWgFaAVoBYQEhASEBIQEhASEBHEDcQNxA3EDiAJMAUwBTAFMAWsEWwJbAvcA9wD3AFIDUgNSA1IDnQKdAp0CnQIEAgQCBAKJAokC4gDiABoDGgMaA20DbQMsASwBLAFGBEYERgRGBAwCDAIMAgwCDALsAuwCvwC/AL8AvwC/AEkCSQKWAEMEQwSMA4wDKQA7AzsDtgNPA08DwgHCAcIBVAFUAVQBAwADAAMAGgQaBHcEzQLNAs0CLQQtBF8CegFXAFcAVwBXAIQFhAWEBYQFEwMTAxMD/wD/AP8A/wD/AN0DPgA+AK0BrQFoBWgFaAVoBYQEhASEBIQEhASEBLsFcQNxA3EDiAKIAoYBhgFMAWsEawRbAlsC9wD3APcA1QJSA1IDUgOdAp0CnQIEAgQCBAIEAokCiQLiAOIAGgMaA4IBbQMsASwBLAGdBUYE3AXcBQwCDAIMAgwCDALsAuwC7AIABAAEvwCsBN4CSQKWAJYAlgCMA4wDjAM7AzsDtgO2A08DTwPCAcIBwgFUAQMAAwADAAMA7wQaBPoFdwTNAs0CLQQtBHoBegF6AXoBVwBXAIcChwKEBYQFEwMTA0EAQQD/AP8A/wC7ALsAuwC7AK0BrQFoBWgF+gL6AoQEhASEBIQEhAS7BbsFcQNxA4gCiAKGAYYBhgGGAWsEawRbAvcA9wD3ANUC1QJNA00DTQO1AbUBtQHTAdMB0wHTAYkCiQIrAysDggGCAYIBLAEsAZ0FnQWdBdwF3AXcBQwCDAIMAgwC7ALsAuwCDwUABAAEAATsAOwAlgCWAJYAlgCMA4wDSAQ7A+UEtgNPA08DUgRSBFIEUgRSBAMAAwADAAMAVgL6BfoFHgMeA80CLQQtBCcGegF6AXoBlwKXAocChwKHAoQFEwNBAEEAQQBBAEEAQQBBALsAuwC7ALsArQGtAfoC+gL6AvoChASEBIQEhAS7BbsFuwVxA9gDiAKIAoYBhgFNBE0EawQMAAwA9wD3ANUC1QI6BU0DTQO1AbUBtQG1AdMB0wHTAdMBKwMrAysDggGCAYIBggGdBZ0FnQWdBUQF3AXcBToBOgHaAdoB7ALsAuwC7AIPBQAEAATsAOwA7ACWAJYAlgCMA0gESARIBIUE5QS2A08DUgRSBFIEUgSdAAMAAwADAFYCVgJWAkEDHgMeAx4DgwAnBicGJwYnBnoBlwKXAocChwKHAocCQQBBAEEAQQBBAEEAQQBCBLsAuwC7AOIE4gTiBPoC+gL6AvoChASEBNEE0QS7BbsFlQDYA9gD2AOGAU0ETQRNBAwADAAMAAwADADVAvgDOgVNA00DTQO1AbUBtQG1AdMB0wEiBSIFKwMrAysDggGCAYIBggEUAp0FRAVEBUQFOgE6AToB2gHaAdoB7ALsAuwCDwUPBQAE7ADsAOwA7ABtAG0A2gLaAkgESASFBIUEhQSgBf8F/wX/BZ0AnQCdAAMAAwBWAlYCVgJBA0EDHgODAIMAgwAnBicGJwYkAZcClwKXAocChwKHAocCYwRjBEEAQQBBAEEAQQBCBEIEQgT4AvgC4gTiBPoC+gL6AvoC0wDRBNEE0QTRBJQDlQCVAJUAxgBDAkMCngKeAjAEjwKPAgwADAAnAycDJwPDBE0DTQOJBIkEtQG1AdMBIgUiBSIFZgFmAWYBggGCAYIBggEUAhQCFAJEBUQFOgE6AToBOgHaAdoB2gHsAuwC7AIPBQ8F+QP5A/kDbQBtAG0A2gLaAtoCLwOFBIUEoAWgBaAF/wX/BZ0AnQCdAJ0AIQYhBlYCVgJWAkEDQQODAIMAgwCDACcGJAEkASQBlwKXAocChwKHAocCYwRjBGMEQQCpBakFQgRCBEIE+AL4AvgC4gTiBPoC+gL6AvoC0wA7BdEElAOUA5UAlQCVAMYAxgBDAkMCngIwBDAEUQJRAgwAAwInAycDwwTDBMMETQOJBIkEtQG1ASIFIgUiBWYBZgFmARQBFAGCAYIBFAIUAhQCFAJEBSYCJgImAjoB2gHaAbMEswSzBOwC7AL5A/kD+QP5A/kDbQBtAPMF2gLaAi8DLwMvA6AFoAWgBaUA/wWdAJ0AnQCdAJ0AIQYhBiEGKgEqASoBgwCDAIMAgwAOBCQBJAEkASQBJAHFAsUChwKHAocC1ARjBGMEXQBdAKkFqQVCBEIEiQP4AvgC+ALiBPoC+gL6AvoC0wDTADsFlAOUA5QDlQCVAJUAxgBDAkMCngKeAjAEUQJRAlECAwIDAgMCAwLjAuMC4wKJBIkEiQS1ASIFIgUiBWYBZgFmARQBFAEUAf4C/gIUAhQCFAKYBZgFJgImAhUCFQLaAbMEswSzBLMEswTsAvkD+QP5AwIBbQBtAPMF8wXaAtoCLwMvA4ICggKCAqUApQClAJ0AnQCdAJ0AIQYhBiEGIQYqASoBKgGDAIMAgwAOBA4E/AQkASQBSQPFAsUCxQLFAroD1ARjBGMEXQBdAF0AjwGPAYkDiQP4AvgC+AKoA6gDqAOoAyEF0wDTANMAlAOUA5QDlQCVAJUAxgBDAkMCiQWJBdcATwJRAgMCAwIDAgMC4wLjAuMC4wLjAqQApACkAKQAqASoBBQBFAEUARQBFAEUAf4C/gL+AhQCmAWYBa8EFQIVAhUCFQLZALMEswSzBLMEswQCAQIBAgECAQIBbQBtAPMF2gLaAtoCUwJTAoICggKCAqUApQClAJ0AnQCdAJYBlgEhBiEGKgEqASoBdAR0BAAFDgQOBJwB/AT8BEkDSQOvAK8ArwC6A7oD1ARjBGME2QVdAF0AowCPAY8BiQOJA/gC+AKQBZAFqAOoAyEFIQXTANMAxQOUA5QDlQCVAJUAlQDGANcA1wDXANcATwJPAk8CAwIDAgMCAwLjAuMC4wLjAqQApACkAKQApACoBKgEqAQUARQBFAFWA/4C/gL+Av4CowSjBK8ErwQVAhUCFQLxAdkA2QDZANkA2QAhBCEEIQQCAQIBAgHjAOMA4wANAw0DsQVTAlMCggKCAqUApQClAKUAMQSdAEIBlgGWAZYBKgEqASoBdAR0BCcAAAUOBJwBnAGcAZwBSQOvAK8ArwC6A7oDngOeA9kF2QVdAKMAowCjAKMANAQ0BAcDkAWQBSsCKwIhBSEFHgAeAMUDxQPFA5QDlQCVAKUDpQOlA6UD1wDXANcATwJPAgMCAwIDAgMC4wLjAuMC4wIGBaQApACkAKQAqASoBKgEqAQUARQBVgNWA+gA/gL+AqMEowSvBK8ErwQVAvEB8QHxAdkA2QDZANkA2QAhBCEEIQQhBGcAZwDjAOMADQMNAw0DsQVTAlMCHQIdAh0CpQAxBDEEQgFCAZYBlgGWAZYBKgEqASoBdAQnACcAJwAnAJwBnAGcAUkDrwCvABsFQQS6A7oDJQGeA54DngOHBIcEowCjAHUFNAQ0BAcDHwPmBdwBKwLLAR4AHgAeAB4AxQPFA8UDoAKgAqACpQOlA6UDpQPXANcA1wBPAk8C8QPxA/ED8QPVANUA1QAGBQYFpACkAKQApACoBKgEqARYAVYDVgNWA+gA6ADoAKMEvQK9Aq8ErwSvBJ0EnQSdBHMA2QDZANkAdAJ0AiEEIQQhBCEEZwBnAGcAZwDOAc4BKwVTAmACYAIdAh0CHQIxBDEEQgFCAUIBlgGWAZYBlgGuAeYC5gInACcAJwC3BZwBnAGcAZwBrwCvAEEEQQQgBCAEJQGeA54DhwSHBIcEowB1BXUFWQIHAwcDHwPcATsBywHLAR4AHgAeAB4AxQPFA6ACoAKgAqACpQOlA6UDpQPXANcA1wBPAvED8QPxA/ED1QDVANUAAQUGBQYFpACkAKQAngDABMAEWAFYAVYDVgPoAOgA6ACcBb0CvQK9AukB6QFHA3MAcwBzAHMAcwBzAHQCdAJ0AiEEIQQhBG4FbgVnADEDzgHOAc4BKwWOAmACHQIdAh0CpQGlAUIBQgFCAZEAkQCWAa4BrgHmAuYCjACMALcFtwWgBKAEoAThBOEE6APoA0EEIAQgBCAEJQElAVwFAQK7AbsBDgEOAVkCWQJZAgcDHwPcAboEOwE7ATsBHgAeAB4AHgDFA6ACoAKgAqACoAKlA6UDbgJuAm4C1wDXAPED8QPxA/ED1QDVANUAAQUBBQYFBgWkAKQAngCeAJ4AWAFYAVgBVgPoAOgA6ACcBZwFvQK9AukB6QFHA0cDcwBzAHMAcwBzAHQCdAJ0Au0A7QDtACEEbgUEAAQAMQPOAVUBVQGOAo4CYAIdAh0CpQGlAaUBQgFCAZEAkQCRAK4BrgGuAeYCjACMAIwAtwWgBKAEoAThBOEE6APoA+gDfwR/BCAEJQFHAEcAAQK7AQ4BDgEOAVkCWQJZAgcD3AGcBDsBOwE7AXUCdQJ1AhsAGwBoAqACoAKgAqACoAJuAm4CbgJuAm4C9QP1AzcEfAF8AXwB1QDVAAEFAQV5AnkCvgG+AZ4AngCeAJ4AWAG3A7cD6ADoAOgA6ACcBZwF6QHpAekB6QFHA0cDcwBzAHMAswN0AnQCdAJ0Au0A7QDtAAQABAAEAAQAMQNVAVUBVQFVAY4CHQIdAqUBpQGlAaUBkQCRAJEAkQCRAK4BawJrAowAjACMAIwA0gLSApwAnADhBOEE6APoA+gDfwR/BCAERwBHAEcARwC7AbsBDgEOAQ4B0gHSAdIBngGcBJwEnAQ7AXUCdQJ1AhsAGwBoAmgCaAKgAqACoAJuAm4CbgJuAm4CTQH1A/UDNwR8AXwBxALVANUAAQV5AnkCeQK+Ab4BwgOeACkGtwO3A7cDtwOvAq8CrwKcBZwDnAOcA+kB6QFHA0cDRwNzAHMAswOzA7MDdAJ0Au0A7QDtAO0ABAAEAAQABABVAVUBVQHFBMUExQTwA3ADcANwA3ADcAORAJEAkQCRAOAB4AFrAmsCjACMAIwAOgbSAtICnAClAqUCpQLoA+gD6AN/BH8ERwBHAEcASwVLBV0FXQUOAdIB0gHSAZ4BngGeAZwEnAR1AnUCGwAbABsAaAJoAmgCaAKgAkUARQBFAG4CbgJNAU0BTQH1A/UDNwR8AXwBxALVANUAAQV5AnkCvgG+AcIDwgOsAykGtwO3AxMGEwavAq8CrwKcA5wDnAMFBgUG6QFHA0cDrwOvA7MDswOzA7MDdAJ9BH0E7QBUA+QD5AMEAAQABABVAVUBxQTFBMUE8APzAuACcANwA3ADcAORAJEAkQDgAeAB4AHnAOcAjAA6BjoGOgbSApwAnAClAqUCRQMGBgYGBgZ/BH8ERwBHAEcASwVLBV0FXQVdBdIB0gHSAdIBngGeAZ4BngE/AxsAGwAbABsA2AJoAmgCaAIDBkUARQBFAEUATQBNAE0BTQH1A/UD8AA3BHwBfAHEAtUA1QB5AnkCvgG+ASoErAOsA6wDKAMoAxMGEwavAq8CrwKjBaMFnAOcAwUGBQbpAa8DrwOvA68DswOzA7MDswN9BH0EVANUA1IA5APkA5ABkAFVAREGxQTFBPAD8APzAvMC4ALgAuACjwCPAI8AjwDgAeAB4AHnAOcA5wDnADoGOgbaBNoE2gR8BaUCRQNFAwYGBgYGBgYGRwBHAEsFSwVLBV0FXQVdBTwA0gHSAZ4BngGeAZ4BPwM/Az8DGwAbANgC2AJoAmgCAwYDBkUARQBFAEUATQBNAE0BTQHwAPAA8ABLAksCCQEJAQkBCAB5AjgDOAMqBCoErAOsAygDKAMoAxMGEwavAq8CowWjBaMFnAOcA38FfwWvA68DrwOvA68DswM0BTQFygTKBFQDVANSAFIAUgCQAZABkAERBhEGEQbrAPAD8wLzAlYA4ALgAo8AjwCPAI8AjwDgAecA5wDnAOcA5wCKAuoC2gTaBNoEfAV8BdQCRQNFA0UDRQNFAxMARwBHAI4AjgAiBAcGBwZdBTwAPAA8ADwAngGeAZ4BPwM/Az8DPwMbABsGGwZoAmgCAwYDBmUBRQDuAe4BTQBNAE0ATQEeAvAA8ABLAksCCQEJAQkBCAAIADgDOAM4AyoEeAB4AHgAKAMoAygDTAOvAhoAGgAaAKMFZgVmBX8FfwV/Ba8DrwOvA68DNAU0BTQFygTKBMoEVANSAFIAUgCQAZABkAGQAREGEQbrAOsA6wDzAlYAVgDgAuACjwCPAI8AjwCqBKoEqgTnAOcAigKKAuoC6gLaBNoEfAV8BdQC1AKlBC8GLwYvBhMAjgCOAI4AjgAiBAcGBwY8ADwAPAA8ADwAPADWA9YDLgQ/Az8DPwMbBhsGGwZoAksBSwFlAWUB7gHuAU0ATQCbAJsAHgLWAtYC8ABLAgkBCQEJAQgACAAIADgDOAM4A3gAeAB4AAEGAQYoA0wDTAMaABoAGgAaAGYFZgV/BX8FfwV/Ba8DrwOvA68DNAU0BTQFygTKBCUAJQBSAHQAdACQAZABkAF+AX4BfgHrABEE8wJWAFYAVgDgAmIAjwCPAI8AqgSqBKoEqwEzA4oCigLqAuoC0gDSANIA1ALUAtQC1ALjA+MDQAMTABMAjgCOAI4AjgCOACIEIgQiBDwAPAA8ADwAZwOVA9YD1gMuBC4EPwMVARUBFQEbBksBSwFLAUsBSwHuAe4BTQCbAJsAmwDWAtYC0QE4ADgAOAAJAQgACAAIAAgAOAM4A4YFeAB4AHgAAQYBBkwDTAOxArECGgAaAJcAZgVmBX8FfwWWBJYErwOvA68DNAU0BTQFygQlACUAJQAFA3QAdAB0AMkByQF+AX4BfgF+AREEQAVABVYAVgBhA2EDYgBiAGIAYgCqBKoEqwGrAasBigKKAuoC0gDSANIA0gDUAtQC1ALjA0ADQAMTABMAjgCOAI4AjgCOACIEigGKATwAPABnA2cDlQOVA9YD1gMuBC4EFQEVARUBFQEVAUsBSwFLAUsBSwHuAU0AmwCbAJsAMAUwBTAF0QE4ADgAOAAIAAgACAAIAAgAOAOGBYYFNwI3AjcCAQbhAuECsQKxArECsQKXAJcAlwCXAJYElgSWBJYEQARABEAEQAQ0BSUAJQAlACUABQMFA3QAHgbJAckByQF+AX4BfgF+AS8FLwVWAFYAYQNhAxcFYgBiAGIAYgCqBKsBqwGrATkFdgF2AdIA0gDSANIA0gDUAtQC+wBAA0ADQAMTABMAfAR8BHwEjgCOAI4AigGKAYoBZwNnA2cDZwOVA5UD1gPWAy4EFQEVARUBFQEVARAASwFLAUsBSwFLAU0AmwCbAJsAMAUwBTAF0QHRATgAOAA4ADoCOgInAicCJwKGBTcCNwI3AjcCNwLhAuEC4QKxArECsQKdA5cAlwCXAJYElgSWBJYElgRABEAEQARABCUAJQAlACUAJQAFA3QAHgZpBMkByQHJAX4BfgF+AS8FLwUvBS8FYQNhAxcFYgBiAGIAYgAEAeUB5QHlAeUBDQR2AXYBtAC0ALQAtAC0AGYA+wD7APsAQAMHABMAfAR8BHwEfASOAIoBigGKAYoBZwNnA2cDlQOVA6kC1gMdBh0GFQEVARUBEAAQABAASwFLAUsBSwFuAG4AbgBuAG4AMAUwBdEB0QEHBWkBaQFpAToCJwInAo0FjQU3AjcCNwI3AjcC4QLhAuEC4QLSA1kEnQOdA5cAlwACBQIFAgVaAloCQARABEAEQAQZARkBJQAlACUAJQAFAxMBaQRpBGkEyQF+AX4BMQIxAi8FLwUvBXQDdAMKBgoGYgBiAGIAmQAEAT8CPwLlAQYDdgF2AWABtAC0ALQAtABmAGYA+wD7AAcABwAHABMAWAJYAnwEfASkAqQCpAKKAVcEVwQJBQkFDwapAqkCqQJqAh0GHQYVAQ4CEAAQABAA6QLpAukCFQAVAG4AbgBuAG4AbgAPAdgB0QEHBWkBaQFpAToCJwKNBY0FjQWNBTcCNwKKAIoAigDhAuEC4QLSA9IDnQOdAzoAOgA6AMABWgJaAloCWgJABEAEQARABBkBGQEZASUAawVrBWsFEwETAWkEaQTJATECMQIxAjECMQIvBXQDdAN0AwoGCgaZAJkAmQAEAQQBBAE/AgYDiASIBGABYAG0ALQAtABmAGYAZgBmAAcABwAHAJEDWAIIBggG0QLRAtECpAJXBFcEVwQJBQkFDwapAqkCagJqAh0GHQapAQ4CEAAQAOkC6QLpAhUAFQBuAG4AbgBuAG4ADwEPAdgB2AFLAEsAaQFpAScCjQWNBY0FjQWNBYoAigCKAIoAigDhAuEC0gP9BP0EOgA6ADoAOgDAAcABwAFaAvwFcwJzAnMCcwIZARkBGQEZAUABawVrBRMBEwH1BfUF9QUxAjECMQIxAjECMQJ0A3QDdAN0AwoGmQCZAJkAmQAEAQQBBAEEAYgEiARgAWABYAG0ALQAZgBmAGYAZgBQAQcABwCRA5EDWAJYAggGCAaXBZcF0QKkAlcEVwQJBQkFHwEfAakCagJqAmoCagKpAakBEACLBekC6QLpAhUAFQAVAG4AbgBuAG4AbgAPAQ8B2AFLAEsASwBLAB8FWABYAFgAWABYAIoAigCKAIoAigCKADoE0gP9BK4FrgU6ADoAOgD/A8ABwAHAAfwF/AVzAnMCcwIZARkBGQEZAUABQAFrBWsFEwETAfUF9QWNA+IF4gUxAjECawBrAHQDdAN0A3QDmQCZAJkAmQAsAiwCBAEEAYgEiAQCAgICAgICAgICVAVmAGYAZgBmAFABBwAHAJEDWAIIBggGlwWXBZcF0QJXBFcEVwQfAR8BHwEfAYAFWAVYBWoC3wLfAqkBiwWLBekCLgEVABUAFQAVAG4AbgBuAKIBDwEPAQ8BSwBLAEsASwBLAB8FWABYAFgAWACyArICigCKAIoAigA6BDoEOgSuBX8AfwA+BjoA/wP/A8ABSgVKBfwFKQHOAnMCcwIZARkBGQFAAUABQAFAARMBEwETAfUFjQONA+IF4gXiBWsAawA0ADQANAB0A88EmQCZAJkAmQAsAiwCBAHqAIgEAgICAgICAgJUBVQFVAVmAGYAZgBmAFABzASRA5EDWAJYAvgE+ASXBZcFlwWUBZQFlAUfAR8BHwEfAYAFgAVYBa0CrQLfAt8CAQABAAEALgEuARUAFQAVABUAbgBuAKIBogEPAQ8BggNLAEsASwCSBJIEHwVYAFgAWABYALICsgKKAIoAigA6BDoEOgR/AH8AfwB/AA8EOgD/A/8DSgVKBVgDKQEpATsAOwA7ABkBGQEZAUABQAFeBF4EXgTpAOkAjQONA40D4gXiBWsAawBrADQANADPBM8EzwSZAJkAmQA0AeoA6gDqAOoA0wMCAgICAgJUBVQFVAVUBXIAcgByAHIAzATMBMwEJAD4BPgEmAGYAdoA2gCUBZQFlAUfAR8BEgISAhICaACtAq0CrQKtAgEAAQABAAEALgEVABUAVQJVArUDtQO1A6IBogEPAYIDewB7AHsAkgSSBB8FHwVYAFgAzgCyArICsgKyAv0C/QI6BDoEzQXNBX8AfwAPBA8EIAAgAP8DWANYA1gDOwA7ADsAOwA7AN4A3gBAAUABXgReBF4E6QDpAOkAjQONA40DjQNrAGsAawA0ADQANADPBM8EyALIAsgCNAE0AeoA6gDqANMD0wPTAwICVAVUBVQFVAVyAHIAcgByAHIAzATMBMwEJAAkAPgEmAGYAdoA2gDaAJQFlAWUBR8BEgISAmgAaABoAK0CrQKQAqEEoQQBAAEAAQAVAFUCVQJVAlUCtQO1A7UDogGiAYIDewB7AHsAkgSSBJIEHwUfBc4AzgA0BrICsgIyBf0C/QLoAugCzQXNBc0FFgQWBMUFIAAgACAAIAA/AT8BPwE7ADsAOwCKBIoE3gDeAN4AMgFeBF4E7gXpAOkA6QCNA40DjQMQBGsAawAjBjQANADPBM8EyALIAsgCCwA0ATQB6gDqAOoA0wPTA9MD0wNUBVQFVAXEBcQFcgByAKAAoADMBMwEJAAkACQAmAGYAdoA2gDaAJQFlAWtA60DrQOtA2gAaABoAJACkAKhBKEEdQF1AXUBrQStBFUCVQJHAbUDtQO1A7UDRgFGAXsAewB7AHsAkgSSBJIEAAMAA84AzgA0BmYDZgMyBf0C6ALoAugCCgPNBUgCFgQWBCAAIAAgACAAPwE/AT8BPwE7ADsAMwCKBIoE3gDeADIBMgHuBe4F6QDpAOkAkACNA40DEAQQBBAEuAAjBiMGNAA4BDgEyALIAsgCCwALAEoA6gDqANMD0wPTA9MDlACUAJQAlADEBcQFoACgAKAAoADMBMwEJAAkACQAmAGYAdoA2gDaANoAlAWUBbACrQOtA2gAaABoAJACkAItBqEEoQR1AXUBrQStBK0ERwFHAUcBtQO1A7UDUwRGAUYBRgF7AHsAkgSSBJIEAAMAAwADAAPOAGYDZgNpBTIF6ALoAugCCgMKA0gCSAJIAiAAIAAgAKUFpQU/AT8BPwETBQsCCwIzAIoE3gDeADIBMgHWAO4F7gXpAJAAkACQAO0BEAQQBBAEuAC4ALgAuAA4BDgEOATIAsgCCwALAEoASgBKAEoBSgHTA/YD9gOUAJQAlACUAMQFxAWgAKAAoACgAMwEJAAkAN0B3QHdAdoA2gDaANoAlAWwArACsAJoAGgAaACQApACkAIIBQgFdQF1AXUBrQStBEcBRwFHAUcBRwFTBFMEUwRGAUYBRgFGAZIEkgSSBAADAAMAAwADAAM1AzUDNQM1AzUD6ALoAgoDCgNIAkgCSAJxBSAApQWlBaUF7AHsAewBEwUTBQsCCwIzAEoEeAHeADIB1gDWANYAkACQAJAAkADtAe0BdwN3A3cDuAC4ALgAuACZAzgEOATIAgsACwALAL0FvQVKAUoBSgH2A/YDdgWUAJQAlACUAD0FoACgAKAAoACgAGwEJAAkAN0B3QHdAd0B2gDaANoA2gCwArACsAKwArAC9QT1BPUEkAIIBQgFCAWnBKcEpwSnBEcBRwFHAUcBdwBTBFMEUwRGAUYBRgFGAUYB3wXfBd8F3wUAAwAD9gX2BTUDNQM1AzUD6ALoAgoDCgNIAkgCSAJxBSsAKwClBaUF7AHsAewB7AEbARsBCwIzADMAeAF4AdYA1gDWANYA1gCQAJAAkADtAe0BSABIAHcDdwPcAtwC3AKZA5kDmQOZA7MAswCzABUGWQVKAUoBSgH2A/YDdgV2BZQAlAB/AT0FPQWgAKAAoABsBGwE2wPdAd0B3QHdAXIFcgXaAOoB6gGwArACsAKwArAC9QT1BPUECwQLBAgFpwSnBKcEpwQaBhoGdwB3AHcAUwBTBFMEswJGAUYBRgFGAd8F3wXfBd8F3wX2BfYF9gX2BTUDNQM1AzUD6AIKA34CfgJ+An4CKwArACsAFgIWAqUF7AHsAewBGwEbARsBMwAzADMAeAF4AdYA1gDWANYAkACQAJAA7QHtAUgASABIANwC3ALcAtwCMgSZA5kDmQMWARYBFgGzAFkFWQXuBO4E7gTcA9wDdgUYAH8BfwE9BT0FPQX0AGwEbARsBGwE2wPbA90BcgVyBXIFcgVyBeoB6gHqAeoBsAKwArACFAX1BPUECwQLBAsECwSnBKcEpwQaBhoGGgZ3AHcAdwBTAFMAswKzArMCRgFGAd8F3wXfBd8F3wUfBh8G9gX2BXwCfAI1AzUDtgIfAB8AfgJ+An4CfgIrACsAFgIWAhYC7AHsAbwFxgEbARsBGwEzADMAMwB4AS8ALwAvAC8ALwCQAJAA7QHlA0gASABIAEgAgwHcAtwCMgQyBJkDmQOZAxYBFgEWAVkFWQXuBO4E7gTcA9wD3AMYABgAfwF/AYMFgwX3AfQAbARsBGwE2wPbA3IFcgVyBXIFcgXqAeoB6gHqASQDJAOwAhQFFAUUBQsECwQLBAsEfQV9BX0FfQUaBhoGdwB3AHcAFANTAFMAswKzArMCBwQHBLQC3wXfBd8FHwYfBh8GfAJ8AnwCfAJ8ArYCtgIfAB8AHwB+An4CKwD9A/0DFgIWAnoFegW8BbwFxgHGARsBGwEiAyIDIgMvAC8ALwAvAC8ALwBbAOUD5QPlA0gASABIAIMBgwEgAiAC/AP8A5kDmQMWARYBFgEWAVkFWQXuBD4DPgM+A9wDGAAYABgAGABfAV8B9wH0APQAbARsBGwE2wPbAyADcgVyBXIFcgXqAeoB6gHqAeoBJAMkAyQDFAUUBUQECwQLBAsECwR9BX0FfQV9BRoGdwB3AHcAFAMUA1MAUwBTAAcEBwQHBLQCtAK0ArQC3wUfBh8GfAJ8AnwCfAJ8AnwCtgK2Ah8AHwAfAF8EXwT9A/0D/QMWAnoFegV6BbwFxgHGAcYBGwEiAyIDIgMiAy8ALwAvAC8ALwBbAFsAWwDlA+UDkwWTBYMBgwEgAiAC/AP8A/wD/AOZAxYBFgEWARYB9AIJAwkDPgM+A/AFGwMbA30BfQFfAV8B9wH3AfQA9AD0APQAIAMgAxwCcgVyBXIFcgXqAeoB6gHqAZUClQKEAv0F/QVEBEQERAQLBAsEfQV9BX0FfQV9BXcAdwCLA4sDUANTAFMAUwAHBAcEBwQHBLQCtAK0ArQChQOFA4UDfAJ8AnwCfAJ8ArYCtgK2Ah8AHwBfBF8EXwT9A/0D/QN6BXoFegV6BcYBxgHGAbkEIgMiAyIDIgOsBawFLwCDA4MDWwBbAFsAWwANAg0CkwWDAYMBgwEgAjkCKAIoAigCogUDAwMD9AL0AvQC9AIJAwkDPgM+A/AFGwN9AX0BXwFfAV8B9wH0APQA9AD0APQAMQUgAxwCHAI8BDwENgL5AfkB+QH5AZUClQKEAoQC/QVvBUQERAREBHABcAFwAXABfQV9BfMB8wHzAYsDUANQA1MAUwAHBAcEBwQHBLQCtAK0ArQCtAKFA4UDhQN8AnwCfAJ8ArYCtgK2ArYCHwAfAF8EXwRfBBkCGQIZAnoFegV6BXoFxgG5BLkEuQSoBagFIgOsBawFrAWDA4MDWwBbAFsAWwB5AQ0CDQINAskDyQM5AjkCKAIoAigCogUDAwMD9AL0AvQC9AIJAwkDCQMFAQUBkgF9AX0BfQFfAdsC2wL3AfQA9gT2BPYEHAIcAhwCPAQ8BDYCNgL5AfkB+QH5AfkBpwKEAoQCbwVvBUQERARwAXABcAFwAXABcAHzAfMB8wHzAfMBUANQA1MAUwAHBMkFyQXJBbQCtAK0AsADwAOFA6ECoQKhAnwCfAK2ArYCtgK2Ah8AHwAfAF8EXwReAxkCGQIZAnoFegV6BQkEuQS5BLkEuQSiA8sA2gWsBawFgwODA4MDWwBbAFsAeQF5AQ0CDQLJA8kDyQM5AjkCKAIoAqIFAwMDAwMD9AL0AvQC9AIJAwkDBQEFAZIBkgGIAIgAwgLCAtsC2wILAfYE9gT2BPYEHAIcAhwCPAQ8BDYCNgI2AvkB+QH5AfkBpwKnAoQCvAK8ArwCvAJwAXABcAFwAXABcAHzAfMB8wHzAfMB8wG2AVADyQXJBckFyQXJBfkC+QL5AsADwANXAlcCoQKhAqECoQKhArYCtgK2Ah8AHwAfAB8AXgNeA14DGQIZAjgBOAEJBAkECQS5BLkEuQSiA6IDywDLAMsAiwK4BMAAwABbAIwCjAJ5AXkBDQLJA8kDyQM5AscBxwHHAaIFAwMDAwMDAwP0AvQC9AL0AgkDBQEFAQUBkgGIAIgAiADCAsICCwELAQsB9gT2BJEBnAKcApwCHAQcBDYCNgI2AvkB+QH5AacCpwKnArwCvAK8ArwCcAFwAXABcAFwAXAB5gTmBPMB8wHzAbYBtgG2AbYByQXJBckFyQX5AvkC+QL5AsADPgFXAlcCoQKhAqECQwNDA0MDtgIfAB8AHwAfAIIAXgNeA14DGQI4ATgBCQQJBAkE1ADUANQAdQN1A8sAywCLAosCEQC4BMAAwAAPAz8EjAJ5AXkBuQG5AbkBuQHHAccBxwHHAQMDAwMDAzUFqgOqA6oD9AL0AgUBBQEFAQUBiACIAIgAiADCAgsBCwELAQsBkQGRAZEBoQGhAaEBnwUcBDYCNgIpAykDKQO9A70D8wPzA/MDvAK8ApcBlwFTAVMBUwFTAVMB5gTmBOYEtQW1BbYBtgG2AbYBtgHJBckFyQXJBfkC+QL5AgABAAE+AT4BPgGhAmcCQwNDA0MDQwMfAB8AHwAfAIIAggCCAF4DGQI4ATgBOAEJBAkECQTUANQA1AB1A3UDOAW/BYsCEQARALgEwADAAA8DDwOMAosAiwC5AbkBuQG5AccBxwHHAccBRAI1BTUFNQWqA6oDqgOqAxYFAwFcAVwBXAGIAIgAiACIAAsBCwELARgDkQGRAZEBoQGhAaEBnwWfBTYCKQMpAykDvQO9A0cERwTzA6cDpwOnA5cBlwFTAVMBUwFTAeYE5gTmBLUFtQW2AbYBtgG2AbYBygXJBckFyQX5AvkC+QIAAQABAAEAAQABZwJnAmcCQwNDA0MD2ADYANgAggCCAIIAggCCAIIAOAE4ATgBCQQJBAkE1ADUANQA1AB1AzgFOAWLAhEAEQARAMAAwADRANEA0QCLAIsAiwC5AbkBuQG5AccBxwHHAUQCRAKaAzUF8AHwAaoDFgUWBQsFAwFcAVwBXAF4A4gAiACIAAsBGAMYAxgDkQGRAZEBSAGhAaEBnwWfBZ8FKQMpAykDvQO9A70DRwRHBKcDpwOnAwQElwGXAVMBUwFTAeoE6gSFAvsBtQUcABwAtgG2AcoFygXKBcoFDAP5AvkC+QLdBN0EAAEAAQABZwJnAmcCQwNDA0MD2ADYANgA2ACCAIIAggCCAIIAggA4AagBqAGmAAkEDQUNBQ0F1ACKBTgF9wX3BQIEAgQRABEAwADRANEA0QDRAIsAiwCLALkBuQG5AccBxwHHAUQCRAKaA5oD8AHwAZgEmAQWBQsFAwEDAQMBXAF4A3gDeAOIAAsBGAMYAxgDLAORAZEBSAFIAaEBnwWfBWwBKQMpAykDvQO9AzMBMwGnA6cDpwMEBAQElwGXAbQDtAO0A4UChQL7ARwAHAAcABwAHABHAsoFygXKBcoFDAMMAwwD3QTdBN0ELgIAAWcCZwJnAmcCQwNDA9gA2ADYANgA2ACCAIIAggCCAIIAqAGoAagBpgCmAKYAkASQBJAEigWKBSoCKgIqAl0DXQMRACABIAHRANEA0QCLAIsAiwCLAEMAQwBDAEMAxwFEAkQCRAKaAwUA8AHwAZgECwULBQsFAwEDAQMBeAN4A3gDeAOIABgDGAMsAywDLAMsA5EBSAFIAUgBSAFBArAEbAFsAWwBRQVFBTMBMwEzAacDMwLiAQQElwGXAZcBtAO0A/sB+wH7AfsBHAAcANAB0AFHAkcCygXKBcoFwQAMAwwDDAMuAi4CLgIuAi4CZwJnAmcCZwJDA9gA2ADYANgA2ADYAIIAggCCAIIAqwCmAKYApgCmAKYAkASQBJAEkASKBSoCKgIqAl0DXQNdA8MFIAEgASAB0QCLAIsAiwCLAOMEQwBDAEMAQwA+Aj4CPgJEAgUABQAFAAUAmAQLBQsFAwEDAQMBTwR4A3gDeAN4AxgDGAMsAywDLAMsAywDSAFIAUECQQJBArAEbAFsAUUFRQUzATMBMwEzATMCMwLiAeIBlwGXAbQDtAO0A/sB+wEMBgwGGAQYBNABRwJHAkcCygXKBcEAwQAMAwwDDAMEBS4CLgIuAtcE1wTXBNcE1wTYANgA2ADYANgA2ADJAMkAyQCrAKsAqwB9A6YAQgNCA0IDkASQBJAEFwEXASoCKgKaAZoBXQPDBcMFIAEgASAB0QCLAIsAiwDjBOMEQwBDAEMAPgI+Aj4CPgIFAAUABQAFAAUACwULBQsFAwEIAk8ETwRPBHgDeAMWBlwEXATAApMEkwSTBIMESAFIAUECQQJBArAEsARsAWwBRQVFBTMBMwEzATMCMwIzAuIB4gHiATcFtAO5ArkCuQK5AgwGGAQYBBgE0AFHAkcCRwLKBcEAwQDBAAwDDAMEBQQFBAUuAqsEqwTXBNcE1wT1APUA2ADYANgAiQDJAMkAyQDJAKsAqwCrAH0DQgNCA0IDQgOQBBcBFwEXARcBRQSaAZoBmgGaAcMFwwUgASABnwOfA2kAaQBpAOMEQwBDANcB1wE+Aj4CPgLyBAUABQAFAAUABQDEA8QDCAIIAggCCALIBcgFyAUWBhYGXARcBMACkwSTBIMESAFBAkECQQJBArAEbAFsAWwBzgQzAeID4gN7A4EFgQXiAeIBZgQ3BTcFuQK5ArkCuQK5AlsEQgAYBBgERwJHAkcCwQDBAMEAwQDBAAwD9AMEBQQFqwSrBKsE2wXbBdcEzwL1APUA9QCJAIkAXAPJAMkAyQA1AMQEqwB9A30DQgNCA0IDkAQXARcBFwEXAUUERQSaAZoBmgHvAu8C7wLvAp8DnwOfA2kAaQBpAEMA1wHXAdcBngU+Aj4C8gTyBAUABQAFABwFHAXEA8QDxAMIAggCyAXIBcgFyAUWBhYGXARcBMACwAKDBIMEUAVQBUECQQLkAuQCbAFsAc4EzgTiA+ID4gN7A3sDgQWBBWYEZgQ3BTcFNwW5ArkCuQK5AlsEQgBCAG0BbQFtAW0BqADYBCMFIwXBAAID9AP0A/QDVwGrBKsEqwTbBdsFJQLPAvUA9QCJAIkAXANcA8kAyQA1ADUANQA1AH0DfQNCA0IDewR7BBcBFwEXARcBRQSaAZoBmgHvAu8C7wLvAp8DnwOfA2kAaQBpAGkAxwXXAdcBngWeBZ4F8gTyBKQDpAMFABwFHAUcBcQDxAPEAwgCyAXIBcgFyAUWBhYGFgZcBMACwAKDBIMEUAVQBVAF5ALkAmQCZALOBM4EzgQyA3sDewN7A3sDgQVmBGYEZgQ3BTcF+wK5ArkCQgBCAEIAQgBzA20BbQFtAagAqADYBLcEtwQCAwID9AP0A1cBVwFXAasE2wUlAiUCzwLPAvUAiQCJAFoEXANcA8kANQA1ADUANQA1AH0DfQN7BHsEewR7BBcBeQN5A3kDmgGaAXkFeQV5Be8C7wKeBJ4EnwOfA2kAaQBpAMcFxwXXARcDFwOeBfIEpAOkA6QDpAMcBRwFHAXZBNkExAPEA8gFyAXIBcgFNAM0AzQDNAPAArkDuQO5A5QBUAVQBVAFUAVkAmQCZAJkAs4EMgMyA7kFewN7A3sD7gDuAGYEZgRmBPsC+wL7AoYEZQBlAGUAQgBzA3MDbQFtAW0BqACoANgEtwQCAwIDAgP0A1cBVwFXAVcBVwElAiUCJQJ4Bc8CiAWJAOEFXANcA1wDCAMIAwgDCAMIAwgDvgXQA3sEewR7BHsEeQN5A3kDeQN5A3kFeQV5BXkF7wLvAp4EngSfA2kAaQCWBZYFxwUXAxcDFwMXAxcDpAOkA6QDpAOkAxwFHAUcBecC5wLnAucCFQQVBBUENAM0AzQDNAM0A9QBuQOUAZQBUAVQBVAFhgBkAmQCZALRAzIDMgO5BdAE0ATuAO4A7gDuAAEB+wL7AvsC+wKGBIYEZQBlAGUAQgBzA20BbQFtAagAqACoAKgAqAACAwIDAgNXAVcBVwFXAVcBJQIlAiUCeAV4BYgFGAEYARgBGAHCBcIFCAMIAwgDCAMQAr4FvgXQA3sEewR7BHkDeQN5A3kDeQN5A3kFeQV5BXkF7wKeBJ4EngRvA5YFlgWWBZYFlgUXAxcDZARkBFoApAOkA2MFYwW3ArcCNwE3AecC5wLnAucCFQQVBBUEYwBjAGMAYwDUAdQBzQSUAZQBUAVQBYYAhgCGAC0BZALRA9EDMgN6AyED0ATQBO4A7gDuAAEBAQH7AvsC+wLFAYYEsQOxA9AF0AXPAMwBzAHMAcwBrAKsAtUD1QNTA1MDAgMqA1cBVwFXARYDFgMlAiUCJQJnBB4EGAEYARgBpAFRAcIFwgUIAwgDCAMGABACvgW+BdAD0AN7BHsEeQN5A5sEmwSbBMsFywXLBcsFywWeBJ4EngRvA28DbwOWBZYFlgUXAxcDZARaAFoAWgCkA2MFYwWmAbcCtwI3ATcBNwHSBdIFFQQVBBUEPANjAGMAYwBjANQB1AGUAZQBhgCGAIYAhgAtAS0BLQHRA9EDIQMhAyEDPALuAO4A7gABAQEBAQH7AvsCxQHFAcUBsQPdAtAFzwDPAMwBzAHMAawCrAKsAtUDUwNTA1MDKgMqAyoDFgMWAxYDFgMVAxUDFQNnBB4EHgQYAaQBpAFRAVEBUQHsAwYABgAGABACvgXQA9AD0APQA2cBeQObBJsEmwSbBMsFywXLBZsDmwObA28DbwNvA28DbwNvA78DvwNaAFoAWgBaAFoAWgBjBWMFoAGmAbcCtwJjAzcB0gXSBRUEFQQVBDwDPANjAGMAYwDUAdQBlAGUAZQBhgCGAIYAhgCGAC0BLQFVBVUFIQMhAyEDPAI8Au4A7gABAQEBAQE9AzkALAQsBMUBsQPdAt0CzwDPAM8AzwDMAfkFrAKsAg4FUwNTA1MDKgMqAyoDDwAPABYDFgNqBRUDFQNnBGcEHgQeBDsGpAFRAVEBUQHsA+wDBgAGABACEAIQAtAD0APQA10EZwFnAWcBmwSbBJsDmwObA5sDmwObA28DbwNvA28DbwNvA78DvwOmA7cBWgBaAFoAWgAbBBsEoAGgAaYBpgFjA2MD0gXSBdIFPAM8AzwDPAPMA8wDYwBjANQB1AGiAKIAXwNfA18DTAVMBS0BVQVVBVUFIQMhAzwCPAI8AiAGAQEBAQEBPQM9AzkAOQDKAMoA3QLdAt0CzwDPAM8A+QX5BfkFDgUOBQ4FUwNTAyoDKgMqAw8ADwAPAGoFagUVAxUDFQNnBB4EHgQ7BjsGOwZRAVEB7APsAwYABgAGABACEAIQAtADXQRdBCIAZwFnAdAAfQCbA5sDmwObA5sDmwObA6sDpgRvA28DbwO/A78DvwOmA7cBtwG0AbQBGwQbBOsEoAGgAaABoAFjA2MD0gXSBfsF+wX7BTwD2wDMA8wDFAAUAKIAogCiAKIAXwNfA18DXwNfA18DVQVVBVUFVQUhAzwCPAI8AiAGIAb/AmIBYgE9AzkAOQDKAMoAygDdAt0CzwDPAM8A+QX5BfkFyAAOBQ4FDgU5ATkBxgIqAw8ADwAPAA8AagXoBBUDFQMVAygFKAUoBTsGOwY7BlEB7APsA+wDBgAGAAYAgACAAIAAXQRdBF0EIgBnAdAAfQB9AJsDmwObA5sDmwOrA6sDqwOmBKYEbwNvA78DjQSmA6YDtwGSArQBtAEbBOsE6wSgAaABNAI0AjQClALSBRQEFAQUBBQE2wDbABQAFAAUABQAogCiAKIAXwNfA18DXwNfA18DVQXkBIAEgASABDwCFwYXBv8C/wL/AmIBYgE9AzkAOQDKAMoAygDdAs8AzwBhAK0FrQXIAMgAyAAOBTkBOQE5AcYCxgIPAA8ADwAPAOkD6AToBOgEcQFxASgFKAWZApkCmQKZAuwD7APsAwYABgAGAIAAgACAAEwCTAJdBCIAIgDQAH0AfQB9AGIFYgViBZsDqwOrA6sDpgSmBKYEJAbQAtAC0AKmA7cBtwG0AbQBvgO+AygBKAE0AjQCNAI0ApQClAJxAHEAFAQUBBQE2wAUABQAFAAUADMGogCiAKIAXwNfA18DXwNfA18D5ATkBOQEgASABIAEFwYXBhcGuwL/AmIBYgFiATkArgKuAsoA0gTSBNIEYQBhAGEArQWtBcgAyADIADkBOQE5ATkBxgLGAg8ADwDpA+kD6QPoBOgEcQFxAXEBKAWZApkCmQKZAkoCSgL1AdUE1QTVBIAAgACAAIAATAJMAlIBIgAiAH0AfQB9AGIFYgViBWIFqwOrA6sDqwOmBKYEJAYkBtAC0ALQArcBtwG0AbQBvgO+AygBKAEoATQCNAKUApQClAKUAnEAcQBxAHEA2wAUABQAFAAUADMGMwYzBqIAYABfA18DXwNfAyIB5ATkBOQEgASABIAEFwYXBhcGuwK7AmIBYgGuAq4CrgKuAtIE0gTSBNIEYQBhAGEAYQDIAMgAyAASBRIFOQE5ASgAKAAoAOkD6QPpA+kD8QJxAXEBcQFxAXEBmQKZApkCmQJKAkoC9QH1AdUE1QTVBBIDgACAAEwCTAJSAVIBUgF9AH0AfQB9AN0A3QDdAN0ANgGrA6sDLgAuACQGJAb6AdAC0ALQAkwATABMAL4DvgO+AygBTASpA6kDjQCUApQClAJxAHEAcQBxAPYA9gAUABQAFAAuAzMGMwYzBjMGYABgAGAAYABgACIBIgE2ADYANgCABIAEFwYXBhcGuwK7ArsCuwJiAa4CrgKuAtIE0gTSBNIEYQBhAGEAYQBhACwGyAASBRIFpwGnASgAKAAoACgA6QPpA/EC8QLxAnEBcQFxAXEBNQI1ApkCmQJKAkoCSgL1AfUB9QHrBRIDEgMSAx8EEQMRA1IBUgGdAZ0BnQGdAd0A3QDdAN0AHwI2AZkELgAuAGMBYwH6AfoB0ALQAkwATABMAEwAvgO+AygBTASpA6kDjQCNAI0AjQBxAHEAcQBxAPYA9gD2AC4DLgMuAz4EPgQzBjMGYABgAGAAYAAiASIBIgE2ADYANgA2ADYAFwYXBrsCuwK7ArsCuwKuAq4CrgKuAtIE0gTSBNIEYQBhAGEAYQAsBiwGEgUSBRIFpwGnASgAKAAoAPIB8gHxAvEC8QLkBeQFcQFxATUCNQI1AgAAAABKAkoC9QH1AfUB9QHrBRIDEgNpAxEDygLKAlIBRwVHBZ0BnQHdAN0A3QDdAB8CNgE2AS4ALgAuAGMB+gH6AfoB+gFzBUwATABMAEwATAAMAUwEqQOpA6kDjQCNAI0AjQBxAHEAcQBxAPYAhwUuAy4DLgMuAz4EPgQ+BD4EYABgAGAAYABgACIBIgEiATYANgA2AN8A3wDfAO4CuwK7ArsCuwI9AD0APQA9ANIE0gTSBOEBmgJhAGEAYQCLAYsBiwESBRIFpwGnASgAKAAoAPIB8gHyAfEC8QLkBeQF5AXlADUCNQI1AgAAAAAAAEoCEgR6BPUBuwO7AxIDPQQiAiICVQPKAr0BvQEkAqMDowOjA3sCewJ7AhsCGwI2AZYCLgAuAE8ATwD6AfoB+gFzBXMFTABMAEwATABMAAwBDAEMAakDjQCNAI0AjQBQAhkDcQBxAIcFhwWHBS4DLgMuAz4EPgQ+BN4FYABgAGAAYADZAdkBIgEiAYQDNgDfAN8A3wDuAu4CXwVfBbsCPQA9AD0APQA9AOEB4QHhAeEBmgKaAosBiwGLAYsBiwGwALYEtgS2BNcC1wLyAfIB8gHyARoB8QLkBeUA5QDlADUCNQI1AgAAAAASBBIEegR6BLsDuwO7Az0EPQQiAiICygK9Ab0BJAISAaMDowO6ALoAewJ7AswAzACWApYCLgBPAE8ATwD6AfoBcwVzBXMFTABMAEwAvgIMAQwBDAEMAZsBmwGbAZsBUAJQAhkDGQMZA4cFhwWHBRADEAMQAxADPgTeBd4FJAUkBSkFKQXZAdkB2QHZAYQDhAPfAN8A3wDfAO4CXwVfBV8FPQA9AD0APQA9AOEB4QHhAeEBmgKaApoCiwGLAYsBsACwALAAtgS2BNcC1wLXAvIB8gEaARoBGgHxBXYA5QDlAOUANQI1AgAAAAAAAGUCZQJ6BBQGFAa7Az0EPQQiAiICjgS9Ab0BEgESARIBowO6ALoAugDxAMwAzADMAMwAlgI2BTYFTwBPAPoBcwVzBXMFcwVMAEwAvgK+AgwBDAEMAQwBmwGbAZsBUAJQAhkDGQMZAywALACRApECEAMQAxADnwDeBd4FJAUkBSkFKQXZAdkB2QGEA4QDhAPIBN8A3wDuAu4CAwV1BHUEPQA9AD0APQA9AOEB4QHhAeEBmgKaApoCiwGLAbAAsACwAFwCXAKrAvgB+AH4AdwEGgEaARoBLgXxBXYAIQIhAjUBNQE1AQAAZQJlAmUCZQKaBBQGzgVXBT0EIgKOBI4EjgS9ARIBEgESARIBugC6ALoAugDxAMwAzADMAJMCNgU2BTYFNgU2BfoBcwVzBXMFcwVMAL4CvgK+AgwBDAEMAcEFwQWbAVACUAJQAhkDGQMsACwAkQKRApECEAMQA58AnwCfAN4FbgFuAW4BbgFuAdkB2QHZAYQDdgR2BMgEyQTJBHsFAwV1BHUEdQQ9AD0APQA9AOEB4QHhARgGWwGaApoCmgKwALAAsACwALAAXAKrAvgB+AH4AdwE3ARlBG0FLgUuBXYAdgAhAu0DNQE1ATUBwgTCBMIEZQKfAZoEzgVXBecD5wOOBI4EjgSOBMMCEgESARIB6QW6ALoAugDxAPEAKgaTApMCfQJ9An0CfQJ9An0CcwVzBXMFcwVzBb4CvgK+Ar4CDAEMAfsE+wQQBRAFUAJQAvAC6AUsACwALACRApECkQIQA58AnwCfAJ8AbgFuAW4BbgGbAvoD+gP6A3YEdgR2BFMFyQR7BQMFdQR1BHUEdQQ9AD0APQAmBCYEbAAYBlsBWwGaApoCVAKwALAAsACwAAkGXAKrAvgBTgXtBH4AfgBlBC4FLgUQARABEAHtAzUBNQE1ATUBzwHCBMIEnwGfAZ8BVwXnA+cDIAWOBI4EjgTDAsMCwwLDAukF6QUzBTMFugCwA7ADkwKTApMCfQJ9An0CfQJ9An0CcwVzBXMFcwW+Ar4CvgK+Ar4C+wT7BPsE7QIQBa0ArQDwAvAC6AUsACwAkQKRApECcwRzBLgDnwCfAJ8AEgBuAW4BmwKbAhkA+gP6A/oDdgR2BFMFUwXJBAMFdQR1BHUEzQHNAUQDRANEAyYEJgRsAFsBWwG0BLQEVAJUArAAsACwAAkGCQZcAvgB7QTtBH4AfgB+AH4A8gAQARABEAHgAOAANQE1ATUBzwHPAc8B8ASfAZ8BVwXnA+cDIAUgBU8FTwXDAsMCwwLDAsMC6QXpBTMFMwWwA7ADsAOTApMCfQJ9An0CfQJ9An0C+QD5APkA+QD5AL4CvgK+Ar4C/gTtAu0C7QLtAq0ArQCtAPACeQR5BCwALACRApECcwRzBHMEuAO4A58AEgASAJsCmwIZABkA+gM8BTwFdgR2BFMFUwXJBEoDSgPTBM0BzQHNAUQDRANEAyYEbABsAFsBtAS0BFQCVAJUArAAsAAJBgkGCQb2AfYB9gH2AX4AfgDyAPIA8gCxALEAsQDgAOAA4ADUBdQFzwHPAfAE8ASfAZ8B5wPnA+cDIAVPBU8FTwXDAsMCwwLDAukF6QUzBTMFsAOwA7ADkwJ2A3YDMgZ9An0C5gPmA/kA+QD5APkA+QD5AIwFjAWMBf4E/gT+BO0C7QKtAK0ArQCtAHkEeQR5BD8APwA/AD8AcwRzBLgDuAO4A58AEgASABIAGQAZABkAGQA8BTwFgQGBAXYEUwUjACMASgNKA9MEzQHNAUQDRANEA/gAbAAcBhwGWwG0BFQCVAJUAlQCcAKSBY4FCQb2AfYB9gH2AfYBfgDyAPIA8gDnBLEAsQCxAOAA4ADUBdQF1AXPAc8B8ATwBJ8BnwHnA+cD5wMgBU8FTwUmA8MCwwLDAm8B9QL1AvUCMwWwA7ADdgN2A3YDMgYyBuYD5gPmA+YD+QD5APkA+QD5AIwFjAWMBYwF/gT+BP4E5QLlAq0ArQCtAHkEeQR5BD8APwA/AD8APwBzBLgDuAO4A7gDEgCvBYABGQAZABkAgQGBAYEBgQGBASMAIwAjACMASgNKA80BzQHNAUQDRAP4APgAHAYcBhwGtARUAlQCVAJwAnACkgWOBScBlwT2AfYB9gH2AcUAxQCqAh4BHgHnBNUFQAJAArUCtQLUBdQFPAF0AXQB4wGHAYcBhwHJAskCZQVlBWUFJgMmAyYDbwFvAW8B9QL1AvUC9QKwA3YDdgN2A3YDXABcAOYD5gPmA/kA+QD5APkA+QD5AIwFjAWMBYwF/gT+BE4B5QLlAuUCrQAtAi0CLQI/AD8APwA/AD8APwC4A7gDuAO4A7gDCgG9AIABgAEZABkAigOBAYEBgQGBAYEBIwAjACMAIwCZAUoDzQHNAa4DrgP4APgA+AAcBhwGHAZUAlQCVAJwAnACkgWOBScBlwSXBJcEwgDCAMIAxQDFAB4BHgHnBOcEQAJAArUCtQI8ATwBPAF0AXQB4wGHAYcBhwHJAskCZQVlBWUFQgUmAyYDJgNvAW8B9QL1AvUC9QL1AksESwRLBEsEXABcAFwA5gMPAg8C+QD5APkA+QD5APkAjAWMBYwFTgFOAU4B5QLlAuUC5QItAi0CLQLBAT8APwA/AD8ArwGvAa8BuAO4A7gDvQC9AIABgAGKA4oDigOBAYEBgQGBASMAIwAjACMAmQGrBasFqwXoAegB+AX4APgA+AAcBhwGHAZUAgsDCwNwAnACjgUnAdYElwSXBMIAwgDCAMIAxQBNAh4BHgHnBEACQAK1ArUCPAE8ATwByAN0AeMB4wGHAYcByQLJAl4BXgFlBUIFQgUmA+8BbwFvAW8B9QL1AvUC9QL1AksESwRLBEsEXABcAFwADwIPAg8C+QD5APkA+QD5ABEBjAWMBU4BTgFOAU4B5QLlAv4A/gAtAi0CwQHBAT8APwCvAa8BrwGvAdwA3ABCAkICvQC9AL0AgAGAAYoDigOKA4EBgQGBAVYBVgFWASMAIwCZAasFYQToAegB6AHoAfgA+AAaBRoFGgULAwsDCwMLAwsDJwEnAdYElwSXBJcEwgDCAMIATQJNAk0CTQIeAUACQAK1ArUC5wHnATwBOwR0AXQB4wGHAYcBhwHJAl4BXgFeAWkCQgVCBe8B7wFvAW8BbwH1AvUC9QJ3AksESwRLBDkEXABcAFwADwIPAg8CDwL5APkA+QD5AGIEEQERAREBlgOWA04BTgH+AP4A/gD+AMEBwQHBAQUErwGvAa8BrwGvAdwA3ABCAkICvQC9AL0AgAGEAYQBhAGEAUUCRQJWAVYBVgFWAVYBbAOZAWQDYQRhBOgB6AHoARoFGgUaBRoFywILAwsDCwMLAycBJwEnAdYElwSXBGgE2gPaA9oDTQJNAmoBagEdAR0BtQKBAOcB5wHnAecBOwQvBC8EDQGHAYcByQJeAV4BXgFeAWkCaQLvAe8B7wFvAQ0GDQYNBncCdwI3BjkEOQQ5BDkEOQQnBCcEJwQPAg8CDwLPA8oDygPKA2IEEQERAVUAlgOWA5gD/gD+AP4A/gCJAYkBwQEFBAUEPwavAa8B3ADcANwAQgJCAkICvQC9AL0AvQCEAYQBhAGEAUUCRQJFAjcANwBWAVYBbANsA+sDZANhBF0CXQJdAl0CGgUaBRoFywJvABUFFQUVBQsDVARUBCcBlwRoBGgEaATaA9oDagFqAWoBagEdAR0BHQGBAIEAgQDnAecBzwXPBQ0BDQENAQ0BPQE9AV4B4wXjBWkCaQJGAqgCqALvAQ0GDQYNBncCdwI3BjcGOQQ5BDkEOQQ5BCcEJwQnBA8CDwLPA88DygPKA2IEYgQRAREBVQBVAJgDmAP+AP4A/gCJAYkBiQEFBAUEPwY/Bj8GhADcANwA3ABCAkICvQChBeAD4APgA+AD4AOEAWsDawMHATcANwA3AGwDbAOPA+sDZANAAEAAXQJdAhoFGgXLAssCywJvABUFFQUVBVQEVARUBFQEoQBoBGgEaATaAysBagFqAWoBagEdAR0BHQGBAIEAgQCBAM8FzwUNAQ0BDQENAT0BPQE9AeMF4wVGAkYCRgJGAqgCqALGA0MBQwF3AncCNwY3BjcGOQQ5BDkEOQROA04DJwQnBBIGEgbPA88DygPKA2IEEQERAVUAVQBVAJgDEwITAoUF/gCJAYkB8wQGAgYCPwaEAIQA3ADcANwAQgJCAkICJQMlA6EFoQXgA+AD4APgA2sDawMHAQcBNwA3ADcAbgSPA48DZANAAEAAQABAAEAAywLLAssCywJvAG8AbwAVBVQEVARUBKEAoQD/BAkACQAJAEgFKwErAWoBagEdAR0BHQGBAIEAgQCBAIEAWgFaAVoBDQENAT0BPQE9AT0B2wTjBUYCRgIRBagCqALGA8YDQwFDAXcCNwY3BjcGNwZaA1oDWgNOA04DZAVkBRIGEgaxBM8DygNRAFEAeAIRAd8D3wNVAFUAEwITAoUFhQWJAfME8wQGAgYChACEAIQAhADcANwA3ABCAiYFJQMlA6EFoQWhBeAD4ANJBUkFwwAHAQcBNwA3AG4EbgSPA48DQABAAEAAQABAAMsCywLLAssCbwBvAG8AbwBvAFQEAgChAKEAoQD/BAkACQBIBUgFKwErASsBHQEdAR0BHQHeAYEAgQCBADEBWgFaAVoB1QEeBT0BPQHbBNsErAGsAUYCggSCBDIAMgAyAEMBQwF3AncCNwY3BjcGWgNaA1oDWgNOA04DZAVkBRIGsQSxBOED4QNRAHgCeAJ4At8DgQKBAhMCEwITAn4FfgXzBPMEBgIGAgYChACEAIQAhADcANwAQgImBSYFJQMlAyUDoQWhBaEFCgQKBEkFwwDDAMMAiwQ3ADcAxwPHA48DVABAAEAAQABAAEAAywLLAssCywJvAG8AbwBvAO4DAgACAKEAoQD/BP8ECQAJAEgFKwErAX4DfgMdAR0BHQHeAd4B3gGBADEBMQExAVoB1QEeBR4F2wTbBNsErAGsAYIEggSCBIIEMgAyADIAMgAOAA4ADgAOAA4AdwFaA1oDWgNaA04DTgO+BL4EbwRvBG8E4QNRAFEAeAJ4AoECgQKBAoECjgGOAX4FfgV+BfMEvAG8AbwBsgWEAIQAhACEANwA3AAmBSYFJQMlAyUDoQWhBQoECgQKBMMAwwDDAIsElwOXA8cDxwPHA1UEVABUAFQAQABAALUAywLLAssCbwBvAG8AbwDuA+4DAgACAEsDSwNSAlICCQAJACsB6wJ+A34DdQAdAYUAhQCFAN4B3gExATEBMQExAdUB1QEeBVoFrAGsAawBrAGsAYIEggSCBCUGMgAyADIADgAOAA4ADgAOAHcBdwFaA1oDWgNaA0EFvgS+BL4EbwRvBG8EUQBRAFEAwwPDA4ECgQKBAo4BjgGOAX4FfgV+BbwBvAG8AbIFsgWyBYQAhADYBdgFJgUmBSYFJQMlAyUDJQMlAyUDCgQKBAoEwwDDAJcDlwOXA4UBhQGFAVUEVQRUAFQAVABUALUAtQC1AMsCbwBvANcD1wPXA+4D7gMCAAIASwNSAlICUgIJAE8B6wLrAnUAdQBrAYUAhQCFAIUAhQCFADEBMQExATEB1QFaBVoFWgWsAawBKQQpBHkAeQCCBCUGJQY1BjUENQQOAA4ADgB3AXcBdwF3AVoDWgNBBUEFQQW+BL4EBwJvBG8EbwQwBjAGwwPDA8MDgQKBAo4BjgGOAY4BjgF+BbwBvAG8AbwBfwJ/An8C2AXYBdgF2AXYBSYFMwQzBDMEJQMlAz0CPQI9Aj0CeASXA5cDlwOFAYUBhQGFAVUEVABUAFQAtQC1ALUAtQC1ADkG1wPXA9cD1wNGAO4DAgACAAIASwNSAlICTwFPAU8B6wJ1AHUAawFrAYUAhQCFAIUAhQAxATEBMQExATEBWgVaBVoFWgWsASkEOgN5AHkAeQAlBiUGNQY1BjUENQQOAA4AdwF3AXcBdwF3ARwDKARBBUEFQQUHAgcCBwIHAv4F/gUwBjAGwwPDA8MDJQWOAY4BjgGOAY4BjgF+BbwBvAF/An8CfwJ/An8C2AXYBdgF2AXYBdgFIwEjATMEMwQlAz0CPQI9Aj0CeAR4BJcDWQFZAVkBhQGFAYUBVABUAKMBowG1ALUAtQC1AHQFOQY5BkYARgBGAEYARgACAAIAxgXGBVsDWwNPAU8BTwF1AHUAdQBrAWsBhQCFAIUAhQBwBDEBMQExATEB6gNaBVoFWgW8A78CvwI6A3kAeQB5ACoAKQIpAikCGAIYAlsFdwF3AboCugK6AhwDHAMoBCgEQQUHAgcCBwIHAv4F/gX+BTAGmwWbBSUFJQUlBY4BjgGOAY4BqgGqAUgDogSiBKIEfwJ/AigG2AXYBdgF2AXYBdgFIwEjASMBMwQ9Aj0CPQI9AngEeASYAlkBWQFZAc0AhQGFAVQAowGjAaMBtQC1ALUAtQB0BTkGOQY5BkYARgBGAEYALQMuBjEAxgXGBVsDWwNOBE8BTwF1AEMFQwXZAtkC2QKFAIUAcARwBHAE6gPqA+oD6gPqA7wDvAO8A78CvwJ5AHkAeQAqACoAKQIpAhgCGAJbBVsFdwG6AroCugIcAxwDHAMoBCgEKARQAFAAUAD+Bf4F/gX+BZsFmwUlBSUFJQUlBY4BqgGqAaoBqgFIA0gDSAOiBKIEfwIoBigG2AXYBdgF2AXYBdgFIwEjASMBIwEjASYGJgYmBngEeASYApgCWQFZAc0AzQDNAMQAxADEAKMBowG1ALUAdAV0BXQFOQY5BjkG2wHbAS0DLQMuBi4GMQAxAFsDWwNOBE4ETwEdBB0EHQTZAtkC2QLWAdYBYgNwBHAEcATqA+oD6gPqA7wDvAO8A7wDvwK/AiMDIwMjAyoAKgAqACkCGAIYAlsFWwW6AroCugIcAxwDHAMcAygEKARQAFAAUABQAJEFkQX+BZsFmwUlBSUFJQUlBaoBqgGqAaoBqgGqAUgDSANIA6IEogQoBigGKAbYBdgF2AXYBdgFIwEjASMBbQJtAm0CJgYmBngEmAKYApgCzQDNAM0AzQBgA8QAxADEAMQAugW6BXQFdAV0BXECcQJxAtsB2wHbAS0DLQMuBjEAMQAxAPcC9wL3Ak4EHQQdBB0EHQTZAtkC1gHWAWIDYgNwBHAE6gPqA+oD6gPLA8sDvAO8A7wDvwIjAyMDIwMqACoAKgAqACoAGAIYAmoEagS6AroCugIcAxwDHAMcAygEUABQAFAAUACRBZEFkQWRBZsFJQUlBSUFJQUlBaoBqgGqAaoBqgFIA0gDSANIA4IF/AH8AfwB/AG6AboB2AXYBa4A4AXgBSMB9AFtAm0CbQKVBZUFtgW2BZgCmALNAM0AzQCGAmADxADEAMQAugW6BRkEdAV0BUkBcQJxAnEC2wHbAfwCagNqAy4GMQAxAPcC9wL3AvcCkQSRBJEEHQTZAogD1gHWAdYBYgNiA3AEAwTqA+oD6gPLA8sDywO8A7wDvAMjAyMDIwP7AyoAKgAqAF4FXgWaAGoEagRqBGoEogKiAhwDHAMcAxwDUABQAFAAUACRBZEFkQWRBQ4GDgYFBQUFBQUqBSoFKgWqAaoB8gLyAkgDSANIA4IFggX8AfwB/AG6AboBugGuAK4A4AXgBfQB9AFtAm0ClQWVBbYFtgW2BZgCzQDNAM0AhgKGAmADxADEAMQAvwEZBCEBIQEhAUkBSQFxAtsB2wH8AvwCagMKAgoCCgIKAvcC9wL3AvcCkQSRBJEEiAOIA4gDNgbWAWIDYgMlBAMEAwTqA8sDywPLA8sDywO8AyMCqgWqBaoFHAH7A/sDKgBeBV4FmgCaAGoEagRqBKICogKiAqICFwQXBBcEZAFQAFAAUACRBZEFDgYOBg4GBQUFBQUFBQUqBSoFKgXyAvIC8gLGBMYESAOCBYIFggX8AfwBugG6AboBrgCuAK4A4AXgBfQB9AH0AW0ClQWVBZUFtgW2BbYFzQAABgAGhgKGAoYChgLEAMQAvwG/ASEBIQEhAUkBSQFJAUkBSQHKAcoBygEZBhkGCgIKAgoC9wL3AsECwQKRBJEEkQSIA4gDiAM2BtYBJQQlBN4DAwQDBAME7wDvAO8A7wDvACMCIwKqBaoFHAEcAfsD+wMwATABcAWaAJoAagRqBIwBogKiAqICogIXBBcEZAFkAWQBZAHBA8EDDgYOBg4GDgYFBQUFBQUqBSoFKgXrAfIC8gLyAsYEjQJeAIIFggX8AboBugG6AboBrgCuAK4AbQRtBG0E9AH0AW0ClQWVBZUFtgW2BSYAAAYABgAGwwHDAcMBwwHyBfIF8gV/AyEBIQEwA0kBSQFJAUkBygHKAcoBygEZBhkGCgIKAsQBxAHBAsECwQLBApQEEAaIA4gDiAM2BiUEJQTeA94DpwCnAO8A7wDvAO8A7wDvACMCIwIjAhwBHAEcAQQDBAMwATABmgCaAJoAagSMAYwBogKiAqICFwQXBBcEZAFkAWQBwQPBA5MBkwETBBMEBQUFBQUFBQUqBesB6wGYAPIC8gJfAF8AjQJeAF4AXgBvAm8CugGyALIArgCuAK4AbQRtBG0EbQT0AVYEVgSVBZUFjgMmACYAJgAABgAGAAbDAcMBwwFwAPIF8gV/A38DIQEwAzADUARQBFAELQXKAcoBygEZBhkGGQbEAcQBxAHEAcECwQLBApQEEAYQBhAGiAOIAyUEJQSnAKcApwCnAKcA7wDvAO8A7wDTAiMCIwIjAiMCHAEcAQQDBAMEAzABMAHyA/ID8gOMAYwBjAGiAqIC1gUXBBcEZAFkAWQBZAHBA5MBkwETBBMEEwQFBQUFBQUGAesB6wGYAJgAXwBfAF8AXwCNAl4AXgBvAm8CbwKyALIArgCuAK4AbQRtBG0EVgRWBFYEVgSOA44DjgMmACYAJgD5BAAGwwHDAXAAcABwABkFfwN/A38D5gDmAOYAUARQBC0FLQUtBaoAqgCqAKoAxAHEAcQBxAHBAsECwQKUBJQEEAYQBhAGEAaIAyUEpwCnAKcApwCnAKcA7wDvAO8A0wLTAr8EIwIjAtQD1AMcAQQDBANYBFgE8gPyAzYENgSMAYwBjAGjAtYF1gXWBYMCgwJkAWQBVgVWBZMBkwETBBMEBgEGAQYBBgGYAJgAmACYAJgAXwBfAF8AXwCkBV4AXgBvAm8C3gTeBLIArgCuAK4AbQRtBFYEVgRWBFYEVgSOA44DjgMmACYAJgD5BPkE+QRwAHAAcABwABkFGQUZBeYA5gDmAOYA5gDmAC0FLQUtBS0FqgCqAKoAqgDEAcQBxAHEAcECwQLBApQEEAYQBhAGEAYQBiUEpwCnAKcAAQQBBAEE7wDvANMC0wLTAtMCvwS/BNQD1APUAwQDUQRRBFgEWATyAzYENgQ2BIwBjAGjAqMC1gXWBYMCgwKDAoMC6gXqBVYFkwGTARMEBgEGAQYBBgEGAQsGmACYAJgAXwBfAF8AXwCkBaQFpgVvAm8CLwIvAi8CrgCuAK4AbQRWBFYEVgRWBFYEjgOOA44DjgMmACYAJgD5BPkEcABwAHAAAQMBAxkFGQUZBeYA5gDmADkDOQM5Ay0FLQUtBaoAqgCqAKoAxAHEAcQBxAHEAcECwQLBApQEEAYQBhAGEAYBBAEEAQQBBAEEAQQBBAEEAQTTAtMC0wLTAr8EvwTUA9QD1APUA1EEUQRRBFEEWAQ2BDYENgSMAYwBowKjAqMC1gWDAoMC6QTpBOkE6gXqBVYFkwGTARMEBgEGAQYBBgELBgsGCwaYAJgAXwBfAF8AXwCmBaYFpgWmBS8CLwIvAi8CLwKuAK4A"), out = new Uint16Array(N);
+  for (let i = 0; i < N; i++) out[i] = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+  return out;
+})();
+const NC = 1600;
+
+/* ---------- legacy set scheduler: port of immunity_lock_study.run() ---------- */
+function makeSetSim(cfg) {
+  const x = new Float64Array(N), immune = new Uint8Array(N);
+  const contact = new Int32Array(N).fill(-1), satur = new Int32Array(N).fill(-1);
+  const rv = new Float64Array(N), pv = new Float64Array(N);
+  for (let v = 0; v < N; v++) { const ctl = cfg.controlled && (v % GW) > CB; rv[v] = ctl ? cfg.crho : cfg.rho; pv[v] = ctl ? cfg.cp : cfg.p; }
+  const timed = cfg.t1 > 0 || cfg.t2 > 0, mark = new Int32Array(N).fill(-1);
+  x[CENTER] = cfg.seed;
+  let current = [...new Set([CENTER, ...NBRS[CENTER]])];
+  const st = { U: 0, round: 0, month: 0, lastU: 0, lastServed: 0, peak: 0, stepMonths: 1, phase: "growth", extra: 0, done: false };
+  let pendingSeeds = [];
+  const timersPending = () => { if (!timed) return false; for (let v = 0; v < N; v++) if (!immune[v] && (contact[v] >= 0 || satur[v] >= 0)) return true; return false; };
+  function step(strict) {
+    if (pendingSeeds.length) { const s = new Set(current);
+      for (const [v, val] of pendingSeeds) { x[v] = Math.max(x[v], val); s.add(v); for (const u of NBRS[v]) s.add(u); }
+      current = [...s]; pendingSeeds = []; }
+    if ((strict && st.round >= cfg.maxRounds) || (!current.length && (strict || !timersPending()))) { st.done = true; return false; }
+    const r = st.round, nxt = [], add = v => { if (mark[v] !== r) { mark[v] = r; nxt.push(v); } };
+    st.peak = Math.max(st.peak, current.length);
+    const U0 = st.U, { delta, epsIn, satSkip, contactLevel, t1, t2 } = cfg;
+    for (let i = 0; i < current.length; i++) {
+      const v = current[i], nb = NBRS[v], d = nb.length, old = x[v];
+      if (satSkip && old >= 100.0 && !immune[v]) { st.U += 3; continue; }
+      let y;
+      if (immune[v]) { y = rv[v] * old; st.U += 9; }
+      else { let s = 0.0; for (let j = 0; j < d; j++) s += pv[v] * x[nb[j]]; if (s < epsIn) s = 0.0; y = rv[v] * old + s; st.U += 8 + 4 * d; }
+      if (y > 100) y = 100.0; if (y < EPS_ZERO) y = 0.0;
+      if (Math.abs(y - old) > delta || (y === 0.0 && old !== 0.0)) {
+        x[v] = y; st.U += 1 + 2 * d; add(v);
+        for (let j = 0; j < d; j++) { const u = nb[j]; if (satSkip && x[u] >= 100.0) { st.U += 1; continue; } add(u); }
+      }
+      if (contact[v] < 0 && x[v] >= contactLevel) contact[v] = r;
+      if (satur[v] < 0 && x[v] >= 100.0) satur[v] = r;
+    }
+    st.lastServed = current.length;
+    if (timed) for (let v = 0; v < N; v++) { if (immune[v]) continue;
+      if ((t1 > 0 && contact[v] >= 0 && r - contact[v] >= t1) || (t2 > 0 && satur[v] >= 0 && r - satur[v] >= t2)) { immune[v] = 1; add(v); st.U += 2; } }
+    current = nxt; st.round = r + 1; st.month = st.round; st.lastU = st.U - U0; st.extra = st.round;
+    return true;
+  }
+  return { st, step, eff: v => x[v], isQueued: null, get queued() { return current; }, get qlen() { return current.length; },
+           addSeed: (v, val) => pendingSeeds.push([v, val]), immune };
+}
+
+/* ---------- option A queue (port of delta_adoption_study.runA + global decay phases) ---------- */
+function makeASim(cfg) {
+  const x = new Float64Array(N), q = new Int32Array(N).fill(-1), rv = new Float64Array(N), pv = new Float64Array(N);
+  for (let v = 0; v < N; v++) { const ctl = cfg.controlled && (v % GW) > CB; rv[v] = ctl ? cfg.crho : cfg.rho; pv[v] = ctl ? cfg.cp : cfg.p; }
+  let head = -1, tail = -1, length = 0, S = 1;
+  const st = { U: 0, round: 0, month: 0, lastU: 0, lastServed: 0, peak: 0, stepMonths: 1, phase: "growth", extra: 0, renorms: 0, done: false };
+  const push = v => { if (q[v] !== -1) return 1; q[v] = v; if (length === 0) head = v; else q[tail] = v; tail = v; length++; return 4; };
+  const pop = () => { const v = head; if (length === 1) head = tail = -1; else head = q[v]; q[v] = -1; length--; return v; };
+  if (cfg.initAll > 0) { for (let v = 0; v < N; v++) { x[v] = cfg.initAll; push(v); } }
+  else { x[CENTER] = cfg.seed; push(CENTER); for (const u of NBRS[CENTER]) push(u); }
+  let pendingSeeds = [];
+  const decayOn = cfg.decayStart >= 0;
+  function enterDecay() {
+    const g = cfg.decayRho + 6 * cfg.decayP;
+    if (cfg.decayMode === "lazy") { while (length) { pop(); st.U += 3; } S = 1; st.phase = "lazy"; st.lazyFactor = g; return; }
+    let r = cfg.decayRho, p = cfg.decayP;
+    if (cfg.decayMode === "annual") { const g12 = Math.pow(g, 12); r = g12 * cfg.decayRho / g; p = cfg.decayP * g12 / g; st.stepMonths = 12; }
+    for (let v = 0; v < N; v++) { rv[v] = r; pv[v] = p; st.U += 2; if (x[v] > 0) st.U += push(v); }
+    st.phase = "decay";
+  }
+  function lazyTick() {
+    const U0 = st.U; S *= st.lazyFactor; st.U += 1;
+    if (S < 0.1) { let any = false;
+      for (let v = 0; v < N; v++) { st.U += 2; if (x[v] > 0) { let y = x[v] * S; if (y < EPS_ZERO) y = 0; x[v] = y; st.U += 2; if (y > 0) any = true; } }
+      S = 1; st.renorms++;
+      if (!any) { st.month++; st.lastU = st.U - U0; st.lastServed = 0; st.phase = "calm"; st.done = true; return true; } }
+    st.month++; st.lastU = st.U - U0; st.lastServed = 0; st.extra = st.renorms; return true;
+  }
+  function step(strict) {
+    if (st.done) return false;
+    if (pendingSeeds.length) { for (const [v, val] of pendingSeeds) {
+      if (st.phase === "lazy") x[v] = Math.max(x[v] * S, val) / S; else { x[v] = Math.max(x[v], val); push(v); for (const u of NBRS[v]) push(u); } }
+      pendingSeeds = []; }
+    if (decayOn && st.phase === "growth" && st.month >= cfg.decayStart) enterDecay();
+    if (st.phase === "lazy") return lazyTick();
+    if (strict && st.round >= cfg.maxRounds) { st.done = true; return false; }
+    if (length === 0) {
+      if (!strict && decayOn && st.phase === "growth") { st.month++; st.lastU = 0; st.lastServed = 0; return true; }
+      st.done = true; return false;
+    }
+    const n0 = length, U0 = st.U, delta = cfg.delta;
+    st.peak = Math.max(st.peak, n0);
+    for (let i = 0; i < n0; i++) {
+      const v = pop(), nb = NBRS[v], d = nb.length, old = x[v];
+      let y = rv[v] * old; for (let j = 0; j < d; j++) y += pv[v] * x[nb[j]];
+      if (y > 100) y = 100.0; if (y < EPS_ZERO) y = 0.0;
+      st.U += 3 + 8 + 4 * d;
+      if (Math.abs(y - old) > delta || (y === 0.0 && old !== 0.0)) { x[v] = y; st.U += 1 + d + push(v); for (let j = 0; j < d; j++) st.U += push(nb[j]); }
+    }
+    st.lastServed = n0; st.round++; st.month += st.stepMonths; st.lastU = st.U - U0; st.extra = st.round;
+    return true;
+  }
+  return { st, step, eff: v => (st.phase === "lazy" ? x[v] * S : x[v]), isQueued: v => q[v] !== -1, get qlen() { return length; },
+           addSeed: (v, val) => pendingSeeds.push([v, val]), get S() { return S; } };
+}
+
+/* ---------- country-clock ripple (port of ripple_country_clock_study.run) ---------- */
+function makeCountrySim(cfg) {
+  const x = new Float64Array(N), q = new Int32Array(N).fill(-1);
+  const join = new Int32Array(NC).fill(-1), S = new Float64Array(NC).fill(1), decaying = new Uint8Array(NC), finished = new Uint8Array(NC);
+  const membersOf = Array.from({ length: NC }, () => []);
+  for (let v = 0; v < N; v++) membersOf[OWNER[v]].push(v);
+  let head = -1, tail = -1, length = 0, t = 0;
+  const st = { U: 0, round: 0, month: 0, lastU: 0, lastServed: 0, peak: 0, stepMonths: 1, phase: "growth", extra: 0, done: false, peakMonthlyU: 0, calm: null };
+  const push = v => { if (decaying[OWNER[v]]) return 2; if (q[v] !== -1) return 3; q[v] = v; if (length === 0) head = v; else q[tail] = v; tail = v; length++; return 6; };
+  const pop = () => { const v = head; if (length === 1) head = tail = -1; else head = q[v]; q[v] = -1; length--; return v; };
+  const kap = cfg.kappa || 0;
+  const eff = v => { const c = OWNER[v]; return decaying[c] ? (kap > 0 ? x[v] * (kap + (1 - kap) * S[c]) : x[v] * S[c]) : x[v]; };
+  x[CENTER] = cfg.seed; push(CENTER); for (const u of NBRS[CENTER]) push(u);
+  let pendingSeeds = [];
+  function step(strict) {
+    if (st.done) return false;
+    if (strict && t >= cfg.maxMonths) { st.done = true; return false; }
+    if (pendingSeeds.length) { for (const [v, val] of pendingSeeds) { if (!decaying[OWNER[v]]) { x[v] = Math.max(x[v], val); push(v); for (const u of NBRS[v]) push(u); } } pendingSeeds = []; }
+    const U0 = st.U;
+    for (let c = 0; c < NC; c++) {
+      if (finished[c] || join[c] < 0) continue;
+      st.U += 2;
+      if (!decaying[c] && t >= join[c] + cfg.T) { decaying[c] = 1; S[c] = 1.0; }
+      if (decaying[c]) {
+        S[c] *= cfg.cg; st.U += 1;
+        if (kap > 0) {
+          if (S[c] < 0.01) { const k = kap + (1 - kap) * S[c];
+            for (const v of membersOf[c]) { st.U += 4; const y = x[v] * k; x[v] = y >= EPS_ZERO ? y : 0.0; }
+            S[c] = 1.0; finished[c] = 1; }
+        } else if (S[c] < 0.1) { let alive = false;
+          for (const v of membersOf[c]) { st.U += 4; const y = x[v] * S[c]; x[v] = y >= EPS_ZERO ? y : 0.0; alive = alive || x[v] > 0; }
+          S[c] = 1.0; if (!alive) finished[c] = 1; }
+      }
+    }
+    const n0 = length; st.peak = Math.max(st.peak, n0);
+    for (let i = 0; i < n0; i++) {
+      const v = pop(); st.U += 3 + 2;
+      if (decaying[OWNER[v]]) continue;
+      const nb = NBRS[v], d = nb.length, old = x[v];
+      let y = cfg.rho * old; for (let j = 0; j < d; j++) y += cfg.p * eff(nb[j]);
+      if (y > 100) y = 100.0; if (y < EPS_ZERO) y = 0.0;
+      st.U += 8 + 6 * d;
+      if (Math.abs(y - old) > cfg.delta || (y === 0.0 && old !== 0.0)) {
+        x[v] = y; st.U += 1 + d + push(v); for (let j = 0; j < d; j++) st.U += push(nb[j]);
+        const c = OWNER[v]; if (join[c] < 0 && y >= 1) { join[c] = t; st.U += 2; }
+      }
+    }
+    st.lastServed = n0; st.lastU = st.U - U0; st.peakMonthlyU = Math.max(st.peakMonthlyU, st.lastU);
+    let nDec = 0, nJoin = 0; for (let c = 0; c < NC; c++) { if (decaying[c] && !finished[c]) nDec++; if (join[c] >= 0) nJoin++; }
+    st.extra = nDec; st.phase = nDec ? "decay" : "growth";
+    let allDone = true; for (let c = 0; c < NC; c++) if (!(finished[c] || join[c] < 0)) { allDone = false; break; }
+    if (st.calm === null && t > 0 && length === 0 && allDone) { st.calm = t; st.done = true; st.phase = "calm"; }
+    t++; st.month = t; st.round = t;
+    return true;
+  }
+  return { st, step, eff, isQueued: v => q[v] !== -1, get qlen() { return length; }, addSeed: (v, val) => pendingSeeds.push([v, val]),
+           decaying, joinOf: c => join[c] };
+}
+
+/* ---------- water drop: scripted sources + subcritical medium (port of ripple_source_study.run) ---------- */
+function curveAt(t, start, rise, hold, fall) {
+  const k = t - start, top = 100.0;
+  if (k < 0) return 0.0;
+  if (k < rise) return top * k / rise;
+  if (k < rise + hold) return top;
+  if (k < rise + hold + fall) return top * (1 - (k - rise - hold) / fall);
+  return 0.0;
+}
+function makeDropSim(cfg) {
+  const x = new Float64Array(N), q = new Int32Array(N).fill(-1), isSrc = new Uint8Array(N);
+  const row = Math.floor(GH / 2);
+  const sources = cfg.layout === "relay" ? [20, 35, 50, 65, 80, 95].map((c, i) => [row * GW + c, i * 120]) : [[CENTER, 0]];
+  for (const [s] of sources) isSrc[s] = 1;
+  let head = -1, tail = -1, length = 0, t = 0;
+  const lastEnd = Math.max(...sources.map(s => s[1])) + cfg.rise + cfg.hold + cfg.fall;
+  const st = { U: 0, round: 0, month: 0, lastU: 0, lastServed: 0, peak: 0, stepMonths: 1, phase: "growth", extra: 0, done: false,
+               calm: null, maxMembers: 0, members: 0, snaps: 0, peakMonthlyU: 0 };
+  const push = v => { if (q[v] !== -1) return 1; q[v] = v; if (length === 0) head = v; else q[tail] = v; tail = v; length++; return 4; };
+  const pop = () => { const v = head; const nx = q[v]; if (length === 1) head = tail = -1; else head = nx; q[v] = -1; length--; return v; };
+  let pendingSeeds = [];
+  function step(strict) {
+    if (st.done) return false;
+    if (t >= cfg.maxMonths) { st.done = true; return false; }
+    if (pendingSeeds.length) { for (const [v, val] of pendingSeeds) { if (!isSrc[v]) { x[v] = Math.max(x[v], val); push(v); for (const u of NBRS[v]) if (!isSrc[u]) push(u); } } pendingSeeds = []; }
+    const U0 = st.U;
+    for (const [s, s0] of sources) {
+      const nw = curveAt(t, s0, cfg.rise, cfg.hold, cfg.fall); st.U += 3;
+      if (nw !== x[s]) { x[s] = nw; st.U += 1 + NBRS[s].length; for (const u of NBRS[s]) if (!isSrc[u]) st.U += push(u); }
+    }
+    const n0 = length; st.peak = Math.max(st.peak, n0);
+    for (let i = 0; i < n0; i++) {
+      const v = pop(), nb = NBRS[v], d = nb.length, old = x[v];
+      let y = cfg.rho * old; for (let j = 0; j < d; j++) y += cfg.p * x[nb[j]];
+      if (y > 100) y = 100.0; if (y < EPS_ZERO) y = 0.0;
+      st.U += 3 + 8 + 4 * d + 1;
+      const dl = y - old;
+      if (cfg.snap && dl < 0 && -dl <= cfg.delta && old > 0) { y = 0.0; st.snaps++; }
+      if (Math.abs(y - old) > cfg.delta || (y === 0.0 && old !== 0.0)) {
+        x[v] = y; st.U += 1 + d + push(v); for (let j = 0; j < d; j++) if (!isSrc[nb[j]]) st.U += push(nb[j]);
+      }
+    }
+    let mem = 0; for (let v = 0; v < N; v++) if (x[v] >= 1) mem++;
+    st.members = mem; st.maxMembers = Math.max(st.maxMembers, mem);
+    st.lastServed = n0; st.lastU = st.U - U0; st.peakMonthlyU = Math.max(st.peakMonthlyU, st.lastU);
+    st.phase = t < lastEnd ? "growth" : "decay";
+    if (st.calm === null && t > lastEnd && length === 0) st.calm = t;
+    if (st.calm !== null && t > st.calm + 12) { st.done = true; st.phase = "calm"; }
+    st.extra = Math.round(Math.max(...sources.map(s => x[s[0]])));
+    t++; st.month = t; st.round = t;
+    return true;
+  }
+  return { st, step, eff: v => x[v], isQueued: v => q[v] !== -1, get qlen() { return length; },
+           addSeed: (v, val) => pendingSeeds.push([v, val]), isSrc, residual() { let n = 0; for (let v = 0; v < N; v++) if (x[v] > 0 && !isSrc[v]) n++; return n; },
+           residualAll() { let n = 0; for (let v = 0; v < N; v++) if (x[v] > 0) n++; return n; } };
+}
+
+function makeSim(cfg) {
+  return cfg.model === "A" ? makeASim(cfg) : cfg.model === "set" ? makeSetSim(cfg) : cfg.model === "country" ? makeCountrySim(cfg) : makeDropSim(cfg);
+}
+function counts(sim) {
+  let mem = 0, sat = 0, hot = 0, pos = 0, sum = 0;
+  for (let v = 0; v < N; v++) { const a = sim.eff(v); if (a >= 1) mem++; if (a >= 100) sat++; if (a >= 45) hot++; if (a > 0) { pos++; sum += a; } }
+  return { mem, sat, hot, pos, mean: pos ? sum / pos : 0 };
+}
+</script>
+
+<script>
+const PYREF_LEGACY = {"baseline":{"rounds_run":676,"U":53457453,"peak_active":3754,"final_members_x_ge_1":13572,"final_saturated":13572,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":107,"membership_queries":0,"skipped_saturated":0},"sat_skip":{"rounds_run":676,"U":49998335,"peak_active":3480,"final_members_x_ge_1":13572,"final_saturated":13572,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":107,"membership_queries":0,"skipped_saturated":13572},"delta_0.01":{"rounds_run":723,"U":33343259,"peak_active":2304,"final_members_x_ge_1":13572,"final_saturated":13559,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":115,"membership_queries":0,"skipped_saturated":0},"delta_0.1":{"rounds_run":779,"U":27481241,"peak_active":1811,"final_members_x_ge_1":13572,"final_saturated":13371,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":124,"membership_queries":0,"skipped_saturated":0},"delta_1.0":{"rounds_run":1,"U":224,"peak_active":7,"final_members_x_ge_1":1,"final_saturated":0,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":1,"membership_queries":0,"skipped_saturated":0},"delta_10.0":{"rounds_run":1,"U":224,"peak_active":7,"final_members_x_ge_1":1,"final_saturated":0,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":1,"membership_queries":0,"skipped_saturated":0},"eps_in_0.1":{"rounds_run":780,"U":27492124,"peak_active":1809,"final_members_x_ge_1":13572,"final_saturated":13572,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":124,"membership_queries":0,"skipped_saturated":0},"eps_in_1.0":{"rounds_run":1467,"U":347666,"peak_active":7,"final_members_x_ge_1":0,"final_saturated":0,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":1,"membership_queries":0,"skipped_saturated":0},"eps_in_10.0":{"rounds_run":1467,"U":347666,"peak_active":7,"final_members_x_ge_1":0,"final_saturated":0,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":1,"membership_queries":0,"skipped_saturated":0},"sat_skip_delta_0.1":{"rounds_run":779,"U":23567022,"peak_active":1509,"final_members_x_ge_1":13572,"final_saturated":13371,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":124,"membership_queries":0,"skipped_saturated":13371},"controlled_P3_like":{"rounds_run":2500,"U":169360496,"peak_active":2994,"final_members_x_ge_1":11590,"final_saturated":10950,"final_immune":0,"final_active":1558,"yearly_cohort_lists_opened":415,"membership_queries":0,"skipped_saturated":0},"controlled_strong":{"rounds_run":1831,"U":83544578,"peak_active":2831,"final_members_x_ge_1":7656,"final_saturated":7424,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":106,"membership_queries":0,"skipped_saturated":0},"controlled_strong_delta_0.1":{"rounds_run":768,"U":15910067,"peak_active":1048,"final_members_x_ge_1":7597,"final_saturated":7281,"final_immune":0,"final_active":0,"yearly_cohort_lists_opened":122,"membership_queries":0,"skipped_saturated":0},"T2_240_after_saturation":{"rounds_run":2000,"U":463159888,"peak_active":13572,"final_members_x_ge_1":0,"final_saturated":0,"final_immune":13572,"final_active":12813,"yearly_cohort_lists_opened":107,"membership_queries":20016450,"skipped_saturated":13572},"T1_480_after_contact_x_ge_1":{"rounds_run":2000,"U":408124087,"peak_active":13572,"final_members_x_ge_1":0,"final_saturated":0,"final_immune":13572,"final_active":13572,"yearly_cohort_lists_opened":107,"membership_queries":17424813,"skipped_saturated":0},"T1_120_after_contact_x_gt_0":{"rounds_run":2000,"U":514970470,"peak_active":13572,"final_members_x_ge_1":0,"final_saturated":0,"final_immune":13572,"final_active":7993,"yearly_cohort_lists_opened":103,"membership_queries":22344809,"skipped_saturated":0}};
+const PYREF_A = {"growth_delta_0":{"rounds":677,"U":58799757,"peak":3565,"members":13572,"sat":13572},"growth_delta_0.1":{"rounds":780,"U":28967703,"peak":1664,"members":13572,"sat":13384},"controlled_strong_delta_0":{"rounds":1887,"U":90907395,"peak":2677,"members":7656,"sat":7424},"controlled_strong_delta_0.1":{"rounds":780,"U":16722501,"peak":935,"members":7597,"sat":7322},"fatigue_decay_delta_0":{"rounds":786,"U":546440222,"peak":13572,"members":0,"sat":0},"fatigue_decay_delta_0.1":{"rounds":149,"U":103000838,"peak":13572,"members":13572,"sat":0}};
+const PYREF_RIP = {"drop":{"drop_G0.99_rho0.93_p0.01":{"total_U":262805,"max_members_at_once":19,"members_at_end":18,"queue_empty_month":602,"residual_positive_locations":18,"reach_hops_peak_ge_1":2,"peak_monthly_U":1620},"drop_G0.995_rho0.8_p0.0325":{"total_U":707773,"max_members_at_once":61,"members_at_end":60,"queue_empty_month":617,"residual_positive_locations":84,"reach_hops_peak_ge_1":4,"peak_monthly_U":4623},"drop_G0.999_rho0.4_p0.0998":{"total_U":2198636,"max_members_at_once":240,"members_at_end":239,"queue_empty_month":621,"residual_positive_locations":314,"reach_hops_peak_ge_1":9,"peak_monthly_U":13793},"drop_G0.9_rho0.78_p0.02":{"total_U":217737,"max_members_at_once":13,"members_at_end":0,"queue_empty_month":602,"residual_positive_locations":18,"reach_hops_peak_ge_1":2,"peak_monthly_U":1426},"drop_G0.99_snap":{"total_U":259438,"max_members_at_once":19,"members_at_end":0,"queue_empty_month":601,"residual_positive_locations":0,"reach_hops_peak_ge_1":2,"peak_monthly_U":1620},"drop_G0.99_delta0":{"total_U":47284564,"max_members_at_once":61,"members_at_end":0,"queue_empty_month":1571,"residual_positive_locations":0,"reach_hops_peak_ge_1":4,"peak_monthly_U":38301},"relay6_G0.99":{"total_U":1587630,"max_members_at_once":113,"members_at_end":108,"queue_empty_month":1202,"residual_positive_locations":108,"reach_hops_peak_ge_1":77,"peak_monthly_U":3243},"relay6_G0.99_snap":{"total_U":1567428,"max_members_at_once":83,"members_at_end":0,"queue_empty_month":1201,"residual_positive_locations":0,"reach_hops_peak_ge_1":77,"peak_monthly_U":2885}},"country":{"T240":{"total_U":48453229,"peak_monthly_U":122368,"calm_month":1760,"mean_monthly_U":27515},"T120":{"total_U":48069229,"peak_monthly_U":122908,"calm_month":1640,"mean_monthly_U":29293},"HABIT30":{"total_U":45391501,"peak_monthly_U":122314,"calm_month":1190,"mean_monthly_U":38112}}};
+const BASE = { model: "A", rho: 0.99, p: 0.02, seed: 25, initAll: 0, delta: 0.1,
+  controlled: false, crho: 0.95, cp: 0.004,
+  decayStart: -1, decayMode: "monthly", decayRho: 0.95, decayP: 0.005,
+  T: 240, cg: 0.98, kappa: 0,
+  layout: "single", rise: 120, hold: 240, fall: 240, snap: false,
+  satSkip: false, epsIn: 0, t1: 0, t2: 0, contactLevel: 1, maxRounds: 3000, maxMonths: 2400 };
+const LEG = { model: "set", delta: 0, crho: 0.985, cp: 0.004, maxRounds: 1500 };
+const DROP = { model: "drop" };
+const GROUPS = [
+  ["现行基准：方案A + δ=0.1 + 国家时钟 T=240", [
+    ["country_T240", "基准：国家时钟 T = 240", { model: "country", T: 240 }, ["country", "T240"], "现行方案。各国第一个地点成为成员后保持 20 年，再整国懒衰退且不再接收输入。高强度环带由内向外推进，中心先平静，最后全图归零。"],
+    ["country_T240_k30", "基准 + 习俗保留率 κ = 0.3", { model: "country", T: 240, kappa: 0.3 }, ["country", "HABIT30"], "习惯型商品的建议形态：退潮结束时各地定格为峰值的约 30%，作为习俗长期保留、不再计算。"],
+    ["country_T120", "对比：保持期 T = 120", { model: "country", T: 120 }, ["country", "T120"], "保持期缩短到 10 年，环带更窄。"],
+    ["cur_growth", "只开增长（校准 p 用）", {}, ["A", "growth_delta_0.1"], "方案A + δ=0.1、没有退潮。校准到达年份与前沿速度时先用它。"],
+    ["cur_strong", "只开增长 + 强控制东半区", { controlled: true }, ["A", "controlled_strong_delta_0.1"], "东半区增益 0.974 < 1。边界收敛后锁死，第 780 轮全部休眠。"],
+  ]],
+  ["对比：全局退潮（为什么不用）", [
+    ["decay_monthly", "全图同时逐节点退潮：会冻结", { initAll: 100, rho: 0.95, p: 0.005 }, ["A", "fatigue_decay_delta_0.1"], "全图同时退潮，δ=0.1 下冻结在 x≈2.6–4.9，全部仍是成员；而且一轮约 70 万 U。"],
+    ["life_annual", "生命周期 + 全图年度步长退潮", { decayStart: 800, decayMode: "annual" }, null, "中心播种增长，第 800 月全图同时进入年度步长退潮。冻结在约 0.45。"],
+    ["life_lazy", "生命周期 + 全图共享 S", { decayStart: 800, decayMode: "lazy" }, null, "第 800 月全图同时进入懒衰退：最便宜，但全球均匀退潮。"],
+  ]],
+  ["对比：水滴入湖（脚本发源地 + 亚临界介质）", [
+    ["drop_G0.99", "单点，G = 0.99", { ...DROP, rho: 0.93, p: 0.01 }, ["drop", "drop_G0.99_rho0.93_p0.01"], "发源地按脚本升到 100、保持 20 年、再降回 0。介质 G < 1 不能自持，只形成约 2 跳的小光晕。"],
+    ["drop_G0.999", "单点，G = 0.999（贴近临界）", { ...DROP, rho: 0.4, p: 0.0998 }, ["drop", "drop_G0.999_rho0.4_p0.0998"], "增益贴近 1，成员半径也只有约 9 跳。"],
+    ["drop_snap", "单点，衰减停滞即归零", { ...DROP, rho: 0.93, p: 0.01, snap: true }, ["drop", "drop_G0.99_snap"], "没有冻结残留，但保持期内平衡态地点也会被误判归零再被点燃。"],
+    ["relay6", "中线 6 个中继", { ...DROP, rho: 0.93, p: 0.01, layout: "relay", maxMonths: 3000 }, ["drop", "relay6_G0.99"], "沿中线每 15 跳一个脚本中继，每 10 年点燃一个。只有中继周围亮起来，中间不连贯。"],
+  ]],
+  ["早期实验（集合版调度）", [
+    ["baseline", "集合版基线", { ...LEG }, ["set", "baseline"], "集合版调度、δ=0、增益 1.11。"],
+    ["T2_240_after_saturation", "T2：满值 20 年后免疫衰退", { ...LEG, satSkip: true, t2: 240, maxRounds: 2000 }, ["set", "T2_240_after_saturation"], "需要地点时钟；衰退带每轮都在算。"],
+    ["T1_120_after_contact_x_gt_0", "T1：x>0 起 10 年后免疫", { ...LEG, t1: 120, contactLevel: 0.00001, maxRounds: 2000 }, ["set", "T1_120_after_contact_x_gt_0"], "前沿外拖尾提前免疫，形成防火墙。"],
+  ]],
+];
+const PRESETS = GROUPS.flatMap(g => g[1].map(p => ({ key: p[0], name: p[1], over: p[2], ref: p[3], desc: p[4], group: g[0] })));
+
+const $ = id => document.getElementById(id);
+let cfg, sim, playing = false, raf = 0, preset = PRESETS[0], pristine = true, modified = false;
+let hist, lastCounts;
+const browserRuns = {};
+const fmt = n => n === null || n === undefined ? "—" : Math.round(n).toLocaleString("en-US");
+
+/* ---------- reference handling ---------- */
+function refOf(p) {
+  if (!p.ref) return null;
+  const [kind, key] = p.ref;
+  const r = kind === "A" ? PYREF_A[key] : kind === "set" ? PYREF_LEGACY[key] : kind === "country" ? PYREF_RIP.country[key] : PYREF_RIP.drop[key];
+  if (kind === "A") return { label: `轮数 ${fmt(r.rounds)}，总U ${fmt(r.U)}，峰值 ${fmt(r.peak)}，成员 ${fmt(r.members)}，饱和 ${fmt(r.sat)}`, vec: [r.rounds, r.U, r.peak, r.members, r.sat] };
+  if (kind === "set") return { label: `轮数 ${fmt(r.rounds_run)}，总U ${fmt(r.U)}，峰值 ${fmt(r.peak_active)}，成员 ${fmt(r.final_members_x_ge_1)}`, vec: [r.rounds_run, r.U, r.peak_active, r.final_members_x_ge_1, r.final_saturated] };
+  if (kind === "country") return { label: `总U ${fmt(r.total_U)}，月峰值 ${fmt(r.peak_monthly_U)}，平静于第 ${fmt(r.calm_month)} 月`, vec: [r.total_U, r.peak_monthly_U, r.calm_month] };
+  return { label: `总U ${fmt(r.total_U)}，同时成员峰值 ${fmt(r.max_members_at_once)}，结束成员 ${fmt(r.members_at_end)}，队列清空于第 ${fmt(r.queue_empty_month)} 月，残留 ${fmt(r.residual_positive_locations)}`,
+           vec: [r.total_U, r.max_members_at_once, r.members_at_end, r.queue_empty_month, r.residual_positive_locations] };
+}
+function browserVec(kind) {
+  const st = sim.st, k = counts(sim);
+  if (kind === "A" || kind === "set") return [st.round, st.U, st.peak, k.mem, k.sat];
+  if (kind === "country") return [st.U, st.peakMonthlyU, st.calm];
+  return [st.U, st.maxMembers, st.members, st.calm, sim.residualAll() - (sim.residualAll() - sim.residual()) - 0 + (sim.residualAll() - sim.residual())];
+}
+function checkRef() {
+  if (!pristine || !preset.ref || browserRuns[preset.key] !== undefined || !sim.st.done) return;
+  browserRuns[preset.key] = JSON.stringify(browserVec(preset.ref[0])) === JSON.stringify(refOf(preset).vec);
+  buildRef();
+}
+
+/* ---------- palette ---------- */
+const STAGES = [
+  [0, "#F1F2EE", "x = 0"], [1e-9, "#CFE6DF", "0 < x < 1 前沿"], [1, "#EBD6BC", "1–20"],
+  [20, "#D1A274", "20–45"], [45, "#A6683F", "45–70"], [70, "#6E412B", "70–<100"], [100, "#3A2013", "x = 100"],
+];
+const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const SRGB = STAGES.map(s => hex(s[1])), ACT = hex("#2E9C85"), IMMC = hex("#8597B0"), SRC = hex("#2F5C9E");
+function colorOf(a) {
+  if (a <= 0) return SRGB[0]; if (a < 1) return SRGB[1]; if (a < 20) return SRGB[2];
+  if (a < 45) return SRGB[3]; if (a < 70) return SRGB[4]; if (a < 100) return SRGB[5]; return SRGB[6];
+}
+const BORDER = (() => { const b = new Uint8Array(N); for (let v = 0; v < N; v++) for (const u of NBRS[v]) if (OWNER[u] !== OWNER[v]) { b[v] = 1; break; } return b; })();
+function legend() {
+  let h = STAGES.map(s => `<span><i style="background:${s[1]}"></i>${s[2]}</span>`).join("") + `<span><i style="background:#2E9C85"></i>排队中</span>`;
+  if (cfg.model === "country") h += `<span><i style="background:#8597B0"></i>所在国已进入衰退（色调偏灰）</span>`;
+  if (cfg.model === "drop") h += `<span><i style="background:#2F5C9E"></i>脚本发源地</span>`;
+  $("legend").innerHTML = h;
+}
+
+/* ---------- map ---------- */
+const mapC = $("map"), mctx = mapC.getContext("2d"), img = mctx.createImageData(235, 116);
+function drawMap() {
+  const d = img.data, showAct = $("show-active").checked, borders = cfg.model === "country" && $("show-borders").checked;
+  let act = null;
+  if (showAct && !sim.isQueued) { act = new Uint8Array(N); for (const v of sim.queued) act[v] = 1; }
+  for (let v = 0; v < N; v++) {
+    const r = Math.floor(v / GW), c = v % GW, off = r % 2;
+    let col = colorOf(sim.eff(v));
+    if (sim.immune && sim.immune[v]) col = [(col[0]+IMMC[0])>>1, (col[1]+IMMC[1])>>1, (col[2]+IMMC[2])>>1];
+    if (sim.decaying && sim.decaying[OWNER[v]]) col = [(col[0]*0.6+IMMC[0]*0.4)|0, (col[1]*0.6+IMMC[1]*0.4)|0, (col[2]*0.6+IMMC[2]*0.4)|0];
+    if (sim.isSrc && sim.isSrc[v]) col = SRC;
+    const on = showAct && (sim.isQueued ? sim.isQueued(v) : act[v]);
+    if (on) col = [(col[0]*0.35+ACT[0]*0.65)|0, (col[1]*0.35+ACT[1]*0.65)|0, (col[2]*0.35+ACT[2]*0.65)|0];
+    if (borders && BORDER[v]) col = [(col[0]*0.82)|0, (col[1]*0.82)|0, (col[2]*0.82)|0];
+    for (let k = 0; k < 2; k++) { const i = (r * 235 + 2 * c + off + k) * 4; d[i]=col[0]; d[i+1]=col[1]; d[i+2]=col[2]; d[i+3]=255; }
+  }
+  for (let r = 0; r < GH; r++) { const i = (r * 235 + (r % 2 ? 0 : 234)) * 4; d[i]=247; d[i+1]=248; d[i+2]=245; d[i+3]=255; }
+  mctx.putImageData(img, 0, 0);
+}
+function drawOverlay() {
+  const oc = $("overlay"), rect = oc.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  oc.width = rect.width * dpr; oc.height = rect.height * dpr;
+  const g = oc.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, rect.width, rect.height);
+  if (cfg.controlled && (cfg.model === "A" || cfg.model === "set")) {
+    const xpx = (2 * (CB + 1)) / 235 * rect.width;
+    g.strokeStyle = "#2F5C9E"; g.setLineDash([5, 4]); g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(xpx, 0); g.lineTo(xpx, rect.height); g.stroke();
+    g.setLineDash([]); g.fillStyle = "#2F5C9E"; g.font = "12px " + getComputedStyle(document.body).fontFamily;
+    g.fillText("受控区 ρ=" + cfg.crho + " p=" + cfg.cp, xpx + 6, 16);
+  }
+}
+$("mapwrap").addEventListener("click", e => {
+  const rect = mapC.getBoundingClientRect();
+  const r = Math.floor((e.clientY - rect.top) / rect.height * GH);
+  const px = (e.clientX - rect.left) / rect.width * 235;
+  const c = Math.floor((px - (r % 2)) / 2);
+  if (r < 0 || r >= GH || c < 0 || c >= GW) return;
+  sim.addSeed(r * GW + c, cfg.seed); pristine = false;
+  if (!playing) { if (sim.step(false)) record(); render(); }
+});
+
+/* ---------- charts ---------- */
+function lineChart(id, xs, series, opts) {
+  const c = $(id), rect = c.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  c.width = rect.width * dpr; c.height = rect.height * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  const W = rect.width, H = rect.height, m = { l: 58, r: 10, t: 8, b: 22 };
+  const xmax = Math.max(12, xs.length ? xs[xs.length - 1] : 12);
+  let ymax = opts.ymax || Math.max(1, ...series.flatMap(s => s.data), opts.line || 0);
+  ymax *= 1.06;
+  const X = t => m.l + (W - m.l - m.r) * t / xmax, Y = y => m.t + (H - m.t - m.b) * (1 - y / ymax);
+  g.font = "11px " + getComputedStyle(document.body).fontFamily; g.fillStyle = "#5D6875"; g.strokeStyle = "#E3E7E4"; g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const y = ymax / 1.06 * k / 4; g.beginPath(); g.moveTo(m.l, Y(y)); g.lineTo(W - m.r, Y(y)); g.stroke();
+    g.textAlign = "right"; g.fillText(Math.round(y).toLocaleString("en-US"), m.l - 6, Y(y) + 4); }
+  g.textAlign = "center";
+  const stepX = xmax > 1200 ? 240 : xmax > 480 ? 120 : xmax > 120 ? 60 : 12;
+  for (let t = 0; t <= xmax; t += stepX) g.fillText(opts.xLabel ? opts.xLabel(t) : t, X(t), H - 6);
+  if (opts.line) { g.strokeStyle = "#A8452F"; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(m.l, Y(opts.line)); g.lineTo(W - m.r, Y(opts.line)); g.stroke(); g.setLineDash([]); }
+  for (const s of series) {
+    if (!s.data.length) continue;
+    g.strokeStyle = s.color; g.globalAlpha = s.alpha || 1; g.lineWidth = s.w || 1.6; g.beginPath();
+    const stride = Math.max(1, Math.floor(s.data.length / (W * 2)));
+    for (let i = 0; i < s.data.length; i += stride) { const px = X(xs[i]), py = Y(s.data[i]); i ? g.lineTo(px, py) : g.moveTo(px, py); }
+    g.stroke(); g.globalAlpha = 1;
+  }
+}
+function drawCharts() {
+  const ymax = Math.max(500, ...hist.mem, ...hist.served) * 1.0;
+  lineChart("ch-nodes", hist.month, [
+    { data: hist.hot, color: "#3A2013", alpha: .45 }, { data: hist.mem, color: "#6B3F2A" },
+    { data: hist.served, color: "#2E7A6A", w: 1.8 }], { ymax: Math.min(14000, Math.max(ymax, 100)) });
+  lineChart("ch-u", hist.month, [{ data: hist.u, color: "#2E7A6A" }], { line: 40000 });
+}
+
+/* ---------- state ---------- */
+function record() {
+  const k = counts(sim); lastCounts = k;
+  hist.month.push(sim.st.month); hist.served.push(sim.st.lastServed); hist.mem.push(k.mem); hist.hot.push(k.hot);
+  hist.u.push(sim.st.lastU / sim.st.stepMonths);
+}
+const EXTRA_K = { A: "逻辑轮", set: "逻辑轮", country: "衰退中的国家", drop: "发源地当前 x" };
+function phaseText() {
+  const st = sim.st;
+  if (st.phase === "calm") return "已平静";
+  if (cfg.model === "country") return st.phase === "decay" ? "增长与国家退潮并行" : "增长";
+  if (cfg.model === "drop") return st.phase === "growth" ? "发源地脚本进行中" : "发源地已熄灭";
+  if (st.phase === "lazy") return `退潮：懒衰退 S，S=${sim.S.toFixed(3)}`;
+  if (st.phase === "decay") return "退潮：逐节点" + (st.stepMonths === 12 ? "（年度步长）" : "（每月）");
+  return "增长";
+}
+function render() {
+  const st = sim.st;
+  $("clock").innerHTML = `第 ${fmt(st.month)} 月<small>${(st.month / 12).toFixed(1)} 年</small>`;
+  const ph = $("phase"); ph.className = "phase " + (st.phase === "calm" ? "calm" : st.phase === "lazy" ? "lazy" : st.phase === "decay" ? "decay" : "growth");
+  ph.textContent = phaseText();
+  $("s-active").textContent = fmt(st.lastServed);
+  $("s-mem").textContent = fmt(lastCounts.mem); $("s-hot").textContent = fmt(lastCounts.hot);
+  $("s-mean").textContent = lastCounts.mean.toFixed(lastCounts.mean < 10 ? 2 : 1);
+  const um = st.lastU / st.stepMonths;
+  $("s-ulast").textContent = fmt(um); $("st-ulast").classList.toggle("warn", um > 40000);
+  $("s-u").textContent = fmt(st.U); $("s-peak").textContent = fmt(st.peak);
+  $("s-extra-k").textContent = st.phase === "lazy" ? "重标定次数" : EXTRA_K[cfg.model];
+  $("s-extra").textContent = fmt(st.phase === "lazy" ? st.renorms : st.extra);
+  drawMap(); drawCharts(); checkRef();
+}
+function reset() {
+  stop(); sim = makeSim(cfg);
+  hist = { month: [], served: [], mem: [], hot: [], u: [] };
+  lastCounts = counts(sim); legend(); drawOverlay(); render();
+}
+const strictNow = () => pristine && !!preset.ref;
+function tick() {
+  const n = +$("speed").value; let alive = true;
+  for (let i = 0; i < n; i++) { if (!sim.step(strictNow())) { alive = false; break; } record(); }
+  render();
+  if (alive && playing) raf = requestAnimationFrame(tick); else stop();
+}
+function play() { if (playing) return stop(); playing = true; $("play").textContent = "暂停"; raf = requestAnimationFrame(tick); }
+function stop() { playing = false; cancelAnimationFrame(raf); $("play").textContent = "播放"; }
+$("play").addEventListener("click", play);
+$("step").addEventListener("click", () => { stop(); if (sim.step(strictNow())) record(); render(); });
+$("reset").addEventListener("click", () => { pristine = !modified; reset(); });
+$("speed").addEventListener("input", e => $("speed-v").textContent = e.target.value + " 步/帧");
+$("show-active").addEventListener("change", drawMap);
+$("show-borders").addEventListener("change", drawMap);
+
+/* ---------- controls ---------- */
+const NUM = { rho: "p-rho", p: "p-p", seed: "p-seed", initAll: "p-init", delta: "p-delta", crho: "p-crho", cp: "p-cp",
+  decayStart: "p-dstart", decayRho: "p-drho", decayP: "p-dp", T: "p-T", cg: "p-cg", kappa: "p-kappa", rise: "p-rise", hold: "p-hold", fall: "p-fall",
+  epsIn: "p-eps", t1: "p-t1", t2: "p-t2" };
+function visibility() {
+  document.querySelectorAll("aside [data-m]").forEach(el => { el.hidden = !el.dataset.m.split(" ").includes(cfg.model); });
+}
+function writeControls() {
+  for (const [k, id] of Object.entries(NUM)) $(id).value = cfg[k];
+  $("p-model").value = cfg.model; $("p-dmode").value = cfg.decayMode; $("p-layout").value = cfg.layout;
+  $("p-sat").checked = cfg.satSkip; $("p-ctl").checked = cfg.controlled; $("p-snap").checked = cfg.snap; $("p-contact").value = String(cfg.contactLevel);
+  visibility(); notes();
+}
+function notes() {
+  const g1 = cfg.rho + 6 * cfg.p, gd = cfg.decayRho + 6 * cfg.decayP;
+  let h = `增益 ρ+6p = <b style="color:${g1 < 1 ? "#2E7A6A" : "#6B3F2A"}">${g1.toFixed(4)}</b>`;
+  if (cfg.model === "drop") h += g1 < 1 ? "：亚临界，发源地熄灭后会平静" : "：≥1，会自持，不会平静";
+  if ((cfg.model === "A" || cfg.model === "set") && cfg.controlled) { const g2 = cfg.crho + 6 * cfg.cp; h += `；受控区 <b style="color:${g2 < 1 ? "#2E7A6A" : "#A8452F"}">${g2.toFixed(3)}</b>`; }
+  $("gain-note").innerHTML = h;
+  const fm = cfg.delta / (1 - gd), fa = cfg.delta / (1 - Math.pow(gd, 12));
+  $("decay-note").innerHTML = gd < 1
+    ? `退潮增益 G = <b>${gd.toFixed(3)}</b>。冻结下限约：每月 <b style="color:${fm >= 1 ? "#A8452F" : "#2E7A6A"}">${fm.toFixed(2)}</b>，年度 <b style="color:${fa >= 1 ? "#A8452F" : "#2E7A6A"}">${fa.toFixed(2)}</b>；懒衰退不受 δ 影响。`
+    : `退潮增益 G = ${gd.toFixed(3)} ≥ 1，不会退潮。`;
+}
+function readControls() {
+  for (const [k, id] of Object.entries(NUM)) { const v = parseFloat($(id).value); cfg[k] = isNaN(v) ? 0 : v; }
+  for (const k of Object.keys(NUM)) if (k !== "decayStart") cfg[k] = Math.max(0, cfg[k]);
+  cfg.decayStart = Math.max(-1, cfg.decayStart); cfg.rise = Math.max(1, cfg.rise); cfg.fall = Math.max(1, cfg.fall);
+  cfg.model = $("p-model").value; cfg.decayMode = $("p-dmode").value; cfg.layout = $("p-layout").value;
+  cfg.satSkip = $("p-sat").checked; cfg.controlled = $("p-ctl").checked; cfg.snap = $("p-snap").checked; cfg.contactLevel = parseFloat($("p-contact").value);
+  if (cfg.model === "set" && cfg.maxRounds < 1) cfg.maxRounds = 1500;
+  modified = true; pristine = false; $("scen-title").textContent = "自定义（基于 " + preset.name + "）";
+  visibility(); notes(); reset();
+}
+document.querySelectorAll("aside input, aside select").forEach(el => {
+  if (["preset", "speed", "show-active", "show-borders"].includes(el.id)) return;
+  el.addEventListener("change", readControls);
+});
+const sel = $("preset");
+for (const [gname, items] of GROUPS) {
+  const og = document.createElement("optgroup"); og.label = gname;
+  for (const p of items) { const o = document.createElement("option"); o.value = p[0]; o.textContent = p[1]; og.appendChild(o); }
+  sel.appendChild(og);
+}
+sel.addEventListener("change", () => loadPreset(sel.value));
+function loadPreset(k) {
+  preset = PRESETS.find(p => p.key === k);
+  cfg = Object.assign({}, BASE, preset.over); modified = false; pristine = true;
+  sel.value = k; $("desc").textContent = preset.desc; $("scen-title").textContent = preset.name;
+  writeControls(); reset(); buildRef();
+}
+function buildRef() {
+  const tb = document.querySelector("#ref tbody"); tb.innerHTML = "";
+  for (const [gname, items] of GROUPS) {
+    const rows = items.map(p => PRESETS.find(q => q.key === p[0])).filter(p => p.ref);
+    if (!rows.length) continue;
+    tb.insertAdjacentHTML("beforeend", `<tr class="grp"><td colspan="4">${gname}</td></tr>`);
+    for (const p of rows) {
+      const b = browserRuns[p.key];
+      const mark = b === undefined ? "<span style='color:#5D6875'>未跑完</span>" : b ? "<span class='match'>一致</span>" : "<span class='mismatch'>不一致</span>";
+      tb.insertAdjacentHTML("beforeend", `<tr class="${p.key === preset.key ? "cur" : ""}"><td>${p.name}</td><td class="k">${refOf(p).label}</td><td>${mark}</td><td><button type="button" data-k="${p.key}">载入</button></td></tr>`);
+    }
+  }
+  tb.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { loadPreset(b.dataset.k); window.scrollTo({ top: 0, behavior: "smooth" }); }));
+}
+/* ---------- playback of tools/obsession_sim exports ---------- */
+let PB = null, pbIdx = 0, pbPlaying = false, pbRaf = 0;
+let pbRaster = null, pbImage = null, pbBorderImage = null, pbGeo = null, pbHover = -1;
+let pbMissingNodes = [];
+let pbOwnerIds = [];
+let pbWorldIndex = -1;
+let pbView = {zoom:1, dx:0, dy:0}, pbTransform = null, pbDrag = null, pbImageKey = "";
+const PBCOL = (() => { const out = [];
+  for (let code = 0; code < 14; code++) { const st = code % 7; let c = SRGB[st];
+    if (code >= 7) c = [(c[0]*0.6+IMMC[0]*0.4)|0, (c[1]*0.6+IMMC[1]*0.4)|0, (c[2]*0.6+IMMC[2]*0.4)|0];
+    out.push(`rgb(${c[0]},${c[1]},${c[2]})`); }
+  return out; })();
+function pbPlaybackTypeError(obj) {
+  if(obj&&typeof obj==="object"){
+    if(obj.selected&&obj.budget_frontier) return "这是研究统计报告，不含地图回放；请选择商品.playback.json 或商品.html。";
+    if(obj.format==="obsession_sim.graph/1") return "这是地图数据，需要先运行模拟生成回放；请选择商品.playback.json 或商品.html。";
+    if("seeds" in obj||"initial" in obj||"transport" in obj||obj.scenario) return "这是情景配置，不是回放；请在「导入配置」中载入并重算，或选择商品.playback.json / 商品.html 查看已有结果。";
+  }
+  return "不是 obsession_sim.playback/1 回放文件；请选择商品.playback.json 或内嵌回放的商品.html。";
+}
+function pbParsePlaybackFile(text) {
+  text=String(text).replace(/^\uFEFF/,"").trim();
+  if(text.startsWith("<")){
+    const embedded=text.match(/<script\b(?=[^>]*\bid\s*=\s*["']obsession-playback-data["'])[^>]*>([\s\S]*?)<\/script\s*>/i);
+    if(!embedded)throw new Error("这个 HTML 没有内嵌回放数据；请选择商品.html 或商品.playback.json。");
+    text=embedded[1];
+  }
+  const obj=JSON.parse(text);
+  if(!obj||obj.format!=="obsession_sim.playback/1")throw new Error(pbPlaybackTypeError(obj));
+  return obj;
+}
+function pbLoad(obj) {
+  if (!obj || obj.format !== "obsession_sim.playback/1") throw new Error(pbPlaybackTypeError(obj));
+  if (!Array.isArray(obj.frames) || !obj.frames.length) throw new Error("文件里没有帧（导出时需要 --frames-every）");
+  if (!Number.isInteger(obj.nodes) || obj.nodes < 1 || !Array.isArray(obj.xy) || obj.xy.length !== obj.nodes || obj.frames.some(f => typeof f.stages !== "string" || f.stages.length !== obj.nodes || /[^a-n]/.test(f.stages) || !Number.isFinite(f.month))) throw new Error("坐标或帧的地点数 / 分档无效");
+  if (!Array.isArray(obj.bounds) || obj.bounds.length !== 4 || !obj.bounds.every(Number.isFinite) || obj.xy.some(p => !Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite))) throw new Error("地图坐标无效");
+  let raster = null, geo = obj.graph_meta && obj.graph_meta.geometry;
+  if (geo) {
+    if (geo.type !== "index-raster/1" || !Number.isInteger(geo.width) || !Number.isInteger(geo.height) || geo.width < 1 || geo.height < 1 || geo.width * geo.height > 16000000 || !Array.isArray(geo.rows) || geo.rows.length !== geo.height || !Array.isArray(geo.bounds) || geo.bounds.length !== 4 || !geo.bounds.every(Number.isFinite) || geo.bounds[2] <= geo.bounds[0] || geo.bounds[3] <= geo.bounds[1]) throw new Error("真实地图几何格式无效或尺寸过大");
+    raster = new Int32Array(geo.width * geo.height);
+    for (let y = 0; y < geo.height; y++) {
+      let x = 0;
+      if (!Array.isArray(geo.rows[y])) throw new Error("地图行格式无效");
+      for (const run of geo.rows[y]) {
+        if (!Array.isArray(run) || run.length !== 2 || !Number.isInteger(run[0]) || run[0] < -2 || run[0] >= obj.nodes || !Number.isInteger(run[1]) || run[1] < 1 || x + run[1] > geo.width) throw new Error("地图游程无效");
+        raster.fill(run[0], y * geo.width + x, y * geo.width + x + run[1]); x += run[1];
+      }
+      if (x !== geo.width) throw new Error("地图行长度不一致");
+    }
+  }
+  clearTimeout(pbRaf); pbPlaying = false; $("pb-play").textContent = "播放";
+  const previous = PB;
+  PB = obj; pbIdx = 0; pbWorldIndex = -1;
+  const intro=document.querySelector?.('.sub');
+  if(intro)intro.textContent=`${PB.title||'扩散模拟'}。${PB.preview?'当前为起点预览，尚未完整计算。':'当前显示此地图已计算的回放。'}真实地图与合成六角网格共用参数、播放与统计；历史实验保留在折叠区。`;
+  pbGeo = geo || null; pbRaster = raster; pbImage = null; pbImageKey = ""; pbHover = -1; pbView = {zoom:1, dx:0, dy:0};
+  const sampled=new Set(raster||[]);pbMissingNodes=Array.from({length:PB.nodes},(_,i)=>i).filter(i=>!sampled.has(i));
+  const ownerKeys=Array.from({length:PB.nodes},(_,v)=>pbOwner(v)),ownerIndex=new Map([...new Set(ownerKeys)].sort().map((key,i)=>[key,i]));
+  pbOwnerIds=ownerKeys.map(key=>key==="无主"?-1:ownerIndex.get(key));
+  $("pb-flip").checked = false; pbBuildBorders();
+  const t = $("pb-t"); t.max = PB.frames.length - 1; t.value = 0; t.disabled = false; $("pb-play").disabled = false;
+  const sm = PB.summary || {};
+  $("pb-summary").textContent = `${PB.title || "回放"}：${fmt(PB.nodes)} 个地点，${PB.frames.length} 帧；总 U ${fmt(sm.total_U)}，月峰值 ${fmt(sm.peak_monthly_U)}，${sm.calm_month == null ? "尚未平静" : "平静于" + pbDate(sm.calm_month)}，曾为成员 ${fmt(sm.ever_member)}。`;
+  pbAppliedInputs();
+  const meta=PB.graph_meta||{},unowned=pbOwnerIds.filter(id=>id<0).length;
+  const sourceYear=meta.source_year??(meta.source_date&&String(meta.source_date).match(/^\d{1,4}/)||[])[0];
+  $("pb-meta").textContent = (pbPayloadMap()==='hex'?`合成六角网格 · ${PB.graph_meta?.width??117} × ${PB.graph_meta?.height??116}，${fmt(PB.nodes)} 个节点；用于在相同 Python 核心下对照传播系数。`:pbGeo ? `EU5 地点轮廓 · ${pbGeo.width} × ${pbGeo.height} 显示采样；传播使用导入的地点邻接图，显示分辨率不改变图拓扑。细小地点以中心点补充。` : "坐标点图（此回放没有真实地图轮廓）。")+
+    (meta.kind==="eu5_map"||meta.owner_source?`\n地图快照：${meta.source_date||"日期未声明"}；来源年份：${sourceYear??"未声明"}；归属来源：${meta.owner_source||"未声明"}。${fmt(PB.nodes)} 个地点，${fmt(unowned)} 个无主地点。${PB.world_frames?.length?"归属与市场随世界快照阶梯更新。":"归属是静态快照，不随模拟年份更新。"}`:"")+
+    `\n时钟分组：${meta.clock_group||"owner（国家）"}；模拟起年：${PB.start_year??"未声明"}。`;
+  pbMilestones();
+  $("pb-msg").textContent = "";
+  pbAfterLoad(previous);
+  pbDraw();
+}
+function pbAppliedInputs(){
+  const params=PB.params||{},keys=[['p','p'],['ρ','rho'],['δ','delta'],['T（月）','hold_T'],['退潮因子','decay_factor'],['κ','habit_floor'],['最长月数','max_months']];
+  const values=keys.filter(([,key])=>params[key]!=null).map(([label,key])=>`${label}=${params[key]}`);
+  if('budget' in params)values.push(`月预算=${params.budget==null?'不限':params.budget}`);
+  const seeds=PB.inputs?.seeds;
+  const seedText=Array.isArray(seeds)?seeds.map(row=>`${PB.names?.[row[0]]??'地点 '+row[0]}：x=${row[2]}，${pbDate(row[1])}（第 ${row[1]} 月）`).join('；'):'旧回放未提供实际种子输入';
+  $("pb-applied").textContent=`当前回放：${pbMapLabel(pbPayloadMap())}（实际生效的输入，与尚未重算的表单修改区分）\n模型：${params.decay??'未记录'}；起年：${PB.start_year??'未记录'}\n${values.join(' · ')}\n实际种子：${seedText||'无'}`;
+  $("pb-scenario-note").textContent=PB.note?`原情景说明（背景与限制；其中初始设定可能已被本次参数覆盖，实际输入见上方）：${PB.note}`:'';
+}
+function pbPayloadMap(payload=PB){return payload?.inputs?.map||payload?.graph_meta?.simulation_map||(payload?.graph_meta?.kind==='hex_grid'?'hex':'real');}
+function pbMapLabel(map){return map==='hex'?'合成六角网格':'真实 EU5 地图';}
+function pbDate(month,allowNegative=false) {
+  if (month == null || (month < 0&&!allowNegative)) return "未达到";
+  if (PB && PB.start_year != null && Number.isFinite(+PB.start_year)) {
+    const total = Math.round(+PB.start_year * 12 + month);
+    return `${Math.floor(total / 12)} 年 ${(total%12+12)%12+1} 月`;
+  }
+  return `第 ${fmt(month)} 月`;
+}
+function pbAttr(key, v) { const col = PB.attrs && PB.attrs[key]; return col && col[v] != null ? String(col[v]) : "—"; }
+function pbOwner(v) {
+  for(const key of ["owner_tag","owner"]){if(PB.attrs&&Array.isArray(PB.attrs[key]))return PB.attrs[key][v]==null||PB.attrs[key][v]===""?"无主":String(PB.attrs[key][v]);}
+  if(PB.group&&PB.group[v]<0)return "无主";
+  return PB.group_names&&PB.group?PB.group_names[PB.group[v]]||"—":"—";
+}
+function pbName(v) { const display=pbAttr("display_name",v), name=pbAttr("name",v); return display!=="—"?display:PB.names&&PB.names[v]|| (name!=="—"?name:`地点 ${v}`); }
+const pbMasks=new WeakMap();
+function pbMasked(v){if(!PB?.masked_nodes)return false;let mask=pbMasks.get(PB);if(!mask){mask=new Set(PB.masked_nodes);pbMasks.set(PB,mask);}return mask.has(v);}
+function pbColor(v) {
+  const mode = $("pb-mode").value;
+  if(mode!=="owner"&&pbMasked(v))return "#b8bec6";
+  if (mode === "owner") { const owner = pbOwnerIds[v]; return owner<0?"#c5cec9":`hsl(${(owner * 137.508) % 360} 35% 63%)`; }
+  if (mode === "arrival") {
+    const t = PB.arrival && PB.arrival[v];
+    if (t == null || t < 0 || t > pbFrame().month) return "#e1e5e4";
+    const max = Math.max(1, PB.frames[PB.frames.length - 1].month);
+    return `hsl(${220 - 210 * Math.min(1,t/max)} 55% 48%)`;
+  }
+  if (mode === "compare") { const c = pbCompareColor(v); if (c) return c; }
+  return PBCOL[pbFrame().stages.charCodeAt(v)-97];
+}
+/* Frame on screen: the live frame of a running job (same map), else the replay frame. */
+function pbFrame() {
+  if (pbLive && pbLive.stages.length === PB.nodes && $("pb-live-on").checked) return pbLive;
+  return PB.frames[pbIdx];
+}
+const PB_CMP_RANGE = 240;
+function pbCompareColor(v) {
+  const ref = pbRefPayload(); if (!ref) return null;
+  const a = PB.arrival && PB.arrival[v], b = ref.arrival && ref.arrival[v];
+  const ha = a != null && a >= 0, hb = b != null && b >= 0;
+  if (!ha && !hb) return "#e6e9e7";
+  if (ha && !hb) return "#2f8a57";
+  if (!ha && hb) return "#8b5fb0";
+  const d = a - b; if (d === 0) return "#f3eedf";
+  const k = Math.min(1, Math.abs(d) / PB_CMP_RANGE);
+  return d < 0 ? `hsl(212 ${45 + 30 * k}% ${86 - 44 * k}%)` : `hsl(12 ${45 + 35 * k}% ${86 - 44 * k}%)`;
+}
+function pbBuildBorders() {
+  pbBorderImage = null; if (!pbRaster) return;
+  const c = document.createElement("canvas"); c.width = pbGeo.width; c.height = pbGeo.height;
+  const g = c.getContext("2d"), im = g.createImageData(c.width,c.height), w = c.width;
+  const owner = v => pbOwnerIds[v];
+  for (let y=0;y<c.height;y++) for(let x=0;x<w;x++) {
+    const i=y*w+x, v=pbRaster[i]; if(v<0) continue;
+    const r=x+1<w?pbRaster[i+1]:-1, b=y+1<c.height?pbRaster[i+w]:-1;
+    if(r<0 || b<0 || owner(v)!==owner(r) || owner(v)!==owner(b)) { const p=i*4; im.data[p]=47; im.data[p+1]=63; im.data[p+2]=69; im.data[p+3]=155; }
+  }
+  g.putImageData(im,0,0); pbBorderImage=c;
+}
+function pbRasterImage() {
+  const live = pbFrame() === PB.frames[pbIdx] ? "" : "live" + pbLive.month;
+  const key = `${pbIdx}/${$("pb-mode").value}/${live}/${pbRefId}/${pbScope ? pbScope.key + "=" + pbScope.value : ""}`;
+  if (pbImage && key===pbImageKey) return;
+  pbImageKey=key;
+  const c=document.createElement("canvas"); c.width=pbGeo.width; c.height=pbGeo.height;
+  const palette=document.createElement("canvas"); palette.width=256; palette.height=Math.ceil(PB.nodes/256);
+  const pg=palette.getContext("2d");
+  for(let v=0;v<PB.nodes;v++){pg.fillStyle=pbColor(v);pg.fillRect(v%256,Math.floor(v/256),1,1);}
+  const colors=pg.getImageData(0,0,palette.width,palette.height).data;
+  if(pbScope)for(let v=0;v<PB.nodes;v++)if(!pbScope.mask[v]){const q=v*4;colors[q]=colors[q]*.3+222*.7;colors[q+1]=colors[q+1]*.3+228*.7;colors[q+2]=colors[q+2]*.3+226*.7;}
+  const g=c.getContext("2d"), im=g.createImageData(c.width,c.height);
+  for(let i=0;i<pbRaster.length;i++){const v=pbRaster[i],p=i*4;
+    if(v<0){im.data[p]=v===-2?197:220;im.data[p+1]=v===-2?207:232;im.data[p+2]=v===-2?201:237;}
+    else {const q=v*4;im.data[p]=colors[q];im.data[p+1]=colors[q+1];im.data[p+2]=colors[q+2];} im.data[p+3]=255;
+  }
+  g.putImageData(im,0,0);pbImage=c;
+}
+function pbApplyWorld() {
+  if (!Array.isArray(PB.world_frames) || !PB.world_frames.length) return;
+  const month = pbFrame().month;
+  let index = 0;
+  for (let i=1;i<PB.world_frames.length && PB.world_frames[i].month<=month;i++) index=i;
+  if(index===pbWorldIndex) return;
+  const state=PB.world_frames[index];
+  if(!Array.isArray(state.owner)||state.owner.length!==PB.nodes) throw new Error("动态世界归属列无效");
+  pbWorldIndex=index; PB.group=state.owner;
+  PB.attrs=PB.attrs||{};
+  PB.attrs.owner_tag=state.owner.map(c=>c<0?null:(state.group_labels?.[c]||PB.group_names?.[c]||String(c)));
+  PB.attrs.market=state.market;
+  pbOwnerIds=state.owner;pbImage=null;pbImageKey="";pbBuildBorders();
+}
+function pbDraw() {
+  if (!PB) return;
+  pbApplyWorld();
+  const c = $("pb-map"), W = c.clientWidth || 600;
+  const [x0, y0, x1, y1] = pbGeo ? pbGeo.bounds : PB.bounds, bw = Math.max(1e-9, x1 - x0), bh = Math.max(1e-9, y1 - y0);
+  const H = Math.round(Math.max(280,Math.min(660,W * bh / bw))), dpr = devicePixelRatio || 1;
+  c.style.height = H + "px"; c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr); g.fillStyle="#dce8ed";g.fillRect(0,0,W,H);
+  const sc = Math.min(W / bw,H / bh)*.98*pbView.zoom, flip = $("pb-flip").checked;
+  const left=W/2-bw*sc/2+pbView.dx, top=H/2-bh*sc/2+pbView.dy;
+  pbTransform={W,H,x0,y0,x1,y1,bw,bh,sc,left,top,flip};
+  const X=x=>left+(x-x0)*sc, Y=y=>top+(flip?y1-y:y-y0)*sc;
+  if(pbRaster){
+    pbRasterImage();g.imageSmoothingEnabled=false;
+    g.save();g.translate(left,flip?top+bh*sc:top);g.scale(1,flip?-1:1);
+    g.drawImage(pbImage,0,0,bw*sc,bh*sc);
+    if($("pb-borders").checked&&pbBorderImage)g.drawImage(pbBorderImage,0,0,bw*sc,bh*sc);
+    if(pbScope&&pbScope.outline)g.drawImage(pbScope.outline,0,0,bw*sc,bh*sc);
+    g.restore();
+  }
+  const size=pbRaster?1.4:Math.max(1.5,Math.sqrt(W*H/PB.nodes)*.75)*Math.sqrt(pbView.zoom);
+  for(const v of pbMissingNodes){
+    const px=X(PB.xy[v][0]),py=Y(PB.xy[v][1]);
+    if(px< -size||px>W+size||py< -size||py>H+size)continue;
+    g.globalAlpha=pbScope&&!pbScope.mask[v]?.3:1;g.fillStyle=pbColor(v);g.fillRect(px-size/2,py-size/2,size,size);
+  }
+  g.globalAlpha=1;
+  if(pbSelected>=0&&pbSelected<PB.nodes){const p=PB.xy[pbSelected];g.strokeStyle="#A8452F";g.lineWidth=2.5;g.beginPath();g.arc(X(p[0]),Y(p[1]),8,0,2*Math.PI);g.stroke();g.strokeStyle="#fff";g.lineWidth=1;g.beginPath();g.arc(X(p[0]),Y(p[1]),10,0,2*Math.PI);g.stroke();}
+  if(pbHover>=0){const p=PB.xy[pbHover];g.strokeStyle="#0d559c";g.lineWidth=2;g.beginPath();g.arc(X(p[0]),Y(p[1]),6,0,2*Math.PI);g.stroke();}
+  const frame = pbFrame(), live = frame !== PB.frames[pbIdx], month = frame.month;
+  $("pb-clock").textContent = live ? `计算中 · ${pbLiveDate(month)}` : `${pbDate(month)} · 第 ${fmt(month)} 月`;
+  $("pb-live").hidden = !live; if (live) $("pb-live").textContent = `实时计算画面 · ${pbLiveDate(month)} · 成员 ${fmt(pbLive.members)}（取消勾选“计算时实时显示地图”可查看旧回放）`;
+  const ser = PB.series || [];
+  let row = null; for (const r of ser) { if (r.month <= month) row = r; else break; }
+  if (live) row = {members: pbLive.members, x_ge_45: pbLive.x_ge_45, decaying_groups: null, U: null};
+  $("pb-mem").textContent = row ? fmt(row.members) : "—"; $("pb-hot").textContent = row ? fmt(row.x_ge_45) : "—";
+  $("pb-dec").textContent = row ? fmt(row.decaying_groups) : "—"; $("pb-u").textContent = row ? fmt(row.U) : "—";
+  pbMainChart(live ? null : month);
+  pbScopeChart(live ? null : month);
+  pbDetails();pbLegend();pbSelectStat();
+}
+function pbDetails() {
+  const shown=pbHover>=0?pbHover:pbSelected;
+  if(!PB || shown<0 || shown>=PB.nodes){$("pb-detail").textContent="悬浮查看地点，点击选中（可设种子、选观察范围、存为里程碑）；查找框输入地点名后回车定位。地图中拖拽平移，滚轮缩放；键盘方向键 / ＋− / Home 也可操作。";return;}
+  const v=shown,frame=pbFrame(),code=frame.stages.charCodeAt(v)-97,t=PB.arrival&&PB.arrival[v],month=frame.month;
+  if(pbMasked(v)){$("pb-detail").textContent=`${pbName(v)}\n留出范围：传播强度、到达时间与时钟已在导出前屏蔽；世界归属仍可查看。`;return;}
+  const region=pbAttr("region",v),area=pbAttr("area",v), group=PB.group&&PB.group[v];
+  const clockName=group==null||group<0?"无组":PB.group_names&&PB.group_names[group]||String(group);
+  const join=PB.clock&&PB.clock.join&&PB.clock.join[group],decay=PB.clock&&PB.clock.decay_start&&PB.clock.decay_start[group];
+  const joined=PB.clock?.joined?.[group]??(join!=null&&join>=0);
+  const arrivalText=time=>time==null?"无记录":time<0?"本轮尚未达到":`${pbDate(time)}（第 ${time} 月${time>month?"，当前尚未到达":""}）`;
+  const arrival=arrivalText(t),thresholds=PB.threshold_arrival||{};
+  const reached=[['首次非零 x>0',PB.first_positive&&PB.first_positive[v]],['首次 x≥20',thresholds['20']&&thresholds['20'][v]],['首次 x≥45',thresholds['45']&&thresholds['45'][v]],['首次 x≥70',thresholds['70']&&thresholds['70'][v]]];
+  const kinds={opening:'开局习俗',adjacency:'邻接',contact:'商人常驻接触',ownership:'所有权回流',event:'条件事件',origin:'发源输入',market:'同市场输入',seed:'种子'};
+  const parent=PB.arrival_kind?.[v];
+  $("pb-detail").textContent=`${pbName(v)}${PB.names&&PB.names[v]&&PB.names[v]!==pbName(v)?" · "+PB.names[v]:""}\n国家：${pbOwner(v)}　Area：${area}　Region：${region}\n时钟组：${clockName}\n当前：${STAGES[code%7][2]}${code>=7?" · 退潮中":""}\n首次 x≥1：${arrival}\n`+reached.map(([label,time])=>`${label}：${arrivalText(time)}`).join("\n")+
+    (parent?`\n首次成为成员的父来源：${kinds[parent]||parent}`:"")+
+    (joined?`\n最后一波时钟记录：时钟基准 ${pbDate(join,true)}（政策可前移）；退潮起点 ${decay!=null&&decay>=0?pbDate(decay):"未触发"}`:"")+pbRefDetail(v);
+}
+function pbLegend() {
+  const box=$("pb-legend");box.replaceChildren();
+  const mode=$("pb-mode").value;
+  if(mode==="compare"){const run=pbRuns.find(r=>r.id===pbRefId),ref=pbRefPayload();
+    const labels=ref?[["hsl(212 75% 42%)",`本次更早（深色≥${PB_CMP_RANGE/12} 年）`],["#f3eedf","同月"],["hsl(12 80% 42%)","本次更晚"],["#2f8a57","仅本次到达"],["#8b5fb0","仅基准到达"],["#e6e9e7","都未到达"]]:[["#e6e9e7",run?(run.payload===PB?"当前回放就是基准：请查看另一次运行":"基准与当前回放不是同一张地图"):"尚未设基准：在下方运行记录中点“设为基准”"]];
+    for(const [color,text] of labels){const span=document.createElement("span"),swatch=document.createElement("i");swatch.style.background=color;span.append(swatch,document.createTextNode(text));box.append(span);}
+    if(ref){const span=document.createElement("span");span.append(document.createTextNode(`比较首次 x≥1 月份：本次 #${pbCurrentRun||"?"} 对基准 #${pbRefId}`));box.append(span);}
+    return;}
+  const labels=mode==="intensity"?STAGES.map((s,i)=>[PBCOL[i],s[2]]).concat([[PBCOL[11],"退潮偏灰"]]):mode==="arrival"?[["hsl(220 55% 48%)",`早 · ${pbDate(0)}`],["hsl(10 55% 48%)",`晚 · ${pbDate(PB.frames.at(-1).month)}`],["#e1e5e4","当前尚未抵达"]]:[["#a6b19e","颜色区分归属国家；国界按当前世界快照"],["#c5cec9","无主地点"]];
+  for(const [color,text] of labels){const span=document.createElement("span"),swatch=document.createElement("i");swatch.style.background=color;span.append(swatch,document.createTextNode(text));box.append(span);}
+}
+function pbMilestones() {
+  const rows=Array.isArray(PB.milestones)?PB.milestones:[];$("pb-milestones").hidden=!rows.length;
+  const body=$("pb-milestone-rows");body.replaceChildren();
+  const ref=pbRefPayload(),refRows=ref&&Array.isArray(ref.milestones)?ref.milestones:[];
+  const head=$("pb-ms-head");head.replaceChildren();
+  for(const text of ["目标","覆盖条件","目标时间","模拟时间","误差 / 容差","结果"].concat(ref?[`基准 #${pbRefId} 模拟时间`,"本次 − 基准"]:[])){const th=document.createElement("th");th.textContent=text;head.append(th);}
+  for(const [index,r] of rows.entries()){
+    const thresholdLabel=r.threshold==="positive"?"首次非零 (x>0)":`x≥${r.threshold??1}`;
+    const tr=document.createElement("tr"), values=[r.name||"未命名",`${Math.round((r.fraction??.5)*100)}% · ${thresholdLabel} · ${r.reached??"—"}/${r.locations??"—"}`,pbDate(r.target_month),pbDate(r.simulated_month),`${r.error_months==null?"未达到":(r.error_months>0?"+":"")+r.error_months+" 月"} / ±${r.tolerance_months??"—"} 月`,r.within_tolerance?"符合容差":r.simulated_month==null?"未达到":"超出容差"];
+    values.forEach((text,i)=>{const td=document.createElement("td");td.textContent=text;if(i===5)td.className=r.within_tolerance?"match":"mismatch";
+      if(i===3&&r.simulated_month!=null){td.textContent="";const b=document.createElement("button");b.type="button";b.textContent=text;b.title="跳到最接近此时间的导出帧";b.addEventListener("click",()=>pbSeekMonth(r.simulated_month));td.append(b);}tr.append(td);});
+    if(ref){const other=refRows.find((q,i)=>q.name===r.name&&i===index)||refRows.find(q=>q.name===r.name);
+      const a=document.createElement("td"),d=document.createElement("td");d.className="delta";
+      a.textContent=other?pbDate(other.simulated_month):"无此里程碑";
+      d.textContent=other&&other.simulated_month!=null&&r.simulated_month!=null?`${r.simulated_month-other.simulated_month>0?"+":""}${r.simulated_month-other.simulated_month} 月`:"—";
+      tr.append(a,d);}
+    body.append(tr);
+  }
+}
+function pbSeekMonth(month) {
+  pbPlaying=false;clearTimeout(pbRaf);$("pb-play").textContent="播放";
+  pbIdx=PB.frames.reduce((best,f,i)=>Math.abs(f.month-month)<Math.abs(PB.frames[best].month-month)?i:best,0);
+  $("pb-t").value=pbIdx;pbDraw();
+}
+function pbPoint(e) {const r=$("pb-map").getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+function pbWorld(p) {const t=pbTransform;return {x:t.x0+(p.x-t.left)/t.sc,y:t.flip?t.y1-(p.y-t.top)/t.sc:t.y0+(p.y-t.top)/t.sc};}
+function pbHit(p) {
+  if(!PB||!pbTransform)return -1;
+  const t=pbTransform,w=pbWorld(p);
+  if(pbRaster){
+    const x=Math.floor((w.x-t.x0)/t.bw*pbGeo.width),y=Math.floor((w.y-t.y0)/t.bh*pbGeo.height);
+    if(x>=0&&x<pbGeo.width&&y>=0&&y<pbGeo.height){const v=pbRaster[y*pbGeo.width+x];if(v>=0)return v;}
+  }
+  let best=-1,dist=8*8;
+  for(let v=0;v<PB.nodes;v++){const d=((PB.xy[v][0]-w.x)*t.sc)**2+((PB.xy[v][1]-w.y)*t.sc)**2;if(d<dist){dist=d;best=v;}}
+  return best;
+}
+function pbZoom(factor,p) {
+  if(!PB||!pbTransform)return;
+  const t=pbTransform,zoom=Math.max(1,Math.min(32,pbView.zoom*factor)),ratio=zoom/pbView.zoom;
+  p=p||{x:t.W/2,y:t.H/2};
+  pbView.dx=(pbView.dx+t.W/2-p.x)*ratio-t.W/2+p.x;pbView.dy=(pbView.dy+t.H/2-p.y)*ratio-t.H/2+p.y;pbView.zoom=zoom;
+  if(zoom===1){pbView.dx=0;pbView.dy=0;}pbDraw();
+}
+function pbTick() {
+  if (!PB || !pbPlaying) return;
+  if (pbIdx < PB.frames.length - 1) { pbIdx++; $("pb-t").value = pbIdx; pbDraw(); pbRaf = setTimeout(pbTick, Math.max(0, +$("pb-speed").value)); }
+  else { pbPlaying = false; $("pb-play").textContent = "播放"; }
+}
+/* ---------- workbench: selection, observation scope, charts, run history ---------- */
+let pbSelected=-1,pbScope=null,pbScopeCache=null,pbLive=null,pbLiveStartYear=null;
+let pbRuns=[],pbRunSeq=0,pbRefId=0,pbCurrentRun=0,pbPlots={};
+const PB_SCOPE_KEYS=[["owner_tag","国家"],["province","省"],["area","Area"],["region","Region"],["subcontinent","次大陆"],["culture","文化"],["religion","宗教"]];
+const PB_MAX_RUNS=8;
+function pbLiveDate(month){
+  const y=pbLiveStartYear??PB?.start_year;
+  if(y==null||!Number.isFinite(+y))return `第 ${fmt(month)} 月`;
+  const total=Math.round(+y*12+month);return `${Math.floor(total/12)} 年 ${total%12+1} 月`;
+}
+function pbYearOf(month){return PB&&PB.start_year!=null&&Number.isFinite(+PB.start_year)?Math.floor(+PB.start_year+month/12):null;}
+/* Reference run: only comparable when it is another run on the same map. */
+function pbRefPayload(){
+  const run=pbRuns.find(r=>r.id===pbRefId);
+  if(!run||!PB||run.payload===PB||run.payload.nodes!==PB.nodes||pbPayloadMap(run.payload)!==pbPayloadMap())return null;
+  return run.payload;
+}
+function pbRefDetail(v){
+  const ref=pbRefPayload();if(!ref)return "";
+  const a=PB.arrival&&PB.arrival[v],b=ref.arrival&&ref.arrival[v],has=t=>t!=null&&t>=0;
+  const delta=has(a)&&has(b)?`；本次${a===b?"同月":a<b?`早 ${b-a} 个月`:`晚 ${a-b} 个月`}`:"";
+  return `\n基准 #${pbRefId} 首次 x≥1：${has(b)?pbDate(b):"未达到"}${delta}`;
+}
+/* ---- selection ---- */
+function pbSelect(v){
+  pbSelected=PB&&v>=0&&v<PB.nodes?v:-1;
+  pbSelectRender();pbDraw();
+}
+function pbScopeValue(key,v){return key==="owner_tag"?pbOwner(v):pbAttr(key,v);}
+function pbScopeKeys(){
+  if(!PB)return [];
+  return PB_SCOPE_KEYS.filter(([key])=>key==="owner_tag"?true:PB.attrs&&Array.isArray(PB.attrs[key]));
+}
+function pbScopeSet(key,value){
+  if(!PB)return;
+  if(value==null||pbScope&&pbScope.key===key&&pbScope.value===value){pbScope=null;}
+  else{
+    const mask=new Uint8Array(PB.nodes);let count=0;
+    for(let v=0;v<PB.nodes;v++)if(pbScopeValue(key,v)===value){mask[v]=1;count++;}
+    const label=(PB_SCOPE_KEYS.find(k=>k[0]===key)||[key,key])[1];
+    pbScope={key,value,mask,count,label:`${label} ${value}`,outline:pbScopeOutline(mask)};
+  }
+  pbScopeCache=null;pbImage=null;pbSelectRender();pbDraw();
+}
+/* Outline of the scope on the display raster, drawn above country borders. */
+function pbScopeOutline(mask){
+  if(!pbRaster)return null;
+  const w=pbGeo.width,h=pbGeo.height,c=document.createElement("canvas");c.width=w;c.height=h;
+  const g=c.getContext("2d"),im=g.createImageData(w,h),inside=i=>{const v=pbRaster[i];return v>=0&&mask[v]===1;};
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!inside(i))continue;
+    if(x===0||y===0||x===w-1||y===h-1||!inside(i-1)||!inside(i+1)||!inside(i-w)||!inside(i+w)){const q=i*4;im.data[q]=20;im.data[q+1]=70;im.data[q+2]=150;im.data[q+3]=255;}}
+  g.putImageData(im,0,0);return c;
+}
+function pbButton(text,title,fn,cls){const b=document.createElement("button");b.type="button";b.textContent=text;if(title)b.title=title;if(cls)b.className=cls;b.addEventListener("click",fn);return b;}
+function pbSelectRender(){
+  const box=$("pb-select");box.replaceChildren();
+  const v=pbSelected,hasSel=PB&&v>=0;
+  box.hidden=!hasSel&&!pbScope;
+  if(!PB)return;
+  const named=Array.isArray(PB.names)&&!!PB.names.length;
+  if(hasSel){
+    const title=document.createElement("b");title.textContent=pbName(v)+(named&&PB.names[v]!==pbName(v)?` · ${PB.names[v]}`:"");box.append(title);
+    const seeds=document.createElement("span");seeds.className="grp";
+    const s1=pbButton("设为首个种子","把此地点写入参数页的首个种子",()=>pbSeedFromSelection(false)),s2=pbButton(`在 ${pbDate(PB.frames[pbIdx].month)} 追加种子`,"按当前回放月份和参数页的种子强度追加一个种子",()=>pbSeedFromSelection(true));
+    s1.disabled=s2.disabled=!named;seeds.append(s1,s2);box.append(seeds);
+    const scopes=document.createElement("span");scopes.className="grp";const lab=document.createElement("span");lab.textContent="观察范围：";scopes.append(lab);
+    for(const [key,label] of pbScopeKeys()){const value=pbScopeValue(key,v);if(value==="—"||value==="无主")continue;
+      const on=pbScope&&pbScope.key===key&&pbScope.value===value;
+      scopes.append(pbButton(`${label} ${value}`,on?"再次点击取消观察范围":"高亮此范围并绘制采纳比例曲线",()=>pbScopeSet(key,value),on?"on":""));}
+    box.append(scopes);
+    const ms=document.createElement("span");ms.className="grp";
+    const m1=pbButton("存为地点里程碑","此地点首次 x≥1；目标年取当前回放年份，请在情景页改为史料年份",()=>pbMilestoneFromSelection(false));m1.disabled=!named;ms.append(m1);
+    if(pbScope){const m2=pbButton(`存为范围里程碑（${pbScope.label} 半数成员）`,"",()=>pbMilestoneFromSelection(true));ms.append(m2);}
+    ms.append(pbButton("取消选中","",()=>pbSelect(-1)));
+    box.append(ms);
+  }else if(pbScope){
+    const title=document.createElement("b");title.textContent="观察范围："+pbScope.label;box.append(title);
+    box.append(pbButton("存为范围里程碑","",()=>pbMilestoneFromSelection(true)),pbButton("清除观察范围","",()=>pbScopeSet(pbScope.key,null)));
+  }
+  const stat=document.createElement("span");stat.className="scope-stat";stat.id="pb-scope-stat";box.append(stat);
+  pbSelectStat();
+}
+function pbSelectStat(){
+  const el=document.getElementById?.("pb-scope-stat");if(!el||!PB)return;
+  if(!pbScope){el.textContent="";return;}
+  if(PB.masked_nodes?.some(v=>pbScope.mask[v])){el.textContent=`${pbScope.label} 含留出地点；只显示地理轮廓，不计算采纳比例或到达时间。`;return;}
+  const s=pbFrame().stages;let m=0,f=0;
+  for(let v=0;v<PB.nodes;v++)if(pbScope.mask[v]){const st=(s.charCodeAt(v)-97)%7;if(st>=2){m++;if(st>=3)f++;}}
+  el.textContent=`${pbScope.label}：${fmt(pbScope.count)} 个地点；此刻成员 ${(100*m/Math.max(1,pbScope.count)).toFixed(1)}%，风尚 ${(100*f/Math.max(1,pbScope.count)).toFixed(1)}%。`;
+}
+function pbSeedFromSelection(append){
+  if(!PB||pbSelected<0||typeof pbScenarioMutate!=="function")return;
+  const name=PB.names[pbSelected],value=Number($("pb-run-seed_value").value)||25;
+  if(append){const month=PB.frames[pbIdx].month;pbScenarioMutate(s=>{s.seeds=Array.isArray(s.seeds)?s.seeds:[];s.seeds.push({name,month,value});});
+    $("pb-msg").textContent=`已追加种子 ${name}：第 ${month} 月（${pbDate(month)}）x=${value}。点击重算后生效。`;}
+  else{pbScenarioMutate(s=>{s.seeds=Array.isArray(s.seeds)?s.seeds:[];s.seeds[0]={...(s.seeds[0]||{month:0}),name,value};});
+    $("pb-msg").textContent=`首个种子改为 ${name}。点击重算后生效。`;}
+}
+function pbScopeSelector(){
+  const {key,value}=pbScope;
+  if(key==="owner_tag"&&!(PB.attrs&&Array.isArray(PB.attrs.owner_tag)))return {group:value};
+  return {where:{[key]:[value]}};
+}
+function pbMilestoneFromSelection(scope){
+  if(!PB||typeof pbScenarioMutate!=="function")return;
+  const month=PB.frames[pbIdx].month,year=pbYearOf(month);
+  let row;
+  if(scope){if(!pbScope)return;row={name:`${pbScope.label} 半数成员`,...pbScopeSelector(),threshold:1,fraction:.5};}
+  else{if(pbSelected<0)return;row={name:`${pbName(pbSelected)} 成员`,names:[PB.names[pbSelected]],threshold:1};}
+  if(year!=null)row.target_year=year;else row.target_month=month;
+  row.tolerance_months=120;
+  pbScenarioMutate(s=>{s.milestones=Array.isArray(s.milestones)?s.milestones:[];s.milestones.push(row);});
+  $("pb-msg").textContent=`已添加里程碑「${row.name}」，目标暂取 ${year??"第 "+month+" 月"}；请在“情景与里程碑”页改为史料年份，重算后生效。`;
+}
+/* ---- generic plot used by the timeline, scope and sweep charts ---- */
+function pbPlot(id,o){
+  const c=$(id),rect=c.getBoundingClientRect(),dpr=devicePixelRatio||1;
+  if(!rect.width)return;
+  c.width=rect.width*dpr;c.height=rect.height*dpr;
+  const g=c.getContext("2d");g.scale(dpr,dpr);
+  const W=rect.width,H=rect.height,m={l:52,r:12,t:12,b:22};
+  const xmin=o.xmin??0,xmax=Math.max(xmin+1e-9,o.xmax),ymin=o.ymin??0,ymax=Math.max(ymin+1e-9,o.ymax);
+  const X=x=>m.l+(W-m.l-m.r)*(x-xmin)/(xmax-xmin),Y=y=>m.t+(H-m.t-m.b)*(1-(Math.max(ymin,Math.min(ymax,y))-ymin)/(ymax-ymin));
+  g.font="11px "+getComputedStyle(document.body).fontFamily;g.lineWidth=1;
+  if(o.band){g.fillStyle="rgba(46,122,106,.10)";g.fillRect(m.l,Y(o.band[1]),W-m.l-m.r,Y(o.band[0])-Y(o.band[1]));}
+  const yt=o.yticks||[0,1,2,3,4].map(k=>ymin+(ymax-ymin)*k/4);
+  for(const y of yt){g.strokeStyle=y===0&&ymin<0?"#B9C1BC":"#E3E7E4";g.beginPath();g.moveTo(m.l,Y(y));g.lineTo(W-m.r,Y(y));g.stroke();
+    g.fillStyle="#5D6875";g.textAlign="right";g.fillText(o.yFmt?o.yFmt(y):Math.round(y).toLocaleString("en-US"),m.l-6,Y(y)+4);}
+  g.textAlign="center";g.fillStyle="#5D6875";
+  let xt=o.xticks;
+  if(!xt){const span=xmax-xmin,step=span>2400?480:span>1200?240:span>480?120:span>120?60:12;xt=[];for(let t=Math.ceil(xmin/step)*step;t<=xmax;t+=step)xt.push(t);}
+  for(const t of xt)g.fillText(o.xLabel?o.xLabel(t):String(t),X(t),H-6);
+  for(const s of o.series){
+    if(!s.xs.length)continue;
+    g.strokeStyle=s.color;g.globalAlpha=s.alpha??1;g.lineWidth=s.w||1.6;g.setLineDash(s.dash||[]);g.beginPath();
+    const stride=Math.max(1,Math.floor(s.xs.length/(W*2)));
+    for(let i=0;i<s.xs.length;i+=stride){const px=X(s.xs[i]),py=Y(s.ys[i]);i?g.lineTo(px,py):g.moveTo(px,py);}
+    g.stroke();g.setLineDash([]);
+    if(s.points)for(let i=0;i<s.xs.length;i++){g.beginPath();g.arc(X(s.xs[i]),Y(s.ys[i]),3.2,0,2*Math.PI);if(s.hollow&&s.hollow[i]){g.fillStyle="#fff";g.fill();g.stroke();}else{g.fillStyle=s.color;g.fill();}}
+    g.globalAlpha=1;
+  }
+  for(const mk of o.markers||[]){if(mk.x<xmin||mk.x>xmax)continue;const px=X(mk.x);
+    g.strokeStyle=mk.color;g.globalAlpha=.45;g.setLineDash([2,3]);g.beginPath();g.moveTo(px,m.t);g.lineTo(px,H-m.b);g.stroke();g.setLineDash([]);g.globalAlpha=1;
+    g.fillStyle=mk.color;g.beginPath();g.moveTo(px,m.t+7);g.lineTo(px-5,m.t-1);g.lineTo(px+5,m.t-1);g.closePath();g.fill();}
+  if(o.cursor!=null&&o.cursor>=xmin&&o.cursor<=xmax){g.strokeStyle="#1E2633";g.lineWidth=1.2;g.beginPath();g.moveTo(X(o.cursor),m.t);g.lineTo(X(o.cursor),H-m.b);g.stroke();}
+  pbPlots[id]={left:m.l,right:W-m.r,xmin,xmax};
+}
+function pbPlotX(id,e){const t=pbPlots[id];if(!t)return null;const r=$(id).getBoundingClientRect();const f=(e.clientX-r.left-t.left)/Math.max(1,t.right-t.left);return t.xmin+Math.max(0,Math.min(1,f))*(t.xmax-t.xmin);}
+function pbXLabel(){return PB&&PB.start_year!=null&&Number.isFinite(+PB.start_year)?t=>String(Math.floor(+PB.start_year+t/12)):t=>String(t);}
+function pbMilestoneMarkers(){
+  return (Array.isArray(PB.milestones)?PB.milestones:[]).filter(r=>r.target_month!=null).map(r=>({x:r.target_month,color:r.within_tolerance?"#2E7A6A":r.simulated_month==null?"#8C969F":"#A8452F"}));
+}
+function pbMainChart(cursor){
+  const ser=PB.series||[];if(!ser.length)return;
+  const ref=pbRefPayload(),rs=ref&&Array.isArray(ref.series)?ref.series:[];
+  const markers=pbMilestoneMarkers();
+  const xmax=Math.max(12,ser.at(-1).month,rs.length?rs.at(-1).month:0,...markers.map(m=>m.x));
+  const series=[{xs:ser.map(r=>r.month),ys:ser.map(r=>r.x_ge_45),color:"#3A2013",alpha:.45},{xs:ser.map(r=>r.month),ys:ser.map(r=>r.members),color:"#6B3F2A"},{xs:ser.map(r=>r.month),ys:ser.map(r=>r.served),color:"#2E7A6A",w:1.8}];
+  if(rs.length)series.unshift({xs:rs.map(r=>r.month),ys:rs.map(r=>r.members),color:"#6B3F2A",alpha:.55,dash:[5,4],w:1.4});
+  $("pb-chart-ref-cap").hidden=!rs.length;
+  pbPlot("pb-chart",{xmax,ymax:Math.max(10,...ser.map(r=>Math.max(r.members,r.served)),...rs.map(r=>r.members))*1.06,series,cursor,markers,xLabel:pbXLabel()});
+}
+/* ---- observation scope curves (from replay frames) ---- */
+function pbScopeCurve(payload,mask){
+  const idx=[];for(let v=0;v<mask.length;v++)if(mask[v])idx.push(v);
+  const out={xs:[],pos:[],mem:[],fash:[]},n=Math.max(1,idx.length);
+  for(const f of payload.frames){let p=0,mm=0,fa=0;const s=f.stages;
+    for(const v of idx){const st=(s.charCodeAt(v)-97)%7;if(st>=1){p++;if(st>=2){mm++;if(st>=3)fa++;}}}
+    out.xs.push(f.month);out.pos.push(100*p/n);out.mem.push(100*mm/n);out.fash.push(100*fa/n);}
+  return out;
+}
+function pbScopeArrival(payload,mask,column,frac){
+  if(payload.masked_nodes?.some(v=>mask[v]))return undefined;
+  const col=column==="positive"?payload.first_positive:column==="20"?payload.threshold_arrival&&payload.threshold_arrival["20"]:payload.arrival;
+  if(!Array.isArray(col))return undefined;
+  const got=[];let n=0;for(let v=0;v<mask.length;v++)if(mask[v]){n++;if(col[v]!=null&&col[v]>=0)got.push(col[v]);}
+  got.sort((a,b)=>a-b);const need=Math.max(1,Math.ceil(frac*n));return got.length>=need?got[need-1]:null;
+}
+function pbScopeChart(cursor){
+  if(pbScope&&PB.masked_nodes?.some(v=>pbScope.mask[v])){$("pb-scope-fig").hidden=true;return;}
+  const fig=$("pb-scope-fig");fig.hidden=!pbScope;if(!pbScope)return;
+  const ref=pbRefPayload(),key=`${pbScope.key}=${pbScope.value}/${pbCurrentRun}/${PB.frames.length}/${ref?pbRefId:0}`;
+  if(!pbScopeCache||pbScopeCache.key!==key)pbScopeCache={key,cur:pbScopeCurve(PB,pbScope.mask),ref:ref?pbScopeCurve(ref,pbScope.mask):null};
+  const {cur,ref:rc}=pbScopeCache;
+  $("pb-scope-title").textContent=`观察范围：${pbScope.label}（${fmt(pbScope.count)} 个地点，占比 %）`;
+  const series=[{xs:cur.xs,ys:cur.pos,color:"#9FC9BD",w:1.4},{xs:cur.xs,ys:cur.fash,color:"#D1A274",w:1.6},{xs:cur.xs,ys:cur.mem,color:"#6B3F2A",w:1.8}];
+  if(rc)series.unshift({xs:rc.xs,ys:rc.mem,color:"#6B3F2A",alpha:.55,dash:[5,4],w:1.4});
+  $("pb-scope-ref-cap").hidden=!rc;
+  pbPlot("pb-scope-chart",{xmax:Math.max(12,cur.xs.at(-1)||0,rc?rc.xs.at(-1)||0:0),ymin:0,ymax:100,yticks:[0,25,50,75,100],yFmt:y=>y+"%",series,cursor,xLabel:pbXLabel()});
+  const fmtM=t=>t===undefined?"无数据":t==null?"未达到":pbDate(t);
+  const line=(label,col,frac)=>{const a=pbScopeArrival(PB,pbScope.mask,col,frac),b=ref?pbScopeArrival(ref,pbScope.mask,col,frac):undefined;
+    return `${label} ${fmtM(a)}`+(ref?`（基准 ${fmtM(b)}${a!=null&&b!=null?`，${a===b?"同月":a<b?"早 "+(b-a)+" 月":"晚 "+(a-b)+" 月"}`:""}）`:"");};
+  $("pb-scope-note").textContent=[line("首个接触：","positive",1e-9),line("10% 成员：","1",.1),line("半数成员：","1",.5),line("半数风尚：","20",.5)].join("；")+"。按到达月份精确统计（不受帧间隔影响），等权地点比例。";
+}
+/* ---- run history & comparison ---- */
+const PB_DIFF_KEYS=[["p","p"],["rho","ρ"],["delta","δ"],["hold_T","T"],["decay_factor","因子"],["habit_floor","κ"],["budget","预算"],["max_months","最长月"],["decay","模型"]];
+function pbSeedText(payload){
+  const seeds=payload.inputs&&payload.inputs.seeds;
+  return Array.isArray(seeds)?seeds.map(r=>`${payload.names?.[r[0]]??r[0]}×${r[2]}${r[1]?"@"+r[1]:""}`).join(", "):"—";
+}
+function pbParamText(payload){
+  const P=payload.params||{};
+  return PB_DIFF_KEYS.filter(([k])=>k!=="max_months"&&k!=="decay"&&P[k]!==undefined).map(([k,l])=>`${l}=${P[k]??"不限"}`).join(" ")+` · 种子 ${pbSeedText(payload)}`;
+}
+function pbRunDiff(a,b){
+  if(!a)return "首次";
+  const out=[],A=a.params||{},B=b.params||{};
+  for(const [k,l] of PB_DIFF_KEYS)if(JSON.stringify(A[k])!==JSON.stringify(B[k]))out.push(`${l} ${A[k]??"不限"}→${B[k]??"不限"}`);
+  if(a.start_year!==b.start_year)out.push(`起年 ${a.start_year}→${b.start_year}`);
+  if(pbSeedText(a)!==pbSeedText(b))out.push("种子");
+  const sc=p=>JSON.stringify(["coefficients","routes","milestones"].map(k=>(p.inputs?.scenario||{})[k]||[]));
+  if(sc(a)!==sc(b))out.push("情景（系数/路线/里程碑）");
+  return out.length?out.join("；"):"参数相同";
+}
+function pbRunsAdd(payload,source){
+  if(!payload||payload.preview)return null;
+  const existing=pbRuns.find(r=>r.payload===payload);if(existing){pbCurrentRun=existing.id;pbHistoryRender();return existing;}
+  const map=pbPayloadMap(payload),prev=[...pbRuns].reverse().find(r=>r.map===map);
+  const run={id:++pbRunSeq,payload,map,source,diff:pbRunDiff(prev&&prev.payload,payload),prev:prev?prev.id:0};
+  pbRuns.push(run);
+  while(pbRuns.length>PB_MAX_RUNS){const i=pbRuns.findIndex(r=>r.id!==pbRefId&&r.id!==run.id);pbRuns.splice(i,1);}
+  pbCurrentRun=run.id;pbHistoryRender();return run;
+}
+function pbMilestoneScore(rows){const list=Array.isArray(rows)?rows:[];return list.length?`${list.filter(r=>r.within_tolerance).length}/${list.length} 符合`:"—";}
+async function pbRunView(run){
+  if(typeof pbSwitchMap==="function"&&run.map!==pbMapChoice&&pbApiConnected){await pbSwitchMap(run.map);if(run.map!==pbMapChoice)return;}
+  pbLoad(run.payload);pbCurrentRun=run.id;
+  if(typeof pbRememberMap==="function")pbRememberMap();
+  pbHistoryRender();$("pb-msg").textContent=`正在查看运行 #${run.id}。`;
+}
+function pbSetRef(id){
+  pbRefId=pbRefId===id?0:id;pbImage=null;pbScopeCache=null;
+  if(pbRefId&&$("pb-mode").value!=="compare"&&pbRefPayload())$("pb-mode").value="compare";
+  if(!pbRefId&&$("pb-mode").value==="compare")$("pb-mode").value="intensity";
+  pbHistoryRender();if(PB){pbMilestones();pbDraw();}
+  if(pbRefId)$("pb-msg").textContent=pbRefPayload()?`已设运行 #${pbRefId} 为基准，地图改为“与基准比较到达”着色。`:`已设运行 #${pbRefId} 为基准。改参数再重算后，图表叠加基准曲线；着色可选“与基准比较到达”。`;
+}
+function pbHistoryRender(){
+  const box=$("pb-history"),body=$("pb-history-rows");body.replaceChildren();box.hidden=!pbRuns.length;
+  for(const run of [...pbRuns].reverse()){
+    const p=run.payload,sm=p.summary||{},tr=document.createElement("tr");
+    tr.className=(run.id===pbCurrentRun&&run.payload===PB?"cur":"")+(run.id===pbRefId?" ref":"");
+    const cells=[`#${run.id}${run.id===pbRefId?" 基准":""}${run.id===pbCurrentRun&&run.payload===PB?" · 当前":""}`,pbMapLabel(run.map),pbParamText(p),(run.prev?`对 #${run.prev}：`:"")+run.diff,fmt(sm.ever_member),sm.calm_month==null?"未平静":pbYearOf(sm.calm_month)??sm.calm_month,fmt(sm.total_U),pbMilestoneScore(p.milestones)];
+    cells.forEach((text,i)=>{const td=document.createElement("td");td.textContent=String(text);if(i===2||i===3)td.className="k";tr.append(td);});
+    const td=document.createElement("td"),btns=document.createElement("div");btns.className="btns";
+    btns.append(pbButton("查看","",()=>pbRunView(run)),pbButton(run.id===pbRefId?"取消基准":"设为基准","",()=>pbSetRef(run.id),run.id===pbRefId?"on":""));
+    const restore=pbButton("恢复参数","把此次运行的参数与情景写回表单",()=>{if(typeof pbRunFromReplay==="function"){pbRunFromReplay(run.payload);$("pb-msg").textContent=`表单已恢复为运行 #${run.id} 的参数。`;}});
+    restore.disabled=typeof pbMapChoice!=="undefined"&&run.map!==pbMapChoice;btns.append(restore);
+    btns.append(pbButton("✕","从记录中移除",()=>{pbRuns=pbRuns.filter(r=>r!==run);if(pbRefId===run.id)pbSetRef(run.id);else pbHistoryRender();}));
+    td.append(btns);tr.append(td);body.append(tr);
+  }
+}
+/* Called at the end of pbLoad: keep selection/scope only when the geography is the same. */
+function pbAfterLoad(previous){
+  const same=previous&&previous.nodes===PB.nodes&&pbPayloadMap(previous)===pbPayloadMap();
+  if(!same){pbSelected=-1;pbScope=null;}
+  pbScopeCache=null;pbLive=null;
+  const known=pbRuns.find(r=>r.payload===PB);pbCurrentRun=known?known.id:0;
+  pbSelectRender();pbHistoryRender();
+  if(typeof pbDirtyMark==="function")pbDirtyMark();
+}
+$("pb-file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try { pbLoad(pbParsePlaybackFile(rd.result)); pbRunsAdd(PB, "file"); } catch (err) { $("pb-msg").textContent = "载入失败：" + err.message; } };
+  rd.readAsText(f);
+});
+$("pb-play").addEventListener("click", () => { if (!PB) return; pbPlaying = !pbPlaying; $("pb-play").textContent = pbPlaying ? "暂停" : "播放";
+  if (pbPlaying) { if (pbIdx >= PB.frames.length - 1) pbIdx = 0; pbTick(); } else clearTimeout(pbRaf); });
+$("pb-t").addEventListener("input", e => { pbPlaying=false;clearTimeout(pbRaf);$("pb-play").textContent="播放";pbIdx = +e.target.value; pbDraw(); });
+$("pb-flip").addEventListener("change", pbDraw);
+$("pb-borders").addEventListener("change",pbDraw);
+$("pb-mode").addEventListener("change",pbDraw);
+$("pb-fit").addEventListener("click",()=>{pbView={zoom:1,dx:0,dy:0};pbDraw();});
+$("pb-zoom-in").addEventListener("click",()=>pbZoom(1.5));
+$("pb-zoom-out").addEventListener("click",()=>pbZoom(1/1.5));
+$("pb-map").addEventListener("wheel",e=>{if(!PB)return;e.preventDefault();pbZoom(Math.exp(-e.deltaY*.0015),pbPoint(e));},{passive:false});
+$("pb-map").addEventListener("pointerdown",e=>{if(!PB)return;const p=pbPoint(e);pbDrag={x:p.x,y:p.y,dx:pbView.dx,dy:pbView.dy,moved:false};e.currentTarget.setPointerCapture(e.pointerId);});
+$("pb-map").addEventListener("pointermove",e=>{
+  if(!PB)return;const p=pbPoint(e);
+  if(pbDrag){const dx=p.x-pbDrag.x,dy=p.y-pbDrag.y;if(Math.abs(dx)+Math.abs(dy)>3)pbDrag.moved=true;pbView.dx=pbDrag.dx+dx;pbView.dy=pbDrag.dy+dy;pbDraw();}
+  else {const v=pbHit(p);if(v!==pbHover){pbHover=v;pbDraw();}}
+});
+$("pb-map").addEventListener("pointerup",e=>{if(pbDrag&&!pbDrag.moved){const v=pbHit(pbPoint(e));pbHover=v;pbSelect(v>=0&&v===pbSelected?-1:v);}pbDrag=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);});
+$("pb-map").addEventListener("pointercancel",()=>pbDrag=null);
+$("pb-map").addEventListener("pointerleave",()=>{if(!pbDrag&&pbHover>=0){pbHover=-1;pbDraw();}});
+$("pb-map").addEventListener("keydown",e=>{
+  if(!PB)return;
+  if(e.key==="+"||e.key==="=")pbZoom(1.5);
+  else if(e.key==="-")pbZoom(1/1.5);
+  else if(e.key==="Home"){pbView={zoom:1,dx:0,dy:0};pbDraw();}
+  else if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)){pbView.dx+=e.key==="ArrowLeft"?40:e.key==="ArrowRight"?-40:0;pbView.dy+=e.key==="ArrowUp"?40:e.key==="ArrowDown"?-40:0;pbDraw();}
+  else return;e.preventDefault();
+});
+$("pb-search").addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||!PB)return;
+  const query=e.target.value.trim().toLocaleLowerCase();if(!query)return;
+  const searchable=v=>[pbName(v),PB.names&&PB.names[v]||""].map(s=>s.toLocaleLowerCase());
+  let v=Array.from({length:PB.nodes},(_,i)=>i).find(v=>searchable(v).some(s=>s===query));
+  if(v===undefined)v=Array.from({length:PB.nodes},(_,i)=>i).find(v=>searchable(v).some(s=>s.includes(query)));
+  if(v===undefined){$("pb-msg").textContent="没有找到地点："+e.target.value;return;}
+  $("pb-msg").textContent="";pbHover=-1;pbSelect(v);pbView={zoom:8,dx:0,dy:0};pbDraw();
+  const t=pbTransform,p=PB.xy[v];pbView.dx=-(p[0]-(t.x0+t.x1)/2)*t.sc;pbView.dy=-(p[1]-(t.y0+t.y1)/2)*t.sc*(t.flip?-1:1);pbDraw();
+});
+/* ---------- authoritative local Python recalculation ---------- */
+const PB_RUN_PARAMS=['p','rho','delta','hold_T','decay_factor','habit_floor','budget','max_months','frames_every','series_every'];
+let pbApiConfig=null,pbApiConnected=false,pbRunJob=null,pbRunTimer=0,pbRunBusy=false,pbApiConfigured=false;
+let pbMapChoice='real',pbMapLoading=false,pbMapStates={real:{},hex:{}};
+function pbRunStatus(message,error=false){$("pb-run-status").textContent=message;$("pb-run-status").className="pb-run-status"+(error?" error":"");}
+function pbRunSetBusy(busy){
+  pbRunBusy=busy;$("pb-run-submit").disabled=busy||pbMapLoading||!pbApiConnected;$("pb-run-cancel").disabled=!pbRunJob||!pbApiConnected;
+  $("pb-run-map").disabled=busy||pbMapLoading||!pbApiConnected;
+  $("pb-file").disabled=busy||pbMapLoading;
+  for(const key of [...PB_RUN_PARAMS,'preset','start_year','seed_name','seed_value','scenario','import'])$("pb-run-"+key).disabled=busy;
+  $("pb-run-cancel").disabled=!pbRunJob||!pbApiConnected;
+  $("pb-sweep-run").disabled=busy||pbMapLoading||!pbApiConnected;$("pb-sweep-cancel").disabled=!pbSweepJob||!pbApiConnected;
+}
+async function pbApiRequest(path,body){
+  const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),cache:'no-store'});
+  let result;try{result=await response.json();}catch{throw new Error(`计算服务返回了非 JSON 响应（HTTP ${response.status}）`);}
+  if(!response.ok)throw new Error(result.error||`HTTP ${response.status}`);return result;
+}
+function pbRunWrite(config){
+  if(config.preset!=null)$("pb-run-preset").value=config.preset;
+  const fields={start_year:config.scenario?.start_year,...config};
+  const params={...(config.scenario?.parameters||{}),...(config.params||{})};
+  for(const key of ['start_year','seed_name','seed_value'])if(fields[key]!=null)$("pb-run-"+key).value=fields[key];
+  for(const key of PB_RUN_PARAMS)if(key in params)$("pb-run-"+key).value=params[key]??'';
+  if(config.scenario!==undefined)$("pb-run-scenario").value=JSON.stringify(config.scenario,null,2);
+  pbScenarioRender();pbDirtyMark();
+}
+function pbRunScenario(){
+  let scenario;try{scenario=JSON.parse($("pb-run-scenario").value);}catch(err){throw new Error('高级情景 JSON 无法解析：'+err.message);}
+  if(!scenario||typeof scenario!=='object'||Array.isArray(scenario))throw new Error('高级情景 JSON 必须是对象');return scenario;
+}
+function pbRunSyncSeedFromScenario(){
+  try{const first=pbRunScenario().seeds?.[0];if(first){if(first.name!=null)$("pb-run-seed_name").value=first.name;if(first.value!=null)$("pb-run-seed_value").value=first.value;}}catch{}
+}
+function pbRunRead(){
+  const request={map:pbMapChoice,preset:$("pb-run-preset").value,start_year:Number($("pb-run-start_year").value),seed_name:$("pb-run-seed_name").value.trim(),seed_value:Number($("pb-run-seed_value").value),params:{},scenario:pbRunScenario()};
+  if(!request.seed_name)throw new Error('请填写首个种子地点键');
+  for(const key of ['start_year','seed_value'])if(String($("pb-run-"+key).value).trim()===''||!Number.isFinite(request[key]))throw new Error('起年和种子强度必须是有限数值');
+  for(const key of PB_RUN_PARAMS){const text=String($("pb-run-"+key).value).trim(),value=Number(text);if(key==='budget'&&!text){request.params.budget=null;continue;}if(!text||!Number.isFinite(value))throw new Error(`参数 ${key} 必须是有限数值`);request.params[key]=value;}
+  if(!Array.isArray(request.scenario.seeds)||request.scenario.seeds.length){
+    if(!Array.isArray(request.scenario.seeds))request.scenario.seeds=[];
+    request.scenario.seeds[0]={...(request.scenario.seeds[0]||{month:0}),name:request.seed_name,value:request.seed_value};
+  }
+  request.scenario.start_year=request.start_year;return request;
+}
+function pbRunFromReplay(payload=PB){
+  if(!payload)return;pbMapChoice=pbPayloadMap(payload);$("pb-run-map").value=pbMapChoice;
+  const scenario=payload.inputs?.scenario||payload.graph_meta?.scenario||{},first=scenario.seeds?.[0]||{};
+  pbRunWrite({preset:payload.params?.decay==='none'?'growth_only':'baseline',start_year:payload.start_year,seed_name:first.name||payload.names?.[0]||'',seed_value:first.value??25,params:payload.params,scenario});
+  pbRememberMap();
+}
+function pbRememberMap(){
+  const state=pbMapStates[pbMapChoice]||(pbMapStates[pbMapChoice]={});
+  state.seed_name=$("pb-run-seed_name").value;state.seed_value=$("pb-run-seed_value").value;state.scenarioText=$("pb-run-scenario").value;
+  if(PB&&pbPayloadMap()===pbMapChoice){state.payload=PB;state.index=pbIdx;state.view={...pbView};}
+}
+async function pbSwitchMap(next){
+  if(next===pbMapChoice)return;
+  if(pbRunBusy||pbMapLoading||!pbApiConnected){$("pb-run-map").value=pbMapChoice;return;}
+  const mapConfig=pbApiConfig?.maps?.[next];if(!mapConfig){$("pb-run-map").value=pbMapChoice;pbRunStatus('此计算服务未提供所选地图',true);return;}
+  const previous=pbMapChoice;pbRememberMap();pbMapLoading=true;pbRunSetBusy(false);pbRunStatus('正在载入'+pbMapLabel(next)+'…');
+  try{
+    const state=pbMapStates[next]||(pbMapStates[next]={});
+    const payload=state.payload||await pbApiRequest('/api/preview?map='+encodeURIComponent(next));
+    if(pbPayloadMap(payload)!==next)throw new Error('计算服务返回了不匹配的地图');
+    pbLoad(payload);pbMapChoice=next;$("pb-run-map").value=next;
+    if(state.scenarioText!==undefined){$("pb-run-seed_name").value=state.seed_name;$("pb-run-seed_value").value=state.seed_value;$("pb-run-scenario").value=state.scenarioText;}
+    else {pbRunWrite({seed_name:mapConfig.defaults.seed_name,seed_value:mapConfig.defaults.seed_value,scenario:mapConfig.scenario||{}});}
+    if(state.payload){pbIdx=Math.min(state.index||0,PB.frames.length-1);pbView=state.view||{zoom:1,dx:0,dy:0};$("pb-t").value=pbIdx;pbDraw();}
+    pbRememberMap();pbRunStatus(`已切换到${pbMapLabel(next)}，${fmt(PB.nodes)} 个地点。公共参数保持不变；${PB.preview?'当前为起点预览，请点击重算。':'显示该地图上次回放。'}`);
+  }catch(err){pbMapChoice=previous;$("pb-run-map").value=previous;pbRunStatus('地图切换失败：'+err.message+'；原回放和参数保留。',true);}
+  finally{pbMapLoading=false;pbRunSetBusy(false);}
+}
+async function pbApiConnect(){
+  if(location.protocol==='file:'){pbApiConnected=false;$("pb-api-help").hidden=false;pbRunSetBusy(pbRunBusy);pbRunStatus('此文件可独立回放；参数重算请使用上方本机服务链接。');return;}
+  $("pb-api-connect").disabled=true;pbRunStatus('正在连接本机 Python 计算服务…');
+  try{
+    const config=await pbApiRequest('/api/config');
+    if(!config.defaults||!Array.isArray(config.presets))throw new Error('此地址未提供真实地图计算接口');
+    config.maps=config.maps||{real:{label:'真实 EU5 地图',nodes:config.nodes,graph_name:config.graph_name,defaults:config.defaults,scenario:config.scenario}};
+    pbApiConfig=config;pbApiConnected=true;$("pb-api-help").hidden=true;
+    const mapSelect=$("pb-run-map");mapSelect.replaceChildren();for(const [key,info] of Object.entries(config.maps)){const option=document.createElement('option');option.value=key;option.textContent=`${info.label||pbMapLabel(key)} · ${fmt(info.nodes)} 地点`;mapSelect.append(option);}
+    if(!config.maps[pbMapChoice])pbMapChoice=config.current_map||'real';mapSelect.value=pbMapChoice;
+    const select=$("pb-run-preset"),selected=select.value;select.replaceChildren();for(const name of config.presets){const option=document.createElement('option');option.value=name;option.textContent=name;select.append(option);}if(pbRunJob||pbApiConfigured)select.value=selected;
+    const mapInfo=config.maps[pbMapChoice];
+    if(!pbRunJob&&!pbApiConfigured)pbRunWrite({...mapInfo.defaults,scenario:mapInfo.scenario||{}});
+    pbApiConfigured=true;
+    if(!PB&&!pbRunJob){pbLoad(await pbApiRequest('/api/preview?map='+encodeURIComponent(pbMapChoice)));pbRememberMap();}
+    pbRunSetBusy(!!pbRunJob);pbRunPresetNote();
+    pbRunStatus(`已连接：${mapInfo.graph_name||'当前地图'}，${fmt(mapInfo.nodes)} 个地点。修改参数后点击重算；计算由本机 Python 核心执行。`);
+    if(pbRunJob)pbRunPoll();
+  }catch(err){pbApiConnected=false;$("pb-api-help").hidden=false;pbRunSetBusy(!!pbRunJob);pbRunStatus('计算服务未连接：'+err.message,true);}
+  finally{$("pb-api-connect").disabled=false;}
+}
+function pbRunPresetNote(){const key=$("pb-run-preset").value;$("pb-run-preset-note").textContent=(pbApiConfig?.preset_defaults?.[key]?.doc||'预设决定模型')+'。数值输入框是本次运行的参数覆盖值。';}
+async function pbRunSubmit(){
+  if(pbRunBusy||pbMapLoading)return;
+  try{
+    const request=pbRunRead();if(!pbApiConnected)throw new Error('请先连接本机计算服务');
+    pbRunSetBusy(true);pbRunStatus('正在提交参数，旧回放仍可查看…');pbLiveStartYear=request.start_year;
+    const result=await pbApiRequest('/api/run',request);if(!result.id)throw new Error('计算服务未返回作业编号');
+    pbRunJob=String(result.id);pbRunSetBusy(true);$("pb-run-progress").hidden=false;$("pb-run-progress").value=0;pbRunPoll();
+  }catch(err){pbRunSetBusy(false);pbRunStatus('未能开始计算：'+err.message,true);}
+}
+async function pbRunPoll(){
+  if(!pbRunJob)return;clearTimeout(pbRunTimer);const job=pbRunJob;
+  try{
+    const result=await pbApiRequest('/api/jobs/'+encodeURIComponent(job)+($("pb-live-on").checked?'?live=1':''));if(job!==pbRunJob)return;
+    if(result.map&&result.map!==pbMapChoice)throw new Error('作业地图与当前选择不一致');
+    if(result.status==='running'){
+      const month=result.month??0,max=result.max_months??0;$("pb-run-progress").value=max?Math.min(1,month/max):0;
+      pbRunStatus(`正在计算：第 ${fmt(month)} / ${fmt(max)} 月。${$("pb-live-on").checked?'地图显示实时画面':'旧回放仍可查看'}；计算完成后载入新结果。`);
+      if(result.live&&PB&&typeof result.live.stages==='string'&&result.live.stages.length===PB.nodes&&(!pbLive||pbLive.month!==result.live.month)){pbLive=result.live;pbDraw();}
+      pbRunTimer=setTimeout(pbRunPoll,500);return;
+    }
+    if(result.status==='complete'){
+      if(!result.payload)throw new Error('计算完成但没有回放数据');
+      pbLoad(result.payload);pbRunsAdd(PB,'run');
+      const intro=document.querySelector('.sub');if(intro)intro.textContent=`${PB.title||'扩散模拟'}，当前显示本次参数重算结果。真实地图与合成六角网格共用此处的参数、播放与统计；实际生效的参数与种子列于结果摘要下方。历史实验保留在折叠区。`;
+      pbRememberMap();
+      pbRunStatus(`计算完成：${PB.title||'新结果'}，已载入第 0 帧。`);$("pb-run-progress").value=1;
+    }else if(result.status==='cancelled'){pbRunStatus('计算已取消；继续保留原回放。');}
+    else if(result.status==='failed'){pbRunStatus('计算失败：'+(result.error||'未知错误')+'；继续保留原回放。',true);}
+    else throw new Error('未知作业状态：'+result.status);
+    pbRunJob=null;pbRunSetBusy(false);if(pbLive){pbLive=null;pbImage=null;pbDraw();}
+  }catch(err){
+    pbApiConnected=false;pbRunSetBusy(true);$("pb-api-help").hidden=false;
+    pbRunStatus('作业连接中断：'+err.message+'。旧回放保留；点击连接本机计算服务可恢复此作业状态。',true);
+  }
+}
+async function pbRunCancel(){
+  if(!pbRunJob)return;$("pb-run-cancel").disabled=true;
+  try{await pbApiRequest('/api/jobs/'+encodeURIComponent(pbRunJob)+'/cancel',{});pbRunStatus('已请求取消，等待 Python 核心停止…');clearTimeout(pbRunTimer);pbRunTimer=setTimeout(pbRunPoll,200);}
+  catch(err){pbRunStatus('取消请求失败：'+err.message,true);$("pb-run-cancel").disabled=false;}
+}
+/* ---------- scenario editors, form-vs-replay marks, startup check ---------- */
+let pbNameSetCache=null;
+function pbNameKnown(name){
+  if(!PB||!Array.isArray(PB.names)||!PB.names.length||pbPayloadMap()!==pbMapChoice)return true;
+  if(!pbNameSetCache||pbNameSetCache.pb!==PB)pbNameSetCache={pb:PB,set:new Set(PB.names)};
+  return pbNameSetCache.set.has(name);
+}
+function pbScenarioMutate(fn){
+  let s;try{s=pbRunScenario();}catch(err){pbRunStatus('高级情景 JSON 无法解析，未作修改：'+err.message,true);return false;}
+  fn(s);$("pb-run-scenario").value=JSON.stringify(s,null,2);
+  pbRunSyncSeedFromScenario();pbScenarioRender();pbDirtyMark();return true;
+}
+function pbCell(child,cls){const td=document.createElement("td");if(cls)td.className=cls;if(typeof child==="string")td.textContent=child;else if(child)td.append(child);return td;}
+function pbInput(type,value,onChange,attrs){
+  const el=document.createElement(type==="select"?"select":"input");
+  if(type==="select"){for(const [v,t] of attrs.options){const o=document.createElement("option");o.value=v;o.textContent=t;el.append(o);}}
+  else{el.type=type;if(attrs)for(const [k,v] of Object.entries(attrs))el[k]=v;}
+  el.value=value??"";el.addEventListener("change",()=>onChange(el.value,el));return el;
+}
+function pbSelectorText(row){
+  if(Array.isArray(row.names))return row.names.join(", ");
+  if(row.where&&typeof row.where==="object")return Object.entries(row.where).map(([k,v])=>`${k}=${[].concat(v).join("/")}`).join("；");
+  if(row.group!=null)return "时钟组 "+row.group;
+  if(Array.isArray(row.nodes))return row.nodes.length+" 个节点";
+  return "未指定";
+}
+const PB_THRESHOLDS=[["positive","x>0 接触"],["1","x≥1 成员"],["20","x≥20 风尚"],["45","x≥45"],["70","x≥70"],["100","x=100"]];
+function pbScenarioRender(){
+  const seedBody=$("pb-seed-rows"),msBody=$("pb-ms-rows");seedBody.replaceChildren();msBody.replaceChildren();
+  let s;try{s=pbRunScenario();}catch(err){const tr=document.createElement("tr");tr.append(pbCell("情景 JSON 无法解析，表格暂停同步："+err.message,"empty"));seedBody.append(tr);return;}
+  const seeds=Array.isArray(s.seeds)?s.seeds:[],ms=Array.isArray(s.milestones)?s.milestones:[];
+  seeds.forEach((row,i)=>{
+    const tr=document.createElement("tr");
+    const name=pbInput("text",row.name,v=>pbScenarioMutate(sc=>{sc.seeds[i].name=v.trim();}));if(!pbNameKnown(row.name)){name.className="bad";name.title="当前地图没有这个地点键";}
+    const startYear=Number($("pb-run-start_year").value),month=row.month??(row.year!=null&&Number.isFinite(startYear)?Math.round((row.year-startYear)*12):0);
+    const del=pbButton("✕",i?"删除此种子":"首个种子不能删除（可改地点）",()=>pbScenarioMutate(sc=>{sc.seeds.splice(i,1);}));del.disabled=!i;
+    tr.append(pbCell(name),pbCell(pbInput("number",month,v=>pbScenarioMutate(sc=>{sc.seeds[i].month=Math.max(0,Math.round(Number(v)||0));delete sc.seeds[i].year;}),{min:0,step:1})),
+      pbCell(pbInput("number",row.value,v=>pbScenarioMutate(sc=>{sc.seeds[i].value=Number(v);}),{min:0,max:100,step:"any"})),pbCell(del));
+    seedBody.append(tr);
+  });
+  if(!seeds.length){const tr=document.createElement("tr");const td=pbCell("尚无种子；在参数页填写首个种子地点，或在地图上点选。","empty");td.colSpan=4;tr.append(td);seedBody.append(tr);}
+  const startYear=Number($("pb-run-start_year").value);
+  const field=(label,input)=>{const l=document.createElement("label");l.append(document.createTextNode(label),input);return l;};
+  ms.forEach((row,i)=>{
+    const card=document.createElement("div");card.className="pb-ms-card";
+    const year=row.target_year??(row.target_month!=null&&Number.isFinite(startYear)?Math.round(startYear+row.target_month/12):"");
+    const top=document.createElement("div");top.className="top";
+    top.append(pbInput("text",row.name,v=>pbScenarioMutate(sc=>{sc.milestones[i].name=v;})),pbButton("✕","删除此里程碑",()=>pbScenarioMutate(sc=>{sc.milestones.splice(i,1);})));
+    const sel=document.createElement("div");sel.className="sel";sel.textContent="范围："+pbSelectorText(row);
+    const grid=document.createElement("div");grid.className="grid4";
+    grid.append(field("阈值",pbInput("select",String(row.threshold??1),v=>pbScenarioMutate(sc=>{sc.milestones[i].threshold=v==="positive"?v:Number(v);}),{options:PB_THRESHOLDS})),
+      field("比例",pbInput("number",row.fraction??.5,v=>pbScenarioMutate(sc=>{sc.milestones[i].fraction=Math.min(1,Math.max(.001,Number(v)||.5));}),{min:.001,max:1,step:.05})),
+      field("目标年",pbInput("number",year,v=>pbScenarioMutate(sc=>{sc.milestones[i].target_year=Math.round(Number(v));delete sc.milestones[i].target_month;}),{step:1})),
+      field("容差（月）",pbInput("number",row.tolerance_months??120,v=>pbScenarioMutate(sc=>{sc.milestones[i].tolerance_months=Math.max(0,Math.round(Number(v)||0));}),{min:0,step:12})));
+    card.append(top,sel,grid);msBody.append(card);
+  });
+  if(!ms.length){const empty=document.createElement("div");empty.className="empty";empty.textContent="尚无里程碑。在地图上选中地点或观察范围后点“存为里程碑”。";msBody.append(empty);}
+}
+const PB_DIRTY_LABELS={p:"p",rho:"ρ",delta:"δ",hold_T:"T",decay_factor:"退潮因子",habit_floor:"κ",budget:"预算",max_months:"最长月数"};
+function pbMarkField(el,dirty){const label=el&&el.parentElement;if(label&&label.tagName==="LABEL")label.className=dirty?"dirty":"";}
+function pbDirtyMark(){
+  pbStartupHint();
+  const box=$("pb-dirty");
+  if(!PB||PB.preview||pbPayloadMap()!==pbMapChoice){box.hidden=true;for(const key of [...Object.keys(PB_DIRTY_LABELS),"start_year","seed_name","seed_value"])pbMarkField($("pb-run-"+key),false);return;}
+  const diffs=[],P=PB.params||{};
+  for(const [key,label] of Object.entries(PB_DIRTY_LABELS)){
+    const el=$("pb-run-"+key),text=String(el.value).trim(),cur=key==="budget"&&!text?null:Number(text),applied=P[key];
+    const dirty=applied!==undefined&&!(cur===applied||(cur!=null&&applied!=null&&Math.abs(cur-applied)<=1e-12*Math.max(1,Math.abs(applied))));
+    pbMarkField(el,dirty);if(dirty)diffs.push(label);
+  }
+  const sy=Number($("pb-run-start_year").value),syDirty=PB.start_year!=null&&sy!==+PB.start_year;pbMarkField($("pb-run-start_year"),syDirty);if(syDirty)diffs.push("起年");
+  let scenario=null;try{scenario=pbRunScenario();}catch{}
+  if(scenario&&Array.isArray(PB.inputs?.seeds)){
+    const norm=rows=>JSON.stringify(rows.map(r=>[r[0],r[1],+r[2]]));
+    const applied=PB.inputs.seeds.map(r=>[PB.names?.[r[0]]??String(r[0]),r[1],r[2]]);
+    const form=(scenario.seeds||[]).map(r=>[r.name,r.month??(r.year!=null?Math.round((r.year-sy)*12):0),r.value]);
+    const dirty=norm(applied)!==norm(form);pbMarkField($("pb-run-seed_name"),dirty&&applied[0]?.[0]!==form[0]?.[0]);pbMarkField($("pb-run-seed_value"),dirty&&+applied[0]?.[2]!==+form[0]?.[2]);
+    if(dirty)diffs.push("种子");
+  }
+  if(scenario&&PB.inputs?.scenario){const pick=sc=>JSON.stringify(["parameters","coefficients","routes","milestones","transport","land_corridors","initial","sources","contacts","waves","wake","coefficient_events","constraints"].map(k=>sc[k]??null));if(pick(scenario)!==pick(PB.inputs.scenario))diffs.push("情景（系数/通道/窗口/里程碑）");}
+  box.hidden=!diffs.length;box.textContent=diffs.length?`表单与当前回放不同：${diffs.join("、")}。点“按当前参数重算”（Ctrl+Enter）后生效。`:"";
+}
+/* Startup check: a neighbour first changes only if p·w·x0 > δ (land edge w = 1). */
+function pbStartupHint(){
+  const el=$("pb-gain");const p=Number($("pb-run-p").value),delta=Number($("pb-run-delta").value),rho=Number($("pb-run-rho").value);
+  let seeds=[],scenario={};try{scenario=pbRunScenario();seeds=scenario.seeds||[];}catch{}
+  if(Array.isArray(scenario.seeds)&&!scenario.seeds.length){el.style.color="";el.textContent="情景没有手写种子：使用已有习俗、有限源输入或有条件接触；请重算检查实际通道。";return;}
+  if(!seeds.length)seeds=[{name:$("pb-run-seed_name").value,value:Number($("pb-run-seed_value").value)}];
+  if(![p,delta,rho].every(Number.isFinite)){el.textContent="";return;}
+  const weak=seeds.filter(r=>p*Number(r.value)<=delta);
+  const sourced=weak.map(seed=>({seed,rows:(scenario.sources||[]).filter(s=>s.name===seed.name&&Number.isFinite(Number(s.amount))&&Number(s.amount)>0)})).filter(s=>s.rows.length);
+  if(sourced.length){
+    const info=sourced.map(({seed,rows})=>{
+      const row=rows[0],amount=Number(row.amount),change=(rho-1)*Number(seed.value)+amount;
+      const a=row.start_year??('第 '+row.start_month+' 月'),b=row.end_year??('第 '+row.end_month+' 月');
+      return `${seed.name} 有有限源输入 +${amount}/次服务（${a}–${b}）；按当前 ρ 和初值估算源地增量 ${+change.toPrecision(4)} ${change>delta?'>':'≤'} δ=${delta}`;
+    });
+    const unfed=weak.filter(seed=>!sourced.some(s=>s.seed===seed));
+    el.style.color=unfed.length?'var(--alarm)':'';
+    el.textContent=`入口检查：${info.join('；')}。单次邻接输入不足不能据此判定整个情景无法启动；发源资格、窗口和地区系数由重算核验。`+(unfed.length?`另有未配置源输入的弱种子：${unfed.map(s=>s.name).join('、')}，须单独检查。`:'');
+    return;
+  }
+  const meta=PB&&PB.graph_meta||{},deg=pbPayloadMap()==="hex"?6:Number.isFinite(meta.land_edges)&&PB?2*meta.land_edges/PB.nodes:null;
+  const gain=deg?`单点增益 ρ+d̄·p ≈ ${(rho+deg*p).toFixed(3)}（平均邻居数 ${deg.toFixed(2)}，${rho+deg*p>1?"可自持增长":"不足以自持"}）。`:"";
+  const first=seeds[0]||{};
+  el.style.color=weak.length?"var(--alarm)":"";
+  el.textContent=(weak.length?`启动检查：${weak.map(r=>`${r.name||"?"} 的邻居首次输入 p·x₀ = ${p}×${r.value} = ${+(p*r.value).toPrecision(3)} ≤ δ=${delta}`).join("；")}，单靠该种子无法向外启动（未计有限源输入、地区系数与海峡权重）。`
+    :`启动检查：首个种子邻居首次输入 p·x₀ = ${+(p*Number(first.value)).toPrecision(3)} > δ=${delta}，可以启动。`)+gain;
+}
+/* ---------- parameter sweep ---------- */
+let pbSweepJob=null,pbSweepData=null,pbSweepTimer=0;
+const PB_SWEEP_LABEL={p:"p",rho:"ρ",delta:"δ",hold_T:"T（月）",decay_factor:"退潮因子",habit_floor:"κ",budget:"月预算",seed_value:"首个种子强度"};
+const PB_SWEEP_INT=new Set(["hold_T","budget"]);
+function pbSweepField(param){return $(param==="seed_value"?"pb-run-seed_value":"pb-run-"+param);}
+function pbRound(v,integer){return integer?Math.round(v):+v.toPrecision(4);}
+function pbSweepSuggest(){
+  const param=$("pb-sweep-param").value,cur=Number(pbSweepField(param).value);
+  const fixed={hold_T:[120,180,240,300,360],delta:[.01,.02,.05,.1,.2],decay_factor:[.95,.97,.98,.99,.995],habit_floor:[0,.1,.2,.3,.5],rho:[.97,.98,.99,.995],budget:[20000,40000,80000,"不限"]};
+  const values=fixed[param]||(Number.isFinite(cur)&&cur>0?[.5,.75,1,1.5,2].map(k=>pbRound(cur*k,false)):[.01,.02,.03]);
+  $("pb-sweep-values").value=values.join(", ");
+  const nums=values.filter(Number.isFinite);$("pb-sweep-from").value=Math.min(...nums);$("pb-sweep-to").value=Math.max(...nums);$("pb-sweep-n").value=values.length;
+}
+function pbSweepGenerate(){
+  const param=$("pb-sweep-param").value,a=Number($("pb-sweep-from").value),b=Number($("pb-sweep-to").value),n=Math.round(Number($("pb-sweep-n").value)),log=$("pb-sweep-scale").value==="log";
+  if(![a,b].every(Number.isFinite)||!(n>=2&&n<=24)){pbRunStatus("生成取值需要有限的起止值，个数 2–24",true);return;}
+  if(log&&(a<=0||b<=0)){pbRunStatus("等比间隔需要正的起止值",true);return;}
+  const out=[];for(let i=0;i<n;i++){const f=i/(n-1);out.push(pbRound(log?a*Math.pow(b/a,f):a+(b-a)*f,PB_SWEEP_INT.has(param)));}
+  $("pb-sweep-values").value=[...new Set(out)].join(", ");
+}
+function pbSweepParse(){
+  const param=$("pb-sweep-param").value,parts=$("pb-sweep-values").value.split(/[,，;；\s]+/).filter(Boolean);
+  const values=parts.map(t=>{if(param==="budget"&&/^(不限|null|none)$/i.test(t))return null;const v=Number(t);if(!Number.isFinite(v))throw new Error("扫描取值无法解析："+t);return PB_SWEEP_INT.has(param)?Math.round(v):v;});
+  if(!values.length||values.length>24)throw new Error("扫描取值需要 1–24 个");
+  return {param,values};
+}
+async function pbSweepStart(){
+  if(pbRunBusy||pbMapLoading)return;
+  try{
+    const run=pbRunRead();if(!pbApiConnected)throw new Error("请先连接本机计算服务");
+    const {param,values}=pbSweepParse();
+    pbRunSetBusy(true);pbRunStatus("正在提交参数扫描…");
+    const result=await pbApiRequest("/api/sweep",{run,param,values});if(!result.id)throw new Error("计算服务未返回作业编号");
+    pbSweepJob=String(result.id);
+    pbSweepData={param,values,results:[],milestones:(run.scenario.milestones||[]).map(m=>m.name),start_year:run.start_year,map:run.map,status:"running",base:pbParamTextFromRequest(run,param)};
+    $("pb-run-progress").hidden=false;$("pb-run-progress").value=0;pbRunSetBusy(true);pbSweepRender();pbSweepPoll();
+  }catch(err){pbSweepJob=null;pbRunSetBusy(false);pbRunStatus("未能开始扫描："+err.message,true);}
+}
+function pbParamTextFromRequest(run,param){return Object.entries(run.params).filter(([k])=>k!==param&&!["frames_every","series_every"].includes(k)).map(([k,v])=>`${k}=${v??"不限"}`).join(" ")+(param==="seed_value"?"":` · 种子 ${run.seed_name}×${run.seed_value}`);}
+async function pbSweepPoll(){
+  if(!pbSweepJob)return;clearTimeout(pbSweepTimer);const job=pbSweepJob;
+  try{
+    const result=await pbApiRequest("/api/jobs/"+encodeURIComponent(job));if(job!==pbSweepJob)return;
+    pbSweepData.results=Array.isArray(result.results)?result.results:[];pbSweepData.status=result.status;
+    if(result.status==="running"){
+      const runs=result.runs||pbSweepData.values.length,i=result.run_index||0,frac=result.max_months?Math.min(1,(result.month||0)/result.max_months):0;
+      $("pb-run-progress").value=Math.min(1,(i+frac)/runs);
+      pbRunStatus(`参数扫描：第 ${i+1} / ${runs} 组（${PB_SWEEP_LABEL[pbSweepData.param]} = ${pbSweepData.values[i]??"不限"}），第 ${fmt(result.month||0)} 月。已完成的组已列在下方。`);
+      pbSweepRender();pbSweepTimer=setTimeout(pbSweepPoll,500);return;
+    }
+    if(result.status==="complete"){$("pb-run-progress").value=1;pbRunStatus(`参数扫描完成：${pbSweepData.results.length} 组。在结果表中点“采用并重算”生成完整回放。`);}
+    else if(result.status==="cancelled")pbRunStatus(`参数扫描已取消；保留已完成的 ${pbSweepData.results.length} 组。`);
+    else if(result.status==="failed")pbRunStatus("参数扫描失败："+(result.error||"未知错误"),true);
+    pbSweepJob=null;pbRunSetBusy(false);pbSweepRender();
+  }catch(err){pbApiConnected=false;pbRunSetBusy(true);$("pb-api-help").hidden=false;pbRunStatus("扫描连接中断："+err.message+"。点击连接本机计算服务可恢复。",true);}
+}
+async function pbSweepCancel(){
+  if(!pbSweepJob)return;$("pb-sweep-cancel").disabled=true;
+  try{await pbApiRequest("/api/jobs/"+encodeURIComponent(pbSweepJob)+"/cancel",{});pbRunStatus("已请求取消扫描…");clearTimeout(pbSweepTimer);pbSweepTimer=setTimeout(pbSweepPoll,200);}
+  catch(err){pbRunStatus("取消扫描失败："+err.message,true);$("pb-sweep-cancel").disabled=false;}
+}
+function pbSweepScore(row){
+  const ms=row.milestones||[];if(!ms.length)return null;
+  // Unreached is worse than any reached error; reached errors are scaled by their tolerance.
+  return ms.reduce((sum,m)=>sum+(m.error_months==null?1000:Math.abs(m.error_months)/Math.max(1,m.tolerance_months||1)),0);
+}
+function pbSweepApply(value){
+  const d=pbSweepData;if(!d)return;
+  if(d.map!==pbMapChoice){pbRunStatus("扫描结果属于另一张地图，请先切换地图",true);return;}
+  const field=pbSweepField(d.param);field.value=value==null?"":value;
+  if(d.param==="seed_value")pbScenarioMutate(sc=>{if(Array.isArray(sc.seeds)&&sc.seeds[0])sc.seeds[0].value=value;});
+  pbTab("params");pbDirtyMark();pbRunSubmit();
+}
+function pbSweepColor(i,n){return `hsl(${170-150*(n>1?i/(n-1):0)} 55% ${38+8*Math.sin(i)}%)`;}
+function pbSweepRender(){
+  const d=pbSweepData,box=$("pb-sweep-out");box.hidden=!d;if(!d)return;
+  const label=PB_SWEEP_LABEL[d.param],rows=d.results,n=d.values.length;
+  $("pb-sweep-title").textContent=`参数扫描：${label}（${pbMapLabel(d.map)}，${rows.length}/${n} 组${d.status==="running"?"，计算中":d.status==="cancelled"?"，已取消":""}）· 其余参数：${d.base}`;
+  const head=$("pb-sweep-head");head.replaceChildren();
+  for(const t of [label,"曾为成员","平静","总 U","月峰值 U","里程碑",...d.milestones,""]){const th=document.createElement("th");th.textContent=t;head.append(th);}
+  const scores=rows.map(pbSweepScore),valid=scores.filter(s=>s!=null),best=valid.length>1&&Math.min(...valid)<Math.max(...valid)?Math.min(...valid):null;
+  const body=$("pb-sweep-rows");body.replaceChildren();
+  const year=t=>t==null?"未平静":d.start_year!=null?Math.floor(d.start_year+t/12):t;
+  rows.forEach((r,i)=>{
+    const tr=document.createElement("tr");if(best!=null&&scores[i]===best)tr.className="best";const sm=r.summary||{};
+    const sw=document.createElement("span");sw.style.cssText=`display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:${pbSweepColor(i,n)}`;
+    const first=pbCell(null);first.append(sw,document.createTextNode(String(r.value??"不限")+(best!=null&&scores[i]===best?" ★":"")));
+    tr.append(first,pbCell(fmt(sm.ever_member)),pbCell(String(year(sm.calm_month))),pbCell(fmt(sm.total_U)),pbCell(fmt(sm.peak_monthly_U)),pbCell(pbMilestoneScore(r.milestones)));
+    for(const m of r.milestones||[]){const err=m.error_months;tr.append(pbCell(err==null?"未达":`${err>0?"+":""}${err} 月`,err==null?"na":m.within_tolerance?"ok":"bad"));}
+    tr.append(pbCell(pbButton("采用并重算","把此值写入参数页并完整重算（生成回放）",()=>pbSweepApply(r.value))));
+    body.append(tr);
+  });
+  const cap=$("pb-sweep-cap");cap.replaceChildren();
+  d.values.forEach((v,i)=>{const span=document.createElement("span"),sw=document.createElement("i");sw.style.background=pbSweepColor(i,n);span.append(sw,document.createTextNode(String(v??"不限")));cap.append(span);});
+  if(!rows.length)return;
+  const xmax=Math.max(12,...rows.map(r=>r.series.length?r.series.at(-1)[0]:0)),ymax=Math.max(10,...rows.flatMap(r=>r.series.map(s=>s[1])))*1.06;
+  const xl=d.start_year!=null?t=>String(Math.floor(d.start_year+t/12)):t=>String(t);
+  pbPlot("pb-sweep-chart",{xmax,ymax,xLabel:xl,series:rows.map((r,i)=>({xs:r.series.map(s=>s[0]),ys:r.series.map(s=>s[1]),color:pbSweepColor(d.values.indexOf(r.value)>=0?d.values.indexOf(r.value):i,n),w:1.6}))});
+  const errFig=$("pb-sweep-err-fig");errFig.hidden=!d.milestones.length;
+  if(d.milestones.length){
+    const palette=["#2F5C9E","#A8452F","#2E7A6A","#B9852A","#6B3F2A","#8b5fb0","#3A8FB7","#7A8B2E"];
+    const errs=rows.flatMap(r=>(r.milestones||[]).filter(m=>m.error_months!=null).map(m=>Math.abs(m.error_months)/Math.max(1,m.tolerance_months||1)));
+    const lim=Math.min(20,Math.max(3,Math.ceil(Math.max(0,...errs)*1.1))),step=lim<=4?1:Math.ceil(lim/4);
+    const series=d.milestones.map((name,k)=>{const ys=[],hollow=[];rows.forEach(r=>{const m=(r.milestones||[])[k];const e=m&&m.error_months!=null?m.error_months/Math.max(1,m.tolerance_months||1):lim;ys.push(Math.max(-lim,Math.min(lim,e)));hollow.push(!m||m.error_months==null);});
+      return {xs:rows.map((_,i)=>i),ys,hollow,color:palette[k%palette.length],points:true,w:1.4};});
+    const yt=[];for(let y=-Math.floor(lim/step)*step;y<=lim;y+=step)yt.push(y);if(!yt.includes(1)&&lim<=6)yt.push(1,-1);
+    pbPlot("pb-sweep-err",{xmin:-.3,xmax:Math.max(.3,rows.length-.7),ymin:-lim,ymax:lim,yticks:yt.sort((a,b)=>a-b),yFmt:y=>(y>0?"+":"")+y,band:[-1,1],xticks:rows.map((_,i)=>i),xLabel:i=>String(rows[i]?.value??"不限"),series});
+    const ec=errFig.querySelector?.(".cap");if(ec){ec.replaceChildren();d.milestones.forEach((name,k)=>{const span=document.createElement("span"),sw=document.createElement("i");sw.style.background=palette[k%palette.length];span.append(sw,document.createTextNode(name));ec.append(span);});const note=document.createElement("span");note.textContent=`阴影 ±1 为容差内；负值＝早于目标；空心点＝未到达（画在顶端 +${lim}）`;ec.append(note);}
+  }
+}
+function pbTab(name){
+  for(const k of ["params","scenario","sweep"]){const tab=$("pb-tab-"+k);if(tab.setAttribute)tab.setAttribute("aria-selected",String(k===name));$("pb-panel-"+k).hidden=k!==name;}
+  if(name==="scenario")pbScenarioRender();
+  if(name==="sweep"&&!$("pb-sweep-values").value)pbSweepSuggest();
+}
+/* ---------- local calculation controls ---------- */
+$("pb-run-form").addEventListener('submit',e=>{e.preventDefault();pbRunSubmit();});
+$("pb-run-map").addEventListener('change',e=>pbSwitchMap(e.target.value));
+$("pb-api-connect").addEventListener('click',pbApiConnect);
+$("pb-run-cancel").addEventListener('click',pbRunCancel);
+$("pb-run-preset").addEventListener('change',()=>{const defaults=pbApiConfig?.preset_defaults?.[$("pb-run-preset").value];if(defaults)pbRunWrite({params:defaults.params});pbRunPresetNote();});
+$("pb-run-scenario").addEventListener('input',pbRunSyncSeedFromScenario);
+for(const key of ['seed_name','seed_value'])$("pb-run-"+key).addEventListener('change',()=>{try{const request=pbRunRead();$("pb-run-scenario").value=JSON.stringify(request.scenario,null,2);}catch{}});
+$("pb-run-download").addEventListener('click',()=>{
+  try{const request=pbRunRead(),blob=new Blob([JSON.stringify(request,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='obsession-map-config.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);pbRunStatus('已下载完整运行配置，包含 params、scenario 与首个种子覆盖值。');}
+  catch(err){pbRunStatus('配置未下载：'+err.message,true);}
+});
+$("pb-run-import").addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{const obj=JSON.parse(await file.text());if(!obj||typeof obj!=='object'||Array.isArray(obj))throw new Error('配置必须是 JSON 对象');
+    if(obj.map&&obj.map!==pbMapChoice){await pbSwitchMap(obj.map);if(obj.map!==pbMapChoice)throw new Error('需先连接支持该地图的本机计算服务');}
+    if(obj.params||obj.scenario)pbRunWrite(obj);else pbRunWrite({scenario:obj,params:obj.parameters,start_year:obj.start_year});pbRunSyncSeedFromScenario();pbRunPresetNote();pbRunStatus('配置已载入，点击重算应用。');
+  }catch(err){pbRunStatus('配置导入失败：'+err.message,true);}e.target.value='';
+});
+/* ---------- workbench controls ---------- */
+for(const k of ["params","scenario","sweep"])$("pb-tab-"+k).addEventListener("click",()=>pbTab(k));
+$("pb-sweep-param").addEventListener("change",pbSweepSuggest);
+$("pb-sweep-gen").addEventListener("click",pbSweepGenerate);
+$("pb-sweep-run").addEventListener("click",pbSweepStart);
+$("pb-sweep-cancel").addEventListener("click",pbSweepCancel);
+$("pb-live-on").addEventListener("change",()=>{pbImage=null;pbDraw();});
+let pbDirtyTimer=0;
+const pbDirtySoon=()=>{clearTimeout(pbDirtyTimer);pbDirtyTimer=setTimeout(pbDirtyMark,120);};
+for(const key of [...PB_RUN_PARAMS,"preset","start_year","seed_name","seed_value"])$("pb-run-"+key).addEventListener("input",pbDirtySoon);
+$("pb-run-start_year").addEventListener("change",pbScenarioRender);
+$("pb-run-scenario").addEventListener("change",()=>{pbScenarioRender();pbDirtyMark();});
+for(const id of ["pb-chart","pb-scope-chart"]){
+  const c=$(id);
+  const seek=e=>{if(!PB)return;const x=pbPlotX(id,e);if(x!=null)pbSeekMonth(x);};
+  c.addEventListener("pointerdown",e=>{seek(e);if(c.setPointerCapture)c.setPointerCapture(e.pointerId);});
+  c.addEventListener("pointermove",e=>{if(e.buttons&1)seek(e);});
+}
+function pbStep(delta){if(!PB)return;pbPlaying=false;clearTimeout(pbRaf);$("pb-play").textContent="播放";pbIdx=Math.max(0,Math.min(PB.frames.length-1,pbIdx+delta));$("pb-t").value=pbIdx;pbDraw();}
+function pbKeydown(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();pbRunSubmit();return;}
+  const t=e.target,tag=t&&t.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable)||(t&&t.id==="pb-map"))return;
+  if(e.key===" "&&tag!=="BUTTON"){e.preventDefault();$("pb-play").click();}
+  else if(e.key==="ArrowRight"){e.preventDefault();pbStep(e.shiftKey?10:1);}
+  else if(e.key==="ArrowLeft"){e.preventDefault();pbStep(e.shiftKey?-10:-1);}
+}
+addEventListener("keydown",pbKeydown);
+function pbArrangeLayout(){
+  const section=$("playback"),legacy=$("legacy-experiments"),grid=document.querySelector('.grid'),charts=document.querySelector('.charts');
+  if(grid&&grid.parentElement===section.parentElement)section.parentElement.insertBefore(section,grid);
+  for(const child of [grid,charts,$("legacy-reference")])if(child&&child.parentElement!==legacy)legacy.append(child);
+  legacy.addEventListener('toggle',()=>{if(legacy.open){drawOverlay();drawCharts();render();}});
+}
+addEventListener("DOMContentLoaded",async()=>{
+  pbArrangeLayout();
+  const embedded=$("obsession-playback-data");
+  try {
+    if(embedded){
+      pbLoad(JSON.parse(embedded.textContent));pbRunsAdd(PB,'embedded');
+      document.querySelector(".sub").textContent=`${PB.title||"扩散模拟离线报告"}。真实地图与合成六角网格共用同一模拟区域；本页已内嵌的回放可断网打开，切换地图与重算需本机服务。历史实验与 Python 回归对照保留在折叠区。`;
+    } else {
+      const url=new URLSearchParams(location.search).get("playback");
+      if(url){const response=await fetch(url);if(!response.ok)throw new Error(`HTTP ${response.status}`);pbLoad(await response.json());$("playback").scrollIntoView();}
+    }
+  } catch(err){$("pb-msg").textContent="自动载入失败："+err.message;}
+  pbRunFromReplay();pbApiConnect();
+});
+
+addEventListener("resize", () => { drawOverlay(); drawCharts(); pbDraw(); if (pbSweepData) pbSweepRender(); });
+loadPreset(PRESETS[0].key);
+</script>
+</body>
+</html>

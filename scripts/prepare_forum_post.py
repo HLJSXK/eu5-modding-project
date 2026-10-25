@@ -10,6 +10,7 @@ Usage:
     python scripts/prepare_forum_post.py
     python scripts/prepare_forum_post.py --limit 20000
     python scripts/prepare_forum_post.py --write
+    python scripts/prepare_forum_post.py --source docs/technical/SOL_Substitution_Forum_Post.bbcode
 """
 import argparse
 import re
@@ -20,8 +21,8 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-SOURCE = Path("docs/technical/Country_Demand_Solver_Forum_Post.bbcode")
-OUT_DIR = Path("docs/technical/forum_post_parts")
+DEFAULT_SOURCE = Path("docs/technical/Country_Demand_Solver_Forum_Post.bbcode")
+DEFAULT_OUT_DIR = Path("docs/technical/forum_post_parts")
 
 # Tags that must appear in matched open/close pairs.
 PAIRED = ("B", "I", "U", "SIZE", "COLOR", "CENTER", "LIST", "TABLE", "TR",
@@ -79,6 +80,21 @@ def validate(text: str) -> bool:
     if all(v == 0 for v in checks.values()):
         print("  none")
 
+    # The Paradox forum editor treats paired asterisks as italics before the
+    # BBCode parser runs, so [*] list items collapse into one mangled bullet and
+    # take neighbouring [URL] tags down with them (seen in a live preview,
+    # 2026-10-24). This applies inside [CODE] too, so check the whole text.
+    print()
+    print("=== asterisks (forum editor turns *...* into italics) ===")
+    stars = text.count("*")
+    if stars:
+        items = len(re.findall(r"\[\*\]", text))
+        print(f"  {stars} asterisk(s), {items} of them in [*] list items   <-- BREAKS ON PASTE")
+        print("  use plain numbered lines / ' · ' separators, and × for multiplication")
+        ok = False
+    else:
+        print("  none")
+
     print()
     print("=== CJK (post is English) ===")
     cjk = sorted({c for c in text if "一" <= c <= "鿿"})
@@ -131,12 +147,21 @@ def main() -> int:
                     help="max characters per post (default 20000)")
     ap.add_argument("--write", action="store_true",
                     help="write the split parts to disk")
+    ap.add_argument("--source", type=Path, default=DEFAULT_SOURCE,
+                    help=f"BBCode source (default: {DEFAULT_SOURCE})")
+    ap.add_argument("--out-dir", type=Path, default=None,
+                    help="where --write puts parts (default: forum_post_parts, "
+                         "or a sibling <stem>_parts for a custom --source)")
     args = ap.parse_args()
 
-    if not SOURCE.exists():
-        print(f"missing source: {SOURCE}", file=sys.stderr)
+    if not args.source.exists():
+        print(f"missing source: {args.source}", file=sys.stderr)
         return 1
-    text = SOURCE.read_text(encoding="utf-8")
+    out_dir = args.out_dir
+    if out_dir is None:
+        out_dir = (DEFAULT_OUT_DIR if args.source == DEFAULT_SOURCE
+                   else args.source.parent / f"{args.source.stem}_parts")
+    text = args.source.read_text(encoding="utf-8")
 
     ok = validate(text)
 
@@ -161,11 +186,14 @@ def main() -> int:
                 ok = False
 
     if args.write:
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        for old in OUT_DIR.glob("post_*.bbcode"):
-            old.unlink()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Overwrite in place; only remove parts left over from a longer split.
+        keep = {f"post_{i:02d}.bbcode" for i in range(1, len(posts) + 1)}
+        for old in out_dir.glob("post_*.bbcode"):
+            if old.name not in keep:
+                old.unlink()
         for i, (label, body) in enumerate(posts, 1):
-            path = OUT_DIR / f"post_{i:02d}.bbcode"
+            path = out_dir / f"post_{i:02d}.bbcode"
             note = (f"[SIZE=2][I]Part {i} of {len(posts)}. "
                     f"Sections: {label}[/I][/SIZE]\n\n") if len(posts) > 1 else ""
             path.write_text(note + body.strip() + "\n", encoding="utf-8")

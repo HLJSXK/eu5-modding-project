@@ -32,8 +32,8 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_mnt_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
-MNT_ROOT = REPO_ROOT / "reference_mods" / "3735059838"
-VANILLA_ROOT = REPO_ROOT / "reference_game_files" / "game"
+MNT_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3735059838"
+VANILLA_ROOT = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game"
 
 TARGET_DEMAND_CSV = REPO_ROOT / "data" / "target_demand.csv"
 STABLE_PRICES = STABLE_ROOT / "in_game" / "common" / "prices" / "A_SOL_economy_prices.txt"
@@ -395,25 +395,29 @@ def _compat_quantities(
         for good in GRAINS:
             quantities[good][pop_type] = equal_quantity
 
-    if quantities["tools"]["laborers"] != Decimal("0.00050"):
+    if quantities["tools"]["laborers"] != Decimal("0.00200"):
         raise ValueError(
-            "tools laborer compatibility quantity must be 0.0005, got "
+            "tools laborer compatibility quantity must be 0.002, got "
             f"{quantities['tools']['laborers']}"
         )
+    from gen_whole_group_baskets import groups_for_pop, validate_baskets
+    for pop_type in POP_TYPES:
+        for good in {good for members in groups_for_pop(pop_type).values() for good in members}:
+            quantities[good][pop_type] = max(QUANTUM, quantities[good][pop_type])
+    validate_baskets(quantities, label="M&T calibrated basket")
     return quantities
 
 
 def _render_demand_block(
     quantities: Dict[str, Decimal],
-    slave_quantity: Decimal,
 ) -> str:
     lines = ["\tdemand_add = {"]
-    for pop_type in ALL_POP_TYPES:
-        value = slave_quantity if pop_type == "slaves" else quantities[pop_type]
+    for pop_type in POP_TYPES:
+        value = quantities[pop_type]
         if value == 0:
             continue
         lines.append(f"\t\t{pop_type} = {_format_decimal(value)}")
-    lines.append("\t}")
+    lines.extend(["\t\tslaves = 0", "\t}"])
     return "\n".join(lines)
 
 
@@ -450,12 +454,12 @@ def _render_goods(
         GENERATED_HEADER.rstrip(),
         "# M&T owns every non-demand field where defined; new vanilla goods use the current vanilla base.",
         "# Wealth and development demand gates remain removed for SOL's continuous scaling.",
+        "# Slaves have no income and no goods demand, including M&T's native slave quantities.",
     ]
     for good in sol_targets:
         original = goods_blocks[good].body
-        mnt_pop_demand = _final_pop_demand(original)
         base = _remove_fields(original, DEMAND_FIELDS)
-        demand_block = _render_demand_block(quantities[good], mnt_pop_demand["slaves"])
+        demand_block = _render_demand_block(quantities[good])
         rendered = _insert_after_default_price(base, demand_block, good)
         if _normalize_without_demand(rendered) != _normalize_without_demand(original):
             raise ValueError(f"Non-demand M&T fields changed while rendering {good}")
@@ -478,7 +482,8 @@ def _validate_demand_invariants(
         mnt_price = _default_price(goods_blocks[good].body, good)
         for pop_type in POP_TYPES:
             ideal = target[pop_type] * vanilla_prices[good] / mnt_price
-            if abs(quantities[good][pop_type] - ideal) > QUANTUM / 2:
+            expected = max(QUANTUM, _round_quantity(ideal)) if target[pop_type] > 0 else Decimal(0)
+            if quantities[good][pop_type] != expected:
                 raise ValueError(f"Rounded compatibility quantity is out of range: {good}/{pop_type}")
 
     grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
@@ -493,6 +498,10 @@ def _validate_demand_invariants(
             quantities[good][pop_type] * grain_prices[good] for good in GRAINS
         )
         max_rounding_drift = sum(grain_prices.values()) * QUANTUM / 2
+        if 0 < sol_spending < sum(grain_prices.values()) * QUANTUM:
+            # Minimum positive quantities may exceed nearest rounding by half
+            # a quantum; all subscribed grain members must still survive.
+            max_rounding_drift = sum(grain_prices.values()) * QUANTUM
         if abs(sol_spending - compat_spending) > max_rounding_drift:
             raise ValueError(f"Grain spending drift exceeds fixed-point rounding for {pop_type}")
 
@@ -536,7 +545,9 @@ def _render_values_and_refresh(
         "REPLACE:sol_refresh_market_pop_demand_maps = {",
         1,
     )
-    return values, refresh
+    from sol_substitution import render_country_runtime, render_location_spending
+    runtime = render_country_runtime(rows).replace("\nsol_", "\nREPLACE:sol_")
+    return values, refresh + "\n" + runtime + render_location_spending(rows, replace=True)
 
 
 def _render_authority_objects(
@@ -962,6 +973,10 @@ def _append_callback(
                 "\t\t\t}",
             ]
         )
+    if setting_id == "substitution":
+        lines.extend(["\t\tevery_country = { sol_clear_country_substitution = yes }", "\t\tif = { limit = { sol_sol_is_on = yes } gls_recalculate_global_living_standard = yes }"])
+    if setting_id == "sol_on":
+        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier sol_clear_location_living_standard_modifiers = yes } } }")
     lines.append("\t\t}")
 
 
@@ -971,6 +986,7 @@ def _render_cmm() -> str:
         "# Keep M&T economic authority by default while allowing explicit CMF opt-in",
         "# to SOL's trigger-gated economic balance systems.",
         "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_substitution_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
         "\tremove_global_variable = sol_as_enabled",
@@ -992,6 +1008,7 @@ def _render_cmm() -> str:
     ]
     _append_bool_setting(lines, "sol_on", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "sol", "sol_sol_map_enabled")
+    _append_bool_setting(lines, "substitution", "sol", "sol_substitution_enabled", False)
     _append_bool_setting(
         lines,
         "mnt_as_on",
@@ -1031,6 +1048,7 @@ def _render_cmm() -> str:
     )
     for setting_id, alias, numeric in (
         ("sol_on", "sol_sol_on_enabled", False),
+        ("substitution", "sol_substitution_enabled", False),
         ("sol_map", "sol_sol_map_enabled", False),
         ("mnt_as_on", "sol_as_enabled", False),
         ("bte", "sol_bte", True),
@@ -1167,6 +1185,7 @@ BUTTON_ANCHOR_RE = re.compile(
 SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-standard tooltip.
 \t\t\t\t\t\t\t\t\tnavigational_button_alt = {
 \t\t\t\t\t\t\t\t\t\tsize = {38 38}
+\t\t\t\t\t\t\t\t\t\tvisible = "[Location.HasOwner]"
 
 \t\t\t\t\t\t\t\t\t\tblockoverride "icon_texture" {
 \t\t\t\t\t\t\t\t\t\t\tpiechart = {

@@ -1,5 +1,17 @@
 # EU5 debug-save population parser
 
+## Versioned obsession world exports
+
+`python -m tools.eu5_save_parser.world_export --archive data/saves/observer_archive --out tmp/obsession_worlds`
+reads completed archived text saves without changing them. It resumes existing exports and writes
+`obsession.world-snapshot/2` JSON plus a SHA-256 timeline per playthrough. Outputs include actual
+population, owner/capital, market boundaries and normalized resident merchant power, roads,
+proximity, market access, institutions, and resolved culture/religion keys. Numeric runtime
+identity references are joined through the save's definition managers; country official faith
+is kept separately from the capital's local faith. Active marriages and alliances are exported as separate hash-bound `obsession.world-relations/1` supplements. `world_export` includes them automatically; use `python -m tools.eu5_save_parser.relationships_export` to add/resume them for existing worlds without reparsing populations. Peace offers, opinion lists and inferred friendships are excluded. Original save size, mtime and SHA-256 are
+retained. Version 1 exports upgrade without rereading all population objects. Commodity trade
+quantities and guessed routes are deliberately excluded. This is separate from SOL solver analysis.
+
 This tool extracts only the data needed to study SOL's location-class
 compensation model. It supports **uncompressed text saves produced with debug
 mode enabled**; normal compressed/binary saves are rejected.
@@ -104,3 +116,40 @@ three soft total-penalty candidates to test whether a small total drift buys
 additional four-stratum improvements.
 The reports evaluate all four strata independently so an improvement in one
 cannot hide a worsening in another.
+
+## Decade autosave archiver
+
+EU5 keeps only a few rotating autosaves, so a long observer game loses its
+history. Run this watcher next to the game (stdlib only, no mod changes):
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON -m tools.eu5_save_parser.autosave_archiver
+```
+
+It polls `Documents\Paradox Interactive\Europa Universalis V\save games`
+every 5 seconds, ignores `.tmp` files (the game writes `.tmp` and renames when
+done) and waits until a `.eu5` file's size and mtime stop changing. It reads
+the in-game date from the save metadata (falling back to a zip text member,
+then the `..._YYYY_MM_DD_...` file name) and copies the **first save in every
+10-year bucket** (1330s, 1340s, ...) to
+`data/saves/observer_archive/<playthrough_id>/<YYYY.MM.DD>_<original name>`.
+Copies go through a `.part` file and are discarded if the source changed
+during the copy. `archive_state.json` records what was kept, so a restart
+resumes. Saves of different playthroughs are kept apart.
+
+```text
+--interval 25 --anchor 1337   other bucket sizes/alignment
+--out D:\eu5_archive           another drive (a 1.4 debug save is ~0.4 GB)
+--min-free-gb 5                refuse to copy below this free space (retries)
+--playthrough <id>             only one game
+--save-dir <folder>            non-default/Steam Cloud save folder (repeatable)
+--once / --dry-run             scan current files once / only report
+```
+
+Game settings: launch with `-debug_mode` so saves stay plaintext for the
+parser (non-text saves are still archived, with a warning). Autosave interval
+and the number of kept autosaves can only be changed from the main menu;
+yearly autosaves with more than 3 kept give the watcher minutes per save. The
+copy holds the file open for a few seconds; on Windows the game cannot delete
+it during that time, which only matters if autosaves rotate faster than that.
