@@ -165,6 +165,8 @@ dirty 条件：没有初始快照、领土数量变化、AI/玩家身份变化�
 
 ### 4.3 缺少可归因的 profiler
 
+> 2026-10-27 更正：EU5 在 `-debug_mode` 下有原生脚本 profiler（`Script.Profiling.*`），首份实测见 `SOL_Profiler_Analysis_20261027.md`；本节“缺少 profiler”的判断已过时，原文保留作历史记录。
+
 `performance_degradation.log` 只有 frame 汇总。24.616 秒尖峰在 lobby/初始 1337.4.1 区间；到 1337.6.2 的窗口 max frame 为 2.787 秒，没有 effect 耗时分解。它不能证明“替代组占 CPU 的某个百分比”。`graphs/` 仅缓存初始化依赖图，`dumps/` 为空。
 
 SOL 的 `PERFORMANCE_UPDATE_DEMANDS_MIN/MAX=100` 在 1.4 迁移前已存在，不能当作新回归来源；当前 1.4 原版 defines 中又没有这些键，其有效性需要单独确认。
