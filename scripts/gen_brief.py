@@ -36,6 +36,7 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 
 # Codegen script map: (script, inputs, outputs, when_to_run)
 CODEGEN_SCRIPTS = [
+    ("gen_sol_ls_gui.py", "SOL GUI kit + goods_weights.csv + shared button definition", "stable/standalone location tooltip, country panel, public SOL_location_widgets.gui and bilingual localization", "Run by gen_sol_chain; supports --check; location-window owners use sol_location_living_standard_button with inherited Location context"),
     ("gen_sol_lshud.py", "SOL four-section source + SOL history/ranking/map emitters + vendored Glorp UI types", "stable/standalone HUD, Glorp offset shim, four map modes, scoped map tooltips, font icon registration/asset, bilingual localization and ranking caches", "Run by gen_sol_chain; supports --check; stable must load after Glorp UI; verify with test_sol_lshud_income/ranking/ui.py and test_sol_map_modes.py"),
     ("gen_sol_substitution.py", "goods_weights.csv + pop_group_baskets.csv + substitute_groups.json + calibrated demand", "country pulse effects, guarded cache/display values, triggers and 56 auto modifiers", "Run by gen_sol_chain; edit sol_substitution.py, regenerate, then run test_sol_substitution.py"),
     ("gen_whole_group_baskets.py", "pop_group_baskets.csv + goods_weights.csv + calibrated demand", "whole-group and emittable-net checks; one-time budget-preserving target_demand.csv migration", "--check runs first in gen_sol_chain; --fill migrates incomplete baskets once"),
@@ -45,12 +46,12 @@ CODEGEN_SCRIPTS = [
     ("gen_sol_pp_compat.py", "stable SOL outputs + PP definitions", "SOL-PP compact feature, demand, effects, and GUI overrides; validates PP road-price filename ownership", "After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain"),
     ("gen_sol_mnt_compat.py", "data/target_demand.csv + stable SOL + M&T definitions", "SOL-M&T goods, accounting, EPBM, CMM residual cleanup, actions, and location GUI", "After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain"),
     ("gen_sol_jtg_compat.py", "data/jtg_pop_demand.csv + stable SOL outputs", "SOL-JTG demand, values, effects, and 82-good GUI overrides", "After changing JTG demand data or updating the Just Goods Workshop reference; run by gen_sol_chain"),
-    ("sync_location_window.py", "Glorp UI location window + extracted vanilla types", "Current Glorp UI-based stable window with optional Construction Manager references, one SOL tooltip button, synchronized type support, and backward-compatible 1.4 API migration", "After updating the Glorp UI reference; run by gen_sol_chain for stable/all"),
+    ("sync_location_window.py", "Glorp UI location window + extracted vanilla types + location_window_integrations.py", "Current Glorp UI-based stable window with optional CM/GP references, the shared SOL tooltip button, synchronized type support, and backward-compatible 1.4 API migration", "After updating the Glorp UI reference; run by gen_sol_chain for stable/all"),
     ("gen_sol_economy_effects.py", "scripts/sol_economy_effects_source.py + scripts/sol_country_demand_solver_source.py + scripts/sol_living_standard_source.py + data/demand_price_table.csv", "economy/solver effects, annual SOL values, flat/percent modifier types, icons, 17 building injections, migration/growth static modifiers and bilingual names", "After changing SOL economy emitters, country solver emitters, or demand data; run by gen_sol_chain for stable|sol_standalone|all"),
     ("gen_pop_goods.py",  "data/target_demand.csv",             "src/<target>/.../z_SOL_pop_goods.txt",            "After editing calibrated demand_add baseline; supports --target stable|sol_standalone|all"),
     ("gen_demand_csv.py", "z_SOL_pop_goods.txt + vanilla goods", "data/demand_price_table.csv",                      "After gen_pop_goods.py"),
     ("gen_market_unit_consumption.py", "data/demand_price_table.csv", "src/<target>/.../SOL_market_unit_consumption_values.txt", "After gen_demand_csv.py or SOL market base-spending logic changes; supports --target stable|sol_standalone|all; market refresh block is embedded by gen_sol_economy_effects"),
-    ("generate_sol_location_window.py", "vanilla location_window.gui", "src/sol_standalone/in_game/gui/location_window.gui", "After vanilla location_window.gui changes; run by gen_sol_chain for sol_standalone/all"),
+    ("generate_sol_location_window.py", "vanilla location_window.gui + location_window_integrations.py", "Standalone location window with SOL income/tooltip and optional GP references", "After vanilla location_window.gui changes; run by gen_sol_chain for sol_standalone/all"),
     ("gen_brief.py",      "anti_patterns.yaml + valid_enums.yaml + PROJECT_OVERVIEW.md", "docs/knowledge/BRIEF.md", "After editing any YAML knowledge file"),
     ("gen_index.py",      "reference_game_files + src/",         "data/index/*.txt symbol indexes",                  "Run by gen_brief.py automatically"),
     ("gen_scaffold.py",   "--type argument",                     "Scaffold .txt/.yml file in specified directory",   "When creating a new EU5 file"),
@@ -59,6 +60,8 @@ CODEGEN_SCRIPTS = [
 
 # Auto-generated files: (relative path, generator script)
 AUTOGENERATED_FILES = [
+    *[(f"src/{target}/in_game/gui/SOL_location_widgets.gui", "gen_sol_ls_gui.py")
+      for target in ("stable", "sol_standalone")],
     *[(f"src/{target}/main_menu/gui/messagetypes/SOL_messages.txt", "gen_sol_messages.py")
       for target in ("stable", "sol_standalone")],
     *[(f"src/{target}/{path}", "gen_sol_economy_effects.py")

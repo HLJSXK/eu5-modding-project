@@ -427,11 +427,75 @@ class SubstitutionUI(unittest.TestCase):
                 path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'
                 self.assertIn(generator.SOL_BUTTON, path.read_text(encoding='utf-8-sig'))
                 node = parse(generator.SOL_BUTTON)[0]
+                self.assertEqual(node.key, 'sol_location_living_standard_button')
+                self.assertEqual(node.value, [])
                 for has_owner in (False, True):
                     eng, log = self.engine([(r'Location.HasOwner', has_owner)])
                     button = eng.ex.build(node.key, node.value, {}, str(path), node.line)
                     self.assertEqual(eng.visible(button), has_owner)
+                    self.assertFalse(button.props.get('datacontexts'))
+                    self.assertEqual(button.props['size'], ['38', '38'])
+                    icon = next(e for e in walk(button) if e.props.get('name') == 'stat_sol_living_standard')
+                    self.assertEqual(icon.props['texture'], 'gfx/interface/icons/sol/sol_living_standard.dds')
+                    tip = eng.ex.build_lazy(button.tooltipwidget)
+                    self.assertTrue(any(e.props.get('text') == 'LOCATION_SOL_GUI_TITLE' for e in walk(tip)))
                     self.assertFalse(log, log)
+
+    def test_great_projects_references_keep_native_context_and_queue_actions(self):
+        import sync_location_window as stable
+        import generate_sol_location_window as standalone
+        import gen_sol_mnt_compat as mnt
+
+        def descendants(nodes, parents=()):
+            for node in nodes:
+                yield node, parents
+                if node.is_block():
+                    yield from descendants(node.value, parents + (node,))
+
+        for target, source, queue_count in (
+            ('stable', stable.SOURCE_PATH, 6),
+            ('sol_standalone', standalone.SOURCE_PATH, 6),
+            ('sol_mnt_compatibility_submod', mnt.MNT_LOCATION_GUI, 0),
+        ):
+            with self.subTest(target=target):
+                path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'
+                nodes = list(descendants(parse(path.read_text(encoding='utf-8-sig'))))
+                button, parents = next((n, p) for n, p in nodes if n.key == 'tv_location_wonders_button')
+                self.assertEqual(button.value, [])
+                scene = parents[-1]
+                self.assertEqual(scene.key, 'widget')
+                self.assertTrue(any(n.key == 'scene' and n.value == '[LocationView.GenerateSceneDesc]'
+                                    for n, _ in descendants(scene.value)))
+                panel, parents = next((n, p) for n, p in nodes if n.key == 'tv_location_wonders_panel')
+                self.assertEqual(panel.value, [])
+                self.assertEqual(len(parents), 1)
+                self.assertEqual(parents[0].key, 'lateralview')
+                for key in ('tv_location_wonders_button', 'tv_location_wonders_panel',
+                            'sol_location_living_standard_button'):
+                    self.assertEqual(sum(n.key == key for n, _ in nodes), 1)
+
+                def queues(items):
+                    return [(n, p) for n, p in items if n.key == 'on_action'
+                            and str(n.value).startswith('[LocationView.OpenConstructionQueue(')]
+
+                actions = queues(nodes)
+                self.assertEqual(len(actions), queue_count)
+                original = queues(descendants(parse(source.read_text(encoding='utf-8-sig'))))
+                self.assertEqual([n.value for n, _ in actions], [n.value for n, _ in original])
+                for action, parents in actions:
+                    parent = parents[-1]
+                    self.assertEqual(parent.key, 'action_tooltip')
+                    previous = parent.value[parent.value.index(action) - 1]
+                    self.assertEqual((previous.key, previous.value), ('using', 'tv_location_wonders_close_on_queue'))
+
+    def test_location_button_is_shipped_by_both_base_targets(self):
+        from gen_sol_ls_gui import render_location_widgets
+        for target in ('stable', 'sol_standalone'):
+            path = ROOT / 'src' / target / 'in_game/gui/SOL_location_widgets.gui'
+            with self.subTest(target=target):
+                self.assertEqual(path.read_text(encoding='utf-8-sig'), render_location_widgets())
+                db = GuiDB([path])
+                self.assertEqual(db.type_base['sol_location_living_standard_button'], 'navigational_button_alt')
 
     def test_linear_capacity_bar_and_cursor(self):
         from gen_sol_ls_gui import balance_cursor, capacity_bar, f_capacity_components, f_coef

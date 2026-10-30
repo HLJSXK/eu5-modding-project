@@ -4,6 +4,71 @@ Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guid
 
 ## SOL scenario adapter
 
+### Public location-button integration (2026-10-30)
+
+**[Source and offline checks; native integration acceptance pending.]** SOL exposes
+`sol_location_living_standard_button` in `in_game/gui/SOL_location_widgets.gui`.
+`scripts/gen_sol_ls_gui.py` generates the same definition for stable and standalone;
+M&T, PP and JTG inherit it from their required SOL base. The type owns the existing
+38×38 button, icon, `Location.HasOwner` visibility and `StandardofLiving_tooltip`.
+The tooltip remains separately generated in `SOL_economy_local.gui`, including
+the PP/JTG template overrides.
+
+Other location-window owners (including GP) can insert this single line at the
+desired position in a row that already has the selected `Location` context:
+
+```text
+sol_location_living_standard_button = {}
+```
+
+The type does not rebind `Location` to `LocationView` or to the player. Preserve
+the caller's ancestor context (normally `[LocationView.GetLocation]`); do not add
+an enclosing fixed-size placeholder. SOL's stable, standalone and M&T generators
+use this reference in the original demography-row position. Stable also adds
+the optional GP references described below. Standalone and M&T retain
+their separate `local_sol_total_income` display change; the reusable button does
+not implement that income replacement.
+
+SOL still ships a complete `in_game/gui/location_window.gui`. Both SOL and GP's
+current windows carry each other's public references, so either can supply the
+effective window; its base layout still follows whole-file load order. SOL's
+HUD shim continues to require SOL after Glorp UI. Other window owners must also
+carry both integrations. No GP file is changed by SOL's generator.
+
+### Optional Great Projects integration (2026-10-30)
+
+**[Provider source and offline checks; missing-provider behavior reported by the
+user for Glorp/CM, native GP acceptance pending.]** `location_window_integrations.py`
+adds `tv_location_wonders_button = {}` inside the city-scene widget, outside its
+layout boxes, and `tv_location_wonders_panel = {}` directly under `lateralview`.
+The provider owns the button's LocationView context, visibility, position and
+click behavior, plus the panel's default `{ 0 163 }` offset. No fixed-size wrapper,
+empty fallback type, copied GP implementation, metadata dependency or GP checkout
+is required. This follows Glorp's bare `cm_is_auto_expand_on_icon = {}` reference
+(`reference_mods/3812518640/in_game/gui/location_window.gui:8262`).
+
+Stable and standalone also use `tv_location_wonders_close_on_queue` immediately
+before all six existing `LocationView.OpenConstructionQueue` actions, preserving
+their queue ids and arguments. GP's button closes the queue in the other direction.
+The current M&T bottom panel contains no such actions; its inline construction
+lists remain unchanged. PP/JTG inherit their chosen SOL base window.
+
+Provider contract checked with `guidef.py` against
+`../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532`
+and `../eu5-great-projects/docs/guides/Location_GUI_Integration.md` on 2026-10-30.
+Without GP, missing definitions are deliberately left for the native loader to
+report and omit, as requested. Offline parsing/rendering does not establish
+native error counts, absent-provider geometry, hover hit testing or click order.
+Verify GP enabled/disabled and construction-queue mutual exclusion in game.
+
+Offline verification: `test_sol_substitution_ui.py` checks all three consumer
+trees, direct parents, single instances and unchanged queue actions. Provider-source
+previews for one wonder and no wonders are saved in `tmp/gp_location_preview/`;
+the GP button and panel align with the city scene in all three layouts. Stable
+has no unknown bindings, contexts or textures in these samples. Standalone/M&T
+retain unrelated sample gaps for SOL income and M&T's native data/tooltips; the
+provider's GP bindings resolve. These previews do not execute queue clicks.
+
 ### Glorp compatibility declaration scope (2026-10-24)
 
 **[Runtime error log + vanilla source; native reload pending.]** The 17:11:07

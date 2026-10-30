@@ -25,6 +25,7 @@ from gen_market_unit_consumption import (  # noqa: E402
     _generate_values,
 )
 from gui_14_migration import migrate_location_gui  # noqa: E402
+from location_window_integrations import add_great_projects  # noqa: E402
 from tools.sol_demand_simulator.parser import (  # noqa: E402
     _collect_brace_block,
     load_vanilla_goods,
@@ -1182,37 +1183,8 @@ BUTTON_ANCHOR_RE = re.compile(
     r'\s*visible = "\[HasPopBreakdownIntelOn\(Location\.Self\)\]"'
 )
 
-SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-standard tooltip.
-\t\t\t\t\t\t\t\t\tnavigational_button_alt = {
-\t\t\t\t\t\t\t\t\t\tsize = {38 38}
-\t\t\t\t\t\t\t\t\t\tvisible = "[Location.HasOwner]"
-
-\t\t\t\t\t\t\t\t\t\tblockoverride "icon_texture" {
-\t\t\t\t\t\t\t\t\t\t\tpiechart = {
-\t\t\t\t\t\t\t\t\t\t\t\tparentanchor = center
-\t\t\t\t\t\t\t\t\t\t\t\tsize = { 70% 70% }
-\t\t\t\t\t\t\t\t\t\t\t\talwaystransparent = yes
-
-\t\t\t\t\t\t\t\t\t\t\t\thbox = {
-\t\t\t\t\t\t\t\t\t\t\t\t\twidget = {
-\t\t\t\t\t\t\t\t\t\t\t\t\t\tusing = layoutpolicy_expanding
-\t\t\t\t\t\t\t\t\t\t\t\t\t\ticon = {
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tsize = { 100% 100% }
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tparentanchor = center
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tname = "stat_sol_living_standard"
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t\ttexture = "gfx/interface/icons/sol/sol_living_standard.dds"
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t\ttexture_density = 2
-\t\t\t\t\t\t\t\t\t\t\t\t\t\t}
-\t\t\t\t\t\t\t\t\t\t\t\t\t}
-\t\t\t\t\t\t\t\t\t\t\t\t}
-\t\t\t\t\t\t\t\t\t\t\t\tusing = bg_circle_piechart
-\t\t\t\t\t\t\t\t\t\t\t}
-\t\t\t\t\t\t\t\t\t\t}
-
-\t\t\t\t\t\t\t\t\t\ttooltipwidget = {
-\t\t\t\t\t\t\t\t\t\t\tusing = StandardofLiving_tooltip
-\t\t\t\t\t\t\t\t\t\t}
-\t\t\t\t\t\t\t\t\t}
+SOL_BUTTON = """									# SOL-M&T compatibility insertion: shared location living-standard button.
+									sol_location_living_standard_button = {}
 
 """
 
@@ -1230,7 +1202,7 @@ def _render_location_gui() -> str:
     if len(matches) != 1:
         raise ValueError(f"Expected one M&T location button anchor, found {len(matches)}")
     text = text[: matches[0].start()] + SOL_BUTTON + text[matches[0].start() :]
-    return GENERATED_HEADER + text
+    return GENERATED_HEADER + add_great_projects(text, expected_queue_actions=0)
 
 
 def _render_outputs() -> Dict[Path, str]:
