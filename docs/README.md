@@ -7,6 +7,7 @@ Mod-focused documentation for the EU5 Modding Project.
 ### AI Workflow
 
 - [AI Tool Workflow Prompt (EU5)](guides/AI_Tool_Workflow_Prompt.md) — 3-Step Rule, Mandatory Reference Categories, Verification format
+- [EU5 GUI Modding Guide](guides/EU5_GUI_Modding_Guide.md) — in-game-verified GUI layout, texture, text and number-format rules; entry point for all GUI work and for the GUI renderer in `../ai_gui_assessment/`
 
 ### Knowledge (machine-readable, used by scripts)
 
@@ -28,6 +29,8 @@ Mod-focused documentation for the EU5 Modding Project.
 - SOL-PP Compatibility Submod: [English](discord_announcement_sol_pp_en.md) | [简体中文](discord_announcement_sol_pp_zh.md)
 
 ### Technical Reference (general EU5 knowledge, dated – not authoritative for syntax)
+
+- [SOL 1.4 Algorithm Atlas](analysis/sol_14_algorithm/index.html) — 六张中文算法与复杂度矢量图、交互工作量示意、当前源码与历史故障边界；[公式及源码索引](analysis/sol_14_algorithm/README.md)
 
 - [EU5 Multi-Mod Compatibility](technical/EU5_Multi_Mod_Compatibility.md) – file overwrite, database operation priority, and `INJECT`/`REPLACE` conflict rules
 - [EU5 Modding Knowledge Base](technical/EU5_Modding_Knowledge_Base.md) – Jomini engine overview, scripting, events, localization

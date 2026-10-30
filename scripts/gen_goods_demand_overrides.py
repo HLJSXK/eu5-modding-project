@@ -26,7 +26,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).parent.parent
-REF  = ROOT / "reference_game_files" / "game" / "in_game" / "common"
+REF  = ROOT / ".eu5-base" / "reference_game_files" / "game" / "in_game" / "common"
 SRC  = ROOT / "src" / "stable" / "in_game" / "common"
 
 # (vanilla relative path, output relative path)

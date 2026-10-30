@@ -51,8 +51,8 @@ performed the action.
 
 ## Sources
 
-- `reference_mods/3692202776/in_game/common/scripted_effects/cmf_log_effects.txt`
-- `reference_mods/3692202776/in_game/common/scripted_guis/cmf_log_scripted_gui.txt`
-- `reference_mods/3692202776/loading_screen/data_binding/cmm_macros.txt`
-- `reference_mods/3692202776/in_game/gui/cmm/panes/cmm_log_pane.gui`
+- `.eu5-base/reference_mods/3692202776/in_game/common/scripted_effects/cmf_log_effects.txt`
+- `.eu5-base/reference_mods/3692202776/in_game/common/scripted_guis/cmf_log_scripted_gui.txt`
+- `.eu5-base/reference_mods/3692202776/loading_screen/data_binding/cmm_macros.txt`
+- `.eu5-base/reference_mods/3692202776/in_game/gui/cmm/panes/cmm_log_pane.gui`
 - User-provided wiki text in this session

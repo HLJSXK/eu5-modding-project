@@ -28,14 +28,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INDEX_DIR = REPO_ROOT / "data" / "index"
 
 FONT_ICONS_FILE = (
-    REPO_ROOT / "reference_game_files" / "game" / "main_menu" / "gui" / "shared" / "font_icons.gui"
+    REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "main_menu" / "gui" / "shared" / "font_icons.gui"
 )
 MODIFIER_TYPES_FILE = (
-    REPO_ROOT / "reference_game_files" / "game" / "main_menu" / "common"
+    REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "main_menu" / "common"
     / "modifier_type_definitions" / "00_modifier_types.txt"
 )
-VANILLA_TRIGGERS_DIR = REPO_ROOT / "reference_game_files" / "game" / "in_game" / "common" / "scripted_triggers"
-VANILLA_EFFECTS_DIR  = REPO_ROOT / "reference_game_files" / "game" / "in_game" / "common" / "scripted_effects"
+VANILLA_TRIGGERS_DIR = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "in_game" / "common" / "scripted_triggers"
+VANILLA_EFFECTS_DIR  = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game" / "in_game" / "common" / "scripted_effects"
 MOD_TRIGGERS_DIRS = [
     REPO_ROOT / "src" / "stable" / "in_game" / "common" / "scripted_triggers",
 ]

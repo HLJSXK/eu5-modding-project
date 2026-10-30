@@ -1,5 +1,17 @@
 # EU5 debug-save population parser
 
+## Versioned obsession world exports
+
+`python -m tools.eu5_save_parser.world_export --archive data/saves/observer_archive --out tmp/obsession_worlds`
+reads completed archived text saves without changing them. It resumes existing exports and writes
+`obsession.world-snapshot/2` JSON plus a SHA-256 timeline per playthrough. Outputs include actual
+population, owner/capital, market boundaries and normalized resident merchant power, roads,
+proximity, market access, institutions, and resolved culture/religion keys. Numeric runtime
+identity references are joined through the save's definition managers; country official faith
+is kept separately from the capital's local faith. Active marriages and alliances are exported as separate hash-bound `obsession.world-relations/1` supplements. `world_export` includes them automatically; use `python -m tools.eu5_save_parser.relationships_export` to add/resume them for existing worlds without reparsing populations. Peace offers, opinion lists and inferred friendships are excluded. Original save size, mtime and SHA-256 are
+retained. Version 1 exports upgrade without rereading all population objects. Commodity trade
+quantities and guessed routes are deliberately excluded. This is separate from SOL solver analysis.
+
 This tool extracts only the data needed to study SOL's location-class
 compensation model. It supports **uncompressed text saves produced with debug
 mode enabled**; normal compressed/binary saves are rejected.
@@ -104,3 +116,27 @@ three soft total-penalty candidates to test whether a small total drift buys
 additional four-stratum improvements.
 The reports evaluate all four strata independently so an improvement in one
 cannot hide a worsening in another.
+
+## Decade autosave archiver
+
+The reusable watcher and behavioral tests are maintained in
+[`eu5-modding-base`](../../.eu5-base/docs/guides/Autosave_Archiver.md).
+This project keeps its original command as a thin compatibility launcher:
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON -m tools.eu5_save_parser.autosave_archiver
+```
+
+The default archive remains this project's
+`data/saves/observer_archive/<playthrough_id>/`; existing `archive_state.json`
+files resume unchanged. All existing options are forwarded. `--workspace`
+selects another project's default archive; `--out` overrides the output folder.
+SOL's parser, world exports and obsession analysis continue to use local saves.
+See the shared guide for polling, bucket alignment, disk reserve and game setup.
+
+Run the shared behavioral suite and local launcher checks together:
+
+```powershell
+& $env:EU5_PYTHON -m unittest tools.eu5_save_parser.test_autosave_archiver
+```

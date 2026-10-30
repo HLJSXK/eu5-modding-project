@@ -1,0 +1,271 @@
+# SOL GUI Modding Notes
+
+Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guide.md) first. This file records SOL-specific screen behavior, experiments, runtime evidence, and design decisions.
+
+## SOL scenario adapter
+
+### Glorp compatibility declaration scope (2026-10-24)
+
+**[Runtime error log + vanilla source; native reload pending.]** The 17:11:07
+log rejected `template` at line 6 of `SOL_lshud_glorp_compat.gui`, followed by
+cascading `{` and `=` errors. `gen_sol_lshud.py` now emits the preserved
+`SOL_lshud_legislative_efficiency_tooltip` at file scope before
+`Types SOLLivingStandardGlorpCompat`. Both Glorp widget bodies, their 36px
+offset and the legislative tooltip reference remain intact in stable and
+standalone. The shared parser rejects templates directly inside type groups;
+the local UI regression checks the declaration tree and tooltip composition.
+See the shared `gui_template_inside_types_group` rule for reusable evidence.
+
+### Estate hover, row visibility and ownerless locations (2026-10-24)
+
+**[Vanilla source + offline binding/layout tests; no in-game hot test, as requested.]**
+`gen_sol_ls_gui.py` owns the cache/display-name to estate-key map and shared
+`estate_context`, `estate_visible`, and `estate_tooltip` helpers. Estate labels
+bind the country government's estate object and use native `Estate_tooltip`;
+only the total balance row keeps `SOL_C_BALANCE_TOOLTIP` and its bilingual text.
+Whole estate rows use `ExistsForCountry`, as vanilla `shared/cards.gui:3908`
+does, so existing zero-population estates remain visible. This applies to
+stable/standalone location and country panels, PP/JTG overrides, HUD SOL/power/
+rank tables, and the map country ranking tooltip. Contexts are respectively
+`Location.GetOwner`, `Player`, and retained primary `Scope.GetCountry`.
+
+The stable, standalone and M&T location-window generators hide the entire SOL
+button with `Location.HasOwner`; ownerless locations have no SOL hover entry.
+Offline fixtures explicitly model estate existence independently of population.
+`test_sol_substitution_ui.py` checks shipped label contexts and buttons across
+targets; `test_sol_lshud_ui.py` checks HUD/map contexts and contradictory
+population/existence cases. Both retain Chinese/English render checks. Review
+images are in `../../ai_gui_assessment/images/estate_tooltips_20261024/`.
+Reusable API evidence, including `ShowGoodsName('key')`, lives in the shared
+anti-pattern registry and GUI guide; this update does not change goods labels.
+
+### Map modes and four-section navigation (2026-10-23)
+
+**[Source + offline scope execution/rendering; native hover/selection pending.]**
+`gen_sol_lshud.py` now owns all four `SOL_map_modes.txt` entries through
+`sol_map_modes_source.py`. The living-standard map reads `sol_location_sol`: annual liquid funds per thousand + SOL modifier. Values display directly; colors are red at 0, yellow at the population-weighted world average and green at 3× average (fallback reference 6 until a positive average exists). The situation data map uses the same factors and relative tooltip tiers (0.5× / 1× / 2×). Zero-baseline populations retain SOL.
+The local purchasing-power map uses liquid funds / baseline spending − 1,
+red/yellow/green at −100%/0%/+200%, neutral gray without baseline consumption.
+Its number is uncapped; only its color saturates.
+
+Substitution and rankings use country names and country tooltip contexts at all
+zoom levels. Substitution uses `owner.country_color`; ranking uses the cached
+overall percentile (best green, worst red; a sole ranked country is green).
+`SOL_map_tooltips.gui` registers `CountryMapTooltip_sol_substitution` and
+`CountryMapTooltip_sol_ranking`, reusing the third/fourth tooltip builders.
+A parent `[Country.MakeScope]` retains a primary `Scope`; adapting primary
+`Player` references to `Scope.GetCountry` keeps them stable when ladder rows bind
+peer `Country` objects. Localization also needs adaptation, including the panel
+generator's `SOL_SUB_SUMMARY`; changing direct GUI bindings alone is incomplete.
+
+Each HUD section keeps its existing tooltip, previews its map with
+`onmousehierarchyenter = "[PdxGuiWidget.PushMapModeOverride('...')]"`, and selects
+it through `GetMapMode('...').SetMapMode` on a single left click, following
+Glorp UI `location_window.gui:2617–2633`. Native dispatch examples are in
+`.eu5-base/reference_game_files/game/in_game/gui/cooltip.gui`; typed scope
+promotion is documented by `data_types_script.txt:438,1776`.
+Map menu icons are looked up by key (`MAP_MODES_ICON_PATH` + key + `.dds`). `gen_sol_lshud.py` builds all four from `assets/icons/sol_living_standard.png` via `compose_sol_mapmode_icons.variant_dds()`: the bowl, plus a lower-right badge (coins / up arrow / ⇄) for purchasing power, ranking and substitution. It must not copy the base DDS; the old copy step silently erased the badges (2026-10-24).
+
+`test_sol_map_modes.py` executes the shipped income/power/rank value paths,
+varies applied solver scales independently, and checks both targets' map
+contexts and icons. `test_sol_lshud_ui.py` renders foreign-country map tooltips
+in both languages, checks their primary identity and distinct spending/summary
+bindings, and retains all existing HUD/Glorp layout checks. Mock review images
+are in `../../ai_gui_assessment/images/map_modes_20261023/`.
+
+### Living Standard left-panel row (2026-10-18)
+
+**[Source and offline rendering; in-game acceptance pending.]** The latest design moves the persistent summary into a 570×36 row at `{ 0 130 }`, below the left panel's nine navigation buttons, and keeps the adopted contextual tooltip unchanged. Stable and standalone register a separate `layer = bottom` scripted widget. It hides while `LeftView.IsShown` or `LeftView.IsSideAttached`, follows `Animation_Show_Hide_UI`, and stable's SOL master switch still disables it. `scripts/gen_sol_lshud.py` owns both target GUIs, bilingual localization, ranking outputs and the Glorp UI compatibility shim.
+
+The current first-section contract is SOL and its same-month annual change, superseding the historical income readout. Population accumulation shares the SOL pass, current values are available immediately, and new `sol_ls_sol_sample_*` histories cannot read legacy income baselines. See `SOL_Topbar_HUD_Implementation_20261017.md` for the runtime contract.
+
+When Glorp UI is installed, the generated `SOL_lshud_glorp_compat.gui` wraps its current `left_panel_info_bar` and `left_panel_info_toggle` source type bodies and shifts them down 36px. SOL must load after Glorp UI so its duplicate type names win; no vanilla or Glorp path is replaced, and the shim is unused without Glorp. **[实机错误日志 + 源, 2026-10-23]** Current vanilla comments out `legislative_efficiency_tooltip`, so the generator restores its still-supported modifier/localization content as `SOL_lshud_legislative_efficiency_tooltip` and rewrites that one copied reference. The old reference produced an empty tooltipwidget in our shim. The offline UI regression renders the actual Glorp composition, checks the shifted bar/toggle, and requires the legislative tooltip and its modifier-source textcontext without the missing-template warning. Native hover, UI scaling, scripted-widget hit testing, hide/show animation, and actual Workshop load order still require in-game confirmation.
+
+`ai_gui_assessment/renderer/run.py` retains the SOL presets `situation`, `location`, `tooltip`, `goods_tooltip`, `event`, `market`, `government`, `battle`, `ui_library`, and `proto`. It loads the reusable renderer from `.eu5-base`, reads the installed game's textures, fonts, and localization, and overlays `src/stable` GUI files. Render output and element trees go to `ai_gui_assessment/images/` by default; set `EU5_RENDER_OUTPUT_ROOT` to choose another directory. Set `RENDER_EXTRA_ROOTS` for compatibility DDS assets outside the selected mod root. At 1080p and UI scale 100%, some SOL situation-panel and location-window regions match in-game screenshots, and the SOL location tooltip frame is approximately 550px wide; no screen-wide pixel-accuracy claim applies. For new SOL screens, add mock data to `renderer/scenarios.py` or `renderer/scen_location.py`.
+
+### Four-section HUD migration (2026-10-18)
+
+The formal `SOL_lshud.gui` output now uses the reviewed four-section row from `ai_gui_assessment/prototypes/living_standard_4sections`: living standard/YoY, purchasing power, discounted goods/substitution, and world ranking, each with its own contextual tooltip. `gen_sol_lshud.py` emits the same GUI, bilingual localization, registration, and Glorp compatibility shim for stable and standalone; custom tier DDS assets are shipped in both targets. The new estate ranking caches are generated by `sol_lshud_ranking_source.py` and covered by the ranking tests.
+
+Section 3 shows the first six goods with country substitution multiplier > 1. Selection runs in `sol_refresh_substitution_hud_goods` after the existing country substitution refresh, in fixed goods order, and stores at most six localized icon flags (`sol_sub_hud_good_1..6`). The HUD has only six text slots: one substitution-status script value, six existence checks and at most six localized flag reads; it does not evaluate goods multipliers or count earlier matches during GUI refreshes. `GetFlagName` is consumed as display text through localization, never as a raw texture/key. Rebuilds clear unused slots, and the existing country cleanup/CMF toggle clears the cache; old saves fill it on their next substitution refresh. No new world, market or location traversal is added. Fewer qualifying goods produce fewer icons; inactive/pending/no-positive-goods states stay empty while retaining the tooltip and map actions. Six 24-unit slots with 1-unit gaps fit the 168-unit section. Offline tests execute the generated cache effects and render their localized results for both targets/languages; native performance/hover acceptance remains pending.
+
+```powershell
+$env:PYTHONUTF8='1'
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py situation
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py ui_library windows windows=tooltips
+& $env:EU5_PYTHON ai_gui_assessment/renderer/run.py proto <file.gui> <template_or_type> <mocks.json> [out]
+```
+
+The `proto` JSON supports `script_values`, `gvm`, `paths`, and `scenario`; explicit mock keys override the scenario. Missing script-value mocks are reported rather than replaced with zero. The actual game remains the authority when a static render differs; record comparisons in `ai_gui_assessment/08_round2_results.md`.
+
+### Historical income tooltip table bounds (superseded by SOL, 2026-10-23)
+
+**[User runtime screenshot + source arithmetic; corrected layout verified offline, runtime acceptance pending.]**
+The income table's columns and left spacer totaled 418 units while its gold outline and
+zebra backgrounds were 460 units wide. The screenshot's approximately 21-unit left gap
+agrees with half of that shortfall; the exact engine centering path remains inferred.
+The header and all data rows now explicitly expand across the same 460-unit content
+width with zero spacing: 6-unit padding, columns of 96/64/108/90/90 units, and 6-unit
+right padding. The last column right-aligns the arrow immediately before the annual
+percentage in one text run. Missing annual data replaces that column with a 90-unit
+placeholder, preserving the budget. The tooltip retains its native 10-unit content margins.
+The narrower estate column frees space for annual income and per-capita income, whose
+textboxes also reserve a 6-unit left gutter. Nine-digit annual income and per-capita
+values of 99999.99 retain their coin icons and fit at 11-point type in offline checks.
+
+`test_income_table_fills_content_and_stays_inside_frame` checks the shipped stable and
+standalone GUIs in Chinese and English, with and without annual data. It verifies
+intrinsic in-flow widths as well as declared rectangles, large-number ink widths, header alignment, and all row
+descendants including decorative borders. Review images are saved under
+`../../ai_gui_assessment/images/income_columns_20261023/`.
+
+### Separate substitution-level icon row (2026-10-23)
+
+**[User screenshot + native icon definitions; offline rendering, runtime acceptance pending.]**
+The tiny +/- corner overlay has been replaced by a separate 18-unit indicator row
+below each 18-unit goods image. Cells are 18x36 and cards are 122x66; wrapped goods
+rows advance by 37 units. This keeps the native 16-unit glyph clear of the artwork.
+The seven icons are `arrow_malus_tier_3/2/1`, `price_stable`, and
+`arrow_bonus_tier_1/2/3`, registered in vanilla `font_icons.gui:947,2084-2134`.
+The row contains icons only. Parent hover still exposes the existing country multiplier.
+
+These are seven visual bands of the actual country substitution multiplier `m`,
+not the separate market-price weights: `m<0.5`, `0.5<=m<0.75`, `0.75<=m<1`, `m=1`,
+`1<m<=1.25`, `1.25<m<=1.5`, `m>1.5`. Small changes retain their direction rather than
+being rounded to neutral. Every CORE grouped good gets its country indicator after
+initialization, including unavailable local goods, whose image remains dim. Disabled
+and pending calculations show no level; compatibility-only ungrouped goods have no
+substitution indicator. Supply counts, bars, memberships and contextual data are unchanged.
+
+The shared renderer feeds stable, standalone, PP/JTG, the HUD and country-map tooltips;
+M&T inherits the base UI. Regressions cover all seven icons and exact boundaries,
+initialization, actual visible pixels, separate row alignment and complete tooltip bounds.
+Review images are saved under `../../ai_gui_assessment/images/substitution_levels_20261023/`.
+
+### SOL first-section migration (2026-10-23)
+
+**[Source + offline scope execution/rendering; in-game alignment pending.]** The first section and tooltip now read SOL and its annual change, with a four-column estate/population/SOL/change table. Population weights share the SOL accumulator; national income aggregation and retired GUI/localization emitters are removed. The new `sol_ls_sol_sample_<month>_*` namespace prevents old income baselines from producing false SOL changes. Missing population or comparisons retain their pending states. Building bonuses affect SOL change without changing demand.
+
+The existing approved house DDS is registered in `SOL_font_icons.gui` (20×20, offset 0/4, font 16), matching native `font_icons.gui` defaults and the verified custom-texticon pattern in `reference_mods/3599735023/in_game/gui/IV2_texticons.gui:7`. The first-section badge needs no additional unit icon; tooltip 1 and ranking amounts use `@sol_living_standard!`. The active prototype and shipped-target UI tests render Chinese/English, large values and pending comparisons. Native baseline alignment, hover and scaling still need game screenshots.
+
+## SOL examples behind shared rules
+
+- The bare `widget` has no `sol_good_tooltip` block. SOL goods cells assign `tooltip` directly; a location hover uses `Location.GetOwner.MakeScope`, whereas country goods use the panel country. Only the location surface has a market price weight, so the generic goods tooltip keeps static membership.
+- Final-row spacer widgets in SOL goods grids keep fixed children aligned when an `hbox` distributes extra space. A six-icon SOL group row budgets 216px for icons; check descendant positions as well as its measured width. Estate mini-cards set `autoresize = no` and separate funds from baseline to preserve large figures.
+- An inherited `blockoverride` cannot carry five different values into five siblings: each retains its own default. SOL uses a per-row `block "sol_cells" {}` so each emitted child carries its own override. An earlier attempt appended five cells beside five defaults and silently rendered ten.
+
+2026-10-13 SOL dashboard corrections:
+
+- **[实机错误日志 + 源] GUI arithmetic is typed.** Scope.ScriptValue returns CFixedPoint; Multiply_float returns float. Feeding the latter to FixedPointToInt causes FetchData failures. Keep dial calculations in *_CFixedPoint until integer conversion. The renderer now reports this mismatch.
+- **[实机错误日志 + 源] A bare numeric binding such as max = "[1]" is invalid.** It produces an empty function call. Use max = 1; constants inside function arguments use explicit typed literals.
+- **[实机错误日志 + 源] Text formatting is not valid inside numeric properties.** Population slices using `ScriptValue(...)|+0` produced ten statement-parser errors in the 16:53 log. Use `[FixedPointToFloat(Scope.ScriptValue(...))]` for each slice value (vanilla location_window.gui:1455); keep `|+0` in legend text. The renderer now rejects unquoted format suffixes in numeric bindings.
+- **[实机错误日志 + 源] Separate a format tag from punctuation with whitespace.** `#R-[expense|+2]#!` and `#E/[target|+0]#!` produced unknown formatting tags when the ledger opened at 17:03. Use `#R -[expense|2]#!` (vanilla cooltip.gui:3479) and `#E /[target|0]#!`; plain number formats keep the enclosing colour. The renderer now flags these missing separators.
+- **[实机错误日志] Generated and handwritten vocabulary must not define the same key.** SOL_GUI_SECTION_POP and SOL_GUI_SECTION_CONSUMPTION now have one owner in SOL_ls_ui localization, for each language and target.
+- **[1.4.3 changelog + 源] SOL resolution messages use `main_menu/gui/messagetypes/SOL_messages.txt`.** `gen_sol_messages.py` emits only SOL's recalculation type for stable/standalone and removes its old generated `gui/messagetypes.txt`. Vanilla now uses `gui/messagetypes/00_messagetypes.txt`; copying vanilla entries into the new folder would produce duplicate ids. Compatibility submods inherit registration from SOL. The previous fixed-path advice applied to older versions; native registration still needs a fresh runtime check. See the shared knowledge base's Generic Action Message Types section for the engine contract.
+- **[截图症状 + 源] Supply noprogresstexture explicitly.** Vanilla supplies the empty texture; the installed progressbar shader samples Texture1 for the empty region. A parent background does not supply this sampler. Missing it accompanied solid lime bars; the exact fallback colour is not established as a general rule.
+- **[源] SOL tax/power weights are amounts.** Divide effective weights by local_total_tax_share before percent formatting; use the singular commoner key. A zero consumption baseline displays “无消费” with a neutral dial.
+- **[推，渲染检查] Budget the complete framed tooltip.** The F dashboard initially measured 1244px high. Compact repeated figures, use a two-column population legend and split oversized compatibility goods groups. Chinese/English previews at 100% measure 484×1003 (stable/standalone), 484×1028 (PP) and 484×1078 (JTG), including the frame. These are static previews, not new in-game measurements; larger UI scales need in-game checking.
+- **[源] Diagnostics refresh independently of optional solver preparation.** gls_accumulate_panel_stats aggregates estate display caches in its existing traversal, including small countries and disabled solvers.
+- **[工具检查] Missing SOL script-value mocks are reported, not defaulted to zero.** A zero unknown-expression count must not hide missing estate funds/baseline data.
+- **[源] Standalone must ship its shared GUI types.** The build mirrors only the selected target directory. `gen_sol_ls_gui.py` copies stable's shared kit into standalone and includes it in `--check`; loading stable types during preview does not prove standalone packaging.
+
+2026-10-13 substitution integration:
+
+- **[源 + 渲染像素检查] Full and dim icons must be mutually exclusive.** Drawing an alpha-0.3 copy over an opaque icon leaves the original bright. Bind the full copy to the cached supply condition and the dim copy to its inverse; verify the pixels as well as the properties. SOL's `sol_market_consumes_*` maps record supply, so dimming means no cached supply, not a shortage or zero demand.
+- **[数据源 + 渲染检查] Labelled groups show every membership.** `goods_weights.csv` contains 56 unique goods and 67 memberships across 20 groups. `ordered()` uses the primary group to order a unique list; `group_rows()` shows an overlapping good in each of its groups. Repeated icons do not repeat spending. PP/JTG extras stay in the ungrouped tail.
+- **[官方 API + 原版源 + 离线检查] Missing market weights are pending data, not neutral prices.** Check `GetVariableFromGlobalVariableMap(...).IsSet` (data_types_script.txt:34,3427), then use `SelectLocalization` (goods_details.gui:135) to choose the location price snippet or pending text. Only the location hover has a market; country goods use `Player.MakeScope` for the multiplier and the generic goods tooltip keeps static memberships.
+- **[模组源 + 离线检查，实机悬停待验收] Show substitution lifecycle explicitly.** The guarded display value distinguishes disabled, enabled awaiting a snapshot, and initialized. Country goods show a compact refresh-year / eligible-count / largest-absolute-modifier summary; the last metric includes external demand offsets and differs from the substitution multiplier. Each grouped good now has a native seven-level icon beneath it after country initialization, including locally unavailable goods; the goods image itself retains its supply dimming. Hover text explains the country scope and annual/full-refresh market cache.
+
+`scripts/test_sol_substitution_ui.py` reads the shipped templates and installed game assets. It checks
+all memberships, supply pixels, localized hover content, missing-cache text, lifecycle summaries, and
+Chinese/English framed tooltip bounds for stable, standalone, PP and JTG. M&T inherits the base goods UI.
+It uses mock values and does not execute engine hover or demand updates. To save review images:
+
+```powershell
+$env:PYTHONUTF8='1'
+$env:SOL_UI_PREVIEW_OUT='../../ai_gui_assessment/images/substitution_integration'
+& $env:EU5_PYTHON scripts/test_sol_substitution_ui.py
+```
+## 5. Engine behaviour of SOL's screens
+
+| Rule | Level |
+|---|---|
+| Lateral panel at 1080p / UI scale 100%: 570 × 950 (1080 − topbar 40 − panel bar 90). | 实机 |
+| A tooltip taller than the space below its anchor is shifted up so its bottom edge touches the screen bottom; it is not clipped or scaled. | 实机 |
+| Situation panel action cards come from `generic_actions` with `type = situation`, **not** from resolutions. A resolution appears only via the situation's `resolution =` / `voters =` or a custom `scripted_action_tooltip` button. | 源 |
+| Situation mapmode switching must use `trigger_on_create` + `PdxGuiWidget.PushMapModeOverride`; `_show` does not fire for a widget created visible. | 源 |
+| Panel structure of SOL's three screens: [`ai_gui_assessment/03_sol_screens_anatomy.md`](../../ai_gui_assessment/03_sol_screens_anatomy.md). | 源 |
+### 2026-10-14 F runtime screenshot corrections
+
+- **[Runtime screenshot + official API]** Fractional float stretch weights made all estate markers coincide. Vanilla `SocietalValueItem.GetInertiaCapWeight` returns int32. Use scaled integer weights and hide zero-weight spacers; give population/income markers independent full tracks. Renderer rejects float weights; boundary positions are regression tested. New in-game confirmation is pending.
+- **[Runtime screenshot; cause inferred from layout/source]** A fixed label in an unconstrained `size = { -1 17 }` header collapsed to ellipsis. Set positive widths for header, label and count. Fixed card policy prevents a lone card expanding to full row width. Width/height checks alone do not prove visible labels or non-overlapping descendants.
+- **[Mod source]** Funds/baseline minus one is distinct from the final country-solver demand coefficient. By explicit user decision, all SOL GUI consumption balances use raw location alpha (displayed as alpha minus one); the country panel aggregates raw funds and baseline. Do not display country-solver beta or final/applied demand in panels or their tooltips. The location modifier retains the actual applied result. Goods count/gold line reflect cached supply, not consumption.
+
+
+### Current SOL layout decision: compact sheet C balances (2026-10-15)
+
+**User-directed design, source-backed bars, offline preview checked; new runtime confirmation pending.**
+SOL shows three purchasing-power values per row: raw alpha minus one, available funds, baseline consumption. The total and five estates use centered signed bars with a linear scale on each side of zero and one shared numeric ruler (-100%, -50%, 0%, +100%, +200%) above the estate rows. Every track keeps two short minor ticks and a fixed two-unit-wide zero line. Labels, tracks and right-aligned values share columns. Estate rows are 42 units high with 18-point percentages and an 11-point gray funds / baseline pair underneath; its bilingual tooltip explains the ordering. The 64-unit total row has a faint gold background and one-unit gold outline, a 12-unit bar (estate bars: 8), and a 24-point percentage. No numeric scale is repeated inside individual rows. For funds/base `q` in 0..1, negative fill is `1-q` and cursor position is `q/2`; positive raw balance `c=q-1` in 0..2 uses fill `c/2` and cursor position `1/2+c/4`. Zero funds reaches -100%, baseline reaches centered 0%, and three times baseline reaches +200%. A zero baseline shows no consumption and a neutral bar. Preserve alpha-only scope; beta is visible via the actual location modifier, not these rows.
+
+All dials, population/income charts, steel/gold share markers, income/population ratios and explanatory paragraphs are temporarily removed. Required/daily/luxury goods tiers are retained. The compatibility filename data/sol_ui_f_spec.yaml now describes this sheet C + F goods layout (schema 2); do not restore F charts solely because older audit documents request them. Current bilingual previews are in ../../ai_gui_assessment/images/purchasing_power_fix_20261022/linear/; these use mock data, and new in-game confirmation is pending.
+
+### Purchasing-power axis correction (2026-10-22)
+
+**[Runtime screenshot + generator source; corrected layout checked offline, in-game acceptance pending.]**
+The screenshot exposed a ruler shifted to the right, labels using a linear negative branch,
+and positive labels/ticks using half the fill's raw input. The shared generator now places
+the ruler in a fixed full-width row at the same explicit column origin as every track.
+The suspected runtime handling of the former unsized hbox spacer remains an inference;
+the replacement does not depend on it. After the user's subsequent request for linear halves, the ruler, ticks, fill and cursor
+use one piecewise-linear mapping: -100%, -50%, 0%, +100%, +200% are at 0%, 25%, 50%, 75%,
+100% of track width. Zero stays centered while -50% and +100% bisect their respective halves.
+Endpoint labels stay centered on the ends; 10-point labels have 40-unit text boxes above
+the 244-unit track within the 500-unit row. Values retain their right edge and full raw values.
+Minor ticks, zero line, cursor and fill share a vertical center. With no baseline,
+both fills are empty and the cursor stays at 0%, including the 0 / 0 case.
+
+`gen_sol_ls_gui.py` and its HUD consumer regenerate stable/standalone, country/location
+surfaces, and PP/JTG overrides together; M&T inherits the base UI. Bilingual layout
+regressions compare all labels and ticks with the linear fill, cover its endpoints and
+no-consumption state, and save review images under
+`../../ai_gui_assessment/images/purchasing_power_fix_20261022/linear/`.
+
+### Sheet C goods tooltips (2026-10-15)
+
+**[Vanilla/official source; offline bilingual previews; in-game confirmation pending.]**
+The actual goods tooltip is separate from the SOL basket cells' string hover.
+`goods_details` is shared by `Goods_tooltip`, `Goods_Cards_tooltip` and
+`SpecificGoodsMarket_tooltip` (production_tooltips.gui:458/495; market_tooltips.gui:1515).
+It shows tier/group labels and all member icon/name chips, including the hovered good,
+plus the seven static price preferences. Goods outside the membership table hide
+the complete substitution section: heading, dividers, membership rows, price
+preferences and the substitution market-price ratio. Gate on static membership,
+not a market's current supply or cached consumption, so grouped goods still show
+their alternatives when locally unavailable. The separate basket-cell hover keeps
+its ungrouped string for compatibility goods.
+Visibility uses an explicit allowlist from `goods_weights.csv`: extra goods from
+other mods and unknown/default/empty keys hide the section even when no
+`SOL_GOOD_SUB_<key>` localization exists. No fallback text or substitute data is
+evaluated for those goods. Bilingual regressions cover all three tooltip types.
+
+`block "sol_goods_price_context"` defaults to the static legend. Only the market
+use site supplies its override: vanilla already binds `Market.GetMarketEntry(Goods.Self)`.
+The generator owns that complete vanilla path and preserves every other block.
+The live ratio divides `Market.GetPrice(Goods.Self)` by `Goods.GetDefaultMarketPrice`
+(both CFixedPoint, official data_types_uncategorized.txt:98436/76572); guard zero base price
+and invalid markets. It is a live reference price, not the cached applied country
+multiplier. Preference boundaries match sol_substitution.py:29, including strict
+comparisons at 0.40/0.65/0.85/1.30/1.70/2.30; column tooltips spell out full intervals.
+The market-only `SOL_goods_market_price_tiers` highlights exactly one current
+tier with a 1 GUI-unit gold outline and a faint gold fill, drawn as a sized
+`ignore_layout = yes` child before the text. Four flat edge widgets use
+`color_gold_texture` (window_components.gui:26); the beveled `bg_square_gold_tile`
+was too heavy in the user's runtime screenshot. Compare the live price directly
+against `Multiply_CFixedPoint(base_price, threshold)`, matching the runtime;
+formatting or rounding the ratio first can select the wrong boundary tier.
+Generic/card legends have no active tier, and invalid markets, zero base prices
+and ungrouped goods have no highlight. Regression checks cover all seven tiers,
+every boundary and the actual selected-column pixels. In-game confirmation remains pending.
+Review images are in `../../ai_gui_assessment/images/sheet_c_goods/`. Generate them with
+`SOL_UI_PREVIEW_OUT` and `scripts/test_sol_substitution_ui.py`; the renderer CLI also
+accepts `run.py goods_tooltip wine 1.42` for a market preview.

@@ -684,6 +684,8 @@ main 对应的独有成本 =
 
 这个表说明了两个容易混淆的事实：beta 的 raw 计算保留了共享地点基线，但在同一个地点缓存阶段附加了分类数据；而 `B` 中 1,461 个 minimax 顶点入口只在满足人类国家路径和 active-set 预筛的国家中被调用，不能把 1,461 乘到所有国家或所有地点上。
 
+> 2026-10-27 更正：EU5 在 `-debug_mode` 下有原生脚本 profiler（`Script.Profiling.*`），首份实测见 `SOL_Profiler_Analysis_20261027.md`；本节“缺少 profiler”的判断已过时，原文保留作历史记录。
+
 在没有 EU5 profiler/frame-time 采样前，不能把这些静态操作换算成 CPU 百分比或毫秒。但从调用次数已经能确定：beta 对 `10,366` 个有效地点至少增加分类/聚合和最终诊断扫描；main 只有每地点一次旧 poverty apply。故“beta 国家级算法已经比 main 地点级算法更轻、所以 main 才是热点”目前没有证据，反而更合理的待测假设是：共享 raw 可能是共同热点，beta 的国家级增量由地点分类/聚合扫描和人类 minimax 候选组成，main 的增量是旧 poverty apply。必须用同一月度脉冲的游戏 profiler 或显式分段计时日志验证三者占比。
 
 ## 8. 可追踪的运行日志字段

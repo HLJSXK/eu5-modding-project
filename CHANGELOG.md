@@ -5,10 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Added the SOL-JTG compact compatibility target for Just Brass, Just Meat, Just Soap, Just Spices, and Just Cheese. It applies SOL-style per-stratum demand scaling with clean magnitude-aware rounding to 22 new goods, fully negates their source wealth/development demand gates, and includes them in SOL market accounting and both goods panels.
+- Added local SOL gameplay feedback: migration attraction rises by 0.02 per SOL up to +0.5 at 25 SOL; population growth changes by -0.1 percentage points below 0.1 SOL and +0.1 percentage points above 10 SOL. Existing monthly application and AI calculation cadence are preserved, with bilingual modifiers and SOL-disable cleanup across compatibility callbacks.
+- Corrected the SOL formula and population weighting: annual liquid funds per thousand + SOL modifier (floor 0), displayed as an amount in titles and rankings. Tribesmen retain SOL without baseline baskets. Both living-standard maps use world-relative colors (0 / average / 3× average; positive fallback 6). Purchasing power and demand remain unchanged.
+
+- Separated living standard (SOL) from purchasing power. Purchasing power (available funds / baseline consumption) remains the only demand input; living standard is annual liquid funds per thousand people plus an annual per-thousand SOL modifier, with modifier hooks currently zero. This prepares buildings that raise living standard without adding spendable money.
+- Added the SOL-JTG compact compatibility target for Just Goods (`3785316314` / `moveably.goods`). It applies SOL-style per-stratum demand scaling with clean magnitude-aware rounding to 26 direct-demand goods, fully negates their source wealth/development/regional demand gates, and includes them in SOL market accounting and both 81-good panels.
 - Built the Glorp UI version of `location_window.gui` directly into the main SOL target without adding runtime dependencies. SOL vendors the required extracted vanilla types and its own zoom-button type, removes external Construction Manager automation calls, and adds the SOL income display and Living Standard tooltip button on top.
 
 ### Changed
+- Replaced the HUD's obsolete annual net income per thousand with living standard and its same-month annual change. Removed country income aggregation and retired HUD code, fused population weights into SOL accumulation, isolated new SOL history from legacy save samples, and added a dedicated unit icon to SOL tooltip amounts. Purchasing power and location income inputs are preserved.
+- The HUD living-standard tier, the world ranking and the SOL living-standard map (map mode and situation map) now use living standard instead of per-capita income. The purchasing-power HUD section, purchasing-power map and the panel bars still show purchasing power.
+- Migrated the SOL-JTG compatibility target to the merged Just Goods Workshop mod (`3785316314` / `moveably.goods`), expanding coverage to 26 direct-demand goods including the new clocks goods and neutralizing Just Goods regional demand modifiers.
 - Changed all SOL release targets to date-based `YYMMDD` mod versions, stamped automatically by the build workflow while keeping the EU5 compatibility version separate.
 - Removed every development-based pop-demand constraint: the engine-wide development multiplier is now zero, all nine vanilla per-good development thresholds are fully negated, PP `victuals` is handled by the compatibility generator, and SOL no longer carries development-adjusted spending through its runtime or UI.
 - Synced vanilla reference files under `reference_game_files/` to EU5 version 1.1.10.

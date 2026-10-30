@@ -52,7 +52,7 @@ INDICATOR_GROUPS: List[Tuple[str, List[str]]] = [
     ("medicine",          ["medicaments", "mercury"]),          # mercury primary here; secondary in DEMAND_GROUPS ritual
     ("ritual",            ["incense"]),
     ("weapons",           ["weaponry", "firearms"]),
-    ("mounts",            ["horses", "elephants"]),
+    ("mounts",            ["horses", "camels", "elephants"]),
     ("knowledge",         ["paper", "books"]),                  # paper primary here; secondary in DEMAND_GROUPS household
 ]
 
@@ -101,7 +101,7 @@ DEMAND_GROUPS: List[Tuple[str, List[str]]] = [
                            "mercury"   # secondary (primary: medicine)
                            ]),
     ("weapons",           ["weaponry", "firearms"]),
-    ("mounts",            ["horses", "elephants"]),
+    ("mounts",            ["horses", "camels", "elephants"]),
     ("knowledge",         ["paper", "books"]),
 ]
 
@@ -121,7 +121,7 @@ GOOD_NAMES_ZH: dict = {
     "wheat": "小麦", "rice": "大米", "millet": "杂谷", "maize": "玉米",
     "potato": "土豆", "legumes": "豆类", "olives": "橄榄", "fruit": "水果",
     "fish": "鱼类", "wild_game": "野味", "livestock": "牲畜",
-    "horses": "马匹", "elephants": "大象", "weaponry": "武器", "firearms": "火器",
+    "horses": "马匹", "camels": "骆驼", "elephants": "大象", "weaponry": "武器", "firearms": "火器",
     "coal": "煤炭", "salt": "盐",
     "lumber": "木材", "masonry": "砖石", "tools": "工具", "pottery": "陶器",
     "furniture": "家具", "porcelain": "瓷器", "lacquerware": "漆器",
@@ -140,7 +140,7 @@ GOOD_NAMES_EN: dict = {
     "wheat": "Wheat", "rice": "Rice", "millet": "Millet", "maize": "Maize",
     "potato": "Potato", "legumes": "Legumes", "olives": "Olives", "fruit": "Fruit",
     "fish": "Fish", "wild_game": "Wild Game", "livestock": "Livestock",
-    "horses": "Horses", "elephants": "Elephants", "weaponry": "Weaponry", "firearms": "Firearms",
+    "horses": "Horses", "camels": "Camels", "elephants": "Elephants", "weaponry": "Weaponry", "firearms": "Firearms",
     "coal": "Coal", "salt": "Salt",
     "lumber": "Lumber", "masonry": "Masonry", "tools": "Tools", "pottery": "Pottery",
     "furniture": "Furniture", "porcelain": "Porcelain", "lacquerware": "Lacquerware",
@@ -202,7 +202,7 @@ INDICATORS_FILE       = ROOT / "src/stable/in_game/common/script_values/SOL_subs
 GROUP_INDICATORS_FILE = ROOT / "src/stable/in_game/common/script_values/SOL_substitute_group_indicators.txt"
 LOCALIZATION_FILE     = ROOT / "src/stable/main_menu/localization/english/SOL_substitute_goods_l_english.yml"
 LOCALIZATION_FILE_ZH  = ROOT / "src/stable/main_menu/localization/simp_chinese/SOL_substitute_goods_l_simp_chinese.yml"
-GOODS_DIR             = ROOT / "reference_game_files/game/in_game/common/goods"
+GOODS_DIR             = ROOT / ".eu5-base/reference_game_files/game/in_game/common/goods"
 GUI_OVERRIDE_FILE     = ROOT / "src/stable/in_game/gui/z_SOL_goods_tooltip_override.gui"
 
 # ── Scarcity score ────────────────────────────────────────────────────────────

@@ -1,20 +1,19 @@
 # SOL-JTG Compact Compatibility Submod
 
 This target is a late-loading compatibility layer for Standard of Living and
-the five Just Trade Goods mods. It is not a standalone mod.
+Just Goods. It is not a standalone mod.
 
 Load order:
 
 1. Community Mod Framework
-2. Just Brass, Just Meat, Just Soap, Just Spices, and Just Cheese (any order)
+2. Just Goods
 3. Standard of Living
 4. SOL-JTG Compatibility Submod
 
-All five JTG mods are required. Just Spices currently has an empty metadata ID,
-so it cannot be declared as a formal dependency and must be enabled manually.
+Just Goods is required as a formal dependency.
 
-The submod applies SOL's approximate per-stratum demand scaling to the 22 JTG
-goods that have direct pop demand:
+The submod applies SOL's approximate per-stratum demand scaling to the 26 Just
+Goods goods that have direct pop demand:
 
 - nobles: 1.05
 - clergy: 0.45
@@ -29,14 +28,15 @@ use 0.01 increments, then smaller values use 0.001, 0.0001, or 0.00001
 increments. This keeps the visible balance values compact without erasing the
 small commoner quantities.
 
-Every `wealth_impact_threshold` supplied by the five JTG mods is fully negated,
-matching SOL's development-independent and income-driven demand model. The
-current JTG sources define no `development_threshold`; the checked-in data and
-Workshop audit track that field so a future JTG gate cannot be missed silently.
+Every `wealth_impact_threshold`, `development_threshold`, and regional demand
+modifier supplied by Just Goods on those direct pop-demand goods is fully
+negated, matching SOL's development-independent and income-driven demand model.
+The checked-in data and Workshop audit track these fields so future Just Goods
+gates cannot be missed silently.
 
 Slave demand remains owned by the JTG mods and is not changed. The compatibility
-layer also adds the 22 final quantities to SOL's market unit-spending cache and
-shows all 77 SOL + JTG demand goods in both SOL goods panels.
+layer also adds the 26 final quantities to SOL's market unit-spending cache and
+shows all 81 SOL + JTG demand goods in both SOL goods panels.
 
 The SOL-JTG and SOL-PP compatibility submods replace the same two SOL scripted
 effects and are mutually exclusive. A combined PP + JTG stack requires a

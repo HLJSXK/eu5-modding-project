@@ -8,7 +8,7 @@ This note summarizes practical AI-assisted programming techniques validated duri
 
 - Always confirm vanilla keys and scope before implementing formulas.
 - Typical workflow:
-  - locate original key usage in `reference_game_files/game/in_game/common/**`
+  - locate original key usage in `.eu5-base/reference_game_files/game/in_game/common/**`
   - confirm whether a value is trigger-only, script-value, or UI-only getter
   - only then design the mod-side implementation
 

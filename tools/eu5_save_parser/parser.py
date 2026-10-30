@@ -75,7 +75,7 @@ _POP_FIELD_PATTERNS = {
 }
 _LOCATION_DIRECT_FIELD_RE = re.compile(
     rb"(?m)^\t{3}"
-    rb"(owner|controller|market|province|rank|raw_material|development|control)"
+    rb"(owner|controller|market|province|rank|raw_material|development|control|culture|religion|proximity|market_access|road_to_capital)"
     rb"=([^\s{}]+)\r?$"
 )
 _LOCATION_POPS_RE = re.compile(
@@ -134,6 +134,12 @@ class LocationRecord:
     control: float | None
     pop_ids: tuple[int, ...]
     sol_variables: Mapping[str, float] = field(default_factory=dict)
+    culture: str | None = None
+    religion: str | None = None
+    proximity: float | None = None
+    market_access: float | None = None
+    road_to_capital: bool | None = None
+    institutions: Mapping[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +154,9 @@ class ParsedSave:
     populations: Mapping[int, PopulationRecord]
     locations: tuple[LocationRecord, ...]
     diagnostics: Mapping[str, int]
+    culture_names: Mapping[str, str] = field(default_factory=dict)
+    religion_names: Mapping[str, str] = field(default_factory=dict)
+    religion_groups: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def population_types(self) -> tuple[str, ...]:
@@ -246,6 +255,29 @@ def _parse_country_tags(
         int(match.group(1)): _decode(match.group(2))
         for match in _COUNTRY_TAG_RE.finditer(view, tags_start, tags_end)
     }
+
+
+def _parse_identity_definitions(view, section, definition_key):
+    """Runtime culture/religion ids are database refs, not script keys."""
+    try:
+        a,b=_top_level_bounds(view,section)
+    except SaveFormatError:
+        return {},{}
+    starts=list(_POP_RECORD_RE.finditer(view,a,b))
+    definition=re.compile(rb'(?m)^\t'+definition_key.encode()+rb'=([^\s{}]+)\r?$')
+    name=re.compile(rb'(?m)^\tname="([^"\r\n]+)"\r?$')
+    group=re.compile(rb'(?m)^\tgroup=([^\s{}]+)\r?$')
+    names,groups={},{}
+    for index,match in enumerate(starts):
+        end=starts[index+1].start() if index+1<len(starts) else b
+        key=definition.search(view,match.end(),end) or name.search(view,match.end(),end)
+        if key:
+            value=_decode(key.group(1)).strip('"')
+            names[str(int(match.group(1)))]=value
+            faith=group.search(view,match.end(),end)
+            if faith:
+                groups[value]=_decode(faith.group(1))
+    return names,groups
 
 
 def _matched_text(
@@ -412,6 +444,14 @@ def _parse_location_record(
         control=optional_float("control"),
         pop_ids=pop_ids,
         sol_variables=sol_variables,
+        culture=direct.get("culture"),
+        religion=direct.get("religion"),
+        proximity=optional_float("proximity"),
+        market_access=optional_float("market_access"),
+        road_to_capital={"yes": True, "no": False}.get(direct.get("road_to_capital")),
+        institutions={_decode(m.group(1)): float(m.group(2)) for block in
+                      re.finditer(rb"(?m)^\t{3}institutions=\{(.*?)^\t{3}\}", view[start:end], re.S | re.M)
+                      for m in re.finditer(rb"([a-z_]+)=([-+0-9.eE]+)", block.group(1))},
     )
 
 
@@ -516,6 +556,8 @@ def parse_save(path: str | Path, *, strict: bool = True) -> ParsedSave:
             locations = _parse_locations(
                 view, *locations_bounds, location_names
             )
+            culture_names,_ = _parse_identity_definitions(view,"culture_manager","culture_definition")
+            religion_names,religion_groups = _parse_identity_definitions(view,"religion_manager","definition")
         except Exception:
             # A regex match in an exception traceback can temporarily export
             # the mmap buffer on Windows. Let that traceback release the map
@@ -548,6 +590,7 @@ def parse_save(path: str | Path, *, strict: bool = True) -> ParsedSave:
 
     return ParsedSave(
         source=source,
+        culture_names=culture_names,religion_names=religion_names,religion_groups=religion_groups,
         metadata=metadata,
         country_tags=country_tags,
         country_variables=country_variables,
@@ -647,6 +690,7 @@ def _write_locations_csv(
         "raw_material",
         "development",
         "control",
+        "culture", "religion", "proximity", "market_access", "road_to_capital", "institutions",
         "pop_group_count",
         "population_total",
         "sol_population_total",
@@ -684,6 +728,11 @@ def _write_locations_csv(
                 "raw_material": location.raw_material or "",
                 "development": location.development if location.development is not None else "",
                 "control": location.control if location.control is not None else "",
+                **{key: getattr(location, key) for key in
+                   ("culture", "religion", "proximity", "market_access", "road_to_capital")},
+                "culture": parsed.culture_names.get(location.culture,location.culture),
+                "religion": parsed.religion_names.get(location.religion,location.religion),
+                "institutions": json.dumps(location.institutions, sort_keys=True),
                 "pop_group_count": len(location.pop_ids),
                 "population_total": derived["all_total"],
                 "sol_population_total": derived["sol_total"],

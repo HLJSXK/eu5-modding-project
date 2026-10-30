@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>痴迷系统：计算流程与复杂度（整合版）</title>
+<style>
+:root{
+  color-scheme: light;
+  --paper:#F7F8F5; --sheet:#FFFFFF; --ink:#1E2633; --muted:#5D6875; --rule:#D5DAD6; --faint:#EEF1EE;
+  --tea:#2E7A6A; --coffee:#6B3F2A; --porcelain:#2F5C9E; --tobacco:#B9852A; --alarm:#A8452F; --ui:#7A838C;
+  --sans:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC","Source Han Sans SC",sans-serif;
+  --mono:"Cascadia Code","Cascadia Mono",Consolas,"Sarasa Mono SC",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.75 var(--sans);}
+a{color:var(--porcelain)}
+:focus-visible{outline:2px solid var(--porcelain);outline-offset:2px}
+.wrap{max-width:1140px;margin:0 auto;padding:0 28px}
+.prose{max-width:760px}
+h1,h2,h3{font-weight:700;line-height:1.3;margin:0}
+h2{font-size:26px;margin:72px 0 8px;letter-spacing:.01em}
+h3{font-size:17px;margin:28px 0 6px}
+p{margin:10px 0}
+.lede{color:var(--muted);margin:0 0 18px}
+code,.m{font-family:var(--mono);font-size:.92em}
+code{background:var(--faint);padding:1px 5px;border-radius:3px}
+
+/* hero */
+header.hero{padding:56px 0 40px;border-bottom:1px solid var(--rule);background:var(--sheet)}
+.hero h1{font-size:34px;letter-spacing:.02em}
+.hero .status{color:var(--muted);margin-top:6px}
+.formula{margin:34px 0 8px;font-family:var(--mono);font-size:clamp(20px,3.1vw,34px);line-height:1.35;color:var(--ink);overflow-x:auto;white-space:nowrap;padding-bottom:4px}
+.formula .k{color:var(--coffee);font-weight:700}
+.formula .s{color:var(--tea)}
+.formula .h{color:var(--porcelain)}
+.formula-note{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 32px;color:var(--muted);font-size:14px;max-width:980px}
+.formula-note b{color:var(--ink);font-weight:600}
+.cost{margin-top:28px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+.cost .big{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--coffee);line-height:1}
+.cost .big small{font-size:22px;color:var(--muted);font-weight:400}
+.cost .what{max-width:620px;color:var(--muted);font-size:14px}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:14px;margin:14px 0;background:var(--sheet)}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--rule)}
+th{font-weight:600;color:var(--muted);background:var(--faint)}
+td.m,th.m{white-space:nowrap}
+.tbl{overflow-x:auto}
+.tag{display:inline-block;font-size:12px;padding:0 6px;border-radius:3px;border:1px solid currentColor;line-height:18px;white-space:nowrap}
+.t-tea{color:var(--tea)} .t-coffee{color:var(--coffee)} .t-por{color:var(--porcelain)} .t-ui{color:var(--ui)} .t-warn{color:var(--alarm)}
+.was{color:var(--muted);text-decoration:line-through;text-decoration-color:#b8bfc4}
+
+/* pipeline */
+.pipe-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:32px;align-items:start;margin-top:22px}
+@media (max-width:920px){.pipe-grid{grid-template-columns:1fr}.panel{position:static!important}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted);margin:8px 0 4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+ol.pipe{list-style:none;margin:0;padding:0;position:relative}
+ol.pipe::before{content:"";position:absolute;left:19px;top:8px;bottom:8px;width:2px;background:var(--rule)}
+.stage{position:relative;padding:0 0 18px 56px}
+.stage .no{position:absolute;left:0;top:2px;width:40px;height:40px;border-radius:50%;background:var(--sheet);border:2px solid var(--c);color:var(--c);font:700 14px/36px var(--mono);text-align:center}
+.stage .card{background:var(--sheet);border:1px solid var(--rule);border-left:4px solid var(--c);border-radius:2px 6px 6px 2px;padding:12px 16px 12px}
+.stage .top{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.stage .name{font-weight:700;font-size:16px}
+.stage .freq{font-size:13px;color:var(--muted)}
+.stage .big-o{margin-left:auto;font-family:var(--mono);font-size:14px;color:var(--c);font-weight:700}
+.stage .desc{font-size:14px;margin:6px 0 8px;color:#38414d}
+.stage .desc code{font-size:12.5px}
+.bar{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.bar .track{flex:1;height:8px;background:var(--faint);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;background:var(--c);width:0;transition:width .35s ease}
+.bar .val{font-family:var(--mono);min-width:112px;text-align:right;color:var(--ink)}
+.stage.offbudget .bar .track{background:repeating-linear-gradient(45deg,var(--faint) 0 6px,#fff 6px 12px)}
+.sub{margin:6px 0 0 0;padding:0;list-style:none;font-size:13px;color:var(--muted)}
+.c-tea{--c:var(--tea)} .c-coffee{--c:var(--coffee)} .c-por{--c:var(--porcelain)} .c-ui{--c:var(--ui)}
+
+.panel{position:sticky;top:16px;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:16px 18px}
+.panel h3{margin:0 0 4px;font-size:16px}
+.panel .hint{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+.presets button{font:13px var(--sans);border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:4px 9px;border-radius:4px;cursor:pointer}
+.presets button[aria-pressed="true"]{border-color:var(--tea);background:#E5F0EC;color:var(--tea)}
+.field{display:grid;grid-template-columns:1fr 92px;gap:2px 8px;align-items:center;margin:5px 0;font-size:13px}
+.field label{color:#38414d}
+.field label small{color:var(--muted)}
+.field input{width:100%;font:13px var(--mono);padding:3px 6px;border:1px solid var(--rule);border-radius:3px;text-align:right;background:#fff;color:var(--ink)}
+details.adv{margin-top:8px;font-size:13px}
+details.adv summary{cursor:pointer;color:var(--muted)}
+.total{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+.total .n{font:700 28px/1.1 var(--mono)}
+.total .n.over{color:var(--alarm)}
+.gauge{height:12px;background:var(--faint);border-radius:6px;position:relative;margin:8px 0 4px;overflow:hidden}
+.gauge .g{position:absolute;left:0;top:0;bottom:0;background:var(--tea);transition:width .35s ease}
+.gauge .g.over{background:var(--alarm)}
+.gauge .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.verdict{font-size:13px;margin-top:6px}
+.verdict b{font-family:var(--mono)}
+
+/* node task */
+.task{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:28px;align-items:start}
+@media (max-width:860px){.task{grid-template-columns:1fr}}
+pre.code{background:var(--sheet);border:1px solid var(--rule);border-left:4px solid var(--coffee);border-radius:2px 6px 6px 2px;padding:14px 16px;margin:12px 0;font:13.5px/1.7 var(--mono);overflow-x:auto}
+pre.code .u{color:var(--coffee);font-weight:700}
+pre.code .cm{color:var(--muted)}
+.ledger{font-size:13.5px}
+.ledger div{display:flex;justify-content:space-between;border-bottom:1px dashed var(--rule);padding:4px 0}
+.ledger div b{font-family:var(--mono)}
+.ledger .sum{border-bottom:0;border-top:1.5px solid var(--ink);margin-top:4px;font-weight:700}
+
+/* chart */
+figure{margin:18px 0;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:14px 14px 8px}
+figcaption{font-size:13px;color:var(--muted);padding:4px 4px 0}
+.chart-toggles{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;padding:0 4px 8px}
+.chart-toggles label{cursor:pointer;display:flex;align-items:center;gap:6px}
+.chart-toggles i{display:inline-block;width:18px;height:3px;border-radius:2px}
+svg text{font-family:var(--sans)}
+
+.finding{border-left:3px solid var(--tobacco);padding:2px 0 2px 16px;margin:18px 0}
+.finding h3{margin:0 0 4px}
+.finding.ok{border-left-color:var(--tea)}
+footer{margin:80px 0 40px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>痴迷系统的计算流程与复杂度</h1>
+    <p class="status">整合 2026-10-19 的现行方案：单变量 x、方案A队列、δ = 0.1、国家级时钟退潮（T = 240），以及原计划中仍有效的部分（排期、事件、行动、风尚、国家需求接入）。设计与离线实验阶段，没有玩法代码，也未经实机性能验收。</p>
+
+    <div class="formula" aria-label="地点更新公式">
+      <span class="k">x</span>[v,g] ← clamp( <span class="s">ρ</span>·<span class="k">x</span>[v,g] + Σ<sub>u→v</sub> <span class="s">p</span><sub>uv</sub>·<span class="k">x</span>[u,g] + <span class="h">hub</span>[v,g], 0, 100 )
+    </div>
+    <div class="formula-note">
+      <div><b>x</b> 每个地点×商品唯一的持久浮点，0–100；阶段 1/20/45/70 由它直接派生</div>
+      <div><b>ρ、p</b> 商品、国家政策、走廊、亲和共享参数；任务内即时求值，不落地存</div>
+      <div><b>hub</b> 有限入口（港口、首都、市场中心、事件目标）的当轮输入</div>
+      <div><b>原地异步</b> 读当前已提交的邻居 x，立即写回；没有 x_next 双缓冲</div>
+      <div><b>δ = 0.1</b> 变化不超过 0.1 不写回、不入队，地点休眠</div>
+    </div>
+
+    <div class="cost">
+      <div class="big">16 + 9d <small>U / 节点任务预扣</small></div>
+      <div class="what">方案A（侵入式队列）下的完整预扣，d=6 时 70 U；增长期实际平均约 50 U，因为大多数邻居已在排队、只读一次。现行国家时钟模式下每次服务还要查所有者是否在退潮、读邻居的 S_c，预扣变为 20 + 13d（d=6 时 98 U）。U 是离线抽象计数，调度只用变量读写，已不含原生集合成本；作用域切换和真实脚本展开仍是 P0。</div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section class="prose" id="diff">
+  <h2>原计划与现行方案的差异</h2>
+  <p class="lede">删掉的东西决定了复杂度的形态：地点上没有任何缓存，所以每次服务都要重新读取全部邻边，节点能否休眠只取决于 x 这一次有没有变。</p>
+</section>
+<div class="tbl">
+<table>
+  <thead><tr><th>方面</th><th>原计划（10-18 及更早）</th><th>现行（10-19 整合）</th><th>对计算量的影响</th></tr></thead>
+  <tbody>
+    <tr><td>地点状态</td><td class="was">E/I/D/R 多状态、接触度、依赖度、峰值、首见日期、随机偏移</td><td>只有一个浮点 x</td><td>存储降为 O(1)/地点×商品；失去增量缓存，服务必须完整拉取邻边</td></tr>
+    <tr><td>调度结构</td><td class="was">常驻地点链表、queued/next/prev、QSS 到期预测、时间轮</td><td>方案A：每商品一条侵入式 FIFO；地点只在排队期间持有指针 q，商品层存 head/tail/length/round_remaining</td><td>不依赖原生集合；没有到期预测，节点只要 x 还在变就留在队列里</td></tr>
+    <tr><td>传播缓存</td><td class="was">逐边 sent 贡献、累计压力、来源计数</td><td>服务时读 d 条实际邻边重新求和</td><td>每节点 Θ(d)，撤掉一个来源不需要补丁</td></tr>
+    <tr><td>成本口径</td><td class="was">128 U 状态槽、32 U 边槽、200 U 节点、16,470/28,000 对容量</td><td>16 + 9d（方案A预扣），全部为变量读写</td><td>旧容量结论作废，不能用来验收</td></tr>
+    <tr><td>商品覆盖</td><td class="was">部分商品事件化分流，3/4/5 并发</td><td>16 种历史商品全部走同一核心</td><td>工作负载由排期决定，不靠删内容压峰</td></tr>
+    <tr><td>排期</td><td>16 波长窗，峰值 13/14 层</td><td>26 短波，每轮含缓冲 ≤ 100 年，峰值 11/12 层</td><td>商品层年 −26.4%/−14.8%（只是时间窗代理，不是运算下降比例）</td></tr>
+    <tr><td>退潮</td><td class="was">商品级共享波龄疲劳，全图同时降低 ρ/p；逐节点衰退</td><td>国家级时钟：首个地点成为成员后保持 T = 240 月，再整国懒衰退（S_c × 0.98/月），不再接收输入；可选习俗保留率 κ</td><td>退潮不再服务节点，每国每月约 3 U；退潮由内向外推进，δ 冻结问题消失</td></tr>
+    <tr><td>经济接入</td><td colspan="2">保持不变：地方 x 聚合成国家 X，H = 1 + h·X/100，与外部、替代因子按 B×H×M 组合；只在 SOL 原有的自然求解入口提交（玩家月度、AI 年度），不额外触发求解</td><td>新增成本只有聚合与修正写入</td></tr>
+    <tr><td>事件、行动、风尚</td><td colspan="2">保持不变：效果只写有界入口的 x 或改变国家/市场/商品共享参数，然后登记候选</td><td>每次效果 O(1 + d) 登记；共享参数变化可能唤醒整片内部</td></tr>
+    <tr><td>预算</td><td colspan="2">每月新增痴迷计算 ≤ 500,000，内部计划 480,000、裕量 20,000；全商品共享一份</td><td>仍是待验目标</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="prose" id="storage">
+  <h2>存储账本</h2>
+  <p class="lede">空间复杂度由“被触及过的地点”决定，而不是全图。x = 0 可以用未设置变量表示。</p>
+</section>
+<div class="tbl">
+<table>
+  <thead><tr><th>层</th><th>持久数据</th><th class="m">空间</th><th>禁止项</th></tr></thead>
+  <tbody>
+    <tr><td><span class="tag t-coffee">地点×商品</span></td><td>x ∈ [0,100]</td><td class="m">O(Σ<sub>g</sub> N<sub>touched</sub>(g))</td><td>任何第二个数值、布尔、日期、prev 指针；也不能挪到按地点键的全局表或塞进小数位</td></tr>
+    <tr><td><span class="tag t-tea">地点×商品（暂存）</span></td><td>排队期间的 q：队列中下一个地点，队尾指向自身</td><td class="m">O(Σ<sub>g</sub> |A<sub>g</sub>|)</td><td>出队后仍保留；附带数值、阶段或时间</td></tr>
+    <tr><td><span class="tag t-tea">商品调度器</span></td><td>head、tail、length、round_remaining、轮次、截止日、剩余额度</td><td class="m">O(G)</td><td>原生 current/next 集合</td></tr>
+    <tr><td><span class="tag t-por">国家×商品</span></td><td>聚合 X、成员地点计数、经济提交量、政策档位与期限、事件冷却；国家时钟的加入月份、退潮/结束标志、S_c</td><td class="m">O(C·G)</td><td>逐地点旧权重、旧所有者、旧贡献</td></tr>
+    <tr><td><span class="tag t-por">市场×商品</span></td><td>共享供货、贸易入口、共享系数</td><td class="m">O(M·G)</td><td>按地点键的压力表</td></tr>
+    <tr><td><span class="tag t-ui">局势</span></td><td>波次阶段与起止、发源、世界统计、5 年采样、大事记 ≤ 6 条</td><td class="m">O(G)</td><td>逐地点采纳史</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="prose" style="font-size:13px;color:var(--muted)">符号：N 地点数（全图 28,573 条地点记录，有主地点 13,588），G 商品，C 国家（约 1,600 个有地有人口），M 市场，A<sub>g</sub> 商品 g 的活跃候选集，d 邻接度。</p>
+
+<section id="pipeline">
+  <div class="prose">
+    <h2>月度计算流程</h2>
+    <p class="lede">调度采用方案A（侵入式队列）。一个月内按下面的顺序执行。条形图是右侧估算器在当前假设下各步每月占用的 U，改参数会实时更新；斜纹条表示不计入 50 万预算、需要另测的部分。</p>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--tea)"></i>共享调度层</span>
+    <span><i style="background:var(--coffee)"></i>地点更新层</span>
+    <span><i style="background:var(--porcelain)"></i>国家与经济层</span>
+    <span><i style="background:var(--ui)"></i>界面层（另测）</span>
+  </div>
+
+  <div class="pipe-grid">
+    <ol class="pipe" id="pipe">
+      <li class="stage c-tea" data-k="gate">
+        <span class="no">S1</span>
+        <div class="card">
+          <div class="top"><span class="name">波次门控</span><span class="freq">每月一次</span><span class="big-o">O(L)</span></div>
+          <p class="desc">只遍历活跃传播注册表（L 层，短波峰值 11/12），检查日历窗口、共享阶段、截止日和通用风尚名额。约 50 个局势键中休眠的不参与。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-tea" data-k="seed">
+        <span class="no">S2</span>
+        <div class="card">
+          <div class="top"><span class="name">入口播种与路线登记</span><span class="freq">事件、行动、风尚成立、新路线开启时</span><span class="big-o">O(E·(1+d))</span></div>
+          <p class="desc">效果只改有界入口的 x（如 <code>x = max(x,25)</code>），再把该入口和它的出边目标登记进候选。来源 x 已稳定、播种没改变数值时，新路线目标也必须显式登记。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-tea" data-k="wake">
+        <span class="no">S3</span>
+        <div class="card">
+          <div class="top"><span class="name">共享输入变化唤醒</span><span class="freq">政策、禁令、所有权、市场迁移、供货变化</span><span class="big-o">O(W·n<sub>c</sub>)</span></div>
+          <p class="desc">国家政策改变 p/ρ 后，该国所有 x &gt; 0 的地点都可能需要重算，按 n<sub>c</sub> 分片登记。有 hook（如所有权变化 on_action）就逐项登记；没有 hook 的变化只能用有界轮转探测，发现延迟单独报告。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-tea" data-k="clock">
+        <span class="no">S3b</span>
+        <div class="card">
+          <div class="top"><span class="name">国家时钟</span><span class="freq">每月，对已加入未结束的国家</span><span class="big-o">O(C<sub>clk</sub>) + 重标定 O(n<sub>c</sub>)/114 月</span></div>
+          <p class="desc">到期（加入月份 + T）的国家进入退潮；退潮中的国家 S_c ← 0.98·S_c。S_c 跌破 0.1 时遍历本国地点写回一次（有习俗保留率 κ 时在 0.01 以下定格）。退潮中的地点不再服务、不接收输入，读取一律用 x × S_c。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-coffee" data-k="node">
+        <span class="no">S4</span>
+        <div class="card">
+          <div class="top"><span class="name">节点服务</span><span class="freq">每个逻辑轮，队列跨月续跑</span><span class="big-o">Θ(Σ<sub>v∈A</sub>(1+d<sub>v</sub>))</span></div>
+          <p class="desc">轮开始时记 round_remaining = length，逐个预扣完整任务费用后出队、执行公式并原地写回。x 变了就把自身和出边目标入队，已在排队的目标只读一次 q 就跳过；没变就不入队。新入队的排在本轮之后，本轮不递归。额度不够时停止出队，下个月继续，此时传播按日历变慢。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+          <ul class="sub"><li>p 的即时求值（亲和、政策、走廊、供货）按目标节点一次、按边一次分开计费</li></ul>
+        </div>
+      </li>
+      <li class="stage c-tea" data-k="handoff">
+        <span class="no">S5</span>
+        <div class="card">
+          <div class="top"><span class="name">轮次交接</span><span class="freq">round_remaining 归零时</span><span class="big-o">O(1)</span></div>
+          <p class="desc">方案A下没有集合交换：round_remaining 归零即一轮结束，下一轮开始时重新读 length。只是几个商品级变量的读写。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-por" data-k="agg">
+        <span class="no">S6</span>
+        <div class="card">
+          <div class="top"><span class="name">国家聚合</span><span class="freq">节点变化时增量，权重或所有权变时重建</span><span class="big-o">O(f·|A|) + O(R·n<sub>c</sub>)</span></div>
+          <p class="desc">任务内用临时 old/new 给国家 X 和成员计数做差值（跨过 x = 1 时成员计数 ±1）。人口权重或所有者变化后差值不再可靠，就把该国×商品置脏，分片读取当前 x 重建，不保存逐地点旧贡献。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-por" data-k="commit">
+        <span class="no">S7</span>
+        <div class="card">
+          <div class="top"><span class="name">经济提交</span><span class="freq">SOL 原有自然入口：玩家月度、AI 年度</span><span class="big-o">O(P·G<sub>c</sub>) + O(C<sub>m</sub>·G<sub>c</sub>/12)</span></div>
+          <p class="desc">读取已准备好的 X 快照，算 <code>H = 1 + h·X/100</code>，按 B×H×M 换算成痴迷修正与替代修正的 size 写入，再走原有替代计算和 SOL 求解。求解本身不是新增成本；聚合未完成时沿用旧快照。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-por" data-k="events">
+        <span class="no">S8</span>
+        <div class="card">
+          <div class="top"><span class="name">事件与 AI 行动</span><span class="freq">成员国家月度脉冲，AI 行动 90–180 天一次</span><span class="big-o">O(C<sub>m</sub>) + O(C<sub>m</sub>·K/90d)</span></div>
+          <p class="desc">冷却（同局势 12 月、同国 5 月）先过滤，条件只读国家聚合。命中的效果回到 S2 或改共享参数回到 S3，不在这里直接扫描地点。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-tea" data-k="life">
+        <span class="no">S9</span>
+        <div class="card">
+          <div class="top"><span class="name">波次交接与清理</span><span class="freq">截止日后分片，摊到每月</span><span class="big-o">O(length)</span></div>
+          <p class="desc">截止后停止新的传播登记，残留队列分片出队清理，每个 3 U。已加入的国家继续按 S3b 的时钟退潮，直到归零或定格为习俗，这部分不再服务节点。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
+        </div>
+      </li>
+      <li class="stage c-ui offbudget" data-k="ui">
+        <span class="no">UI</span>
+        <div class="card">
+          <div class="top"><span class="name">地图与面板</span><span class="freq">玩家打开时</span><span class="big-o">M1：O(N) 每次重绘</span></div>
+          <p class="desc">M1/M5 每地点读一个 x 比较阈值；M2/M3 读国家聚合；面板成员排名取前 8 名为 O(C<sub>m</sub>)。只读也有成本，但由引擎渲染节奏决定，需要单独实测，不放进 50 万。</p>
+          <div class="bar"><div class="track"><div class="fill"></div></div><span class="val">另测</span></div>
+        </div>
+      </li>
+    </ol>
+
+    <aside class="panel" aria-labelledby="est-title">
+      <h3 id="est-title">月度预算估算器</h3>
+      <p class="hint">默认值是假设情景，不是实测。带“假设”的单价在 P0 核实脚本原语后必须替换。</p>
+      <div class="presets" role="group" aria-label="预设情景">
+        <button type="button" data-p="typical" aria-pressed="true">现行：12 层增长 + 国家时钟</button>
+        <button type="button" data-p="decay">对比：两层全图逐节点退潮</button>
+        <button type="button" data-p="annual">对比：两层年度步长退潮</button>
+        <button type="button" data-p="naive">对比：朴素全图扫描</button>
+      </div>
+      <div id="fields"></div>
+      <details class="adv"><summary>单价假设（U）</summary><div id="fields-adv"></div></details>
+      <div class="total">
+        <div style="font-size:13px;color:var(--muted)">每月合计</div>
+        <div class="n" id="tot">0</div>
+        <div class="gauge"><div class="g" id="gauge"></div><div class="mark" id="mark480" title="计划额度 480,000"></div></div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section id="node">
+  <div class="prose">
+    <h2>一次节点任务的成本拆解</h2>
+    <p class="lede">与方案A参考实现 <code>queue_pointer_scheduler.py</code> 的预扣函数逐项对应。预扣按最坏情况（x 发生变化）收取，执行后实际花费 ≤ 预扣。</p>
+  </div>
+  <div class="task">
+<pre class="code"><span class="cm"># 预扣 3 + 8 + 4·d_in + 1 + d_out + 4·(1+d_out)，额度不足则不出队</span>
+v = pop()                          <span class="u">3</span>  读 head、读 head.q、删除 q
+old = x[v]                         <span class="u">1</span>  读自身
+y   = ρ · old                      <span class="u">1</span>  保留乘法
+for u in in_edges(v):              <span class="cm">每条入边 4：</span>
+    y += p[u,v] · x[u]             <span class="u">4</span>  枚举 + 读邻居 + 乘 + 加
+y   = clamp(y, 0, 100)             <span class="u">2</span>  两次比较
+if y &lt; ε: y = 0                    <span class="u">1</span>
+x[v] = y                           <span class="u">1</span>  写回
+changed = |y − old| &gt; δ         <span class="u">1</span>  δ = 0.1；未变化则不写回
+<span class="cm">                                   </span><span class="u">1</span>  轮内计数 −1
+if changed:                        <span class="u">1</span>  自身登记
+    push(v)                        <span class="u">4</span>  刚出队，必为新入队
+    for w in out_edges(v):         <span class="cm">每条出边 1 + push：</span>
+        push(w)                    <span class="u">1+4</span> 新入队；已在排队只读 q：<span class="u">1+1</span></pre>
+    <div class="ledger">
+      <div><span>出队 + 固定部分</span><b>11</b></div>
+      <div><span>入边 4 × d</span><b id="l-in">24</b></div>
+      <div><span>变化时自身登记与入队</span><b>5</b></div>
+      <div><span>出边最坏 5 × d</span><b id="l-out">30</b></div>
+      <div class="sum"><span>预扣（d = <span id="l-d">6</span>）</span><b id="l-sum">70</b></div>
+      <div><span>未变化时实际</span><b id="l-nochg">35</b></div>
+      <div><span>变化、邻居都已在排队</span><b id="l-typ">52</b></div>
+      <p style="color:var(--muted);font-size:12.5px;margin-top:10px">网格实验里 88% 的服务有变化，邻居入队尝试中 97.7% 已在排队，所以实际平均约 50 U，远低于预扣上限。没有计入：p 的即时求值（估算器里单列）和作用域切换。所有调度操作都是常数次变量读写，不随队列长度变化。</p>
+    </div>
+  </div>
+</section>
+
+<section id="dynamics">
+  <div class="prose">
+    <h2>活跃集与退潮方式</h2>
+    <p>S4 的总量等于活跃集大小乘单节点成本。增长期内部会被夹到 100 而休眠，只有一条前沿带活跃；退潮期如果逐节点计算，整片已触及区域每月都在变，成本会暴涨。现行方案把退潮交给国家时钟，节点服务只剩增长前沿。</p>
+    <p>下面是共享模拟包 <code>tools/obsession_sim</code> 在 13,572 节点六边形网格、1,600 个合成国家上的单商品结果（方案A + δ = 0.1，测试系数，没有历史校准）。</p>
+  </div>
+  <figure>
+    <div class="chart-toggles" id="toggles"></div>
+    <div id="chart" role="img" aria-label="各情景每月服务节点数随月份变化"></div>
+    <figcaption>横轴：月份。纵轴实线：当月服务的节点数；虚线：成员（x ≥ 1）地点数。每 12 个月采样一次。U 按 <code>PRICE_QUEUE</code>（无时钟）或 <code>PRICE_CLOCK</code>（国家时钟）计价。</figcaption>
+  </figure>
+  <div class="tbl">
+  <table id="scen-table">
+    <thead><tr><th>情景</th><th class="m">月数</th><th class="m">总 U</th><th class="m">峰值排队</th><th class="m">峰值月 U</th><th class="m">平静于</th><th class="m">结束时成员</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  </div>
+  <div class="prose">
+    <p>全图同时逐节点退潮时，一个月约 78 万 U，而且 δ = 0.1 让衰退停在 x ≈ 2.6–4.9，所有地点永远是成员。全图共享一个 S 最便宜，但全球同时退潮。国家时钟的总 U 比只有增长多约 1,950 万（主要来自读邻居时查所有者的 S_c），换来的是由内向外的退潮和完全归零；习俗保留率 κ = 0.3 时各地定格在峰值的约 30%。早期集合版实验里“退潮服务约 71% 花在 x &lt; 1 的尾巴上”的结论见归档的 computation_flow_scenarios。</p>
+  </div>
+</section>
+
+<section id="summary">
+  <div class="prose"><h2>复杂度汇总</h2></div>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>环节</th><th class="m">单次</th><th class="m">每月总量</th><th>主导变量</th><th>依赖的 P0</th></tr></thead>
+    <tbody>
+      <tr><td>节点服务</td><td class="m">Θ(1 + d)</td><td class="m">Σ<sub>g</sub> C<sub>round</sub>(g) / T<sub>g</sub></td><td>活跃集 |A<sub>g</sub>|；增长期约为前沿带，退潮期约为全部已触及地点</td><td>最大邻接度、地点引用变量写法</td></tr>
+      <tr><td>p 即时求值</td><td class="m">O(k) + O(d)</td><td class="m">同上</td><td>每节点的亲和、政策、供货因子数 k</td><td>文化/宗教组、政策读取写法</td></tr>
+      <tr><td>播种登记</td><td class="m">O(1 + d)</td><td class="m">O(E·d)</td><td>事件与行动频率（成员国家每年约 1.5–2.5 个痴迷事件）</td><td>延迟国家事件接口</td></tr>
+      <tr><td>政策唤醒</td><td class="m">O(n<sub>c</sub>)</td><td class="m">O(W·n<sub>c</sub>)</td><td>全国禁令、宗教组世界事件可一次唤醒成千地点</td><td>变化 hook 是否存在</td></tr>
+      <tr><td>入队/出队</td><td class="m">O(1)</td><td class="m">含在节点服务内</td><td>每次服务 1 次出队、变化时 1+d 次入队</td><td>无原生容器依赖</td></tr>
+      <tr><td>国家聚合</td><td class="m">O(1) 差值 / O(n<sub>c</sub>) 重建</td><td class="m">O(f·Σ|A|) + O(R·n<sub>c</sub>)</td><td>所有权、人口变化频率</td><td>on_action 所有权 hook</td></tr>
+      <tr><td>经济提交</td><td class="m">O(1) 每国×商品</td><td class="m">O(P·G<sub>c</sub> + C<sub>m</sub>·G<sub>c</sub>/12)</td><td>成员国家数</td><td>修正名、强度回读</td></tr>
+      <tr><td>波次清理</td><td class="m">O(1) 每引用</td><td class="m">摊销 O(|A|)/月数</td><td>截止前的活跃集</td><td>局势能否 end 后重启</td></tr>
+      <tr><td>界面</td><td class="m">O(1) 每地点</td><td class="m">另测</td><td>重绘频率</td><td>GUI scope 绑定</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="prose">
+    <p>合起来写成一条约束：</p>
+    <pre class="code" style="border-left-color:var(--tea)">C_month = Σ_g  C_round(g) / T_g              <span class="cm"># S4 + S5</span>
+        + E·(1+d)·c_reg + W·n_c·c_wake          <span class="cm"># S2 + S3</span>
+        + f·Σ|A|·c_Δ + R·n_c·c_rebuild          <span class="cm"># S6</span>
+        + (P·G_c + C_m·G_c/12)·c_commit          <span class="cm"># S7</span>
+        + C_m·c_event + 固定门控与清理            <span class="cm"># S1 S8 S9</span>
+        ≤ 480,000
+
+C_round(g) = Σ_{v∈A_g} (11 + 4·d_v + f·(5 + d_v·(1+push)) + c_pnode + c_pedge·d_v)
+T_g        = max(Δt_g, ⌈C_round(g) / B_g⌉)    <span class="cm"># 一轮实际跨越的月数</span>
+传播减速    = T_g / Δt_g                        <span class="cm"># 超过 1 就进入历史校准误差</span></pre>
+    <p>对照禁止的朴素方案：每月全图积分 13,588 × 12 层 × 约 52 U（方案A，全部变化、邻居都已在排队）≈ 848 万 U，是预算的 18 倍；28,573 全部地点则约 1,780 万。稀疏候选的收益完全来自活跃集远小于 N，退潮期正是它失效的时候。</p>
+  </div>
+</section>
+
+<section id="findings" class="prose">
+  <h2>由此得出的结论</h2>
+  <div class="finding">
+    <h3>退潮交给国家时钟后，节点服务只剩增长前沿</h3>
+    <p>逐节点退潮时，全图一轮约 70 万 U，大于 48 万的总额度，而且 δ = 0.1 下会冻结。国家时钟把退潮变成每国每月约 3 U 的共享因子更新，外加约每 114 个月一次的本国重标定。合成网格上基准情景单商品平均约 2.75 万 U/月，峰值 12.2 万 U 出现在增长前沿最宽的时候，与退潮无关。</p>
+  </div>
+  <div class="finding">
+    <h3>δ = 0.1 与国家时钟一起采纳</h3>
+    <p>共享变化容差 δ = 0.1（02 第 2.1 节）让增长期总 U −51%、强控制边界 −82%，前沿慢约 15%。它会让逐节点衰退停在 δ/(1−G)（各商品 2–50，都高于成员门槛 1），所以退潮不走逐节点衰退，而由国家时钟承担（02 第 8 节）。曾比较过的退潮期年度步长、较大 ε、全图共享 S 等做法保留在实验对比项和 <code>tools/obsession_sim</code> 预设中。</p>
+  </div>
+  <div class="finding">
+    <h3>预算分配直接改变传播速度</h3>
+    <p>基准情景增长前沿峰值 1,664 个排队地点、月峰值约 12.2 万 U。给单商品每月 4 万 U 的额度时，增长从 780 个月拉长到 1,132 个月（慢约 1.45 倍），全图平静从第 1,760 月推迟到第 2,568 月。所以历史校准必须在实际预算下跑（模拟包的 <code>--budget</code>），不能先用不限额结果校准再加上限。</p>
+  </div>
+  <div class="finding">
+    <h3>方案A消除了原生容器复杂度这个最大的未知数</h3>
+    <p>如果原生集合插入需要线性查重，单轮会从 Θ(d·|A|) 退化到 O(d·|A|²)。方案A改用排队期间才存在的地点指针 q，入队、出队、去重都是常数次变量读写，这个风险不复存在；同时消除了"已读到新值又被重排"的约 5.4% 空跑。剩下的 P0 是地点变量能否保存并进入地点引用。最大邻接度决定单个任务的预扣上限；长程贸易、宫廷入口如果做成高扇出边，应当限定为有限入口而不是普通邻边。</p>
+  </div>
+  <div class="finding ok">
+    <h3>稳定的部分确实是便宜的</h3>
+    <p>无关连通分量从不登记；增长期饱和区夹在 100 后休眠；零输入不会自热；撤掉一个来源不需要补丁。这些在小图实验中都已断言通过，说明稀疏候选在增长期是有效的，风险集中在退潮期和大范围政策唤醒。</p>
+  </div>
+</section>
+
+<footer>
+  <p>数据来源：<code>docs/design/obsession/</code> 00–12；<code>experiments/queue_pointer_scheduler.py</code>（单节点预扣与断言）；<code>tools/obsession_sim</code>（本页情景曲线，预设 baseline、baseline_habit30、growth_only、global_node_800、global_lazy_800）；有主地点数与国家数取自 <code>docs/technical/SOL_AI_Annual_Cadence_20261015.md</code> 与 <code>docs/analysis/sol_topbar_cost_20261018/README.md</code>。所有 U 都是离线抽象计数，不是 EU5 指令数或耗时，不构成 50 万验收。</p>
+</footer>
+</main>
+
+<script>
+const TR = {"baseline":{"summary":{"months":1761,"total_U":48453229,"peak_queue":1664,"peak_monthly_U":122368,"mean_monthly_U_active":27515,"calm_month":1760,"final_members":0,"final_positive":0},"tr":[[0,7,1,0],[12,31,13,0],[24,53,31,1],[36,96,57,7],[48,134,91,31],[60,176,147,61],[72,212,205,109],[84,247,276,163],[96,289,365,229],[108,348,455,307],[120,385,569,390],[132,430,676,500],[144,459,816,601],[156,509,955,738],[168,539,1111,862],[180,602,1276,1017],[192,652,1453,1172],[204,668,1639,1349],[216,716,1835,1531],[228,762,2058,1718],[240,806,2271,1931],[252,842,2522,2139],[264,896,2752,2378],[276,935,3027,2608],[288,984,3287,2848],[300,1040,3583,3037],[312,1050,3867,3308],[324,1096,4184,3550],[336,1153,4498,3774],[348,1204,4829,4031],[360,1255,5166,4252],[372,1278,5517,4483],[384,1320,5890,4778],[396,1377,6264,5010],[408,1415,6647,5231],[420,1463,7047,5487],[432,1494,7459,5760],[444,1543,7874,5963],[456,1595,8315,6178],[468,1633,8744,6454],[480,1658,9143,6671],[492,1628,9556,6870],[504,1545,9964,7148],[516,1470,10293,7352],[528,1420,10576,7457],[540,1343,10863,7599],[552,1273,11096,7715],[564,1180,11339,7695],[576,1084,11533,7827],[588,961,11595,7788],[600,837,11693,7678],[612,723,11721,7557],[624,631,11763,7486],[636,560,11668,7266],[648,489,11638,7110],[660,429,11572,6867],[672,372,11414,6547],[684,321,11284,6327],[696,272,11154,6010],[708,211,10998,5564],[720,152,10673,5195],[732,96,10513,4784],[744,58,10180,4348],[756,31,9890,3897],[768,7,9659,3555],[780,0,9340,3203],[792,0,8922,2819],[804,0,8685,2465],[816,0,8276,2062],[828,0,7926,1800],[840,0,7610,1520],[852,0,7172,1240],[864,0,6770,1034],[876,0,6438,820],[888,0,6069,703],[900,0,5537,571],[912,0,5089,367],[924,0,4704,303],[936,0,4221,245],[948,0,3815,147],[960,0,3378,110],[972,0,3051,39],[984,0,2702,4],[996,0,2349,4],[1008,0,1937,0],[1020,0,1707,0],[1032,0,1397,0],[1044,0,1227,0],[1056,0,982,0],[1068,0,785,0],[1080,0,651,0],[1092,0,500,0],[1104,0,345,0],[1116,0,298,0],[1128,0,230,0],[1140,0,110,0],[1152,0,99,0],[1164,0,39,0],[1176,0,4,0],[1188,0,4,0],[1200,0,0,0],[1212,0,0,0],[1224,0,0,0],[1236,0,0,0],[1248,0,0,0],[1260,0,0,0],[1272,0,0,0],[1284,0,0,0],[1296,0,0,0],[1308,0,0,0],[1320,0,0,0],[1332,0,0,0],[1344,0,0,0],[1356,0,0,0],[1368,0,0,0],[1380,0,0,0],[1392,0,0,0],[1404,0,0,0],[1416,0,0,0],[1428,0,0,0],[1440,0,0,0],[1452,0,0,0],[1464,0,0,0],[1476,0,0,0],[1488,0,0,0],[1500,0,0,0],[1512,0,0,0],[1524,0,0,0],[1536,0,0,0],[1548,0,0,0],[1560,0,0,0],[1572,0,0,0],[1584,0,0,0],[1596,0,0,0],[1608,0,0,0],[1620,0,0,0],[1632,0,0,0],[1644,0,0,0],[1656,0,0,0],[1668,0,0,0],[1680,0,0,0],[1692,0,0,0],[1704,0,0,0],[1716,0,0,0],[1728,0,0,0],[1740,0,0,0],[1752,0,0,0]]},"baseline_habit30":{"summary":{"months":1191,"total_U":45391501,"peak_queue":1664,"peak_monthly_U":122314,"mean_monthly_U_active":38112,"calm_month":1190,"final_members":13572,"final_positive":13572},"tr":[[0,7,1,0],[12,31,13,0],[24,53,31,1],[36,96,57,7],[48,134,91,31],[60,176,147,61],[72,212,205,109],[84,247,276,163],[96,289,365,229],[108,348,455,307],[120,385,569,390],[132,430,676,500],[144,459,816,601],[156,509,955,738],[168,539,1111,862],[180,602,1276,1017],[192,652,1453,1172],[204,668,1639,1349],[216,716,1835,1531],[228,762,2058,1718],[240,806,2271,1931],[252,842,2522,2139],[264,896,2752,2378],[276,935,3027,2608],[288,984,3287,2866],[300,1040,3583,3125],[312,1050,3867,3407],[324,1096,4184,3673],[336,1153,4498,3919],[348,1204,4829,4202],[360,1255,5166,4494],[372,1278,5517,4742],[384,1320,5890,5059],[396,1377,6264,5306],[408,1415,6647,5582],[420,1463,7047,5888],[432,1494,7459,6163],[444,1543,7874,6432],[456,1595,8315,6706],[468,1633,8762,7010],[480,1658,9223,7247],[492,1628,9644,7505],[504,1545,10063,7803],[516,1470,10439,8007],[528,1420,10814,8147],[540,1343,11157,8363],[552,1273,11514,8488],[564,1180,11819,8636],[576,1084,12092,8684],[588,961,12324,8763],[600,837,12543,8587],[612,723,12719,8629],[624,631,12879,8509],[636,560,13015,8310],[648,489,13138,8076],[660,429,13241,7970],[672,372,13334,7660],[684,321,13408,7511],[696,272,13471,7190],[708,211,13518,6831],[720,152,13549,6553],[732,96,13567,6186],[744,58,13572,5730],[756,31,13572,5302],[768,7,13572,4859],[780,0,13572,4385],[792,0,13572,3992],[804,0,13572,3576],[816,0,13572,3209],[828,0,13572,2880],[840,0,13572,2547],[852,0,13572,2097],[864,0,13572,1800],[876,0,13572,1530],[888,0,13572,1242],[900,0,13572,1060],[912,0,13572,820],[924,0,13572,717],[936,0,13572,603],[948,0,13572,402],[960,0,13572,313],[972,0,13572,245],[984,0,13572,187],[996,0,13572,110],[1008,0,13572,44],[1020,0,13572,4],[1032,0,13572,4],[1044,0,13572,0],[1056,0,13572,0],[1068,0,13572,0],[1080,0,13572,0],[1092,0,13572,0],[1104,0,13572,0],[1116,0,13572,0],[1128,0,13572,0],[1140,0,13572,0],[1152,0,13572,0],[1164,0,13572,0],[1176,0,13572,0],[1188,0,13572,0]]},"growth_only":{"summary":{"months":780,"total_U":28967703,"peak_queue":1664,"peak_monthly_U":79797,"mean_monthly_U_active":37138,"calm_month":779,"final_members":13572,"final_positive":13572},"tr":[[0,7,1,0],[12,31,13,0],[24,53,31,1],[36,96,57,7],[48,134,91,31],[60,176,147,61],[72,212,205,109],[84,247,276,163],[96,289,365,229],[108,348,455,307],[120,385,569,390],[132,430,676,500],[144,459,816,601],[156,509,955,738],[168,539,1111,862],[180,602,1276,1017],[192,652,1453,1172],[204,668,1639,1349],[216,716,1835,1531],[228,762,2058,1718],[240,806,2271,1931],[252,842,2522,2139],[264,896,2752,2378],[276,935,3027,2608],[288,984,3287,2866],[300,1040,3583,3125],[312,1050,3867,3407],[324,1096,4184,3691],[336,1153,4498,3999],[348,1204,4829,4301],[360,1255,5166,4635],[372,1278,5517,4957],[384,1320,5890,5317],[396,1377,6264,5667],[408,1415,6647,6041],[420,1463,7047,6412],[432,1494,7459,6811],[444,1543,7874,7217],[456,1595,8315,7631],[468,1633,8762,8061],[480,1658,9223,8501],[492,1628,9644,8951],[504,1545,10063,9405],[516,1470,10439,9823],[528,1420,10814,10222],[540,1343,11157,10591],[552,1273,11514,10954],[564,1180,11819,11309],[576,1084,12092,11641],[588,961,12324,11934],[600,837,12543,12187],[612,723,12719,12417],[624,631,12879,12618],[636,560,13015,12787],[648,489,13138,12934],[660,429,13241,13066],[672,372,13334,13177],[684,321,13408,13278],[696,272,13471,13365],[708,211,13518,13434],[720,152,13549,13490],[732,96,13567,13529],[744,58,13572,13555],[756,31,13572,13568],[768,7,13572,13572]]},"global_node_800":{"summary":{"months":949,"total_U":132049973,"peak_queue":13572,"peak_monthly_U":781596,"mean_monthly_U_active":142142,"calm_month":948,"final_members":13572,"final_positive":13572},"tr":[[0,7,1,0],[12,31,13,0],[24,53,31,1],[36,96,57,7],[48,134,91,31],[60,176,147,61],[72,212,205,109],[84,247,276,163],[96,289,365,229],[108,348,455,307],[120,385,569,390],[132,430,676,500],[144,459,816,601],[156,509,955,738],[168,539,1111,862],[180,602,1276,1017],[192,652,1453,1172],[204,668,1639,1349],[216,716,1835,1531],[228,762,2058,1718],[240,806,2271,1931],[252,842,2522,2139],[264,896,2752,2378],[276,935,3027,2608],[288,984,3287,2866],[300,1040,3583,3125],[312,1050,3867,3407],[324,1096,4184,3691],[336,1153,4498,3999],[348,1204,4829,4301],[360,1255,5166,4635],[372,1278,5517,4957],[384,1320,5890,5317],[396,1377,6264,5667],[408,1415,6647,6041],[420,1463,7047,6412],[432,1494,7459,6811],[444,1543,7874,7217],[456,1595,8315,7631],[468,1633,8762,8061],[480,1658,9223,8501],[492,1628,9644,8951],[504,1545,10063,9405],[516,1470,10439,9823],[528,1420,10814,10222],[540,1343,11157,10591],[552,1273,11514,10954],[564,1180,11819,11309],[576,1084,12092,11641],[588,961,12324,11934],[600,837,12543,12187],[612,723,12719,12417],[624,631,12879,12618],[636,560,13015,12787],[648,489,13138,12934],[660,429,13241,13066],[672,372,13334,13177],[684,321,13408,13278],[696,272,13471,13365],[708,211,13518,13434],[720,152,13549,13490],[732,96,13567,13529],[744,58,13572,13555],[756,31,13572,13568],[768,7,13572,13572],[780,0,13572,13572],[792,0,13572,13572],[804,13572,13572,13572],[816,13572,13572,13572],[828,13572,13572,13224],[840,13572,13572,0],[852,13572,13572,0],[864,13572,13572,0],[876,13572,13572,0],[888,13572,13572,0],[900,13572,13572,0],[912,13572,13572,0],[924,13455,13572,0],[936,13555,13572,0],[948,702,13572,0]]},"global_lazy_800":{"summary":{"months":1598,"total_U":29348517,"peak_queue":1664,"peak_monthly_U":79797,"mean_monthly_U_active":18599,"calm_month":1597,"final_members":0,"final_positive":0},"tr":[[0,7,1,0],[12,31,13,0],[24,53,31,1],[36,96,57,7],[48,134,91,31],[60,176,147,61],[72,212,205,109],[84,247,276,163],[96,289,365,229],[108,348,455,307],[120,385,569,390],[132,430,676,500],[144,459,816,601],[156,509,955,738],[168,539,1111,862],[180,602,1276,1017],[192,652,1453,1172],[204,668,1639,1349],[216,716,1835,1531],[228,762,2058,1718],[240,806,2271,1931],[252,842,2522,2139],[264,896,2752,2378],[276,935,3027,2608],[288,984,3287,2866],[300,1040,3583,3125],[312,1050,3867,3407],[324,1096,4184,3691],[336,1153,4498,3999],[348,1204,4829,4301],[360,1255,5166,4635],[372,1278,5517,4957],[384,1320,5890,5317],[396,1377,6264,5667],[408,1415,6647,6041],[420,1463,7047,6412],[432,1494,7459,6811],[444,1543,7874,7217],[456,1595,8315,7631],[468,1633,8762,8061],[480,1658,9223,8501],[492,1628,9644,8951],[504,1545,10063,9405],[516,1470,10439,9823],[528,1420,10814,10222],[540,1343,11157,10591],[552,1273,11514,10954],[564,1180,11819,11309],[576,1084,12092,11641],[588,961,12324,11934],[600,837,12543,12187],[612,723,12719,12417],[624,631,12879,12618],[636,560,13015,12787],[648,489,13138,12934],[660,429,13241,13066],[672,372,13334,13177],[684,321,13408,13278],[696,272,13471,13365],[708,211,13518,13434],[720,152,13549,13490],[732,96,13567,13529],[744,58,13572,13555],[756,31,13572,13568],[768,7,13572,13572],[780,0,13572,13572],[792,0,13572,13572],[804,0,13572,13572],[816,0,13572,13572],[828,0,13572,13572],[840,0,13572,0],[852,0,13572,0],[864,0,13572,0],[876,0,13572,0],[888,0,13572,0],[900,0,13572,0],[912,0,13572,0],[924,0,13572,0],[936,0,13572,0],[948,0,13572,0],[960,0,13572,0],[972,0,13572,0],[984,0,13572,0],[996,0,13572,0],[1008,0,13572,0],[1020,0,13572,0],[1032,0,0,0],[1044,0,0,0],[1056,0,0,0],[1068,0,0,0],[1080,0,0,0],[1092,0,0,0],[1104,0,0,0],[1116,0,0,0],[1128,0,0,0],[1140,0,0,0],[1152,0,0,0],[1164,0,0,0],[1176,0,0,0],[1188,0,0,0],[1200,0,0,0],[1212,0,0,0],[1224,0,0,0],[1236,0,0,0],[1248,0,0,0],[1260,0,0,0],[1272,0,0,0],[1284,0,0,0],[1296,0,0,0],[1308,0,0,0],[1320,0,0,0],[1332,0,0,0],[1344,0,0,0],[1356,0,0,0],[1368,0,0,0],[1380,0,0,0],[1392,0,0,0],[1404,0,0,0],[1416,0,0,0],[1428,0,0,0],[1440,0,0,0],[1452,0,0,0],[1464,0,0,0],[1476,0,0,0],[1488,0,0,0],[1500,0,0,0],[1512,0,0,0],[1524,0,0,0],[1536,0,0,0],[1548,0,0,0],[1560,0,0,0],[1572,0,0,0],[1584,0,0,0],[1596,0,0,0]]}};
+
+/* ---------- estimator ---------- */
+const FIELDS = [
+  ["L","活跃商品层 L","短波峰值 11/12",12],
+  ["A","每层活跃候选 |A|","",500],
+  ["d","平均邻接度 d","",6],
+  ["f","变化比例 f","0–1",0.8],
+  ["dt","逻辑步长 Δt（月）","",1],
+  ["E","每月播种次数 E","",30],
+  ["W","每月政策/所有权唤醒 W","国家×商品",4],
+  ["nc","每国平均地点 n_c","",15],
+  ["R","每月重建聚合 R","国家×商品",4],
+  ["P","玩家国家 P","",1],
+  ["Gc","每国痴迷商品 G_c","",4],
+  ["Cm","成员国家 C_m","",400],
+  ["Cclk","活跃时钟国家 C_clk","国家×商品",600],
+  ["B","计划额度","U/月",480000],
+];
+const ADV = [
+  ["cpn","p 求值 / 节点","假设",10],
+  ["cpe","p 求值 / 边","假设",1],
+  ["qn","邻居入队中新入队比例","网格实验 0.023",0.03],
+  ["creg","登记 / 引用","假设",2],
+  ["cwake","唤醒 / 地点","假设",3],
+  ["cdelta","聚合差值 / 变化节点","假设",4],
+  ["creb","聚合重建 / 地点","假设",3],
+  ["ccom","提交 / 国家×商品","假设",20],
+  ["cev","事件检查 / 成员国","假设",3],
+  ["cgate","门控 / 层","假设",20],
+  ["cclean","清理摊销 / 层","假设",200],
+];
+const PRESETS = {
+  typical:{L:12,A:500,d:6,f:0.8,dt:1,E:30,W:4,R:4,Cm:400},
+  decay:{L:12,A:Math.round((2*13572+10*500)/12),d:6,f:1,dt:1,E:30,W:4,R:4,Cm:600},
+  annual:{L:12,A:Math.round((2*13572+10*500)/12),d:6,f:1,dt:1,E:30,W:4,R:4,Cm:600,_annual:true},
+  naive:{L:12,A:13588,d:6,f:1,dt:1,E:30,W:4,R:4,Cm:600},
+};
+const V = {};
+function mkField(host,[k,label,small,val]){
+  V[k]=val;
+  const row=document.createElement("div");row.className="field";
+  const id="f-"+k;
+  row.innerHTML=`<label for="${id}">${label}${small?` <small>${small}</small>`:""}</label><input id="${id}" type="number" step="any" min="0" value="${val}">`;
+  row.querySelector("input").addEventListener("input",e=>{V[k]=Math.max(0,parseFloat(e.target.value)||0);annualMode=false;clearPreset();calc();});
+  host.appendChild(row);
+}
+FIELDS.forEach(f=>mkField(document.getElementById("fields"),f));
+ADV.forEach(f=>mkField(document.getElementById("fields-adv"),f));
+function setField(k,v){V[k]=v;const el=document.getElementById("f-"+k);if(el)el.value=v;}
+function clearPreset(){document.querySelectorAll(".presets button").forEach(b=>b.setAttribute("aria-pressed","false"));}
+let annualMode=false;
+document.querySelectorAll(".presets button").forEach(b=>b.addEventListener("click",()=>{
+  const p=PRESETS[b.dataset.p];
+  Object.entries(p).forEach(([k,v])=>{if(!k.startsWith("_"))setField(k,v);});
+  if(p._annual){ // two decaying layers on a 12-month step; others monthly
+    setField("dt",1); annualMode=true;
+  } else annualMode=false;
+  clearPreset();b.setAttribute("aria-pressed","true");calc();
+}));
+
+const fmt=n=>Math.round(n).toLocaleString("en-US");
+function calc(){
+  const {L,A,d,f,dt,E,W,nc,R,P,Gc,Cm,Cclk,B,cpn,cpe,qn,creg,cwake,cdelta,creb,ccom,cev,cgate,cclean}=V;
+  const perNode = 11 + 4*d + f*(5 + d*(1 + 1 + 3*qn)) + cpn + cpe*d;   // option A actual, not reservation
+  let nodeRound = L*A*perNode;                            // all layers, one round each
+  let step = Math.max(1,dt);
+  let nodeDemand = nodeRound/step;                        // U per month if rounds keep their step
+  if(annualMode){                                         // preset: 2 full-map decaying layers on 12-month step
+    const decayLayers=2, other=L-decayLayers;
+    nodeDemand = other*500*perNode + decayLayers*13572*perNode/12;
+    nodeRound = other*500*perNode + decayLayers*13572*perNode;
+  }
+  const actF = annualMode ? ( (L-2)*500 + 2*13572/12 ) : L*A/step; // nodes per month
+  const parts = {
+    gate: L*cgate,
+    clock: Cclk*3 + Cclk*nc*4/114,
+    seed: E*(1+d)*creg,
+    wake: W*nc*(cwake+creg),
+    node: nodeDemand,
+    handoff: 0,
+    agg: f*actF*cdelta + R*nc*creb,
+    commit: (P*Gc + Cm*Gc/12)*ccom,
+    events: Cm*cev,
+    life: L*cclean,
+  };
+  const fixed = parts.clock+parts.gate+parts.seed+parts.wake+parts.agg+parts.commit+parts.events+parts.life;
+  const total = Object.values(parts).reduce((a,b)=>a+b,0);
+  const max = Math.max(...Object.values(parts), 1);
+  document.querySelectorAll("#pipe .stage").forEach(li=>{
+    const k=li.dataset.k; if(!(k in parts)) return;
+    li.querySelector(".fill").style.width = (100*parts[k]/Math.max(total,B)) + "%";
+    li.querySelector(".val").textContent = fmt(parts[k])+" U";
+  });
+  const tot=document.getElementById("tot");
+  tot.textContent=fmt(total)+" U";
+  const over = total > B;
+  tot.classList.toggle("over",over);
+  const scale = Math.max(total,B)*1.05;
+  const g=document.getElementById("gauge");
+  g.style.width=(100*total/scale)+"%"; g.classList.toggle("over",over);
+  document.getElementById("mark480").style.left=(100*B/scale)+"%";
+  // round stretch: budget left for node + handoff after fixed costs
+  const avail = Math.max(1, B - fixed);
+  const stretch = Math.max(1, (parts.node+parts.handoff)/avail);
+  const v=document.getElementById("verdict");
+  const naive = 13588*L*(11+4*d+(5+2*d)+cpn+cpe*d);
+  let msg;
+  if(!over){
+    msg=`在额度内，余量 <b>${fmt(B-total)}</b> U。单节点实际约 <b>${perNode.toFixed(1)}</b> U（含 p 求值），完整任务预扣上限 <b>${(16+9*d).toFixed(0)}</b> U。`;
+  } else if(fixed >= B){
+    msg=`超出额度 <b>${(total/B).toFixed(2)}×</b>。仅节点以外的开销（聚合、唤醒、提交等）就有 ${fmt(fixed)} U，已经用完额度，节点服务无法推进。`;
+  } else {
+    msg=`超出额度 <b>${(total/B).toFixed(2)}×</b>。节点服务只能分到 ${fmt(avail)} U，每轮被拉长到约 <b>${stretch.toFixed(2)}</b> 倍步长，传播按日历同比变慢。`;
+  }
+  if(A < 13588) msg += `<br><span style="color:var(--muted)">对照：同参数每月全图积分约 ${fmt(naive)} U。</span>`;
+  v.innerHTML = msg;
+  // ledger
+  document.getElementById("l-d").textContent=d;
+  document.getElementById("l-in").textContent=fmt(4*d);
+  document.getElementById("l-out").textContent=fmt(5*d);
+  document.getElementById("l-sum").textContent=fmt(16+9*d);
+  document.getElementById("l-nochg").textContent=fmt(11+4*d);
+  document.getElementById("l-typ").textContent=fmt(16+6*d);
+}
+calc();
+
+/* ---------- scenario chart ---------- */
+const SC = [
+  ["baseline","现行：国家时钟 T=240","#2E7A6A",true],
+  ["baseline_habit30","国家时钟 + 习俗保留率 κ=0.3","#73A99B",false],
+  ["growth_only","只有增长","#6B3F2A",true],
+  ["global_node_800","对比：第 800 月全图逐节点退潮","#A8452F",true],
+  ["global_lazy_800","对比：第 800 月全图共享 S","#2F5C9E",false],
+];
+const on = Object.fromEntries(SC.map(s=>[s[0],s[3]]));
+const tg=document.getElementById("toggles");
+SC.forEach(([k,label,color])=>{
+  const l=document.createElement("label");
+  l.innerHTML=`<input type="checkbox" ${on[k]?"checked":""}><i style="background:${color}"></i>${label}`;
+  l.querySelector("input").addEventListener("change",e=>{on[k]=e.target.checked;draw();});
+  tg.appendChild(l);
+});
+function draw(){
+  const host=document.getElementById("chart");
+  const W=Math.max(320,host.clientWidth||900), H=320, m={l:56,r:16,t:12,b:34};
+  const keys=SC.filter(s=>on[s[0]]);
+  let xmax=60; keys.forEach(([k])=>{const t=TR[k].tr;xmax=Math.max(xmax,t[t.length-1][0]);});
+  const ymax=14000;
+  const X=x=>m.l+(W-m.l-m.r)*x/xmax, Y=y=>m.t+(H-m.t-m.b)*(1-y/ymax);
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  for(let y=0;y<=ymax;y+=2000){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(y)}" y2="${Y(y)}" stroke="#E3E7E4"/><text x="${m.l-8}" y="${Y(y)+4}" font-size="11" text-anchor="end" fill="#5D6875">${y.toLocaleString()}</text>`;}
+  const xs=xmax>600?120:60;
+  for(let x=0;x<=xmax;x+=xs){s+=`<text x="${X(x)}" y="${H-12}" font-size="11" text-anchor="middle" fill="#5D6875">${x}</text>`;}
+  s+=`<text x="${W-m.r}" y="${H-0}" font-size="11" text-anchor="end" fill="#5D6875">月</text>`;
+  keys.forEach(([k,label,color])=>{
+    const t=TR[k].tr;
+    s+=`<polyline fill="none" stroke="${color}" stroke-width="2" points="${t.map(p=>X(p[0])+","+Y(p[1])).join(" ")}"><title>${label}</title></polyline>`;
+    s+=`<polyline fill="none" stroke="${color}" stroke-width="1.2" stroke-dasharray="4 3" opacity=".75" points="${t.map(p=>X(p[0])+","+Y(p[2])).join(" ")}"/>`;
+  });
+  s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(13572)}" y2="${Y(13572)}" stroke="#1E2633" stroke-width=".8" stroke-dasharray="2 3"/><text x="${W-m.r}" y="${Y(13572)-5}" font-size="11" text-anchor="end" fill="#1E2633">全图 13,572 节点</text>`;
+  s+="</svg>"; host.innerHTML=s;
+}
+draw(); addEventListener("resize",draw);
+
+const tb=document.querySelector("#scen-table tbody");
+SC.forEach(([k,label])=>{
+  const r=TR[k].summary;
+  tb.insertAdjacentHTML("beforeend",`<tr><td>${label}</td><td class="m">${fmt(r.months)}</td><td class="m">${fmt(r.total_U)}</td><td class="m">${fmt(r.peak_queue)}</td><td class="m">${fmt(r.peak_monthly_U)}</td><td class="m">${r.calm_month===null?"—":fmt(r.calm_month)}</td><td class="m">${fmt(r.final_members)}</td></tr>`);
+});
+</script>
+</body>
+</html>

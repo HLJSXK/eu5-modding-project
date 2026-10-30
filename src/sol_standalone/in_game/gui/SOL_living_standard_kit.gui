@@ -1,0 +1,296 @@
+# SOL Living Standard UI kit - one visual language for every SOL economy surface.
+#
+#   * the location tooltip           (SOL_economy_local.gui)
+#   * the country situation panel    (panels/situation/global_living_standard.gui)
+#
+# CURRENT SURFACES
+# scripts/gen_sol_ls_gui.py owns sheet C purchasing-power rows and the three
+# numeric values (raw balance, available funds, baseline). Population charts
+# and dials are temporarily removed by user decision. F goods tiers use
+# sol_group_row below. Older ring/ledger helpers remain defined for legacy
+# tooling but are not emitted into either current surface.
+#
+# Every wrapping text must have a max_width. Fixed headers and card labels need
+# positive width budgets; blockoverride replaces an inherited block entirely.
+
+types SOLivingStandardKit {
+	# ---------------------------------------------------------------- headline figure
+	# A small concept icon beside a caption + value stack. Four of these, written out
+	# per surface, form the headline strip.
+	type sol_stat_item = widget {
+		size = { 112 46 }
+
+		hbox = {
+			layoutpolicy_horizontal = expanding
+			spacing = 6
+
+			icon = {
+				size = { 26 26 }
+				texture_density = 2
+				block "sol_stat_icon" { texture = "[GetConceptTexture('gold')]" }
+			}
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				spacing = 0
+
+				text_single = {
+					layoutpolicy_horizontal = expanding
+					using = Font_Size_Small
+					autoresize = yes
+					block "sol_stat_label" { text = "SOL_GUI_ROW_TOTAL_INCOME" }
+				}
+
+				text_single = {
+					layoutpolicy_horizontal = expanding
+					using = Font_Size_Medium
+					autoresize = yes
+					block "sol_stat_value" { raw_text = "0" }
+				}
+			}
+		}
+	}
+
+	# ---------------------------------------------------------------- section caption
+	# A full-width tinted bar carrying one section title. Inherited TooltipTableHeader
+	# *is* the caption, so this adds no body - a body would stack a second header row
+	# underneath the first.
+	type sol_caption = TooltipListBase {
+		blockoverride "tooltip_minimumsize" { minimumsize = { -1 -1 } }
+		blockoverride "bg_listbase" {}
+
+		TooltipTableHeader = {
+			blockoverride "table_header_background" {
+				background = {
+					using = text_mask_container_texture
+					alpha = 0.5
+					modify_texture = {
+						using = color_turquoise_texture
+						blend_mode = add
+						alpha = 0.45
+					}
+				}
+			}
+
+			blockoverride "tableheader_text" {
+				block "sol_caption_text" { text = "SOL_GUI_SECTION_INCOME" }
+			}
+		}
+	}
+
+	# ---------------------------------------------------------------- body paragraph
+	# Quiet explanatory sentence. max_width is mandatory, not cosmetic: an hbox measures
+	# its children with no width hint, so an uncapped wrapping text reports its full
+	# unwrapped width as a minimum and inflates the whole frame.
+	type sol_note = TooltipListBase {
+		blockoverride "tooltip_minimumsize" { minimumsize = { -1 -1 } }
+		blockoverride "bg_listbase" {}
+
+		TooltipTableHeader = {
+			blockoverride "tableheader_text" { visible = no }
+		}
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+			margin = { 10 4 }
+
+			textbox = {
+				using = tooltip_text_block_template
+				max_width = 448
+				block "sol_note_text" { text = "GLS_TT_SAVINGS_HEADER" }
+			}
+		}
+	}
+
+	# ---------------------------------------------------------------- composition ring
+	# Estate population share. Slice colours are the vanilla pop colours from
+	# main_menu/common/named_colors/02_map.txt (pop_nobles 224/59/80, pop_clergy 217/13/90,
+	# pop_burghers 40/87/79, pop_peasants 78/44/47, pop_tribes 20/44/47) converted to RGB,
+	# because a named colour cannot be referenced from a pieslice colour field.
+	#
+	# The slices take raw counts, not percentages: the engine normalises a pie, so the
+	# same ring works on a location with 115 people and a country with 30000.
+	type sol_ring = widget {
+		size = { 62 62 }
+
+		piechart = {
+			size = { 100% 100% }
+			parentanchor = center
+			using = piechart_angles
+			using = bg_circle_piechart
+
+			pieslice_no_highlight = {
+				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+				color = { 0.328 0.454 0.800 1 }
+				block "sol_slice_nobles" { value = "0" }
+			}
+			pieslice_no_highlight = {
+				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+				color = { 0.783 0.828 0.900 1 }
+				block "sol_slice_clergy" { value = "0" }
+			}
+			pieslice_no_highlight = {
+				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+				color = { 0.790 0.561 0.103 1 }
+				block "sol_slice_burghers" { value = "0" }
+			}
+			pieslice_no_highlight = {
+				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+				color = { 0.408 0.470 0.263 1 }
+				block "sol_slice_commoners" { value = "0" }
+			}
+			pieslice_no_highlight = {
+				texture = "gfx/interface/pie_charts/pie_chart_alpha_80.dds"
+				color = { 0.470 0.332 0.263 1 }
+				block "sol_slice_tribesmen" { value = "0" }
+			}
+		}
+	}
+
+	# One legend line beside the ring: the estate texticon (already coloured by the
+	# game with the estate colour that matches its slice) plus name and *the same
+	# quantity the ring is drawn from*. Pairing the ring with a different metric -
+	# e.g. a population ring next to a tax-share legend - makes the graphic lie.
+	type sol_legend_row = hbox {
+		size = { -1 22 }
+		spacing = 3
+
+		text_single = {
+			size = { 126 22 }
+			autoresize = no
+			align = left|nobaseline
+			block "sol_legend_name" { text = "SOL_ESTATE_NOBLES" }
+		}
+
+		text_single = {
+			size = { 52 22 }
+			align = right|nobaseline
+			block "sol_legend_value" { raw_text = "0" }
+		}
+
+		expand = {}
+	}
+
+	# ---------------------------------------------------------------- estate ledger
+	# Column header. Widths must match sol_ledger_row exactly or the columns drift.
+	type sol_ledger_header = hbox {
+		layoutpolicy_horizontal = expanding
+		size = { -1 22 }
+		margin = { 4 0 }
+
+		# autoresize = no is load-bearing on every fixed column: text_single inherits
+		# autoresize = yes from text_single_template, and autoresize makes the declared
+		# size lose to the text's intrinsic width, which collapses the columns together.
+		text_single = {
+			size = { 126 22 }
+			autoresize = no
+			align = left|nobaseline
+			text = "SOL_LEDGER_ESTATE"
+		}
+
+		text_single = { size = { 46 22 } autoresize = no align = center|nobaseline text = "SOL_LEDGER_POP" }
+		text_single = { size = { 50 22 } autoresize = no align = center|nobaseline text = "SOL_LEDGER_POWER" }
+		text_single = { size = { 58 22 } autoresize = no align = center|nobaseline text = "SOL_LEDGER_INCOME" }
+		text_single = { size = { 52 22 } autoresize = no align = center|nobaseline text = "SOL_LEDGER_UPKEEP" }
+		text_single = { size = { 96 22 } autoresize = no align = center|nobaseline text = "SOL_LEDGER_SAVINGS" }
+
+		expand = {}
+	}
+
+	# One estate. Label + population + income + upkeep + savings/target.
+	# `sol_ledger_row` is plain; `sol_ledger_row_alt` carries the vanilla turquoise
+	# stripe. Stripes are assigned per row rather than by index so an interleaved
+	# caption cannot shift the parity.
+	type sol_ledger_row = hbox {
+		layoutpolicy_horizontal = expanding
+		size = { -1 26 }
+		margin = { 4 0 }
+
+		block "sol_ledger_bg" {}
+
+		text_single = {
+			size = { 126 26 }
+			autoresize = no
+			align = left|nobaseline
+			block "sol_ledger_label" { text = "SOL_ESTATE_NOBLES" }
+		}
+
+		block "sol_ledger_cells" {}
+
+		expand = {}
+	}
+
+	type sol_ledger_row_alt = sol_ledger_row {
+		blockoverride "sol_ledger_bg" {
+			background = { using = tooltip_table_field_texture }
+		}
+	}
+
+	# ---------------------------------------------------------------- key / value row
+	# A label on the left and one right-aligned value: the consumption coefficient and
+	# every other single-figure line.
+	type sol_kv_row = hbox {
+		layoutpolicy_horizontal = expanding
+		size = { -1 26 }
+		margin = { 4 0 }
+
+		block "sol_kv_bg" {}
+
+		text_single = {
+			layoutpolicy_horizontal = expanding
+			align = left|nobaseline
+			block "sol_kv_label" { text = "SOL_GUI_ROW_BASE_SPENDING" }
+		}
+
+		text_single = {
+			size = { 118 26 }
+			align = right|nobaseline
+			block "sol_kv_value" { raw_text = "0" }
+		}
+	}
+
+	type sol_kv_row_alt = sol_kv_row {
+		blockoverride "sol_kv_bg" {
+			background = { using = tooltip_table_field_texture }
+		}
+	}
+
+	# ---------------------------------------------------------------- substitute group
+	# F-route card: one demand group with its goods shown in a compact icon grid.
+	# A 122px card fits six icons on one row. Both surfaces have four columns.
+	type sol_group_row = vbox {
+		size = { 122 66 }
+		minimumsize = { 122 66 }
+		layoutpolicy_horizontal = fixed
+		spacing = 1
+		margin = { 4 3 }
+		background = { using = tooltip_table_field_texture }
+
+		hbox = {
+			block "sol_group_header" { size = { 114 17 } layoutpolicy_horizontal = fixed }
+			text_single = {
+				layoutpolicy_horizontal = fixed
+				autoresize = no
+				fontsize = 11
+				align = left|nobaseline
+				block "sol_group_label" { text = "SOL_SUBGROUP_STAPLE" }
+			}
+			text_single = {
+				size = { 30 17 }
+				autoresize = no
+				fontsize = 10
+				align = right|nobaseline
+				block "sol_group_count" { raw_text = "0" }
+			}
+		}
+
+		block "sol_group_icons" {}
+		expand = {}
+		progressbar = {
+			block "sol_group_progress" { size = { 114 3 } max = 1 value = 0 }
+			min = 0
+			progresstexture = "gfx/interface/sol_proto/bar_gold.dds"
+			noprogresstexture = "gfx/interface/sol_proto/bar_track.dds"
+		}
+	}
+}

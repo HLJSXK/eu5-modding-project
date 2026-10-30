@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Single source of truth for SOL substitute-group ordering of goods in the UI.
+
+Both SOL economy surfaces show every demand good as an icon cell. Ordering those
+cells by substitute group (instead of alphabetically) is what makes the grouping
+legible without any extra widgets: a cell is adjacent to its substitutes.
+
+The membership table is read from data/goods_weights.csv (one row per membership).
+Ordering a unique goods list uses its first group, while labelled group rows show
+every membership. An overlapping good therefore appears in each of its groups.
+
+JTG-only goods have no membership in that file and sort after every grouped good,
+keeping their existing relative order.
+"""
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+GOODS_WEIGHTS = REPO_ROOT / "data" / "goods_weights.csv"
+
+
+def _load() -> tuple[list[str], dict[str, str], dict[str, list[str]]]:
+    groups: list[str] = []
+    primary: dict[str, str] = {}
+    members: dict[str, list[str]] = {}
+    with GOODS_WEIGHTS.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            good = (row["good"] or "").strip()
+            group = (row["group"] or "").strip()
+            if not good or not group:
+                continue
+            if group not in groups:
+                groups.append(group)
+            primary.setdefault(good, group)
+            if good not in members.setdefault(group, []):
+                members[group].append(good)
+    if len(primary) != 56:
+        raise ValueError(
+            f"Expected 56 grouped SOL goods in {GOODS_WEIGHTS}, found {len(primary)}"
+        )
+    return groups, primary, members
+
+
+_CSV_GROUP_ORDER, PRIMARY_GROUP, GROUP_MEMBERS = _load()
+
+# F-route groups are presented as three demand tiers in sheet3_f.png.
+GROUP_ORDER = [
+    "staple", "protein", "basic_clothing", "heating", "crude_goods",
+    "condiments", "household", "standard_clothing", "intoxicants",
+    "medicine", "ritual", "knowledge",
+    "luxury_food", "luxury_drinks", "luxury_goods", "spices", "precious",
+    "treasures", "weapons", "mounts",
+]
+if set(GROUP_ORDER) != set(_CSV_GROUP_ORDER):
+    raise ValueError("F-route group order does not match data/goods_weights.csv")
+
+GROUP_TIERS = (
+    ("required", GROUP_ORDER[:5]),
+    ("daily", GROUP_ORDER[5:12]),
+    ("luxury", GROUP_ORDER[12:]),
+)
+
+
+def group_of(good: str) -> str | None:
+    return PRIMARY_GROUP.get(good)
+
+
+def sort_key(good: str) -> tuple[int, str]:
+    """Sort goods into substitute-group order.
+
+    Grouped goods come first (in group order, then by table order inside the
+    group); ungrouped goods follow in their original relative order.
+    """
+    group = PRIMARY_GROUP.get(good)
+    if group is None:
+        return (len(GROUP_ORDER), good)
+    index = GROUP_ORDER.index(group)
+    return (index, f"{index:03d}")
+
+
+def ordered(goods: list[str]) -> list[str]:
+    """Return `goods` in substitute-group order, keeping ungrouped goods stable."""
+    ungrouped = [good for good in goods if good not in PRIMARY_GROUP]
+    grouped = [good for good in goods if good in PRIMARY_GROUP]
+    # Stable pass first so two goods in the same group keep their original order.
+    return sorted(grouped, key=lambda g: GROUP_ORDER.index(PRIMARY_GROUP[g])) + ungrouped
+
+
+def main() -> None:
+    goods = list(PRIMARY_GROUP)
+    lines = ["# Substitute groups (order = first appearance in data/goods_weights.csv)"]
+    for group in GROUP_ORDER:
+        members = GROUP_MEMBERS[group]
+        lines.append(f"\n{group} ({len(members)}): " + ", ".join(members))
+    lines.append("\n# UI cell order (10 per row)")
+    cells = ordered(goods)
+    for start in range(0, len(cells), 10):
+        lines.append("  " + " ".join(cells[start : start + 10]))
+    print("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()
+
+
+def group_rows(goods: list[str]) -> list[tuple[str | None, list[str]]]:
+    """Split `goods` into (group, members) rows in GROUP_ORDER, ungrouped goods last.
+
+    This is what lets the UI show substitute groups as labelled rows instead of one
+    flat lattice of icons: the group is the unit the player reasons about, and an
+    ungrouped good (the compat submods' extras) gets its own trailing row rather
+    than being silently mixed in.
+    """
+    available = set(goods)
+    rows = [(group, [good for good in GROUP_MEMBERS[group] if good in available])
+            for group in GROUP_ORDER]
+    rows = [(group, members) for group, members in rows if members]
+    ungrouped = list(dict.fromkeys(good for good in goods if good not in PRIMARY_GROUP))
+    if ungrouped:
+        rows.append((None, ungrouped))
+    return rows

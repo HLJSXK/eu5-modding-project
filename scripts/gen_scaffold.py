@@ -57,7 +57,7 @@ DEFAULT_EXTENSIONS = {
 # ── Template functions ────────────────────────────────────────────────────────
 # Each returns (filename_stem, file_content, encoding)
 # References (Step 3 compliance):
-#   event            → reference_game_files/game/in_game/events/civil_war.txt
+#   event            → .eu5-base/reference_game_files/game/in_game/events/civil_war.txt
 #   scripted_effect  → src/stable/in_game/common/scripted_effects/A_SOL_economy_effects.txt
 #   scripted_trigger → src/stable/in_game/common/scripted_triggers/SOL_cmm_triggers.txt
 #   static_modifier  → src/stable/main_menu/common/static_modifiers/A_SOL_economy_modifiers.txt
@@ -140,7 +140,7 @@ TRY_INJECT:{name} = {{
 \tgame_data = {{
 \t\tcategory = {category}
 \t}}
-\t# TODO: add modifier values (see reference_game_files/.../modifier_type_definitions/)
+\t# TODO: add modifier values (see .eu5-base/reference_game_files/.../modifier_type_definitions/)
 }}
 """
     return name, content, "utf-8-sig"

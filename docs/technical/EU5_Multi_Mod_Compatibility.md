@@ -103,7 +103,7 @@ INJECT_OR_CREATE
 
 - 多数 trigger/effect 字段已经存在时，不能通过再次注入同名字段来可靠合并；若原对象没有该字段，注入一个新字段才可能正常工作。
 - 对 scripted effects 和 scripted triggers 使用 `INJECT:` 不会追加其内部效果或条件，而会像 `REPLACE:` 一样覆盖原定义。
-- 并非所有数据库目录都支持这些关键字。使用前应查当前版本的 `reference_official_defines/`，不足时再查 `reference_game_files/`。
+- 并非所有数据库目录都支持这些关键字。使用前应查当前版本的 `.eu5-base/reference_official_defines/`，不足时再查 `.eu5-base/reference_game_files/`。
 
 ## 6. 多 Mod 兼容检查清单
 

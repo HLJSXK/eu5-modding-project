@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOL 人口需求：完整计算链</title>
+<link rel="stylesheet" href="styles.css">
+<script defer src="engine.js"></script>
+<script defer src="pipeline.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">SOL · 人口需求 · <a href="index.html">替代组逐步讲解 →</a></p>
+    <h1>从收入到游戏里的需求</h1>
+    <p class="lead">SOL 每个月替每个地点、每个阶层决定"该买多少"，再想办法让引擎照做。下面先给整条链，再用一个 4 地点、2 市场的小国家逐步算一遍，最后对比三种结果各自精确在哪、近似在哪。</p>
+    <p class="legend">
+      <span class="tag old">现有</span> 当前代码已经这样做
+      <span class="tag new">新增</span> 替代组要加的部分
+      <span class="tag test">待定</span> 还需要拍板
+    </p>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="p0">
+  <h2><span class="num">0</span>整条链</h2>
+  <ol class="pipeline">
+    <li><b>游戏外 · 消费常量表 <span class="tag old">现有</span></b>每个阶层每人每种商品买多少，是一张固定表（<code>data/demand_price_table.csv</code> → <code>SOL_market_unit_consumption_values.txt</code>）。收入不进这张表。</li>
+    <li><b>每年 · 市场刷新 <span class="tag old">现有</span></b>只算市场里有供给的商品；有效价格 = min(市场价, 默认价)；单位支出 = Σ 每人消费量 × 有效价格。目前只按阶层存总和。<span class="chg">新增：按价格档位算每个市场每种商品的替代倍率 D，并且要保留每商品明细</span></li>
+    <li><b>每月 · 国家存款压力 <span class="tag old">现有</span></b>sp = (五个阶层总存款 ÷ 总目标 − 1) × 0.25，最多 +50%。全国所有阶层用同一个值。</li>
+    <li><b>每月 · 国家替代倍率 M <span class="tag new">新增</span></b>M(国家, 商品) = Σ 原消费量 × D ÷ Σ 原消费量，只统计本国地点。一国每种商品只有一个数。</li>
+    <li><b>每月 · 地点收支闭合 → 结果 α <span class="tag old">现有</span></b>流动资金 = 各阶层净收入（减阶层建筑维护）× (1 + sp)；基础支出 = Σ 阶层人口 × 单位支出（替代后要乘 M）；<b>k = 流动资金 ÷ 基础支出</b>，一个地点一个 k，不分阶层。</li>
+    <li><b>每月 · 国家阶层求解器 → 结果 β <span class="tag old">现有</span></b>5 个地点以上才跑。地点按"哪个阶层占比最突出"分成 4 类，解 4×4 方程得每类一个系数 c，让全国每个阶层的支出 = 流动资金。精确解失败时做顶点搜索，再不行就退回 α。</li>
+    <li><b>每月 · 写进游戏</b>地点 <code>local_pop_demand</code> size = k × c − 1 <span class="tag old">现有</span><span class="chg">新增：国家 <code>global_&lt;商品&gt;_pop_demand</code> size = (1 + e) × (M − 1)</span></li>
+    <li><b>引擎</b>人口实际需求 = demand_add × (1 + 商品修正) × (1 + 地点修正) × 原版因子。不同类型修正相乘（已实测），所以最终 ≈ 每人消费量 × M × k × c。</li>
+  </ol>
+</section>
+
+<section id="p1">
+  <h2><span class="num">1</span>示例国家</h2>
+  <p>4 个地点、2 个市场、3 种商品。小麦和稻米同属"主食"替代组，布料单独一组不替代。所有数字都是示例，只为看清结构。</p>
+  <div class="panel controls">
+    <label class="slider-row"><span>市场 A 小麦</span><input type="range" id="c-pa" min="0.3" max="3" step="0.05" value="2"><output id="c-pa-o"></output></label>
+    <label class="slider-row"><span>市场 B 小麦</span><input type="range" id="c-pb" min="0.3" max="3" step="0.05" value="0.6"><output id="c-pb-o"></output></label>
+    <label class="slider-row"><span>存款压力 sp</span><input type="range" id="c-sp" min="-0.5" max="0.5" step="0.05" value="0"><output id="c-sp-o"></output></label>
+    <div class="seg">
+      <label><input type="checkbox" id="c-sub" checked> 开启替代组</label>
+      <label><input type="radio" name="c-w" value="quantity" checked> M 按数量加权</label>
+      <label><input type="radio" name="c-w" value="money"> M 按金额加权</label>
+    </div>
+  </div>
+  <div class="table-wrap"><table id="t-loc"></table></div>
+  <p class="caption">人口单位：千人。收入为该阶层在该地点的月收入（已扣阶层建筑维护）。稻米、布料在两个市场都是正常价。</p>
+</section>
+
+<section id="p2">
+  <h2><span class="num">2</span>消费常量表：完全线性</h2>
+  <p>每人每种商品的消费量是固定常量，和收入无关。收入只通过后面那个统一系数 k 起作用，所以"流动资金 → 各商品消费"是一条过原点的直线，所有商品同一个乘数。</p>
+  <div class="table-wrap"><table id="t-unit"></table></div>
+</section>
+
+<section id="p3">
+  <h2><span class="num">3</span>市场：有效价格与替代倍率 D</h2>
+  <p>有效价格只往下截：贵了按默认价算支出，便宜了按市场价算。D 是替代组讲解页第 2 步的组内倍率，<b>只看市场价格，和阶层无关</b>。</p>
+  <div class="table-wrap"><table id="t-mkt"></table></div>
+</section>
+
+<section id="p4">
+  <h2><span class="num">4</span>国家替代倍率 M <span class="tag new">新增</span></h2>
+  <p>D 因市场而异，但一个国家每种商品只能写一个修正，所以要压成一个 M。</p>
+  <div id="m-out"></div>
+  <div class="table-wrap"><table id="t-mcheck"></table></div>
+  <p class="note" id="m-note"></p>
+</section>
+
+<section id="p5">
+  <h2><span class="num">5</span>地点闭合：结果 α</h2>
+  <p>每个地点一个 k，让<b>地点总支出 = 地点总流动资金</b>。所有阶层乘同一个 k，所以各阶层自己是亏是盈，α 不管。</p>
+  <div class="table-wrap"><table id="t-alpha"></table></div>
+  <p class="caption">"阶层支出 ÷ 资金"一栏：100% 代表该阶层收支相等，红色是花得比挣得多，蓝色是花得少。</p>
+</section>
+
+<section id="p6">
+  <h2><span class="num">6</span>国家求解器：结果 β</h2>
+  <p>每个地点归入一类，同类地点共用一个系数 c，最终倍率 = k × c。4 个阶层、4 类、4 个未知数，正好解出让<b>全国每个阶层收支相等</b>的 c。代价是单个地点的总收支不再相等，地点修正值只是"解"，本身没有含义。</p>
+  <div id="beta-coef" class="result-line"></div>
+  <div class="twin">
+    <div class="mini"><h4>全国各阶层：支出 ÷ 资金</h4><div id="beta-strata"></div></div>
+    <div class="mini"><h4>各地点：支出 ÷ 资金</h4><div id="beta-loc"></div></div>
+  </div>
+  <p class="caption">示例里的分类是简化版（取占比最突出的阶层）。真实代码还按置信度排序并加容量惩罚，4 个地点以下直接用 α。</p>
+</section>
+
+<section id="p7">
+  <h2><span class="num">7</span>写进游戏</h2>
+  <div class="twin">
+    <div class="mini"><h4>地点 <code>local_pop_demand</code></h4><div id="w-loc"></div></div>
+    <div class="mini"><h4>国家商品修正 <span class="tag new">新增</span></h4><div id="w-cty"></div></div>
+  </div>
+  <p class="note">e 是该商品已有的其他同类修正（时代、思潮等）。示例取 e = 0。三层修正互相相乘，例如 L1 的平民每人小麦需求 = 1 × <span id="w-ex"></span>。</p>
+</section>
+
+<section id="p8">
+  <h2><span class="num">8</span>三种结果各自精确在哪</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>v1.1</th><th>α 地点闭合</th><th>β 国家求解器</th><th>β + 替代组</th></tr></thead>
+    <tbody>
+      <tr><td>控制粒度</td><td>每个 POP 每种商品（脚本值）</td><td>每地点一个总量修正</td><td>每地点一个总量修正</td><td>+ 每国每商品一个修正</td></tr>
+      <tr><td>地点总收入 = 总支出</td><td>✓</td><td>✓ 精确</td><td>✗ 地点值只是解</td><td>✗ 同 β</td></tr>
+      <tr><td>全国每个阶层收入 = 支出</td><td>✓</td><td>✗</td><td>✓ 精确解时；否则近似</td><td>✓ 同 β</td></tr>
+      <tr><td>价格替代</td><td>✓ 每个 POP 按本市场</td><td>✗</td><td>✗</td><td>✓ 阶层无误差；多市场国家有误差</td></tr>
+      <tr><td>主要误差来源</td><td>—</td><td>阶层之间的盈亏</td><td>地点之间的分配</td><td>+ 同一商品不同市场的多少</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="p9">
+  <h2><span class="num">9</span>几处需要说清楚的地方</h2>
+  <ul class="plain">
+    <li><b>替代要放在闭合之前，而不是之后。</b>方案 A 的 M 会改变篮子总价（组内合计不守恒），所以要先把 M 乘进基础支出，再算 k 和 c。这样 α、β 的收支相等照样成立，替代只改变"钱花在哪些商品上"。引擎里商品修正和地点修正相乘，最终每人需求 = 消费量 × M × k × c，三层互不打架。</li>
+    <li><b>阶层之间确实没有误差，前提是不恢复宗教 / 文化偏好。</b>D 只取决于市场价格和市场里有哪些商品，所以只有一个市场的国家 M 就等于 D。把示例两个市场的小麦价调成一样就能看到误差消失。</li>
+    <li><b>"总额一致"要选口径。<span class="tag test">待定</span></b>同一商品两市场价格不同时，按数量加权保证全国<em>数量</em>对，按金额加权保证全国<em>花费</em>对，两者不能同时成立（第 4 步的表可切换对比）。规格目前选数量。而且这是在 k、c 缩放之前的口径，各地点乘上不同的 k × c 之后合计还会再偏一点。</li>
+    <li><b>市场缓存要改。</b>现在每个市场只存"每个阶层的单位支出总和"。不同国家的 M 不同，这个总和就不能共用了，必须保留每商品明细。</li>
+    <li><b>SOL 账本和引擎明细并不完全一致。</b>账本用 min(市场价, 默认价) 近似价格影响；引擎明细里还有价格系数、低食物 +50%、生产于本市场 +10%、宗教、赤字等项。这些是否已被常量表校准吸收，这次没有查证。</li>
+  </ul>
+</section>
+
+<footer>依据：<code>A_SOL_economy_effects.txt</code>（<code>sol_refresh_market_pop_demand_maps</code>、<code>gls_compute_savings_pressure</code>、<code>sol_compute_location_pop_demand</code>、<code>sol_solve_country_pop_demand</code>）与替代组实施规格。示例是离线演示，不是游戏实算。</footer>
+</main>
+</body>
+</html>

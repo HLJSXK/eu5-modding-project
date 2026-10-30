@@ -104,7 +104,7 @@ GOOD_TO_PRIMARY_GROUP: Dict[str, str] = {
         ("medicine",          ["medicaments", "mercury"]),
         ("ritual",            ["incense"]),
         ("weapons",           ["weaponry", "firearms"]),
-        ("mounts",            ["horses", "elephants"]),
+        ("mounts",            ["horses", "camels", "elephants"]),
         ("knowledge",         ["paper", "books"]),
     ]
     for g in members

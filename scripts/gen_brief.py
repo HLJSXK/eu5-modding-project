@@ -8,6 +8,7 @@ Usage:
 """
 
 from datetime import date
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,6 +23,12 @@ except ImportError:
     raise SystemExit(1)
 
 REPO_ROOT = Path(__file__).parent.parent
+_BASE_DEFAULT = REPO_ROOT / ".eu5-base"
+if not _BASE_DEFAULT.exists():
+    _BASE_DEFAULT = REPO_ROOT.parent / "eu5-modding-base"
+BASE_ROOT = Path(os.environ.get("EU5_MODDING_BASE", str(_BASE_DEFAULT))).resolve()
+sys.path.insert(0, str(BASE_ROOT / "docs" / "knowledge"))
+from knowledge_loader import load_anti_patterns, load_valid_enums
 KNOWLEDGE_DIR = REPO_ROOT / "docs" / "knowledge"
 OUTPUT = KNOWLEDGE_DIR / "BRIEF.md"
 OVERVIEW = KNOWLEDGE_DIR / "PROJECT_OVERVIEW.md"
@@ -29,13 +36,17 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 
 # Codegen script map: (script, inputs, outputs, when_to_run)
 CODEGEN_SCRIPTS = [
+    ("gen_sol_lshud.py", "SOL four-section source + SOL history/ranking/map emitters + vendored Glorp UI types", "stable/standalone HUD, Glorp offset shim, four map modes, scoped map tooltips, font icon registration/asset, bilingual localization and ranking caches", "Run by gen_sol_chain; supports --check; stable must load after Glorp UI; verify with test_sol_lshud_income/ranking/ui.py and test_sol_map_modes.py"),
+    ("gen_sol_substitution.py", "goods_weights.csv + pop_group_baskets.csv + substitute_groups.json + calibrated demand", "country pulse effects, guarded cache/display values, triggers and 56 auto modifiers", "Run by gen_sol_chain; edit sol_substitution.py, regenerate, then run test_sol_substitution.py"),
+    ("gen_whole_group_baskets.py", "pop_group_baskets.csv + goods_weights.csv + calibrated demand", "whole-group and emittable-net checks; one-time budget-preserving target_demand.csv migration", "--check runs first in gen_sol_chain; --fill migrates incomplete baskets once"),
     ("update_mod_version.py", "local date or explicit --date", "selected src/<target>/.metadata/metadata.json version fields", "Run automatically by build.bat before deployment; supports --target and --check"),
     ("gen_sol_chain.py",  "SOL demand data + vanilla/PP/M&T/JTG goods + Glorp UI", "active SOL generated files for all deploy targets", "Preferred one-shot SOL generation entry; build.bat runs it automatically"),
+    ("gen_sol_messages.py", "SOL resolution message definition", "stable/standalone main_menu/gui/messagetypes/SOL_messages.txt (SOL entries only)", "Run by gen_sol_chain; supports --check; removes its obsolete full-copy database for EU5 1.4.3"),
     ("gen_sol_pp_compat.py", "stable SOL outputs + PP definitions", "SOL-PP compact feature, demand, effects, and GUI overrides; validates PP road-price filename ownership", "After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain"),
     ("gen_sol_mnt_compat.py", "data/target_demand.csv + stable SOL + M&T definitions", "SOL-M&T goods, accounting, EPBM, CMM residual cleanup, actions, and location GUI", "After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain"),
-    ("gen_sol_jtg_compat.py", "data/jtg_pop_demand.csv + stable SOL outputs", "SOL-JTG demand, values, effects, and 77-good GUI overrides", "After changing JTG demand data or updating the five JTG mods; run by gen_sol_chain"),
-    ("sync_location_window.py", "Glorp UI location window + extracted vanilla types", "exact Glorp stable window plus one SOL tooltip button and unchanged type support", "After updating the Glorp UI reference; run by gen_sol_chain for stable/all"),
-    ("gen_sol_economy_effects.py", "scripts/sol_economy_effects_source.py + scripts/sol_country_demand_solver_source.py + data/demand_price_table.csv", "src/<target>/.../A_SOL_economy_effects.txt + B_SOL_country_demand_solver.txt", "After changing SOL economy emitters, country solver emitters, or demand data; run by gen_sol_chain for stable|sol_standalone|all"),
+    ("gen_sol_jtg_compat.py", "data/jtg_pop_demand.csv + stable SOL outputs", "SOL-JTG demand, values, effects, and 82-good GUI overrides", "After changing JTG demand data or updating the Just Goods Workshop reference; run by gen_sol_chain"),
+    ("sync_location_window.py", "Glorp UI location window + extracted vanilla types", "Current Glorp UI-based stable window with optional Construction Manager references, one SOL tooltip button, synchronized type support, and backward-compatible 1.4 API migration", "After updating the Glorp UI reference; run by gen_sol_chain for stable/all"),
+    ("gen_sol_economy_effects.py", "scripts/sol_economy_effects_source.py + scripts/sol_country_demand_solver_source.py + scripts/sol_living_standard_source.py + data/demand_price_table.csv", "economy/solver effects, annual SOL values, flat/percent modifier types, icons, 17 building injections, migration/growth static modifiers and bilingual names", "After changing SOL economy emitters, country solver emitters, or demand data; run by gen_sol_chain for stable|sol_standalone|all"),
     ("gen_pop_goods.py",  "data/target_demand.csv",             "src/<target>/.../z_SOL_pop_goods.txt",            "After editing calibrated demand_add baseline; supports --target stable|sol_standalone|all"),
     ("gen_demand_csv.py", "z_SOL_pop_goods.txt + vanilla goods", "data/demand_price_table.csv",                      "After gen_pop_goods.py"),
     ("gen_market_unit_consumption.py", "data/demand_price_table.csv", "src/<target>/.../SOL_market_unit_consumption_values.txt", "After gen_demand_csv.py or SOL market base-spending logic changes; supports --target stable|sol_standalone|all; market refresh block is embedded by gen_sol_economy_effects"),
@@ -48,6 +59,18 @@ CODEGEN_SCRIPTS = [
 
 # Auto-generated files: (relative path, generator script)
 AUTOGENERATED_FILES = [
+    *[(f"src/{target}/main_menu/gui/messagetypes/SOL_messages.txt", "gen_sol_messages.py")
+      for target in ("stable", "sol_standalone")],
+    *[(f"src/{target}/{path}", "gen_sol_economy_effects.py")
+      for target in ("stable", "sol_standalone")
+      for path in ("main_menu/common/static_modifiers/SOL_living_standard_modifiers.txt",
+                   "main_menu/common/modifier_type_definitions/SOL_living_standard_modifier_types.txt",
+                   "main_menu/common/modifier_icons/SOL_living_standard_modifier_icons.txt",
+                   "in_game/common/building_types/SOL_living_standard_buildings.txt",
+                   "main_menu/localization/english/SOL_living_standard_modifier_types_l_english.yml",
+                   "main_menu/localization/simp_chinese/SOL_living_standard_modifier_types_l_simp_chinese.yml",
+                   "main_menu/localization/english/SOL_living_standard_modifiers_l_english.yml",
+                   "main_menu/localization/simp_chinese/SOL_living_standard_modifiers_l_simp_chinese.yml")],
     ("src/stable/in_game/common/goods/z_SOL_pop_goods.txt",                                     "gen_pop_goods.py"),
     ("src/sol_standalone/in_game/common/goods/z_SOL_pop_goods.txt",                             "gen_pop_goods.py"),
     ("src/stable/in_game/common/script_values/SOL_market_unit_consumption_values.txt",          "gen_market_unit_consumption.py"),
@@ -56,6 +79,8 @@ AUTOGENERATED_FILES = [
     ("src/sol_standalone/in_game/common/scripted_effects/A_SOL_economy_effects.txt",            "gen_sol_economy_effects.py"),
     ("src/stable/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt",               "gen_sol_economy_effects.py"),
     ("src/sol_standalone/in_game/common/scripted_effects/B_SOL_country_demand_solver.txt",       "gen_sol_economy_effects.py"),
+    ("src/stable/in_game/common/script_values/SOL_living_standard_values.txt",                   "gen_sol_economy_effects.py"),
+    ("src/sol_standalone/in_game/common/script_values/SOL_living_standard_values.txt",           "gen_sol_economy_effects.py"),
     ("src/sol_standalone/in_game/gui/location_window.gui",                                      "generate_sol_location_window.py"),
     ("src/stable/in_game/gui/location_window.gui",                                              "sync_location_window.py"),
     ("src/stable/in_game/gui/vanilla/cmfg_location_window_vanilla_types.gui",                   "sync_location_window.py"),
@@ -94,6 +119,31 @@ AUTOGENERATED_FILES = [
 ]
 
 
+AUTOGENERATED_FILES.extend(
+    (f"src/{target}/{relative}", "gen_sol_lshud.py")
+    for target in ("stable", "sol_standalone")
+    for relative in (
+        "in_game/gui/SOL_lshud.gui",
+        "in_game/gui/SOL_font_icons.gui",
+        "in_game/gfx/interface/sol_proto/sol_living_standard_texticon.dds",
+        "in_game/gui/SOL_lshud_glorp_compat.gui",
+        "in_game/gui/scripted_widgets/SOL_lshud_scripted_widgets.txt",
+        "in_game/common/scripted_effects/D_SOL_lshud_ranking.txt",
+        "in_game/common/script_values/SOL_lshud_ranking_values.txt",
+        "in_game/gfx/map/map_modes/SOL_map_modes.txt",
+        "in_game/common/script_values/SOL_map_values.txt",
+        "in_game/gui/SOL_map_tooltips.gui",
+        "main_menu/gfx/interface/icons/map_modes/sol_purchasing_power.dds",
+        "main_menu/gfx/interface/icons/map_modes/sol_substitution.dds",
+        "main_menu/gfx/interface/icons/map_modes/sol_ranking.dds",
+        "main_menu/localization/english/SOL_map_modes_l_english.yml",
+        "main_menu/localization/simp_chinese/SOL_map_modes_l_simp_chinese.yml",
+        "main_menu/localization/english/SOL_lshud_l_english.yml",
+        "main_menu/localization/simp_chinese/SOL_lshud_l_simp_chinese.yml",
+    )
+)
+
+
 def load(filename: str):
     path = KNOWLEDGE_DIR / filename
     if not path.exists():
@@ -124,8 +174,8 @@ def _run_gen_index() -> None:
 
 def main():
     _run_gen_index()
-    anti_patterns = load("anti_patterns.yaml") or []
-    enums = load("valid_enums.yaml") or {}
+    anti_patterns = load_anti_patterns(REPO_ROOT)
+    enums = load_valid_enums(REPO_ROOT)
 
     lines: list[str] = []
     lines.append("# EU5 Knowledge Brief")

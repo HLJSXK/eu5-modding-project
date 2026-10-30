@@ -24,6 +24,7 @@ from gen_market_unit_consumption import (  # noqa: E402
     _generate_refresh_block,
     _generate_values,
 )
+from gui_14_migration import migrate_location_gui  # noqa: E402
 from tools.sol_demand_simulator.parser import (  # noqa: E402
     _collect_brace_block,
     load_vanilla_goods,
@@ -31,8 +32,8 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_mnt_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
-MNT_ROOT = REPO_ROOT / "reference_mods" / "3735059838"
-VANILLA_ROOT = REPO_ROOT / "reference_game_files" / "game"
+MNT_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3735059838"
+VANILLA_ROOT = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game"
 
 TARGET_DEMAND_CSV = REPO_ROOT / "data" / "target_demand.csv"
 STABLE_PRICES = STABLE_ROOT / "in_game" / "common" / "prices" / "A_SOL_economy_prices.txt"
@@ -123,7 +124,14 @@ ALL_POP_TYPES = (*POP_TYPES, "slaves")
 UPPER_TYPES = frozenset(("nobles", "clergy", "burghers", "laborers", "soldiers"))
 COMMONER_TYPES = frozenset(("laborers", "peasants", "soldiers"))
 GRAINS = ("maize", "millet", "rice")
+EXPECTED_SOL_GOODS = 56
 
+# M&T's 1.3 lumber object still references a removed vanilla scripted trigger.
+# The 1.4 vanilla object replaced it with a plain vegetation expression;
+# keep the current vanilla potential while retaining M&T's production fields.
+GOODS_FIELDS_FROM_VANILLA = {
+    "lumber": (("location_potential", True),),
+}
 
 @dataclass(frozen=True)
 class Block:
@@ -256,6 +264,31 @@ def _remove_fields(body: str, fields: Sequence[Tuple[str, bool]]) -> str:
     return body
 
 
+def _replace_field_from_reference(body: str, field: str, reference_body: str) -> str:
+    target_spans = _field_spans(body, field, True)
+    reference_spans = _field_spans(reference_body, field, True)
+    if len(target_spans) != 1 or len(reference_spans) != 1:
+        raise ValueError(
+            f"Expected one {field} block in both goods definitions; "
+            f"got target={len(target_spans)}, reference={len(reference_spans)}"
+        )
+    target_start, target_end = target_spans[0]
+    reference_start, reference_end = reference_spans[0]
+    return (
+        body[:target_start]
+        + reference_body[reference_start:reference_end]
+        + body[target_end:]
+    )
+
+
+def _apply_vanilla_goods_fields(good: str, body: str, vanilla_body: str) -> str:
+    for field, is_block in GOODS_FIELDS_FROM_VANILLA.get(good, ()):
+        if not is_block:
+            raise ValueError(f"Vanilla goods field override must be a block: {good}/{field}")
+        body = _replace_field_from_reference(body, field, vanilla_body)
+    return body
+
+
 DEMAND_FIELDS = (
     ("demand_add", True),
     ("demand_multiply", True),
@@ -340,20 +373,20 @@ def _load_sol_targets() -> Dict[str, Dict[str, Decimal]]:
 def _compat_quantities(
     sol_targets: Dict[str, Dict[str, Decimal]],
     vanilla_prices: Dict[str, Decimal],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> Dict[str, Dict[str, Decimal]]:
     quantities: Dict[str, Dict[str, Decimal]] = {}
     for good, target in sol_targets.items():
-        if good not in mnt_blocks:
-            raise ValueError(f"M&T goods definition missing for SOL good: {good}")
-        mnt_price = _default_price(mnt_blocks[good].body, good)
+        if good not in goods_blocks:
+            raise ValueError(f"Goods definition missing for SOL good: {good}")
+        mnt_price = _default_price(goods_blocks[good].body, good)
         vanilla_price = vanilla_prices[good]
         quantities[good] = {
             pop_type: _round_quantity(target[pop_type] * vanilla_price / mnt_price)
             for pop_type in POP_TYPES
         }
 
-    grain_prices = {good: _default_price(mnt_blocks[good].body, good) for good in GRAINS}
+    grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
     for pop_type in POP_TYPES:
         sol_spending = sum(
             sol_targets[good][pop_type] * vanilla_prices[good] for good in GRAINS
@@ -362,25 +395,29 @@ def _compat_quantities(
         for good in GRAINS:
             quantities[good][pop_type] = equal_quantity
 
-    if quantities["tools"]["laborers"] != Decimal("0.00050"):
+    if quantities["tools"]["laborers"] != Decimal("0.00200"):
         raise ValueError(
-            "tools laborer compatibility quantity must be 0.0005, got "
+            "tools laborer compatibility quantity must be 0.002, got "
             f"{quantities['tools']['laborers']}"
         )
+    from gen_whole_group_baskets import groups_for_pop, validate_baskets
+    for pop_type in POP_TYPES:
+        for good in {good for members in groups_for_pop(pop_type).values() for good in members}:
+            quantities[good][pop_type] = max(QUANTUM, quantities[good][pop_type])
+    validate_baskets(quantities, label="M&T calibrated basket")
     return quantities
 
 
 def _render_demand_block(
     quantities: Dict[str, Decimal],
-    slave_quantity: Decimal,
 ) -> str:
     lines = ["\tdemand_add = {"]
-    for pop_type in ALL_POP_TYPES:
-        value = slave_quantity if pop_type == "slaves" else quantities[pop_type]
+    for pop_type in POP_TYPES:
+        value = quantities[pop_type]
         if value == 0:
             continue
         lines.append(f"\t\t{pop_type} = {_format_decimal(value)}")
-    lines.append("\t}")
+    lines.extend(["\t\tslaves = 0", "\t}"])
     return "\n".join(lines)
 
 
@@ -411,18 +448,18 @@ def _normalize_without_demand(body: str) -> str:
 def _render_goods(
     sol_targets: Dict[str, Dict[str, Decimal]],
     quantities: Dict[str, Dict[str, Decimal]],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# M&T owns every non-demand field. SOL owns the seven calibrated pop quantities.",
+        "# M&T owns every non-demand field where defined; new vanilla goods use the current vanilla base.",
         "# Wealth and development demand gates remain removed for SOL's continuous scaling.",
+        "# Slaves have no income and no goods demand, including M&T's native slave quantities.",
     ]
     for good in sol_targets:
-        original = mnt_blocks[good].body
-        mnt_pop_demand = _final_pop_demand(original)
+        original = goods_blocks[good].body
         base = _remove_fields(original, DEMAND_FIELDS)
-        demand_block = _render_demand_block(quantities[good], mnt_pop_demand["slaves"])
+        demand_block = _render_demand_block(quantities[good])
         rendered = _insert_after_default_price(base, demand_block, good)
         if _normalize_without_demand(rendered) != _normalize_without_demand(original):
             raise ValueError(f"Non-demand M&T fields changed while rendering {good}")
@@ -437,18 +474,19 @@ def _validate_demand_invariants(
     sol_targets: Dict[str, Dict[str, Decimal]],
     quantities: Dict[str, Dict[str, Decimal]],
     vanilla_prices: Dict[str, Decimal],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> None:
     for good, target in sol_targets.items():
         if good in GRAINS:
             continue
-        mnt_price = _default_price(mnt_blocks[good].body, good)
+        mnt_price = _default_price(goods_blocks[good].body, good)
         for pop_type in POP_TYPES:
             ideal = target[pop_type] * vanilla_prices[good] / mnt_price
-            if abs(quantities[good][pop_type] - ideal) > QUANTUM / 2:
+            expected = max(QUANTUM, _round_quantity(ideal)) if target[pop_type] > 0 else Decimal(0)
+            if quantities[good][pop_type] != expected:
                 raise ValueError(f"Rounded compatibility quantity is out of range: {good}/{pop_type}")
 
-    grain_prices = {good: _default_price(mnt_blocks[good].body, good) for good in GRAINS}
+    grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
     for pop_type in POP_TYPES:
         grain_values = {quantities[good][pop_type] for good in GRAINS}
         if len(grain_values) != 1:
@@ -460,18 +498,22 @@ def _validate_demand_invariants(
             quantities[good][pop_type] * grain_prices[good] for good in GRAINS
         )
         max_rounding_drift = sum(grain_prices.values()) * QUANTUM / 2
+        if 0 < sol_spending < sum(grain_prices.values()) * QUANTUM:
+            # Minimum positive quantities may exceed nearest rounding by half
+            # a quantum; all subscribed grain members must still survive.
+            max_rounding_drift = sum(grain_prices.values()) * QUANTUM
         if abs(sol_spending - compat_spending) > max_rounding_drift:
             raise ValueError(f"Grain spending drift exceeds fixed-point rounding for {pop_type}")
 
 
 def _render_values_and_refresh(
     quantities: Dict[str, Dict[str, Decimal]],
-    mnt_blocks: Dict[str, Block],
+    goods_blocks: Dict[str, Block],
 ) -> Tuple[str, str]:
     rows = [
         (
             good,
-            float(_default_price(mnt_blocks[good].body, good)),
+            float(_default_price(goods_blocks[good].body, good)),
             {pop_type: float(quantities[good][pop_type]) for pop_type in POP_TYPES},
         )
         for good in sorted(quantities)
@@ -503,7 +545,9 @@ def _render_values_and_refresh(
         "REPLACE:sol_refresh_market_pop_demand_maps = {",
         1,
     )
-    return values, refresh
+    from sol_substitution import render_country_runtime, render_location_spending
+    runtime = render_country_runtime(rows).replace("\nsol_", "\nREPLACE:sol_")
+    return values, refresh + "\n" + runtime + render_location_spending(rows, replace=True)
 
 
 def _render_authority_objects(
@@ -929,6 +973,10 @@ def _append_callback(
                 "\t\t\t}",
             ]
         )
+    if setting_id == "substitution":
+        lines.extend(["\t\tevery_country = { sol_clear_country_substitution = yes }", "\t\tif = { limit = { sol_sol_is_on = yes } gls_recalculate_global_living_standard = yes }"])
+    if setting_id == "sol_on":
+        lines.append("\t\telse = { every_country = { sol_clear_country_substitution = yes every_owned_location = { remove_location_modifier = sol_local_pop_demand_modifier sol_clear_location_living_standard_modifiers = yes } } }")
     lines.append("\t\t}")
 
 
@@ -938,6 +986,7 @@ def _render_cmm() -> str:
         "# Keep M&T economic authority by default while allowing explicit CMF opt-in",
         "# to SOL's trigger-gated economic balance systems.",
         "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
+        "\tset_global_variable = { name = sol_substitution_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_map_enabled value = yes }",
         "\tremove_global_variable = sol_as_enabled",
@@ -959,6 +1008,7 @@ def _render_cmm() -> str:
     ]
     _append_bool_setting(lines, "sol_on", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "sol", "sol_sol_map_enabled")
+    _append_bool_setting(lines, "substitution", "sol", "sol_substitution_enabled", False)
     _append_bool_setting(
         lines,
         "mnt_as_on",
@@ -998,6 +1048,7 @@ def _render_cmm() -> str:
     )
     for setting_id, alias, numeric in (
         ("sol_on", "sol_sol_on_enabled", False),
+        ("substitution", "sol_substitution_enabled", False),
         ("sol_map", "sol_sol_map_enabled", False),
         ("mnt_as_on", "sol_as_enabled", False),
         ("bte", "sol_bte", True),
@@ -1134,6 +1185,7 @@ BUTTON_ANCHOR_RE = re.compile(
 SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-standard tooltip.
 \t\t\t\t\t\t\t\t\tnavigational_button_alt = {
 \t\t\t\t\t\t\t\t\t\tsize = {38 38}
+\t\t\t\t\t\t\t\t\t\tvisible = "[Location.HasOwner]"
 
 \t\t\t\t\t\t\t\t\t\tblockoverride "icon_texture" {
 \t\t\t\t\t\t\t\t\t\t\tpiechart = {
@@ -1167,6 +1219,7 @@ SOL_BUTTON = """\t\t\t\t\t\t\t\t\t# SOL-M&T compatibility insertion: living-stan
 
 def _render_location_gui() -> str:
     text = _read(MNT_LOCATION_GUI)
+    text = migrate_location_gui(text, "M&T")
     text = _replace_once(
         text,
         'raw_text = "[Location.GetTotalIncome|g2]@income!"',
@@ -1185,17 +1238,30 @@ def _render_outputs() -> Dict[Path, str]:
     vanilla_goods = load_vanilla_goods()
     vanilla_prices = {good: _decimal(data["price"]) for good, data in vanilla_goods.items()}
     mnt_goods_blocks_list = _blocks_in_tree(MNT_GOODS_ROOT)
-    mnt_goods_blocks: Dict[str, Block] = {}
+    vanilla_goods_blocks_list = _blocks_in_tree(VANILLA_ROOT / "in_game" / "common" / "goods")
+    goods_blocks: Dict[str, Block] = {}
     for good in sol_targets:
-        mnt_goods_blocks[good] = _unique_block(mnt_goods_blocks_list, good, "M&T good")
-    if len(sol_targets) != 55:
-        raise ValueError(f"Expected 55 SOL demand goods, found {len(sol_targets)}")
-    quantities = _compat_quantities(sol_targets, vanilla_prices, mnt_goods_blocks)
-    _validate_demand_invariants(sol_targets, quantities, vanilla_prices, mnt_goods_blocks)
-    values, refresh = _render_values_and_refresh(quantities, mnt_goods_blocks)
+        mnt_block = _optional_unique_block(mnt_goods_blocks_list, good, "M&T good")
+        vanilla_block = _unique_block(vanilla_goods_blocks_list, good, "vanilla good")
+        if mnt_block is None:
+            goods_blocks[good] = vanilla_block
+        else:
+            goods_blocks[good] = Block(
+                key=good,
+                body=_apply_vanilla_goods_fields(good, mnt_block.body, vanilla_block.body),
+                operation=mnt_block.operation,
+                source=mnt_block.source,
+            )
+    if len(sol_targets) != EXPECTED_SOL_GOODS:
+        raise ValueError(
+            f"Expected {EXPECTED_SOL_GOODS} SOL demand goods, found {len(sol_targets)}"
+        )
+    quantities = _compat_quantities(sol_targets, vanilla_prices, goods_blocks)
+    _validate_demand_invariants(sol_targets, quantities, vanilla_prices, goods_blocks)
+    values, refresh = _render_values_and_refresh(quantities, goods_blocks)
 
     return {
-        GOODS_OUTPUT: _render_goods(sol_targets, quantities, mnt_goods_blocks),
+        GOODS_OUTPUT: _render_goods(sol_targets, quantities, goods_blocks),
         VALUES_OUTPUT: values,
         EFFECTS_OUTPUT: _render_effects(refresh),
         CMM_OUTPUT: _render_cmm(),
