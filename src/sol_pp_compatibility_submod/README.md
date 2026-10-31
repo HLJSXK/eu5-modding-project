@@ -14,31 +14,31 @@ The PP reference metadata currently has an empty mod ID, so metadata can only
 declare Standard of Living as a formal dependency. Prosper or Perish must be
 enabled manually.
 
-The submod keeps all PP systems active, while limiting SOL gameplay to:
+The submod keeps PP's economic systems authoritative while retaining SOL's
+Purchasing Power, SOL, demand accounting, country solver, substitution groups,
+living-standard modifiers, UI and non-economic features. PP's `victuals` remains
+a trade, building and logistics good, but its final population demand and all
+SOL consumption paths are zero. PP's `silk` adds a seventh `luxury_goods`
+member only in this target; the existing luxury budget is rebased so the group
+does not grow on the first compatibility pass.
 
-- income-based pop demand and its UI, including PP `victuals`;
-- age-scaled building efficiency and city/town upgrade costs;
-- low-control construction efficiency;
-- the default -15% base tax efficiency;
-- difficulty tax-bonus adjustments and configurable AI devastation recovery;
-- diplomatic-capacity spending and cultural-tradition stability discounts;
-- harsher war exhaustion, enemy-troop/raiding/razing, colonial, and call-to-war restrictions;
-- SOL gold transfer and non-conflicting action-price changes.
-
-It neutralizes SOL's GDP-to-development, base location/RGO rebalance, winter and
-Little Ice Age rebalance, and the food, RGO, and prosperity portions of age
-escalation. PP also owns the
+It disables SOL's seven Economic Balance groups: base tax efficiency, age
+economic escalation, stability spending discount, diplomatic spending, difficulty
+tax adjustments, GDP-to-development, and AI prosperity recovery. It also
+neutralizes SOL's base location/RGO rebalance, winter and Little Ice Age
+rebalance, and the food, RGO, and prosperity portions of age escalation. PP owns the
 shared blockade, siege, occupation, and looting location modifiers: their SOL
 deltas are canceled. PP owns shared price values as well, so SOL's road deltas
 are not cleaned up by this submod: repeated price scalars replace instead of
 adding, and `pp_road_gold_adjustments.txt` loads after
 `A_SOL_economy_prices.txt`. PP's institution replacement wins as well.
 
-The demand layer cancels SOL's remaining lumber pop demand, adds PP `victuals`
-to SOL market spending, and overrides both SOL goods-display panels.
-It adds only the new `victuals` script values and explicitly replaces the two
-SOL scripted effects whose market and country aggregation bodies must change;
-unchanged full-SOL database objects are not duplicated.
+The demand layer cancels SOL's remaining lumber pop demand, adds PP `silk` to
+SOL living-standard spending and substitution, and overrides both SOL goods
+display panels. It explicitly replaces the two SOL scripted effects whose market
+and country aggregation bodies must change; unchanged full-SOL database objects
+are not duplicated. The generator validates PP `0.10.0` at upstream commit
+`967cadbe` before producing output.
 
 The compact CMF panel is rebuilt from an explicit whitelist. It exposes only
 settings backed by active compact behavior; the disabled `gdp_dev` setting and
