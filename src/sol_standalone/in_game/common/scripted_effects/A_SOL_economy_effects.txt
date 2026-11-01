@@ -123,6 +123,7 @@ sol_update_estate_building_maintenance = {
 }
 
 sol_refresh_market_pop_demand_maps = {
+	sol_oos_trace_global = { stage = market_refresh_begin }
 	# Global scope. Refresh per-market unit spending and market-keyed goods counters.
 	# Unit spending is hardcoded consumption quantity times min(market price, base price).
 	# Also tracks which goods have suppressed demand (market_price > default_price).
@@ -4944,6 +4945,7 @@ sol_refresh_market_pop_demand_maps = {
 	}
 	set_global_variable = { name = sol_market_pop_demand_maps_initialized value = 1 }
 	set_global_variable = { name = sol_market_substitution_initialized value = 1 }
+	sol_oos_trace_global = { stage = market_refresh_end }
 }
 
 sol_compute_location_pop_demand = {
@@ -5295,6 +5297,7 @@ sol_solve_country_pop_demand_raw_only = {
 }
 
 sol_solve_country_pop_demand = {
+	sol_oos_trace_country = { stage = solve_begin }
 	sol_ls_reset_country_living_standard = yes
 	sol_refresh_country_substitution = yes
 	gls_compute_savings_pressure = yes
@@ -5339,6 +5342,7 @@ sol_solve_country_pop_demand = {
 	else = { sol_solve_country_pop_demand_raw_only = yes }
 	sol_ls_finalize_country_living_standard = yes
 	sol_ls_finalize_country_living_standard_yoy = yes
+	sol_oos_trace_country = { stage = solve_end }
 }
 
 # Global census counters. Incremented per country during the monthly pass
@@ -5698,6 +5702,7 @@ sol_solve_country_pop_demand_solver = {
 }
 
 sol_apply_local_pop_demand_modifiers = {
+	sol_oos_trace_country = { stage = apply_begin }
 	# Country goods modifiers are permanent and updated only by substitution refresh.
 	# root = country. Writes the one-month modifier from each location's already-cached
 	# sol_location_pop_demand_modifier_size without re-solving. Split out of
@@ -5725,6 +5730,7 @@ sol_apply_local_pop_demand_modifiers = {
 			sol_apply_location_living_standard_modifiers = yes
 		}
 	}
+	sol_oos_trace_country = { stage = apply_end }
 }
 
 sol_update_local_pop_demand_modifiers = {
@@ -6510,19 +6516,23 @@ gls_accumulate_panel_stats = {
 }
 
 gls_full_refresh_country = {
+	sol_oos_trace_country = { stage = country_refresh_begin }
 	# root = country. sol_update_local_pop_demand_modifiers already refreshes
 	# gls_savings_pressure_adjustment, so gls_compute_panel_display would be redundant here.
 	sol_update_estate_building_maintenance = yes
 	set_variable = { name = sol_estate_building_maintenance_initialized value = 1 }
 	sol_update_local_pop_demand_modifiers = yes
 	gls_accumulate_panel_stats = yes
+	sol_oos_trace_country = { stage = country_refresh_end }
 }
 
 gls_recalculate_global_living_standard = {
+	sol_oos_trace_global = { stage = world_refresh_begin }
 	# World scope: refresh market maps once, then refresh all countries.
 	sol_refresh_market_pop_demand_maps = yes
 	every_country = { if = { limit = { total_population > 0 num_locations > 0 } gls_full_refresh_country = yes } else = { sol_clear_country_substitution = yes } }
 	sol_ls_recalculate_world_ranking = yes
+	sol_oos_trace_global = { stage = world_refresh_end }
 }
 
 # Called after current country SOL has been finalized, without a location pass.
