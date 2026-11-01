@@ -61,11 +61,13 @@ STABLE_WAR_STATIC_MODIFIERS = STABLE_ROOT / "main_menu" / "common" / "static_mod
 STABLE_PRICES = STABLE_ROOT / "in_game" / "common" / "prices" / "A_SOL_economy_prices.txt"
 STABLE_LOCATION_GUI = STABLE_ROOT / "in_game" / "gui" / "SOL_economy_local.gui"
 STABLE_SITUATION_GUI = STABLE_ROOT / "in_game" / "gui" / "panels" / "situation" / "global_living_standard.gui"
+PP_LOCATION_GUI = PP_ROOT / "in_game" / "gui" / "location_window.gui"
 
 VALUES_OUTPUT = TARGET_ROOT / "in_game" / "common" / "script_values" / "zz_SOL_market_unit_consumption_values.txt"
 EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_A_SOL_economy_effects.txt"
 LUMBER_OUTPUT = TARGET_ROOT / "in_game" / "common" / "goods" / "zz_SOL_PP_lumber_demand.txt"
 LOCATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "zz_SOL_economy_local.gui"
+LOCATION_WINDOW_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "location_window.gui"
 SITUATION_GUI_OUTPUT = TARGET_ROOT / "in_game" / "gui" / "panels" / "situation" / "global_living_standard.gui"
 AUTO_MODIFIERS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "auto_modifiers" / "zz_SOL_PP_compact_economy_auto_modifiers.txt"
 CMM_EFFECTS_OUTPUT = TARGET_ROOT / "in_game" / "common" / "scripted_effects" / "zz_SOL_PP_compact_cmm_effects.txt"
@@ -654,6 +656,36 @@ def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str
     return GENERATED_HEADER + rendered
 
 
+PP_LOCATION_BUTTON_ANCHOR = "\n\t\t\t\t\t# RIGHT BUTTONS\n"
+PP_LOCATION_BUTTON = (
+    "\t\t\t\t\t# SOL-PP compatibility insertion: shared location living-standard button.\n"
+    "\t\t\t\t\tsol_location_living_standard_button = {}\n\n"
+)
+
+
+def _render_location_window() -> str:
+    """Inject the shared SOL button into PP's complete location-window owner."""
+    text = _read(PP_LOCATION_GUI)
+    pp_card_start = text.find("\n\ttype pp_location_card = hbox {")
+    if pp_card_start < 0:
+        raise ValueError("PP location window is missing type pp_location_card")
+    pp_card_end = text.find("\n\ttype army_slot =", pp_card_start)
+    if pp_card_end < 0:
+        raise ValueError("PP location window has no type following pp_location_card")
+    pp_card = text[pp_card_start:pp_card_end]
+    anchor_count = pp_card.count(PP_LOCATION_BUTTON_ANCHOR)
+    if anchor_count != 1:
+        raise ValueError(
+            "Expected one PP location-card right-button anchor, "
+            f"found {anchor_count}"
+        )
+    if "sol_location_living_standard_button = {}" in text:
+        raise ValueError("PP location window already contains the SOL button")
+    insert_at = pp_card_start + pp_card.index(PP_LOCATION_BUTTON_ANCHOR)
+    text = text[:insert_at] + "\n" + PP_LOCATION_BUTTON + text[insert_at + 1 :]
+    return GENERATED_HEADER + text
+
+
 def _render_auto_modifiers() -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
@@ -954,6 +986,7 @@ def _render_outputs_active() -> Dict[Path, str]:
             "sol_market_consumes",
             "Location.GetMarket.MakeScope",
         ),
+        LOCATION_WINDOW_OUTPUT: _render_location_window(),
         SITUATION_GUI_OUTPUT: _render_gui(
             STABLE_SITUATION_GUI,
             "SOL_GUI_SECTION_COUNTRY_GOODS",

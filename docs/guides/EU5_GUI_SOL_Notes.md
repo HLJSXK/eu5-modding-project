@@ -24,16 +24,19 @@ sol_location_living_standard_button = {}
 The type does not rebind `Location` to `LocationView` or to the player. Preserve
 the caller's ancestor context (normally `[LocationView.GetLocation]`); do not add
 an enclosing fixed-size placeholder. SOL's stable, standalone and M&T generators
-use this reference in the original demography-row position. Stable also adds
-the optional GP references described below. Standalone and M&T retain
+use this reference in the original demography-row position. The PP generator
+uses the same reference in PP's `pp_location_card` top-content row. Stable also
+adds the optional GP references described below. Standalone and M&T retain
 their separate `local_sol_total_income` display change; the reusable button does
 not implement that income replacement.
 
-SOL still ships a complete `in_game/gui/location_window.gui`. Both SOL and GP's
-current windows carry each other's public references, so either can supply the
-effective window; its base layout still follows whole-file load order. SOL's
-HUD shim continues to require SOL after Glorp UI. Other window owners must also
-carry both integrations. No GP file is changed by SOL's generator.
+SOL still ships a complete `in_game/gui/location_window.gui`, generated from
+vanilla with SOL and optional GP controls injected. Both SOL and GP's current
+windows carry each other's public references, so either can supply the
+effective window; its base layout still follows whole-file load order. When
+Glorp UI is enabled, SOL's HUD shim requires SOL to load after Glorp UI. Other
+window owners must also carry both integrations. No GP file is changed by SOL's
+generator.
 
 ### Optional Great Projects integration (2026-10-30)
 
@@ -51,7 +54,8 @@ Stable and standalone also use `tv_location_wonders_close_on_queue` immediately
 before all six existing `LocationView.OpenConstructionQueue` actions, preserving
 their queue ids and arguments. GP's button closes the queue in the other direction.
 The current M&T bottom panel contains no such actions; its inline construction
-lists remain unchanged. PP/JTG inherit their chosen SOL base window.
+lists remain unchanged. PP keeps its own PP location-window layout and only
+uses the public SOL button integration; JTG inherits its chosen SOL base window.
 
 Provider contract checked with `guidef.py` against
 `../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532`
@@ -94,7 +98,7 @@ stable/standalone location and country panels, PP/JTG overrides, HUD SOL/power/
 rank tables, and the map country ranking tooltip. Contexts are respectively
 `Location.GetOwner`, `Player`, and retained primary `Scope.GetCountry`.
 
-The stable, standalone and M&T location-window generators hide the entire SOL
+The stable, standalone, M&T and PP location-window generators hide the entire SOL
 button with `Location.HasOwner`; ownerless locations have no SOL hover entry.
 Offline fixtures explicitly model estate existence independently of population.
 `test_sol_substitution_ui.py` checks shipped label contexts and buttons across

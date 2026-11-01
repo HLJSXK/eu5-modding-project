@@ -88,6 +88,13 @@ class PPCompatibilityTests(unittest.TestCase):
         self.assertNotIn("@lumber!", outputs[pp.LOCATION_GUI_OUTPUT])
         self.assertNotIn("@lumber!", outputs[pp.SITUATION_GUI_OUTPUT])
 
+    def test_location_window_is_based_on_pp_and_injects_sol_button(self) -> None:
+        outputs = pp._render_outputs()
+        window = outputs[pp.LOCATION_WINDOW_OUTPUT]
+        self.assertIn("size = { 600 100% } # PP: wider than the vanilla left panel", window)
+        self.assertEqual(window.count("sol_location_living_standard_button = {}"), 1)
+        self.assertIn("# SOL-PP compatibility insertion: shared location living-standard button.", window)
+
     def test_economic_balance_is_not_registered_or_active(self) -> None:
         outputs = pp._render_outputs()
         cmm = outputs[pp.CMM_EFFECTS_OUTPUT]

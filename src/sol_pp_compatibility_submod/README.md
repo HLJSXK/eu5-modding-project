@@ -40,6 +40,10 @@ and country aggregation bodies must change; unchanged full-SOL database objects
 are not duplicated. The generator validates PP `0.10.0` at upstream commit
 `967cadbe` before producing output.
 
+The submod also generates PP's complete `location_window.gui` and injects the
+shared SOL Living Standard button into PP's `pp_location_card`, so the control
+continues to appear when PP owns the final location-window path.
+
 The compact CMF panel is rebuilt from an explicit whitelist. It exposes only
 settings backed by active compact behavior; the disabled `gdp_dev` setting and
 callback are omitted. CMF clears each group's old setting list during
