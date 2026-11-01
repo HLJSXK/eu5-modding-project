@@ -28,6 +28,10 @@ def read_nodes(path):
 class CadenceRuntime(Runtime):
     def __init__(self, target, reduced=True, enabled=True):
         super().__init__(_load_good_rows(), enabled=enabled)
+        # File-only tracing is disabled in normal builds and does not participate
+        # in this economy fixture; its generated bodies are checked in test_sol_oos.
+        self.effects['sol_oos_trace_country'] = []
+        self.effects['sol_oos_trace_global'] = []
         self.reduced = reduced
         self.master = True
         self.calls = Counter()

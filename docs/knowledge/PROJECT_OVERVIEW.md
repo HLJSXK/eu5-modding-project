@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-10-29
+> Last updated: 2026-11-01
 
 ## Project Identity
 
@@ -166,6 +166,8 @@ eu5-modding-project/
 ```
 
 ## Script Reference
+
+SOL OOS diagnostics are disabled in normal builds. `scripts/sol_oos_trace_source.py` emits file-only initialization, market-refresh, human-country solve/apply and world-refresh probes through the economy generator. `scripts/sol_oos.py` exports trace-enabled or control copies with file manifests and compares collected traces; `scripts/collect_sol_oos.ps1` collects both peers' logs/OOS files and observed mod hashes without requiring Python. See `docs/guides/SOL_OOS_Diagnostics.md`; runtime logging and numeric rendering still require multiplayer validation, and no desync fix is claimed.
 
 | Script | When to run | Output |
 |---|---|---|
