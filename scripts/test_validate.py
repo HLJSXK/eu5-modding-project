@@ -14,6 +14,82 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import validate
+import update_mod_version
+
+
+class ReleaseDateTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name)
+        source = update_mod_version.REPO_ROOT / update_mod_version.MIGRATION_ACTION_PATH
+        text = source.read_text(encoding='utf-8-sig')
+        text = update_mod_version.MIGRATION_MARKER.sub('SOL_migration_261101_seen', text)
+        self.actions = self.root / update_mod_version.MIGRATION_ACTION_PATH
+        self.actions.parent.mkdir(parents=True)
+        self.actions.write_bytes(b'\xef\xbb\xbf' + text.replace('\n', '\r\n').encode('utf-8'))
+        for target in update_mod_version.TARGET_NAMES:
+            path = self.metadata(target)
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({'version': '261101', 'supported_game_version': '1.4.*'},
+                                       indent=4) + '\n', encoding='utf-8')
+        patcher = patch.object(update_mod_version, 'REPO_ROOT', self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def metadata(self, target):
+        return self.root / 'src' / target / '.metadata/metadata.json'
+
+    def run_version(self, target='stable', release_date='2026-11-02', check=False):
+        args = ['update_mod_version.py', '--target', target, '--date', release_date]
+        if check:
+            args.append('--check')
+        with patch.object(sys, 'argv', args), contextlib.redirect_stdout(io.StringIO()):
+            update_mod_version.main()
+
+    def test_one_date_updates_metadata_and_all_marker_reads_and_writes(self):
+        previous_lines = self.actions.read_bytes().count(b'\r\n')
+        self.run_version()
+        self.assertEqual(json.loads(self.metadata('stable').read_text())['version'], '261102')
+        self.assertEqual(json.loads(self.metadata('sol_standalone').read_text())['version'], '261101')
+        data = self.actions.read_bytes()
+        self.assertTrue(data.startswith(b'\xef\xbb\xbf'))
+        self.assertEqual(data.count(b'\r\n'), previous_lines)
+        self.assertEqual(set(update_mod_version.MIGRATION_MARKER.findall(data.decode('utf-8-sig'))),
+                         {'SOL_migration_261102_seen'})
+        before = data
+        self.run_version()
+        self.assertEqual(self.actions.read_bytes(), before)
+        self.run_version(release_date='2027-01-01')
+        self.assertEqual(json.loads(self.metadata('stable').read_text())['version'], '270101')
+        self.assertIn(b'SOL_migration_270101_seen', self.actions.read_bytes())
+
+    def test_check_catches_stale_marker_even_when_metadata_is_current_without_writes(self):
+        self.run_version()
+        self.actions.write_bytes(self.actions.read_bytes().replace(b'261102', b'261101'))
+        before = self.actions.read_bytes(), self.metadata('stable').read_bytes()
+        with self.assertRaises(SystemExit) as exited:
+            self.run_version(check=True)
+        self.assertEqual(exited.exception.code, 1)
+        self.assertEqual((self.actions.read_bytes(), self.metadata('stable').read_bytes()), before)
+        self.run_version()
+        self.run_version(check=True)
+
+    def test_other_targets_do_not_change_stables_migration_marker(self):
+        before = self.actions.read_bytes()
+        self.run_version(target='sol_standalone')
+        self.assertEqual(self.actions.read_bytes(), before)
+        self.run_version(target='all')
+        for target in update_mod_version.TARGET_NAMES:
+            self.assertEqual(json.loads(self.metadata(target).read_text())['version'], '261102')
+        self.assertIn(b'SOL_migration_261102_seen', self.actions.read_bytes())
+
+    def test_mixed_marker_names_are_rejected_without_touching_the_script(self):
+        self.actions.write_bytes(self.actions.read_bytes() + b'\n# SOL_migration_v3_seen\n')
+        before = self.actions.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'one consistent migration marker'):
+            update_mod_version._set_migration_marker(self.actions, '261102', False)
+        self.assertEqual(self.actions.read_bytes(), before)
 
 
 @unittest.skipUnless(sys.platform == 'win32', 'Windows batch integration')

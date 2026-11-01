@@ -2,6 +2,18 @@
 
 Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guide.md) first. This file records SOL-specific screen behavior, experiments, runtime evidence, and design decisions.
 
+## GUI script execution and multiplayer OOS (2026-11-01)
+
+**[User-confirmed runtime cause.]** GUI execution of scripts causes the reported SOL
+multiplayer OOS. Do not use `GetScriptedGui(...).Execute(...)` lifecycle callbacks
+for initialization, migration or economic writes, or substitute CMF's GUI-backed
+load hooks. Host/visibility guards and idempotence are not evidence of a fix.
+See [the lifecycle risk card](../knowledge/risk_cards/sol_gui_script_oos.md) for
+the three old callbacks and native hook evidence. The SOL migration was implemented
+on 2026-11-02: native new-game stamping, post-lobby economic initialization and
+monthly old-save notification replace all three GUI entrypoints. Runtime multiplayer
+acceptance remains pending. `on_game_start` is not a save-load callback.
+
 ## SOL scenario adapter
 
 ### Public location-button integration (2026-10-30)

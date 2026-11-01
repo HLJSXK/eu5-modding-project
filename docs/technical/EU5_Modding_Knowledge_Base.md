@@ -7,6 +7,24 @@
 
 > **Note:** Generated 2026-01-22 as a baseline reference. May not reflect recent patches. Treat as background reading, not authoritative syntax — use `.eu5-base/reference_official_defines/` and `.eu5-base/reference_game_files/` to verify.
 
+## SOL OOS diagnostics implementation note (2026-11-01)
+
+The user has separately confirmed GUI execution of scripts as the cause of the
+reported SOL multiplayer OOS. This is an established runtime finding, independent
+of the trace-format issue below. Lifecycle scripts must use verified native
+hooks or synchronized pulses; CMF's GUI-dispatched load hooks are not native
+alternatives. See `docs/knowledge/risk_cards/sol_gui_script_oos.md` for the
+native lifecycle implementation completed on 2026-11-02 and its runtime acceptance limits.
+
+The original pipe-delimited `debug_log` protocol failed in EU5 1.4.6 runtime
+reports. SOL now emits `SOL_OOS;2;...`, uses `GetTagAndName` (CString) for country
+identity and `SCOPE.sCountry(...).MakeScope.GetVariable(...).GetValue` for metrics.
+These replacement accessors are verified against the official type reference
+and vanilla source; their new trace rendering still needs an in-game check.
+The comparison tool recovers malformed v1 emissions without counting localization
+error echoes, and marks broken formats/values as invalid evidence. See
+`docs/guides/SOL_OOS_Diagnostics.md` and `scripts/test_sol_oos.py`.
+
 ## 1. Introduction
 
 European Universalis 5 (EU5), released in November 2025, is a grand strategy game developed by Paradox Development Studio. Built upon an updated version of the Clausewitz Engine and featuring the Jomini scripting layer, EU5 offers a powerful and flexible platform for modding. This document provides a comprehensive overview of the EU5 modding landscape, covering everything from fundamental concepts to advanced techniques, to serve as a foundational knowledge base for your modding projects.

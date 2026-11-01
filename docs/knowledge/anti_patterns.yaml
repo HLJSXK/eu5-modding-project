@@ -1,4 +1,27 @@
 # eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: sol_gui_script_execution_oos
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: global
+  only_in_paths:
+  - src/stable/in_game/gui
+  - src/sol_standalone/in_game/gui
+  - in_game/common/scripted_guis
+  - in_game/common/on_action
+  bad: Executing SOL initialization, migration or economic state writes through GUI scripted-GUI callbacks, including legacy CMF-style start/load bridges, or treating on_game_start as equivalent to every post-lobby/save-load callback.
+  correction: GUI script execution is the user-confirmed cause of SOL multiplayer OOS. Remove that entry path rather than host-gating it. Use native on_game_start for new-save version stamps and on_game_started_after_lobby for new-game economic initialization; use native synchronized pulses for one-time old-save migration and missing/versioned cache repair. No verified native every-load hook exists in the checked corpus; CMF load hooks are GUI-dispatched. Read docs/knowledge/risk_cards/sol_gui_script_oos.md.
+  source: User runtime confirmation 2026-11-01; docs/knowledge/risk_cards/sol_gui_script_oos.md; .eu5-base/reference_official_defines/docs/on_actions.log:653,743,857; .eu5-base/reference_game_files/game/in_game/common/on_action/_hardcoded.txt:1,316; .eu5-base/reference_mods/3692202776/in_game/common/scripted_guis/cmf_after_lobby_caller_scripted_gui.txt:18,38
+  notes: The cause is confirmed, not a hypothesis or a claim inferred from the malformed diagnostic logs. The three callbacks have separate stamping, notification and economic-refresh duties. Native pulse migration changes timing; persistent flags cannot detect each save reload. Implemented 2026-11-02. All three SOL GUI entrypoints and registrations are removed. Native on_game_start stamps new saves; on_game_started_after_lobby initializes world economics in both targets; the first human monthly pulse notifies unmarked old saves once. Migration markers use SOL_migration_<YYMMDD>_seen and are stamped from the same date as stable metadata by update_mod_version.py during builds. Only the current release-date marker suppresses the notice; old dates and v3 stamps are ignored, and each new release date can notify once. Native multiplayer acceptance and the dependent CMF implementation need separate verification.
+- id: sol_oos_trace_v1_localization_format
+  pattern: null
+  detectability: advisory
+  category: workflow
+  scope: any
+  bad: Treating SOL_OOS v1 pipe-delimited debug messages as a verified protocol, counting localization error echoes as executions, or accepting two ERROR metric strings as equal readings.
+  correction: Generate SOL_OOS v2 semicolon-delimited records, use the CString GetTagAndName identity and Country.MakeScope.GetVariable for numeric reads, and validate the emitted values in-game. Recover malformed v1 only as explicitly invalid evidence; parse actual debug_log emissions once, recover absent tags only from the immediately following same-file scope line, and flag ERROR, unresolved expressions and unknown identities. Keep trace probes free of persistent writes and random calls.
+  source: scripts/sol_oos_trace_source.py; scripts/sol_oos.py; scripts/test_sol_oos.py; .eu5-base/reference_official_defines/docs/effects.log:1492; .eu5-base/reference_official_defines/docs/data_types_script.txt:438,2346; .eu5-base/reference_official_defines/docs/data_types_uncategorized.txt:60128,60134; docs/guides/SOL_OOS_Diagnostics.md
+  notes: '2026-11-01 123650 host / 123654 client runtime reports contain SOL_OOS|1solve_begin$ with empty subject and GetVariable promotion errors. Recovered event counts are 8 per solve/apply boundary on each peer, not 72 (the latter counted metric outputs plus source echoes). Corrected syntax is source-verified, not yet runtime-verified. Initialization before the transferred snapshot can already be inherited by a peer and is not proof of OOS.'
 - id: sol_optional_gp_location_widgets_wrong_parent
   pattern: null
   detectability: advisory

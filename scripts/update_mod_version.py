@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Set active SOL metadata versions from a calendar date.
+"""Set SOL metadata versions and the stable migration marker from one date.
 
 Versions use YYMMDD. By default the local system date and all deploy targets
 are used; --date makes release builds reproducible.
@@ -12,6 +12,8 @@ import re
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TARGET_NAMES = (
@@ -26,6 +28,8 @@ VERSION_LINE = re.compile(
     r'(?P<suffix>[ \t]*,?[ \t]*)$',
     re.MULTILINE,
 )
+MIGRATION_ACTION_PATH = Path("src/stable/in_game/common/on_action/SOL_migration_on_actions.txt")
+MIGRATION_MARKER = re.compile(r"\bSOL_migration_(?:v\d+|\d{6})_seen\b")
 
 
 def _parse_date(value: str) -> date:
@@ -91,9 +95,33 @@ def _set_metadata_version(path: Path, version: str, check: bool) -> bool:
     return False
 
 
+def _set_migration_marker(path: Path, version: str, check: bool) -> bool:
+    raw = path.read_bytes()
+    original = raw.decode("utf-8-sig")
+    markers = set(MIGRATION_MARKER.findall(original))
+    if len(markers) != 1:
+        raise ValueError(
+            f"expected one consistent migration marker in {path.relative_to(REPO_ROOT)}, "
+            f"found {sorted(markers)}"
+        )
+    current = markers.pop()
+    expected = f"SOL_migration_{version}_seen"
+    if current == expected:
+        print(f"[OK] {path.relative_to(REPO_ROOT)}: {expected}")
+        return False
+    if check:
+        print(f"[FAIL] {path.relative_to(REPO_ROOT)}: found {current!r}, expected {expected!r}")
+        return True
+    updated = MIGRATION_MARKER.sub(expected, original)
+    bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
+    path.write_bytes(bom + updated.encode("utf-8"))
+    print(f"[UPDATED] {path.relative_to(REPO_ROOT)}: {current} -> {expected}")
+    return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Update SOL metadata versions using the YYMMDD release format."
+        description="Update SOL metadata and the stable migration marker using YYMMDD."
     )
     parser.add_argument(
         "--target",
@@ -110,7 +138,7 @@ def main() -> None:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Check metadata without writing changes.",
+        help="Check metadata and the selected target's migration marker without writing changes.",
     )
     args = parser.parse_args()
 
@@ -124,6 +152,8 @@ def main() -> None:
             raise SystemExit(f"[ERROR] Metadata file not found: {path}")
         try:
             failed = _set_metadata_version(path, version, args.check) or failed
+            if target == "stable":
+                failed = _set_migration_marker(REPO_ROOT / MIGRATION_ACTION_PATH, version, args.check) or failed
         except ValueError as exc:
             raise SystemExit(f"[ERROR] {exc}") from exc
 

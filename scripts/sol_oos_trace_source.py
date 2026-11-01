@@ -53,7 +53,8 @@ def render_effects() -> str:
         "sol_oos_trace_global = {",
         "\tif = {",
         "\t\tlimit = { sol_oos_trace_is_enabled = yes }",
-        '\t\tdebug_log = "SOL_OOS|1|$stage$|GLOBAL|[GetDateString]|event"',
+        # Pipes outside [] are localization formatting, not safe delimiters.
+        '\t\tdebug_log = "SOL_OOS;2;$stage$;GLOBAL;[GetDateString];event"',
         "\t\tdebug_log_date = yes",
         "\t}",
         "}",
@@ -63,16 +64,18 @@ def render_effects() -> str:
         "\t\tlimit = { sol_oos_trace_is_enabled = yes is_human = yes }",
         "\t\tsave_scope_as = sol_oos_trace_subject",
     ]
-    prefix = "SOL_OOS|1|$stage$|[SCOPE.sCountry('sol_oos_trace_subject').GetTag]|[GetDateString]"
-    lines += [f'\t\tdebug_log = "{prefix}|event"', "\t\tdebug_log_scopes = no"]
+    # GetTag has an unregistered return type in the engine data API; use CString.
+    subject = "SCOPE.sCountry('sol_oos_trace_subject')"
+    prefix = f"SOL_OOS;2;$stage$;[{subject}.GetTagAndName];[GetDateString]"
+    lines += [f'\t\tdebug_log = "{prefix};event"', "\t\tdebug_log_scopes = no"]
     for metric in METRICS:
-        expression = f"[SCOPE.sCountry('sol_oos_trace_subject').GetVariable('{metric}').GetValue|V5]"
+        expression = f"[{subject}.MakeScope.GetVariable('{metric}').GetValue|V5]"
         lines += [
             "\t\tif = {",
             f"\t\t\tlimit = {{ has_variable = {metric} }}",
-            f'\t\t\tdebug_log = "{prefix}|{metric}={expression}"',
+            f'\t\t\tdebug_log = "{prefix};{metric}={expression}"',
             "\t\t}",
-            f'\t\telse = {{ debug_log = "{prefix}|{metric}=MISSING" }}',
+            f'\t\telse = {{ debug_log = "{prefix};{metric}=MISSING" }}',
         ]
     lines += ["\t}", "}"]
     return "\n".join(lines) + "\n"

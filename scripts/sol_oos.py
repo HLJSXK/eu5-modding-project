@@ -17,7 +17,9 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[1]
-TRACE = re.compile(r"SOL_OOS\|1\|([^|\r\n]+)\|([^|\r\n]+)\|([^|\r\n]+)\|([^\r\n]*)")
+TRACE = re.compile(r"SOL_OOS\|1\|([^|\r\n]+)\|([^|\r\n]*)\|([^|\r\n]+)\|([^\r\n]*)")
+TRACE_V2 = re.compile(r"SOL_OOS;2;([^;\r\n]+);([^;\r\n]*);([^;\r\n]+);([^\r\n]*)")
+BROKEN_TRACE = re.compile(r"SOL_OOS\|1([a-z_]+)\$\|([^|\r\n]*)\|([^|\r\n]+)\|([^\r\n]*)")
 TRIGGER = Path("in_game/common/scripted_triggers/SOL_oos_trace_triggers.txt")
 
 
@@ -28,6 +30,51 @@ def sha256(path: Path) -> str:
 def file_manifest(folder: Path) -> list[dict]:
     return [{"path": p.relative_to(folder).as_posix(), "sha256": sha256(p), "size": p.stat().st_size}
             for p in sorted(folder.rglob("*")) if p.is_file() and p.name != "sol_oos_build.json"]
+
+
+def parse_trace(text: str) -> tuple[list[tuple[str, str, str, str]], list[str]]:
+    """Read actual log emissions, including the malformed 1.4.6 v1 format.
+
+    Localization errors echo the source expression; they are not executions.
+    Recovered records remain explicitly invalid evidence for numeric comparison.
+    """
+    records, warnings = [], set()
+    lines = text.splitlines()
+    event_context = None
+    for index, line in enumerate(lines):
+        if "SOL_OOS" not in line or "Data error in loc string" in line:
+            continue
+        # Do not interpret quoted source in diagnostics as a second execution.
+        if line.startswith("[") and "[jomini_effect_impl.cpp:" not in line:
+            continue
+        match = TRACE_V2.search(line) or TRACE.search(line)
+        broken = BROKEN_TRACE.search(line) if match is None else None
+        if match is None and broken is None:
+            warnings.add("Unrecognized SOL_OOS record format")
+            continue
+        stage, subject, date, value = (match or broken).groups()
+        if broken:
+            warnings.add("Malformed v1 trace recovered; stage/subject/metrics are not fully reliable")
+        if value == "event":
+            # v1 GetTag rendered empty. Its next debug_log_scopes line can
+            # identify this event without inventing a cross-file ordering.
+            if not subject and index + 1 < len(lines):
+                following = lines[index + 1]
+                tag = re.search(r"[（(]([A-Z0-9_]+)[）)]", following)
+                if "[jomini_effect_impl.cpp:" in following and tag:
+                    subject = tag[1]
+            event_context = (stage, date, subject)
+        elif not subject and event_context and event_context[:2] == (stage, date):
+            subject = event_context[2]
+        if not subject:
+            subject = "UNKNOWN"
+            warnings.add("Missing country identity")
+        if "ERROR:" in value or any("[" in field or "]" in field for field in (stage, subject, date, value)):
+            warnings.add("Unexpanded or ERROR localization; numeric readings are unusable")
+        if "$" in stage:
+            warnings.add("Unexpanded stage parameter")
+        records.append((stage, subject, date, value))
+    return records, sorted(warnings)
 
 
 def build(target: str, output: Path, trace: bool) -> Path:
@@ -83,17 +130,24 @@ def read_report(path: Path) -> dict:
     # older copies of the same logs; never concatenate them into the live stream.
     candidates = [(name, data) for name, data in entries.items()
                   if name.startswith(prefix + "logs/") and name.lower().endswith(".log")]
-    streams = {}
+    streams, trace_warnings = {}, {}
     for name, data in candidates:
-        records = [m.groups() for m in TRACE.finditer(data.decode("utf-8-sig", errors="replace"))]
+        records, warnings = parse_trace(data.decode("utf-8-sig", errors="replace"))
+        stream_name = name.removeprefix(prefix)
         if records:
-            streams[name.removeprefix(prefix)] = records
-    return {"manifest": manifest, "streams": streams}
+            streams[stream_name] = records
+        if warnings:
+            trace_warnings[stream_name] = warnings
+    return {"manifest": manifest, "streams": streams, "trace_warnings": trace_warnings}
 
 
 def compare(left: dict, right: dict) -> dict:
     lm, rm = left["manifest"], right["manifest"]
     findings = []
+    trace_warnings = {"left": left.get("trace_warnings", {}), "right": right.get("trace_warnings", {})}
+    for side, streams in trace_warnings.items():
+        for name, warnings in streams.items():
+            findings.extend(f"{side} {name}: {warning}" for warning in warnings)
     if {lm.get("role"), rm.get("role")} != {"host", "client"}:
         findings.append("Expected one host report and one client report")
     for key in ("session", "game_version", "game_checksum", "language"):
@@ -116,8 +170,13 @@ def compare(left: dict, right: dict) -> dict:
     stream_results = []
     for name in sorted(left["streams"].keys() | right["streams"].keys()):
         a, b = left["streams"].get(name, []), right["streams"].get(name, [])
-        if any("[" in value or "]" in value for record in a + b for value in record):
+        invalid_readings = any("ERROR:" in value or "[" in value or "]" in value
+                               for record in a + b for value in record)
+        if invalid_readings:
             findings.append(f"Unexpanded localization expressions in {name}; validate runtime logging")
+        missing_identity = any(r[1] in ("", "UNKNOWN") for r in a + b)
+        if missing_identity:
+            findings.append(f"Missing country identity in {name}; per-country comparison is incomplete")
         first = next((i for i in range(max(len(a), len(b)))
                       if (a[i] if i < len(a) else None) != (b[i] if i < len(b) else None)), None)
         # Compare each date/subject independently as well: this distinguishes mere
@@ -133,6 +192,8 @@ def compare(left: dict, right: dict) -> dict:
                 grouped.append({"date": key[0], "subject": key[1],
                                 "left_count": len(ga[key]), "right_count": len(gb[key])})
         stream_results.append({"file": name, "left_records": len(a), "right_records": len(b),
+                               "trace_valid": bool(a and b) and not (invalid_readings or missing_identity
+                                   or trace_warnings["left"].get(name) or trace_warnings["right"].get(name)),
                                "first_observed_difference": None if first is None else {
                                    "index": first, "left": a[first] if first < len(a) else None,
                                    "right": b[first] if first < len(b) else None},
@@ -142,6 +203,7 @@ def compare(left: dict, right: dict) -> dict:
     if not left["streams"] or not right["streams"]:
         findings.append("No trace on at least one peer: disabled, unsupported logging, or wrong log/session")
     return {"schema": 1, "findings": findings, "mod_file_differences": differences,
+            "trace_warnings": trace_warnings,
             "streams": stream_results,
             "limitation": "Trace differences are observations, not proof of the first simulation divergence. "
                           "Matching traces do not prove synchronization; only selected human-country caches are logged. "

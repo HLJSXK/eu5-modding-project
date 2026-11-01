@@ -2,6 +2,7 @@
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
+import json
 import sys
 import unittest
 
@@ -106,6 +107,76 @@ def country(human=False,cached=True):
         c.variables[STATUS]=1
     c.locations=[Scope('location',owner=c,variables={SIZE:0.6})]
     return c
+
+
+class LifecycleRuntime(Runtime):
+    """Execute real lifecycle dispatch; economic pulse bodies have separate tests."""
+    def __init__(self, target):
+        self.actions = {}
+        folder = ROOT/'src'/target/'in_game/common/on_action'
+        for filename in ('SOL_economy_on_actions.txt', 'SOL_migration_on_actions.txt'):
+            if (folder/filename).exists():
+                for node in read_nodes(folder/filename):
+                    self.actions.setdefault(node.key, []).extend(node.value)
+        self.migration_marker = None
+        if 'sol_migration_stamp_new_game' in self.actions:
+            stamp = block(self.actions['sol_migration_stamp_new_game'], 'effect')
+            self.migration_marker = next(n.value for n in stamp if n.key == 'set_global_variable')
+        self.effects = {'gls_recalculate_global_living_standard': []}
+        self.flags = set()
+        self.countries = [country(human=True), country(), country(human=True)]
+        self.notifications = []
+        self.calls = Counter()
+        self.operations = Counter()
+        self.local_context = {}
+        self.master = True
+
+    def test(self, node, scope):
+        if node.key == 'has_global_variable':
+            return node.value in self.flags
+        if node.key == 'sol_sol_is_on':
+            return self.master == (node.value == 'yes')
+        return super().test(node, scope)
+
+    def dispatch(self, name, scope):
+        # These unrelated boundaries are exercised by CadenceTests or their
+        # own feature tests, not by this migration/startup fixture.
+        if name in {'sol_initialize_cmm_alias_defaults_game_start', 'sol_ae_game_start',
+                    'sol_substitution_cleanup_monthly_pulse', 'sol_local_pop_demand_monthly_pulse'}:
+            return
+        nodes = self.actions.get(name, [])
+        conditions = [n for section in nodes if section.key == 'trigger' for n in section.value]
+        if not self.condition(conditions, scope):
+            return
+        for section in nodes:
+            if section.key == 'effect':
+                self.execute(section.value, scope)
+            elif section.key == 'on_actions':
+                for child in section.value:
+                    self.dispatch(child.key, scope)
+
+    def execute(self, nodes, scope):
+        for node in nodes:
+            if node.key == 'set_global_variable':
+                self.flags.add(node.value if isinstance(node.value, str) else
+                               next(n.value for n in node.value if n.key == 'name'))
+            elif node.key == 'trigger_event_silently':
+                self.dispatch(next(n.value for n in node.value if n.key == 'on_action'), scope)
+            elif node.key == 'trigger_event_non_silently':
+                # All recipients must observe the global stamp before any event.
+                assert self.migration_marker in self.flags
+                self.notifications.append((node.value, scope))
+            elif node.key == 'every_country':
+                conditions = next((n.value for n in node.value if n.key == 'limit'), [])
+                for recipient in self.countries:
+                    if self.condition(conditions, recipient):
+                        self.execute(node.value, recipient)
+            else:
+                super().execute([node], scope)
+
+    def run(self, name, scope):
+        self.calls[name] += 1
+        super().run(name, scope)
 
 
 class CadenceTests(unittest.TestCase):
@@ -225,14 +296,91 @@ class CadenceTests(unittest.TestCase):
             rt.pulse('sol_local_pop_demand_monthly_pulse',c)
             self.assertEqual(rt.calls['sol_solve_country_pop_demand'],0)
 
-    def test_yearly_registration_and_start_load_refresh_are_present(self):
+    def test_yearly_registration_and_native_post_lobby_refresh_are_present(self):
         for target in TARGETS:
             with self.subTest(target=target):
                 rt=CadenceRuntime(target)
                 entries=block(rt.actions['yearly_country_pulse'],'on_actions')
                 self.assertTrue(any(n.key=='sol_ai_yearly_pop_demand_pulse' for n in entries))
-                refresh=block(rt.actions['gls_init_after_lobby'],'effect')
-                self.assertTrue(any(n.key=='gls_recalculate_global_living_standard' for n in refresh))
+                startup=block(rt.actions['on_game_started_after_lobby'],'on_actions')
+                self.assertEqual(sum(n.key=='gls_init_on_game_started_after_lobby' for n in startup),1)
+                rt.effects['gls_recalculate_global_living_standard']=[]
+                rt.pulse('gls_init_on_game_started_after_lobby',Scope('global'))
+                self.assertEqual(rt.calls['gls_recalculate_global_living_standard'],1)
+                if target=='stable':
+                    rt.master=False
+                    rt.pulse('gls_init_on_game_started_after_lobby',Scope('global'))
+                    self.assertEqual(rt.calls['gls_recalculate_global_living_standard'],1)
+
+
+class LifecycleTests(unittest.TestCase):
+    def test_economics_waits_for_country_selection_and_respects_master(self):
+        for target in TARGETS:
+            with self.subTest(target=target):
+                rt = LifecycleRuntime(target)
+                rt.dispatch('on_game_start', Scope('global'))
+                self.assertEqual(rt.calls['gls_recalculate_global_living_standard'], 0)
+                rt.dispatch('on_game_started_after_lobby', Scope('global'))
+                self.assertEqual(rt.calls['gls_recalculate_global_living_standard'], 1)
+                if target == 'stable':
+                    rt.master = False
+                    rt.dispatch('on_game_started_after_lobby', Scope('global'))
+                    self.assertEqual(rt.calls['gls_recalculate_global_living_standard'], 1)
+
+    def test_native_new_game_stamp_prevents_migration_notice(self):
+        rt = LifecycleRuntime('stable')
+        metadata = json.loads((ROOT/'src/stable/.metadata/metadata.json').read_text(encoding='utf-8'))
+        self.assertEqual(rt.migration_marker, f"SOL_migration_{metadata['version']}_seen")
+        rt.dispatch('on_game_start', Scope('global'))
+        self.assertIn(rt.migration_marker, rt.flags)
+        for _ in range(2):
+            for c in rt.countries:
+                rt.dispatch('monthly_country_pulse', c)
+        self.assertFalse(rt.notifications)
+
+    def test_old_save_notifies_all_humans_once_even_with_legacy_flags(self):
+        rt = LifecycleRuntime('stable')
+        rt.flags.update({'sol_game_started_after_lobby', 'sol_is_new_game',
+                         'SOL_migration_v3_seen', 'SOL_migration_260101_seen'})
+        # Loading while paused dispatches no native monthly tick.
+        self.assertFalse(rt.notifications)
+        rt.dispatch('monthly_country_pulse', rt.countries[1])
+        self.assertNotIn(rt.migration_marker, rt.flags)
+        for _ in range(2):
+            for c in rt.countries:
+                rt.dispatch('monthly_country_pulse', c)
+        self.assertEqual(rt.notifications, [('sol_migration.1', rt.countries[0]),
+                                            ('sol_migration.1', rt.countries[2])])
+        rt.dispatch('SOL_migration_fire_event', Scope('global'))
+        self.assertEqual(len(rt.notifications), 2)
+        self.assertEqual(rt.calls['gls_recalculate_global_living_standard'], 0)
+        loaded = LifecycleRuntime('stable')
+        loaded.flags = rt.flags.copy()
+        for c in loaded.countries:
+            loaded.dispatch('monthly_country_pulse', c)
+        self.assertFalse(loaded.notifications)
+
+    def test_already_migrated_save_skips_notice_with_sol_disabled(self):
+        rt = LifecycleRuntime('stable')
+        rt.master = False
+        rt.flags.add(rt.migration_marker)
+        for c in rt.countries:
+            rt.dispatch('monthly_country_pulse', c)
+        self.assertFalse(rt.notifications)
+        rt.flags.clear()
+        rt.dispatch('monthly_country_pulse', rt.countries[0])
+        self.assertEqual(len(rt.notifications), 2)
+
+    def test_legacy_gui_entrypoints_and_registrations_are_absent(self):
+        names = ('sol_after_lobby_caller', 'sol_load_after_lobby_caller', 'sol_gls_init_caller')
+        for target in TARGETS:
+            root = ROOT/'src'/target
+            for folder in ('in_game/gui', 'in_game/common/scripted_guis'):
+                for path in (root/folder).rglob('*'):
+                    if path.suffix in {'.txt', '.gui'}:
+                        content = path.read_text(encoding='utf-8-sig')
+                        for name in names:
+                            self.assertNotIn(name, content, str(path))
 
 
 if __name__ == '__main__':
