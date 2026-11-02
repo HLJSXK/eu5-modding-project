@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+import re
 import unittest
 from pathlib import Path
 
@@ -14,6 +15,16 @@ import gen_sol_pp_compat as pp
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RENDERER_ROOT = ROOT / ".eu5-base" / "ai_gui_assessment" / "renderer"
+if str(RENDERER_ROOT) not in sys.path:
+    sys.path.insert(0, str(RENDERER_ROOT))
+from eu5_gui_renderer.pdx import parse_file
+
+
+DATABASE_OPERATIONS = (
+    "TRY_INJECT:", "TRY_REPLACE:", "INJECT:", "REPLACE:",
+    "REPLACE_OR_CREATE:", "INJECT_OR_CREATE:",
+)
 
 
 class PPCompatibilityTests(unittest.TestCase):
@@ -94,20 +105,99 @@ class PPCompatibilityTests(unittest.TestCase):
         self.assertIn("size = { 600 100% } # PP: wider than the vanilla left panel", window)
         self.assertEqual(window.count("sol_location_living_standard_button = {}"), 1)
         self.assertIn("# SOL-PP compatibility insertion: shared location living-standard button.", window)
+        button_at = window.index("sol_location_living_standard_button = {}")
+        average_at = window.rfind("using = AverageSatisfaction_tooltip", 0, button_at)
+        migration_at = window.find("using = MigrationAttraction_tooltip", button_at)
+        self.assertGreaterEqual(average_at, 0)
+        self.assertGreater(migration_at, button_at)
 
-    def test_economic_balance_is_not_registered_or_active(self) -> None:
+    def test_economic_balance_is_cmf_opt_in_and_default_off(self) -> None:
         outputs = pp._render_outputs()
         cmm = outputs[pp.CMM_EFFECTS_OUTPUT]
         disabled = outputs[pp.CMM_TRIGGERS_OUTPUT]
         auto = outputs[pp.AUTO_MODIFIERS_OUTPUT]
-        for setting_id in ("as_on", "bte", "ae", "cts", "ds", "difficulty", "gdp_dev", "ai_pr"):
-            self.assertNotIn(f"setting_id = {setting_id}", cmm)
-            self.assertNotIn(f"flag:sol__{setting_id}", cmm)
+        scripted_gui = outputs[pp.CMM_SCRIPTED_GUI_OUTPUT]
+        self.assertIn("setting_id = pp_as_on", cmm)
+        self.assertIn("default_value = 0", cmm)
+        for setting_id in ("bte", "ae", "cts", "ds", "difficulty", "gdp_dev", "ai_pr"):
+            self.assertIn(f"setting_id = {setting_id}", cmm)
+            self.assertIn(f"flag:sol__{setting_id}", cmm)
+        self.assertNotIn("setting_id = as_on", cmm)
+        self.assertNotIn("flag:sol__as_on", cmm)
+        self.assertIn("has_global_variable_map = cmm", disabled)
+        self.assertIn("has_global_variable = sol_as_enabled", disabled)
         for trigger in ("sol_as_is_on", "sol_ae_is_on", "sol_difficulty_is_on", "sol_gdp_dev_is_on"):
-            self.assertIn(f"REPLACE:{trigger} = {{ always = no }}", disabled)
-        for modifier in pp.DISABLED_AUTO_MODIFIER_KEYS:
-            self.assertIn(f"REPLACE:{modifier} = {{", auto)
-            self.assertIn("potential_trigger = { always = no }", auto)
+            self.assertIn(f"REPLACE:{trigger} = {{", disabled)
+        self.assertNotIn("potential_trigger = { always = no }", auto)
+        self.assertIn("sol_substitute_silk", auto)
+        for setting_id in (
+            "sol_map", "ai_reduced_freq", "bte", "ae", "cts", "ds",
+            "difficulty", "gdp_dev", "ai_pr", "iwe", "hwe", "rwe",
+        ):
+            self.assertNotIn(f"sol__{setting_id}_on_changed =", scripted_gui)
+
+    def test_pp_silk_localization_uses_unique_keys(self) -> None:
+        outputs = pp._render_outputs()
+        for path in (pp.LOCATION_GUI_OUTPUT, pp.SITUATION_GUI_OUTPUT):
+            text = outputs[path]
+            self.assertIn("SOL_PP_GOOD_SUB_silk", text)
+            self.assertNotIn("SOL_GOOD_SUB_silk", text)
+            self.assertNotIn("SOL_SUB_PRICE_silk", text)
+        self.assertIn("SOL_PP_SUB_PRICE_silk", outputs[pp.LOCATION_GUI_OUTPUT])
+        for language in ("english", "simp_chinese"):
+            text = outputs[pp.ENGLISH_SUB_LOC_OUTPUT if language == "english" else pp.CHINESE_SUB_LOC_OUTPUT]
+            self.assertIn(f"SOL_PP_GOOD_SUB_silk:", text)
+            self.assertIn(f"SOL_PP_SUB_PRICE_silk:", text)
+            pp_keys = set(re.findall(r"(?m)^\s+([A-Za-z0-9_.-]+):", text))
+            upstream_keys = set()
+            upstream_roots = (
+                ROOT / "src/stable/main_menu/localization" / language,
+                ROOT.parent / "prosper-or-perish-upstream" / "mod" / "Prosper or Perish (Population Growth & Food Rework)" / "main_menu/localization" / language,
+            )
+            for loc_root in upstream_roots:
+                if not loc_root.exists():
+                    continue
+                for loc_file in loc_root.glob("*.yml"):
+                    upstream_keys.update(re.findall(
+                        r"(?m)^\s+([A-Za-z0-9_.-]+):",
+                        loc_file.read_text(encoding="utf-8-sig"),
+                    ))
+            self.assertFalse(pp_keys & upstream_keys, sorted(pp_keys & upstream_keys))
+
+    def test_loaded_sol_pp_stack_has_no_plain_key_collisions(self) -> None:
+        roots = {
+            "SOL": ROOT / "src/stable",
+            "PP": ROOT.parent / "prosper-or-perish-upstream" / "mod" / "Prosper or Perish (Population Growth & Food Rework)",
+            "COMPATCH": ROOT / "src/sol_pp_compatibility_submod",
+        }
+        objects = {}
+        for owner, root in roots.items():
+            for path in root.rglob("*.txt"):
+                relative = path.relative_to(root)
+                database = (relative.parts[0], *relative.parts[1:-1])
+                for node in parse_file(path):
+                    if not node.is_block():
+                        continue
+                    operation = "="
+                    key = node.key
+                    for prefix in DATABASE_OPERATIONS:
+                        if key.startswith(prefix):
+                            operation = prefix[:-1]
+                            key = key[len(prefix):]
+                            break
+                    objects.setdefault((database, key), []).append((owner, operation, path))
+
+        collisions = []
+        for (database, key), entries in objects.items():
+            compatch = [entry for entry in entries if entry[0] == "COMPATCH" and entry[1] == "="]
+            upstream = [entry for entry in entries if entry[0] in {"SOL", "PP"}]
+            if database[-1] == "on_action":
+                continue
+            if compatch and upstream:
+                collisions.append((database, key, compatch, upstream))
+            if len(compatch) > 1:
+                collisions.append((database, key, compatch, []))
+        self.assertEqual([], collisions)
 
 
 if __name__ == "__main__":

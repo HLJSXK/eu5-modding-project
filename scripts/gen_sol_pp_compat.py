@@ -166,6 +166,14 @@ VISIBLE_CMM_SETTINGS = (
     "sol_on",
     "sol_map",
     "substitution",
+    "pp_as_on",
+    "bte",
+    "ae",
+    "cts",
+    "ds",
+    "difficulty",
+    "gdp_dev",
+    "ai_pr",
     "hw_on",
     "iwe",
     "hwe",
@@ -176,23 +184,7 @@ VISIBLE_CMM_SETTINGS = (
     "solver_ai_exact",
     "solver_ai_approx",
 )
-HIDDEN_CMM_SETTINGS = ("as_on", "bte", "ae", "cts", "ds", "difficulty", "pp_gdp_dev", "ai_pr", "gdp_dev")
-DISABLED_AUTO_MODIFIER_KEYS = (
-    "base_tax_efficiency_602",
-    "sol_diplomatic_spending_dynamic",
-    "sol_cultural_tradition_stability_discount",
-    "sol_ai_prosperity_recovery_mod",
-    "sol_difficulty_ai_hard_mod",
-    "sol_difficulty_ai_very_hard_mod",
-    "sol_difficulty_player_very_easy_mod",
-    "sol_difficulty_player_easy_mod",
-    "sol_ae_age_1_mod",
-    "sol_ae_age_2_mod",
-    "sol_ae_age_3_mod",
-    "sol_ae_age_4_mod",
-    "sol_ae_age_5_mod",
-    "sol_ae_age_6_mod",
-)
+HIDDEN_CMM_SETTINGS = ("as_on", "pp_gdp_dev")
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig")
 
@@ -647,6 +639,11 @@ def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str
     if "silk" not in goods or "victuals" in goods:
         raise ValueError("PP goods rows must contain silk and exclude victuals")
     rendered = replace_goods_vbox(text, section_marker, goods, variable_map, scope)
+    # SOL already owns the generic silk localization keys. The PP target needs
+    # a distinct caption because its silk membership differs from SOL's base
+    # data, and localization keys are global across the loaded mod stack.
+    rendered = rendered.replace("SOL_GOOD_SUB_silk", "SOL_PP_GOOD_SUB_silk")
+    rendered = rendered.replace("SOL_SUB_PRICE_silk", "SOL_PP_SUB_PRICE_silk")
     if rendered.count('tooltip = "@silk!') != 1:
         raise ValueError(f"Rebuilt GUI does not contain exactly one silk cell in {source}")
     for good in ("weaponry", "lumber"):
@@ -656,52 +653,39 @@ def _render_gui(source: Path, section_marker: str, variable_map: str, scope: str
     return GENERATED_HEADER + rendered
 
 
-PP_LOCATION_BUTTON_ANCHOR = "\n\t\t\t\t\t# RIGHT BUTTONS\n"
-PP_LOCATION_BUTTON = (
-    "\t\t\t\t\t# SOL-PP compatibility insertion: shared location living-standard button.\n"
-    "\t\t\t\t\tsol_location_living_standard_button = {}\n\n"
+PP_LOCATION_BUTTON_ANCHOR_RE = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)expand = \{\}[ \t]*\r?\n"
+    r"(?:[ \t]*\r?\n)*(?P=indent)subheader_unified_icon = \{[ \t]*\r?\n"
+    r'[ \t]+visible = "\[HasPopBreakdownIntelOn\(Location\.Self\)\]"'
 )
-
-
 def _render_location_window() -> str:
     """Inject the shared SOL button into PP's complete location-window owner."""
     text = _read(PP_LOCATION_GUI)
-    pp_card_start = text.find("\n\ttype pp_location_card = hbox {")
-    if pp_card_start < 0:
-        raise ValueError("PP location window is missing type pp_location_card")
-    pp_card_end = text.find("\n\ttype army_slot =", pp_card_start)
-    if pp_card_end < 0:
-        raise ValueError("PP location window has no type following pp_location_card")
-    pp_card = text[pp_card_start:pp_card_end]
-    anchor_count = pp_card.count(PP_LOCATION_BUTTON_ANCHOR)
-    if anchor_count != 1:
+    anchor_matches = list(PP_LOCATION_BUTTON_ANCHOR_RE.finditer(text))
+    if len(anchor_matches) != 1:
         raise ValueError(
-            "Expected one PP location-card right-button anchor, "
-            f"found {anchor_count}"
+            "Expected one PP location-window anchor after average satisfaction, "
+            f"found {len(anchor_matches)}"
         )
     if "sol_location_living_standard_button = {}" in text:
         raise ValueError("PP location window already contains the SOL button")
-    insert_at = pp_card_start + pp_card.index(PP_LOCATION_BUTTON_ANCHOR)
-    text = text[:insert_at] + "\n" + PP_LOCATION_BUTTON + text[insert_at + 1 :]
+    match = anchor_matches[0]
+    indent = match.group("indent")
+    button = (
+        f"{indent}# SOL-PP compatibility insertion: shared location living-standard button.\n"
+        f"{indent}sol_location_living_standard_button = {{}}\n\n"
+    )
+    insert_at = match.start()
+    text = text[:insert_at] + button + text[insert_at:]
     return GENERATED_HEADER + text
 
 
 def _render_auto_modifiers() -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# PP owns economic balance; disable all seven SOL Economic Balance",
-        "# auto modifiers while retaining SOL's non-economic auto modifiers.",
+        "# PP owns economic balance by default; the CMF opt-in restores SOL's",
+        "# trigger-gated Economic Balance auto modifiers when explicitly enabled.",
     ]
-
-    for key in DISABLED_AUTO_MODIFIER_KEYS:
-        lines.extend([
-            "",
-            f"REPLACE:{key} = {{",
-            "\tcategory = country",
-            "\trequires_real = no",
-            "\tpotential_trigger = { always = no }",
-            "}",
-        ])
     lines.extend([
         "",
         "# PP-only silk member of SOL's luxury_goods substitute group.",
@@ -729,20 +713,6 @@ def _render_static_cleanup() -> str:
         lines.append(f"\t{field} = {_format_float(-value)}")
     lines.append("}")
 
-    lines.extend([
-        "",
-        "# Neutralize SOL age-economic tooltip modifiers in this PP stack.",
-    ])
-    for age, _age_key in AGE_NAMES:
-        source_key = f"sol_ae_age_{age}_modifier"
-        lines.extend([
-            "",
-            f"REPLACE:{source_key} = {{",
-            "\tgame_data = {",
-            "\t\tcategory = country",
-            "\t}",
-        ])
-        lines.append("}")
     lines.append("")
     return "\n".join(lines)
 
@@ -834,7 +804,8 @@ def _render_cmm_effects() -> str:
 
     lines = [
         GENERATED_HEADER.rstrip(),
-        "# Keep PP-compatible defaults and remove SOL Economic Balance controls.",
+        "# Keep PP-compatible defaults while allowing explicit CMF opt-in to SOL",
+        "# Economic Balance controls.",
         "REPLACE:sol_initialize_cmm_bool_alias_defaults = {",
         "\tset_global_variable = { name = sol_substitution_enabled value = yes }",
         "\tset_global_variable = { name = sol_sol_on_enabled value = yes }",
@@ -859,6 +830,14 @@ def _render_cmm_effects() -> str:
     _append_bool_setting(lines, "sol_on", "feat", "sol", "sol_sol_on_enabled", False)
     _append_bool_setting(lines, "sol_map", "feat", "sol", "sol_sol_map_enabled")
     _append_bool_setting(lines, "substitution", "feat", "sol", "sol_substitution_enabled", False)
+    _append_bool_setting(lines, "pp_as_on", "feat", "as", "sol_as_enabled", False, default_value=0)
+    _append_slider_setting(lines, "bte", "sol_bte", "-15", "-30", "30", "1")
+    _append_bool_setting(lines, "ae", "feat", "as", "sol_ae_enabled")
+    _append_slider_setting(lines, "cts", "sol_cts", "-5", "-20", "0", "1")
+    _append_slider_setting(lines, "ds", "sol_ds", "-5", "-20", "0", "1")
+    _append_bool_setting(lines, "difficulty", "feat", "as", "sol_difficulty_enabled")
+    _append_bool_setting(lines, "gdp_dev", "feat", "as", "sol_gdp_dev_enabled")
+    _append_slider_setting(lines, "ai_pr", "sol_ai_pr", "0.5", "0", "2", "0.1")
     _append_bool_setting(lines, "hw_on", "feat", "hw", "sol_hw_enabled", False)
     _append_bool_setting(lines, "iwe", "feat", "hw", "sol_iwe_enabled")
     _append_bool_setting(lines, "hwe", "feat", "hw", "sol_hwe_enabled")
@@ -877,6 +856,14 @@ def _render_cmm_effects() -> str:
         ("sol_on", "sol_sol_on_enabled", False),
         ("substitution", "sol_substitution_enabled", False),
         ("sol_map", "sol_sol_map_enabled", False),
+        ("pp_as_on", "sol_as_enabled", False),
+        ("bte", "sol_bte", True),
+        ("ae", "sol_ae_enabled", False),
+        ("cts", "sol_cts", True),
+        ("ds", "sol_ds", True),
+        ("difficulty", "sol_difficulty_enabled", False),
+        ("gdp_dev", "sol_gdp_dev_enabled", False),
+        ("ai_pr", "sol_ai_pr", True),
         ("hw_on", "sol_hw_enabled", False),
         ("iwe", "sol_iwe_enabled", False),
         ("hwe", "sol_hwe_enabled", False),
@@ -900,10 +887,39 @@ def _render_cmm_effects() -> str:
 
 
 def _render_disabled_triggers() -> str:
-    return GENERATED_HEADER + "# SOL Economic Balance is unavailable in the PP stack.\nREPLACE:sol_as_is_on = { always = no }\nREPLACE:sol_ae_is_on = { always = no }\nREPLACE:sol_difficulty_is_on = { always = no }\nREPLACE:sol_gdp_dev_is_on = { always = no }\n"
+    lines = [
+        GENERATED_HEADER.rstrip(),
+        "# SOL Economic Balance is off by default in the PP stack and can be",
+        "# enabled explicitly through the PP-specific CMF master setting.",
+        "",
+        "REPLACE:sol_as_is_on = {",
+        "\tAND = {",
+        "\t\thas_global_variable_map = cmm",
+        "\t\thas_global_variable = sol_as_enabled",
+        "\t}",
+        "}",
+    ]
+    for trigger, alias in (
+        ("sol_ae_is_on", "sol_ae_enabled"),
+        ("sol_difficulty_is_on", "sol_difficulty_enabled"),
+        ("sol_gdp_dev_is_on", "sol_gdp_dev_enabled"),
+    ):
+        lines.extend([
+            "",
+            f"REPLACE:{trigger} = {{",
+            "\tAND = {",
+            "\t\tsol_as_is_on = yes",
+            f"\t\thas_global_variable = {alias}",
+            "\t}",
+            "}",
+        ])
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _render_cmm_scripted_gui() -> str:
+    # SOL already defines these callbacks. PP registers their setting IDs but
+    # must not load duplicate scripted-GUI keys alongside the base SOL mod.
     return GENERATED_HEADER
 
 
@@ -915,6 +931,7 @@ def _render_on_actions() -> str:
 sol_pp_compatibility_cleanup = {
 \teffect = {
 \t\tevery_country = {
+\t\t\tlimit = { sol_ae_is_on = no }
 \t\t\tremove_country_modifier = sol_ae_age_1_modifier
 \t\t\tremove_country_modifier = sol_ae_age_2_modifier
 \t\t\tremove_country_modifier = sol_ae_age_3_modifier
@@ -923,37 +940,46 @@ sol_pp_compatibility_cleanup = {
 \t\t\tremove_country_modifier = sol_ae_age_6_modifier
 \t\t}
 \t\tevery_location_in_the_world = {
+\t\t\tlimit = { sol_gdp_dev_is_on = no }
 \t\t\tremove_location_modifier = gdp_to_development_modifier
 \t\t}
 \t}
 }
-
-REPLACE:gdp_to_development_pulse = { effect = { } }
-REPLACE:sol_ae_game_start = { effect = { } }
-REPLACE:sol_ae_new_age = { effect = { } }
 """
 
 
 def _render_cmm_localization(language: str) -> str:
     if language not in {"english", "simp_chinese"}:
         raise ValueError(f"Unsupported localization language: {language}")
-    return f"l_{language}:\n"
+    if language == "english":
+        return (
+            "l_english:\n"
+            ' sol__pp_as_on_name: "Enable SOL Economic Balance with PP?"\n'
+            ' sol__pp_as_on_desc: "Off by default. Enables SOL\'s trigger-gated economic settings alongside Prosper or Perish; PP remains the default economic authority."\n'
+            ' sol__pp_as_on: "sol__pp_as_on"\n'
+        )
+    return (
+        "l_simp_chinese:\n"
+        ' sol__pp_as_on_name: "启用SOL经济平衡（PP兼容）？"\n'
+        ' sol__pp_as_on_desc: "默认关闭。开启后在Prosper or Perish兼容层中启用SOL的经济开关控制；默认经济权仍由PP负责。"\n'
+        ' sol__pp_as_on: "sol__pp_as_on"\n'
+    )
 
 
 def _render_substitution_localization(language: str) -> str:
     if language == "english":
         return (
             "l_english:\n"
-            ' SOL_GOOD_SUB_silk: "Luxury goods @fine_cloth! @fur! @porcelain! @lacquerware! @marble! @glass!"\n'
-            ' SOL_SUB_PRICE_silk: "$SOL_SUB_PRICE_WEIGHT$ [GetVariableFromGlobalVariableMap(\'sol_market_substitute_weight_silk\', Location.GetMarket.MakeScope).GetValue|2]"\n'
+            ' SOL_PP_GOOD_SUB_silk: "Luxury goods @fine_cloth! @fur! @porcelain! @lacquerware! @marble! @glass!"\n'
+            ' SOL_PP_SUB_PRICE_silk: "$SOL_SUB_PRICE_WEIGHT$ [GetVariableFromGlobalVariableMap(\'sol_market_substitute_weight_silk\', Location.GetMarket.MakeScope).GetValue|2]"\n'
             ' AUTO_MODIFIER_NAME_sol_substitute_silk: "Goods substitution ($silk$)"\n'
             ' AUTO_MODIFIER_DESC_sol_substitute_silk: "Adjusts population demand for $silk$ through goods substitution."\n'
             ' SOL_LSHUD_GOOD_ICON_silk: "@silk!"\n'
         )
     return (
         "l_simp_chinese:\n"
-        ' SOL_GOOD_SUB_silk: "奢侈品 @fine_cloth! @fur! @porcelain! @lacquerware! @marble! @glass!"\n'
-        ' SOL_SUB_PRICE_silk: "$SOL_SUB_PRICE_WEIGHT$ [GetVariableFromGlobalVariableMap(\'sol_market_substitute_weight_silk\', Location.GetMarket.MakeScope).GetValue|2]"\n'
+        ' SOL_PP_GOOD_SUB_silk: "奢侈品 @fine_cloth! @fur! @porcelain! @lacquerware! @marble! @glass!"\n'
+        ' SOL_PP_SUB_PRICE_silk: "$SOL_SUB_PRICE_WEIGHT$ [GetVariableFromGlobalVariableMap(\'sol_market_substitute_weight_silk\', Location.GetMarket.MakeScope).GetValue|2]"\n'
         ' AUTO_MODIFIER_NAME_sol_substitute_silk: "商品替代（$silk$）"\n'
         ' AUTO_MODIFIER_DESC_sol_substitute_silk: "通过商品替代调整$silk$的人口需求。"\n'
         ' SOL_LSHUD_GOOD_ICON_silk: "@silk!"\n'

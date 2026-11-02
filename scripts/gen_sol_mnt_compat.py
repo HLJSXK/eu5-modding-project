@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
 TARGET_ROOT = REPO_ROOT / "src" / "sol_mnt_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
 MNT_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3735059838"
+MNT_METADATA = MNT_ROOT / ".metadata" / "metadata.json"
+EXPECTED_MNT_VERSION = "0.2.12"
+EXPECTED_MNT_GAME_VERSION = "1.4.*"
 VANILLA_ROOT = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game"
 
 TARGET_DEMAND_CSV = REPO_ROOT / "data" / "target_demand.csv"
@@ -144,6 +148,18 @@ class Block:
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig")
+
+
+def _validate_mnt_version() -> None:
+    metadata = json.loads(MNT_METADATA.read_text(encoding="utf-8-sig"))
+    version = metadata.get("version")
+    game_version = metadata.get("supported_game_version")
+    if version != EXPECTED_MNT_VERSION or game_version != EXPECTED_MNT_GAME_VERSION:
+        raise ValueError(
+            "SOL-M&T generator targets MnT "
+            f"{EXPECTED_MNT_VERSION} for EU5 {EXPECTED_MNT_GAME_VERSION}; "
+            f"reference metadata is MnT {version} for EU5 {game_version}"
+        )
 
 
 def _decimal(value: str | float | Decimal) -> Decimal:
@@ -578,11 +594,12 @@ def _render_authority_objects(
             )
             continue
         source_label = "M&T" if mnt_block else "vanilla"
+        authority_body = "\n".join(line.rstrip() for line in authority.body.splitlines()).strip("\r\n")
         lines.extend(
             [
                 "",
                 f"# {source_label} authority: {authority.source.relative_to(REPO_ROOT)}",
-                f"REPLACE:{sol_block.key} = {{{authority.body}}}",
+                f"REPLACE:{sol_block.key} = {{\n{authority_body}\n}}",
             ]
         )
     lines.append("")
@@ -738,6 +755,9 @@ EPBM_CLEANUP = """
 
 def _render_epbm_body() -> str:
     original = _unique_block(_blocks_in_file(MNT_EPBM), "epbm_calculate_maintenance", "M&T EPBM").body
+    for iterator in ("every_estate", "every_owned_building", "every_owned_foreign_building"):
+        if len(re.findall(rf"(?m)^\s*{iterator}\s*=\s*\{{", original)) != 1:
+            raise ValueError(f"Expected one {iterator} loop in MnT EPBM maintenance")
     rendered = _replace_once(
         original,
         "\tset_local_variable = { name = epbm_crown_total_cost value = 0 }\n",
@@ -1179,15 +1199,10 @@ def _render_decoupled_action(path: Path, key: str, purpose: str) -> str:
 
 
 BUTTON_ANCHOR_RE = re.compile(
-    r"(?m)^\s*expand = \{\}\s*\n\s*subheader_unified_icon = \{\s*\n"
-    r'\s*visible = "\[HasPopBreakdownIntelOn\(Location\.Self\)\]"'
+    r"(?m)^(?P<indent>[ \t]*)expand = \{\}[ \t]*\r?\n"
+    r"(?:[ \t]*\r?\n)*(?P=indent)subheader_unified_icon = \{[ \t]*\r?\n"
+    r'[ \t]+visible = "\[HasPopBreakdownIntelOn\(Location\.Self\)\]"'
 )
-
-SOL_BUTTON = """									# SOL-M&T compatibility insertion: shared location living-standard button.
-									sol_location_living_standard_button = {}
-
-"""
-
 
 def _render_location_gui() -> str:
     text = _read(MNT_LOCATION_GUI)
@@ -1201,11 +1216,17 @@ def _render_location_gui() -> str:
     matches = list(BUTTON_ANCHOR_RE.finditer(text))
     if len(matches) != 1:
         raise ValueError(f"Expected one M&T location button anchor, found {len(matches)}")
-    text = text[: matches[0].start()] + SOL_BUTTON + text[matches[0].start() :]
-    return GENERATED_HEADER + add_great_projects(text, expected_queue_actions=0)
+    indent = matches[0].group("indent")
+    sol_button = (
+        f"{indent}# SOL-M&T compatibility insertion: shared location living-standard button.\n"
+        f"{indent}sol_location_living_standard_button = {{}}\n\n"
+    )
+    text = text[: matches[0].start()] + sol_button + text[matches[0].start() :]
+    return GENERATED_HEADER + add_great_projects(text, expected_queue_actions=6)
 
 
 def _render_outputs() -> Dict[Path, str]:
+    _validate_mnt_version()
     sol_targets = _load_sol_targets()
     vanilla_goods = load_vanilla_goods()
     vanilla_prices = {good: _decimal(data["price"]) for good, data in vanilla_goods.items()}

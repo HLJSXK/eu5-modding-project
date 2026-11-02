@@ -34,6 +34,11 @@ class LocationWindowGenerationTests(unittest.TestCase):
             self.assertEqual(window.count("sol_location_living_standard_button = {}"), 1)
             self.assertEqual(window.count("tv_location_wonders_button = {}"), 1)
             self.assertEqual(window.count("tv_location_wonders_panel = {}"), 1)
+            button_at = window.index("sol_location_living_standard_button = {}")
+            average_at = window.rfind("using = AverageSatisfaction_tooltip", 0, button_at)
+            migration_at = window.find("using = MigrationAttraction_tooltip", button_at)
+            self.assertGreaterEqual(average_at, 0)
+            self.assertGreater(migration_at, button_at)
             for marker in stable.LEGACY_GUI_MARKERS:
                 self.assertNotIn(marker, window)
         self.assertIn("local_sol_total_income", standalone_window)

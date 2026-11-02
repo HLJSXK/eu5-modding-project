@@ -1,6 +1,8 @@
 # SOL-M&T Compatibility Feature Matrix
 
-Date: 2026-07-22
+Date: 2026-11-02
+
+Validated source: MEIOU and Taxes `0.2.12`, EU5 `1.4.*`.
 
 ## Stack Contract
 
@@ -20,7 +22,7 @@ SOL owns its calibrated pop-demand and Living Standard presentation.
 | --- | --- |
 | Seven SOL pop types | SOL final quantities are multiplied by `SOL price / M&T price`, then rounded to EU5's five-decimal precision. |
 | Maize, millet, rice | Each pop receives one equal quantity across all three goods; combined SOL default-price spending is preserved within fixed-point rounding. |
-| Tools | Laborer demand is `0.0005`; M&T's special `0.002` quantity is not retained. |
+| Tools | Laborer demand is `0.002`, following the SOL demand matrix and price conversion. |
 | Slaves | M&T final slave quantities are retained. |
 | Demand gates | All wealth and development thresholds are removed, and SOL's engine-wide development multiplier disable remains active. |
 | Other goods fields | M&T price, production, food, transport, RGO, climate, origin, and availability fields remain unchanged. |
@@ -46,23 +48,25 @@ effect, so it cannot overwrite the EPBM-derived location variables.
 
 ## SOL Feature Boundary
 
-Retained: income-based demand, Living Standard situation/map/location UI,
-migration support, war exhaustion and non-conflicting war-location effects,
-wartime cabinet restriction, colonial restrictions, and the 30-favor call-to-war
-cost.
+Retained: income-based demand, goods substitution, Living Standard
+situation/map/location UI, and migration support.
 
 Removed: base tax, age escalation, difficulty tax changes, AI recovery,
 GDP-to-development, dynamic diplomatic spending, cultural-tradition stability
 discount, SOL prices and gold-transfer scaling, location/RGO/low-control balance,
 winter/raised-levy food changes, and Little Ice Age balance.
 
-CMF exposes only `sol_on`, `sol_map`, `hw_on`, `iwe`, `hwe`, and `rwe`.
+CMF exposes the SOL core controls; the compatibility-specific economic master
+remains default-off. MnT owns prices, economic static modifiers, building
+maintenance, food, RGO, and construction balance.
 
 ## Verification Boundary
 
-`scripts/gen_sol_mnt_compat.py --check` validates the 56-goods matrix,
+`scripts/gen_sol_mnt_compat.py --check` pins the reference to MnT 0.2.12 and validates the 56-goods matrix,
 price-scaling tolerance, equal grains, `tools`, threshold removal, M&T
-non-demand fields, and the marked EPBM source-preservation invariant.
+non-demand fields, all three EPBM building traversals, unchanged M&T charge
+logic, and the marked EPBM source-preservation invariant. It also verifies the
+1.4 location window, SOL button, and all six Great Projects queue hooks.
 `scripts/validate.py` checks static project syntax. A combined in-game load,
 runtime log review, M&T-only charge comparison, and GUI interaction test remain
 required before claiming runtime compatibility.

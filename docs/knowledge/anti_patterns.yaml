@@ -1,4 +1,13 @@
 # eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: compatibility_scripted_gui_redeclares_upstream_callback
+  pattern: null
+  detectability: advisory
+  category: compatibility
+  scope: scripted_guis
+  bad: Copying an upstream mod's keyed scripted-GUI callback definitions into a compatibility submod merely because the submod registers the same CMF setting IDs.
+  correction: Keep the upstream callback definitions owned by the upstream mod. A compatibility layer may register or replace setting effects and callbacks, but must emit no duplicate <mod_id>__<setting_id>_on_changed keys unless it uses a distinct key intentionally.
+  source: User runtime error.log 2026-11-02; src/sol_pp_compatibility_submod/in_game/common/scripted_guis/zz_SOL_PP_compact_cmm_scripted_gui.txt; src/stable/in_game/common/scripted_guis/SOL_cmm_scripted_gui.txt
+  notes: The PP generator copied SOL_cmm_scripted_gui.txt after restoring opt-in economic settings. SOL already loads those twelve sol__*_on_changed keys, so the PP file produced Duplicated key warnings and was ignored by the database. The generated PP scripted-GUI file is now header-only; CMF registration still references the upstream callback keys.
 - id: sol_gui_script_execution_oos
   pattern: null
   detectability: advisory
@@ -31,6 +40,15 @@
   correction: Use bare tv_location_wonders_button in the city-scene widget and tv_location_wonders_panel directly under lateralview. Add the provider's tv_location_wonders_close_on_queue template before existing OpenConstructionQueue actions. Keep these references in all three SOL window generators through location_window_integrations.py without a GP build or metadata dependency.
   source: ../eu5-great-projects/docs/guides/Location_GUI_Integration.md; ../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532; .eu5-base/reference_mods/3812518640/in_game/gui/location_window.gui:8262; user direction 2026-10-30
   notes: GP owns context, assets, tooltip, visibility and queue-close behavior. Current M&T has no OpenConstructionQueue action. Missing-provider errors and omitted controls are intentional by user request; offline checks do not prove native fallback geometry or hover behavior. No fallback types should shadow the provider.
+- id: sol_mnt_location_queue_hook_count_drift
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: location
+  bad: Reusing a fixed Great Projects queue-hook count after the upstream MnT location window changes its construction queue actions.
+  correction: Pin the MnT metadata version used by the generator, count every OpenConstructionQueue entry in the source window, and pass that expected count to the shared queue-close integration. Keep a regression that verifies the generated count and the SOL location button.
+  source: .eu5-base/reference_mods/3735059838/.metadata/metadata.json; .eu5-base/reference_mods/3735059838/in_game/gui/location_window.gui; scripts/gen_sol_mnt_compat.py; scripts/test_sol_mnt_compat.py
+  notes: MnT 0.2.12 for EU5 1.4.* contains six construction queue actions; the previous compatibility generator expected zero and failed before writing outputs. The hook count is source-drift protection, not runtime proof of Great Projects availability.
 - id: sol_native_demand_preferences_bypass_weight_authority
   pattern: null
   detectability: advisory
