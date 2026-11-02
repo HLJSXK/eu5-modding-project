@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 import re
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -52,7 +53,39 @@ class PPCompatibilityTests(unittest.TestCase):
                 compat_rows[good][0] * compat_rows[good][1][pop_type]
                 for good in (*pp.LUXURY_BASELINE_MEMBERS, "silk")
             )
-            self.assertAlmostEqual(old_budget, new_budget, places=4)
+            target_budget = old_budget * pp.PP_BASKET_MULTIPLIERS[pop_type]
+            if target_budget > 0:
+                self.assertLessEqual(abs(new_budget / target_budget - 1), 0.05)
+
+    def test_pp_baskets_use_save_medians_and_two_significant_digits(self) -> None:
+        base = {good: quantities for good, _price, quantities in pp._load_good_rows()}
+        calibrated = {good: quantities for good, _price, quantities in pp._compat_good_rows()}
+        self.assertEqual(pp.PP_BASKET_MULTIPLIERS["nobles"], 2.0)
+        self.assertEqual(pp.PP_BASKET_MULTIPLIERS["clergy"], 2.0)
+        self.assertAlmostEqual(pp.PP_BASKET_MULTIPLIERS["burghers"], 1.5373831775700935)
+        self.assertAlmostEqual(pp.PP_BASKET_MULTIPLIERS["laborers"], 1.706803704957381)
+        self.assertAlmostEqual(pp.PP_BASKET_MULTIPLIERS["peasants"], 1.706803704957381)
+        self.assertAlmostEqual(pp.PP_BASKET_MULTIPLIERS["soldiers"], 1.706803704957381)
+        self.assertEqual(pp.PP_BASKET_MULTIPLIERS["tribesmen"], 1.0)
+        for good, quantities in calibrated.items():
+            for pop_type, quantity in quantities.items():
+                if good != "lumber" and base.get(good, {}).get(pop_type, 0.0) > 0:
+                    self.assertGreater(quantity, 0, (good, pop_type))
+                if quantity > 0:
+                    self.assertLessEqual(
+                        pp._significant_digits(Decimal(str(quantity))),
+                        2,
+                        (good, pop_type, quantity),
+                    )
+
+    def test_compatch_emits_target_scoped_basket_deltas(self) -> None:
+        outputs = pp._render_outputs()
+        output = outputs[pp.LUMBER_OUTPUT]
+        self.assertIn("# PP compatch basket calibration: coal.", output)
+        self.assertIn("INJECT:coal = {", output)
+        self.assertIn("INJECT:cloves = {", output)
+        self.assertIn("INJECT:silk = {", output)
+        self.assertIn("sol_unit_consumption_nobles_fine_cloth", outputs[pp.VALUES_OUTPUT])
 
     def test_victuals_and_lumber_final_demand_are_zero(self) -> None:
         fur_output = pp._render_outputs()[pp.LUMBER_OUTPUT]

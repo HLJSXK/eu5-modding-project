@@ -2,6 +2,18 @@
 
 Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guide.md) first. This file records SOL-specific screen behavior, experiments, runtime evidence, and design decisions.
 
+## Goods tier icon startup availability (2026-11-03)
+
+**[Runtime log + shipped assets; native reload acceptance pending.]** The Required,
+Daily and Luxury icons were still referenced, but `goods_details.gui` loads from
+`main_menu` while the three DDS files were only in `in_game`. The runtime log
+reported missing `gfx/interface/sol_proto/tier_need.dds`, `tier_daily.dds` and
+`tier_lux.dds` from the shared goods tooltip. Stable and standalone now ship the
+unchanged artwork under `main_menu/gfx/interface/sol_proto`; their virtual paths
+remain unchanged for location, country, HUD, map and compatibility surfaces.
+The packaging regression explicitly checks this early asset root: the offline
+renderer searches both roots and previously hid the failure.
+
 ## GUI script execution and multiplayer OOS (2026-11-01)
 
 **[User-confirmed runtime cause.]** GUI execution of scripts causes the reported SOL

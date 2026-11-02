@@ -566,6 +566,22 @@ class SubstitutionUI(unittest.TestCase):
                 for scope in ('Market.', 'Player.', 'Location.'):
                     self.assertNotIn(scope, source)
 
+    def test_tier_icons_are_available_when_main_menu_goods_tooltips_load(self):
+        # goods_details loads before in_game assets. Searching both roots in
+        # offline previews otherwise conceals this startup packaging failure.
+        for target in ('stable', 'sol_standalone'):
+            base = ROOT / 'src' / target
+            source = (base / 'main_menu/gui/shared/goods_details.gui').read_text(encoding='utf-8')
+            for name in ('tier_need.dds', 'tier_daily.dds', 'tier_lux.dds'):
+                relative = Path('gfx/interface/sol_proto') / name
+                with self.subTest(target=target, texture=name):
+                    self.assertIn(relative.as_posix(), source)
+                    path = base / 'main_menu' / relative
+                    self.assertTrue(path.is_file(), f'Missing main_menu texture: {path}')
+                    with Image.open(path) as icon:
+                        self.assertEqual(icon.size, (64, 64))
+                        self.assertGreater(icon.convert('RGBA').getchannel('A').getextrema()[1], 0)
+
     def test_goods_tooltip_all_memberships_and_unknown_good(self):
         from sol_goods_order import GROUP_MEMBERS
         for language in ('simp_chinese', 'english'):

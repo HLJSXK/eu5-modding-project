@@ -20,7 +20,12 @@ living-standard modifiers, UI and non-economic features. PP's `victuals` remains
 a trade, building and logistics good, but its final population demand and all
 SOL consumption paths are zero. PP's `silk` adds a seventh `luxury_goods`
 member only in this target; the existing luxury budget is rebased so the group
-does not grow on the first compatibility pass.
+does not grow on the first compatibility pass. The PP target then calibrates
+each final basket item to two significant digits using the 1340-04-06 combined
+save: nobles and clergy x2, burghers x1.537383, and laborer/peasant/soldier
+commoners x1.706804. Demand injections, market accounting and substitution use
+the same rounded quantities; standalone and other compatibility targets keep
+their shared baseline.
 
 SOL's seven Economic Balance groups (base tax efficiency, age economic
 escalation, stability spending discount, diplomatic spending, difficulty tax
