@@ -83,9 +83,34 @@ class MntCompatibilityTests(unittest.TestCase):
     def test_generated_goods_and_location_gui_match_mnt_contract(self):
         outputs = mnt._render_outputs()
         goods = mnt._parse_top_level_blocks(outputs[mnt.GOODS_OUTPUT], mnt.GOODS_OUTPUT)
-        tools = next(block for block in goods if block.key == "tools")
+        goods_by_key = {block.key: block for block in goods}
+        tools = goods_by_key["tools"]
         self.assertEqual(mnt._final_pop_demand(tools.body)["laborers"], mnt.Decimal("0.002"))
         self.assertEqual(len(mnt._load_sol_targets()), 56)
+
+        sol_targets = mnt._load_sol_targets()
+        mnt_goods = {block.key: block for block in mnt._blocks_in_tree(mnt.MNT_GOODS_ROOT)}
+        vanilla_goods = {block.key: block for block in mnt._blocks_in_tree(
+            mnt.VANILLA_ROOT / "in_game" / "common" / "goods"
+        )}
+        vanilla_prices = {
+            good: mnt._decimal(data["price"])
+            for good, data in mnt.load_vanilla_goods().items()
+        }
+        for pop_type, multiplier in mnt.MNT_POP_DEMAND_MULTIPLIERS.items():
+            expected = sum(
+                quantity * vanilla_prices[good]
+                for good, targets in sol_targets.items()
+                for quantity in (targets[pop_type] * multiplier,)
+            )
+            actual = sum(
+                mnt._final_pop_demand(goods_by_key[good].body)[pop_type]
+                * mnt._default_price(
+                    (mnt_goods.get(good) or vanilla_goods[good]).body, good
+                )
+                for good in sol_targets
+            )
+            self.assertLessEqual(abs(actual - expected), mnt.Decimal("0.0001"))
 
         gui = outputs[mnt.LOCATION_GUI_OUTPUT]
         self.assertEqual(gui.count("using = tv_location_wonders_close_on_queue"), 6)

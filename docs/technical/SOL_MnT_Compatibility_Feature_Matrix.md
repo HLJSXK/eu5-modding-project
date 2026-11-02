@@ -1,8 +1,11 @@
 # SOL-M&T Compatibility Feature Matrix
 
-Date: 2026-11-02
+Date: 2026-11-03
 
-Validated source: MEIOU and Taxes `0.2.12`, EU5 `1.4.*`.
+Validated source: MEIOU and Taxes `0.2.12`, EU5 `1.4.*`. M&T noble demand uses
+an additional `x2` compatibility multiplier based on the combined-mod 1340
+save (`+82.3%` median noble purchasing power before adjustment); other baskets
+remain at their existing calibration.
 
 ## Stack Contract
 
@@ -20,8 +23,8 @@ SOL owns its calibrated pop-demand and Living Standard presentation.
 
 | Area | Final behavior |
 | --- | --- |
-| Seven SOL pop types | SOL final quantities are multiplied by `SOL price / M&T price`, then rounded to EU5's five-decimal precision. |
-| Maize, millet, rice | Each pop receives one equal quantity across all three goods; combined SOL default-price spending is preserved within fixed-point rounding. |
+| Seven SOL pop types | M&T nobles receive a compatibility-only `x2` basket multiplier; the other six types are unchanged. Final quantities are then multiplied by `SOL price / M&T price` and rounded to EU5's five-decimal precision. |
+| Maize, millet, rice | Each pop receives one equal quantity across all three goods; combined spending follows its calibrated basket budget within fixed-point rounding. |
 | Tools | Laborer demand is `0.002`, following the SOL demand matrix and price conversion. |
 | Slaves | M&T final slave quantities are retained. |
 | Demand gates | All wealth and development thresholds are removed, and SOL's engine-wide development multiplier disable remains active. |

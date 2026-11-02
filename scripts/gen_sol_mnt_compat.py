@@ -130,6 +130,15 @@ UPPER_TYPES = frozenset(("nobles", "clergy", "burghers", "laborers", "soldiers")
 COMMONER_TYPES = frozenset(("laborers", "peasants", "soldiers"))
 GRAINS = ("maize", "millet", "rice")
 EXPECTED_SOL_GOODS = 56
+MNT_POP_DEMAND_MULTIPLIERS = {
+    "nobles": Decimal("2"),
+    "clergy": Decimal("1"),
+    "burghers": Decimal("1"),
+    "laborers": Decimal("1"),
+    "peasants": Decimal("1"),
+    "soldiers": Decimal("1"),
+    "tribesmen": Decimal("1"),
+}
 
 # M&T's 1.3 lumber object still references a removed vanilla scripted trigger.
 # The 1.4 vanilla object replaced it with a plain vegetation expression;
@@ -399,14 +408,22 @@ def _compat_quantities(
         mnt_price = _default_price(goods_blocks[good].body, good)
         vanilla_price = vanilla_prices[good]
         quantities[good] = {
-            pop_type: _round_quantity(target[pop_type] * vanilla_price / mnt_price)
+            pop_type: _round_quantity(
+                target[pop_type]
+                * MNT_POP_DEMAND_MULTIPLIERS[pop_type]
+                * vanilla_price
+                / mnt_price
+            )
             for pop_type in POP_TYPES
         }
 
     grain_prices = {good: _default_price(goods_blocks[good].body, good) for good in GRAINS}
     for pop_type in POP_TYPES:
         sol_spending = sum(
-            sol_targets[good][pop_type] * vanilla_prices[good] for good in GRAINS
+            sol_targets[good][pop_type]
+            * MNT_POP_DEMAND_MULTIPLIERS[pop_type]
+            * vanilla_prices[good]
+            for good in GRAINS
         )
         equal_quantity = _round_quantity(sol_spending / sum(grain_prices.values()))
         for good in GRAINS:
@@ -470,6 +487,7 @@ def _render_goods(
     lines = [
         GENERATED_HEADER.rstrip(),
         "# M&T owns every non-demand field where defined; new vanilla goods use the current vanilla base.",
+        "# M&T nobles receive a compatibility-only 2x baseline basket quantity multiplier.",
         "# Wealth and development demand gates remain removed for SOL's continuous scaling.",
         "# Slaves have no income and no goods demand, including M&T's native slave quantities.",
     ]
@@ -498,7 +516,12 @@ def _validate_demand_invariants(
             continue
         mnt_price = _default_price(goods_blocks[good].body, good)
         for pop_type in POP_TYPES:
-            ideal = target[pop_type] * vanilla_prices[good] / mnt_price
+            ideal = (
+                target[pop_type]
+                * MNT_POP_DEMAND_MULTIPLIERS[pop_type]
+                * vanilla_prices[good]
+                / mnt_price
+            )
             expected = max(QUANTUM, _round_quantity(ideal)) if target[pop_type] > 0 else Decimal(0)
             if quantities[good][pop_type] != expected:
                 raise ValueError(f"Rounded compatibility quantity is out of range: {good}/{pop_type}")
@@ -509,7 +532,10 @@ def _validate_demand_invariants(
         if len(grain_values) != 1:
             raise ValueError(f"Grain quantities are not equal for {pop_type}: {grain_values}")
         sol_spending = sum(
-            sol_targets[good][pop_type] * vanilla_prices[good] for good in GRAINS
+            sol_targets[good][pop_type]
+            * MNT_POP_DEMAND_MULTIPLIERS[pop_type]
+            * vanilla_prices[good]
+            for good in GRAINS
         )
         compat_spending = sum(
             quantities[good][pop_type] * grain_prices[good] for good in GRAINS
