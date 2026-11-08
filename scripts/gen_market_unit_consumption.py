@@ -140,7 +140,7 @@ def _consuming_pop_types(quantities: Dict[str, float]) -> List[str]:
     return [pop_type for pop_type in POP_TYPES if quantities[pop_type] > EPSILON and _format_float(quantities[pop_type]) != "0"]
 
 
-def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]) -> str:
+def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]], *, profile=None) -> str:
     local_names = [f"sol_market_{pop_type}_unit_spending" for pop_type in POP_TYPES]
     lines: List[str] = [
         "sol_refresh_market_pop_demand_maps = {",
@@ -233,6 +233,8 @@ def _generate_refresh_block(good_rows: List[Tuple[str, float, Dict[str, float]]]
             "}",
         ]
     )
+    if profile is not None:
+        lines.insert(-1, f"\tset_global_variable = {{ name = {profile.cache_schema} value = 1 }}")
     return "\n".join(lines)
 
 

@@ -74,12 +74,11 @@ empty fallback type, copied GP implementation, metadata dependency or GP checkou
 is required. This follows Glorp's bare `cm_is_auto_expand_on_icon = {}` reference
 (`reference_mods/3812518640/in_game/gui/location_window.gui:8262`).
 
-Stable and standalone also use `tv_location_wonders_close_on_queue` immediately
+Stable, standalone, M&T, and PP also use `tv_location_wonders_close_on_queue` immediately
 before all six existing `LocationView.OpenConstructionQueue` actions, preserving
 their queue ids and arguments. GP's button closes the queue in the other direction.
-The current M&T bottom panel contains no such actions; its inline construction
-lists remain unchanged. PP keeps its own PP location-window layout and only
-uses the public SOL button integration; JTG inherits its chosen SOL base window.
+PP keeps its own location-window layout and also uses the public SOL button
+integration; JTG inherits its chosen SOL base window.
 
 Provider contract checked with `guidef.py` against
 `../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532`
@@ -89,7 +88,7 @@ report and omit, as requested. Offline parsing/rendering does not establish
 native error counts, absent-provider geometry, hover hit testing or click order.
 Verify GP enabled/disabled and construction-queue mutual exclusion in game.
 
-Offline verification: `test_sol_substitution_ui.py` checks all three consumer
+Offline verification: `test_sol_substitution_ui.py` checks all four consumer
 trees, direct parents, single instances and unchanged queue actions. Provider-source
 previews for one wonder and no wonders are saved in `tmp/gp_location_preview/`;
 the GP button and panel align with the city scene in all three layouts. Stable

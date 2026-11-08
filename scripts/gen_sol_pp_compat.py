@@ -41,6 +41,7 @@ from tools.sol_demand_simulator.parser import (  # noqa: E402
 )
 from sol_goods_ui import replace_goods_vbox  # noqa: E402
 from sol_goods_order import GROUP_MEMBERS, PRIMARY_GROUP  # noqa: E402
+from location_window_integrations import add_great_projects  # noqa: E402
 import sol_substitution as _sol_substitution  # noqa: E402
 
 TARGET_ROOT = REPO_ROOT / "src" / "sol_pp_compatibility_submod"
@@ -742,7 +743,7 @@ def _render_location_window() -> str:
     )
     insert_at = match.start()
     text = text[:insert_at] + button + text[insert_at:]
-    return GENERATED_HEADER + text
+    return GENERATED_HEADER + add_great_projects(text, expected_queue_actions=6)
 
 
 def _render_auto_modifiers() -> str:

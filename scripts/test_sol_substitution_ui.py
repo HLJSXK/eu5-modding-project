@@ -258,6 +258,28 @@ class SubstitutionUI(unittest.TestCase):
                             self.assertGreaterEqual(child.x, -1, child.kind)
                             self.assertLessEqual(child.x + child.w, width + 1, child.kind)
                     # Every supplied group, including compatibility tails, is one icon row.
+                    if target == 'sol_jtg_compatibility_submod':
+                        from sol_substitution_profile import load_jtg_profile
+                        profile = load_jtg_profile()
+                        cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size', [None])[0] == '122'
+                                 and any(str(e.props.get('tooltip', '')).startswith('@') for e in walk(c))]
+                        self.assertEqual(len(cards), 20)
+                        seen = set()
+                        for card in cards:
+                            cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
+                            names = [str(c.props["tooltip"]).split("!")[0][1:] for c in cells]
+                            seen.update(names)
+                            expected = next(members for members in profile.groups.values() if set(members) == set(names))
+                            self.assertEqual(len(cells), len(expected))
+                            rows = {}
+                            for cell in cells:
+                                rows.setdefault(round(cell.y, 1), []).append(cell)
+                            self.assertEqual(len(rows), (len(expected) + 5) // 6)
+                            self.assertTrue(all(len(row) <= 6 for row in rows.values()))
+                            for cell in cells:
+                                self.assertLessEqual(cell.y + cell.h, card.y + card.h + 1)
+                        self.assertEqual(seen, set(profile.goods))
+                        continue
                     cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size') == ['122', str(GROUP_CARD_H)]]
                     self.assertGreaterEqual(len(cards), 20)
                     for card in cards:
@@ -445,6 +467,7 @@ class SubstitutionUI(unittest.TestCase):
         import sync_location_window as stable
         import generate_sol_location_window as standalone
         import gen_sol_mnt_compat as mnt
+        import gen_sol_pp_compat as pp
 
         def descendants(nodes, parents=()):
             for node in nodes:
@@ -455,7 +478,8 @@ class SubstitutionUI(unittest.TestCase):
         for target, source, queue_count in (
             ('stable', stable.SOURCE_PATH, 6),
             ('sol_standalone', standalone.SOURCE_PATH, 6),
-            ('sol_mnt_compatibility_submod', mnt.MNT_LOCATION_GUI, 0),
+            ('sol_mnt_compatibility_submod', mnt.MNT_LOCATION_GUI, 6),
+            ('sol_pp_compatibility_submod', pp.PP_LOCATION_GUI, 6),
         ):
             with self.subTest(target=target):
                 path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'

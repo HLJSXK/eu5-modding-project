@@ -114,8 +114,17 @@ NONE_LABEL = {
 
 
 # --------------------------------------------------------------------------- data
-def _memberships() -> tuple[dict[str, list[tuple[str, float]]], dict[str, list[str]]]:
+def _memberships(profile=None) -> tuple[dict[str, list[tuple[str, float]]], dict[str, list[str]]]:
     """good -> [(group, k_factor)], group -> [goods], in table order."""
+    if profile is not None:
+        baseline, _ = _memberships()
+        weights = {(good, group): factor for good, memberships in baseline.items() for group, factor in memberships}
+        by_group = {group: list(members) for group, members in profile.groups.items()}
+        by_good = {}
+        for group, members in by_group.items():
+            for good in members:
+                by_good.setdefault(good, []).append((group, weights.get((good, group), 1.0)))
+        return by_good, by_group
     by_good: dict[str, list[tuple[str, float]]] = {}
     by_group: dict[str, list[str]] = {}
     with GOODS_WEIGHTS.open(encoding="utf-8-sig", newline="") as handle:
@@ -185,9 +194,11 @@ def gold_frame(indent: str, name: str, width: int, height: int, visible: str) ->
     return lines
 
 
-def goods_block() -> str:
+def goods_block(profile=None) -> str:
     """Static memberships and price legend; safe with only Goods in context."""
-    by_good, by_group = _memberships()
+    by_good, by_group = _memberships(profile)
+    chip_width = CHIP_W if profile is None else 145
+    chips_per_row = 4 if profile is None else 2
     lines = [
         "\t# ---- SOL sheet C goods ---------------------------------------------------",
         f'\tvbox = {{ visible = "[{_member_condition(sorted(by_good))}]" layoutpolicy_horizontal = expanding spacing = 4',
@@ -209,15 +220,15 @@ def goods_block() -> str:
                 "\t\t\tvbox = { layoutpolicy_horizontal = expanding spacing = 2",
             ]
             # Explicit wrapping; a layout box does not wrap at its available width.
-            for start in range(0, len(members), 4):
+            for start in range(0, len(members), chips_per_row):
                 lines.append("\t\t\t\thbox = { layoutpolicy_horizontal = expanding spacing = 2")
-                for good in members[start:start + 4]:
+                for good in members[start:start + chips_per_row]:
                     lines += [
-                        f'\t\t\t\t\twidget = {{ size = {{ {CHIP_W} 27 }}',
-                        f'\t\t\t\t\t\ttext_single = {{ size = {{ {CHIP_W} 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
+                        f'\t\t\t\t\twidget = {{ size = {{ {chip_width} 27 }}',
+                        f'\t\t\t\t\t\ttext_single = {{ size = {{ {chip_width} 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
                         f'using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{good}\')]" tooltip = "{good}" }}',
                         # The hovered good itself is framed like the current price tier.
-                        *gold_frame('\t\t\t\t\t\t', f'sol_sub_chip_current_{good}', CHIP_W, 27,
+                        *gold_frame('\t\t\t\t\t\t', f'sol_sub_chip_current_{good}', chip_width, 27,
                                     f"EqualTo_string(Goods.GetKey, '{good}')"),
                         '\t\t\t\t\t}',
                     ]
@@ -263,8 +274,8 @@ def price_tier_condition(interval: str) -> str:
     return f"And(And(Market.IsValid, GreaterThan_CFixedPoint(Goods.GetDefaultMarketPrice, '(CFixedPoint)0')), {inside})"
 
 
-def price_template(market: bool = False) -> str:
-    grouped = sorted(_memberships()[0])
+def price_template(market: bool = False, *, profile=None) -> str:
+    grouped = sorted(_memberships(profile)[0])
     lines = [
         f"\ntemplate {'SOL_goods_market_price_tiers' if market else 'SOL_goods_price_tiers'} {{",
         f'\tvbox = {{ visible = "[{_member_condition(grouped)}]" layoutpolicy_horizontal = expanding spacing = 4',
@@ -286,8 +297,8 @@ def price_template(market: bool = False) -> str:
     return "\n".join(lines) + "\n"
 
 
-def market_price_block() -> str:
-    grouped = _member_condition(sorted(_memberships()[0]))
+def market_price_block(profile=None) -> str:
+    grouped = _member_condition(sorted(_memberships(profile)[0]))
     ratio = market_price_ratio()
     return (
         '\n\t\t\t# SOL: only this use site owns Market; generic goods stay static.\n'
@@ -311,7 +322,7 @@ def market_price_block() -> str:
     )
 
 
-def inject_market(source: str) -> str:
+def inject_market(source: str, profile=None) -> str:
     """Change only SpecificGoodsMarket_tooltip, preserving every vanilla block."""
     start = source.index("template SpecificGoodsMarket_tooltip {")
     # Put the override on the actual instance, alongside title/tooltip_content
@@ -320,11 +331,11 @@ def inject_market(source: str) -> str:
     needle = "\tContextualTooltipType = {\n"
     position = source.index(needle, start) + len(needle)
     block = "\n".join(line[1:] if line.startswith("\t") else line
-                      for line in market_price_block().split("\n"))
+                      for line in market_price_block(profile).split("\n"))
     return source[:position] + block + source[position:]
 
 
-def inject(source: str) -> str:
+def inject(source: str, profile=None) -> str:
     """Insert the section at the end of the `goods_details` template body."""
     marker = "template goods_details {"
     if marker not in source:
@@ -343,24 +354,24 @@ def inject(source: str) -> str:
                 break
     if close < 0:
         raise ValueError("Unbalanced braces in `template goods_details`")
-    return source[:close] + goods_block() + source[close:]
+    return source[:close] + goods_block(profile) + source[close:]
 
 
-def gui_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
+def gui_files(roots: tuple[Path, ...] = TARGETS, *, profile=None) -> dict[Path, str]:
     source_path = VANILLA_GUI if VANILLA_GUI.exists() else GAME_GUI
     source = source_path.read_text(encoding="utf-8-sig", errors="replace")
     if "\ufeff" in source:
         source = source.replace("\ufeff", "")
-    patched = inject(source)
+    patched = inject(source, profile)
     relative = Path("main_menu") / "gui" / "shared" / "goods_details.gui"
     market_source = VANILLA_MARKET_GUI.read_text(encoding="utf-8-sig")
     market_relative = Path("in_game/gui/shared/market_tooltips.gui")
     return {**{root / relative: patched for root in roots},
-            **{root / market_relative: inject_market(market_source) + price_template(market=True) for root in roots}}
+            **{root / market_relative: inject_market(market_source, profile) + price_template(market=True, profile=profile) for root in roots}}
 
 
 # ------------------------------------------------------------------ localization
-def _good_line(good: str, by_good: dict, by_group: dict, language: str) -> str:
+def _good_line(good: str, by_good: dict, by_group: dict, language: str, *, profile=None) -> str:
     memberships = by_good.get(good)
     if not memberships:
         return NONE_LABEL[language][1]
@@ -370,15 +381,15 @@ def _good_line(good: str, by_good: dict, by_group: dict, language: str) -> str:
         peers = [other for other in by_group[group] if other != good]
         if not peers:
             continue
-        label = GROUP_LABELS[group][index]
+        label = GROUP_LABELS[group][index] if profile is None else f"$SOL_GOOD_GROUP_NAME_{group.upper()}$"
         icons = " ".join(f"@{peer}!" for peer in peers)
         suffix = "" if abs(factor - 1.0) < 1e-9 else f" #E x{factor:g}#!"
         parts.append(f"{label} {icons}{suffix}")
     return "\\n".join(parts) if parts else NONE_LABEL[language][1]
 
 
-def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
-    by_good, by_group = _memberships()
+def localization_files(roots: tuple[Path, ...] = TARGETS, *, profile=None) -> dict[Path, str]:
+    by_good, by_group = _memberships(profile)
     result: dict[Path, str] = {}
     for language in ("english", "simp_chinese"):
         lines = [
@@ -393,10 +404,13 @@ def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
             "SOL_GOOD_MARKET_RATIO_PREFIX": ("This market's price is", "本市场价格为基础价的"),
             "SOL_GOOD_MARKET_RATIO_SUFFIX": ("times the base price.", "倍。"),
         }
+        if profile is not None:
+            for group in GROUP_LABELS:
+                strings[f"SOL_GOOD_GROUP_NAME_{group.upper()}"] = (f"$SOL_SUBGROUP_{group.upper()}$",) * 2
         for tier, groups in GROUP_TIERS:
             for group in groups:
                 strings[f"SOL_GOOD_GROUP_{group}"] = tuple(
-                    f"#E {TIER_LABELS[tier][i]}#! {SHORT_GROUP_LABELS[group][i]}" for i in (0, 1)
+                    f"#E {TIER_LABELS[tier][i]}#! " + (f"$SOL_GOOD_GROUP_NAME_{group.upper()}$" if profile is not None else SHORT_GROUP_LABELS[group][i]) for i in (0, 1)
                 )
         for number, (weight, _, interval, _) in enumerate(PRICE_TIERS):
             strings[f"SOL_GOOD_PRICE_TIER_{number}"] = (
@@ -404,8 +418,8 @@ def localization_files(roots: tuple[Path, ...] = TARGETS) -> dict[Path, str]:
                 f"价格/基础价：{interval}。价格偏好权重：×{weight}。",
             )
         lines += [f' {key}: "{value[index]}"' for key, value in strings.items()]
-        for good in _all_goods():
-            lines.append(f' SOL_GOOD_SUB_{good}: "{_good_line(good, by_good, by_group, language)}"')
+        for good in sorted(set(_all_goods()) | (set(profile.goods) if profile is not None else set())):
+            lines.append(f' SOL_GOOD_SUB_{good}: "{_good_line(good, by_good, by_group, language, profile=profile)}"')
             # Selected only by the location hover when the market entry exists.
             weight = f"GetVariableFromGlobalVariableMap('sol_market_substitute_weight_{good}', Location.GetMarket.MakeScope)"
             lines.append(f' SOL_SUB_PRICE_{good}: "$SOL_SUB_PRICE_WEIGHT$ [{weight}.GetValue|2]"')

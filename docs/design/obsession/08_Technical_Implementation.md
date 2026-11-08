@@ -18,6 +18,29 @@
 
 上述仅证明原有接口用途，不证明可中断性或总性能。实际写 EU5 代码仍须 CLAUDE.md 的 Step 2/3 与 Verification。
 
+## 1.1 原生运动作为痴迷载体的复查（2026-11-03）
+
+**结论：传播路线值得借鉴；当前证据不支持用 movement 直接替换商品痴迷的独立 x。** 本轮是源码/接口审查，未运行游戏实验，未改变现有模型或生成玩法代码。本机 Steam 安装与共享镜像的 `lutheranism_movement.txt` SHA-256 相同；安装目录 movements/readme.txt 也要求宗教/文化目标。
+
+下表原版路径以 `.eu5-base/reference_game_files/game/` 为前缀，官方接口以 `.eu5-base/reference_official_defines/docs/` 为前缀。
+
+| 能力或约束 | 核实结果与来源 |
+|---|---|
+| 原生传播网络 | `in_game/common/movements/readme.txt:46-58` 描述邻接、当地到市场中心、市场中心的贸易联系、当地到所属国首都；列出无人口、禁运、目标 presence 已达 50%、停滞等阻断条件。不能据此推导所有边双向、完整权重或固定传播速度。 |
+| 生长与人群差异 | `lutheranism_movement.txt:18-174` 使用地点条件化 r0、20–40 日计算间隔、识字率/发展度/满意度方向和阶层倍率；readme:25-28 明确运动默认不传播，须配置 specific_pop_type_effect。环境输入来自传播人物，不可直接当作商品供应。 |
+| 种子、人物与事件 | 官方 `effects.log:477,11309-11325` 有 add_spreader、spawn_movement、spread_to_location；readme:11-12 有进入国家事件与 movement root 的 on_calc_effect。`in_game/common/situations/reformation.txt:101-108,138-146` 创建运动并加入传教人物。 |
+| 生命周期 | `reformation.txt:498-508` 显式 destroy_movement 结束传播，注释说明 potential 不会停止已有运动。销毁运动不代表撤销人口改宗/同化。 |
+| 读数与地点作用 | 官方 `triggers.log:9389-9393` 的 movement_presence 是受影响人口数量读数，不是任意可写的 0–100 商品强度；`effects.log:2788-2792` 可遍历受影响地点。readme:29 描述 location_modifier 按 presence 比例缩放；未验证与 SOL 国家商品聚合的桥接成本。 |
+| 宗教/文化绑定（主要阻碍） | readme:30-31 原文为 “You have to specify this OR culture” / “You have to specify this OR religion”；路德宗定义第 2 行为 religion = lutheran，罗马运动第 2 行为 culture = roman_culture。`main_menu/localization/english/movements_l_english.yml:17-18` 将支持人口解释为已同化/已改宗人口；路德宗地图直接读取 religion_percentage。全部四个现有定义均绑定宗教或文化，未找到关闭身份转换的公开字段或原版先例。 |
+
+**对痴迷模型的影响：**茶、咖啡、烟草需要相互独立且能在同一人群并存的商品强度。用虚拟宗教或文化承载，会引入身份竞争及真实宗教/文化玩法副作用；读出 presence 再写 x 不会自动消除它们。已查接口未找到直接设定/递减某地点支持者数、移除单个地点或以自定义效果替换转换结果的公开接口。降低增长、停止外传或销毁整个运动，不足以证明能实现国家时钟退潮及下一波重新采纳。
+
+即使引擎负责扩散，也不能把其内部支持者/停滞状态算成“没有状态”，或宣称满足 x+q 账本与性能预算。本轮没有内存、存档或并发耗时测量。可借鉴四类传播通道、人群/社会条件敏感度、传播人物、进入国家通知，以及运动和局势分离的生命周期；若仍用自写 x 更新，这些是设计参照，不是已复用原生扩散计算。
+
+**保留的最小实验：**隔离测试运动同时省略 religion 和 culture，检查加载报错、播种后真实跨地点传播、独立支持者读数、全部人口宗教/文化保持不变及保存再加载。全部通过后，才继续测两个商品运动并存、退潮/复燃、读取和聚合成本；仅加载成功或出现 UI 不算可用。该配置违背当前 readme 契约，只是兼容性探针，不能先作为正式支持语法实施。本轮未执行，不能把“未找到接口”说成已证明引擎绝对不可能。
+
+**注释边界：**readme:10 有 location_spread_threshold，第 47 行却写 “no threshold”；路德宗实际设置 0.05。“目标 >=50% 不再接收外来传播”不是支持度最高 50% 的证据。具体阈值、停滞与增长公式须实机核实。`loading_screen/common/defines/00_defines.txt:2833-2840` 有 NSpreadable 旅行/贸易参数；随后 3600 天停滞常量属于 NDisease，不能直接断言也控制 movement。
+
 ## 2. P0：实现前必须解决
 
 | 待核实项 | 用途与限制 |

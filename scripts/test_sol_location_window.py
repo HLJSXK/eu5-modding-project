@@ -49,10 +49,12 @@ class LocationWindowGenerationTests(unittest.TestCase):
     def test_checked_in_location_windows_match_their_generators(self) -> None:
         import generate_sol_location_window as standalone
         import sync_location_window as stable
+        import gen_sol_pp_compat as pp
 
         for path, generated in (
             *stable.generate_outputs().items(),
             (standalone.TARGET_PATH, standalone.generate()),
+            (pp.LOCATION_WINDOW_OUTPUT, pp._render_location_window()),
         ):
             with self.subTest(path=path):
                 self.assertEqual(path.read_text(encoding="utf-8-sig"), generated)

@@ -1,0 +1,31 @@
+# SOL / Just Goods 1.1 compatibility audit
+
+Date: 2026-11-09. Reference: base commit `0459b2b` versus its parent; Just Goods Workshop `3785316314`, own version 1.0 → 1.1, game compatibility 1.3 → 1.4.
+
+## Override findings
+
+Database operations must be evaluated before filename order. Shared rule `database_operation_priority_ignored` (`.eu5-base/docs/knowledge/anti_patterns.yaml:940`) records `INJECT_OR_CREATE → REPLACE_OR_CREATE → TRY_INJECT → TRY_REPLACE → INJECT → REPLACE`. Exact relative-path replacement is a separate mechanism.
+
+* `zzzzzz_just_stone_building_injections.txt:358` replaces lazaretto completely, erasing SOL's earlier TRY_INJECT +0.03. The compatibility generator now extracts the current complete upstream block and adds exactly one `local_sol_living_standard = 0.03` inside its modifier. A later-named REPLACE output preserves coastal eligibility, level limit, disease resistance, and maintenance (fiber crops/books/lime/medicaments). Independent regression removes the added field and compares every remaining token to upstream.
+* `production_leather.txt` defines tanning_workshop, tannery_manufactory, tannery_mill without REPLACE. SOL's TRY_INJECT penalties (-0.01/-0.02/-0.03) follow ordinary definitions and remain applicable. JTG gunpowder and soap INJECT blocks on tannery_mill, putrefaction_mill, iron_mill and steel_mill add production/maintenance data; they do not replace these complete objects. No additional SOL penalty injection is required.
+* `just_soap_goods.txt:206` and `just_spices_produced_goods.txt:168` both inject `cloves.default_market_price = 6`. No other original-good INJECT/REPLACE occurs in this goods directory. Existing shared scalar-price rule (`anti_patterns.yaml:4662`) says repeated scalar price fields replace rather than add. Thus 6 is the static expectation, not 12; both upstream blocks are retained. This is source-based inference for the goods loader, not a fresh in-game measurement. Independent regression requires both recorded prices to remain 6.
+
+## Symbol collisions
+
+The actual directory is `in_game/common/on_action` (singular). It contains JTG academy, brass, cheese, clock, gunpowder, meat, soap, spices and stone callbacks. SOL/JTG top-level intersections are `cmf_on_mod_registration`, `monthly_country_pulse`, `on_game_start`, `yearly_country_pulse`: shared registration/pulse nodes with separately named callbacks, not competing SOL callback implementations. A top-level scan finds no shared scripted_effects, scripted_triggers or script_values keys. Do not replace those pulse nodes to eliminate expected overlap.
+
+JTG GUI files are `main_menu/gui/shared/clock_font_icons.gui` and `in_game/gui/advances_lateralview.gui`; SOL stable does not own these paths or reference their clock/AdvancesTypes definitions. This establishes no identified SOL conflict, not general compatibility with every other GUI mod. Goods `INJECT:cloves` is a real database-key intersection despite different source paths.
+
+## Acceptance and limits
+
+* Main-agent independent `gen_sol_jtg_compat.py --check --audit-workshop-root <installed Steam root>`: all six outputs current; source contract 42 goods / 30 direct-demand / 12 demand-free passed.
+* M&T generator check: all 14 outputs current, as verified by the external-demand agent.
+* `validate.py --changed`: eight files validated, no errors.
+* Explicit validation of the new `zzzzzzz_SOL_JTG_lazaretto.txt`: one file, no errors. Full-source validator invocation also passed 177 files (the script treats `--help` as its default full-source scan rather than a help option).
+* Main-agent rerun: seven JTG compatibility tests, three independent overlap tests, and two external-demand tests passed (12 total).
+* Dual-language merged situation renders were viewed by the main agent: `tmp/jtg-render-merged-zh/r1_situation_panel_full.png` and `tmp/jtg-render-merged-en/r1_situation_panel_full.png`. Both show 86 goods, including 30 neutral external goods arranged as five six-item cards, with normal card boundaries. These are offline renders, not engine screenshots.
+* JTG agent rendered and viewed both local tooltips (`tmp/jtg-render-merged-{zh,en}/r3_location_sol_tooltip.png`): all 86 goods present, 520×1003 pixels, zero unknown expressions. The main agent also viewed the Chinese image and confirmed its final row is complete without clipping. One existing `ExtraTooltipInfo.GetUIAction` unresolved context remains in the fixture. Workshop descriptions now reflect 30 direct-demand goods / 86 displayed goods, zero slave demand, the four added goods, game 1.4 and JTG 1.1; old-save behavior remains unverified.
+* Overview updated incrementally; BRIEF regeneration passed (374 shared + 57 local = 431 rules). `knowledge_loader.validate_migration_coverage` passed, covering 131 migration entries and checking duplicate IDs / shared-local shadows. No dedicated knowledge-test executable was found in either root; this existing dual-root validator is the available knowledge consistency check.
+* Broad UI suite: 25 tests, six failures and one error. A read-only HEAD `sol_substitution.py` module control produced the same individual results: stable/standalone goods-details missing price-template tail (two), zh/en hover row count 6 versus expected 8 (two), PP zh/en card count 19 versus expected at least 20 (two), and M&T missing `SOL_BUTTON` attribute (one error). These are outside JTG paths; matching control establishes that this shared-module extension did not introduce them, without attributing them to any particular pre-existing user edit. Detailed logs: `tmp_external_ui_audit.log` and `tmp_external_ui_head_audit.log` in the workspace.
+
+`scripts/test_sol_jtg_overlap_audit.py`: 3 tests passed, checking complete lazaretto source preservation, final filename ordering, generated disk output consistency, authoritative SOL hook synchronization, and duplicate cloves price consistency. Generator and external-demand regression results are recorded by the implementing agents/main task. No deployment, publication, or game runtime validation was performed. No new engine behavior was established; these conclusions apply existing shared rules and therefore do not add speculative knowledge entries.

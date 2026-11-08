@@ -1,6 +1,12 @@
 # obsession_sim：痴迷扩散离线模拟核心
 
-更新：2026-10-22。这是「痴迷」系统的 Python 离线参考实现。现行三层实验以设计 26 为准，未覆盖项沿用 23，读取 24 的世界状态格式；旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+更新：2026-11-04。这是「痴迷」系统的 Python 离线参考实现。第三轮三层实验以设计 26 为准，未覆盖项沿用 23，读取 24 的世界状态格式；单波重拟合使用下述独立入口。旧静态情景与城市代理实验保留以复现既有研究。离线验收不代表玩法代码或实机性能已通过。
+
+## 单波重拟合（2026-11-04）
+
+`python -m tools.obsession_sim.single_wave_fit {mechanics,protocol,fit,diagnostics}` 按顺序执行；直接使用 eu5 环境解释器并启用 UTF-8，`fit/diagnostics --workers 8` 可并行。它在第三轮冻结输入之上显式启用 `uniform_ebb=true`，保留 1200 月窗口，复用已登记的 64 组候选，前六名补足五种子选参。配置、流程源码、基础冻结哈希共同绑定独立缓存，旧结果不复用；留出不评分，W-C 不启用。
+
+结果位于 `tmp/obsession_single_wave_20261104/`；选参先以内容哈希锁定，再做 S×R 30 种子、H×R 5 种子、旧参数同机制与双倍预算各 5 种子诊断。`python -m tools.obsession_sim.single_wave_report` 发布设计 29 与 `docs/design/obsession/experiments/single_wave_*.json`。使用新参数必须同时使用导出的单波配置；旧 `selected_params.json`、默认配置和历史协议不改。独立流程不自动提交 Git，不等同于设计 26 的提交审计或全集验收。
 
 ## 当前流程：26 第三轮交接规格
 

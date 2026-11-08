@@ -597,6 +597,92 @@ def test_entry_clock_starts_before_queue_service_and_survives_wave_renewal():
     assert sim.deadline[0]==1460
 
 
+def uniform_world(wave_months=600, window=None):
+    g, s = tiny_world()
+    cfg = deepcopy(CONFIG)
+    cfg["fixed"]["uniform_ebb"] = True
+    cfg["fixed"]["wave_months"] = wave_months
+    if window:
+        cfg["fixed"]["wave_window_months"] = window
+    return g, s, cfg
+
+
+def test_uniform_ebb_ignores_mid_wave_hold_and_national_trigger():
+    """A joined country must not start ebbing just because T or theta passed."""
+    g, s, cfg = uniform_world()
+    r = StructuralRun(g, Timeline(g, [s]), cfg, SPEC, end_month=1)
+    sim = r.sims["coffee"]
+    sim.t = 10
+    sim.open_wave()
+    sim.inject(0, 7, "event", {"event": "fixture"})
+    assert sim.deadline[0] > sim.wave_end          # clock is armed for diagnostics
+    sim.shared_open_country[0] = 100                # theta crossing must not ebb
+    for t in range(11, sim.wave_end):
+        sim.t = t
+        sim._clocks(t)
+        assert not sim.decaying[0], f"ebbed early at {t}"
+    sim.t = sim.wave_end
+    sim._clocks(sim.wave_end)
+    assert sim.decaying[0]                          # everyone ebbs at the window
+
+
+def test_uniform_ebb_applies_kappa_once_and_never_reopens():
+    """The whole point: one ebb per good life, so kappa is not compounded."""
+    g, s, cfg = uniform_world()
+    cfg["fixed"]["wave_months"] = 10**6             # no second window can open
+    r = StructuralRun(g, Timeline(g, [s]), cfg, SPEC, end_month=1)
+    sim = r.sims["coffee"]
+    k = sim.P.habit_floor
+    sim.x[0] = 100.0
+    sim.clock_first_touch(0, 0)
+    sim.t = 0
+    sim.open_wave()
+    for t in range(1, 4000):
+        sim.t = t
+        sim._clocks(t)
+        if sim.finished[0]:
+            break
+    assert sim.finished[0]
+    # Settle fires below habit_finish_S, so the kept share is kappa plus one
+    # last partial step; it must stay near kappa and never compound.
+    assert sim.x[0] == pytest.approx(100.0 * k, rel=0.05)
+
+    # A later contact link must not reopen the wave or the clock.
+    sim.t += 12
+    sim.open_wave("contact_success")
+    sim.t += 1
+    sim._clocks(sim.t)
+    assert sim.finished[0] and sim.x[0] == pytest.approx(100.0 * k, rel=0.05)
+
+
+def test_uniform_ebb_wave_window_does_not_reopen_after_close():
+    g, s, cfg = uniform_world(wave_months=200)
+    r = StructuralRun(g, Timeline(g, [s]), cfg, SPEC, end_month=1)
+    sim = r.sims["coffee"]
+    sim.t = 0
+    sim.open_wave()
+    first_end = sim.wave_end
+    assert len(sim.waves) == 1
+    sim.t = first_end + 5
+    sim.open_wave("ownership_success")
+    assert sim.wave_end == first_end and len(sim.waves) == 1
+
+
+def test_uniform_ebb_per_good_window_override():
+    g, s, cfg = uniform_world(wave_months=120, window={"coffee": 60})
+    r = StructuralRun(g, Timeline(g, [s]), cfg, SPEC, end_month=1)
+    coffee, tea = r.sims["coffee"], r.sims["tea"]
+    coffee.t = tea.t = 0
+    coffee.open_wave(); tea.open_wave()
+    assert coffee.wave_end == 60 and tea.wave_end == 120
+
+
+def test_uniform_ebb_off_by_default_keeps_renewal_semantics():
+    g, s = tiny_world()
+    r = StructuralRun(g, Timeline(g, [s]), CONFIG, SPEC, end_month=1)
+    assert r.sims["coffee"].uniform_ebb is False
+
+
 def test_t_alive_uses_first_wave_and_missing_losses_remain_infinite():
     from .acceptance import RunMetrics
     g,s=tiny_world();r=StructuralRun(g,Timeline(g,[s]),CONFIG,SPEC,end_month=1).run()

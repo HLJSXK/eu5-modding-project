@@ -1,5 +1,7 @@
 # 痴迷离线实验索引
 
+2026-11-04 最新实验：[单波重拟合结果](../29_Single_Wave_Refit.md)。`single_wave_fit_protocol.json`、`single_wave_fit_phase_a.json`、`single_wave_fit_selection.json` 保存登记与选参；`single_wave_selected_config.json` 是含 `uniform_ebb=true` 的配套配置，`single_wave_selected_params.json` 保存六参数；`single_wave_fit_diagnostics.json` 保存完整诊断摘要。运行入口为 `python -m tools.obsession_sim.single_wave_fit`，报告入口为 `python -m tools.obsession_sim.single_wave_report`，原始运行保留在 `tmp/obsession_single_wave_20261104/`。
+
 更新：2026-10-19。现行方案：每地点×商品一个持久浮点 x，外加方案A的暂存队列指针 q（只在排队期间存在）；共享变化容差 δ = 0.1；退潮由国家级时钟承担（首个地点成为成员后保持 T = 240 月，再整国懒衰退）。不允许用按地点键的全局表恢复额外状态。
 
 **现行参考实现已收拢到共享模拟包 [`tools/obsession_sim`](../../../../tools/obsession_sim/README.md)**：图数据接口（合成网格 / 真实地图 JSON 与 CSV）、预设、月度预算、到达月份与历史里程碑、回放导出。下面的实验脚本保留为它的回归锚点和对比项。

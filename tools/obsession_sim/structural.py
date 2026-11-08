@@ -121,6 +121,9 @@ class RuleSimulation(Simulation):
         self.spreading = False
         self.contact_started = False
         self.wave_end = None
+        # Single-wave diagnosis: one wave per good, no per-country mid-wave ebb.
+        # The whole country set ebbs together once the wave window closes.
+        self.uniform_ebb = bool(controller.config["fixed"].get("uniform_ebb", False))
         self.renew_cursor = self.ng
         self.wake_cursor = self.n
         self.cleanup_pending = False
@@ -197,6 +200,9 @@ class RuleSimulation(Simulation):
         return ''.join(stages)
 
     def _clocks(self, t):
+        if self.uniform_ebb:
+            self._uniform_clocks(t)
+            return
         for c in range(self.ng):
             if not self.clock_joined(c) or self.decaying[c] or self.finished[c]:
                 continue
@@ -208,6 +214,28 @@ class RuleSimulation(Simulation):
             row = self.clock_current.get(c)
             if row is not None:
                 row["deadline"] = self.deadline[c]
+        super()._clocks(t)
+        for c, row in self.clock_current.items():
+            if self.decaying[c] and row["decay_start_month"] is None:
+                row["decay_start_month"] = t
+            if self.finished[c] and row["finished_month"] is None:
+                row["finished_month"] = t
+
+    def _uniform_clocks(self, t):
+        """Single wave: no per-country mid-wave ebb and no renewal.
+
+        Every joined country that has not settled ebbs together once the wave
+        window closes. The standard decay/settle path then runs unchanged, so
+        kappa is applied exactly once per good life.
+        """
+        ebbing = self.wave_end is not None and t >= self.wave_end
+        for c in range(self.ng):
+            if not self.clock_joined(c) or self.finished[c]:
+                continue
+            if ebbing and not self.decaying[c]:
+                self.decaying[c] = True
+                self.decay_start[c] = t
+                self.S[c] = 1.0
         super()._clocks(t)
         for c, row in self.clock_current.items():
             if self.decaying[c] and row["decay_start_month"] is None:
@@ -444,10 +472,16 @@ class RuleSimulation(Simulation):
     def open_wave(self, reason="origin"):
         if self.wave_end is not None and self.t < self.wave_end:
             return
+        # Single-wave mode: a good has exactly one wave. Later contact or
+        # ownership links may still inject, but they never reopen the window.
+        if self.uniform_ebb and self.wave_start is not None:
+            return
         self.wave_start = self.t
         if self.first_wave_start is None:
             self.first_wave_start=self.t
-        self.wave_end = self.t + self.controller.config["fixed"]["wave_months"]
+        fixed = self.controller.config["fixed"]
+        months = fixed.get("wave_window_months", {}).get(self.good, fixed["wave_months"])
+        self.wave_end = self.t + months
         self.waves.append([self.t, self.wave_end])
         self.controller.wave_log[self.good].append(dict(start_month=self.t,end_month=self.wave_end,reason=reason))
         self.spreading = True
@@ -469,7 +503,7 @@ class RuleSimulation(Simulation):
             return self.U-start
         if not self.spreading:
             return 0
-        while self.renew_cursor < self.ng:
+        while self.renew_cursor < self.ng and not self.uniform_ebb:
             c=self.renew_cursor
             if c not in self.controller.current_countries:
                 self.renew_cursor+=1
