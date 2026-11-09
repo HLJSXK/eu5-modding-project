@@ -170,7 +170,6 @@ LIA_KEYS = (
     "short_harvest_modifier",
     "recent_white_storm_modifier",
 )
-WEATHER_KEYS = ("winter_mild", "winter_normal")
 PP_OWNED_WAR_LOCATION_KEYS = (
     "is_blockaded_by_enemies",
     "under_siege",
@@ -1099,11 +1098,8 @@ def _render_outputs_active() -> Dict[Path, str]:
             PP_OWNED_WAR_LOCATION_KEYS,
             "# PP owns these shared local war-state modifiers in the compact stack.",
         ),
-        WEATHER_OUTPUT: _render_inverse_injections(
-            STABLE_STATIC_MODIFIERS,
-            WEATHER_KEYS,
-            "# Restore PP's weather values by removing only SOL's winter deltas.",
-        ),
+        # Keep the output to overwrite obsolete inverse deltas on deployment.
+        WEATHER_OUTPUT: GENERATED_HEADER + "# SOL leaves winter modifiers unchanged; PP owns weather values.\n",
         LIA_OUTPUT: _render_inverse_injections(
             STABLE_STATIC_MODIFIERS,
             LIA_KEYS,
