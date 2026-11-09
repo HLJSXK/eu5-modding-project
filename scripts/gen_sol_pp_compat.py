@@ -778,6 +778,15 @@ def _render_static_cleanup() -> str:
         lines.append(f"\t{field} = {_format_float(-value)}")
     lines.append("}")
 
+    lines.extend([
+        "",
+        "# Keep PP's native prosperity food consumption without doubling SOL's delta.",
+        "TRY_INJECT:prosperity = {",
+    ])
+    for field, value in _numeric_fields(STABLE_STATIC_MODIFIERS, "prosperity"):
+        lines.append(f"\t{field} = {_format_float(-value)}")
+    lines.append("}")
+
     lines.append("")
     return "\n".join(lines)
 
