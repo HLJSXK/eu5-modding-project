@@ -194,11 +194,22 @@ def gold_frame(indent: str, name: str, width: int, height: int, visible: str) ->
     return lines
 
 
+# JTG-only compact chip labels. Measured with the real StandardGameFont at 11px;
+# retain original keys for titles, hover and translated Chinese names.
+JTG_SHORT_NAMES = {
+    "lacquerware": "Lacquer",
+    "medicaments": "Medic.",
+    "millet": "St. grains",
+    "pewterware": "Pewterw.",
+    "precision_instruments": "Prec. Instr.",
+}
+
+
 def goods_block(profile=None) -> str:
     """Static memberships and price legend; safe with only Goods in context."""
     by_good, by_group = _memberships(profile)
-    chip_width = CHIP_W if profile is None else 145
-    chips_per_row = 4 if profile is None else 2
+    chip_width = CHIP_W
+    chips_per_row = 4
     lines = [
         "\t# ---- SOL sheet C goods ---------------------------------------------------",
         f'\tvbox = {{ visible = "[{_member_condition(sorted(by_good))}]" layoutpolicy_horizontal = expanding spacing = 4',
@@ -223,10 +234,12 @@ def goods_block(profile=None) -> str:
             for start in range(0, len(members), chips_per_row):
                 lines.append("\t\t\t\thbox = { layoutpolicy_horizontal = expanding spacing = 2")
                 for good in members[start:start + chips_per_row]:
+                    label_key = f"SOL_GOOD_SHORT_{good}" if profile is not None and good in JTG_SHORT_NAMES else good
+                    overflow = "elide = right " if profile is not None and good in JTG_SHORT_NAMES else ""
                     lines += [
                         f'\t\t\t\t\twidget = {{ size = {{ {chip_width} 27 }}',
                         f'\t\t\t\t\t\ttext_single = {{ size = {{ {chip_width} 27 }} autoresize = no fontsize = 13 fontsize_min = 11 align = left|nobaseline '
-                        f'using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{good}\')]" tooltip = "{good}" }}',
+                        f'{overflow}using = bg_number_container_bckg raw_text = "@{good}! [Localize(\'{label_key}\')]" tooltip = "{good}" }}',
                         # The hovered good itself is framed like the current price tier.
                         *gold_frame('\t\t\t\t\t\t', f'sol_sub_chip_current_{good}', chip_width, 27,
                                     f"EqualTo_string(Goods.GetKey, '{good}')"),
@@ -405,6 +418,8 @@ def localization_files(roots: tuple[Path, ...] = TARGETS, *, profile=None) -> di
             "SOL_GOOD_MARKET_RATIO_SUFFIX": ("times the base price.", "倍。"),
         }
         if profile is not None:
+            for good, short_name in JTG_SHORT_NAMES.items():
+                strings[f"SOL_GOOD_SHORT_{good}"] = (short_name, f"${good}$")
             for group in GROUP_LABELS:
                 strings[f"SOL_GOOD_GROUP_NAME_{group.upper()}"] = (f"$SOL_SUBGROUP_{group.upper()}$",) * 2
         for tier, groups in GROUP_TIERS:
