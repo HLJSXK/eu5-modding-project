@@ -91,6 +91,46 @@ BASKET_REBASE_FACTORS = {
     "tribesmen": Decimal("1"),
 }
 
+# Equal-country F/B medians from 1340.4.1, playthrough e07b1782, 2026-11-10.
+# Applied once after the historical rebase and the whole-group additions.
+JTG_BASKET_MULTIPLIERS = {
+    "nobles": Decimal("1.2328519257983843"),
+    "clergy": Decimal("0.8648111883509839"),
+    "burghers": Decimal("0.8360945050078797"),
+    "laborers": Decimal("0.865006267371519"),
+    "peasants": Decimal("0.865006267371519"),
+    "soldiers": Decimal("0.865006267371519"),
+    "tribesmen": Decimal("1"),
+}
+DEMAND_STEP = Decimal("0.00001")
+
+
+def _calibrated_quantity(quantity: float, pop_type: str, *, lattice_origin: float | None = None) -> float:
+    """Nearest positive <=2-significant-digit net on the original delta lattice."""
+    original = Decimal(str(quantity)).quantize(Decimal("0.000000000001"))
+    if original <= 0:
+        return 0.0
+    if pop_type == "tribesmen":
+        return float(original)
+    ideal = original * JTG_BASKET_MULTIPLIERS[pop_type]
+    offset = (original if lattice_origin is None else Decimal(str(lattice_origin))) % DEMAND_STEP
+    # Enumerating the small decimal lattice also handles half-step masonry
+    # nets without silently rounding away their native 0.000005 remainder.
+    candidates = [Decimal(n).scaleb(exponent)
+                  for exponent in range(-6, max(1, ideal.adjusted() + 1))
+                  for n in range(1, 100)
+                  if Decimal(n).scaleb(exponent) >= DEMAND_STEP
+                  and (Decimal(n).scaleb(exponent) - offset) % DEMAND_STEP == 0]
+    if not candidates:
+        raise ValueError(f"No two-significant-digit target on lattice: {original}")
+    return float(min(candidates, key=lambda value: (abs(value - ideal), -value)))
+
+
+def _calibrated_base_rows():
+    return [(good, price, {pop: _calibrated_quantity(q, pop) for pop, q in qs.items()})
+            for good, price, qs in _load_good_rows()]
+
+
 CLEAN_ROUNDING_STEPS = (
     (0.01, Decimal("0.01")),
     (0.001, Decimal("0.001")),
@@ -278,7 +318,7 @@ def _load_rows() -> List[Dict[str, object]]:
     return sorted(rows, key=lambda row: str(row["good"]))
 
 
-def _target_quantities(row: Dict[str, object]) -> Dict[str, float]:
+def _uncalibrated_target_quantities(row: Dict[str, object]) -> Dict[str, float]:
     native = row["native"]
     assert isinstance(native, dict)
     targets = {
@@ -289,16 +329,23 @@ def _target_quantities(row: Dict[str, object]) -> Dict[str, float]:
     return targets
 
 
+def _target_quantities(row: Dict[str, object]) -> Dict[str, float]:
+    return {pop: _calibrated_quantity(q, pop, lattice_origin=row["native"][pop])
+            for pop, q in _uncalibrated_target_quantities(row).items()}
+
+
 def _corrections(row: Dict[str, object]) -> Dict[str, float]:
     native = row["native"]
     assert isinstance(native, dict)
     targets = _target_quantities(row)
     corrections: Dict[str, float] = {}
     for pop_type in POP_TYPES:
-        effective_native = _script_float(float(native[pop_type]))
-        correction = _script_float(targets[pop_type] - effective_native)
-        final = _script_float(effective_native + correction)
-        if abs(final - targets[pop_type]) > EPSILON:
+        effective_native = Decimal(str(native[pop_type]))
+        target = Decimal(str(targets[pop_type]))
+        delta = target - effective_native
+        correction = _script_float(float(delta))
+        final = effective_native + Decimal(str(correction))
+        if final != target:
             raise ValueError(
                 f"{row['good']}: cannot reach {pop_type} target "
                 f"{targets[pop_type]} from {effective_native} with {correction}"
@@ -327,7 +374,7 @@ def _jtg_good_rows(rows: List[Dict[str, object]]) -> List[Tuple[str, float, Dict
 
 
 def _combined_good_rows(rows: List[Dict[str, object]]) -> List[Tuple[str, float, Dict[str, float]]]:
-    base_rows = _load_good_rows()
+    base_rows = _calibrated_base_rows()
     if len(base_rows) != EXPECTED_BASE_GOODS_COUNT:
         raise ValueError(f"Expected {EXPECTED_BASE_GOODS_COUNT} SOL goods, found {len(base_rows)}")
     base_goods = {good for good, _price, _quantities in base_rows}
@@ -345,8 +392,8 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
     lines = [
         GENERATED_HEADER.rstrip(),
         "# Apply SOL's approximate per-stratum scaling to JTG pop demand.",
-        "# Legacy clean-rounded targets are rebased: nobles x1, clergy x2, commoners x4.",
-        "# Burgher targets use approximately x0.6555 and one or two significant digits.",
+        "# 1340 JTG country-median calibration covers all 86 goods after historical rebasing.",
+        "# Final net targets use at most two significant digits and emittable deltas.",
         "# Every source threshold and regional demand modifier is fully negated.",
         "# Slaves have no income: fully cancel their native JTG demand.",
     ]
@@ -387,6 +434,18 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
         ):
             lines.extend(_negated_modifier_block(row, field_name, block_name))
         lines.append("}")
+    base = {g: qs for g, _, qs in _load_good_rows()}
+    for good, _, quantities in _calibrated_base_rows():
+        deltas = {pop: Decimal(str(q)) - Decimal(str(base[good][pop])).quantize(Decimal("0.000000000001"))
+                  for pop, q in quantities.items()}
+        if not any(deltas.values()):
+            continue
+        lines.extend(["", f"# JTG-only baseline calibration: {good}", f"INJECT:{good} = {{", "\tdemand_add = {"])
+        for pop, delta in deltas.items():
+            if delta:
+                assert delta % DEMAND_STEP == 0, (good, pop, delta)
+                lines.append(f"\t\t{pop} = {_format_float(float(delta))}")
+        lines.extend(["\t}", "}"])
     lines.append("")
     rendered = "\n".join(lines)
     if rendered.count("\twealth_impact_threshold = {") != len(EXPECTED_WEALTH_THRESHOLD_GOODS):
@@ -401,7 +460,7 @@ def _render_goods(rows: List[Dict[str, object]]) -> str:
 
 
 def _render_values(rows: List[Dict[str, object]]) -> str:
-    text = _generate_values(_jtg_good_rows(rows))
+    text = _generate_values(_combined_good_rows(rows))
     text = text.replace(
         "# @AUTOGENERATED by scripts/gen_market_unit_consumption.py - do not edit; run script to regenerate.\n",
         GENERATED_HEADER,
@@ -412,11 +471,15 @@ def _render_values(rows: List[Dict[str, object]]) -> str:
         "# demand_add quantity for one pop type and one good, with duplicate\n"
         "# legacy demand-group rows counted once. Yearly market spending\n"
         "# multiplies these quantities by min(market_price, default_price).\n",
-        "# Adds only the Just Goods demand goods. Existing SOL constants remain owned\n"
-        "# by the full SOL mod. Values equal final post-compatibility demand and\n"
+        "# Replaces core SOL constants and adds JTG constants using calibrated targets.\n"
+        "# Values equal final post-compatibility demand at engine precision and\n"
         "# yearly spending multiplies them by min(market_price, default_price).\n",
         1,
     )
+    base_goods = {g for g, _, _ in _load_good_rows()}
+    for good in base_goods:
+        text = re.sub(rf"(?m)^(sol_unit_consumption_[A-Za-z0-9_]*_{re.escape(good)}\s*=)",
+                      r"REPLACE:\1", text)
     return text
 
 

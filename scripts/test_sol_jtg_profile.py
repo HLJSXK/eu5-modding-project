@@ -28,6 +28,40 @@ OVERRIDES = {("plaster", "laborers"): .00063, ("plaster", "peasants"): .00014, (
 
 
 class ProfileAudit(unittest.TestCase):
+    def test_calibration_net_precision_and_runtime_accounting(self):
+        from decimal import Decimal
+        from test_sol_slave_demand import base_goods, definitions, inject
+        import gen_sol_mnt_compat as mnt
+        from test_sol_substitution import parse
+        baseline = {g: qs for g, _, qs in jtg._load_good_rows()}
+        baseline.update({str(r["good"]): jtg._uncalibrated_target_quantities(r) for r in jtg._load_rows()})
+        native = {str(r["good"]): r["native"] for r in jtg._load_rows()}
+        goods = base_goods()
+        goods.update({g: qs for g, qs in definitions(ROOT / ".eu5-base/reference_mods/3785316314/in_game/common/goods").items() if g not in goods})
+        inject(goods, mnt._blocks_in_file(jtg.GOODS_OUTPUT))
+        values = {n.key.removeprefix("REPLACE:"): Decimal(n.value[0].value)
+                  for n in parse(jtg.VALUES_OUTPUT.read_text(encoding="utf-8-sig"))
+                  if n.key.removeprefix("REPLACE:").startswith("sol_unit_consumption_")}
+        for good, _, qs in jtg._combined_good_rows(jtg._load_rows()):
+            for pop, q in qs.items():
+                with self.subTest(good=good, pop=pop):
+                    net = Decimal(str(q))
+                    old = Decimal(str(baseline[good][pop])).quantize(Decimal("0.000000000001"))
+                    self.assertEqual(q > 0, old > 0)
+                    self.assertLessEqual(len(net.normalize().as_tuple().digits), 2)
+                    origin = Decimal(str(native[good][pop])) if good in native else old
+                    self.assertEqual((net-origin) % jtg.DEMAND_STEP, 0)
+                    self.assertLessEqual(abs(goods[good][pop]-net), Decimal("0.000000000001"))
+                    key = f"sol_unit_consumption_{pop}_{good}"
+                    self.assertEqual(values.get(key, Decimal(0)), Decimal(jtg._format_float(q)))
+                    if old > 0:
+                        ratio = net / old
+                        # Tiny positive members may hit the minimum lattice;
+                        # meaningful budgets must track the requested direction.
+                        if old >= Decimal("0.001"):
+                            self.assertLess(abs(ratio-jtg.JTG_BASKET_MULTIPLIERS[pop]), Decimal("0.06"))
+        jtg.validate_baskets({g: qs for g, _, qs in jtg._combined_good_rows(jtg._load_rows())}, profile=jtg.load_jtg_profile())
+
     def test_ui_cells_and_group_memberships_cover_every_profile_good(self):
         from sol_goods_ui import _good_cell
         from gen_sol_goods_tooltip import _memberships
@@ -75,10 +109,11 @@ class ProfileAudit(unittest.TestCase):
             self.assertEqual(set(members) - added, set(GROUPS[group]), group)
         self.assertEqual({(g, pop): v for g, qs in p.quantity_overrides.items() for pop, v in qs.items()}, OVERRIDES)
 
-    def test_only_eleven_quantity_cells_change_and_emit_budget_report(self):
+    def test_precalibration_has_only_eleven_quantity_additions(self):
         fixture = json.loads((ROOT / "scripts/fixtures/jtg_quantities_before_grouping_20261109.json").read_text())
         before = {g: (price, q) for g, price, q in fixture["rows"]}
-        after = {g: (price, q) for g, price, q in jtg._jtg_good_rows(jtg._load_rows())}
+        after = {str(row["good"]): (float(row["price"]), jtg._uncalibrated_target_quantities(row))
+                 for row in jtg._load_rows()}
         profile = load_jtg_profile()
         combined = {g: qs for g, _, qs in jtg._combined_good_rows(jtg._load_rows())}
         for pop, groups in profile.subscriptions.items():
