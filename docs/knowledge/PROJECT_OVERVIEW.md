@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-11-09
+> Last updated: 2026-11-10
 
 ## Project Identity
 
@@ -45,7 +45,9 @@ performance boundary.
 
 4. **War & Combat (Harsher Wars)** - War exhaustion further reduces levy size, control, stability, legitimacy, and defensive capability. Total occupation adds +1.6 monthly war exhaustion on top of vanilla, and capital occupation adds +0.2 monthly war exhaustion on top of vanilla. The reduce-war-exhaustion cabinet action can be restricted to peacetime. Blockade, siege, occupation, hostile troops, looting, raiding, and razing modifiers are harsher for prosperity, control, construction, migration attraction, development, raw materials, and food.
 
-5. **Food, Climate & Prosperity** - Stable and JTG apply prosperity food-consumption feedback through local_pop_food_consumption = 0.40: all population types, including slaves and tribesmen, receive +40% food consumption at full prosperity, scaled linearly by native prosperity. The coefficient follows PP, but SOL uses the universal modifier instead of PP's six per-population fields. Standalone excludes this feedback. This static injection has no CMF toggle; PP cancels SOL's delta to preserve its own values, and M&T restores its own prosperity definition. Raised levies create harsher local food pressure; normal winter modifiers retain vanilla values (or the active overhaul's values in compatibility stacks). Little Ice Age event penalties are softened to avoid runaway food-crisis spirals. Age escalation starts with mild prosperity scarcity and later returns prosperity in the late game.
+5. **Food, Climate & Prosperity** - Stable and JTG apply prosperity food-consumption feedback through local_pop_food_consumption = 0.40: all population types, including slaves and tribesmen, receive +40% food consumption at full prosperity and -40% at full devastation. Both native modifiers use positive 0.40, scaled respectively by prosperity (0 to 1) and devastation (0 to -1). The coefficient follows PP, but SOL uses the universal modifier instead of PP's six per-population fields. Standalone excludes this feedback. This static injection has no CMF toggle; PP cancels SOL's delta to preserve its own values, and M&T restores its own prosperity and devastation definitions. Raised levies create harsher local food pressure; normal winter modifiers retain vanilla values (or the active overhaul's values in compatibility stacks). Little Ice Age event penalties are softened to avoid runaway food-crisis spirals. Age escalation starts with mild prosperity scarcity and later returns prosperity in the late game.
+
+**Food-price prosperity calibration** - Stable/JTG extend the native cheap_food_in_location and expensive_food_in_location modifiers with +0.005 / -0.004 local_monthly_prosperity. There is no pulse application or CMF toggle. At the vanilla 0.05 baseline, the provisional half-strength capped scaling model predicts +0.20 percentage points/month at price 0.01, zero at 0.05, and -0.20 at 0.10 and above. This bounds the food-price contribution over the assumed 0.01-0.20 price range, not total prosperity growth; exact native scaling remains pending in-game verification. Standalone excludes the feature; PP cancels the deltas and M&T restores its own food-price objects.
 
 6. **Colonial & Diplomatic Restrictions** - AI generally requires more than 500 tax base to create colonial charters; historical colonizers are exempt, and colonial nations can colonize only in their capital region. The player is not restricted by this rule. In the 1.4 beta reference the scripted create_colonial_charter action has disappeared; these restrictions still live in the old override and require migration/verification against the new creation path before they can be claimed to work. Asking another country to join a war costs 30 favors.
 
