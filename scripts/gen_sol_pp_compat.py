@@ -788,8 +788,8 @@ def _render_static_cleanup() -> str:
             lines.append(f"\t{field} = {_format_float(-value)}")
         lines.append("}")
 
-    for key in ("cheap_food_in_location", "expensive_food_in_location"):
-        lines.extend(["", "# Preserve PP food-price effects; cancel SOL's calibration delta.",
+    for key in ("cheap_food_in_location", "expensive_food_in_location", "province_starving"):
+        lines.extend(["", "# Preserve PP food-price/starvation effects; cancel SOL's prosperity delta.",
                       f"TRY_INJECT:{key} = {{"])
         for field, value in _numeric_fields(STABLE_STATIC_MODIFIERS, key):
             lines.append(f"\t{field} = {_format_float(-value)}")
