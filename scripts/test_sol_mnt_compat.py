@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression checks for the MnT 0.2.12 compatibility source contract."""
+"""Regression checks for the MnT 0.2.13 compatibility source contract."""
 
 import json
 import sys
@@ -40,17 +40,17 @@ class MntCompatibilityTests(unittest.TestCase):
         blocks = mnt._parse_top_level_blocks(rendered, Path("generated.txt"))
         self.assertEqual([(block.operation, block.key) for block in blocks], [("REPLACE", "sample_price")])
 
-    def test_reference_version_is_pinned_to_mnt_012(self):
+    def test_reference_version_is_pinned_to_mnt_013(self):
         mnt._validate_mnt_version()
 
         with TemporaryDirectory() as temp_dir:
             metadata = Path(temp_dir) / "metadata.json"
             metadata.write_text(
-                json.dumps({"version": "0.2.11", "supported_game_version": "1.4.*"}),
+                json.dumps({"version": "0.2.12", "supported_game_version": "1.4.*"}),
                 encoding="utf-8",
             )
             with patch.object(mnt, "MNT_METADATA", metadata):
-                with self.assertRaisesRegex(ValueError, "targets MnT 0.2.12"):
+                with self.assertRaisesRegex(ValueError, "targets MnT 0.2.13"):
                     mnt._validate_mnt_version()
 
     def test_epbm_keeps_all_three_mnt_building_loops_and_charge_body(self):
@@ -122,6 +122,17 @@ class MntCompatibilityTests(unittest.TestCase):
         self.assertGreaterEqual(average_at, 0)
         self.assertGreater(migration_at, button_at)
         self.assertIn("[Location.MakeScope.ScriptValue('local_sol_total_income')|g2]", gui)
+
+    def test_starvation_leaves_mortality_to_mnt_severity(self):
+        outputs = mnt._render_outputs()
+        block = mnt._unique_block(
+            mnt._parse_top_level_blocks(outputs[mnt.STATIC_OUTPUT], mnt.STATIC_OUTPUT),
+            "province_starving", "generated authority",
+        )
+        self.assertNotIn("local_population_growth", block.body)
+        self.assertNotIn("local_life_expectancy", block.body)
+        self.assertNotIn("local_monthly_prosperity", block.body)
+        self.assertIn("local_supply_limit_modifier = -0.25", block.body)
 
     def test_generated_authority_blocks_remain_top_level_after_terminal_comments(self):
         outputs = mnt._render_outputs()

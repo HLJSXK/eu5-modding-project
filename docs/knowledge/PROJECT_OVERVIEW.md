@@ -1,7 +1,7 @@
 # EU5 Mod - Project Overview
 
 > This document is maintained by AI. Update it whenever mod features or directory structure change.
-> Last updated: 2026-11-10
+> Last updated: 2026-11-12
 
 ## Project Identity
 
@@ -45,7 +45,7 @@ performance boundary.
 
 4. **War & Combat (Harsher Wars)** - War exhaustion further reduces levy size, control, stability, legitimacy, and defensive capability. Total occupation adds +1.6 monthly war exhaustion on top of vanilla, and capital occupation adds +0.2 monthly war exhaustion on top of vanilla. The reduce-war-exhaustion cabinet action can be restricted to peacetime. Blockade, siege, occupation, hostile troops, looting, raiding, and razing modifiers are harsher for prosperity, control, construction, migration attraction, development, raw materials, and food.
 
-5. **Food, Climate & Prosperity** - Stable and JTG apply prosperity food-consumption feedback through local_pop_food_consumption = 0.40: all population types, including slaves and tribesmen, receive +40% food consumption at full prosperity and -40% at full devastation. Both native modifiers use positive 0.40, scaled respectively by prosperity (0 to 1) and devastation (0 to -1). The coefficient follows PP, but SOL uses the universal modifier instead of PP's six per-population fields. Standalone excludes this feedback. This static injection has no CMF toggle; PP cancels SOL's delta to preserve its own values, and M&T restores its own prosperity and devastation definitions. Raised levies create harsher local food pressure; normal winter modifiers retain vanilla values (or the active overhaul's values in compatibility stacks). Little Ice Age event penalties are softened to avoid runaway food-crisis spirals. Age escalation starts with mild prosperity scarcity and later returns prosperity in the late game.
+5. **Food, Climate & Prosperity** - Stable and JTG apply prosperity food-consumption feedback through local_pop_food_consumption = 0.40: all population types, including slaves and tribesmen, receive +40% food consumption at full prosperity and -40% at full devastation. Both native modifiers use positive 0.40, scaled respectively by prosperity (0 to 1) and devastation (0 to -1). The coefficient follows PP, but SOL uses the universal modifier instead of PP's six per-population fields. Standalone excludes this feedback. This static injection has no CMF toggle; PP cancels SOL's delta to preserve its own values, and M&T restores its own prosperity and devastation definitions. Raised levies create harsher local food pressure; normal winter modifiers retain vanilla values (or the active overhaul's values in compatibility stacks). Little Ice Age event penalties are softened to avoid runaway food-crisis spirals. Age escalation applies monthly prosperity penalties of 0.25%, 0.20%, 0.15%, 0.10%, 0.05%, and 0% across the six ages.
 
 **Food-price prosperity calibration** - Stable/JTG extend the native cheap_food_in_location and expensive_food_in_location modifiers with +0.005 / -0.004 local_monthly_prosperity. There is no pulse application or CMF toggle. At the vanilla 0.05 baseline, the provisional half-strength capped scaling model predicts +0.20 percentage points/month at price 0.01, zero at 0.05, and -0.20 at 0.10 and above. This bounds the food-price contribution over the assumed 0.01-0.20 price range, not total prosperity growth; exact native scaling remains pending in-game verification. Standalone excludes the feature; PP cancels the deltas and M&T restores its own food-price objects.
 
@@ -144,7 +144,7 @@ eu5-modding-project/
 |       |-- in_game/common/              lumber correction and PP-aware SOL calculation overrides
 |       |-- in_game/gui/                 victuals-aware location and situation panel overrides
 |       `-- main_menu/                   Little Ice Age cleanup and CMF opt-in localization
-|   `-- sol_mnt_compatibility_submod/    late-loading SOL / MEIOU and Taxes compatibility target (validated against MnT 0.2.12)
+|   `-- sol_mnt_compatibility_submod/    late-loading SOL / MEIOU and Taxes compatibility target (validated against MnT 0.2.13)
 |       |-- .metadata/                   formal M&T and SOL dependencies
 |       |-- in_game/common/              generated goods, EPBM, cleanup, CMM, war, and colonial overrides
 |       |-- in_game/gui/                 M&T location window plus SOL income/tooltip and optional GP wonder references
@@ -177,7 +177,7 @@ SOL OOS diagnostics are disabled in normal builds. `scripts/sol_oos_trace_source
 | Script | When to run | Output |
 |---|---|---|
 | `update_workshop_tags.py` | SOL launcher for `.eu5-base/scripts/update_workshop_tags.py`; explicit `--item-id`, default stable metadata, optional `--metadata` override | Shared implementation owns Steam tag updates and verification; offline preview by default, `--check` reads Steam, `--apply` replaces tags; local usage in `docs/guides/Workshop_Tags.md` |
-| `update_mod_version.py` | Automatically before every `build.bat` deployment; may also be run manually with `--target` and `--date` | Selected target metadata `version` fields in `YYMMDD` form; stable also stamps every migration marker read/write from that same date |
+| `update_mod_version.py` | Automatically before every `build.bat` deployment; may also be run manually with `--target` and `--date` | Selected target metadata `version` fields in `YYMMDD` form; stable also stamps every migration marker read/write and both English/Chinese update notification versions from that same date; `--check` verifies all three without writing |
 | `gen_sol_chain.py` | Preferred one-shot SOL generation entry; `build.bat` runs it automatically for the selected target | Active SOL generated files for all five deploy targets |
 | `build.bat` | Build/deploy selected targets; use `--validate-only` for generation plus full source validation | Uses the explicit EU5_PYTHON interpreter or resolves the eu5 environment, prints the interpreter and validator paths, and retains tmp/build_validate.log. Normal deployment validates changed files before BOM normalization and mirroring; --validate-only checks all sources and exits before those steps |
 | `gen_sol_messages.py` | After SOL resolution message changes; called by gen_sol_chain.py; supports --check | Additive main_menu/gui/messagetypes/SOL_messages.txt for stable/standalone with only SOL's recalculation type; checks every vanilla message file for id collisions and rejects obsolete gui/messagetypes.txt; update mode removes only its own legacy generated file |
@@ -201,7 +201,7 @@ SOL OOS diagnostics are disabled in normal builds. `scripts/sol_oos_trace_source
 | `test_sol_jtg_localization.py` | After changing JTG localization composition | Resolves group-card, goods-detail and compact-hover key chains in both languages; checks key parity, original-name ownership, BOM, four-column detail-only short labels and simulated third-party goods translations |
 | `test_sol_jtg_profile.py` / `test_sol_jtg_substitution.py` | After changing the JTG profile or generated runtime | Checks approved mapping, 11 pre-calibration quantity additions against a provenance fixture, calibrated net-demand precision and emitted accounting, budgets, all 86 UI markers, actual emitted runtime and combined base/JTG auto definitions, cache lifecycle and owner isolation |
 | `test_sol_jtg_overlap_audit.py` | After updating JTG building or goods overrides | Independently verifies lazaretto source preservation, final replacement ordering and authoritative SOL hook synchronization, plus duplicate cloves scalar-price consistency |
-| `test_sol_mnt_compat.py` | After changing the MnT reference, EPBM instrumentation, or the M&T location window | Pins the MnT 0.2.12/1.4.* source contract, checks all three EPBM building traversals and unchanged charge body, and verifies the six Great Projects queue hooks, SOL location button, 56-good output, and tools quantity |
+| `test_sol_mnt_compat.py` | After changing the MnT reference, EPBM instrumentation, or the M&T location window | Pins the MnT 0.2.13/1.4.* source contract, checks all three EPBM building traversals and unchanged charge body, and verifies the six Great Projects queue hooks, SOL location button, 56-good output, and tools quantity |
 | `gen_pop_goods.py` | After editing `target_demand.csv` | `src/<target>/in_game/common/goods/z_SOL_pop_goods.txt` (calibrated demand_add baseline, zero slave demand and complete vanilla development-threshold negations; supports `--target stable\|sol_standalone\|all`) |
 | `gen_whole_group_baskets.py` | `--check` runs before generation; `--fill` performs one-time migration | Owns subscription loading and whole-group/net-target validation; fills missing members within existing allocated group budgets and rounds connected groups together, preserving positive minima and emittable INJECT deltas |
 | `gen_demand_csv.py` | After demand calibration | `data/demand_price_table.csv` |

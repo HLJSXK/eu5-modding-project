@@ -28,6 +28,17 @@ class ReleaseDateTests(unittest.TestCase):
         self.actions = self.root / update_mod_version.MIGRATION_ACTION_PATH
         self.actions.parent.mkdir(parents=True)
         self.actions.write_bytes(b'\xef\xbb\xbf' + text.replace('\n', '\r\n').encode('utf-8'))
+        self.notifications = []
+        for language in update_mod_version.MIGRATION_LANGUAGES:
+            relative = Path('src/stable/main_menu/localization') / language / f'SOL_migration_events_l_{language}.yml'
+            source = update_mod_version.REPO_ROOT / relative
+            original = source.read_text(encoding='utf-8-sig')
+            original = update_mod_version.MIGRATION_DESCRIPTION_VERSION.sub(
+                lambda match: match.group('prefix') + '1.1.0', original)
+            path = self.root / relative
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'\xef\xbb\xbf' + original.replace('\n', '\r\n').encode('utf-8'))
+            self.notifications.append(path)
         for target in update_mod_version.TARGET_NAMES:
             path = self.metadata(target)
             path.parent.mkdir(parents=True)
@@ -90,6 +101,31 @@ class ReleaseDateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'one consistent migration marker'):
             update_mod_version._set_migration_marker(self.actions, '261102', False)
         self.assertEqual(self.actions.read_bytes(), before)
+
+    def test_notifications_follow_release_date_preserving_translations_and_encoding(self):
+        originals = [path.read_bytes() for path in self.notifications]
+        self.run_version(target='sol_standalone')
+        self.assertEqual([path.read_bytes() for path in self.notifications], originals)
+        for release_date, version in [('2026-11-02', b'261102'), ('2027-01-01', b'270101')]:
+            self.run_version(target='all', release_date=release_date)
+            expected = [original.replace(b'v1.1.0', b'v' + version) for original in originals]
+            self.assertEqual([path.read_bytes() for path in self.notifications], expected)
+            self.run_version(release_date=release_date, check=True)
+            self.run_version(release_date=release_date)
+            self.assertEqual([path.read_bytes() for path in self.notifications], expected)
+
+    def test_check_rejects_stale_notification_without_writing(self):
+        self.run_version()
+        for path in self.notifications:
+            current = path.read_bytes()
+            path.write_bytes(current.replace(b'v261102', b'v1.1.0'))
+            before = path.read_bytes()
+            with self.assertRaises(SystemExit) as exited:
+                self.run_version(check=True)
+            self.assertEqual(exited.exception.code, 1)
+            self.assertEqual(path.read_bytes(), before)
+            self.run_version()
+            self.assertEqual(path.read_bytes(), current)
 
 
 @unittest.skipUnless(sys.platform == 'win32', 'Windows batch integration')

@@ -36,7 +36,7 @@ TARGET_ROOT = REPO_ROOT / "src" / "sol_mnt_compatibility_submod"
 STABLE_ROOT = REPO_ROOT / "src" / "stable"
 MNT_ROOT = REPO_ROOT / ".eu5-base" / "reference_mods" / "3735059838"
 MNT_METADATA = MNT_ROOT / ".metadata" / "metadata.json"
-EXPECTED_MNT_VERSION = "0.2.12"
+EXPECTED_MNT_VERSION = "0.2.13"
 EXPECTED_MNT_GAME_VERSION = "1.4.*"
 VANILLA_ROOT = REPO_ROOT / ".eu5-base" / "reference_game_files" / "game"
 
