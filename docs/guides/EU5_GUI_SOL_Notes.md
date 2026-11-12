@@ -2,7 +2,99 @@
 
 Read the [shared EU5 GUI guide](../../.eu5-base/docs/guides/EU5_GUI_Modding_Guide.md) first. This file records SOL-specific screen behavior, experiments, runtime evidence, and design decisions.
 
+## Goods tier icon startup availability (2026-11-03)
+
+**[Runtime log + shipped assets; native reload acceptance pending.]** The Required,
+Daily and Luxury icons were still referenced, but `goods_details.gui` loads from
+`main_menu` while the three DDS files were only in `in_game`. The runtime log
+reported missing `gfx/interface/sol_proto/tier_need.dds`, `tier_daily.dds` and
+`tier_lux.dds` from the shared goods tooltip. Stable and standalone now ship the
+unchanged artwork under `main_menu/gfx/interface/sol_proto`; their virtual paths
+remain unchanged for location, country, HUD, map and compatibility surfaces.
+The packaging regression explicitly checks this early asset root: the offline
+renderer searches both roots and previously hid the failure.
+
+## GUI script execution and multiplayer OOS (2026-11-01)
+
+**[User-confirmed runtime cause.]** GUI execution of scripts causes the reported SOL
+multiplayer OOS. Do not use `GetScriptedGui(...).Execute(...)` lifecycle callbacks
+for initialization, migration or economic writes, or substitute CMF's GUI-backed
+load hooks. Host/visibility guards and idempotence are not evidence of a fix.
+See [the lifecycle risk card](../knowledge/risk_cards/sol_gui_script_oos.md) for
+the three old callbacks and native hook evidence. The SOL migration was implemented
+on 2026-11-02: native new-game stamping, post-lobby economic initialization and
+monthly old-save notification replace all three GUI entrypoints. Runtime multiplayer
+acceptance remains pending. `on_game_start` is not a save-load callback.
+
 ## SOL scenario adapter
+
+### Public location-button integration (2026-10-30)
+
+**[Source and offline checks; native integration acceptance pending.]** SOL exposes
+`sol_location_living_standard_button` in `in_game/gui/SOL_location_widgets.gui`.
+`scripts/gen_sol_ls_gui.py` generates the same definition for stable and standalone;
+M&T, PP and JTG inherit it from their required SOL base. The type owns the existing
+38×38 button, icon, `Location.HasOwner` visibility and `StandardofLiving_tooltip`.
+The tooltip remains separately generated in `SOL_economy_local.gui`, including
+the PP/JTG template overrides.
+
+Other location-window owners (including GP) can insert this single line at the
+desired position in a row that already has the selected `Location` context:
+
+```text
+sol_location_living_standard_button = {}
+```
+
+The type does not rebind `Location` to `LocationView` or to the player. Preserve
+the caller's ancestor context (normally `[LocationView.GetLocation]`); do not add
+an enclosing fixed-size placeholder. SOL's stable, standalone and M&T generators
+use this reference in the original demography-row position. The PP generator
+uses the same reference in PP's `pp_location_card` top-content row. Stable also
+adds the optional GP references described below. Standalone and M&T retain
+their separate `local_sol_total_income` display change; the reusable button does
+not implement that income replacement.
+
+SOL still ships a complete `in_game/gui/location_window.gui`, generated from
+vanilla with SOL and optional GP controls injected. Both SOL and GP's current
+windows carry each other's public references, so either can supply the
+effective window; its base layout still follows whole-file load order. When
+Glorp UI is enabled, SOL's HUD shim requires SOL to load after Glorp UI. Other
+window owners must also carry both integrations. No GP file is changed by SOL's
+generator.
+
+### Optional Great Projects integration (2026-10-30)
+
+**[Provider source and offline checks; missing-provider behavior reported by the
+user for Glorp/CM, native GP acceptance pending.]** `location_window_integrations.py`
+adds `tv_location_wonders_button = {}` inside the city-scene widget, outside its
+layout boxes, and `tv_location_wonders_panel = {}` directly under `lateralview`.
+The provider owns the button's LocationView context, visibility, position and
+click behavior, plus the panel's default `{ 0 163 }` offset. No fixed-size wrapper,
+empty fallback type, copied GP implementation, metadata dependency or GP checkout
+is required. This follows Glorp's bare `cm_is_auto_expand_on_icon = {}` reference
+(`reference_mods/3812518640/in_game/gui/location_window.gui:8262`).
+
+Stable, standalone, M&T, and PP also use `tv_location_wonders_close_on_queue` immediately
+before all six existing `LocationView.OpenConstructionQueue` actions, preserving
+their queue ids and arguments. GP's button closes the queue in the other direction.
+PP keeps its own location-window layout and also uses the public SOL button
+integration; JTG inherits its chosen SOL base window.
+
+Provider contract checked with `guidef.py` against
+`../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532`
+and `../eu5-great-projects/docs/guides/Location_GUI_Integration.md` on 2026-10-30.
+Without GP, missing definitions are deliberately left for the native loader to
+report and omit, as requested. Offline parsing/rendering does not establish
+native error counts, absent-provider geometry, hover hit testing or click order.
+Verify GP enabled/disabled and construction-queue mutual exclusion in game.
+
+Offline verification: `test_sol_substitution_ui.py` checks all four consumer
+trees, direct parents, single instances and unchanged queue actions. Provider-source
+previews for one wonder and no wonders are saved in `tmp/gp_location_preview/`;
+the GP button and panel align with the city scene in all three layouts. Stable
+has no unknown bindings, contexts or textures in these samples. Standalone/M&T
+retain unrelated sample gaps for SOL income and M&T's native data/tooltips; the
+provider's GP bindings resolve. These previews do not execute queue clicks.
 
 ### Glorp compatibility declaration scope (2026-10-24)
 
@@ -29,7 +121,7 @@ stable/standalone location and country panels, PP/JTG overrides, HUD SOL/power/
 rank tables, and the map country ranking tooltip. Contexts are respectively
 `Location.GetOwner`, `Player`, and retained primary `Scope.GetCountry`.
 
-The stable, standalone and M&T location-window generators hide the entire SOL
+The stable, standalone, M&T and PP location-window generators hide the entire SOL
 button with `Location.HasOwner`; ownerless locations have no SOL hover entry.
 Offline fixtures explicitly model estate existence independently of population.
 `test_sol_substitution_ui.py` checks shipped label contexts and buttons across

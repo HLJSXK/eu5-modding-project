@@ -30,6 +30,7 @@ from sol_country_demand_solver_source import (  # noqa: E402
     render_country_demand_solver,
 )
 from sol_economy_effects_source import render_static_sections  # noqa: E402
+from sol_oos_trace_source import instrument, render_effects as render_oos_effects  # noqa: E402
 from sol_living_standard_source import (  # noqa: E402
     render_values as render_living_standard_values,
     render_feedback_modifiers,
@@ -92,6 +93,7 @@ def _values_output_path(target: str) -> Path:
 def _auxiliary_outputs(target: str) -> dict[Path, str]:
     root = REPO_ROOT / "src" / target
     outputs = {
+        root / "in_game/common/scripted_effects/SOL_oos_trace_effects.txt": render_oos_effects(),
         _values_output_path(target): render_living_standard_values(),
         root / "main_menu/common/static_modifiers/SOL_living_standard_modifiers.txt": render_feedback_modifiers(),
         root / "main_menu/common/modifier_type_definitions/SOL_living_standard_modifier_types.txt": render_modifier_types(),
@@ -125,7 +127,7 @@ def _render_target(target: str) -> tuple[str, str]:
         aggregation,
     )
     solver = GENERATED_HEADER + render_country_demand_solver()
-    return economy, solver
+    return instrument(economy), solver
 
 
 def _check_target(target: str) -> bool:

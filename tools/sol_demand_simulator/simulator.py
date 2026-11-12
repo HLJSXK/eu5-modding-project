@@ -77,7 +77,7 @@ class ScenarioParams:
 
     # Location-level
     tax_base: float                 # location_tax_base  [gold/month]
-    effective_control: float        # 0.01 – 1.0
+    wealth: float                   # location_potential_tax_base [gold/month]
 
     # Social mechanics
     peasant_enfranchisement: float  # 0.1 – 1.0
@@ -148,9 +148,6 @@ def fn1_gdp_per_capita(p: ScenarioParams) -> Dict[str, float]:
     total_share = max(0.01, nobles_eff_share + clergy_share + burgher_share
                             + commoner_eff_share + tribesman_share)
 
-    ctrl = max(0.01, p.effective_control)
-    control_loss = (1.0 / ctrl - 1.0) * p.tax_base  # lost to low control
-
     eff_shares = {
         "nobles":    nobles_eff_share,
         "clergy":    clergy_share,
@@ -168,8 +165,7 @@ def fn1_gdp_per_capita(p: ScenarioParams) -> Dict[str, float]:
 
     result: Dict[str, float] = {}
     for s in STRATA:
-        strata_taxed = (1.0 - p.strata[s].tax_rate) * p.tax_base
-        income_pool  = control_loss + strata_taxed
+        income_pool  = p.wealth - p.tax_base * p.strata[s].tax_rate
         gdp          = income_pool * eff_shares[s] / total_share
         result[s]    = gdp / pop_counts[s]   # GDP per pop-unit
 

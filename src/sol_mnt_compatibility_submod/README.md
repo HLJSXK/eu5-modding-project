@@ -10,18 +10,22 @@ Required load order:
 3. Standard of Living
 4. SOL-M&T Compatibility Submod
 
-M&T remains authoritative for prices, production, food, RGO, buildings,
-estates, climate, and other economic balance. The compatibility layer retains
-SOL's income-based pop demand, Living Standard UI/map, migration support, and
-non-conflicting war, colonial, and diplomatic rules.
+Validated against MEIOU and Taxes `0.2.12` for EU5 `1.4.*`. M&T remains
+authoritative for economic balance, prices, production, food, RGO, buildings,
+estates, climate, and maintenance. The compatibility layer retains SOL's
+income-based pop demand, goods substitution, Living Standard UI/map, and
+migration support.
 
-Population quantities start from SOL's final seven-pop matrix. Quantities are
-scaled inversely against M&T default prices so default-price spending remains
-as close as EU5's five-decimal fixed-point precision permits. Maize, millet,
-and rice use equal quantities per pop while preserving their combined SOL
-spending within that precision. Tools receives only the generic price scaling,
-so laborer demand is `0.0005`; M&T's special `0.002` quantity is not retained.
-All wealth and development demand gates remain removed.
+Population quantities start from SOL's final seven-pop matrix. M&T nobles
+receive a compatibility-only `x2` basket multiplier, selected after the latest
+combined M&T+SOL 1340 save showed median noble purchasing power of about `+82%`.
+The other six population baskets retain their existing quantities. After this
+multiplier, quantities are scaled inversely against M&T default prices so
+default-price spending follows the calibrated basket budget within EU5's
+five-decimal fixed-point precision. Maize, millet, and rice use equal quantities
+per pop while preserving the corresponding basket spending within that
+precision. Tools laborer demand remains `0.002`. All wealth and development
+demand gates remain removed.
 
 The compatibility replacement of `epbm_calculate_maintenance` preserves M&T's
 original calculation and charge variables while caching domestic final costs

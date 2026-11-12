@@ -1,21 +1,48 @@
 ﻿# SOL Migration Notice
-#
-# Detection is entirely built-in via GUI widgets — no CMF dependency.
-#   Widget 1 (sol_after_lobby_caller):   detects new game vs old save, stamps new games
-#   Widget 2 (sol_load_after_lobby_caller): fires migration event for old saves
-#   See: SOL_migration_caller.gui / SOL_migration_scripted_guis.txt
-#
-# Tracking variables (all global, persist in saves):
-#   sol_game_started_after_lobby — set once our widget has run; marks "we've been past lobby"
-#   sol_is_new_game              — transient; set by Widget 1, cleared by Widget 2
-#   SOL_migration_v3_seen        — permanent stamp; prevents re-firing
+# Native lifecycle only; no GUI or CMF load bridge.
+# The release-date marker is stamped with metadata by scripts/update_mod_version.py.
+# SOL_migration_261112_seen persists in saves and suppresses this release's notice.
+# Legacy sol_game_started_after_lobby / sol_is_new_game values are ignored.
 
-# Fires migration event for all human players from global scope.
-# Called by sol_load_after_lobby_caller scripted GUI via trigger_event_silently.
-# Scope: none (global)
-SOL_migration_fire_event = {
+on_game_start = {
+	on_actions = {
+		sol_migration_stamp_new_game
+	}
+}
+
+# A real new-game hook replaces the old year-based guess.
+sol_migration_stamp_new_game = {
 	effect = {
-		set_global_variable = SOL_migration_v3_seen
+		set_global_variable = SOL_migration_261112_seen
+	}
+}
+
+monthly_country_pulse = {
+	on_actions = {
+		sol_migration_check_monthly
+	}
+}
+
+# Country scope. A loaded, unmarked save is checked when simulation advances.
+# AI pulses cannot consume the notice before a human country is available.
+sol_migration_check_monthly = {
+	trigger = {
+		is_human = yes
+		NOT = { has_global_variable = SOL_migration_261112_seen }
+	}
+	effect = {
+		trigger_event_silently = { on_action = SOL_migration_fire_event }
+	}
+}
+
+# Stamp before notifying every human, so later pulses/loads cannot repeat it.
+# The dispatcher works from any caller scope.
+SOL_migration_fire_event = {
+	trigger = {
+		NOT = { has_global_variable = SOL_migration_261112_seen }
+	}
+	effect = {
+		set_global_variable = SOL_migration_261112_seen
 		every_country = {
 			limit = { is_ai = no }
 			trigger_event_non_silently = sol_migration.1

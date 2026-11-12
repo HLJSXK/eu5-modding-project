@@ -47,7 +47,9 @@ def load_subscriptions(path: Path = ROOT / "data/pop_group_baskets.csv") -> dict
 SUBSCRIBED = load_subscriptions()
 
 
-def groups_for_pop(pop: str, removed_goods=()) -> dict[str, list[str]]:
+def groups_for_pop(pop: str, removed_goods=(), *, profile=None) -> dict[str, list[str]]:
+    if profile is not None:
+        return profile.groups_for_pop(pop, removed_goods)
     removed = set(removed_goods)
     if removed - set(CORE):
         raise ValueError(f"Unknown target-level removals: {sorted(removed - set(CORE))}")
@@ -55,12 +57,12 @@ def groups_for_pop(pop: str, removed_goods=()) -> dict[str, list[str]]:
             for group in SUBSCRIBED[pop]}
 
 
-def validate_baskets(quantities, *, removed_goods=(), label="basket") -> None:
+def validate_baskets(quantities, *, removed_goods=(), label="basket", profile=None) -> None:
     """Core consumption must equal the union of subscribed, target-level groups."""
     errors = []
     for pop in POPS:
-        expected = {good for members in groups_for_pop(pop, removed_goods).values() for good in members}
-        for good in CORE:
+        expected = {good for members in groups_for_pop(pop, removed_goods, profile=profile).values() for good in members}
+        for good in (CORE if profile is None else profile.goods):
             if good not in quantities or pop not in quantities[good]:
                 errors.append(f"{good}/{pop}: missing quantity")
                 continue

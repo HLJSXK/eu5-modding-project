@@ -58,6 +58,9 @@ class PerformanceTests(unittest.TestCase):
             expected = aggregate(bases, responses)
             rt.run('sol_refresh_country_substitution', country)
             for good in CORE:
+                if good in removed:
+                    self.assertNotIn('sol_sub_multiplier_' + good, country.variables)
+                    continue
                 self.assertAlmostEqual(country.variables['sol_sub_multiplier_' + good], expected.get(good, 1.))
                 self.assertAlmostEqual(country.variables['sol_good_effective_' + good],
                                        max(1 + country.external[good], 0.) * expected.get(good, 1.))

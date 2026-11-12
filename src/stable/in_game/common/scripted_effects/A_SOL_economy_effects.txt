@@ -210,6 +210,7 @@ sol_update_estate_building_maintenance = {
 }
 
 sol_refresh_market_pop_demand_maps = {
+	sol_oos_trace_global = { stage = market_refresh_begin }
 	# Global scope. Refresh per-market unit spending and market-keyed goods counters.
 	# Unit spending is hardcoded consumption quantity times min(market price, base price).
 	# Also tracks which goods have suppressed demand (market_price > default_price).
@@ -5031,6 +5032,7 @@ sol_refresh_market_pop_demand_maps = {
 	}
 	set_global_variable = { name = sol_market_pop_demand_maps_initialized value = 1 }
 	set_global_variable = { name = sol_market_substitution_initialized value = 1 }
+	sol_oos_trace_global = { stage = market_refresh_end }
 }
 
 sol_compute_location_pop_demand = {
@@ -5382,6 +5384,7 @@ sol_solve_country_pop_demand_raw_only = {
 }
 
 sol_solve_country_pop_demand = {
+	sol_oos_trace_country = { stage = solve_begin }
 	sol_ls_reset_country_living_standard = yes
 	sol_refresh_country_substitution = yes
 	gls_compute_savings_pressure = yes
@@ -5419,96 +5422,12 @@ sol_solve_country_pop_demand = {
 				}
 			}
 		}
-		sol_country_demand_census_entered = yes
 		sol_solve_country_pop_demand_solver = yes
-		sol_country_demand_census_outcome = yes
 	}
 	else = { sol_solve_country_pop_demand_raw_only = yes }
 	sol_ls_finalize_country_living_standard = yes
 	sol_ls_finalize_country_living_standard_yoy = yes
-}
-
-# Global census counters. Incremented per country during the monthly pass
-# and reported as one CMF row by the situation's on_monthly, which runs in
-# global scope after every country has solved.
-sol_country_demand_census_reset = {
-	set_global_variable = { name = sol_census_entered value = 0 }
-	set_global_variable = { name = sol_census_prefiltered value = 0 }
-	set_global_variable = { name = sol_census_exact value = 0 }
-	set_global_variable = { name = sol_census_approx value = 0 }
-	set_global_variable = { name = sol_census_fallback value = 0 }
-	set_global_variable = { name = sol_census_outcomes value = 0 }
-}
-
-# The situation's on_monthly and monthly_country_pulse have no guaranteed
-# order, so the counters are cleared by the first country of a new pass
-# rather than by the reporter. sol_census_reported acts as that marker:
-# the reporter sets it, and the next country to arrive clears everything.
-sol_country_demand_census_entered = {
-	if = {
-		limit = {
-			OR = {
-				NOT = { has_global_variable = sol_census_entered }
-				has_global_variable = sol_census_reported
-			}
-		}
-		sol_country_demand_census_reset = yes
-		remove_global_variable = sol_census_reported
-	}
-	change_global_variable = { name = sol_census_entered add = 1 }
-}
-
-# Classifies this country's result. gate_possible = 1 means at least one raw
-# stratum was outside tolerance, so the country was worth solving at all.
-# Every branch also bumps sol_census_outcomes, which the reporter reads as
-# its trigger. The individual counters are rendered by the log
-# localization, and Jomini's unused-variable analysis ignores localization
-# reads, so each one is additionally compared against the running total.
-# Those comparisons are the live script-side reads that keep them counted.
-sol_country_demand_census_outcome = {
-	if = {
-		limit = { var:sol_country_demand_gate_possible = 1 }
-		change_global_variable = { name = sol_census_prefiltered add = 1 }
-	}
-	if = {
-		limit = { var:sol_country_demand_exact_status = 1 }
-		change_global_variable = { name = sol_census_exact add = 1 }
-		change_global_variable = { name = sol_census_outcomes add = 1 }
-	}
-	else_if = {
-		limit = { var:sol_country_demand_selected_strategy > 0 }
-		change_global_variable = { name = sol_census_approx add = 1 }
-		change_global_variable = { name = sol_census_outcomes add = 1 }
-	}
-	else = {
-		change_global_variable = { name = sol_census_fallback add = 1 }
-		change_global_variable = { name = sol_census_outcomes add = 1 }
-	}
-}
-
-# One global CMF row, then reset for the next month. Called from the
-# situation's on_monthly in global scope, so it borrows a human country as
-# the log actor because cmf_log requires a country scope.
-sol_country_demand_census_report = {
-	if = {
-		limit = {
-			has_global_variable = sol_census_entered
-			global_var:sol_census_entered > 0
-			NOT = { has_global_variable = sol_census_reported }
-			# Reading every counter here is what keeps them counted as used:
-			# the log localization renders them, but Jomini ignores that.
-			global_var:sol_census_outcomes >= 0
-			global_var:sol_census_prefiltered >= 0
-			global_var:sol_census_exact >= 0
-			global_var:sol_census_approx >= 0
-			global_var:sol_census_fallback >= 0
-		}
-		random_country = {
-			limit = { is_human = yes }
-			sol_country_demand_cmf_log = { action = CMF_LOG_SOL_DEMAND_CENSUS }
-		}
-		set_global_variable = { name = sol_census_reported value = 1 }
-	}
+	sol_oos_trace_country = { stage = solve_end }
 }
 
 sol_solve_country_pop_demand_solver = {
@@ -5785,6 +5704,7 @@ sol_solve_country_pop_demand_solver = {
 }
 
 sol_apply_local_pop_demand_modifiers = {
+	sol_oos_trace_country = { stage = apply_begin }
 	# Country goods modifiers are permanent and updated only by substitution refresh.
 	# root = country. Writes the one-month modifier from each location's already-cached
 	# sol_location_pop_demand_modifier_size without re-solving. Split out of
@@ -5812,6 +5732,7 @@ sol_apply_local_pop_demand_modifiers = {
 			sol_apply_location_living_standard_modifiers = yes
 		}
 	}
+	sol_oos_trace_country = { stage = apply_end }
 }
 
 sol_update_local_pop_demand_modifiers = {
@@ -6597,19 +6518,23 @@ gls_accumulate_panel_stats = {
 }
 
 gls_full_refresh_country = {
+	sol_oos_trace_country = { stage = country_refresh_begin }
 	# root = country. sol_update_local_pop_demand_modifiers already refreshes
 	# gls_savings_pressure_adjustment, so gls_compute_panel_display would be redundant here.
 	sol_update_estate_building_maintenance = yes
 	set_variable = { name = sol_estate_building_maintenance_initialized value = 1 }
 	sol_update_local_pop_demand_modifiers = yes
 	gls_accumulate_panel_stats = yes
+	sol_oos_trace_country = { stage = country_refresh_end }
 }
 
 gls_recalculate_global_living_standard = {
+	sol_oos_trace_global = { stage = world_refresh_begin }
 	# World scope: refresh market maps once, then refresh all countries.
 	sol_refresh_market_pop_demand_maps = yes
 	every_country = { if = { limit = { total_population > 0 num_locations > 0 } gls_full_refresh_country = yes } else = { sol_clear_country_substitution = yes } }
 	sol_ls_recalculate_world_ranking = yes
+	sol_oos_trace_global = { stage = world_refresh_end }
 }
 
 # Called after current country SOL has been finalized, without a location pass.

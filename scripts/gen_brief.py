@@ -36,21 +36,22 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 
 # Codegen script map: (script, inputs, outputs, when_to_run)
 CODEGEN_SCRIPTS = [
+    ("gen_sol_ls_gui.py", "SOL GUI kit + goods_weights.csv + shared button definition", "stable/standalone location tooltip, country panel, public SOL_location_widgets.gui and bilingual localization", "Run by gen_sol_chain; supports --check; location-window owners use sol_location_living_standard_button with inherited Location context"),
     ("gen_sol_lshud.py", "SOL four-section source + SOL history/ranking/map emitters + vendored Glorp UI types", "stable/standalone HUD, Glorp offset shim, four map modes, scoped map tooltips, font icon registration/asset, bilingual localization and ranking caches", "Run by gen_sol_chain; supports --check; stable must load after Glorp UI; verify with test_sol_lshud_income/ranking/ui.py and test_sol_map_modes.py"),
     ("gen_sol_substitution.py", "goods_weights.csv + pop_group_baskets.csv + substitute_groups.json + calibrated demand", "country pulse effects, guarded cache/display values, triggers and 56 auto modifiers", "Run by gen_sol_chain; edit sol_substitution.py, regenerate, then run test_sol_substitution.py"),
     ("gen_whole_group_baskets.py", "pop_group_baskets.csv + goods_weights.csv + calibrated demand", "whole-group and emittable-net checks; one-time budget-preserving target_demand.csv migration", "--check runs first in gen_sol_chain; --fill migrates incomplete baskets once"),
-    ("update_mod_version.py", "local date or explicit --date", "selected src/<target>/.metadata/metadata.json version fields", "Run automatically by build.bat before deployment; supports --target and --check"),
+    ("update_mod_version.py", "local date or explicit --date", "selected metadata version fields and stable SOL_migration_<YYMMDD>_seen marker reads/writes", "Run automatically by build.bat before deployment; supports --target and --check"),
     ("gen_sol_chain.py",  "SOL demand data + vanilla/PP/M&T/JTG goods + Glorp UI", "active SOL generated files for all deploy targets", "Preferred one-shot SOL generation entry; build.bat runs it automatically"),
     ("gen_sol_messages.py", "SOL resolution message definition", "stable/standalone main_menu/gui/messagetypes/SOL_messages.txt (SOL entries only)", "Run by gen_sol_chain; supports --check; removes its obsolete full-copy database for EU5 1.4.3"),
-    ("gen_sol_pp_compat.py", "stable SOL outputs + PP definitions", "SOL-PP compact feature, demand, effects, and GUI overrides; validates PP road-price filename ownership", "After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain"),
+    ("gen_sol_pp_compat.py", "stable SOL outputs + PP definitions", "SOL-PP compact feature, demand, effects, PP-based complete location window with SOL button injection, and GUI overrides; validates PP road-price filename ownership", "After changing SOL balance/demand/effects/UI or updating the PP reference; run by gen_sol_chain"),
     ("gen_sol_mnt_compat.py", "data/target_demand.csv + stable SOL + M&T definitions", "SOL-M&T goods, accounting, EPBM, CMM residual cleanup, actions, and location GUI", "After changing SOL demand/effects/UI or updating the M&T reference; run by gen_sol_chain"),
     ("gen_sol_jtg_compat.py", "data/jtg_pop_demand.csv + stable SOL outputs", "SOL-JTG demand, values, effects, and 82-good GUI overrides", "After changing JTG demand data or updating the Just Goods Workshop reference; run by gen_sol_chain"),
-    ("sync_location_window.py", "Glorp UI location window + extracted vanilla types", "Current Glorp UI-based stable window with optional Construction Manager references, one SOL tooltip button, synchronized type support, and backward-compatible 1.4 API migration", "After updating the Glorp UI reference; run by gen_sol_chain for stable/all"),
+    ("sync_location_window.py", "Glorp UI 1.4 location_window.gui + location_window_integrations.py", "Glorp UI-based stable window with injected SOL/GP controls and extracted Glorp type support", "After a Glorp UI location-window update; run by gen_sol_chain for stable/all"),
     ("gen_sol_economy_effects.py", "scripts/sol_economy_effects_source.py + scripts/sol_country_demand_solver_source.py + scripts/sol_living_standard_source.py + data/demand_price_table.csv", "economy/solver effects, annual SOL values, flat/percent modifier types, icons, 17 building injections, migration/growth static modifiers and bilingual names", "After changing SOL economy emitters, country solver emitters, or demand data; run by gen_sol_chain for stable|sol_standalone|all"),
     ("gen_pop_goods.py",  "data/target_demand.csv",             "src/<target>/.../z_SOL_pop_goods.txt",            "After editing calibrated demand_add baseline; supports --target stable|sol_standalone|all"),
     ("gen_demand_csv.py", "z_SOL_pop_goods.txt + vanilla goods", "data/demand_price_table.csv",                      "After gen_pop_goods.py"),
     ("gen_market_unit_consumption.py", "data/demand_price_table.csv", "src/<target>/.../SOL_market_unit_consumption_values.txt", "After gen_demand_csv.py or SOL market base-spending logic changes; supports --target stable|sol_standalone|all; market refresh block is embedded by gen_sol_economy_effects"),
-    ("generate_sol_location_window.py", "vanilla location_window.gui", "src/sol_standalone/in_game/gui/location_window.gui", "After vanilla location_window.gui changes; run by gen_sol_chain for sol_standalone/all"),
+    ("generate_sol_location_window.py", "Glorp UI 1.4 location_window.gui + location_window_integrations.py", "Glorp UI-based standalone location window with SOL income/tooltip and optional GP references", "After a Glorp UI location-window update; run by gen_sol_chain for sol_standalone/all"),
     ("gen_brief.py",      "anti_patterns.yaml + valid_enums.yaml + PROJECT_OVERVIEW.md", "docs/knowledge/BRIEF.md", "After editing any YAML knowledge file"),
     ("gen_index.py",      "reference_game_files + src/",         "data/index/*.txt symbol indexes",                  "Run by gen_brief.py automatically"),
     ("gen_scaffold.py",   "--type argument",                     "Scaffold .txt/.yml file in specified directory",   "When creating a new EU5 file"),
@@ -59,6 +60,8 @@ CODEGEN_SCRIPTS = [
 
 # Auto-generated files: (relative path, generator script)
 AUTOGENERATED_FILES = [
+    *[(f"src/{target}/in_game/gui/SOL_location_widgets.gui", "gen_sol_ls_gui.py")
+      for target in ("stable", "sol_standalone")],
     *[(f"src/{target}/main_menu/gui/messagetypes/SOL_messages.txt", "gen_sol_messages.py")
       for target in ("stable", "sol_standalone")],
     *[(f"src/{target}/{path}", "gen_sol_economy_effects.py")
@@ -83,15 +86,26 @@ AUTOGENERATED_FILES = [
     ("src/sol_standalone/in_game/common/script_values/SOL_living_standard_values.txt",           "gen_sol_economy_effects.py"),
     ("src/sol_standalone/in_game/gui/location_window.gui",                                      "generate_sol_location_window.py"),
     ("src/stable/in_game/gui/location_window.gui",                                              "sync_location_window.py"),
-    ("src/stable/in_game/gui/vanilla/cmfg_location_window_vanilla_types.gui",                   "sync_location_window.py"),
+    ("src/stable/in_game/gui/Glorp_location_window_types.gui",                                  "sync_location_window.py"),
     ("src/sol_pp_compatibility_submod/in_game/common/goods/zz_SOL_PP_lumber_demand.txt",         "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/in_game/common/script_values/zz_SOL_market_unit_consumption_values.txt", "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/in_game/common/scripted_effects/zz_A_SOL_economy_effects.txt", "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/in_game/gui/zz_SOL_economy_local.gui",                      "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/gui/location_window.gui",                             "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/in_game/gui/panels/situation/global_living_standard.gui",  "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/in_game/common/auto_modifiers/zz_SOL_PP_compact_economy_auto_modifiers.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/common/scripted_effects/zz_SOL_PP_compact_cmm_effects.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/common/scripted_triggers/zz_SOL_PP_compact_disabled_triggers.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/common/scripted_guis/zz_SOL_PP_compact_cmm_scripted_gui.txt", "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_static_cleanup.txt", "gen_sol_pp_compat.py"),
     ("src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_compact_war_overlap_cleanup.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/common/static_modifiers/zz_SOL_PP_weather_modifiers.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/main_menu/common/static_modifiers/zz_SOL_PP_lia_modifiers.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/in_game/common/on_action/zz_SOL_PP_compatibility_on_actions.txt", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/main_menu/localization/english/SOL_PP_cmm_l_english.yml", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/main_menu/localization/simp_chinese/SOL_PP_cmm_l_simp_chinese.yml", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/main_menu/localization/english/SOL_PP_substitution_l_english.yml", "gen_sol_pp_compat.py"),
+    ("src/sol_pp_compatibility_submod/main_menu/localization/simp_chinese/SOL_PP_substitution_l_simp_chinese.yml", "gen_sol_pp_compat.py"),
     ("src/sol_mnt_compatibility_submod/in_game/common/goods/zz_SOL_MnT_pop_goods.txt", "gen_sol_mnt_compat.py"),
     ("src/sol_mnt_compatibility_submod/in_game/common/script_values/zz_SOL_MnT_market_unit_consumption_values.txt", "gen_sol_mnt_compat.py"),
     ("src/sol_mnt_compatibility_submod/in_game/common/script_values/SOL_cmm_values.txt", "gen_sol_mnt_compat.py"),

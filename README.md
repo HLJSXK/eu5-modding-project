@@ -140,3 +140,53 @@ This project is for educational and modding purposes. European Universalis 5 is 
 ## Shared EU5 foundation
 
 Reusable EU5 references, official definitions, community-mod snapshots, game knowledge, GUI rendering, and shared AI rules live in the sibling `eu5-modding-base` project. Run `python scripts/bootstrap_base.py` after cloning to connect `.eu5-base/`, then read [the shared agent entry](.eu5-base/CLAUDE.md) and this project's `CLAUDE.md`. The project's own source, generated indexes, design notes, and workflow remain here.
+
+## Command-line Workshop publishing
+
+Run `workshop.ps1` from this repository; no uploader source checkout or expanded
+workspace is needed. The default target is the main Mod. `-List` shows all targets.
+
+```powershell
+.\workshop.ps1 -List
+# One-time binding: replace the example number with YOUR existing Workshop item ID.
+.\workshop.ps1 -Init -ItemId 1234567890
+# Offline profile/file check; does not upload or rebuild.
+.\workshop.ps1
+# After running this project's build.bat successfully:
+.\workshop.ps1 -Upload
+```
+
+Select a different target with the first argument, e.g. `-List` shows the aliases
+to use with `-Init -ItemId ...` and later `-Upload`. Every target needs its own ID.
+Do not use the old 1.3 item's ID for a separate 1.4 item. ID 0/new-item creation
+is intentionally unsupported. To change a binding, edit `.workshop/<target>.json`.
+
+The wrapper uploads the selected source Mod directory (including generated files),
+not the whole repository or a potentially stale game installation. Run the existing
+build first: Great Projects supports `build.bat --package-only`; SOL supports
+`build.bat stable` or its other existing target names. The wrapper does not build,
+validate gameplay, check Steam ownership, or verify that a build is current.
+
+Install the **Windows CLI**, not GUI, distribution of
+[pdx-workshop-manager](https://github.com/kaiser-chris/pdx-workshop-manager/releases)
+by putting `pdx-workshop-manager.exe` and `steam_api64.dll` in `.workshop/bin/`.
+Alternatively set `PDX_WORKSHOP_MANAGER` or pass `-Executable` with the CLI path.
+No Go SDK or Steamworks SDK is needed. Keep Steam running and logged in for upload.
+If local PowerShell policy blocks the script, invoke it using
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\workshop.ps1` plus the flags;
+this affects that invocation only. It does not override organization policy.
+
+Profiles, the binary and upload logs are ignored by Git. Paths in the profile are
+resolved relative to this repository, even when called from a different directory.
+Checks print the target, title, version, item ID and content path. Upload runs retain
+their resolved configuration and logs under `.workshop/runs/`. The wrapper also
+detects upstream's zero-exit-code error case by requiring its success log marker.
+
+By default, upstream updates content, the English title from metadata, tags, and
+thumbnail. Descriptions and change notes are opt-in: add `descriptions` and/or
+`change-note-directories` maps to the single Mod entry in the local profile, with
+language keys such as `english` and `schinese` and paths relative to this repository.
+Change-note filenames must match `<metadata version>.bbcode`. Existing localized
+titles can be set with a `names` map. Description files are uploaded verbatim;
+the wrapper does not convert Markdown to BBCode. Review their contents first.
+SOL descriptions: docs/workshop_description_en.txt and docs/workshop_description_zh.txt (use english and schinese respectively).

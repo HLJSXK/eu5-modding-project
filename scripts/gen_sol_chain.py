@@ -2,7 +2,7 @@
 """
 Run the active SOL code-generation chain for one or more deploy targets.
 
-Update mode also stamps the selected metadata versions from the local date.
+Update mode stamps selected metadata versions and stable's migration marker from one date.
 
 Usage:
   $env:PYTHONUTF8='1'; & $env:EU5_PYTHON scripts/gen_sol_chain.py

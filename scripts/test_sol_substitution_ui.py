@@ -258,6 +258,28 @@ class SubstitutionUI(unittest.TestCase):
                             self.assertGreaterEqual(child.x, -1, child.kind)
                             self.assertLessEqual(child.x + child.w, width + 1, child.kind)
                     # Every supplied group, including compatibility tails, is one icon row.
+                    if target == 'sol_jtg_compatibility_submod':
+                        from sol_substitution_profile import load_jtg_profile
+                        profile = load_jtg_profile()
+                        cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size', [None])[0] == '122'
+                                 and any(str(e.props.get('tooltip', '')).startswith('@') for e in walk(c))]
+                        self.assertEqual(len(cards), 20)
+                        seen = set()
+                        for card in cards:
+                            cells = [c for c in walk(card) if str(c.props.get('tooltip', '')).startswith('@')]
+                            names = [str(c.props["tooltip"]).split("!")[0][1:] for c in cells]
+                            seen.update(names)
+                            expected = next(members for members in profile.groups.values() if set(members) == set(names))
+                            self.assertEqual(len(cells), len(expected))
+                            rows = {}
+                            for cell in cells:
+                                rows.setdefault(round(cell.y, 1), []).append(cell)
+                            self.assertEqual(len(rows), (len(expected) + 5) // 6)
+                            self.assertTrue(all(len(row) <= 6 for row in rows.values()))
+                            for cell in cells:
+                                self.assertLessEqual(cell.y + cell.h, card.y + card.h + 1)
+                        self.assertEqual(seen, set(profile.goods))
+                        continue
                     cards = [c for c in walk(element) if c.kind == 'vbox' and c.props.get('size') == ['122', str(GROUP_CARD_H)]]
                     self.assertGreaterEqual(len(cards), 20)
                     for card in cards:
@@ -427,11 +449,77 @@ class SubstitutionUI(unittest.TestCase):
                 path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'
                 self.assertIn(generator.SOL_BUTTON, path.read_text(encoding='utf-8-sig'))
                 node = parse(generator.SOL_BUTTON)[0]
+                self.assertEqual(node.key, 'sol_location_living_standard_button')
+                self.assertEqual(node.value, [])
                 for has_owner in (False, True):
                     eng, log = self.engine([(r'Location.HasOwner', has_owner)])
                     button = eng.ex.build(node.key, node.value, {}, str(path), node.line)
                     self.assertEqual(eng.visible(button), has_owner)
+                    self.assertFalse(button.props.get('datacontexts'))
+                    self.assertEqual(button.props['size'], ['38', '38'])
+                    icon = next(e for e in walk(button) if e.props.get('name') == 'stat_sol_living_standard')
+                    self.assertEqual(icon.props['texture'], 'gfx/interface/icons/sol/sol_living_standard.dds')
+                    tip = eng.ex.build_lazy(button.tooltipwidget)
+                    self.assertTrue(any(e.props.get('text') == 'LOCATION_SOL_GUI_TITLE' for e in walk(tip)))
                     self.assertFalse(log, log)
+
+    def test_great_projects_references_keep_native_context_and_queue_actions(self):
+        import sync_location_window as stable
+        import generate_sol_location_window as standalone
+        import gen_sol_mnt_compat as mnt
+        import gen_sol_pp_compat as pp
+
+        def descendants(nodes, parents=()):
+            for node in nodes:
+                yield node, parents
+                if node.is_block():
+                    yield from descendants(node.value, parents + (node,))
+
+        for target, source, queue_count in (
+            ('stable', stable.SOURCE_PATH, 6),
+            ('sol_standalone', standalone.SOURCE_PATH, 6),
+            ('sol_mnt_compatibility_submod', mnt.MNT_LOCATION_GUI, 6),
+            ('sol_pp_compatibility_submod', pp.PP_LOCATION_GUI, 6),
+        ):
+            with self.subTest(target=target):
+                path = ROOT / 'src' / target / 'in_game/gui/location_window.gui'
+                nodes = list(descendants(parse(path.read_text(encoding='utf-8-sig'))))
+                button, parents = next((n, p) for n, p in nodes if n.key == 'tv_location_wonders_button')
+                self.assertEqual(button.value, [])
+                scene = parents[-1]
+                self.assertEqual(scene.key, 'widget')
+                self.assertTrue(any(n.key == 'scene' and n.value == '[LocationView.GenerateSceneDesc]'
+                                    for n, _ in descendants(scene.value)))
+                panel, parents = next((n, p) for n, p in nodes if n.key == 'tv_location_wonders_panel')
+                self.assertEqual(panel.value, [])
+                self.assertEqual(len(parents), 1)
+                self.assertEqual(parents[0].key, 'lateralview')
+                for key in ('tv_location_wonders_button', 'tv_location_wonders_panel',
+                            'sol_location_living_standard_button'):
+                    self.assertEqual(sum(n.key == key for n, _ in nodes), 1)
+
+                def queues(items):
+                    return [(n, p) for n, p in items if n.key == 'on_action'
+                            and str(n.value).startswith('[LocationView.OpenConstructionQueue(')]
+
+                actions = queues(nodes)
+                self.assertEqual(len(actions), queue_count)
+                original = queues(descendants(parse(source.read_text(encoding='utf-8-sig'))))
+                self.assertEqual([n.value for n, _ in actions], [n.value for n, _ in original])
+                for action, parents in actions:
+                    parent = parents[-1]
+                    self.assertEqual(parent.key, 'action_tooltip')
+                    previous = parent.value[parent.value.index(action) - 1]
+                    self.assertEqual((previous.key, previous.value), ('using', 'tv_location_wonders_close_on_queue'))
+
+    def test_location_button_is_shipped_by_both_base_targets(self):
+        from gen_sol_ls_gui import render_location_widgets
+        for target in ('stable', 'sol_standalone'):
+            path = ROOT / 'src' / target / 'in_game/gui/SOL_location_widgets.gui'
+            with self.subTest(target=target):
+                self.assertEqual(path.read_text(encoding='utf-8-sig'), render_location_widgets())
+                db = GuiDB([path])
+                self.assertEqual(db.type_base['sol_location_living_standard_button'], 'navigational_button_alt')
 
     def test_linear_capacity_bar_and_cursor(self):
         from gen_sol_ls_gui import balance_cursor, capacity_bar, f_capacity_components, f_coef
@@ -501,6 +589,22 @@ class SubstitutionUI(unittest.TestCase):
                 source = (base / 'main_menu/gui/shared/goods_details.gui').read_text(encoding='utf-8')
                 for scope in ('Market.', 'Player.', 'Location.'):
                     self.assertNotIn(scope, source)
+
+    def test_tier_icons_are_available_when_main_menu_goods_tooltips_load(self):
+        # goods_details loads before in_game assets. Searching both roots in
+        # offline previews otherwise conceals this startup packaging failure.
+        for target in ('stable', 'sol_standalone'):
+            base = ROOT / 'src' / target
+            source = (base / 'main_menu/gui/shared/goods_details.gui').read_text(encoding='utf-8')
+            for name in ('tier_need.dds', 'tier_daily.dds', 'tier_lux.dds'):
+                relative = Path('gfx/interface/sol_proto') / name
+                with self.subTest(target=target, texture=name):
+                    self.assertIn(relative.as_posix(), source)
+                    path = base / 'main_menu' / relative
+                    self.assertTrue(path.is_file(), f'Missing main_menu texture: {path}')
+                    with Image.open(path) as icon:
+                        self.assertEqual(icon.size, (64, 64))
+                        self.assertGreater(icon.convert('RGBA').getchannel('A').getextrema()[1], 0)
 
     def test_goods_tooltip_all_memberships_and_unknown_good(self):
         from sol_goods_order import GROUP_MEMBERS

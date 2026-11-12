@@ -1,4 +1,74 @@
 # eu5-modding-project project-specific anti-patterns; reusable entries are loaded from .eu5-base/docs/knowledge/anti_patterns.yaml.
+- id: sol_obsession_x_replaced_with_native_movement_presence
+  pattern: null
+  detectability: advisory
+  category: design
+  scope: location
+  only_in_paths:
+  - docs/design/obsession/
+  bad: Replacing SOL obsession's independent per-good x with native movement presence merely because movements have engine-managed trade and neighbor propagation.
+  correction: Preserve independent commodity-state semantics. Vanilla movements require a religion or culture target and describe supporters as converted or assimilated population. Require an isolated targetless-movement experiment with propagation, identity preservation and save/reload before adoption; then verify concurrent commodities and reversible decay. Dummy identities and destroying an outbreak do not establish commodity decay.
+  source: docs/design/obsession/08_Technical_Implementation.md section 1.1; .eu5-base/reference_game_files/game/in_game/common/movements/readme.txt:25-31; .eu5-base/reference_game_files/game/main_menu/localization/english/movements_l_english.yml:17-18; .eu5-base/reference_official_defines/docs/triggers.log:9389-9393
+  notes: Project-specific adoption gate for SOL x+q and independent commodity waves. Source/interface review on 2026-11-03, not an in-game proof that targetless movements are impossible. No neutral-conversion switch or per-location supporter reset was found in reviewed public interfaces.
+- id: sol_tier_icons_loaded_before_in_game_assets
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: goods
+  bad: Keeping SOL tier_need/tier_daily/tier_lux textures only under in_game while main_menu goods_details.gui references them during startup.
+  correction: Ship the three existing tier DDS files under main_menu/gfx/interface/sol_proto in stable and standalone. Keep their virtual texture paths unchanged for all goods surfaces.
+  source: Runtime error.log inspected 2026-11-03 lines 1-40 reports missing tier textures in gui/shared/goods_details.gui; scripts/test_sol_substitution_ui.py test_tier_icons_are_available_when_main_menu_goods_tooltips_load
+  notes: The original images and widget references were still present. Offline rendering searched both asset roots and concealed the startup availability problem. Packaging fix; native reload verification pending.
+- id: compatibility_scripted_gui_redeclares_upstream_callback
+  pattern: null
+  detectability: advisory
+  category: compatibility
+  scope: scripted_guis
+  bad: Copying an upstream mod's keyed scripted-GUI callback definitions into a compatibility submod merely because the submod registers the same CMF setting IDs.
+  correction: Keep the upstream callback definitions owned by the upstream mod. A compatibility layer may register or replace setting effects and callbacks, but must emit no duplicate <mod_id>__<setting_id>_on_changed keys unless it uses a distinct key intentionally.
+  source: User runtime error.log 2026-11-02; src/sol_pp_compatibility_submod/in_game/common/scripted_guis/zz_SOL_PP_compact_cmm_scripted_gui.txt; src/stable/in_game/common/scripted_guis/SOL_cmm_scripted_gui.txt
+  notes: The PP generator copied SOL_cmm_scripted_gui.txt after restoring opt-in economic settings. SOL already loads those twelve sol__*_on_changed keys, so the PP file produced Duplicated key warnings and was ignored by the database. The generated PP scripted-GUI file is now header-only; CMF registration still references the upstream callback keys.
+- id: sol_gui_script_execution_oos
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: global
+  only_in_paths:
+  - src/stable/in_game/gui
+  - src/sol_standalone/in_game/gui
+  - in_game/common/scripted_guis
+  - in_game/common/on_action
+  bad: Executing SOL initialization, migration or economic state writes through GUI scripted-GUI callbacks, including legacy CMF-style start/load bridges, or treating on_game_start as equivalent to every post-lobby/save-load callback.
+  correction: GUI script execution is the user-confirmed cause of SOL multiplayer OOS. Remove that entry path rather than host-gating it. Use native on_game_start for new-save version stamps and on_game_started_after_lobby for new-game economic initialization; use native synchronized pulses for one-time old-save migration and missing/versioned cache repair. No verified native every-load hook exists in the checked corpus; CMF load hooks are GUI-dispatched. Read docs/knowledge/risk_cards/sol_gui_script_oos.md.
+  source: User runtime confirmation 2026-11-01; docs/knowledge/risk_cards/sol_gui_script_oos.md; .eu5-base/reference_official_defines/docs/on_actions.log:653,743,857; .eu5-base/reference_game_files/game/in_game/common/on_action/_hardcoded.txt:1,316; .eu5-base/reference_mods/3692202776/in_game/common/scripted_guis/cmf_after_lobby_caller_scripted_gui.txt:18,38
+  notes: The cause is confirmed, not a hypothesis or a claim inferred from the malformed diagnostic logs. The three callbacks have separate stamping, notification and economic-refresh duties. Native pulse migration changes timing; persistent flags cannot detect each save reload. Implemented 2026-11-02. All three SOL GUI entrypoints and registrations are removed. Native on_game_start stamps new saves; on_game_started_after_lobby initializes world economics in both targets; the first human monthly pulse notifies unmarked old saves once. Migration markers use SOL_migration_<YYMMDD>_seen and are stamped from the same date as stable metadata by update_mod_version.py during builds. Only the current release-date marker suppresses the notice; old dates and v3 stamps are ignored, and each new release date can notify once. Native multiplayer acceptance and the dependent CMF implementation need separate verification.
+- id: sol_oos_trace_v1_localization_format
+  pattern: null
+  detectability: advisory
+  category: workflow
+  scope: any
+  bad: Treating SOL_OOS v1 pipe-delimited debug messages as a verified protocol, counting localization error echoes as executions, or accepting two ERROR metric strings as equal readings.
+  correction: Generate SOL_OOS v2 semicolon-delimited records, use the CString GetTagAndName identity and Country.MakeScope.GetVariable for numeric reads, and validate the emitted values in-game. Recover malformed v1 only as explicitly invalid evidence; parse actual debug_log emissions once, recover absent tags only from the immediately following same-file scope line, and flag ERROR, unresolved expressions and unknown identities. Keep trace probes free of persistent writes and random calls.
+  source: scripts/sol_oos_trace_source.py; scripts/sol_oos.py; scripts/test_sol_oos.py; .eu5-base/reference_official_defines/docs/effects.log:1492; .eu5-base/reference_official_defines/docs/data_types_script.txt:438,2346; .eu5-base/reference_official_defines/docs/data_types_uncategorized.txt:60128,60134; docs/guides/SOL_OOS_Diagnostics.md
+  notes: '2026-11-01 123650 host / 123654 client runtime reports contain SOL_OOS|1solve_begin$ with empty subject and GetVariable promotion errors. Recovered event counts are 8 per solve/apply boundary on each peer, not 72 (the latter counted metric outputs plus source echoes). Corrected syntax is source-verified, not yet runtime-verified. Initialization before the transferred snapshot can already be inherited by a peer and is not proof of OOS.'
+- id: sol_optional_gp_location_widgets_wrong_parent
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: location
+  bad: Copying Great Projects widget implementations into SOL, putting its anchored button in a layout box, or nesting its side panel under the city scene.
+  correction: Use bare tv_location_wonders_button in the city-scene widget and tv_location_wonders_panel directly under lateralview. Add the provider's tv_location_wonders_close_on_queue template before existing OpenConstructionQueue actions. Keep these references in all three SOL window generators through location_window_integrations.py without a GP build or metadata dependency.
+  source: ../eu5-great-projects/docs/guides/Location_GUI_Integration.md; ../eu5-great-projects/src/in_game/gui/tv_location_wonder_widgets.gui:8,2505,2532; .eu5-base/reference_mods/3812518640/in_game/gui/location_window.gui:8262; user direction 2026-10-30
+  notes: GP owns context, assets, tooltip, visibility and queue-close behavior. Current M&T has no OpenConstructionQueue action. Missing-provider errors and omitted controls are intentional by user request; offline checks do not prove native fallback geometry or hover behavior. No fallback types should shadow the provider.
+- id: sol_mnt_location_queue_hook_count_drift
+  pattern: null
+  detectability: advisory
+  category: gui
+  scope: location
+  bad: Reusing a fixed Great Projects queue-hook count after the upstream MnT location window changes its construction queue actions.
+  correction: Pin the MnT metadata version used by the generator, count every OpenConstructionQueue entry in the source window, and pass that expected count to the shared queue-close integration. Keep a regression that verifies the generated count and the SOL location button.
+  source: .eu5-base/reference_mods/3735059838/.metadata/metadata.json; .eu5-base/reference_mods/3735059838/in_game/gui/location_window.gui; scripts/gen_sol_mnt_compat.py; scripts/test_sol_mnt_compat.py
+  notes: MnT 0.2.12 for EU5 1.4.* contains six construction queue actions; the previous compatibility generator expected zero and failed before writing outputs. The hook count is source-drift protection, not runtime proof of Great Projects availability.
 - id: sol_native_demand_preferences_bypass_weight_authority
   pattern: null
   detectability: advisory
@@ -606,3 +676,23 @@
   correction: Vanilla map_modes/, situations/ and modifier_types/ icons are one painted object on a transparent 128x128 (64x64 for modifier_types) canvas with a ~5-8px margin; related modes reuse the main object and add a small lower-right badge (peasants -> peasants_percentage, control -> missing_control). Prefer a hand-drawn SVG rendered to transparent PNG (assets/icons/sol_living_standard.svg -> scripts/render_sol_icon.py); image models rarely hit the vanilla style. Install the set with scripts/compose_sol_mapmode_icons.py.
   source: game/main_menu/gfx/interface/icons/map_modes/*.dds (installed game, alpha bbox e.g. population (9,7,120,121), food (15,7,112,122)); scripts/generate_sol_icon.py build_generation_payload rejects background=transparent
   notes: Vanilla stability.dds is already a balance scale, so a scale also collides semantically. Plain RGB-distance keying leaves a magenta halo on soft dark shadows; estimate alpha from key-ness min(R,B)-G instead.
+
+- id: sol_prosperity_food_compatibility_boundary
+  pattern: null
+  detectability: advisory
+  category: modifier
+  scope: location
+  bad: Stacking SOL's prosperity food-consumption injection with PP, retaining it in M&T, or registering a CMF toggle for the static fields.
+  correction: Stable injects local_pop_food_consumption = 0.40 into both prosperity and devastation for all population types; JTG inherits stable, while standalone excludes this injection. PP cleanup negates only SOL's delta and M&T authority restores its native prosperity and devastation objects. Use the universal field, including slaves and tribesmen, rather than copying PP's six per-population fields.
+  source: .eu5-base/reference_game_files/game/main_menu/common/modifier_type_definitions/00_modifier_types.txt:2191-2196; .eu5-base/reference_mods/3613232232/in_game/common/static_modifiers/pp_population_growth_and_food_adjustments.txt:4-16; src/stable/main_menu/common/static_modifiers/A_SOL_economy_modifiers.txt; scripts/gen_sol_pp_compat.py; scripts/gen_sol_mnt_compat.py
+  notes: Positive 0.40 scales with native prosperity (0 to 1) or devastation (0 to -1), yielding +40% or -40% at the endpoints; see vanilla main_menu/common/static_modifiers/location.txt:386-407. Do not negate the devastation coefficient, which would increase consumption at negative prosperity. This is a project balance and compatibility contract, not a new engine mechanism.
+
+- id: sol_income_pool_direct_wealth
+  pattern: null
+  detectability: advisory
+  category: scripted_values
+  scope: location
+  bad: Using actual tax base divided by clamped control as the SOL income pool's wealth source.
+  correction: Use location_potential_tax_base minus location_tax_base times the estate tax rate. Keep tax-base displays and taxed components on actual tax base, then retain existing estate shares and maintenance deductions. Preserve legacy display aliases without control division.
+  source: src/stable/in_game/common/script_values/SOL_pop_values.txt; scripts/test_sol_wealth.py; docs/technical/SOL_Direct_Wealth_20261109.md
+  notes: All five deploy targets inherit the base income values. Offline regressions cover zero/low control, zero tax base with positive wealth, zero wealth, distinct tax rates and maintenance. See shared location_wealth_inferred_from_tax_base_control for the engine interface evidence.

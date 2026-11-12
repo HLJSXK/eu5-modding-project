@@ -373,7 +373,7 @@ class SubstitutionTests(unittest.TestCase):
         self.assertEqual(country.variables['sol_sub_multiplier_cloth'], 1)
         from gen_sol_pp_compat import _compat_good_rows
         pp = Runtime(_compat_good_rows(), removed_goods={'lumber'})
-        pp.maps[('sol_market_good_spending_nobles_victuals', id(loc.market))] = 3
+        pp.maps[('sol_market_good_spending_nobles_silk', id(loc.market))] = 3
         pp.maps[('sol_market_good_spending_nobles_lumber', id(loc.market))] = 999
         pp.run('sol_compute_substitute_unit_spending', loc)
         self.assertEqual(loc.variables['sol_unit_spending_nobles'], 3)

@@ -30,6 +30,8 @@ SOL_TOKEN = re.compile("|".join(re.escape(token) + (r"\b" if token == "sol_locat
 
 # Effects and values allowed to mention SOL-only names.
 SOL_EFFECTS = {
+    # Read-only observer; test_sol_oos restricts its AST to logging and guards.
+    "sol_oos_trace_country",
     "sol_compute_location_living_standard",
     "sol_ls_reset_country_living_standard",
     "sol_ls_accumulate_country_living_standard",
@@ -453,7 +455,8 @@ class LivingStandardTests(unittest.TestCase):
                                                          "sol_ls_finalize_country_living_standard"],
                         "sol_solve_country_pop_demand_raw_only": ["sol_ls_accumulate_country_living_standard"],
                         "sol_solve_country_pop_demand_solver": ["sol_ls_accumulate_country_living_standard"]}
-            wrapper = [n.key for n in effects["sol_solve_country_pop_demand"]]
+            wrapper = [n.key for n in effects["sol_solve_country_pop_demand"]
+                       if n.key != "sol_oos_trace_country"]
             self.assertEqual(wrapper[0], "sol_ls_reset_country_living_standard")
             self.assertLess(wrapper.index("sol_ls_finalize_country_living_standard"),
                             wrapper.index("sol_ls_finalize_country_living_standard_yoy"))

@@ -12,7 +12,7 @@ Load order:
 
 Just Goods is required as a formal dependency.
 
-The submod applies SOL's approximate per-stratum demand scaling to the 26 Just
+The submod applies SOL's approximate per-stratum demand scaling to the 30 Just
 Goods goods that have direct pop demand:
 
 - nobles: 1.05
@@ -34,11 +34,13 @@ negated, matching SOL's development-independent and income-driven demand model.
 The checked-in data and Workshop audit track these fields so future Just Goods
 gates cannot be missed silently.
 
-Slave demand remains owned by the JTG mods and is not changed. The compatibility
-layer also adds the 26 final quantities to SOL's market unit-spending cache and
-shows all 81 SOL + JTG demand goods in both SOL goods panels.
+Slave and tribesmen demand is zero. Twelve demand-free JTG goods remain excluded. The compatibility
+layer also adds the 30 final quantities to SOL's market unit-spending cache and
+shows all 86 SOL + JTG demand goods in both SOL goods panels.
 
-The SOL-JTG and SOL-PP compatibility submods replace the same two SOL scripted
+All 30 demand goods join the original 20 substitute groups through an explicit JTG-only profile; subscriptions, historical group sizes and Algorithm A stay unchanged. Eleven explicit quantity additions complete subscribed groups without rescaling prior positive demand. The 86 goods share substitution markers, contextual tooltips and the six-slot HUD.
+
+The SOL-JTG and SOL-PP compatibility submods replace shared SOL scripted
 effects and are mutually exclusive. A combined PP + JTG stack requires a
 separate merged compatibility target.
 

@@ -71,6 +71,41 @@ def load_modifier_whitelist() -> set[str]:
     return whitelist
 
 
+TRUSTED_MODIFIER_DEPENDENCIES = {"moveably.goods": "3785316314"}
+
+
+@lru_cache(maxsize=16)
+def dependency_modifier_whitelist(mod_root: Path) -> frozenset[str]:
+    """Load real declarations only from a target's declared, trusted dependencies."""
+    metadata_path = mod_root / ".metadata/metadata.json"
+    if not metadata_path.is_file():
+        return frozenset()
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8-sig"))
+    names = set()
+    for relation in metadata.get("relationships", []):
+        dependency_id = relation.get("id")
+        reference_id = TRUSTED_MODIFIER_DEPENDENCIES.get(dependency_id)
+        if relation.get("rel_type") != "dependency" or reference_id is None:
+            continue
+        reference = BASE_ROOT / "reference_mods" / reference_id
+        identity = reference / ".metadata/metadata.json"
+        if not identity.is_file():
+            continue
+        if json.loads(identity.read_text(encoding="utf-8-sig")).get("id") != dependency_id:
+            continue
+        for source in sorted((reference / "main_menu/common/modifier_type_definitions").glob("*.txt")):
+            names.update(node.key for node in parse_file(source) if node.is_block())
+    return frozenset(names)
+
+
+def modifier_whitelist_for_path(path: Path, vanilla: set[str]) -> set[str]:
+    try:
+        target = path.relative_to(MOD_SOURCE_DIR).parts[0]
+    except (ValueError, IndexError):
+        return vanilla
+    return vanilla | dependency_modifier_whitelist(MOD_SOURCE_DIR / target)
+
+
 def get_changed_files() -> list[Path]:
     result = subprocess.run(
         ["git", "diff", "--name-only", "HEAD"],
@@ -291,7 +326,7 @@ def check_modifier_names(path: Path, content: str, whitelist: set[str]):
             if name not in structural and name not in whitelist:
                 issues.append(
                     f"[MODIFIER] {path.relative_to(REPO_ROOT)}:{i} -- "
-                    f"Unknown modifier name '{name}'; verify in 00_modifier_types.txt"
+                    f"Unknown modifier name '{name}'; verify in vanilla or this target's declared dependency modifier definitions"
                 )
 
 
@@ -527,7 +562,7 @@ def main():
 
         check_anti_patterns(path, content, anti_patterns)
         check_enums(path, content, enum_data)
-        check_modifier_names(path, content, modifier_whitelist)
+        check_modifier_names(path, content, modifier_whitelist_for_path(path, modifier_whitelist))
         check_inject_demand_multiply(path, content)
         check_global_variable_map_updates(path, content)
         check_local_variable_cleanup(path, content)
